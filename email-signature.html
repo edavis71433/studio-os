@@ -2,31 +2,47 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Email Signature | Davis Digital Studio</title>
+<!-- Internal doc: Eric's copy-paste email signature + setup steps.
+     MS3 reskinned the wrapper onto styles.css tokens and brought the
+     signature's CTA onto the system (ink button, 2px radius, no
+     sparkle glyph — email clients get inline styles, so the table
+     keeps email-safe inline CSS by design). MS7 excludes this page
+     from the public build entirely. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..500&family=Inter:wght@400;450;500;550;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <style>
-body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 40px; }
-.preview-label { font-size: 12px; color: #999; margin-bottom: 16px; font-family: sans-serif; }
-.sig { display: inline-block; }
+body{padding:40px 24px}
+.preview-label{font-size:13px;color:var(--muted);margin-bottom:16px;max-width:64ch;line-height:1.6}
+.preview-label strong{color:var(--ink)}
+/* the signature is a fixed-width email table — scroll it inside the
+   box on phones instead of letting it stretch the page */
+.sig-box{border:1px dashed var(--hair);border-radius:3px;padding:24px;background:#fff;
+  display:inline-block;max-width:100%;overflow-x:auto}
 </style>
 </head>
-<body>
-<p class="preview-label">Copy everything inside the box below into your email signature settings in Private Email (Webmail → Settings → Identities → Signature). Make sure HTML mode is enabled.</p>
+<body data-page="email-signature">
+<h1 class="serif" style="font-size:24px;margin-bottom:6px">Email signature</h1>
+<p class="preview-label">Copy everything inside the box below into your email signature settings in Private Email (Webmail &rarr; Settings &rarr; Identities &rarr; Signature). Make sure HTML mode is enabled.</p>
 
-<div style="border: 1px dashed #ccc; padding: 24px; background: #fff; display: inline-block;">
+<div class="sig-box">
 
 <!-- SIGNATURE START — copy from here -->
-<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1a1523;line-height:1.5;">
+<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1B1525;line-height:1.5;">
   <tr>
     <td style="padding-right:18px;border-right:3px solid #5b3fa0;vertical-align:top;">
-      <div style="width:48px;height:48px;background:#5b3fa0;border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:48px;">
+      <div style="width:48px;height:48px;background:#1B1525;border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:48px;">
         <span style="font-family:Georgia,serif;font-size:28px;color:#ffffff;font-weight:bold;">D</span>
       </div>
     </td>
     <td style="padding-left:16px;vertical-align:top;">
-      <div style="font-weight:bold;font-size:15px;color:#1a1523;margin-bottom:1px;">Eric Davis</div>
-      <div style="color:#5b3fa0;font-size:12px;font-weight:600;margin-bottom:6px;letter-spacing:0.3px;">Web Design & SEO · Davis Digital Studio</div>
-      <div style="color:#7a6d8e;font-size:12px;margin-bottom:8px;">Serving businesses nationwide</div>
+      <div style="font-weight:bold;font-size:15px;color:#1B1525;margin-bottom:1px;">Eric Davis</div>
+      <div style="color:#5b3fa0;font-size:12px;font-weight:600;margin-bottom:6px;letter-spacing:0.3px;">Web Design &amp; SEO &middot; Davis Digital Studio</div>
+      <div style="color:#6B6276;font-size:12px;margin-bottom:8px;">Serving businesses nationwide</div>
       <table cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td style="padding-right:14px;">
@@ -34,16 +50,16 @@ body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 40px; }
           </td>
           <td style="color:#d0c8e0;font-size:12px;padding-right:14px;">|</td>
           <td style="padding-right:14px;">
-            <a href="mailto:eric@davisdigitalstudio.com" style="color:#7a6d8e;text-decoration:none;font-size:12px;">eric@davisdigitalstudio.com</a>
+            <a href="mailto:eric@davisdigitalstudio.com" style="color:#6B6276;text-decoration:none;font-size:12px;">eric@davisdigitalstudio.com</a>
           </td>
           <td style="color:#d0c8e0;font-size:12px;padding-right:14px;">|</td>
           <td>
-            <a href="https://www.linkedin.com/in/eric-davis-4b1034b8/" style="color:#7a6d8e;text-decoration:none;font-size:12px;">LinkedIn</a>
+            <a href="https://www.linkedin.com/in/eric-davis-4b1034b8/" style="color:#6B6276;text-decoration:none;font-size:12px;">LinkedIn</a>
           </td>
         </tr>
       </table>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #ede9f6;">
-        <a href="https://davisdigitalstudio.com/report-card" style="display:inline-block;background:#5b3fa0;color:#ffffff;font-size:11px;font-weight:700;padding:5px 14px;border-radius:100px;text-decoration:none;letter-spacing:0.3px;">✦ Get your free Digital Report Card →</a>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #E7E1D6;">
+        <a href="https://davisdigitalstudio.com/report-card" style="display:inline-block;background:#1B1525;color:#ffffff;font-size:11px;font-weight:700;padding:6px 14px;border-radius:2px;text-decoration:none;letter-spacing:0.3px;">Get your free Digital Report Card &rarr;</a>
       </div>
     </td>
   </tr>
@@ -55,10 +71,10 @@ body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 40px; }
 <p class="preview-label" style="margin-top:20px;">
   <strong>How to add in Private Email:</strong><br>
   1. Log into webmail.privateemail.com<br>
-  2. Click Settings (gear icon) → Identities<br>
+  2. Click Settings (gear icon) &rarr; Identities<br>
   3. Click your eric@davisdigitalstudio.com identity<br>
   4. Enable HTML signature mode<br>
-  5. Paste the signature code above (view source first: right-click → View Page Source, find the SIGNATURE START comment)<br>
+  5. Paste the signature code above (view source first: right-click &rarr; View Page Source, find the SIGNATURE START comment)<br>
   6. Save
 </p>
 </body>
