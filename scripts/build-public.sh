@@ -12,6 +12,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# MS1 tripwire: every marketing page's header/footer must match the ONE
+# canonical chrome (scripts/marketing-chrome.template.html). Hand-copied
+# nav drift was the root cause of "my pricing disappeared" — fail the build
+# rather than publish a diverged nav.
+node scripts/sync-marketing-chrome.mjs --check
+
 rm -rf dist
 mkdir -p dist
 

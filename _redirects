@@ -43,6 +43,9 @@
 /tools             /tools.html         200
 
 # Clean URLs for the marketing pages (extensionless links resolve to the .html file)
+# /portal: the marketing chrome's "Client login" uses the clean URL; portal.html
+# itself intentionally keeps working at .html (externally-shared URLs unchanged).
+/portal                 /portal.html                200
 /                       /index.html                 200
 /about                  /about.html                 200
 /services               /services.html              200
