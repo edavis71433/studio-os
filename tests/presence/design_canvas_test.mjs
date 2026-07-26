@@ -488,6 +488,29 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const litStar = ipeSerializeMd(E('div', {}, E('p', {}, E('strong', {}, T('2 * 3')))));
   const litH = renderMarkdown(litStar);
   ok(!/\*\*/.test(litH.replace(/<[^>]*>/g, '')), 'a literal * inside strong never fabricates torn ** markers: stored=' + JSON.stringify(litStar) + ' renders=' + JSON.stringify(litH));
+
+  // ── finding 3: link syntax must survive the renderer's grammar. The link
+  // rule reads [text](url) with text=[^\]]+ and url=[^)\s]+, safeHref allows
+  // https/mailto/tel — so ')' and whitespace percent-encode in the href
+  // (URL-equivalent, render-safe), tel separators strip (cosmetic), ']' drops
+  // from link text (no escape support — the LINK survives, minus a bracket),
+  // and a scheme the render would refuse stays plain text, never [x](js:…). ──
+  const aDom = (href, text) => E('div', {}, E('p', {}, E('a', { href: href, rel: 'noopener' }, T(text))));
+  const wiki = ipeSerializeMd(aDom('https://en.wikipedia.org/wiki/Foo_(bar)', 'wiki'));
+  ok(wiki === '[wiki](https://en.wikipedia.org/wiki/Foo_(bar%29)', 'FINDING 3: a ) in the href percent-encodes at serialize (the url rule stops at )): ' + JSON.stringify(wiki));
+  const wikiH = renderMarkdown(wiki);
+  ok(wikiH === '<p><a href="https://en.wikipedia.org/wiki/Foo_(bar%29" rel="noopener">wiki</a></p>', 'the paren URL re-renders as a WHOLE link (URL-equivalent %29) — no truncated href, no stray ): ' + JSON.stringify(wikiH));
+  const sp = renderMarkdown(ipeSerializeMd(aDom('https://x.example/a b', 'sp')));
+  ok(/href="https:\/\/x\.example\/a%20b"/.test(sp) && !/ b<\/p>/.test(sp), 'whitespace in a href percent-encodes (the url rule stops at whitespace): ' + JSON.stringify(sp));
+  const br2 = ipeSerializeMd(aDom('https://x.example', 'see [this] thing'));
+  const br2H = renderMarkdown(br2);
+  ok(br2H === '<p><a href="https://x.example" rel="noopener">see [this thing</a></p>', 'a ] in link text drops so the LINK survives (never a dead raw-markdown lump): ' + JSON.stringify(br2) + ' → ' + JSON.stringify(br2H));
+  const js2 = ipeSerializeMd(aDom('javascript:alert(1)', 'click'));
+  ok(js2 === 'click' && renderMarkdown(js2) === '<p>click</p>', 'a scheme safeHref refuses is stored as plain TEXT — no [x](javascript:…) lump, no dangling ): ' + JSON.stringify(js2));
+  const tel2 = ipeSerializeMd(aDom('tel:+1 (555) 123-4567', 'call'));
+  ok(tel2 === '[call](tel:+1555123-4567)' && /<a href="tel:\+1555123-4567"/.test(renderMarkdown(tel2)), 'tel spaces/parens strip (dashes are grammar-legal) so the url parses AND passes safeHref: ' + JSON.stringify(tel2));
+  const onlyBr = ipeSerializeMd(aDom('https://x.example', ']]'));
+  ok(onlyBr === ']]', 'link text that is ONLY ] characters degrades to plain text (content never lost): ' + JSON.stringify(onlyBr));
 }
 
 // The §2.3 property: for every fixture, render(serialize(render(x))) === render(x)

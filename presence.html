@@ -9162,7 +9162,26 @@ function ipeSerializeMd(root, notes) {
     if (t === 'BR') return '\n';
     if (t === 'STRONG' || t === 'B') return bold ? inline(ch, bold, ital) : emitStrongEl(ch, ital);
     if (t === 'EM' || t === 'I') { const s2 = inline(ch, bold, true); return ital ? s2 : emitEmStr(s2); }
-    if (t === 'A') { const href = (ch.getAttribute && ch.getAttribute('href')) || ''; const s2 = inline(ch, bold, ital); return href && s2 ? '[' + s2 + '](' + href + ')' : s2; }
+    if (t === 'A') {
+      let href = String((ch.getAttribute && ch.getAttribute('href')) || '').trim();
+      const s2 = inline(ch, bold, ital);
+      if (!href || !s2) return s2;
+      // review finding 3 (+6, storage direction): the link rule reads
+      // [text](url) with text=[^\]]+ and url=[^)\s]+, and safeHref allows
+      // https/mailto/tel only. ')' and whitespace percent-encode in the href
+      // (URL-equivalent, render-safe), tel separators strip (cosmetic), and
+      // ']' or a newline cannot sit in link text (no escape support) — each
+      // degrade is noted for the commit toast. A scheme the render would
+      // refuse anyway stays plain text: never an [x](javascript:…) lump.
+      if (/^tel:/i.test(href)) href = href.replace(/[\s()]/g, '');
+      else href = href.replace(/[)\s]/g, (c2) => (c2 === ')' ? '%29' : encodeURIComponent(c2)));
+      const okHref = /^https:\/\/[^\s]+$/i.test(href) || /^mailto:[^\s]+@[^\s]+$/i.test(href) || /^tel:\+?[\d\-().\s]+$/i.test(href);
+      if (!okHref) { note('That link’s address isn’t https, mailto, or tel — its text was kept, the link wasn’t.'); return s2; }
+      const text = s2.replace(/\]/g, '').replace(/\n/g, ' ');
+      if (!text.trim()) { note('That link’s text was only “]” characters — it was kept as plain text.'); return s2; }
+      if (text !== s2) note('A “]” can’t sit inside a link’s text — it was removed so the link survives.');
+      return '[' + text + '](' + href + ')';
+    }
     return inline(ch, bold, ital);
   };
   const inline = (node, bold, ital) => {
