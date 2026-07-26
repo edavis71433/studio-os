@@ -262,6 +262,19 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(puts.length).toBe(0);   // '- star one…1. seven' ≠ stored, but the USER changed nothing
   });
 
+  test('REVIEW F8: the live region says Saving… at commit and Saved only once the PUT resolves', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
+    await h2.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('Honest announce');
+    await page.keyboard.press('Enter');
+    await expect(frame.locator('#dds-ipe-live')).toContainText('Saving');   // the PUT is still ~1.2s away
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await expect(frame.locator('#dds-ipe-live')).toContainText(/^Saved$/);  // announced only after the resolve (survives the repaint)
+  });
+
   test('core sections are NOT editable this slice — double-click routes to their panel tab', async ({ page }) => {
     const { frame } = await mountCanvas(page);
     await frame.locator('[data-dds-core="hero"]').dblclick();

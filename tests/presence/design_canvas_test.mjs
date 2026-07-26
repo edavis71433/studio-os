@@ -615,6 +615,13 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const soon = extractFn(html, 'ipeSaveSoon');
   ok(/setTimeout/.test(soon) && /1200/.test(soon) && /saveBlocks\(\)/.test(soon), 'the in-place save is the EXISTING saveBlocks, debounced ~1.2s (one undo checkpoint per burst)');
   ok(/IPE_SAVE_PENDING/.test(soon), 'a save landing during a NEW session defers — the reload can never destroy an active contenteditable');
+  // ── review fix 8: honest announce — "Saving…" at commit, "Saved" only when
+  // the PUT resolves ok; a failure announces alongside the failure toast. ──
+  ok(/Saving…/.test(commit) && !/'Saved\.'/.test(commit), 'FIX 8: commit announces "Saving…" — never "Saved" 1.2s before the PUT');
+  ok(/okz \? 'Saved' : 'The save failed/.test(soon), 'ipeSaveSoon announces "Saved" only on a true saveBlocks resolve, the failure line otherwise');
+  const sb2 = extractFn(html, 'saveBlocks');
+  ok(/return true;/.test(sb2) && /return false;/.test(sb2), 'saveBlocks reports its outcome (true only after the PUT + repaint kick actually succeeded)');
+  ok(/IPE_LIVE_MSG/.test(soon) && /IPE_LIVE_MSG/.test(extractFn(html, 'dcInjectCanvas')), 'the outcome announcement survives the repaint (stashed, re-announced once into the fresh document)');
   const rdp = extractFn(html, 'refreshDesignPreview');
   ok(/if \(IPE\) ipeCommit\(\);[\s\S]*?frame\.srcdoc = html/.test(rdp), 'a canvas repaint banks any in-flight session FIRST (text is never silently lost)');
   const sb = extractFn(html, 'saveBlocks');
