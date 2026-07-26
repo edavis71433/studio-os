@@ -313,6 +313,15 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## ✅ WAVE 7 LIVE — SS8 + PS6/PS7 (2026-07-20, Netlify) — SWEEP's non-gated slices COMPLETE
+
+Merged to main. SS8 (website family + the website-health 403-lie fix) and
+PS6/PS7 (project drill-in cohesion — VIEW_SEQ, throw honesty, per-read lines,
+orphan-free share card, surgical reply repaint — + composer polish + the
+projectsFailed-at-Files/Messages residual). Both reviewed safe (no required
+fixes); 1408/0 full e2e, 208/0 pure. This closes EVERY non-decision-gated
+sweep slice. Backlog notes recorded above.
+
 ## 🟢 WAVE 7 IN PROGRESS (resumed 2026-07-20 — Eric "continue" while doing Resend)
 
 - **SS8 (attention + website-health + content-tree): BUILT + REVIEWED — SAFE, no
