@@ -298,6 +298,189 @@ const mkSrcMaps = () => new Function(
 }
 ok(/route === "\/settings" && j && j\.data && j\.data\.section_meta/.test(html), 'api() captures the /settings section_meta sidecar into S.sectionMeta (the ONE writer)');
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// G13 slice 2 · the in-place canvas TEXT editor (docs/design/G13-INPLACE-EDITING.md
+// §2–3). Pure pieces extracted + pinned: the guarded dot-path writer, the client
+// cap table (a soft mirror of validateBlocks' s()/ml() caps — drift only mis-warns,
+// the server stays the moat), the DOM→markdown serializer over EXACTLY
+// renderMarkdown's output allowlist, and the Edit-mode/feature-detect gate.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// extract `const NAME = {...};` by brace-matching (same idiom as extractFn)
+function extractConst(src, name) {
+  const start = src.indexOf('const ' + name + ' = {');
+  if (start < 0) throw new Error('const not found: ' + name);
+  let i = src.indexOf('{', start), depth = 0;
+  for (let j = i; j < src.length; j++) {
+    const c = src[j];
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return src.slice(start, j + 1) + ';'; }
+  }
+  throw new Error('unbalanced braces for ' + name);
+}
+
+// ── ipeSetPath: the guarded field-path writer (dot-path incl. array indices) ──
+{
+  const ipeSetPath = new Function('return (' + extractFn(html, 'ipeSetPath') + ')')();
+  const ipeGetPath = new Function('return (' + extractFn(html, 'ipeGetPath') + ')')();
+  const b1 = { type: 'features', title: 'Why', items: [{ title: 'A', text: 'x' }, { title: 'B' }] };
+  ok(ipeSetPath(b1, 'title', 'New') === true && b1.title === 'New', 'a top-level string field writes in place');
+  ok(ipeSetPath(b1, 'items.1.title', 'Bee') === true && b1.items[1].title === 'Bee', 'an array-index dot-path writes the right item');
+  ok(ipeSetPath(b1, 'items.5.title', 'Z') === false, 'an OUT-OF-BOUNDS array index is refused (guarded, never extends)');
+  ok(ipeSetPath(b1, 'items.1.text', 'tee') === true && b1.items[1].text === 'tee', 'an absent-but-legal string slot on an existing item is writable');
+  const it = { type: 'image_text', body: 'b', button: { label: 'Go', url: 'https://x.example' } };
+  ok(ipeSetPath(it, 'button.label', 'Run') === true && it.button.label === 'Run' && it.button.url === 'https://x.example', 'button.label writes INSIDE the object — the url is untouched');
+  ok(ipeSetPath(it, 'button', 'nope') === false, 'a path landing on an OBJECT slot is refused (fields are string slots only)');
+  ok(ipeSetPath(it, 'button.url.host', 'x') === false, 'walking INTO a string is refused');
+  const tb = { type: 'table', headers: ['A'], rows: [['r1a', 'r1b'], ['r2a', 'r2b']] };
+  ok(ipeSetPath(tb, 'rows.1.0', 'X') === true && tb.rows[1][0] === 'X', 'nested array indices (table cells) write the right cell');
+  ok(ipeSetPath(tb, 'rows.2.0', 'X') === false, 'a table row past the end is refused');
+  ok(ipeSetPath({}, 'a.b', 'x') === false, 'a missing parent object is refused (no vivification)');
+  ok(ipeSetPath({ a: {} }, '0', 'x') === false, 'a numeric segment on a non-array is refused');
+  ok(ipeSetPath(b1, 'title', '<b>x</b> & "quotes"') === true && b1.title === '<b>x</b> & "quotes"', 'THE MOAT: the value is stored as a literal STRING — markup is data, never interpreted');
+  ok(ipeGetPath(it, 'button.label') === 'Run' && ipeGetPath(b1, 'items.1.title') === 'Bee' && ipeGetPath(b1, 'items.9.title') === undefined, 'ipeGetPath reads the same paths back (the unchanged-commit check)');
+}
+
+// ── ipeCapFor: the client cap table mirrors validateBlocks' s()/ml() caps ──
+{
+  const ipeCapFor = new Function(extractConst(html, 'IPE_CAPS') + '\n' + extractFn(html, 'ipeCapFor') + '\nreturn ipeCapFor;')();
+  ok(ipeCapFor('features', 'items.0.text') === 240, 'features items.N.text caps at 240 (validateBlocks s())');
+  ok(ipeCapFor('features', 'items.12.title') === 80, 'any numeric index normalizes to the same cap');
+  ok(ipeCapFor('cta', 'text') === 160 && ipeCapFor('cta', 'button') === 40, 'cta text 160 / button 40');
+  ok(ipeCapFor('richtext', 'body') === 4000 && ipeCapFor('image_text', 'body') === 2000, 'markdown bodies cap at the ml() bounds (4000 / 2000)');
+  ok(ipeCapFor('accordion', 'items.3.summary') === 120 && ipeCapFor('accordion', 'items.3.body') === 1500, 'accordion summary 120 / body 1500');
+  ok(ipeCapFor('spotlight', 'title') === 120 && ipeCapFor('spotlight', 'body') === 800, 'spotlight has its OWN title cap (120) + body 800');
+  ok(ipeCapFor('title', 'title') === 120 && ipeCapFor('title', 'subtitle') === 200, 'the title block: 120 / 200');
+  ok(ipeCapFor('gallery', 'title') === 80, 'a block with no own title entry falls back to the shared 80 (s(title, 80))');
+  ok(ipeCapFor('table', 'rows.3.2') === 200 && ipeCapFor('table', 'headers.1') === 80, 'table cells 200 / headers 80');
+  ok(ipeCapFor('columns', 'columns.2.button.label') === 40, 'a nested button label caps at 40');
+  ok(ipeCapFor('unknown_type', 'weird.path') === null, 'an unknown field has NO client cap (the server still enforces truth)');
+}
+
+// ── ipeGate: Edit-mode-only + feature-detect + block-sections-only ──
+{
+  const ipeGate = new Function('return (' + extractFn(html, 'ipeGate') + ')')();
+  ok(ipeGate('edit', 'title', { kind: 'block', bi: 0 }) === true, 'Edit mode + a stamped field + a block section → editable');
+  ok(ipeGate('comments', 'title', { kind: 'block', bi: 0 }) === false, 'Comments mode never edits in place');
+  ok(ipeGate('preview', 'title', { kind: 'block', bi: 0 }) === false, 'Preview mode never edits in place');
+  ok(ipeGate('timewarp', 'title', { kind: 'block', bi: 0 }) === false, 'Timewarp never edits in place');
+  ok(ipeGate('edit', '', { kind: 'block', bi: 0 }) === false && ipeGate('edit', null, { kind: 'block', bi: 0 }) === false, 'no data-dds-field stamp (old function) → no in-place affordance (feature-detect)');
+  ok(ipeGate('edit', 'title', { kind: 'core', view: 'business', key: 'hero' }) === false, 'core/hero sections are NOT in-place editable this slice');
+  ok(ipeGate('edit', 'title', null) === false, 'an unresolved section never edits');
+}
+
+// ── ipeSerializeMd: DOM → markdown over renderMarkdown's exact allowlist ──
+const T = (s) => ({ nodeType: 3, nodeValue: s });
+const E = (tag, attrs, ...kids) => ({
+  nodeType: 1, tagName: tag.toUpperCase(), childNodes: kids, attrs: attrs || {},
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+  hasAttribute(k) { return k in this.attrs; },
+});
+const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd') + ')')();
+{
+  const dom = E('div', { 'data-dds-field': 'body', 'data-dds-md': '1' },
+    E('p', {}, T('Hello '), E('strong', {}, T('world'))),
+    E('ul', {}, E('li', {}, T('first')), E('li', {}, T('second'))));
+  ok(ipeSerializeMd(dom) === 'Hello **world**\n\n- first\n- second', 'p/strong/ul round-trip to markdown source');
+  const dom2 = E('div', {},
+    E('h2', {}, T('Head')), E('h3', {}, T('Sub')),
+    E('p', {}, T('a'), E('br', {}), T('b')),
+    E('ol', {}, E('li', {}, T('one')), E('li', {}, T('two'))),
+    E('blockquote', {}, E('p', {}, T('quoted'))),
+    E('p', {}, E('a', { href: 'https://x.example', rel: 'noopener' }, T('link me'))));
+  ok(ipeSerializeMd(dom2) === '## Head\n\n### Sub\n\na\nb\n\n1. one\n2. two\n\n> quoted\n\n[link me](https://x.example)',
+    'h2/h3, br, ol numbering, blockquote and links all serialize to their markdown forms');
+  // THE image_text nuance: the md container (.it-text) also wraps the button
+  // anchor — an element carrying its OWN data-dds-field is another field and
+  // must never leak into the body serialization.
+  const itDom = E('div', { 'data-dds-field': 'body', 'data-dds-md': '1' },
+    E('p', {}, T('Beside the '), E('strong', {}, T('image'))),
+    E('p', { class: 'it-cta' }, E('a', { class: 'btn', href: 'https://x.example', rel: 'noopener', 'data-dds-field': 'button.label' }, T('Go now'))));
+  const itMd = ipeSerializeMd(itDom);
+  ok(itMd === 'Beside the **image**', 'image_text: the button anchor (its own data-dds-field) is EXCLUDED from the body — not eaten, not serialized');
+  ok(!/Go now/.test(itMd), 'the button label never leaks into the stored body');
+  const junk = E('div', {},
+    E('p', { contenteditable: 'false' }, T('chrome')),
+    E('section', {}, T('pasted '), E('span', {}, E('em', {}, T('markup')))),
+    E('table', {}, T('tabular')));
+  ok(ipeSerializeMd(junk) === 'pasted *markup*\n\ntabular', 'unknown nodes collapse to content (meaning stripped, content kept); contenteditable=false chrome is skipped');
+  ok(ipeSerializeMd(E('div', {})) === '', 'an empty container serializes to the empty string');
+}
+// The §2.3 property: for every fixture, render(serialize(render(x))) === render(x)
+// — driven through the REAL renderMarkdown and a subset parser of its output.
+{
+  const { renderMarkdown } = await import('../../supabase/functions/presence/lib/markdown.ts');
+  const parseHtml = (src) => {
+    const unesc = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const root = E('div', {}); const stack = [root];
+    const re = /<(\/?)([a-z0-9]+)((?:\s+[a-z-]+="[^"]*")*)\s*>|([^<]+)/gi;
+    let m;
+    while ((m = re.exec(src))) {
+      if (m[4] !== undefined) { stack[stack.length - 1].childNodes.push(T(unesc(m[4]))); continue; }
+      if (m[1]) { if (stack.length > 1) stack.pop(); continue; }
+      const el2 = E(m[2], {});
+      (m[3] || '').replace(/([a-z-]+)="([^"]*)"/gi, (_x, k, v) => { el2.attrs[k] = unesc(v); return ''; });
+      stack[stack.length - 1].childNodes.push(el2);
+      if (m[2].toLowerCase() !== 'br') stack.push(el2);
+    }
+    return root;
+  };
+  const FIX = [
+    'Hello **world**',
+    'One para\n\nTwo *em* and **strong** mix',
+    '## Heading\n\nBody line\nsecond line',
+    '### Sub\n\n- a\n- b **bold b**\n\n1. one\n1. two',
+    '> quoted line\n> second',
+    'Link me [Davis](https://davisdigital.example) now',
+    'a * b * c',
+    'Ampers& and <angle> chars stay text',
+    'Multi\n\n\n\nblank runs collapse',
+  ];
+  let badP = [];
+  for (const x of FIX) {
+    const h1 = renderMarkdown(x);
+    const h2 = renderMarkdown(ipeSerializeMd(parseHtml(h1)));
+    if (h1 !== h2) badP.push(JSON.stringify(x) + ' → ' + JSON.stringify(ipeSerializeMd(parseHtml(h1))));
+  }
+  ok(badP.length === 0, 'PROPERTY: renderMarkdown(serialize(renderMarkdown(x))) === renderMarkdown(x) for every fixture: ' + badP.slice(0, 2).join(' | '));
+}
+
+// ── the session engine + save model: source pins (the impure half) ──
+{
+  const inject = extractFn(html, 'dcInjectCanvas');
+  ok(/addEventListener\("dblclick"/.test(inject) && /ipeStart\(/.test(inject) && /eeEditTarget\(el2\)/.test(inject), 'dcInjectCanvas wires dblclick → in-place edit on a stamped field, panel routing otherwise (never a dead double-click)');
+  ok(/DC_MODE !== "edit"/.test(inject), 'the dblclick wiring is Edit-mode-gated at EVENT time (Comments-mode chrome never edits)');
+  ok(/if \(IPE\) return;/.test(inject), 'the hover toolbar is suppressed while a session is active');
+  const start = extractFn(html, 'ipeStart');
+  ok(/plaintext-only/.test(start), 'plain fields request contenteditable=plaintext-only (rich formatting cannot enter)');
+  ok(/setAttribute\("role", "textbox"\)/.test(start) && /aria-label/.test(start), 'a11y: the session element becomes an aria-labelled textbox');
+  const paste = extractFn(html, 'ipePaste');
+  ok(/preventDefault\(\)/.test(paste) && /insertText/.test(paste) && /text\/plain/.test(paste), 'the UNCONDITIONAL paste guard inserts plain text only (plaintext-only is non-universal)');
+  const kd = extractFn(html, 'ipeKeydown');
+  ok(/Escape/.test(kd) && /ipeCancel\(\)/.test(kd), 'Escape always exits without saving (no trap)');
+  const commit = extractFn(html, 'ipeCommit');
+  ok(/ipeSerializeMd\(/.test(commit) && /ipeReadPlain\(/.test(commit), 'commit reads markdown SOURCE for md fields, collapsed plain text otherwise');
+  ok(/eeClassify\(/.test(commit), 'commit RE-RESOLVES the section index at commit time (tree-rail deletes/moves mid-session — DDS_SRCMAP applies)');
+  ok(/ipeSetPath\(/.test(commit) && /ipeSaveSoon\(\)/.test(commit), 'commit writes through the guarded path writer then the debounced save — no other write path');
+  ok(!/\bapi\(/.test(commit) && !/fetch\(/.test(commit), 'NO parallel save path: commit never calls the API directly');
+  ok(!/innerHTML\s*=/.test(commit), 'commit never writes HTML anywhere — the value is a string field on a structured block');
+  ok(/ipeCapFor\(/.test(commit), 'commit enforces the client cap (no silent server truncation)');
+  const cancel = extractFn(html, 'ipeCancel');
+  ok(/\.innerHTML = s\.orig/.test(cancel), 'cancel restores the element\'s ORIGINAL server-rendered DOM');
+  const soon = extractFn(html, 'ipeSaveSoon');
+  ok(/setTimeout/.test(soon) && /1200/.test(soon) && /saveBlocks\(\)/.test(soon), 'the in-place save is the EXISTING saveBlocks, debounced ~1.2s (one undo checkpoint per burst)');
+  ok(/IPE_SAVE_PENDING/.test(soon), 'a save landing during a NEW session defers — the reload can never destroy an active contenteditable');
+  const rdp = extractFn(html, 'refreshDesignPreview');
+  ok(/if \(IPE\) ipeCommit\(\);[\s\S]*?frame\.srcdoc = html/.test(rdp), 'a canvas repaint banks any in-flight session FIRST (text is never silently lost)');
+  const sb = extractFn(html, 'saveBlocks');
+  ok(/closest\("#blocksCard"\)/.test(sb), 'saveBlocks skips the panel rebuild under a focused panel input (the §3 clobber hazard, closed)');
+  ok(!/ipeStart/.test(extractFn(html, 'eeInjectChrome')), 'the read-only stage proof gets NO text editing (its bar is unchanged)');
+  const wrap = extractFn(html, 'ipeWrapSel');
+  ok(/surroundContents|extractContents/.test(wrap) && !/execCommand/.test(wrap), 'B/I use direct Range wrapping — not the deprecated execCommand');
+  const link = extractFn(html, 'ipeLink');
+  ok(/askText\(/.test(link) && /https:\/\//.test(link), 'Link reuses the parent askText dialog + the bare-domain→https normalization (rtLink rule)');
+}
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);
