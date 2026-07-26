@@ -431,7 +431,10 @@ ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls bac
 // PS3: anchor scrolls try the exact element id (#approval-<id> on decided
 // history rows too) before the anchor's section.
 ok('portal: openProject scrolls the EXACT anchor element first, then the section',
-  portal.includes('scrollToSection(anchorTarget(focusSection))')
+  // PS6 threads the resolved target through a temp so focus management can reuse
+  // it (getElementById + h2/exact-element focus) — anchorTarget still resolves
+  // exact-element-first, and its result is what scrollToSection receives.
+  portal.includes('const t=anchorTarget(focusSection);scrollToSection(t);')
   && portal.includes("function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&document.getElementById(ex))?ex:sectionForAnchor(a);}"));
 
 const passed=results.filter(r=>r.p).length,failed=results.length-passed;
