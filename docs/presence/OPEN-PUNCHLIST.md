@@ -326,7 +326,7 @@ verbatim. One combined slice plan covers studio + portal.
   360px only, structurally safe at 768. (4) health fixture label values diverge
   from the real generators (shapes correct — test-realism only). (5) one
   unreachable REQ_SEQ race. Ready to merge with PS6/PS7 as wave 7.
-- **PS6/PS7: BUILT + pushed — REVIEW RUNNING.** 5 commits (640210e record
+- **PS6/PS7: BUILT + REVIEWED SAFE (no required fixes).** 5 commits (640210e record
   cohesion + the PS1 projectsFailed-at-Files/Messages residual, cf02f99
   share-card Files, f8e8090 support rows, fa147ad openSupportThread+openSurvey
   cohesion, a02448f PS7 composers). All 4 brief items done (residual was in
@@ -335,6 +335,7 @@ verbatim. One combined slice plan covers studio + portal.
   today_home anchorTarget mirror line — restored verbatim (c97f571), 106/106;
   lesson: doc commits use scoped `git commit <path>`, never stash+reset, while
   a sibling agent shares the tree.
+  Review backlog (LOW/pre-existing, non-blocking): (1) openProject/openSupportThread on a server 500 (not a throw) show "not available" + navigate away instead of the retry card — the throw path is honest; extend to !ok 500s later. (2) shareCompose picker read guarded by element-existence not a VIEW_SEQ token (inherited slice-12; narrow race). (3) openSurvey busy() assumes plain-text controls. (4) composers use focus() vs survey's focus({preventScroll:true}) — cosmetic.
 
 ## ⏸️ PAUSED BY ERIC (2026-07-20: "lets pause until i have more fable")
 
