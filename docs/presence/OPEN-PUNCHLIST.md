@@ -323,7 +323,18 @@ Growth Partnership; nav/footer/services/sitemap/_redirects wired; SaaS content
 preserved in git @82d63ba). (2) HOTFIX: pricing-estimator's false "$850/mo
 retainer REQUIRED" → published "$400/mo optional Growth Partnership" (8ff1233);
 ai-critique white-on-white hero fixed (8c0ca3e).
-PLANNED: docs/design/MARKETING-SITE-OVERHAUL.md (recon: 41 pages, 5 auditors) —
+ERIC APPROVED THE FULL OVERHAUL (2026-07-26 "go ahead and do the full
+overhall") with delegated decisions — DEFAULTS CHOSEN (recorded, reversible,
+every slice shown to Eric pre-merge): P1 MERGE the-experience→how-we-work
+(301). P2 PUBLISHED-NUMBERS-ONLY — /pricing is the price truth; estimator/
+audit tier amounts stay as live today; positioning changes flagged at merge,
+never invented. P3 Results → FOOTER-DEMOTE until real work publishes (Bacchus
+flips it back). P4 SITEWIDE LIGHT (contact's lone dark skin removed; full dark
+mode remains a future option). Build order per plan: MS1 nav/IA (one shared
+nav, all pages) → MS2 money-path + MS3 tools-rebrand (parallel) → MS4
+narrative merge → MS5 industries → MS6 entry/legal. MS1 also creates
+tests/e2e/marketing.spec.ts (none exists).
+PLAN: docs/design/MARKETING-SITE-OVERHAUL.md (recon: 41 pages, 5 auditors) —
 click-depth maps (today's maze vs 6-slot flat nav), page verdicts, slices
 MS1-MS…, ONE shared nav definition. ERIC DECISIONS P1-P4: merge the-experience
 into how-we-work? · the price architecture (audit tiers $99-$899? package
