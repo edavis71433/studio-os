@@ -313,6 +313,24 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🌐 MARKETING SITE — TRIAGE LIVE + OVERHAUL PLANNED (2026-07-26)
+
+Eric (after using the site): "redo the architecture… so many clicks… my pricing
+disappeared… the tools pages look like a whole different site."
+SHIPPED to main (Netlify): (1) /pricing REBUILT as services pricing (was
+orphaned SaaS-product pricing; real numbers only — $1,500 web design, $400/mo
+Growth Partnership; nav/footer/services/sitemap/_redirects wired; SaaS content
+preserved in git @82d63ba). (2) HOTFIX: pricing-estimator's false "$850/mo
+retainer REQUIRED" → published "$400/mo optional Growth Partnership" (8ff1233);
+ai-critique white-on-white hero fixed (8c0ca3e).
+PLANNED: docs/design/MARKETING-SITE-OVERHAUL.md (recon: 41 pages, 5 auditors) —
+click-depth maps (today's maze vs 6-slot flat nav), page verdicts, slices
+MS1-MS…, ONE shared nav definition. ERIC DECISIONS P1-P4: merge the-experience
+into how-we-work? · the price architecture (audit tiers $99-$899? package
+catalog $3,800/$6,500?) · Results page (publish Bacchus vs footer-demote) ·
+dark mode (contact-only today). Estimator "Package" catalog framing has no
+published counterpart — part of the price-architecture decision.
+
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
 Eric's "go" → the marquee feature. dblclick any stamped text on the canvas →
