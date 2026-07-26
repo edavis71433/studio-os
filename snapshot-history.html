@@ -9,7 +9,43 @@
 <link rel="stylesheet" href="/fonts/brand.css">
 <link rel="stylesheet" href="/cms.css">
 <style>
+  /* SS10 — page skin re-aliased onto the shell's --dds-* tokens. shell.css is the
+     canonical palette and carries the full four-block theme contract (light base ·
+     prefers-color-scheme dark · data-theme="light" · data-theme="dark"), so this
+     page follows every mode automatically. The selector list mirrors cms.css's
+     own explicit data-theme blocks so this alias wins in all four states;
+     fallbacks only cover a missing shell.css. */
+  :root,:root[data-theme="light"],:root[data-theme="dark"]{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#6f677d);--line:var(--dds-line,#eee9e0);
+    --accent:var(--dds-accent,#5b3fa0);--accent-soft:var(--dds-accent-soft,#efeafa);--good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);
+    --warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#a2453f);--bad-soft:var(--dds-bad-soft,#f6e6e4);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05));
+  }
   header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:54ch}
+
+  /* ── SS8 shared cms-family chrome: .lhead-lite (icon · count meta · "As of
+        {time}" · ↻ soft refresh) — matched by hand with website-health.html /
+        attention.html / content-tree.html (the SS9–SS12 primitive). ── */
+  .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
+  .lhead[hidden]{display:none}   /* the display rule must never defeat the hidden attribute */
+  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lmeta{flex:1;min-width:0;font-size:13px;color:var(--soft);margin:0;font-variant-numeric:tabular-nums}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn:hover{color:var(--accent);background:var(--accent-soft)}
+  .lbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .retry{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 18px;cursor:pointer;margin-top:16px}
+  .retry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  /* dark mode: the filled retry needs dark ink (#fff on the lifted accent fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .retry{color:#171320}}
+  :root[data-theme="dark"] .retry{color:#171320}
+  /* >300ms loading stencil — ghost cards, never a flash on fast reads */
+  .stencil{margin-top:26px}
+  .stencil .gh{background:var(--card);border:1px solid var(--line);border-radius:15px;height:88px;margin-bottom:12px;position:relative;overflow:hidden}
+  .stencil .gh::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--line),transparent);animation:shim 1.2s infinite}
+  @keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  @media (prefers-reduced-motion:reduce){.stencil .gh::after{animation:none}}
 
   .group{margin-top:32px}
   .glabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 13px}
@@ -41,12 +77,17 @@
   .strip .note{font-size:13.5px;color:var(--soft);margin:0 0 8px}
   .chips{display:flex;gap:7px;flex-wrap:wrap}
   .chip{display:inline-block;font-size:12.5px;font-weight:600;border-radius:999px;padding:4px 11px;border:1px solid transparent;white-space:nowrap}
-  .chip.added{background:#e7f5ec;color:#1c6b3a;border-color:#bfe3cc}
-  .chip.removed{background:#fdecea;color:#a3271f;border-color:#f2c7c3}
-  .chip.changed{background:#fbf3df;color:#8a5f04;border-color:#ecd9a8}
-  .chip.moved{background:#e8effc;color:#25549e;border-color:#c3d4f0}
+  /* SS10 (4/5) — diff chips retokened onto the four-block --*-soft / --* pairs so
+     dark theme holds (the old literals — #e7f5ec etc. — were light-only and broke
+     the dark contract). added→good · removed→bad · changed→warn · moved→accent. */
+  .chip.added{background:var(--good-soft);color:var(--good)}
+  .chip.removed{background:var(--bad-soft);color:var(--bad)}
+  .chip.changed{background:var(--warn-soft);color:var(--warn)}
+  .chip.moved{background:var(--accent-soft);color:var(--accent)}
   .strip details{margin-top:10px}
   .strip summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600}
+  .cmpretry{font:inherit;font-size:13.5px;font-weight:600;color:var(--accent);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline}
+  .cmpretry:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
   .strip ul{margin:8px 0 0;padding-left:20px}
   .strip li{font-size:13.5px;color:var(--soft);margin:3px 0;line-height:1.45}
   .panes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -69,7 +110,12 @@
     <h1>Your website versions</h1>
     <p class="sub" id="sub">Every saved version of your website, newest first — like flipping through past editions. You can revisit or restore an earlier one anytime.</p>
   </header>
-  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <div class="lhead" id="lhead" hidden>
+    <span class="obj-ic" aria-hidden="true">📚</span>
+    <p class="lmeta" id="lmeta"></p>
+    <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+  </div>
+  <div id="main"></div>
 
   <!-- G9 — visual publish diff: pick two versions, see what changed section by
        section, and look at both side by side (the SAME /preview render engine). -->
@@ -93,6 +139,7 @@
     </div>
   </section>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -110,7 +157,14 @@ let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':CLIENT });
-async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); if(r.status===401) return Promise.reject(401); return r.ok ? r.json() : Promise.reject(r.status); }
+// SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
+// every failure routes through ONE honest state switch (401/403/404/other).
+async function api(p){ try{ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body:await r.json().catch(()=>({})) }; }catch(_){ return { ok:false, status:0, body:{} }; } }
+// same contract for the HTML preview panes (text, not json)
+async function apiHtml(p){ try{ const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, text: r.ok ? await r.text() : '' }; }catch(_){ return { ok:false, status:0, text:'' }; } }
+let LOADED_AT = Date.now();
+const asOfLabel = () => 'As of ' + new Date(LOADED_AT).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+function toast(m){ if(window.ddsToast) return void ddsToast(m); const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
 function href(link){ if(!link) return null; if(!CLIENT) return link; const [b,h]=String(link).split('#'); return b + (b.includes('?')?'&':'?') + 'client=' + encodeURIComponent(CLIENT) + (h?'#'+h:''); }
 
 function verHtml(c){
@@ -142,12 +196,17 @@ function groupHtml(g){
 function render(h){
   const groups = (h && h.groups) || [];
   if(!groups.length){
+    $('lhead').hidden = true;   // nothing to count yet — no freshness chrome over an empty list
     $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">📚</span>
       <h2>No saved versions yet.</h2>
       <p class="sub">Each time you publish your website, that edition is saved here — so you can always look back or restore one. Publish once and your first version appears.</p>
       <p style="margin-top:22px"><a class="link" href="${esc(href('/presence.html')||'/presence.html')}">Open your website →</a></p></div>`;
     return;
   }
+  // SS8 family chrome: version count + "As of {time}" freshness
+  const total = h.total || groups.reduce((n,g)=>n+((g.versions||[]).length),0);
+  $('lmeta').textContent = `${total} saved version${total===1?'':'s'} · ${asOfLabel()}`;
+  $('lhead').hidden = false;
   if(h.headline) $('sub').textContent = h.headline + ' You can revisit or restore an earlier one anytime — nothing is ever lost.';
   $('main').innerHTML = groups.map(groupHtml).join('')
     + `<p class="foot">Every published edition is saved automatically. Restoring brings an earlier version back as your live website — you can always switch again.</p>`;
@@ -237,7 +296,6 @@ function computeCompareChips(data){
   return { structured:false, chips: order.map((s)=>({ kind:'changed', label:(SECTION_NAMES[s]||s)+(bySec[s]>1?' · '+bySec[s]:'') })) };
 }
 
-async function apiHtml(p){ const r = await fetch(FN+p, { headers:H() }); if(!r.ok) return Promise.reject(r.status); return r.text(); }
 const previewPath = (ref) => '/preview?page=%2F&' + (ref==='live'||ref==='draft' ? 'version='+ref : 'publish_id='+encodeURIComponent(ref));
 const calmFrame = (msg) => `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px 24px;text-align:center;font-size:15px;line-height:1.6">${esc(msg)}</div>`;
 
@@ -245,62 +303,119 @@ let CMP_SEQ = 0;
 async function runCompare(){
   const a = $('cmpA').value, b = $('cmpB').value;
   const seq = ++CMP_SEQ;
-  $('paneAT').textContent = 'From — ' + ($('cmpA').selectedOptions[0]||{}).textContent;
-  $('paneBT').textContent = 'To — ' + ($('cmpB').selectedOptions[0]||{}).textContent;
-  $('cmpStrip').innerHTML = '<div class="spin" role="status" aria-label="Comparing"></div>';
+  $('paneAT').textContent = 'From — ' + (($('cmpA').selectedOptions[0]||{}).textContent||'');
+  $('paneBT').textContent = 'To — ' + (($('cmpB').selectedOptions[0]||{}).textContent||'');
   $('frameA').srcdoc = calmFrame('Drawing this version…');
   $('frameB').srcdoc = calmFrame('Drawing this version…');
-  if(a === b){ if(seq===CMP_SEQ) $('cmpStrip').innerHTML = '<p class="note">That’s the same version on both sides — pick two different ones to compare.</p>'; }
-  else apiGet('/publishes/compare?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b)).then((res)=>{
-    if(seq!==CMP_SEQ) return;
-    const d = (res && res.data) || {};
-    if(d.identical){ $('cmpStrip').innerHTML = '<p class="note">These two versions are identical — nothing changed between them.</p>'; return; }
-    const cc = computeCompareChips(d);
-    const chips = cc.chips.map((c)=>`<span class="chip ${esc(c.kind)}">${esc(c.label)}</span>`).join('');
-    const sentences = (d.changes||[]).map((ch)=>`<li>${esc(ch.sentence)}</li>`).join('');
-    const n = d.count || (d.changes||[]).length;
-    $('cmpStrip').innerHTML = `<p class="note">${n} change${n===1?'':'s'} between these versions${cc.structured?'':' — by section'}:</p>`
-      + `<div class="chips">${chips}</div>`
-      + (sentences ? `<details><summary>What changed, in plain words</summary><ul>${sentences}</ul></details>` : '');
-  }).catch(()=>{ if(seq===CMP_SEQ) $('cmpStrip').innerHTML = '<p class="note">We couldn’t compare those two versions just now — one of them may be too old to compare. Try another pair.</p>'; });
-  apiHtml(previewPath(a)).then((h)=>{ if(seq===CMP_SEQ) $('frameA').srcdoc = h; }).catch(()=>{ if(seq===CMP_SEQ) $('frameA').srcdoc = calmFrame('This version can’t be shown anymore.'); });
-  apiHtml(previewPath(b)).then((h)=>{ if(seq===CMP_SEQ) $('frameB').srcdoc = h; }).catch(()=>{ if(seq===CMP_SEQ) $('frameB').srcdoc = calmFrame('This version can’t be shown anymore.'); });
+  if(a === b){
+    $('cmpStrip').innerHTML = '<p class="note">That’s the same version on both sides — pick two different ones to compare.</p>';
+  } else {
+    $('cmpStrip').innerHTML = '<div class="spin" role="status" aria-label="Comparing"></div>';
+    api('/publishes/compare?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b)).then((res)=>{
+      if(seq!==CMP_SEQ) return;
+      if(!res.ok){ $('cmpStrip').innerHTML = `<p class="note">${esc(compareFailCopy(res.status))}</p>`; return; }
+      const d = (res.body && res.body.data) || {};
+      if(d.identical){ $('cmpStrip').innerHTML = '<p class="note">These two versions are identical — nothing changed between them.</p>'; return; }
+      const cc = computeCompareChips(d);
+      const chips = cc.chips.map((c)=>`<span class="chip ${esc(c.kind)}">${esc(c.label)}</span>`).join('');
+      const sentences = (d.changes||[]).map((ch)=>`<li>${esc(ch.sentence)}</li>`).join('');
+      const n = d.count || (d.changes||[]).length;
+      $('cmpStrip').innerHTML = `<p class="note">${n} change${n===1?'':'s'} between these versions${cc.structured?'':' — by section'}:</p>`
+        + `<div class="chips">${chips}</div>`
+        + (sentences ? `<details><summary>What changed, in plain words</summary><ul>${sentences}</ul></details>` : '');
+    });
+  }
+  // the panes: client HTML into sandbox="" iframes via the srcdoc PROPERTY
+  apiHtml(previewPath(a)).then((res)=>{ if(seq===CMP_SEQ) $('frameA').srcdoc = res.ok ? res.text : calmFrame(paneFailCopy(res.status)); });
+  apiHtml(previewPath(b)).then((res)=>{ if(seq===CMP_SEQ) $('frameB').srcdoc = res.ok ? res.text : calmFrame(paneFailCopy(res.status)); });
+}
+// SS10 (3/5) transient vs permanent copy split — a too-old version (410/404)
+// is permanent for that pair; anything else is a hiccup worth retrying.
+function compareFailCopy(status){
+  return (status===410 || status===404)
+    ? 'One of these versions is too old to compare — pick a more recent pair.'
+    : 'We couldn’t compare those two versions just now — please try again in a moment.';
+}
+function paneFailCopy(status){
+  return (status===410 || status===404)
+    ? 'This version can’t be shown anymore.'
+    : 'We couldn’t draw this version just now — please try again in a moment.';
 }
 
 // Version pickers come from the EXISTING GET /publishes rows (the friendly
 // /snapshot-history projection deliberately carries no version ids).
 async function initCompare(){
-  try{
-    const res = await apiGet('/publishes');
-    const rows = (res && res.data) || [];
-    const live = rows.filter((p)=>p.status==='live');
-    if(!live.length) return;                       // nothing published → nothing to compare
-    const when = (p)=>{ const d=new Date(p.completed_at||p.at); return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
-    const opts = [{ value:'draft', text:'Your working draft' }, { value:'live', text:'Current live site' }];
-    live.slice(1).forEach((p)=>{ if(p.restorable) opts.push({ value:p.id, text:(p.label||p.summary||'Version')+' — '+when(p) }); });
-    const fill = (sel)=>{ sel.innerHTML = opts.map((o)=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join(''); };
-    fill($('cmpA')); fill($('cmpB'));
-    $('cmpA').value = opts.length>2 ? opts[2].value : 'draft';   // latest previous version, else the draft
-    $('cmpB').value = 'live';
-    $('cmpA').addEventListener('change', runCompare);
-    $('cmpB').addEventListener('change', runCompare);
-    $('compare').hidden = false;
-    runCompare();
-  }catch(_e){ /* compare is an extra — the history list above stands on its own */ }
+  const sec = $('compare');
+  const res = await api('/publishes');
+  if(!res.ok){
+    // SS10 (3/5): the compare tool must NEVER fail silently. The history list
+    // above is complete and unaffected — say so, and offer a retry in place.
+    sec.hidden = false;
+    sec.querySelector('.cmp-pick').hidden = true;
+    sec.querySelector('.panes').hidden = true;
+    $('cmpStrip').innerHTML = `<p class="note">The compare tool couldn’t load just now — the versions above are complete and unaffected. <button class="cmpretry" id="cmpRetry" type="button">Try again</button></p>`;
+    const rt=$('cmpRetry'); if(rt) rt.addEventListener('click', initCompare);
+    return;
+  }
+  const rows = (res.body && res.body.data) || [];
+  const live = Array.isArray(rows) ? rows.filter((p)=>p.status==='live') : [];
+  if(!live.length){ sec.hidden = true; return; }   // nothing published → nothing to compare
+  const when = (p)=>{ const d=new Date(p.completed_at||p.at); return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
+  const opts = [{ value:'draft', text:'Your working draft' }, { value:'live', text:'Current live site' }];
+  live.slice(1).forEach((p)=>{ if(p.restorable) opts.push({ value:p.id, text:(p.label||p.summary||'Version')+' — '+when(p) }); });
+  const fill = (sel)=>{ sel.innerHTML = opts.map((o)=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join(''); };
+  fill($('cmpA')); fill($('cmpB'));
+  $('cmpA').value = opts.length>2 ? opts[2].value : 'draft';   // latest previous version, else the draft
+  $('cmpB').value = 'live';
+  // onchange assignment (not addEventListener) so a soft-refresh re-init never stacks listeners
+  $('cmpA').onchange = runCompare;
+  $('cmpB').onchange = runCompare;
+  sec.querySelector('.cmp-pick').hidden = false;
+  sec.querySelector('.panes').hidden = false;
+  sec.hidden = false;
+  runCompare();
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Sign in to see your website versions.</h2><p class="sub">Your saved versions live with your account — sign in to look back through them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
-function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your versions just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page. Please refresh in a moment.</p></div>`; }
+function signedOut(){ $('lhead').hidden = true; $('sub').textContent=''; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>Sign in to see your website versions.</h2><p class="sub">Your saved versions live with your account — sign in to look back through them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
+// SS8 honest failure states, each distinct. A 403 is NOT a hiccup: this account
+// simply can't see this website's versions — "refresh in a moment" would be a
+// permanent lie. A 404 means the site is gone. trouble() alone is transient.
+function notAllowed(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><span class="mark" aria-hidden="true">🔒</span><h2>These versions aren’t in your workspace.</h2><p class="sub">You’re signed in, but this account can’t see this website’s saved versions. If you look after more than one business, switch to the right account and try again.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function notFound(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2>We couldn’t find this website.</h2><p class="sub">It may have been removed, or this link may be out of date.</p><p style="margin-top:22px"><a class="link" href="/today.html">Back to Today →</a></p></div>`; }
+function trouble(){ $('lhead').hidden = true; $('main').innerHTML = `<div class="center"><h2>We couldn’t load your versions just now.</h2><p class="sub">Nothing’s wrong with your website — this is only this page.</p><button class="retry" id="retry" type="button">Try again</button></div>`; const rt=$('retry'); if(rt) rt.addEventListener('click', ()=>load()); }
+
+// SS8 family load(soft): REQ_SEQ so a superseded response never paints; soft
+// (the ↻ button) keeps the last good render on failure and toasts. Hard loads
+// show the ghost stencil only after 300ms — fast reads never flash.
+let REQ_SEQ = 0, STENCIL_TIMER = 0;
+function stencil(){ $('main').innerHTML = `<div class="stencil" role="status" aria-label="Loading your versions"><div class="gh"></div><div class="gh"></div><div class="gh"></div></div>`; }
+async function load(soft){
+  const seq = ++REQ_SEQ;
+  clearTimeout(STENCIL_TIMER);
+  if(!soft){ $('main').innerHTML = ''; STENCIL_TIMER = setTimeout(() => { if(seq === REQ_SEQ) stencil(); }, 300); }
+  const r = await api('/snapshot-history');
+  if(seq !== REQ_SEQ) return;
+  clearTimeout(STENCIL_TIMER);
+  if(!r.ok){
+    if(soft){ toast('Couldn’t refresh just now.'); return; }
+    if(r.status === 401){ signedOut(); return; }
+    if(r.status === 403){ notAllowed(); return; }
+    if(r.status === 404){ notFound(); return; }
+    trouble(); return;
+  }
+  LOADED_AT = Date.now();
+  render(r.body && r.body.data);
+  initCompare();   // G9 — never blocks or breaks the history list above
+}
 
 (async function init(){
+  $('refreshBtn').addEventListener('click', () => load(true));   // wrapped — the click event must never become the soft flag
   try{
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
-    const res = await apiGet('/snapshot-history');
-    render(res && res.data);
-    initCompare();   // G9 — never blocks or breaks the history list above
-  }catch(e){ if(e === 401){ signedOut(); return; } trouble(); }
+    await load();
+  }catch(_){ trouble(); }
 })();
 </script>
 </body>

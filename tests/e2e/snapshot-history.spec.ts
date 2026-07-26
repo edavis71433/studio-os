@@ -106,14 +106,19 @@ test.describe('Snapshot history — SS10 security + family chrome', () => {
     expect(errors).toEqual([]);
   });
 
-  test('SECURITY: iframe content arrives via the srcdoc property (not an escaped attribute)', async ({ page }) => {
+  test('SECURITY: client preview HTML lands in the sandboxed iframe srcdoc, never injected into the operator page', async ({ page }) => {
     await installApp(page, { api: full });
     await page.route(PREVIEW_RE, (route) => route.fulfill(html('<h1 id="pv">from preview</h1>')));
     await page.goto('/snapshot-history.html');
-    // the property carries the html; the parser attribute is never populated
+    // the preview HTML reaches the iframe via the srcdoc property
     await expect.poll(async () => page.locator('#frameA').evaluate((f: HTMLIFrameElement) => f.srcdoc)).toContain('from preview');
-    const attr = await page.locator('#frameA').evaluate((f) => f.getAttribute('srcdoc'));
-    expect(attr === null || attr === '').toBeTruthy();
+    // …and is NOT injected into the operator's own DOM outside the iframe
+    const leaked = await page.locator('#compare').evaluate((sec) => {
+      const clone = sec.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('iframe').forEach((f) => f.remove());
+      return clone.innerHTML.includes('from preview');
+    });
+    expect(leaked).toBe(false);
   });
 
   test('boots under the family chrome: one h1, count meta + "As of" freshness + ↻ — zero console errors', async ({ page }) => {
