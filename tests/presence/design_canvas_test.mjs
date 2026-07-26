@@ -510,6 +510,31 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const litH = renderMarkdown(litStar);
   ok(!/\*\*/.test(litH.replace(/<[^>]*>/g, '')), 'a literal * inside strong never fabricates torn ** markers: stored=' + JSON.stringify(litStar) + ' renders=' + JSON.stringify(litH));
 
+  // ── G13 final review, CONFIRMED corruption #1 (HIGH): Chromium's
+  // surroundContents leaves ZERO-LENGTH text nodes at its split points —
+  // italicizing "Hel" then "lo" in "Hello" really leaves
+  // 'T("") EM[Hel] T("") EM[lo]'. The adjacent-em merge must see THROUGH that
+  // residue: '*Hel**lo*' re-renders as em(Hel) + a LITERAL "*lo*" while the
+  // session showed the whole word italic. A WHITESPACE text node is real
+  // content and still blocks the merge. ──
+  {
+    const torn = E('div', {}, E('p', {}, T(''), E('em', {}, T('Hel')), T(''), E('em', {}, T('lo'))));
+    const src2 = ipeSerializeMd(torn);
+    ok(src2 === '*Hello*', 'CONFIRMED #1: zero-length residue between ems merges to ONE em — no *Hel**lo* tear: ' + JSON.stringify(src2));
+    ok(renderMarkdown(src2) === '<p><em>Hello</em></p>', 'the merged em re-renders as the fully-italic word the session showed');
+    const multi = ipeSerializeMd(E('div', {}, E('p', {}, E('em', {}, T('a')), T(''), T(''), E('em', {}, T('b')), T(''), E('em', {}, T('c')))));
+    ok(multi === '*abc*', 'runs of residue nodes are skipped too — three wraps still merge to one em: ' + JSON.stringify(multi));
+    const spaced = ipeSerializeMd(E('div', {}, E('p', {}, E('em', {}, T('a')), T(' '), E('em', {}, T('b')))));
+    ok(spaced === '*a* *b*', 'a REAL whitespace text node between ems still blocks the merge (content, never residue): ' + JSON.stringify(spaced));
+    const tornB = ipeSerializeMd(E('div', {}, E('p', {}, E('strong', {}, E('em', {}, T('a')), T(''), E('em', {}, T('b'))))));
+    ok(tornB === '***ab***', 'CONFIRMED #1 (strong branch): the in-strong em merge skips the residue the same way: ' + JSON.stringify(tornB));
+    // the browser path additionally normalize()s the field root — a stub root
+    // has no normalize and must serialize correctly WITHOUT it (belt-and-braces)
+    ok(!('normalize' in torn), 'the stub pins prove the merge is correct with NO normalize() available');
+    const ser = extractFn(html, 'ipeSerializeMd');
+    ok(/typeof root\.normalize === 'function'/.test(ser), 'the real DOM path canonicalizes via root.normalize() before serializing (guarded for stub roots)');
+  }
+
   // ── finding 3: link syntax must survive the renderer's grammar. The link
   // rule reads [text](url) with text=[^\]]+ and url=[^)\s]+, safeHref allows
   // https/mailto/tel — so ')' and whitespace percent-encode in the href

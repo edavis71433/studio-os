@@ -223,6 +223,28 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(puts.length).toBe(0);
   });
 
+  // ── G13 final review, CONFIRMED corruption #1: Chromium's surroundContents
+  // leaves empty text nodes at its split points, so italicizing two halves of
+  // one word in separate gestures leaves 'T("") EM[Hel] T("") EM[lo]' in the
+  // DOM. Storage must hold ONE merged em — never the '*Hel**lo*' tear, which
+  // re-renders as em(Hel) plus a LITERAL "*lo*" while the session showed the
+  // whole word italic. ──
+  test('italicizing "Hel" then "lo" in separate gestures stores ONE merged *Hello* — wrap residue never tears the em', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const prose = frame.locator('[data-dds-field="body"]');
+    await prose.dblclick();
+    await expect(prose).toHaveAttribute('contenteditable', 'true');
+    await selectInBody(frame, 'Hel');
+    await page.keyboard.press('ControlOrMeta+i');
+    await selectInBody(frame, 'lo');               // the remnant text node left beside the first wrap
+    await page.keyboard.press('ControlOrMeta+i');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const body = (puts[0].blocks as typeof BLOCKS)[1].body as string;
+    expect(body).not.toMatch(/\*Hel\*\*lo\*/);     // the confirmed corruption shape
+    expect(body).toBe('*Hello* **world**\n\n- first\n- second');
+  });
+
   test('caps: a plain field clamps at the validator cap (cta text 160) with a visible warning', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const cta = frame.locator('[data-dds-field="text"]');

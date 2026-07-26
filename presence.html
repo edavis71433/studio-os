@@ -9108,17 +9108,30 @@ function ipeGate(mode, path, cls) {
 // SPLIT runs — '**a ***b*** c**' re-renders as strong(a) em(strong(b))
 // strong(c), the exact visual the session shows (the browser bolds a nested
 // em too). Same-tag nesting emits once (never '****x****'), directly-adjacent
-// ems merge ('*a**b*' would tear), a multi-line wrap emits per line ('**…**'
-// cannot span a newline), and a block element inside a wrap contributes a
-// LINE BREAK, never a glue. A run holding a literal '*' has no faithful form
-// at all (no escape support) and stays unwrapped: meaning stripped, never
-// content. The optional `notes` array collects human-readable degrades for
-// the commit path to surface.
+// ems merge ('*a**b*' would tear) — and the merge sees THROUGH the
+// zero-length text nodes Chromium's surroundContents leaves at its split
+// points ('T("") EM T("") EM' is what two italicize gestures over one word
+// really leave). A multi-line wrap emits per line ('**…**' cannot span a
+// newline), a block element inside a wrap contributes a LINE BREAK, never a
+// glue. A run holding a
+// literal '*' has no faithful form at all (no escape support) and stays
+// unwrapped: meaning stripped, never content. The optional `notes` array
+// collects human-readable degrades for the commit path to surface.
 function ipeSerializeMd(root, notes) {
+  // normalize() is the DOM's own canonicalization — drops zero-length text
+  // nodes, coalesces fragments; representation only, never content — so the
+  // adjacent-em merges below see truly adjacent siblings. Pure stub roots
+  // (tests) have no normalize; the merge look-aheads also skip the residue
+  // themselves, so the serializer is correct without it.
+  try { if (root && typeof root.normalize === 'function') root.normalize(); } catch (_) {}
   const skip = (n) => !!(n.getAttribute && (n.getAttribute('data-dds-field') != null || n.getAttribute('contenteditable') === 'false' || (n.id && /^dds-/.test(n.id))));
   const note = (m) => { if (notes && notes.indexOf(m) < 0) notes.push(m); };
   const tagOf = (n) => (n && n.nodeType === 1 ? String(n.tagName || '').toUpperCase() : '');
   const isEm = (n) => n && n.nodeType === 1 && !skip(n) && /^(EM|I)$/.test(tagOf(n));
+  // surroundContents residue: a ZERO-LENGTH text node is representation, not
+  // content — a whitespace text node is real (it still blocks an em merge;
+  // '*a* *b*' is already faithful).
+  const isEmptyT = (n) => !!n && n.nodeType === 3 && !String(n.nodeValue || '');
   const BLOCKY = /^(P|DIV|H2|H3|H4|H5|H6|UL|OL|LI|BLOCKQUOTE|SECTION|ARTICLE|HEADER|FOOTER|TABLE|THEAD|TBODY|TR|TD|TH|FIGURE|PRE)$/;
   const wrapLines = (s2, fn) => s2.split('\n').map((l) => (l ? fn(l) : l)).join('\n');
   const emitEmStr = (s2) => (s2 ? wrapLines(s2, (l) => {
@@ -9142,7 +9155,11 @@ function ipeSerializeMd(root, notes) {
       if (isEm(ch)) {
         if (ital) { seg += inline(ch, true, true); continue; }   // both formats already active — content only
         let s2 = inline(ch, true, true);
-        while (i + 1 < kids.length && isEm(kids[i + 1])) { i++; s2 += inline(kids[i], true, true); }
+        for (let j = i + 1; j < kids.length; j++) {   // merge THROUGH surroundContents' zero-length residue
+          if (isEmptyT(kids[j])) continue;
+          if (!isEm(kids[j])) break;
+          s2 += inline(kids[j], true, true); i = j;
+        }
         flushSeg();
         if (s2) res += s2.indexOf('*') < 0 ? wrapLines(s2, (l) => '***' + l + '***') : emitEmStr(s2);
         continue;
@@ -9193,7 +9210,11 @@ function ipeSerializeMd(root, notes) {
       const ch = kids[i];
       if (isEm(ch) && !ital) {
         let s2 = inline(ch, bold, true);
-        while (i + 1 < kids.length && isEm(kids[i + 1])) { i++; s2 += inline(kids[i], bold, true); }
+        for (let j = i + 1; j < kids.length; j++) {   // merge THROUGH surroundContents' zero-length residue
+          if (isEmptyT(kids[j])) continue;
+          if (!isEm(kids[j])) break;
+          s2 += inline(kids[j], bold, true); i = j;
+        }
         out += emitEmStr(s2);
         continue;
       }
