@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <title>Free Local Visibility Score | Davis Digital Studio</title>
 <meta name="description" content="Check how visible your business is in local Google search. GBP status, local pack presence, review signals, and your top opportunity. Free, no signup.">
 <link rel="canonical" href="https://davisdigitalstudio.com/local-visibility">
@@ -28,184 +28,132 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <script src="/analytics.js" defer></script>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="tool-page.css">
 <style>
-
-*{box-sizing:border-box;margin:0;padding:0;}
-html{overflow-x:hidden;}body{font-family:var(--sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw;}
-:root{--p:#5B3FA0;--pxl:#c4aee8;--pxxl:#EDE8F7;--pxxxl:#f7f4fd;--pdark:#2A1B4A;--ink:#1B1525;--muted:#6B6276;--brass:#B08D57;--paper:#FBFAF7;--serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;}
-*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;}
-.skip-link{position:absolute;left:-9999px;top:8px;background:var(--p);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
-.skip-link:focus{left:8px;}
-
-
-.tool-wrap{max-width:680px;margin:0 auto;padding:56px 24px 80px;}
+/* ============================================================
+   Local visibility — page layer on styles.css + tool-page.css
+   (MS3 gap closure: this page sat outside the original file
+   fence and kept the purple template). Tokens come from
+   styles.css only: no :root fork, no page dark skin, no pill
+   buttons, no gradient bands, no emoji icons — the option icons
+   are stroked SVG (pinned by tests/e2e/marketing-tools.spec.ts).
+   The six questions, scoring math, and lead intake are ported
+   unchanged; only presentation moved onto the index system.
+   ============================================================ */
 
 /* Stepper */
-.step-indicator{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:40px;}
-.step-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--pxl);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--muted);transition:all 0.3s;background:#fff;position:relative;z-index:1;}
-.step-dot.active{border-color:var(--p);color:var(--p);background:var(--pxxxl);}
-.step-dot.done{border-color:var(--p);background:var(--p);color:#fff;}
-.step-line{height:2px;width:48px;background:var(--pxl);transition:background 0.3s;}
-.step-line.done{background:var(--p);}
+.step-indicator{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:40px}
+.step-dot{width:32px;height:32px;border-radius:50%;border:1px solid var(--hair);display:flex;
+  align-items:center;justify-content:center;font-family:var(--mono);font-size:12.5px;
+  color:var(--muted);background:var(--paper);transition:all 0.3s;position:relative;z-index:1}
+.step-dot.active{border-color:var(--p);color:var(--p);background:var(--p-mist)}
+.step-dot.done{border-color:var(--p);background:var(--p);color:var(--paper)}
+.step-dot svg{width:12px;height:12px}
+.step-line{height:1px;width:48px;background:var(--hair);transition:background 0.3s}
+.step-line.done{background:var(--p)}
 
-/* Question cards */
-.q-card{background:#fff;border-radius:24px;padding:40px;box-shadow:0 4px 40px rgba(91,63,160,0.08);border:1px solid rgba(91,63,160,0.1);display:none;}
-.q-card.active{display:block;}
-.q-num{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
-.q-card h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:8px;letter-spacing:-0.5px;line-height:1.2;}
-.q-card p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
-.options{display:flex;flex-direction:column;gap:10px;}
-.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid rgba(91,63,160,0.15);border-radius:12px;cursor:pointer;transition:all 0.15s;background:#fff;}
-.opt:hover{border-color:var(--p);background:var(--pxxxl);}
-.opt.selected{border-color:var(--p);background:var(--pxxxl);}
-.opt-icon{width:36px;height:36px;border-radius:10px;background:var(--pxxxl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.opt.selected .opt-icon{background:var(--p);}
-.opt-text h3{font-size:14px;font-weight:600;margin-bottom:2px;}
-.opt-text p{font-size:12px;color:var(--muted);line-height:1.4;}
-.text-input{width:100%;border:1.5px solid rgba(91,63,160,0.2);border-radius:12px;padding:14px 18px;font-size:15px;font-family:var(--sans);color:var(--ink);background:#fff;transition:border-color 0.15s;outline:none;margin-bottom:8px;}
-.text-input:focus{border-color:var(--p);}
-.text-input::placeholder{color:#b0a8c0;}
-.back-btn{background:transparent;border:1.5px solid var(--pxl);color:var(--p);border-radius:100px;padding:10px 22px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background 0.15s;}
-.back-btn:hover{background:var(--pxxxl);}
-.next-btn{background:var(--p);color:#fff;border:none;border-radius:100px;padding:11px 28px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:opacity 0.15s;margin-left:auto;}
-.next-btn:hover{opacity:0.88;}
-.next-btn:disabled{opacity:0.4;cursor:not-allowed;}
+/* Question cards — same layer as the pricing estimator's quiz */
+.q-card{background:var(--paper);border-radius:18px;padding:40px;border:1px solid var(--hair);
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);display:none;animation:fadeUp 0.3s ease}
+.q-card.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.q-num{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass-deep);margin-bottom:10px}
+.q-card h2{font-family:var(--serif);font-size:26px;font-weight:380;margin-bottom:8px;letter-spacing:-.5px;line-height:1.2}
+.q-card > p{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6}
 
-/* Results */
-.results{display:none;}
-.score-hero{background:var(--pdark);border-radius:24px;padding:40px;text-align:center;margin-bottom:24px;position:relative;overflow:hidden;}
-.score-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.5) 0%,transparent 65%);pointer-events:none;}
-.score-big{font-family:var(--serif);font-size:80px;font-weight:400;line-height:1;position:relative;}
-.score-big.poor{color:#e05555;}
-.score-big.ok{color:#f0b429;}
-.score-big.good{color:#6abf69;}
-.score-label{font-size:13px;color:rgba(255,255,255,0.5);margin-top:4px;margin-bottom:8px;position:relative;}
-.score-grade{display:inline-block;font-size:13px;font-weight:700;padding:4px 16px;border-radius:100px;position:relative;}
-.score-grade.poor{background:rgba(224,85,85,0.2);color:#ff6b6b;}
-.score-grade.ok{background:rgba(240,180,41,0.2);color:#f0b429;}
-.score-grade.good{background:rgba(106,191,105,0.2);color:#6abf69;}
-.biz-name-display{font-size:14px;color:rgba(255,255,255,0.4);margin-top:16px;position:relative;}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--hair);
+  border-radius:12px;cursor:pointer;transition:all 0.15s;background:var(--paper)}
+.opt:hover{border-color:var(--p)}
+.opt.selected{border-color:var(--p);background:var(--p-mist)}
+.opt-icon{width:36px;height:36px;border-radius:8px;background:var(--p-mist);color:var(--p);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.opt-icon svg{width:18px;height:18px}
+.opt.selected .opt-icon{background:var(--p);color:var(--paper)}
+.opt-text h3{font-size:14px;font-weight:550;margin-bottom:2px}
+.opt-text p{font-size:12px;color:var(--muted);line-height:1.4}
 
-.signals-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
-.signal-card{background:#fff;border-radius:16px;padding:20px;border:1px solid rgba(91,63,160,0.1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
-.signal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
-.signal-title{font-size:13px;font-weight:600;}
-.signal-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;white-space:nowrap;}
-.signal-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+.text-input{width:100%;border:1px solid var(--hair);border-radius:2px;padding:13px 15px;font-size:15px;
+  font-family:var(--sans);color:var(--ink);background:var(--paper);transition:.15s;margin-bottom:8px}
+.text-input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.25)}
+.text-input::placeholder{color:rgba(107,98,118,.6)}
 
-.opp-card{background:linear-gradient(135deg,var(--pxxxl),#fff);border:2px solid var(--p);border-radius:20px;padding:28px;margin-bottom:20px;box-shadow:0 24px 48px -32px rgba(91,63,160,.22);}
-.opp-card .opp-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
-.opp-card h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:10px;}
-.opp-card p{font-size:14px;color:var(--muted);line-height:1.7;}
+.nav-btns{display:flex;align-items:center;gap:12px;margin-top:24px}
+.back-btn{background:transparent;border:1px solid var(--hair);color:var(--ink);border-radius:2px;
+  padding:12px 22px;font-size:14px;font-weight:550;font-family:var(--sans);cursor:pointer;transition:.15s}
+.back-btn:hover{border-color:var(--ink)}
+.next-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:var(--ink);
+  color:var(--paper);border:none;border-radius:2px;padding:13px 28px;font-size:14px;font-weight:550;
+  font-family:var(--sans);letter-spacing:.01em;cursor:pointer;transition:.2s ease;margin-left:auto}
+.next-btn:hover{background:var(--p-deep);transform:translateY(-1px)}
+.next-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
-.actions-list{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid rgba(91,63,160,0.1);}
-.actions-list h3{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
-.action-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid rgba(91,63,160,0.06);}
-.action-item:last-child{border-bottom:none;padding-bottom:0;}
-.action-num{width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-.action-body h4{font-size:14px;font-weight:600;margin-bottom:3px;}
-.action-body p{font-size:12px;color:var(--muted);line-height:1.5;}
+/* Results — one flat tokenized card family; the score bands keep their
+   poor/ok/good classes on AA-legible tones (the old template's brights
+   sat on a dark orb hero that is gone) */
+.results{display:none;animation:fadeUp 0.4s ease}
+.summary-note{display:none;font-size:15px;color:var(--ink);line-height:1.8;padding:18px 22px;
+  background:var(--p-mist);border-left:3px solid var(--p);border-radius:3px;margin-bottom:20px}
+.score-card{background:var(--paper);border:1px solid var(--hair);border-left:3px solid var(--p);
+  border-radius:18px;padding:40px;text-align:center;margin-bottom:20px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2)}
+.score-big{font-family:var(--serif);font-size:72px;font-weight:380;line-height:1;letter-spacing:-2px}
+.score-big.poor{color:#b23b3b}
+.score-big.ok{color:#8a5a00}
+.score-big.good{color:#2e7d32}
+.score-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-top:10px;margin-bottom:12px}
+.score-grade{display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+  padding:4px 12px;border-radius:3px}
+.score-grade.poor{background:rgba(178,59,59,.1);color:#b23b3b}
+.score-grade.ok{background:rgba(240,180,41,.16);color:#8a5a00}
+.score-grade.good{background:rgba(46,125,50,.1);color:#2e7d32}
+.biz-name-display{font-size:13.5px;color:var(--muted);margin-top:14px}
 
-.upgrade-card{background:var(--pdark);border-radius:20px;padding:32px;text-align:center;position:relative;overflow:hidden;box-shadow:0 30px 60px -30px rgba(0,0,0,.35);}
-.upgrade-card::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(91,63,160,0.5) 0%,transparent 65%);pointer-events:none;}
-.upgrade-card h3{font-family:var(--serif);font-size:24px;font-weight:400;color:#fff;margin-bottom:10px;position:relative;}
-.upgrade-card p{font-size:14px;color:rgba(255,255,255,0.55);margin-bottom:24px;line-height:1.7;position:relative;}
-.upgrade-btns{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;position:relative;}
-.restart-btn{display:block;text-align:center;margin-top:20px;font-size:13px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:var(--sans);text-decoration:underline;}
+.method-note{background:var(--paper-2);border:1px solid var(--hair);border-radius:12px;
+  padding:16px 20px;margin-bottom:20px;font-size:12.5px;color:var(--muted);line-height:1.7}
 
+.signals-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.signal-card{background:var(--paper);border:1px solid var(--hair);border-radius:16px;padding:20px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2)}
+.signal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
+.signal-title{font-size:13px;font-weight:550}
+.signal-badge{font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:3px 10px;
+  border-radius:3px;white-space:nowrap}
+.signal-desc{font-size:12px;color:var(--muted);line-height:1.5}
+
+.opp-card{background:var(--p-mist);border-left:3px solid var(--brass);border-radius:3px;
+  padding:28px;margin-bottom:20px}
+.opp-card .opp-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--brass-deep);margin-bottom:10px}
+.opp-card h3{font-family:var(--serif);font-size:22px;font-weight:380;margin-bottom:10px}
+.opp-card p{font-size:14px;color:var(--ink);line-height:1.7}
+
+.actions-list{background:var(--paper);border:1px solid var(--hair);border-radius:16px;
+  padding:24px;margin-bottom:20px}
+.actions-list h3{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px}
+.action-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.action-item:last-child{border-bottom:none;padding-bottom:0}
+.action-num{width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;font-size:12px;
+  font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.action-body h4{font-size:14px;font-weight:550;margin-bottom:3px}
+.action-body p{font-size:12px;color:var(--muted);line-height:1.5}
+
+.info-card{background:var(--paper);border:1px solid var(--hair);border-radius:16px;padding:24px;margin-bottom:20px}
+.info-card .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px}
+
+.restart-btn{display:block;text-align:center;font-size:13px;color:var(--muted);cursor:pointer;
+  background:none;border:none;font-family:var(--sans);text-decoration:underline;margin:0 auto}
+.restart-btn:hover{color:var(--ink)}
 
 @media(max-width:700px){
-  .signals-grid{grid-template-columns:1fr;}
-  .step-line{width:28px;}
-}
-
-
-/* NAV-FINAL-V5 */
-
-.skip-link{position:absolute;left:-9999px;top:8px;background:#5b3fa0;color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;font-weight:600;z-index:99999;text-decoration:none;}
-.skip-link:focus{left:8px;}
-*:focus-visible{outline:2px solid #5b3fa0;outline-offset:3px;border-radius:4px;}
-body{}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;}}
-
-
-/* Dropdown gap fix - bridge pseudo-element */
-
-
-/* Dropdown bridge - prevents menu closing when moving mouse down */
-
-
-/* ---------------------------------------------------------------
-   TOOL SWITCHER — cross-tool navigation, added so a visitor on any
-   one tool has a clear, designed path to the other five, plus back
-   to the Resources hub. Not a footer link dump — real cards with
-   the same shadow/radius language used across the rest of V2.
-   --------------------------------------------------------------- */
-.tool-switch-section{padding:72px 24px;background:#fff;position:relative;}
-.tool-switch-inner{max-width:1080px;margin:0 auto;}
-.tool-switch-head{text-align:center;margin-bottom:40px;}
-.tool-switch-head span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);}
-.tool-switch-head h2{font-family:var(--serif);font-size:clamp(24px,3vw,32px);font-weight:400;letter-spacing:-.5px;margin-top:10px;}
-.tool-switch-head p{font-size:14px;color:var(--muted);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
-.tool-switch-head p a{color:var(--p);text-decoration:underline;}
-.tool-switch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.tool-switch-item{display:block;background:#fff;border:1px solid rgba(91,63,160,0.1);border-radius:18px;padding:22px 20px;text-decoration:none;transition:transform .25s cubic-bezier(.32,.72,0,1),box-shadow .25s cubic-bezier(.32,.72,0,1);box-shadow:0 18px 38px -30px rgba(27,21,37,.18);}
-.tool-switch-item:hover{transform:translateY(-3px);box-shadow:0 26px 50px -28px rgba(27,21,37,.24);}
-.tool-switch-item h3{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--ink);margin-bottom:6px;}
-.tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5;}
-.tool-switch-item.current{background:var(--p);border-color:var(--p);cursor:default;box-shadow:0 22px 44px -24px rgba(91,63,160,.42);pointer-events:none;}
-.tool-switch-item.current h3{color:#fff;}
-.tool-switch-item.current p{color:rgba(255,255,255,.72);}
-.tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:100px;margin-bottom:8px;}
-@media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr;}}
-@media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr;}}
-
-
-/* Tool-hero two-column grid — was inline-only with zero mobile breakpoint,
-   causing horizontal overflow on phones (confirmed via screenshot: the
-   sample card was spilling off-screen). Now a real class with a real
-   breakpoint. */
-.tool-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;}
-@media(max-width:860px){.tool-hero-grid{grid-template-columns:1fr;}}
-
-/* ── Dark-mode variant (page-scoped, token-level — same recipe as audit.html) ── */
-@media (prefers-color-scheme: dark){
-  :root{
-    --paper:#171320; --ink:#EFEAF7; --muted:#A79DBE;
-    --pxxxl:#241d38; --pxxl:#2c2344;
-    /* styles.css tokens the shared nav/footer read on this page */
-    --paper-2:#1f1a2e; --hair:#332B49; --p-mist:#241d38; --brass-deep:#C9A468;
-  }
-  header.nav,header.nav.is-scrolled{background:rgba(23,19,32,.85);}
-  .eyebrow{color:#C9A468;}
-  .btn-primary{background:#EFEAF7;color:#171320;}
-  .btn-primary:hover{background:#c4aee8;color:#1B1525;}
-  .btn-light{background:#EFEAF7;color:#171320;}
-  footer.site{background:#0f0c18;}
-  [style*="color:var(--p)"]{color:#c4aee8 !important;}
-  .page-hero-v2{background:linear-gradient(180deg,#171320 0%,#241d38 100%) !important;}
-  /* the sample-score specimen card flips to a dark surface */
-  .page-hero-v2 .tool-hero-grid > div:last-child{background:#241d38 !important;}
-  .page-hero-v2 [style*="background:#f7f4fd"]{background:#171320 !important;}
-  .step-dot{background:#241d38;border-color:#3a3153;}
-  .step-dot.active{color:#c4aee8;}
-  .step-line{background:rgba(196,174,232,.35);}
-  .step-line.done{background:var(--p);}
-  .q-card{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 4px 40px rgba(0,0,0,.4);}
-  .q-num{color:#c4aee8;}
-  .opt{background:#171320;border-color:rgba(196,174,232,.2);}
-  .text-input{background:#171320;border-color:#3a3153;}
-  .text-input::placeholder{color:rgba(239,234,247,.38);}
-  .signal-card{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 18px 38px -30px rgba(0,0,0,.5);}
-  .opp-card{background:linear-gradient(135deg,#241d38,#1c1729);border-color:#7c5cc4;box-shadow:0 24px 48px -32px rgba(0,0,0,.5);}
-  .opp-card .opp-label{color:#c4aee8;}
-  .actions-list{background:#241d38;border-color:rgba(196,174,232,.12);}
-  #leadCard{background:#241d38 !important;border-color:rgba(196,174,232,.18) !important;}
-  #leadCard input{background:#171320;color:var(--ink);}
-  .tool-switch-section{background:#171320;}
-  .tool-switch-item{background:#241d38;border-color:rgba(196,174,232,.12);box-shadow:0 20px 42px -32px rgba(0,0,0,.5);}
-  .tool-switch-head span,.tool-switch-head p a{color:#c4aee8;}
-  ::selection{background:rgba(196,174,232,.3);color:var(--ink);}
+  .signals-grid{grid-template-columns:1fr}
+  .step-line{width:28px}
+  .q-card{padding:26px 22px}
+  .score-card{padding:28px 24px}
 }
 </style>
 <link rel="stylesheet" href="/enhance.css">
@@ -251,30 +199,46 @@ body{}
 </header>
 <!-- dds-marketing-nav:end -->
 <main id="main-content" tabindex="-1">
-<section class="page-hero-v2" style="padding:64px 24px 72px;background:linear-gradient(180deg,#FBFAF7 0%,#ede8f7 100%);position:relative;overflow:hidden;">
-  <div class="tool-hero-grid" style="max-width:1100px;margin:0 auto;gap:56px;align-items:center;position:relative;z-index:1;">
+
+<!-- BREADCRUMBS — the one standard: Home / Free tools / X -->
+<nav aria-label="Breadcrumb" class="crumbs">
+  <div class="crumbs-in">
+    <a href="/">Home</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <a href="/tools">Free tools</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <span aria-current="page">Local Visibility Checker</span>
+  </div>
+</nav>
+
+<!-- HERO — light, on tokens, with the specimen beside the copy -->
+<section class="tool-hero">
+  <div class="tool-hero-grid">
     <div>
-      <div style="font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);margin-bottom:16px;">Free Tool &middot; Local Visibility</div>
-      <h1 style="font-family:var(--serif);font-size:clamp(38px,5.5vw,56px);font-weight:400;line-height:1.05;letter-spacing:-1.5px;color:var(--ink);margin-bottom:18px;">How visible is your business in <em style="color:var(--p);font-style:italic;">local search?</em></h1>
-      <p style="font-size:16px;line-height:1.6;color:var(--muted);max-width:480px;">When someone nearby searches for what you do, does your business show up — or does a competitor? Answer six quick questions for an honest local visibility score and the single biggest thing holding you back.</p>
+      <span class="eyebrow">Free tool &middot; Local visibility</span>
+      <h1 class="mt-s">How visible is your business in <em>local search?</em></h1>
+      <p class="lede">When someone nearby searches for what you do, does your business show up &mdash; or does a competitor? Answer six quick questions for an honest local visibility score and the single biggest thing holding you back.</p>
     </div>
-    <div style="background:#fff;border-radius:22px;padding:34px 26px;box-shadow:0 34px 64px -36px rgba(43,27,74,.26);display:flex;flex-direction:column;align-items:center;" aria-hidden="true">
-      <svg viewBox="0 0 120 120" width="100" height="100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="60" cy="60" r="52" stroke="var(--p)" stroke-width="1" opacity="0.15"/>
-        <circle cx="60" cy="60" r="36" stroke="var(--p)" stroke-width="1" opacity="0.3"/>
-        <circle cx="60" cy="60" r="20" stroke="var(--p)" stroke-width="1" opacity="0.5"/>
-        <path d="M60 40c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="var(--p)"/>
-        <circle cx="60" cy="54" r="5" fill="#fff"/>
-      </svg>
-      <div style="margin-top:18px;padding:14px 20px;background:#f7f4fd;border-radius:12px;text-align:center;width:100%;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--p);text-transform:uppercase;margin-bottom:4px;">Sample visibility score</div>
-        <div style="font-family:var(--serif);font-size:26px;color:var(--ink);">62 / 100</div>
+    <div class="tool-specimen" aria-hidden="true">
+      <div class="spec-label">Example &middot; local visibility score</div>
+      <div style="display:flex;justify-content:center;margin-bottom:20px;">
+        <svg viewBox="0 0 120 120" width="96" height="96" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="var(--p)" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="60" cy="60" r="52" stroke-width="1" opacity="0.18"/>
+          <circle cx="60" cy="60" r="36" stroke-width="1" opacity="0.35"/>
+          <path d="M60 38c-9 0-16 7-16 16 0 11 16 30 16 30s16-19 16-30c0-9-7-16-16-16z" stroke-width="1.6"/>
+          <circle cx="60" cy="54" r="6" stroke-width="1.6"/>
+        </svg>
+      </div>
+      <div class="spec-track" style="margin-bottom:14px;"><div class="spec-fill" style="width:62%"></div></div>
+      <div class="spec-callout">
+        <div class="k">Sample visibility score</div>
+        <div class="v">62 / 100</div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="tool-wrap">
+<div class="tool-wrap tool-wrap--narrow">
 
   <div class="step-indicator" id="stepIndicator" aria-label="Progress">
     <div class="step-dot active" id="sd1">1</div>
@@ -295,29 +259,29 @@ body{}
     <div class="q-num">Question 1 of 6</div>
     <h2>What kind of business do you have?</h2>
     <p>Local search works differently depending on your industry. This helps us score you accurately.</p>
-    <div class="options">
+    <div class="opts">
       <div class="opt" onclick="selectOpt(1,'restaurant')" id="q1_restaurant">
-        <div class="opt-icon">🍽️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zM21 15v7"/></svg></div>
         <div class="opt-text"><h3>Restaurant or Bar</h3><p>Food service, cafe, wine bar, brewery</p></div>
       </div>
       <div class="opt" onclick="selectOpt(1,'service')" id="q1_service">
-        <div class="opt-icon">🔧</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
         <div class="opt-text"><h3>Home Services</h3><p>Plumber, electrician, landscaper, cleaner</p></div>
       </div>
       <div class="opt" onclick="selectOpt(1,'salon')" id="q1_salon">
-        <div class="opt-icon">✂️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/></svg></div>
         <div class="opt-text"><h3>Salon or Spa</h3><p>Hair, nails, massage, skincare</p></div>
       </div>
       <div class="opt" onclick="selectOpt(1,'retail')" id="q1_retail">
-        <div class="opt-icon">🛍️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
         <div class="opt-text"><h3>Retail or Boutique</h3><p>Clothing, gifts, specialty shop</p></div>
       </div>
       <div class="opt" onclick="selectOpt(1,'health')" id="q1_health">
-        <div class="opt-icon">🏥</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
         <div class="opt-text"><h3>Health or Wellness</h3><p>Gym, yoga, chiropractor, therapist</p></div>
       </div>
       <div class="opt" onclick="selectOpt(1,'other')" id="q1_other">
-        <div class="opt-icon">💼</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
         <div class="opt-text"><h3>Other Local Business</h3><p>Professional services, creative, etc.</p></div>
       </div>
     </div>
@@ -329,17 +293,17 @@ body{}
     <div class="q-num">Question 2 of 6</div>
     <h2>Do you have a Google Business Profile?</h2>
     <p>This is the listing that shows your business in Google Maps and the local pack. It's free and one of the highest-impact things you can have.</p>
-    <div class="options">
+    <div class="opts">
       <div class="opt" onclick="selectOpt(2,'yes_claimed')" id="q2_yes_claimed">
-        <div class="opt-icon">✅</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
         <div class="opt-text"><h3>Yes, and I manage it actively</h3><p>I post updates, respond to reviews, and keep it current</p></div>
       </div>
       <div class="opt" onclick="selectOpt(2,'yes_unclaimed')" id="q2_yes_unclaimed">
-        <div class="opt-icon">⚠️</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
         <div class="opt-text"><h3>Yes, but I don't really manage it</h3><p>It exists but I rarely update it</p></div>
       </div>
       <div class="opt" onclick="selectOpt(2,'no')" id="q2_no">
-        <div class="opt-icon">❌</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div>
         <div class="opt-text"><h3>No, I don't have one</h3><p>Or I'm not sure if I do</p></div>
       </div>
     </div>
@@ -354,21 +318,21 @@ body{}
     <div class="q-num">Question 3 of 6</div>
     <h2>How are your Google reviews?</h2>
     <p>Review count and rating are two of the strongest local ranking signals Google uses.</p>
-    <div class="options">
+    <div class="opts">
       <div class="opt" onclick="selectOpt(3,'great')" id="q3_great">
-        <div class="opt-icon">⭐</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></svg></div>
         <div class="opt-text"><h3>50+ reviews, 4.5 stars or above</h3><p>Strong review presence</p></div>
       </div>
       <div class="opt" onclick="selectOpt(3,'decent')" id="q3_decent">
-        <div class="opt-icon">🌟</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01z"/></svg></div>
         <div class="opt-text"><h3>10-50 reviews, 4.0 or above</h3><p>Decent but room to grow</p></div>
       </div>
       <div class="opt" onclick="selectOpt(3,'few')" id="q3_few">
-        <div class="opt-icon">💫</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
         <div class="opt-text"><h3>Fewer than 10 reviews</h3><p>Just getting started</p></div>
       </div>
       <div class="opt" onclick="selectOpt(3,'bad')" id="q3_bad">
-        <div class="opt-icon">😬</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
         <div class="opt-text"><h3>Reviews are mixed or below 4.0</h3><p>Needs attention</p></div>
       </div>
     </div>
@@ -383,17 +347,17 @@ body{}
     <div class="q-num">Question 4 of 6</div>
     <h2>How's your website for local SEO?</h2>
     <p>Google uses your website to confirm your location, services, and relevance for local searches.</p>
-    <div class="options">
+    <div class="opts">
       <div class="opt" onclick="selectOpt(4,'optimized')" id="q4_optimized">
-        <div class="opt-icon">🎯</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
         <div class="opt-text"><h3>City and service mentioned throughout</h3><p>My site clearly mentions where I am and what I do</p></div>
       </div>
       <div class="opt" onclick="selectOpt(4,'partial')" id="q4_partial">
-        <div class="opt-icon">📄</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
         <div class="opt-text"><h3>I have a website but it's basic</h3><p>It exists but probably isn't optimized for local search</p></div>
       </div>
       <div class="opt" onclick="selectOpt(4,'none')" id="q4_none">
-        <div class="opt-icon">🚫</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg></div>
         <div class="opt-text"><h3>No website or it's very outdated</h3><p>I rely mainly on social media or word of mouth</p></div>
       </div>
     </div>
@@ -408,17 +372,17 @@ body{}
     <div class="q-num">Question 5 of 6</div>
     <h2>Are you listed in other directories?</h2>
     <p>Consistent listings on Yelp, Apple Maps, Bing, and industry directories reinforce your location to Google.</p>
-    <div class="options">
+    <div class="opts">
       <div class="opt" onclick="selectOpt(5,'many')" id="q5_many">
-        <div class="opt-icon">📋</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
         <div class="opt-text"><h3>Yes, on Yelp, Apple Maps, Bing, and more</h3><p>Multiple consistent listings</p></div>
       </div>
       <div class="opt" onclick="selectOpt(5,'some')" id="q5_some">
-        <div class="opt-icon">📌</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
         <div class="opt-text"><h3>A few, maybe Yelp or one or two others</h3><p>Limited directory presence</p></div>
       </div>
       <div class="opt" onclick="selectOpt(5,'none')" id="q5_none">
-        <div class="opt-icon">🔍</div>
+        <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
         <div class="opt-text"><h3>I'm not sure, or probably not many</h3><p>Haven't focused on this</p></div>
       </div>
     </div>
@@ -445,9 +409,9 @@ body{}
 
   <!-- Results -->
   <div class="results" id="lvResults" role="region" aria-label="Your local visibility results" aria-live="polite">
-    <h2 id="lvResultsHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Your local visibility results</h2>
-    <div id="lvSummary" style="display:none;font-size:15px;color:var(--ink);line-height:1.8;padding:18px 22px;background:var(--pxxxl,#f7f4fd);border-radius:12px;margin-bottom:20px;border-left:3px solid var(--p);"></div>
-    <div class="score-hero">
+    <h2 id="lvResultsHeading" tabindex="-1" class="serif" style="font-size:22px;color:var(--ink);margin-bottom:16px;outline:none;">Your local visibility results</h2>
+    <div id="lvSummary" class="summary-note"></div>
+    <div class="score-card">
       <div class="score-big" id="lvScoreNum">0</div>
       <div class="score-label">Local Visibility Score out of 100</div>
       <div class="score-grade" id="lvGrade"></div>
@@ -456,7 +420,7 @@ body{}
 
     <!-- Methodology / honesty note: separates self-reported answers from certainty,
          labels heuristics, and avoids implying a live scan or guaranteed rankings. -->
-    <div style="background:var(--pxxxl,#f7f4fd);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:12.5px;color:var(--muted);line-height:1.7;">
+    <div class="method-note">
       <strong style="color:var(--ink);">How to read this.</strong> This score is based on the answers you gave &mdash; it's a quick, honest guide, not a live scan of your Google listing and not a guarantee of rankings. Local visibility also shifts over time as competitors change and Google updates how it ranks. Any figures mentioned are widely-cited industry averages, not a promise about your specific results. A proper review looks at more than six questions can.
     </div>
 
@@ -477,33 +441,37 @@ body{}
          follow-up that routes the full result + context into clever-api
          lead_intake with the site-wide Formspree fallback. Same architecture as
          the ROI Calculator and Pricing Estimator — no second workflow. -->
-    <div id="leadCard" style="background:#fff;border:1px solid rgba(91,63,160,0.18);border-radius:16px;padding:24px;margin-bottom:20px;">
+    <div class="info-card" id="leadCard">
       <form id="leadForm" onsubmit="return submitLead(event,'local_visibility','Local Visibility Checker')" novalidate>
-        <h3 style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;">Want your score and action plan emailed to you?</h3>
+        <h3 class="serif" style="font-size:20px;font-weight:380;margin:0 0 8px;">Want your score and action plan emailed to you?</h3>
         <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 16px;">I'll send your visibility score, the signals I looked at, and your prioritized next steps &mdash; plus a couple of things specific to your business and area that a six-question check can't see. No spam, no obligation.</p>
-        <label for="leadName" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Your name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-        <input id="leadName" type="text" autocomplete="name" placeholder="Your name" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
-        <label for="leadEmail" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);">Email address</label>
-        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:12px 14px;border:1px solid rgba(91,63,160,0.2);border-radius:10px;font-size:15px;margin-bottom:14px;">
+        <label for="leadName" style="display:block;font-size:13px;font-weight:550;margin-bottom:6px;color:var(--ink);">Your name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input id="leadName" type="text" autocomplete="name" placeholder="Your name" style="width:100%;padding:13px 15px;border:1px solid var(--hair);border-radius:2px;font-size:15px;font-family:var(--sans);background:var(--paper);color:var(--ink);margin-bottom:14px;">
+        <label for="leadEmail" style="display:block;font-size:13px;font-weight:550;margin-bottom:6px;color:var(--ink);">Email address</label>
+        <input id="leadEmail" type="email" required autocomplete="email" placeholder="you@yourbusiness.com" style="width:100%;padding:13px 15px;border:1px solid var(--hair);border-radius:2px;font-size:15px;font-family:var(--sans);background:var(--paper);color:var(--ink);margin-bottom:14px;">
         <div id="leadError" role="alert" style="display:none;color:#c0392b;font-size:13px;margin-bottom:12px;"></div>
-        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my results &rarr;</button>
+        <button type="submit" class="btn btn-primary" id="leadSubmit">Email me my results <span class="arr">&rarr;</span></button>
         <p style="font-size:12px;color:var(--muted);margin-top:12px;">I reply personally, usually within one business day. Your details are only used to send this and follow up &mdash; never sold, never spammed.</p>
       </form>
       <div id="leadThanks" style="display:none;" role="status">
-        <h3 id="leadThanksHeading" tabindex="-1" style="font-family:var(--serif);font-weight:400;font-size:20px;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
+        <h3 id="leadThanksHeading" tabindex="-1" class="serif" style="font-size:20px;font-weight:380;margin:0 0 8px;outline:none;">On its way &mdash; thank you.</h3>
         <p id="leadThanksBody" style="font-size:14px;color:var(--muted);line-height:1.7;">I've got your results. I'll follow up personally, usually within one business day, with your score, the plan, and anything about your local presence worth knowing.</p>
-        <p style="font-size:14px;margin-top:12px;"><a href="/contact" style="color:var(--p);">Prefer to talk it through now? Book a free call &rarr;</a></p>
+        <p style="font-size:14px;margin-top:12px;"><a href="/contact" class="textlink">Prefer to talk it through now? Book a free call &rarr;</a></p>
       </div>
     </div>
 
-    <div class="upgrade-card">
-      <h3>Want to go deeper on local SEO?</h3>
-      <p>The full Digital Health Check includes a Google Business Profile audit, keyword gap analysis, and a ranked action plan. Delivered in 5 business days.</p>
-      <div class="upgrade-btns">
-        <a href="/audit" class="btn btn-light">See audit options from $99</a>
-        <a href="/contact" class="btn btn-ghost" style="color:var(--paper);border-color:rgba(255,255,255,.3)">Book a free call</a>
+    <!-- The audit upsell stays, restated as a flat tokenized card — the old dark
+         "upgrade" band is gone; THE dark closer ends the page (one per page). -->
+    <div class="info-card" id="lvUpsell">
+      <div class="k">Go deeper</div>
+      <h3 class="serif" style="font-size:20px;font-weight:380;margin:0 0 8px;">Want to go deeper on local SEO?</h3>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.7;margin:0 0 18px;">The full Digital Health Check includes a Google Business Profile audit, keyword gap analysis, and a ranked action plan. Delivered in 5 business days.</p>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <a href="/audit" class="btn btn-primary">See audit options from $99 <span class="arr">&rarr;</span></a>
+        <a href="/contact" class="textlink">Book a free call &rarr;</a>
       </div>
     </div>
+
     <button class="restart-btn" onclick="restart()">Start over with a different business</button>
   </div>
 
@@ -511,96 +479,65 @@ body{}
 <section class="tool-switch-section">
   <div class="tool-switch-inner">
     <div class="tool-switch-head">
-      <span>Free tools</span>
-      <h2>Explore the other free tools.</h2>
-      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="/tools">the Resources hub &rarr;</a></p>
+      <span class="eyebrow">Free tools</span>
+      <h2 class="serif">Explore the other free tools.</h2>
+      <p>Every tool is free, instant, and asks for nothing. See the full picture on <a href="/tools">the Free tools hub &rarr;</a></p>
     </div>
     <div class="tool-switch-grid">
     <a href="/audit" class="tool-switch-item">
-      <h3>Free Site Review</h3>
+      <h3 class="serif">Free Site Review</h3>
       <p>Get your free site review and see exactly what's costing you customers.</p>
     </a>
     <a href="/ai-critique" class="tool-switch-item">
-      <h3>AI Website Review</h3>
+      <h3 class="serif">AI Website Review</h3>
       <p>A free AI read on what's costing you clicks, in plain English.</p>
     </a>
     <a href="/report-card" class="tool-switch-item">
-      <h3>Digital Report Card</h3>
+      <h3 class="serif">Digital Report Card</h3>
       <p>A prioritized snapshot of what to fix first.</p>
     </a>
     <a href="/roi-calculator" class="tool-switch-item">
-      <h3>ROI Calculator</h3>
+      <h3 class="serif">ROI Calculator</h3>
       <p>See what a better site could actually be worth.</p>
     </a>
     <a href="/pricing-estimator" class="tool-switch-item">
-      <h3>Pricing Estimator</h3>
+      <h3 class="serif">Pricing Estimator</h3>
       <p>Get a real ballpark price for your project.</p>
     </a>
     <span class="tool-switch-item current">
       <span class="tsw-badge">You're here</span>
-      <h3>Local Visibility Score</h3>
+      <h3 class="serif">Local Visibility Score</h3>
       <p>Check how findable your business actually is nearby.</p>
     </span>
     </div>
   </div>
 </section>
 
-
-<!-- Soft capture: free site review (no popup, one calm ask) -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+<!-- Soft capture — the tokenized component (tool-page.css), one calm ask -->
+<section class="soft-capture-wrap" aria-labelledby="softReviewH">
+  <div class="soft-capture">
+    <h2 id="softReviewH" class="serif">Not sure what your site needs?</h2>
+    <p>The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get">
+      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)">
+      <button type="submit" class="btn btn-primary">Get the free site review &rarr;</button>
     </form>
   </div>
 </section>
+
+<!-- THE closer — one dark CTA, then the footer (index anatomy) -->
+<section class="pad panel-dark final-cta">
+<div class="wrap center">
+  <span class="eyebrow" style="color:var(--brass);justify-content:center">Let's talk</span>
+  <h2 class="kicker mt-s" style="margin-inline:auto;color:var(--paper)">Ready to get found by customers nearby?</h2>
+  <p class="lead-muted mt-m" style="margin-inline:auto;color:rgba(255,255,255,.6)">No sales pitch. No obligation. You'll leave knowing exactly what's holding your local visibility back.</p>
+  <div class="hero-cta mt-l" style="justify-content:center;flex-direction:column;align-items:center">
+    <a href="/contact" class="btn btn-light">Book a free call <span class="arr">&rarr;</span></a>
+    <a href="/audit" class="secondary-link">See what your site needs</a>
+  </div>
+</div>
+</section>
 </main>
-
-
-<section class="dds-final-cta" aria-label="Get in touch" style="background:linear-gradient(135deg,#2A1B4A 0%,#5b3fa0 100%);padding:48px 24px;position:relative;overflow:hidden;">
-  <div aria-hidden="true" style="position:absolute;top:-100px;right:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(196,174,232,0.18) 0%,transparent 65%);pointer-events:none;"></div>
-  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1;">
-    <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c4aee8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-    </div>
-    <div style="flex:1;min-width:260px;color:#fff;text-align:left;">
-      <h3 style="font-family:var(--serif);font-size:clamp(22px,3.5vw,28px);font-weight:400;margin:0 0 6px;line-height:1.2;letter-spacing:-0.5px;color:#fff;">Ready to grow your business online?</h3>
-      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;">Let's build a website that works as hard as you do.</p>
-    </div>
-    <a href="/contact" style="display:inline-flex;align-items:center;gap:8px;background:#fff;color:#2A1B4A;font-size:14px;font-weight:600;padding:14px 28px;border-radius:100px;text-decoration:none;flex-shrink:0;font-family:var(--sans);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Book a free call &rarr;</a>
-  </div>
-</section>
-
-<!-- TRUST STRIP -->
-<section style="background:var(--pdark);padding:32px 24px;border-top:1px solid rgba(255,255,255,0.06);">
-  <div style="max-width:1100px;margin:0 auto;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;padding:22px 28px;background:rgba(196,174,232,0.06);border:1px solid rgba(196,174,232,0.10);border-radius:16px;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Founder</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Eric Davis</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Web Design &amp; SEO Strategist</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Background</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise digital team</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Domain Name Manager &amp; Content Producer &middot; 9+ years</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Education</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">M.S. Business Analytics</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">CSUN &middot; Dean's Scholar</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(196,174,232,0.7);text-transform:uppercase;margin-bottom:5px;">Scale</div>
-        <div style="font-size:13px;color:#fff;font-weight:500;line-height:1.4;">Enterprise scale</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">Enterprise governance experience</div>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- dds-marketing-footer:start — generated by scripts/sync-marketing-chrome.mjs from scripts/marketing-chrome.template.html; do not hand-edit (byte-identity pinned by tests/e2e/marketing.spec.ts) -->
 <footer class="site">
@@ -642,6 +579,10 @@ body{}
 var answers = {};
 var currentStep = 1;
 
+// Done-step check drawn as a stroked SVG (the old template wrote a raw
+// checkmark literal into the dots — banned by the family's emoji pin).
+var STEP_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+
 function selectOpt(q, val) {
   // Deselect all
   document.querySelectorAll('#q' + q + ' .opt').forEach(function(el) { el.classList.remove('selected'); });
@@ -659,7 +600,7 @@ function checkQ6() {
 function nextStep(from) {
   document.getElementById('q' + from).classList.remove('active');
   document.getElementById('sd' + from).className = 'step-dot done';
-  document.getElementById('sd' + from).textContent = '✓';
+  document.getElementById('sd' + from).innerHTML = STEP_CHECK;
   if (document.getElementById('sl' + from)) document.getElementById('sl' + from).classList.add('done');
   var next = from + 1;
   if (next <= 6) {
@@ -713,7 +654,7 @@ function showResults() {
 
   document.getElementById('q6').classList.remove('active');
   document.getElementById('sd6').className = 'step-dot done';
-  document.getElementById('sd6').textContent = '✓';
+  document.getElementById('sd6').innerHTML = STEP_CHECK;
   if (document.getElementById('sl6')) document.getElementById('sl6').classList.add('done');
 
   var score = calcScore();
@@ -794,9 +735,11 @@ function showResults() {
     }
   ];
 
+  // Status tones are AA-legible on the light cards (the old template's brights
+  // were tuned for its dark hero, which is gone).
   document.getElementById('signalsGrid').innerHTML = signals.map(function(s) {
-    var statusColors = { good: '#6abf69', ok: '#f0b429', poor: '#e05555' };
-    var badgeBg = { good: 'rgba(106,191,105,0.12)', ok: 'rgba(240,180,41,0.12)', poor: 'rgba(224,85,85,0.12)' };
+    var statusColors = { good: '#2e7d32', ok: '#8a5a00', poor: '#b23b3b' };
+    var badgeBg = { good: 'rgba(46,125,50,0.1)', ok: 'rgba(240,180,41,0.16)', poor: 'rgba(178,59,59,0.1)' };
     var col = statusColors[s.status];
     var bg = badgeBg[s.status];
     return '<div class="signal-card" style="border-left:3px solid ' + col + ';">' +
@@ -884,7 +827,7 @@ function restart() {
   var lf = document.getElementById('leadForm'); if (lf) lf.style.display = '';
   var lt = document.getElementById('leadThanks'); if (lt) lt.style.display = 'none';
   var le = document.getElementById('leadError'); if (le) le.style.display = 'none';
-  var lb = document.getElementById('leadSubmit'); if (lb) { lb.disabled = false; lb.innerHTML = 'Email me my results &rarr;'; }
+  var lb = document.getElementById('leadSubmit'); if (lb) { lb.disabled = false; lb.innerHTML = 'Email me my results <span class="arr">&rarr;</span>'; }
   var lem = document.getElementById('leadEmail'); if (lem) lem.value = '';
   var lnm = document.getElementById('leadName'); if (lnm) lnm.value = '';
 }

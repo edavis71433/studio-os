@@ -29,12 +29,14 @@ function findRoot(): string {
 const ROOT = findRoot();
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
 
-// The MS3 estate. tools.html is the hub; the four TOOL_PAGES share the
-// tool-page.css template; buy-audit is the slim payment chrome (deliberately
-// outside the sync manifest — see scripts/sync-marketing-chrome.mjs);
-// email-signature is an internal doc pending MS7 build-exclusion.
+// The MS3 estate. tools.html is the hub; the five TOOL_PAGES share the
+// tool-page.css template (local-visibility sat outside MS3's file fence and
+// joined in the gap-closure pass — same template, same pins); buy-audit is the
+// slim payment chrome (deliberately outside the sync manifest — see
+// scripts/sync-marketing-chrome.mjs); email-signature is an internal doc
+// pending MS7 build-exclusion.
 const HUB = 'tools.html';
-const TOOL_PAGES = ['ai-critique.html', 'report-card.html', 'roi-calculator.html', 'pricing-estimator.html'];
+const TOOL_PAGES = ['ai-critique.html', 'report-card.html', 'roi-calculator.html', 'pricing-estimator.html', 'local-visibility.html'];
 const FAMILY = [HUB, ...TOOL_PAGES];
 const ALL = [...FAMILY, 'buy-audit.html', 'email-signature.html'];
 
@@ -201,6 +203,29 @@ test.describe('tools family (static pins)', () => {
     // results CTAs point at the one booking front door
     expect(html).toContain("ctaUrl: '/contact'");
     expect(html).not.toContain('ctaUrl: \'https://');
+  });
+
+  test('local-visibility: the gap page rides the template — both stylesheets, chrome regions, one h1; the quiz machinery survives', () => {
+    const html = read('local-visibility.html');
+    // the shared layers, in order: tokens first, then the tool-page layer
+    expect(html, 'styles.css loads').toContain('href="styles.css"');
+    expect(html.indexOf('href="tool-page.css"'), 'tool-page.css loads after styles.css').toBeGreaterThan(
+      html.indexOf('href="styles.css"')
+    );
+    // chrome regions present (byte-identity stays marketing.spec.ts's job)
+    for (const marker of ['dds-marketing-nav:start', 'dds-marketing-nav:end', 'dds-marketing-footer:start', 'dds-marketing-footer:end']) {
+      expect(html, `chrome marker ${marker}`).toContain(marker);
+    }
+    expect(html.match(/<h1[\s>]/g)?.length, 'exactly one h1').toBe(1);
+    // the SEO head survives the reskin
+    expect(html, 'canonical kept').toContain('href="https://davisdigitalstudio.com/local-visibility"');
+    // the closer books through the one front door
+    const closer = html.match(/<section class="pad panel-dark final-cta">[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(closer, 'closer CTA → /contact').toContain('href="/contact"');
+    // a reskin, not a rewrite: the scoring, results, and lead intake are intact
+    for (const bit of ['calcScore', 'showResults()', 'lead_intake', 'score-big', 'q6_city']) {
+      expect(html, `quiz machinery: ${bit}`).toContain(bit);
+    }
   });
 
   test('tools.html hub: the canon of six matches the tool-switch grid, audit is the headline path', () => {
@@ -426,6 +451,61 @@ test.describe('tools family (live)', () => {
     await expect(page.locator('#rcSuccess')).toBeVisible();
     await expect(page.locator('#rcSuccessName')).toHaveText("Rosa's Bakery");
     await expect(page.locator('#rcSuccess')).not.toContainText('weekly');
+  });
+
+  test('local visibility: Next gates on selection, Back retreats, six answers make a scored result', async ({ page }) => {
+    await page.route('**/functions/v1/clever-api', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
+    await page.goto('/local-visibility.html');
+    // Next is locked until an option is chosen
+    await expect(page.locator('#q1next')).toBeDisabled();
+    await page.click('#q1_restaurant');
+    await expect(page.locator('#q1next')).toBeEnabled();
+    await page.click('#q1next');
+    await expect(page.locator('#q2')).toBeVisible();
+    // Back returns to the previous question
+    await page.click('#q2 .back-btn');
+    await expect(page.locator('#q1')).toBeVisible();
+    await expect(page.locator('#q2')).toBeHidden();
+    await page.click('#q1next');
+    // an unmanaged GBP (20) + decent reviews (15) + a basic site (8) + a few
+    // directories (7) = 50/100, the "ok" band — per the untouched calcScore()
+    await page.click('#q2_yes_unclaimed');
+    await page.click('#q2next');
+    await page.click('#q3_decent');
+    await page.click('#q3next');
+    await page.click('#q4_partial');
+    await page.click('#q4next');
+    await page.click('#q5_some');
+    await page.click('#q5next');
+    // the text step gates on BOTH fields
+    await expect(page.locator('#q6next')).toBeDisabled();
+    await page.fill('#q6_name', "Rosa's Bakery");
+    await expect(page.locator('#q6next')).toBeDisabled();
+    await page.fill('#q6_city', 'Burbank');
+    await expect(page.locator('#q6next')).toBeEnabled();
+    await page.click('#q6next');
+    await expect(page.locator('#lvResults')).toBeVisible();
+    await expect(page.locator('#lvScoreNum')).toHaveText('50');
+    await expect(page.locator('#lvScoreNum')).toHaveClass(/\bok\b/);
+    await expect(page.locator('#lvGrade')).toHaveText('Room to improve');
+    await expect(page.locator('#lvBizName')).toContainText("Rosa's Bakery");
+    await expect(page.locator('#signalsGrid .signal-card')).toHaveCount(4);
+    // results CTA anatomy: the $99-audit upsell and the booking front door
+    await expect(page.locator('.results a[href="/audit"]')).toBeVisible();
+    await expect(page.locator('#lvUpsell a[href="/contact"]')).toBeVisible();
+    // the emailed-results follow-up validates, then submits (stubbed) and confirms
+    await page.click('#leadSubmit');
+    await expect(page.locator('#leadError')).toBeVisible();
+    await page.fill('#leadEmail', 'rosa@example.com');
+    await page.click('#leadSubmit');
+    await expect(page.locator('#leadThanks')).toBeVisible();
+    await expect(page.locator('#leadThanks')).toContainText("Rosa's Bakery");
+    // restart resets the whole run — stepper, gates, and the lead card
+    await page.click('.restart-btn');
+    await expect(page.locator('#lvResults')).toBeHidden();
+    await expect(page.locator('#q1')).toBeVisible();
+    await expect(page.locator('#q1next')).toBeDisabled();
+    await expect(page.locator('#leadForm')).toBeHidden(); // results (and the card) are closed again
   });
 
   test('buy-audit: tier catalog renders from the URL; checkout validates then hands off to Stripe', async ({ page }) => {
