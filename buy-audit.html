@@ -6,89 +6,111 @@
 <meta name="robots" content="noindex">
 <title>Get Your Website Audit | Davis Digital Studio</title>
 <meta name="description" content="A complete, human-delivered audit of your website and local search presence, with the exact fixes ranked by impact.">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..500&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="styles.css">
 <style>
-  :root { --p:#5b3fa0; --pdark:#2a1b4a; --ink:#1a1523; --muted:#7a6d8e; --cream:#faf8f4; --line:rgba(91,63,160,0.14); --good:#1a7e49; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; padding:32px 24px; }
-  .shell { max-width:940px; margin:0 auto; display:grid; grid-template-columns:1.15fr .85fr; gap:20px; align-items:start; }
+/* ============================================================
+   buy-audit — MS3's "slim shared chrome at the payment moment".
+   Deliberately OUTSIDE the sync-marketing-chrome manifest (see
+   the note in scripts/sync-marketing-chrome.mjs): a checkout page
+   gets the brand + a clean way back, not the full 6-slot nav.
+   Everything rides styles.css tokens — no :root fork, no page
+   dark skin, no pill buttons (pinned by
+   tests/e2e/marketing-tools.spec.ts). The tier catalog and
+   checkout machinery are unchanged; the server still sets the
+   real price.
+   ============================================================ */
+.slim-nav-in{display:flex;align-items:center;justify-content:space-between;height:70px}
+.back{font-size:13.5px;color:var(--muted);transition:.15s}
+.back:hover{color:var(--ink)}
 
-  /* LEFT — the offer, in plain language */
-  .detail { background:#fff; border:1px solid var(--line); border-radius:20px; padding:38px 36px; }
-  .eyebrow { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--p); margin-bottom:10px; }
-  h1 { font-family:'Fraunces',serif; font-weight:400; font-size:30px; line-height:1.18; margin-bottom:12px; }
-  .summary { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:22px; }
-  .meta { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-bottom:24px; }
-  .meta .amt { font-family:'Fraunces',serif; font-size:34px; color:var(--ink); line-height:1; }
-  .meta .when { font-size:13.5px; color:var(--muted); }
-  .inc-h { font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink); margin-bottom:16px; }
-  .inc { list-style:none; display:flex; flex-direction:column; gap:16px; }
-  .inc li { display:grid; grid-template-columns:22px 1fr; gap:12px; }
-  .inc .tick { width:22px; height:22px; border-radius:50%; background:rgba(91,63,160,0.09); color:var(--p); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
-  .inc .what { font-size:14px; font-weight:600; color:var(--ink); line-height:1.4; margin-bottom:3px; }
-  .inc .why { font-size:13px; color:var(--muted); line-height:1.6; }
-  .credit { margin-top:24px; padding:14px 16px; background:rgba(26,126,73,0.07); border:1px solid rgba(26,126,73,0.18); border-radius:12px; font-size:13px; line-height:1.55; color:#256b45; }
-  .credit strong { color:var(--good); }
+.shell{max-width:940px;margin:0 auto;padding:40px 24px 72px;display:grid;
+  grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
 
-  /* RIGHT — the checkout */
-  .buy { background:#fff; border:1px solid var(--line); border-radius:20px; padding:32px 30px; position:sticky; top:32px; }
-  .buy .bt { font-family:'Fraunces',serif; font-size:19px; margin-bottom:4px; }
-  .buy .bp { font-size:13.5px; color:var(--muted); margin-bottom:22px; }
-  .buy .bp strong { color:var(--ink); font-size:15px; }
-  label { display:block; font-size:12.5px; font-weight:600; margin:0 0 6px; }
-  input, textarea { width:100%; font-family:inherit; font-size:14px; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--cream); outline:none; margin-bottom:15px; }
-  input:focus, textarea:focus { border-color:var(--p); background:#fff; }
-  /* iOS focus-zoom: sub-16px controls zoom the page on focus — worst possible
-     place for it is the purchase form. Floor to 16px on phones. */
-  @media (max-width:760px){ input, textarea, select { font-size:16px; } }
-  textarea { resize:vertical; min-height:64px; }
-  button { width:100%; background:var(--p); color:#fff; border:none; padding:14px; border-radius:100px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
-  button:disabled { opacity:.6; cursor:default; }
-  .err { display:none; color:#c0392b; font-size:13px; margin-top:12px; text-align:center; }
-  .fine { font-size:11.5px; color:var(--muted); text-align:center; margin-top:14px; line-height:1.5; }
-  .disc { font-size:11px; color:var(--muted); line-height:1.55; margin-top:18px; }
-  .hp { position:absolute; left:-9999px; opacity:0; }
-  .back { display:inline-block; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:20px; }
-  .back:hover { color:var(--p); }
+/* LEFT — the offer, in plain language */
+.detail{background:var(--paper);border:1px solid var(--hair);border-radius:18px;padding:38px 36px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2)}
+.detail .eyebrow{margin-bottom:10px}
+.detail h1{font-size:30px;line-height:1.18;margin-bottom:12px}
+.summary{font-size:14.5px;line-height:1.65;color:var(--muted);margin-bottom:22px}
+.meta{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:14px 0;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin-bottom:24px}
+.meta .amt{font-family:var(--serif);font-size:34px;color:var(--ink);line-height:1}
+.meta .when{font-size:13.5px;color:var(--muted)}
+.inc-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass-deep);margin-bottom:16px}
+.inc{list-style:none;display:flex;flex-direction:column;gap:16px}
+.inc li{display:grid;grid-template-columns:22px 1fr;gap:12px}
+.inc .tick{width:22px;height:22px;border-radius:50%;background:var(--p-mist);color:var(--p);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.inc .what{font-size:14px;font-weight:550;color:var(--ink);line-height:1.4;margin-bottom:3px}
+.inc .why{font-size:13px;color:var(--muted);line-height:1.6}
+.credit{margin-top:24px;padding:14px 16px;background:rgba(26,126,73,.07);
+  border:1px solid rgba(26,126,73,.18);border-radius:12px;font-size:13px;line-height:1.55;color:#1f5c3c}
+.credit strong{color:#176a41}
 
-  @media (max-width:760px) {
-    body { padding:20px 16px; }
-    .shell { grid-template-columns:1fr; gap:16px; }
-    .detail { padding:30px 24px; }
-    .buy { position:static; padding:28px 24px; }
-    h1 { font-size:26px; }
-  }
+/* RIGHT — the checkout */
+.buy{background:var(--paper);border:1px solid var(--hair);border-radius:18px;padding:32px 30px;
+  position:sticky;top:102px;box-shadow:0 22px 46px -32px rgba(27,21,37,.2)}
+.buy .bt{font-family:var(--serif);font-size:19px;margin-bottom:4px}
+.buy .bp{font-size:13.5px;color:var(--muted);margin-bottom:22px}
+.buy .bp strong{color:var(--ink);font-size:15px}
+.buy label{display:block;font-size:12.5px;font-weight:550;margin:0 0 6px}
+.buy input,.buy textarea{width:100%;font-family:var(--sans);font-size:14px;padding:12px 14px;
+  border:1px solid var(--hair);border-radius:2px;background:var(--paper);color:var(--ink);
+  outline:none;margin-bottom:15px;transition:.15s}
+.buy input:focus,.buy textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.25)}
+/* iOS focus-zoom: sub-16px controls zoom the page on focus — worst possible
+   place for it is the purchase form. Floor to 16px on phones. */
+@media (max-width:760px){.buy input,.buy textarea,.buy select{font-size:16px}}
+.buy textarea{resize:vertical;min-height:64px}
+#a-go{width:100%;justify-content:center}
+#a-go:disabled{opacity:.6;cursor:default;transform:none}
+.err{display:none;color:#c0392b;font-size:13px;margin-top:12px;text-align:center}
+.fine{font-size:11.5px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5}
+.disc{font-size:11px;color:var(--muted);line-height:1.55;margin-top:18px}
+.hp{position:absolute;left:-9999px;opacity:0}
 
-  /* ── Dark-mode variant (token-level; mirrors signup.html's recipe).
-     Buttons keep #5b3fa0 + white — that pairing passes in both themes. ── */
-  @media (prefers-color-scheme:dark){
-    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; --line:#372e50; --good:#8fd3ae; }
-    .detail, .buy { background:#241d38; }
-    input, textarea { background:#171320; color:var(--ink); }
-    input::placeholder, textarea::placeholder { color:rgba(239,234,247,.35); }
-    input:focus, textarea:focus { background:#1f1a2e; }
-    .eyebrow { color:#c4aee8; }
-    .back:hover { color:#c4aee8; }
-    .inc .tick { background:rgba(183,156,235,.14); color:#c4aee8; }
-    .credit { background:rgba(46,125,82,.16); border-color:rgba(143,211,174,.35); color:#a9d8bc; }
-    .credit strong { color:var(--good); }
-    .err { color:#f2a6a0; }
-  }
+/* slim footer */
+footer.site.slim{padding:36px 0}
+footer.site.slim .fbase{padding-top:0}
+
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr;gap:16px;padding:24px 16px 56px}
+  .detail{padding:30px 24px}
+  .buy{position:static;padding:28px 24px}
+  .detail h1{font-size:26px}
+}
 </style>
 </head>
-<body>
+<body data-page="buy-audit">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<!-- Slim shared chrome: the canonical brand mark + a clean way back.
+     NOT a sync-marketing-chrome region on purpose — the payment moment
+     drops the full nav (see scripts/sync-marketing-chrome.mjs). -->
+<header class="nav">
+<div class="wrap slim-nav-in">
+  <a href="/" class="brand"><svg class="mark" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<circle cx="16" cy="16" r="15" stroke="#B08D57" stroke-width="1"/>
+<path d="M10 21V11h4.2c3 0 4.8 1.9 4.8 5s-1.8 5-4.8 5H10z" stroke="#1B1525" stroke-width="1.4" fill="none"/>
+<circle cx="22" cy="11" r="1.5" fill="#B08D57"/></svg>Davis Digital Studio</a>
+  <a href="/audit#pricing" class="back">&larr; Compare all audit tiers</a>
+</div>
+</header>
+
+<main id="main-content" tabindex="-1">
   <div class="shell">
     <!-- LEFT: what you get, and why each part matters -->
     <div class="detail">
-      <a href="/audit.html#pricing" class="back">&larr; Compare all audit tiers</a>
       <div class="eyebrow">Davis Digital Studio</div>
       <h1 id="a-title">Get your website audit</h1>
       <p class="summary" id="a-summary">A complete review of your website and local search presence, done by a person, not a bot.</p>
       <div class="meta">
         <span class="amt" id="a-price">$99</span>
-        <span class="when">· <span id="a-delivery">delivered in 24 hours</span></span>
+        <span class="when">&middot; <span id="a-delivery">delivered in 24 hours</span></span>
       </div>
       <div class="inc-h">What's included</div>
       <ul class="inc" id="a-includes"></ul>
@@ -98,7 +120,7 @@
     <!-- RIGHT: the checkout form -->
     <div class="buy">
       <div class="bt">Start your audit</div>
-      <p class="bp"><strong id="a-price2">$99</strong> · <span id="a-delivery2">in 24 hours</span></p>
+      <p class="bp"><strong id="a-price2">$99</strong> &middot; <span id="a-delivery2">in 24 hours</span></p>
       <label for="a-name">Your name or business name</label>
       <input id="a-name" autocomplete="name" placeholder="e.g. Rosa's Bakery" maxlength="120">
       <label for="a-email">Email</label>
@@ -108,12 +130,25 @@
       <label for="a-notes">Anything specific you want looked at? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
       <textarea id="a-notes" maxlength="1000" placeholder="e.g. we're not showing up on Google Maps"></textarea>
       <input class="hp" id="a-company" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <button id="a-go" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
+      <button id="a-go" class="btn btn-primary" onclick="startCheckout()">Continue to secure checkout &rarr;</button>
       <div class="err" id="a-err" role="alert"></div>
-      <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio LLC · 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
+      <p class="fine">Secure payment via Stripe. Card, bank, Apple Pay &amp; Google Pay accepted.<br>Davis Digital Studio LLC &middot; 3727 W. Magnolia Blvd #1061, Burbank, CA 91505</p>
       <p class="disc">Some audit inputs are AI-assisted and some use third-party tools like Google Lighthouse and SEMrush. Every paid audit includes strategic review and prioritization by Eric personally. No audit guarantees rankings, traffic, or revenue.</p>
     </div>
   </div>
+</main>
+
+<!-- Slim shared footer: the legal row, nothing pulling away from checkout -->
+<footer class="site slim">
+<div class="wrap">
+  <div class="fbase">
+    <span>&copy; 2026 Davis Digital Studio LLC &middot; Eric Davis</span>
+    <span style="display:flex;gap:18px">
+      <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/accessibility">Accessibility</a><a href="/contact">Contact</a>
+    </span>
+  </div>
+</div>
+</footer>
 <script>
 var FN = "https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api";
 
