@@ -293,6 +293,229 @@ test.describe('marketing nav (live, desktop)', () => {
   }
 });
 
+// ============================================================
+// MS2 — the money path (docs/design/MARKETING-SITE-OVERHAUL.md §MS2).
+//
+// One price truth, quoted identically at every depth. /pricing is canonical:
+//   web design starts around $1,500 · Growth Partnership starts around $400
+//   a month · paid audits from $99 (audit.html's own published tiers).
+// These pins make the price-drift class regress-proof:
+//   - PUBLISHED NUMBERS ONLY: no money page may carry an amount outside the
+//     published set (the $850-retainer class of bug dies at grep level)
+//   - one phrasing family ("starts around", never "starts at"/"from $400")
+//   - label honesty: "Full pricing" may only ever land on /pricing
+//   - every money page links /pricing in its own body, not just the chrome
+//   - audit tiers labeled (free review vs paid audits from $99), one
+//     credited-toward-a-full-project story
+//   - ONE timeline (how-we-work's published FAQ ranges), the 45-day fork dies
+//   - the single-closer rule: dark CTA -> footer, nothing interactive between
+// ============================================================
+
+// The money pages (MS2's file set — the funnel's price-bearing surfaces).
+const MONEY_PAGES = [
+  'services.html', 'web-design.html', 'seo-strategy.html',
+  'monthly-retainer.html', 'audit.html', 'pricing.html',
+];
+// Every price published anywhere on the money path. /pricing owns the first
+// two; audit.html's tier table owns the rest. Anything else is an invention.
+const PUBLISHED_AMOUNTS = new Set(['$1,500', '$400', '$99', '$499', '$899']);
+
+const mainOf = (html: string, f: string): string => {
+  const start = html.indexOf('<main');
+  const end = html.indexOf('</main>');
+  if (start < 0 || end < 0) throw new Error(`${f}: no <main> region`);
+  return html.slice(start, end);
+};
+
+test.describe('MS2 money path (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('published numbers only: no money page carries an amount outside the published set', () => {
+    for (const f of MONEY_PAGES) {
+      for (const m of read(f).matchAll(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g)) {
+        expect(PUBLISHED_AMOUNTS.has(m[0]), `${f}: "${m[0]}" is not a published price`).toBe(true);
+      }
+    }
+  });
+
+  test('one phrasing family: every $1,500 and $400 reads "starts around", never "starts at" / bare "From"', () => {
+    for (const f of MONEY_PAGES) {
+      const html = read(f);
+      // the contradicting families die outright
+      expect(html, `${f}: "starts at" contradicts /pricing's "starts around"`).not.toMatch(/starts? at \$/i);
+      expect(html, `${f}: bare "From $400" contradicts /pricing's "starts around $400"`).not.toMatch(/from \$400/i);
+      for (const m of html.matchAll(/\$(?:1,500|400)/g)) {
+        const ctx = html.slice(Math.max(0, m.index! - 160), m.index! + 160);
+        expect(
+          /start(?:s|ing)? around/i.test(ctx),
+          `${f} @${m.index}: "${m[0]}" outside the "starts around" family:\n…${ctx}…`
+        ).toBe(true);
+      }
+      // $400 is always a monthly number, said so in the same breath
+      for (const m of html.matchAll(/\$400/g)) {
+        const ctx = html.slice(m.index!, m.index! + 120);
+        expect(/(a month|\/month)/i.test(ctx), `${f} @${m.index}: $400 without its "/month" cadence`).toBe(true);
+      }
+    }
+  });
+
+  test('label honesty: a "Full pricing" label may only land on /pricing', () => {
+    for (const f of MONEY_PAGES) {
+      for (const m of read(f).matchAll(/<a href="([^"]+)"[^>]*>[^<]*Full pricing/gi)) {
+        expect(m[1], `${f}: "Full pricing…" label points at a page without full pricing`).toBe('/pricing');
+      }
+    }
+  });
+
+  test('every money page links /pricing in its own body; /pricing cross-quotes the audit tiers', () => {
+    for (const f of MONEY_PAGES.filter((p) => p !== 'pricing.html')) {
+      expect(mainOf(read(f), f).includes('href="/pricing"'), `${f}: in-body /pricing link`).toBe(true);
+    }
+    const pmain = mainOf(read('pricing.html'), 'pricing.html');
+    expect(pmain, 'pricing: audits quoted from their source').toMatch(/audits from \$99/i);
+    expect(pmain, 'pricing: links the audit tiers').toContain('href="/audit#pricing"');
+    // the honest standalone-SEO answer: no invented number, a real link instead
+    expect(pmain, 'pricing: answers the SEO cost question').toContain('href="/seo-strategy"');
+  });
+
+  test('audit tiers labeled: free review vs paid audits from $99, one credited-toward story', () => {
+    const html = read('audit.html');
+    const main = mainOf(html, 'audit.html');
+    // the four tiers, named, in the published order
+    for (const name of ['Site Score', 'Starter Audit', 'Digital Health Check', 'Competitive Intelligence']) {
+      expect(main, `audit tier named: ${name}`).toContain(name);
+    }
+    expect(main, 'free tier labeled Free').toMatch(/tier-badge free">\s*Free/);
+    expect(main, 'the free/paid split is stated, not implied').toMatch(/paid audits from \$99/i);
+    // ONE credit story: "a full project" (the FAQ's own words) — the
+    // "full redesign" variant contradicted it on the same page
+    expect(html, 'no "credited toward a full redesign" fork').not.toContain('credited toward a full redesign');
+    expect(html, 'credit fact stated in its canonical form').toContain('credited toward a full project');
+    // the in-body /contact drain stays (the one-way funnel exit stays closed)
+    expect(main, 'in-body /contact link').toContain('href="/contact"');
+  });
+
+  test('one timeline: web-design quotes how-we-work\'s published FAQ range; the 45-day fork dies', () => {
+    const wd = read('web-design.html');
+    expect(wd, 'no 45-day claim').not.toMatch(/45[- ]day/i);
+    const range = /4(?:&ndash;|–|–)6 weeks/;
+    expect(wd, 'web-design quotes the published custom-build range').toMatch(range);
+    expect(read('how-we-work.html'), 'the range is how-we-work\'s own published number').toMatch(range);
+  });
+
+  test('monthly-retainer font loading matches index (preload + async swap + noscript)', () => {
+    const html = read('monthly-retainer.html');
+    expect(html).toMatch(/<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/);
+    expect(html).toContain('<noscript><link href="https://fonts.googleapis.com/css2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MS2 — live behavior (desktop)
+// ---------------------------------------------------------------------------
+test.describe('MS2 money path (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop behavior');
+  });
+
+  // Single-closer rule: each money page has exactly ONE dark closer, and
+  // nothing interactive stands between it and the footer — the funnel's last
+  // beat is the closer, not a gauntlet.
+  for (const f of MONEY_PAGES) {
+    test(`single closer: ${f} ends dark CTA -> footer`, async ({ page }) => {
+      await page.goto(`/${f}`);
+      const result = await page.evaluate(() => {
+        const closers = [...document.querySelectorAll('main section.panel-dark, main section.cta-band')];
+        const footer = document.querySelector('footer.site');
+        if (!footer) return { closers: closers.length, offenders: ['no footer'] };
+        const last = closers[closers.length - 1];
+        if (!last) return { closers: 0, offenders: ['no dark closer'] };
+        const offenders = [...document.querySelectorAll('a[href], button, form, input, select, textarea')]
+          .filter(
+            (el) =>
+              !last.contains(el) &&
+              !footer.contains(el) &&
+              last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING &&
+              el.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          .map((el) => `${el.tagName}:${(el.textContent || (el as HTMLElement).getAttribute?.('aria-label') || '').trim().slice(0, 40)}`);
+        return { closers: closers.length, offenders };
+      });
+      expect(result.closers, `${f}: exactly one dark closer`).toBe(1);
+      expect(result.offenders, `${f}: nothing interactive between the closer and the footer`).toEqual([]);
+    });
+  }
+
+  test('the services price journey: "See pricing" lands on real pricing', async ({ page }) => {
+    await page.goto('/services.html');
+    const main = page.locator('main');
+    // the retargeted button: an in-body pricing link that means what it says
+    const seePricing = main.locator('a[href="/pricing"]').first();
+    await expect(seePricing).toBeVisible();
+    // no button in the body promises "Full pricing" from a page that lacks it
+    for (const href of await main
+      .locator('a', { hasText: /Full pricing/i })
+      .evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
+      expect(href, 'services: Full-pricing label destination').toBe('/pricing');
+    }
+    // the destination really is the money page (local server: resolve the
+    // clean URL through the parsed _redirects rule, as MS1's tests do)
+    const rules = parseRedirects();
+    await page.goto(targetOf(rules, '/pricing')!);
+    await expect(page.locator('main')).toContainText('New sites start around $1,500 depending on scope');
+    await expect(page.locator('main')).toContainText('$400');
+  });
+
+  for (const f of ['web-design.html', 'seo-strategy.html']) {
+    test(`reveal wiring restored: ${f} runs the .js-anim gate`, async ({ page }) => {
+      await page.goto(`/${f}`);
+      await expect(page.locator('html')).toHaveClass(/js-anim/);
+      // at least one reveal actually resolves to visible
+      await expect(page.locator('.reveal.in').first()).toBeVisible({ timeout: 10_000 });
+    });
+  }
+
+  for (const path of ['/web-design.html', '/seo-strategy.html', '/monthly-retainer.html', '/audit.html']) {
+    test(`console-clean boot: ${path}`, async ({ page }) => {
+      const errors: string[] = [];
+      const external = /fonts\.googleapis|fonts\.gstatic|googletagmanager/;
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('console', (msg) => {
+        if (msg.type() !== 'error') return;
+        if (external.test(msg.text()) || external.test(msg.location()?.url ?? '')) return;
+        errors.push(`${msg.text()} @ ${msg.location()?.url ?? '?'}`);
+      });
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// MS2 — live behavior (mobile)
+// ---------------------------------------------------------------------------
+test.describe('MS2 money path (live, mobile)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'mobile behavior');
+  });
+
+  test('pricing renders the whole price story on a phone: both offers, audits row, one closer', async ({ page }) => {
+    await page.goto('/pricing.html');
+    const main = page.locator('main');
+    await expect(main).toContainText('New sites start around $1,500 depending on scope');
+    await expect(main.getByText('$1,500', { exact: false }).first()).toBeVisible();
+    await expect(main).toContainText(/audits from \$99/i);
+    await expect(main.locator('a[href="/audit#pricing"]')).toBeVisible();
+    const closerCount = await page.evaluate(
+      () => document.querySelectorAll('main section.panel-dark, main section.cta-band').length
+    );
+    expect(closerCount).toBe(1);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Live behavior — mobile drawer
 // ---------------------------------------------------------------------------
