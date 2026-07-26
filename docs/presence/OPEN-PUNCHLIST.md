@@ -313,6 +313,30 @@ surfaces (incl. the untouched Invoices + Help tabs, the project drill-in,
 booking flow, reviewer persona experience) and folds in audit batch B (B1-B6)
 verbatim. One combined slice plan covers studio + portal.
 
+## 🏁 STANDARDS SWEEP — ALL DECISION-FREE WORK COMPLETE (wave 8 LIVE, 2026-07-20)
+
+Wave 8 merged to main (Netlify): **SS10 snapshot-history** — the compare-iframe
+SECURITY fix (client HTML rendered same-origin could read the operator's
+Supabase session from localStorage; both panes now sandbox="" — reviewer
+verified hole real, closed, no bypass) + family chrome + honest compare states
++ theme-aware chips. **SS12 admin-health** — family chrome + KPI band + banded
+ops dashboard + honest operators-only 403 + real area navigations (domains →
+presence.html#foundations after the review caught the OAuth-page mismatch;
+sweep-spec corrected). Both reviewed safe; gates 1495/0 full e2e + 208/0 pure.
+
+**EVERY non-decision-gated slice of the studio+portal standards sweep is now
+LIVE.** Remaining work is ALL Eric-gated:
+- Decisions: P1 (timeline+upcoming merge → SS9), P2 (business-insights vs
+  analytics → SS11), P3 (leads vs inbox one-queue), P4 (sharing under drill-in
+  → SS3), saved-reply scope doctrine, legal drafts' 6 decisions
+  (docs/design/LEGAL-DRAFTS-166.md).
+- G13 slice 2 — THE IN-PLACE EDITOR — on Eric's "go".
+- Activation: Resend (runbook given in-chat 2026-07-20), AWS keys + 4 glue
+  records (docs/presence/DNS-SETUP.md), Name.com token (D5).
+- Review-backlog rollup lives in the wave entries above (C7 server widen,
+  .tscroll 390px leak, viewport inflation on other table pages, server-500
+  retry cards, WebKit CI pass, etc.) — none user-facing-critical.
+
 ## ✅ WAVE 7 LIVE — SS8 + PS6/PS7 (2026-07-20, Netlify) — SWEEP's non-gated slices COMPLETE
 
 Merged to main. SS8 (website family + the website-health 403-lie fix) and
