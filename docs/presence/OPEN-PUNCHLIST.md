@@ -391,7 +391,8 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
-NEXT: MS4 merge ask → MS5 industries (+ about.html leftovers) → MS6
+✅ MS4 MERGED TO MAIN @dbb3503 (Eric "Merge it", 2026-07-27; Netlify).
+NEXT: MS5 industries (+ about.html leftovers from MS4 §2-3) → MS6
 entry/legal → MS7 ghost deletions (incl. email-signature build removal).
 
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
