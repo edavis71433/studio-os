@@ -370,9 +370,19 @@ preserved verbatim, 12 red→57/0 green. NEW tests/e2e/marketing-tools.spec.ts.
 FLAGGED: estimator "Package" catalog framing + 25% rush (P2 decision),
 ROI retire-into-estimator, concierge.js untouched (not in kill list), MS7 owes
 email-signature removal from the public build.
-STATUS: combined MS2+MS3+gap defensive review in flight → fixes → gates →
-Eric's one merge ask (frontend-only, Netlify). Then MS4 (P1 301) → MS5 → MS6
-→ MS7 (ghost deletions).
+✅ MERGED TO MAIN @4ad5a5a (Eric "Merge it", 2026-07-27; Netlify auto-deploy).
+Quality trail: 19-agent combined review (6 dimensions + adversarial verify) →
+22 findings (12 CONFIRMED, 10 PLAUSIBLE, 0 refuted; function-preservation
+CLEAN) → all fixed in 5 commits (7f9ecce price truth · 22848ad _headers
+/pricing no-cache + _redirects /snapshot-history glued-200 fix + well-
+formedness pins · 489b066 test-gate strengthening, evasions proven closed by
+mutation · 6a4db43 dark-OS contrast, all pairs measured AA+, the contact.css
+class fixed family-wide + pinned · 4ad5a5a wizard focus mgmt + consent banner
+joins the system). Gates: marketing suites 115/0 ×3 projects, sync --check 29/
+29, pure 208/0/4, app tripwire 15/15. Shared-file blast radius: analytics.js
+4 lines (banner visuals only), styles.css +3 (dark counterparts).
+NEXT: MS4 (the-experience→how-we-work 301, P1) → MS5 industries → MS6
+entry/legal → MS7 ghost deletions (incl. email-signature build removal).
 
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
