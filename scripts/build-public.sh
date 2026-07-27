@@ -31,10 +31,10 @@ cp ./*.html dist/ 2>/dev/null || true
 cp ./*.css dist/ 2>/dev/null || true
 cp ./*.js dist/ 2>/dev/null || true
 
-# MS6 (overhaul doc §MS7.2): the allowlist stops glob-shipping the INTERNAL
-# pages — email-signature (mail-provider setup steps), styleguide (internal
-# design instructions), and a11y (internal check page) are repo files, not
-# public site. _redirects also force-404s their URLs as defense-in-depth.
+# MS6 (overhaul doc §MS7.2): carve INTERNAL pages back out of the *.html glob —
+# email-signature (mail-provider setup steps), styleguide (internal design
+# instructions), and a11y (internal check page) are repo files, not public
+# site. _redirects also force-404s their URLs as defense-in-depth.
 # Pinned by tests/e2e/marketing.spec.ts (MS6), which runs this script and
 # inspects dist/.
 for f in email-signature.html styleguide.html a11y.html; do

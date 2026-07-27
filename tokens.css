@@ -6,7 +6,7 @@
    the three systems that existed pre-consolidation). Conflicts with the admin
    copy were resolved here once, so they can never drift again.
 
-   RULES (enforced by convention, see styleguide.html):
+   RULES (enforced by convention, see the internal style guide — styleguide.html in the repo, excluded from the public build):
    - No raw hex in page CSS. Reference a token.
    - No raw radius/shadow px in page CSS. Reference a token.
    - Only --serif / --sans / --mono fonts. DM Serif Display + DM Sans are GONE.
