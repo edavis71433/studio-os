@@ -671,9 +671,10 @@ test.describe('MS5 industries family (static pins)', () => {
   test('health-wellness: the unsubstantiated "private" intake bullet is softened to the page\'s own published framing', () => {
     const html = read('health-wellness-web-design.html');
     // "private" implied a security/compliance promise nothing on the site
-    // backs; the page's own FAQ answer ("simple and calm") is the honest form.
+    // backs; the page's own FAQ answer ("simple", "without friction") is the
+    // honest form ("calm" lives in the adjacent pre-existing bullet already).
     expect(html, 'the "private" claim is gone').not.toMatch(/simple and private/i);
-    expect(html, 'softened to the FAQ\'s published phrasing').toContain('simple and calm');
+    expect(html, 'softened to the FAQ\'s published phrasing').toContain('simple, without friction');
   });
 });
 

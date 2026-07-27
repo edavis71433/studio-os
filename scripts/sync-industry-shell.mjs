@@ -64,10 +64,18 @@ function extractRegion(source, name, where) {
 
 /** Stamp the per-lander industry phrase into a shell region. */
 export function stampIndustry(block, industry) {
-  return block.replaceAll('{{industry}}', industry);
+  // function replacement — an industry phrase containing $&, $` or $' must
+  // never be interpreted as a replacement pattern (same law as placeRegion)
+  return block.replaceAll('{{industry}}', () => industry);
 }
 
 function placeRegion(html, name, stamped, file) {
+  // exactly one start and one end marker — a duplicated region would silently
+  // pass --check (only the first occurrence is compared) and ship twice
+  for (const mark of [`<!-- ${name}:start`, `<!-- ${name}:end -->`]) {
+    const n = html.split(mark).length - 1;
+    if (n !== 1) throw new Error(`${file}: ${n} occurrences of ${mark} — must be exactly 1`);
+  }
   const re = new RegExp(`<!-- ${name}:start[\\s\\S]*?<!-- ${name}:end -->`);
   if (!re.test(html)) throw new Error(`${file}: region ${name} missing — adopt by hand`);
   // function replacement — a template containing $&, $` or $' must never be

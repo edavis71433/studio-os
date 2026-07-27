@@ -405,7 +405,7 @@ component (tool-page.css reuse, inline-hex copy dead); Explore pills →
 "simple and calm". MS4 §2-3 leftovers done: about.html 4-card workspace
 grid trimmed to the founder-direct beat + /how-we-work handoff; "Not
 credentials" lede now owns the credentials it leans on (origin/beliefs/
-signature untouched). Red-first: 16 new pins watched fail → green (shell
+signature untouched). Red-first: 13 new pins (21 tests/project) watched fail → green (shell
 byte-identity + sync --check, pill/purple scan extended to the family incl.
 linked css, single-closer static+live, light+dark AA on every changed
 pair). Gates: marketing suites 140/0 ×3 projects (was 119/0), sync 28/28 +
