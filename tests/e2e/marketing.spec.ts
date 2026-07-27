@@ -192,6 +192,48 @@ test.describe('marketing chrome (static pins)', () => {
     }
   });
 
+  test('_redirects is well-formed: every rule parses, no status glued to its target, local .html targets exist', () => {
+    // A missing separator ("/x.html200") silently parses as a redirect to a
+    // nonexistent file with the default 301 — Netlify's parser accepts it
+    // without error, so only this pin stands between a typo and a dead page.
+    const lines = read('_redirects')
+      .split('\n')
+      .map((l) => l.replace(/#.*$/, '').trim())
+      .filter(Boolean);
+    for (const line of lines) {
+      const parts = line.split(/\s+/);
+      expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeGreaterThanOrEqual(2);
+      expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeLessThanOrEqual(3);
+      const [from, to, status] = parts;
+      expect(from, `"${line}": source is a path`).toMatch(/^\//);
+      expect(to, `"${line}": status glued to the target`).not.toMatch(/\.html\d/);
+      if (status !== undefined) expect(status, `"${line}": valid status`).toMatch(/^\d{3}!?$/);
+      if (/^\/[^*:]+\.html$/.test(to)) {
+        expect(existsSync(join(ROOT, to.replace(/^\//, ''))), `"${line}": target file exists`).toBe(true);
+      }
+    }
+  });
+
+  test('_headers: every sitemap clean URL carries the explicit no-cache policy', () => {
+    // The /*.html no-cache rule cannot match extensionless paths, so each
+    // canonical clean URL needs its own entry — a page missing from the list
+    // silently falls through to the cacheable /* rule and can serve
+    // hour-stale content after a deploy (the /pricing gap, C7).
+    const blocks = new Map<string, string>();
+    let current: string | null = null;
+    for (const raw of read('_headers').split('\n')) {
+      if (!raw.trim() || raw.trim().startsWith('#')) continue;
+      if (!/^\s/.test(raw)) { current = raw.trim(); blocks.set(current, ''); }
+      else if (current) blocks.set(current, blocks.get(current)! + raw.trim() + '\n');
+    }
+    const locs = [...read('sitemap.xml').matchAll(/<loc>https:\/\/davisdigitalstudio\.com([^<]*)<\/loc>/g)]
+      .map((m) => m[1] || '/');
+    expect(locs.length).toBeGreaterThan(0);
+    for (const path of locs) {
+      expect(blocks.get(path)?.includes('no-cache'), `_headers: ${path} has a no-cache entry`).toBe(true);
+    }
+  });
+
   test('404.html uses only absolute URLs (it serves at nested paths)', () => {
     const html = read('404.html');
     for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {

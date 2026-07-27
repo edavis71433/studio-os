@@ -51,6 +51,8 @@
   Cache-Control: no-cache, must-revalidate
 /services
   Cache-Control: no-cache, must-revalidate
+/pricing
+  Cache-Control: no-cache, must-revalidate
 /web-design
   Cache-Control: no-cache, must-revalidate
 /seo-strategy

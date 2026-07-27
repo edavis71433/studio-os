@@ -105,7 +105,7 @@
 /agency.html                  /agency              301!
 /agency                      /agency.html          200
 /snapshot-history.html        /snapshot-history    301!
-/snapshot-history            /snapshot-history.html200
+/snapshot-history            /snapshot-history.html   200
 /timeline.html                /timeline            301!
 /timeline                    /timeline.html        200
 /upcoming.html                /upcoming            301!
