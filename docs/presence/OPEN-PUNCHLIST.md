@@ -417,8 +417,33 @@ linked css, single-closer static+live, light+dark AA on every changed
 pair). Gates: marketing suites 140/0 ×3 projects (was 119/0), sync 28/28 +
 industry-shell 5/5, pure 208/0/4. Shared-file blast radius: styles.css +8
 (.ind-chip only), build-public.sh +1 check.
-NEXT: MS5 merge ask → MS6 proof/Results (P3: Bacchus permission?) → MS7
-entry/legal ghost deletions (incl. email-signature build removal).
+**MS6 BUILT (1a48b48) — entry/legal sweep (doc §MS7; Results shipped early
+as MS1's P3 footer-demote, so this moved up a slot):** (1) the owed
+soft-capture tokenization — punchlist said services+web-design, the
+red-first estate sweep found the SAME byte-identical inline-hex band on
+pricing/seo-strategy/monthly-retainer too; all FIVE now on tool-page.css's
+.soft-capture (form function identical, above the single closer), the
+styles.css div[style*=EDE8F7] dark shims deleted with them, pill/purple
+scan extended over the five + legal set + 404 (portal-mock.css sanctioned:
+decorative app-UI miniature). (2) ai-disclaimer REBUILT on the
+privacy/terms legal template — its :root fork, pill badge, dark legal-hero,
+and the stray-brace CSS that trapped dark mode behind <=900px are dead;
+LEGAL COPY UNCHANGED and pinned verbatim. (3) legal-template pins on all
+four legal pages; portal-terms.html spellings → /portal-terms. (4) 404
+fonts on the preload pattern. (5) start.html + contact-disclaimer.html
+DELETED (.html 301 pairs added). (6) email-signature/styleguide/a11y out
+of the public build (build-public.sh rm + forced 404!s; pinned by running
+the build). Gates: 153/0 ×3 projects (+13 pins), sync 28/28 + 5/5, pure
+208/0/4. FLAGGED for Eric: terms covers only "this website and the free
+tools" while SaaS signup records acceptance of it (doc §MS7.4 — legal
+drafts, his call); P6 SaaS namespace UNDECIDED (get-started/signup/welcome/
+studio untouched; signup's no-plan fallback still lands on /pricing.html —
+now services pricing, wrong audience — but any repoint invents product IA);
+audit.html still carries a page-local :root token fork (pre-existing MS2-era,
+outside every scan fence so far); ai-disclaimer no longer loads concierge.js
+(legal template parity — tool pages keep it).
+NEXT: MS6 merge ask → remaining MS7-numbered leftovers are all Eric-gated
+(P6 namespace, terms/privacy legal drafts #166, Bacchus/Results flip-back).
 
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
