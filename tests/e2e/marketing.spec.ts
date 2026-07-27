@@ -556,6 +556,238 @@ test.describe('MS4 one story (static pins)', () => {
   });
 });
 
+// ============================================================
+// MS5 — industries family templatization (docs/design/MARKETING-SITE-OVERHAUL.md §MS5).
+//
+// The five landers shipped an ~80%-identical hand-copied shell — the same
+// drift class MS1 killed for the chrome. The shell (approach head, the
+// "organized and effortless" ethos, Explore chips, soft-capture, closer)
+// now propagates from scripts/industry-shell.template.html via
+// scripts/sync-industry-shell.mjs into delimited regions; the unique
+// content (lede, approach paragraph, bullets, FAQs — the real substance)
+// stays per-page. The double closer collapsed to the standard
+// soft-capture -> ONE dark CTA -> footer, the soft-capture band is MS3's
+// tokenized component (tool-page.css — built once, reused here), and the
+// generalized pill/purple scan extends to this family. Written red-first
+// against the pre-MS5 pages.
+// ============================================================
+const INDUSTRY_LANDERS = [
+  'restaurant-web-design.html', 'salon-web-design.html', 'retail-web-design.html',
+  'home-services-web-design.html', 'health-wellness-web-design.html',
+];
+const INDUSTRY_FAMILY = ['industries.html', ...INDUSTRY_LANDERS];
+const SHELL_REGIONS = [
+  'dds-industry-approach-head', 'dds-industry-ethos', 'dds-industry-explore',
+  'dds-industry-capture', 'dds-industry-closer',
+];
+// the ONLY tolerated variance in the shell: the closer's stamped industry phrase
+const normalizeShell = (block: string) =>
+  block.replace(/obvious choice for (?:\{\{industry\}\}|[^<?]+)\?/, 'obvious choice for X?');
+
+test.describe('MS5 industries family (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('sync-industry-shell --check passes (committed landers == canonical shell template)', () => {
+    execFileSync('node', ['scripts/sync-industry-shell.mjs', '--check'], { cwd: ROOT });
+  });
+
+  test('the shell is template-generated: all five regions on every lander, byte-identical to the template (industry phrase normalized)', () => {
+    const tpl = read('scripts/industry-shell.template.html');
+    for (const name of SHELL_REGIONS) {
+      const canon = normalizeShell(region(tpl, name, 'template'));
+      for (const f of INDUSTRY_LANDERS) {
+        expect(normalizeShell(region(read(f), name, f)), `${f} region ${name}`).toBe(canon);
+      }
+    }
+  });
+
+  test('no pills, no literal purple: the generalized scan extends to the industries family (incl. linked css)', () => {
+    // Same scan as marketing-tools.spec.ts (C4): pill-scale radii and literal
+    // purple fail in every family source plus every page-local linked css —
+    // the Explore chips' 100px pills and the inline-hex soft capture die here.
+    const SANCTIONED_SHARED = new Set(['styles.css', 'enhance.css']);
+    const sources = new Map<string, string>();
+    for (const f of INDUSTRY_FAMILY) {
+      const html = read(f);
+      sources.set(f, html);
+      for (const m of html.matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)) {
+        const href = m[1];
+        if (/^https?:/.test(href)) continue;
+        const css = href.replace(/^\//, '');
+        if (!SANCTIONED_SHARED.has(css)) sources.set(css, read(css));
+      }
+    }
+    for (const [name, raw] of sources) {
+      const src = raw
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/<meta name="theme-color"[^>]*>/g, '');
+      for (const decl of src.matchAll(/border-radius:([^;}"']*)/gi)) {
+        for (const t of decl[1].matchAll(/([\d.]+)(px|r?em)/g)) {
+          const limit = t[2] === 'px' ? 40 : 3;
+          expect(parseFloat(t[1]), `${name}: pill-scale border-radius "${decl[0].trim()}"`).toBeLessThan(limit);
+        }
+      }
+      expect(src, `${name}: literal purple hex outside the token system`).not.toMatch(/#5b3fa0\b/i);
+      expect(src, `${name}: literal purple rgb outside the token system`).not.toMatch(/rgb\(\s*91\s*,\s*63\s*,\s*160\s*\)/);
+    }
+  });
+
+  test('soft-capture is MS3\'s tokenized component on every lander — the inline-hex copy is dead', () => {
+    for (const f of INDUSTRY_LANDERS) {
+      const html = read(f);
+      expect(html, `${f}: inline-hex soft capture`).not.toContain('#EDE8F7');
+      expect(html, `${f}: .soft-capture component`).toContain('soft-capture');
+      // the component's home loads, after the token owner
+      expect(html.indexOf('href="tool-page.css"'), `${f}: tool-page.css loads after styles.css`).toBeGreaterThan(
+        html.indexOf('href="styles.css"')
+      );
+    }
+  });
+
+  test('single closer: on every industry page the dark CTA is the last section, soft-capture above it', () => {
+    for (const f of INDUSTRY_FAMILY) {
+      const html = read(f);
+      const darkBands = html.match(/<section\b[^>]*class="[^"]*\b(?:panel-dark|cta-band)\b[^"]*"/g) || [];
+      expect(darkBands.length, `${f}: exactly one dark band <section>`).toBe(1);
+      const last = html.lastIndexOf('<section');
+      expect(html.slice(last, last + 120), `${f}: the dark closer is the last section`).toContain('panel-dark');
+      if (f !== 'industries.html') {
+        expect(html.indexOf('soft-capture'), `${f}: soft-capture sits above the closer`).toBeLessThan(
+          html.indexOf('panel-dark')
+        );
+      }
+    }
+  });
+
+  test('industries.html: the one-line process bridge — the hub click lands a step from /how-we-work', () => {
+    const main = mainOf(read('industries.html'), 'industries.html');
+    expect(main, 'the bridge names the shared process').toMatch(/same process/i);
+    expect(main, 'the bridge links /how-we-work in the body').toContain('href="/how-we-work"');
+  });
+
+  test('health-wellness: the unsubstantiated "private" intake bullet is softened to the page\'s own published framing', () => {
+    const html = read('health-wellness-web-design.html');
+    // "private" implied a security/compliance promise nothing on the site
+    // backs; the page's own FAQ answer ("simple and calm") is the honest form.
+    expect(html, 'the "private" claim is gone').not.toMatch(/simple and private/i);
+    expect(html, 'softened to the FAQ\'s published phrasing').toContain('simple and calm');
+  });
+});
+
+// ============================================================
+// MS4 leftovers, folded into MS5 per the punchlist: about.html
+// (doc §MS4 2-3). The origin story, beliefs, and signature stay whole;
+// the near-duplicate 4-card workspace grid (redundant with index's
+// master grid + the merged /how-we-work beats) is trimmed, and the
+// "Not credentials" framing stops contradicting the credentials the
+// same page leans on.
+// ============================================================
+test.describe('MS5 about.html leftovers (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('the near-duplicate 4-card workspace grid is trimmed to one founder-direct beat + a /how-we-work link', () => {
+    const main = mainOf(read('about.html'), 'about.html');
+    // the duplicated cards are gone (index keeps the master grid;
+    // /how-we-work carries the merged beats)
+    for (const card of [
+      'One person, start to finish', 'Clear expectations, in plain language',
+      'Everything in one project workspace', 'You approve every decision',
+    ]) {
+      expect(main, `about: duplicated card "${card}"`).not.toContain(card);
+    }
+    // the About-specific point (founder-direct) stays, and hands off to the
+    // page that owns the day-to-day story
+    expect(main, 'founder-direct beat kept').toContain('No account managers');
+    const section = main.match(/<section[^>]*>(?:(?!<\/section>)[\s\S])*No account managers[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section, 'the trimmed section hands off to /how-we-work').toContain('href="/how-we-work"');
+  });
+
+  test('"Not credentials" framing squared with the credentials the page leans on', () => {
+    const html = read('about.html');
+    const main = mainOf(html, 'about.html');
+    expect(main, 'the self-contradicting "Not credentials." lede is gone').not.toContain('Not credentials.');
+    // the honest form: the credentials are owned, then subordinated to the beliefs
+    expect(main, 'the lede owns the credentials it later cites').toMatch(/nearly a decade/i);
+    // kept whole per the doc: origin story + beliefs + signature
+    expect(main, 'origin story kept').toContain('Why I started this.');
+    expect(main, 'beliefs kept').toContain('Three beliefs I don\'t compromise on');
+    expect(main, 'signature moment kept').toContain('refuse to do to a client');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MS5 — live behavior (desktop)
+// ---------------------------------------------------------------------------
+test.describe('MS5 industries family (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop behavior');
+  });
+
+  // Single-closer rule, live: nothing interactive between the dark CTA and
+  // the footer (the old anatomy parked the capture form exactly there).
+  for (const f of INDUSTRY_FAMILY) {
+    test(`single closer: ${f} ends dark CTA -> footer`, async ({ page }) => {
+      await page.goto(`/${f}`);
+      const result = await page.evaluate(() => {
+        const closers = [...document.querySelectorAll('main section.panel-dark, main section.cta-band')];
+        const footer = document.querySelector('footer.site');
+        if (!footer) return { closers: closers.length, offenders: ['no footer'] };
+        const last = closers[closers.length - 1];
+        if (!last) return { closers: 0, offenders: ['no dark closer'] };
+        const offenders = [...document.querySelectorAll('a[href], button, form, input, select, textarea')]
+          .filter(
+            (el) =>
+              !last.contains(el) &&
+              !footer.contains(el) &&
+              last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING &&
+              el.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          .map((el) => `${el.tagName}:${(el.textContent || (el as HTMLElement).getAttribute?.('aria-label') || '').trim().slice(0, 40)}`);
+        return { closers: closers.length, offenders };
+      });
+      expect(result.closers, `${f}: exactly one dark closer`).toBe(1);
+      expect(result.offenders, `${f}: nothing interactive between the closer and the footer`).toEqual([]);
+    });
+  }
+
+  test('lander shell renders tokenized: soft-capture on --p-mist, ink chips (not pills), light-scheme contrast holds', async ({ page }) => {
+    await page.goto('/salon-web-design.html');
+    const band = page.locator('.soft-capture');
+    await expect(band).toHaveCount(1);
+    expect(await band.evaluate((el) => getComputedStyle(el).backgroundColor), 'p-mist token').toBe('rgb(237, 232, 247)');
+    expect(await band.locator('form button').evaluate((el) => getComputedStyle(el).borderRadius), 'ink button, not a pill').toBe('2px');
+    const chip = page.locator('.ind-chip').first();
+    await expect(chip).toBeVisible();
+    expect(await chip.evaluate((el) => getComputedStyle(el).borderRadius), 'chip radius is ink-scale').toBe('3px');
+    // changed text pairs, light scheme
+    expect(await contrastOf(page, '.ind-chip'), 'chip label').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.soft-capture h2'), 'capture heading (large)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.soft-capture p'), 'capture copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.feature-box .fb-list li'), 'feature bullets').toBeGreaterThanOrEqual(4.5);
+  });
+
+  for (const path of ['/industries.html', '/restaurant-web-design.html', '/health-wellness-web-design.html', '/about.html']) {
+    test(`console-clean boot: ${path}`, async ({ page }) => {
+      const errors: string[] = [];
+      const external = /fonts\.googleapis|fonts\.gstatic|googletagmanager/;
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('console', (msg) => {
+        if (msg.type() !== 'error') return;
+        if (external.test(msg.text()) || external.test(msg.location()?.url ?? '')) return;
+        errors.push(`${msg.text()} @ ${msg.location()?.url ?? '?'}`);
+      });
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // MS2 — live behavior (desktop)
 // ---------------------------------------------------------------------------
@@ -749,5 +981,21 @@ test.describe('dark scheme (chrome + closer fine print)', () => {
     expect(await contrastOf(page, 'main section.panel-dark .hint'), 'closer fine print').toBeGreaterThanOrEqual(4.5);
     await page.goto('/audit.html');
     expect(await contrastOf(page, 'section.cta-band > p'), 'audit CTA band copy').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('MS5: the industry shell reads in dark — chips, bullets, FAQ, capture band, bridge, about handoff', async ({ page }) => {
+    // one lander proves the template (the shell is byte-identical family-wide)
+    await page.goto('/restaurant-web-design.html');
+    expect(await contrastOf(page, '.ind-chip'), 'Explore chip').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.feature-box .fb-list li'), 'feature bullets').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.panel-warm details summary'), 'FAQ question').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.soft-capture h2'), 'capture heading (large)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.soft-capture p'), 'capture copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main section.panel-dark .lead-muted'), 'closer copy').toBeGreaterThanOrEqual(4.5);
+    // the new copy on the hub and about pages
+    await page.goto('/industries.html');
+    expect(await contrastOf(page, 'main .textlink'), 'bridge link').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/about.html');
+    expect(await contrastOf(page, 'main .textlink'), 'about handoff link').toBeGreaterThanOrEqual(4.5);
   });
 });

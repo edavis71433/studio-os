@@ -18,6 +18,11 @@ cd "$(dirname "$0")/.."
 # rather than publish a diverged nav.
 node scripts/sync-marketing-chrome.mjs --check
 
+# MS5 tripwire: the five industry landers' shared shell must match the ONE
+# canonical template (scripts/industry-shell.template.html) — same drift
+# class, same defense.
+node scripts/sync-industry-shell.mjs --check
+
 rm -rf dist
 mkdir -p dist
 
