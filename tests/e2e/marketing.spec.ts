@@ -70,6 +70,30 @@ function targetOf(rules: Rule[], url: string): string | null {
   const r = rules.find((x) => x.from === url && x.code.startsWith('200'));
   return r ? r.to : null;
 }
+/**
+ * Label-honesty pin (C6): every occurrence of `label` in the page (HTML
+ * comments stripped) must sit inside an anchor — parsed attribute-order-
+ * independently — whose href is exactly `dest`. Returns the occurrence count
+ * so callers can assert the pin isn't vacuous. An occurrence outside any
+ * parseable anchor fails loudly instead of silently skipping the check.
+ */
+function labelAnchorPin(html: string, f: string, label: RegExp, dest: string): number {
+  const src = html.replace(/<!--[\s\S]*?-->/g, '');
+  const anchors = [...src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map((m) => ({
+    start: m.index!,
+    end: m.index! + m[0].length,
+    href: m[1].match(/href="([^"]+)"/)?.[1] ?? null,
+  }));
+  let count = 0;
+  for (const occ of src.matchAll(label)) {
+    count++;
+    const covering = anchors.find((a) => a.start <= occ.index! && occ.index! < a.end);
+    expect(covering, `${f}: "${occ[0]}" not inside any parseable <a>`).toBeTruthy();
+    expect(covering!.href, `${f}: "${occ[0]}" label destination`).toBe(dest);
+  }
+  return count;
+}
+
 const chromeHrefs = (): string[] => {
   const tpl = read('scripts/marketing-chrome.template.html');
   const nav = region(tpl, 'dds-marketing-nav', 'template');
@@ -246,11 +270,14 @@ test.describe('marketing chrome (static pins)', () => {
   });
 
   test('label honesty: "See what your site needs" always means /audit', () => {
+    // C6: parsed attribute-order-independently, and every occurrence of the
+    // label must resolve to a parseable anchor — a reordered or re-wrapped
+    // link can no longer make the pin pass vacuously.
+    let total = 0;
     for (const f of PAGES) {
-      for (const m of read(f).matchAll(/<a href="([^"]+)"[^>]*>See what your site needs/g)) {
-        expect(m[1], `${f}: label destination`).toBe('/audit');
-      }
+      total += labelAnchorPin(read(f), f, /See what your site needs/g, '/audit');
     }
+    expect(total, 'the label exists somewhere (pin is not vacuous)').toBeGreaterThan(0);
   });
 
   test('P4: contact.html no longer ships its page-scoped TOKEN flip (chrome stays canonical)', () => {
@@ -404,10 +431,10 @@ test.describe('MS2 money path (static pins)', () => {
   });
 
   test('label honesty: a "Full pricing" label may only land on /pricing', () => {
+    // C6: same parse-robust pin — attribute order and nested <span>s can't
+    // exempt a link, and a non-anchor occurrence fails instead of skipping.
     for (const f of MONEY_PAGES) {
-      for (const m of read(f).matchAll(/<a href="([^"]+)"[^>]*>[^<]*Full pricing/gi)) {
-        expect(m[1], `${f}: "Full pricing…" label points at a page without full pricing`).toBe('/pricing');
-      }
+      labelAnchorPin(read(f), f, /Full pricing/gi, '/pricing');
     }
   });
 

@@ -79,13 +79,38 @@ test.describe('tools family (static pins)', () => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
   });
 
-  test('no page-local :root token fork on any tools-family page', () => {
+  // Every stylesheet a family page links, resolved to repo files. styles.css
+  // (the token owner) and enhance.css (the shared enhancement layer, which
+  // carries motion-token :root vars) are the only sanctioned shared layers —
+  // anything else a page links is scanned with the page (C5: a one-line
+  // <link> must not be able to smuggle the purple fork back in).
+  const SANCTIONED_SHARED = new Set(['styles.css', 'enhance.css']);
+  const linkedLocalCss = (html: string): string[] =>
+    [...html.matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)]
+      .map((m) => m[1])
+      .filter((h) => !/^https?:/.test(h))
+      .map((h) => h.replace(/^\//, ''));
+
+  test('no :root token fork on any tools-family page — inline OR page-local linked stylesheet', () => {
     for (const f of ALL) {
-      expect(inlineCss(read(f)), `${f}: styles.css owns the tokens`).not.toMatch(/:root\s*\{/);
+      const html = read(f);
+      expect(inlineCss(html), `${f}: styles.css owns the tokens`).not.toMatch(/:root\s*\{/);
+      for (const css of linkedLocalCss(html).filter((c) => !SANCTIONED_SHARED.has(c))) {
+        const src = read(css);
+        expect(src, `${f} -> ${css}: styles.css owns the tokens`).not.toMatch(/:root\s*\{/);
+        // token re-declarations outside :root (e.g. body{--p:...}) are the same fork
+        expect(src, `${f} -> ${css}: design-token re-declaration`).not.toMatch(
+          /(^|[{;\s])--(ink|paper|paper-2|p|p-deep|p-mist|muted|hair|hair-dk|brass|brass-deep)\s*:/m
+        );
+      }
     }
   });
 
-  test('no page-scoped dark skin (P4: one light system; styles.css owns dark)', () => {
+  test('no page-scoped dark skin (P4: one light system; styles.css owns the dark token remap)', () => {
+    // Pages ship no prefers-color-scheme blocks. The family CSS layers
+    // (tool-page.css / tools.css / buy-audit.css) MAY carry dark SURFACE
+    // counterparts — the contact.css recipe blessed in marketing.spec.ts —
+    // but the token-fork pin above keeps them from repainting the system.
     for (const f of ALL) {
       expect(read(f), `${f}: page-scoped prefers-color-scheme block`).not.toContain('prefers-color-scheme');
     }
@@ -110,13 +135,45 @@ test.describe('tools family (static pins)', () => {
     }
   });
 
-  test('no purple pill buttons in family markup or family css', () => {
-    const sources = [...ALL.map(read), read('tools.css'), read('tool-page.css')];
-    const names = [...ALL, 'tools.css', 'tool-page.css'];
-    sources.forEach((src, i) => {
-      expect(src, `${names[i]}: pill radius`).not.toMatch(/border-radius:\s*100px/);
-      expect(src, `${names[i]}: inline purple button`).not.toContain('background:#5b3fa0');
-    });
+  test('no purple pill buttons in family markup or family css (generalized — not just the retired bytes)', () => {
+    // C4: the old pin banned only the deleted code's literal constants
+    // (100px + lowercase #5b3fa0), so a 999px / #5B3FA0 pill sailed through.
+    // Generalized: any pill-scale radius and any literal purple as page
+    // styling fail, in every family source plus every page-local linked css.
+    const sources = new Map<string, string>();
+    for (const f of ALL) {
+      sources.set(f, read(f));
+      for (const css of linkedLocalCss(read(f)).filter((c) => c !== 'styles.css' && c !== 'enhance.css')) {
+        sources.set(css, read(css));
+      }
+    }
+    for (const [name, raw] of sources) {
+      // scan styling, not prose: drop comments, and the theme-color meta
+      // (which legitimately carries the brand hex for browser chrome)
+      const src = raw
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/<meta name="theme-color"[^>]*>/g, '');
+      // pill radii: the family's largest sanctioned radius is 20px (cards).
+      // Anything pill-scale (>=40px, or >=3em/rem) is the retired anatomy.
+      for (const decl of src.matchAll(/border-radius:([^;}"']*)/gi)) {
+        for (const t of decl[1].matchAll(/([\d.]+)(px|r?em)/g)) {
+          const limit = t[2] === 'px' ? 40 : 3;
+          expect(parseFloat(t[1]), `${name}: pill-scale border-radius "${decl[0].trim()}"`).toBeLessThan(limit);
+        }
+      }
+      // purple as a background, in any spelling
+      expect(src, `${name}: purple button/surface background`).not.toMatch(
+        /background(?:-color)?\s*:\s*(?:#5b3fa0\b|rgb\(\s*91\s*,\s*63\s*,\s*160\s*\))/i
+      );
+      // and in the family proper (email-signature excepted: email clients
+      // force literal hexes there), no literal purple hex at all — purple
+      // reaches pages only as var(--p), so the dark remap can lift it
+      if (name !== 'email-signature.html') {
+        expect(src, `${name}: literal purple hex outside the token system`).not.toMatch(/#5b3fa0\b/i);
+        expect(src, `${name}: literal purple rgb outside the token system`).not.toMatch(/rgb\(\s*91\s*,\s*63\s*,\s*160\s*\)/);
+      }
+    }
   });
 
   test('single closer: one dark final CTA, last section before the footer; the gauntlet is gone', () => {
@@ -131,6 +188,12 @@ test.describe('tools family (static pins)', () => {
       expect(html, `${f}: closer wears the standard dark panel`).toMatch(/class="[^"]*panel-dark[^"]*final-cta[^"]*"/);
       const last = html.lastIndexOf('<section');
       expect(html.slice(last, last + 120), `${f}: closer is the last section`).toContain('final-cta');
+      // C3: count ANY dark CTA band anatomy, not just the final-cta class —
+      // a second <section class="pad panel-dark"> (no final-cta) is exactly
+      // how a gauntlet regrows, and it must fail here, not ship.
+      const darkBands = html.match(/<section\b[^>]*class="[^"]*\b(?:panel-dark|cta-band)\b[^"]*"/g) || [];
+      expect(darkBands.length, `${f}: exactly one dark band <section>`).toBe(1);
+      expect(darkBands[0], `${f}: the one dark band IS the closer`).toContain('final-cta');
     }
   });
 
@@ -312,6 +375,29 @@ test.describe('tools family (live)', () => {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
       );
       expect(overflow, `${f} horizontal overflow`).toBeLessThanOrEqual(1);
+      // C3 (computed variant): exactly one RENDERED dark section per family
+      // page — catches a dark band no matter how it's classed or styled.
+      const darkSections = await page.evaluate(() => {
+        const lum = (c: string) => {
+          const m = c.match(/[\d.]+/g);
+          if (!m) return 1;
+          const [r, g, b] = m.slice(0, 3).map(Number).map((v) => {
+            const s = v / 255;
+            return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        return [...document.querySelectorAll('main section')]
+          .filter((s) => {
+            const bg = getComputedStyle(s).backgroundColor;
+            if (!bg || bg === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(bg)) return false;
+            return lum(bg) < 0.2;
+          })
+          .map((s) => s.className);
+      });
+      const expected = FAMILY.includes(f) ? 1 : 0;
+      expect(darkSections.length, `${f}: rendered dark sections ${JSON.stringify(darkSections)}`).toBe(expected);
+      if (FAMILY.includes(f)) expect(darkSections[0], `${f}: the dark section is the closer`).toContain('final-cta');
     });
   }
 
@@ -553,8 +639,9 @@ test.describe('tools family (live)', () => {
     for (const url of ['/audit', '/ai-critique', '/report-card', '/roi-calculator', '/pricing-estimator', '/local-visibility']) {
       await expect(page.locator(`.res-card a[href="${url}"]`), url).toHaveCount(1);
     }
-    // single dark closer ends the page
-    const closer = page.locator('section.final-cta');
+    // single dark closer ends the page — counted by dark-band anatomy, not
+    // just the final-cta class (C3)
+    const closer = page.locator('main section.panel-dark, main section.cta-band');
     await expect(closer).toHaveCount(1);
     const bg = await closer.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(bg, 'closer wears --p-deep').toBe('rgb(42, 27, 74)');
