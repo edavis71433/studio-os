@@ -392,6 +392,12 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
 ✅ MS4 MERGED TO MAIN @dbb3503 (Eric "Merge it", 2026-07-27; Netlify).
+✅ MS5 MERGED TO MAIN @f22c7f8 (Eric "Merge it", 2026-07-27; Netlify).
+Review: no blockers; 4 items fixed pre-merge ($-safe stamp, unique-marker
+guard, calm-adjacency copy, pin bookkeeping). Eric flag stands: health-
+wellness private-intake claim needs published backing before it returns.
+MS6 owes: services.html + web-design.html still carry the inline-hex/pill
+soft-capture (outside MS5's fence — tokenize like the landers).
 **MS5 BUILT (585fdc9 + 42c03b5):** industries family templatized per doc
 §MS5 — the five landers' ~80%-identical shell now propagates from
 scripts/industry-shell.template.html via sync-industry-shell.mjs (chrome
