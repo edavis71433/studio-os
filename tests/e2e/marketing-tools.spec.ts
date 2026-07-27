@@ -57,6 +57,43 @@ function contrast(fg: string, bg: string): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+/**
+ * Minimum WCAG contrast across every element matching `selector` (optionally
+ * a pseudo-element), measured against the element's EFFECTIVE background:
+ * translucent ancestor backgrounds are alpha-composited down to the nearest
+ * opaque one, and a translucent text color is composited over that. Throws if
+ * nothing matches, so a renamed selector can't turn the pin vacuous.
+ */
+async function contrastOf(page: Page, selector: string, pseudo?: string): Promise<number> {
+  const pairs = await page.evaluate(([sel, ps]) => {
+    const parse = (c: string) => {
+      const m = c.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
+      return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
+    };
+    return [...document.querySelectorAll(sel as string)].map((el) => {
+      const stack: number[][] = [];
+      let n: Element | null = el;
+      while (n) {
+        const bg = parse(getComputedStyle(n).backgroundColor);
+        if (bg && bg[3] > 0) { stack.push(bg); if (bg[3] >= 1) break; }
+        n = n.parentElement;
+      }
+      let bg = [255, 255, 255];
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const [r, g, b, a] = stack[i];
+        bg = [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)];
+      }
+      const fg4 = parse(getComputedStyle(el, (ps as string) || null).color)!;
+      const fg = fg4[3] >= 1
+        ? fg4.slice(0, 3)
+        : [fg4[0] * fg4[3] + bg[0] * (1 - fg4[3]), fg4[1] * fg4[3] + bg[1] * (1 - fg4[3]), fg4[2] * fg4[3] + bg[2] * (1 - fg4[3])];
+      return { fg, bg };
+    });
+  }, [selector, pseudo ?? null] as const);
+  if (!pairs.length) throw new Error(`contrastOf: nothing matches "${selector}"`);
+  return Math.min(...pairs.map((p) => contrast(`rgb(${p.fg.join(',')})`, `rgb(${p.bg.join(',')})`)));
+}
+
 async function collectErrors(page: Page): Promise<string[]> {
   const errors: string[] = [];
   // Third-party CDNs are unreachable in the CI sandbox (same policy as
@@ -633,6 +670,17 @@ test.describe('tools family (live)', () => {
     }
   });
 
+  test('form placeholders and brass micro-labels clear AA in the light scheme too', async ({ page }) => {
+    // P6/P8: the placeholder color and the smallest brass mono labels sat
+    // just under AA in LIGHT mode as well — pin both schemes.
+    await page.goto('/ai-critique.html');
+    expect(await contrastOf(page, '#critUrl', '::placeholder')).toBeGreaterThanOrEqual(4.5);
+    await page.goto('/report-card.html');
+    expect(await contrastOf(page, '#rcName', '::placeholder')).toBeGreaterThanOrEqual(4.5);
+    await page.goto('/roi-calculator.html');
+    expect(await contrastOf(page, '.tool-switch-item.current .tsw-badge')).toBeGreaterThanOrEqual(4.5);
+  });
+
   test('hub: six question cards, six tools, audit leads', async ({ page }) => {
     await page.goto('/tools.html');
     await expect(page.locator('.res-card')).toHaveCount(6);
@@ -645,5 +693,121 @@ test.describe('tools family (live)', () => {
     await expect(closer).toHaveCount(1);
     const bg = await closer.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(bg, 'closer wears --p-deep').toBe('rgb(42, 27, 74)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dark scheme — styles.css's sitewide token remap flips the ink/paper tokens,
+// so every family surface that hardcodes a light/plum value needs a measured
+// dark counterpart (the contact.css recipe). These pins measure the exact
+// fg/bg pairs the MS2+MS3 review found failing (C9-C12, P2-P6, P8) so the
+// class can't regress: WCAG AA, computed styles, alpha-composited.
+// ---------------------------------------------------------------------------
+test.describe('tools family (dark scheme)', () => {
+  test.use({ colorScheme: 'dark' });
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'scheme pins run once, on desktop');
+  });
+
+  test('hub: the six question cards are legible in dark (P2)', async ({ page }) => {
+    await page.goto('/tools.html');
+    expect(await contrastOf(page, '.res-card h3'), 'card heading').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.res-card > p'), 'card copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.res-card .textlink'), 'card link').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.res-card-tag'), 'tool badge').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('tool heroes: plum italics and mono micro-labels lifted in dark (P3)', async ({ page }) => {
+    await page.goto('/roi-calculator.html');
+    expect(await contrastOf(page, '.tool-hero h1 em'), 'hero italic (56px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.tool-specimen .spec-callout .k'), 'specimen label').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.tool-switch-item.current .tsw-badge'), 'switcher badge').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/ai-critique.html');
+    expect(await contrastOf(page, '.crit-hero h1 em'), 'critique hero italic').toBeGreaterThanOrEqual(3);
+  });
+
+  test('roi-calculator: the results panel KPIs and CTAs read in dark (C9)', async ({ page }) => {
+    await page.goto('/roi-calculator.html');
+    expect(await contrastOf(page, '#res-monthly'), 'monthly KPI (32px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '#res-annual'), 'annual KPI (32px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '#res-roi'), 'ROI KPI (32px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.cta-row .btn-outline-light'), 'ghost CTA').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('report-card: the specimen card is legible in dark (C10)', async ({ page }) => {
+    await page.goto('/report-card.html');
+    const pins: Array<[string, number, string]> = [
+      ['.rc-card-header-left h3', 4.5, 'card title'],
+      ['.rc-card-header-left p', 4.5, 'card subtitle'],
+      ['.rc-card-logo', 4.5, 'brass logo'],
+      ['.rc-metric-name', 4.5, 'metric names'],
+      ['.rc-metric-val', 4.5, 'metric values'],
+      ['.rc-grade', 3, 'grade letter (52px)'],
+      ['.rc-grade-label', 4.5, 'grade label'],
+      ['.rc-card-footer-text', 4.5, 'footer text'],
+      ['.rc-form-side h2 em', 3, 'form heading italic (32px)'],
+      ['.rc-bridge .k', 4.5, 'bridge label'],
+    ];
+    for (const [sel, min, what] of pins) {
+      expect(await contrastOf(page, sel), `${what} (${sel})`).toBeGreaterThanOrEqual(min);
+    }
+    expect(await contrastOf(page, '#rcName', '::placeholder'), 'placeholder (P6)').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('ai-critique: the results closer converts in dark too (C11)', async ({ page }) => {
+    await page.goto('/ai-critique.html');
+    await page.evaluate(() => { (document.getElementById('critResults') as HTMLElement).hidden = false; });
+    expect(await contrastOf(page, '.crit-close h3'), 'closer heading (24px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.crit-close-secondary'), 'email-me button').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.crit-close-primary'), 'book-a-call button').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '#critUrl', '::placeholder'), 'URL placeholder (P6)').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('primary buttons keep their label on hover in dark (C12)', async ({ page }) => {
+    await page.goto('/pricing-estimator.html');
+    await page.click('#q1_new');
+    await page.hover('#q1next');
+    await page.waitForTimeout(400); // let the .2s transition settle
+    expect(await contrastOf(page, '#q1next'), 'estimator Next, hovered').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/report-card.html');
+    await page.hover('#rcSubmit');
+    await page.waitForTimeout(400);
+    expect(await contrastOf(page, '#rcSubmit'), 'report-card submit, hovered').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('estimator: rush chip and add-on prices legible in dark (P4/P8)', async ({ page }) => {
+    await page.goto('/pricing-estimator.html');
+    await page.click('#q1_new'); await page.click('#q1next');
+    await page.click('#q2_4-7'); await page.click('#q2next');
+    await page.click('#q3_squarespace'); await page.click('#q3next');
+    await page.click('#q4_seo'); await page.click('#q4next');
+    await page.click('#q5_asap'); await page.click('#q5next');
+    await expect(page.locator('#peResults')).toBeVisible();
+    expect(await contrastOf(page, '.tier-rush'), 'rush-pricing disclosure').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.addon-price'), 'add-on price').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('local visibility: score band, grade chip, and every signal badge legible in dark (P4)', async ({ page }) => {
+    await page.goto('/local-visibility.html');
+    await page.click('#q1_restaurant'); await page.click('#q1next');
+    await page.click('#q2_yes_claimed'); await page.click('#q2next'); // -> good badge
+    await page.click('#q3_bad'); await page.click('#q3next');         // -> poor badge
+    await page.click('#q4_partial'); await page.click('#q4next');     // -> ok badge
+    await page.click('#q5_some'); await page.click('#q5next');
+    expect(await contrastOf(page, '#q6_name', '::placeholder'), 'placeholder (P6)').toBeGreaterThanOrEqual(4.5);
+    await page.fill('#q6_name', "Rosa's Bakery");
+    await page.fill('#q6_city', 'Burbank');
+    await page.click('#q6next');
+    await expect(page.locator('#lvResults')).toBeVisible();
+    expect(await contrastOf(page, '#lvScoreNum'), 'score number (72px)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '#lvGrade'), 'grade chip').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.signal-badge'), 'worst signal badge (good/ok/poor all rendered)').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.opp-card .opp-label'), 'opportunity label').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('buy-audit: the credited-toward reassurance reads in dark (P5)', async ({ page }) => {
+    await page.goto('/buy-audit.html?tier=health');
+    expect(await contrastOf(page, '#a-credit'), 'credit note').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '#a-credit strong'), 'credit note emphasis').toBeGreaterThanOrEqual(4.5);
   });
 });

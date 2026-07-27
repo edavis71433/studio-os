@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -625,5 +625,70 @@ test.describe('marketing nav (live, mobile)', () => {
     const footerLogin = page.locator('footer.site a[href="/portal"]');
     await footerLogin.scrollIntoViewIfNeeded();
     await expect(footerLogin).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dark scheme — the styles.css sitewide remap flips the shared tokens; these
+// pins measure the chrome/closer pairs the MS2+MS3 review found failing (P9)
+// so they can't regress. WCAG helpers mirror marketing-tools.spec.ts.
+// ---------------------------------------------------------------------------
+function wcag(fg: string, bg: string): number {
+  const lum = (c: string) => {
+    const [r, g, b] = (c.match(/\d+(\.\d+)?/g) || ['0', '0', '0']).slice(0, 3).map(Number);
+    const f = (v: number) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const [a, b] = [lum(fg), lum(bg)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+/** min contrast across matches, vs the alpha-composited effective background */
+async function contrastOf(page: Page, selector: string, pseudo?: string): Promise<number> {
+  const pairs = await page.evaluate(([sel, ps]) => {
+    const parse = (c: string) => {
+      const m = c.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
+      return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
+    };
+    return [...document.querySelectorAll(sel as string)].map((el) => {
+      const stack: number[][] = [];
+      let n: Element | null = el;
+      while (n) {
+        const bg = parse(getComputedStyle(n).backgroundColor);
+        if (bg && bg[3] > 0) { stack.push(bg); if (bg[3] >= 1) break; }
+        n = n.parentElement;
+      }
+      let bg = [255, 255, 255];
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const [r, g, b, a] = stack[i];
+        bg = [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)];
+      }
+      const fg4 = parse(getComputedStyle(el, (ps as string) || null).color)!;
+      const fg = fg4[3] >= 1
+        ? fg4.slice(0, 3)
+        : [fg4[0] * fg4[3] + bg[0] * (1 - fg4[3]), fg4[1] * fg4[3] + bg[1] * (1 - fg4[3]), fg4[2] * fg4[3] + bg[2] * (1 - fg4[3])];
+      return { fg, bg };
+    });
+  }, [selector, pseudo ?? null] as const);
+  if (!pairs.length) throw new Error(`contrastOf: nothing matches "${selector}"`);
+  return Math.min(...pairs.map((p) => wcag(`rgb(${p.fg.join(',')})`, `rgb(${p.bg.join(',')})`)));
+}
+
+test.describe('dark scheme (chrome + closer fine print)', () => {
+  test.use({ colorScheme: 'dark' });
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'scheme pins run once, on desktop');
+  });
+
+  test('footer brand line and closer fine print stay legible in dark (P9)', async ({ page }) => {
+    // the footer ships on every page via the chrome — one page proves the rule
+    await page.goto('/index.html');
+    expect(await contrastOf(page, 'footer.site .brand'), 'footer brand line').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/web-design.html');
+    expect(await contrastOf(page, 'main section.panel-dark .hint'), 'closer fine print').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/audit.html');
+    expect(await contrastOf(page, 'section.cta-band > p'), 'audit CTA band copy').toBeGreaterThanOrEqual(4.5);
   });
 });

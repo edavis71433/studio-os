@@ -64,3 +64,12 @@ body[data-page="tools"] .res-card-feature p{ font-size:15.5px; max-width:52ch; }
   body[data-page="tools"] .res-card-feature{ grid-column:span 1; padding:30px 26px 26px; }
   body[data-page="tools"] .res-card{ padding:28px 24px 24px; }
 }
+
+/* Dark-scheme counterpart (the contact.css recipe): the question cards are
+   hardcoded white while their text rides tokens that flip light in dark —
+   1.18:1 headings on white (review P2). Step the cards onto the card tone
+   styles.css uses for .svc/.ns-item; the token text then measures >=4.5:1
+   (pinned in tests/e2e/marketing-tools.spec.ts). No :root, no token writes. */
+@media (prefers-color-scheme: dark){
+  body[data-page="tools"] .res-card{ background:#241d38; }
+}

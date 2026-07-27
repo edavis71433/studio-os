@@ -84,8 +84,12 @@
 .tool-switch-item p{font-size:12.5px;color:var(--muted);line-height:1.5}
 .tool-switch-item.current{background:var(--p-mist);border-color:var(--p);cursor:default;
   pointer-events:none;box-shadow:none}
+/* Color is a darkened --brass-deep, not the token: at 9.5px on the --p-mist
+   current-card the token's own value measures 4.12:1, under AA's 4.5:1 floor
+   (review P8). #7a5d33 measures 5.08:1 there; the dark block below restores
+   the lifted brass the dark remap would otherwise have supplied. */
 .tsw-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--brass-deep);border:1px solid var(--brass);
+  text-transform:uppercase;color:#7a5d33;border:1px solid var(--brass);
   border-radius:3px;padding:2px 8px;margin-bottom:8px}
 @media(max-width:760px){.tool-switch-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.tool-switch-grid{grid-template-columns:1fr}}
@@ -108,3 +112,69 @@
   padding-bottom:1px;transition:.15s}
 .final-cta .secondary-link:hover{color:var(--paper);border-color:var(--paper)}
 .final-cta a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.55);border-radius:4px}
+
+/* ============================================================
+   DARK-SCHEME COUNTERPARTS — the contact.css recipe (review F1),
+   applied to the tool family. styles.css owns the token remap;
+   this block only gives the family's hardcoded light/plum
+   surfaces their dark counterparts and lifts the accents the
+   remap can't reach (stylesheet classes, not inline styles).
+   No :root, no token writes — pinned by
+   tests/e2e/marketing-tools.spec.ts, and every pair below is
+   measured there (WCAG AA on computed styles).
+   ============================================================ */
+@media (prefers-color-scheme: dark){
+  /* NOTE on selectors: each page's own <style> loads AFTER this file, so
+     dark counterparts for classes a page also declares carry a
+     body[data-page] prefix — same declarations, cascade-proof specificity. */
+  /* plum-as-text: #5B3FA0 can't carry text on a dark surface; same lift
+     styles.css gives .hero h1 em (P3) */
+  .tool-hero h1 em,
+  body[data-page="ai-critique"] .crit-hero h1 em{color:#b39ce6}
+  .tool-specimen .spec-callout .k{color:#b39ce6}
+  /* the darkened light-mode brass micro-labels step back up to the lifted
+     brass the dark remap uses (P8) */
+  .tsw-badge,
+  body[data-page="pricing-estimator"] .opt-price,
+  body[data-page="pricing-estimator"] .addon-price,
+  body[data-page="local-visibility"] .opp-card .opp-label{color:#C9A468}
+  /* the page-local primary buttons clone .btn-primary's light-mode hover
+     (deep plum), which would swallow the dark-scheme label — same fix
+     styles.css re-states for .btn-primary itself (C12) */
+  body[data-page="pricing-estimator"] .next-btn:hover,
+  body[data-page="local-visibility"] .next-btn:hover,
+  body[data-page="pricing-estimator"] .tier-cta:hover,
+  body[data-page="report-card"] .rc-btn:hover,
+  body[data-page="ai-critique"] .crit-next:hover,
+  body[data-page="ai-critique"] .crit-go:hover{
+    background:#c4aee8;color:#1B1525}
+  /* roi-calculator: the results panel keeps its literal plum surface, so its
+     token-colored text must stay literally light (C9) */
+  body[data-page="roi-calculator"] .results{color:#FBFAF7}
+  body[data-page="roi-calculator"] .result-num{color:#FBFAF7}
+  body[data-page="roi-calculator"] .result-num.highlight{color:#C9A468}
+  body[data-page="roi-calculator"] .cta-row .btn-outline-light{color:#FBFAF7}
+  /* ai-critique: the results closer is the same literal plum panel (C11) */
+  body[data-page="ai-critique"] .crit-close h3,
+  body[data-page="ai-critique"] .crit-close-secondary{color:#FBFAF7}
+  body[data-page="ai-critique"] .crit-close-primary{background:#EFEAF7;color:#171320}
+  /* report-card: the specimen paints with ink-as-background; --ink flips
+     light in dark, so the card pins the literal dark ink instead (C10) */
+  body[data-page="report-card"] .rc-card{background:#1B1525;border:1px solid #332B49}
+  body[data-page="report-card"] .rc-card-header-left h3,
+  body[data-page="report-card"] .rc-grade{color:#FBFAF7}
+  body[data-page="report-card"] .rc-form-side h2 em,
+  body[data-page="report-card"] .rc-what .section-header h2 em,
+  body[data-page="report-card"] .rc-bridge .k{color:#b39ce6}
+  /* status tones tuned for the light cards go murky on the dark tints (P4) */
+  body[data-page="local-visibility"] .score-big.poor,
+  body[data-page="local-visibility"] .score-grade.poor,
+  body[data-page="local-visibility"] .signal-badge.sb-poor{color:#ee8888}
+  body[data-page="local-visibility"] .score-big.ok,
+  body[data-page="local-visibility"] .score-grade.ok,
+  body[data-page="local-visibility"] .signal-badge.sb-ok,
+  body[data-page="pricing-estimator"] .tier-rush{color:#f0b429}
+  body[data-page="local-visibility"] .score-big.good,
+  body[data-page="local-visibility"] .score-grade.good,
+  body[data-page="local-visibility"] .signal-badge.sb-good{color:#7ed6a2}
+}

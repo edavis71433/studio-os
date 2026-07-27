@@ -1,0 +1,17 @@
+/* ============================================================
+   Davis Digital Studio — buy-audit.css
+   Dark-scheme counterparts ONLY (the contact.css recipe, review
+   F1/P5): buy-audit's light-mode layer lives in the page's own
+   <style>; styles.css owns the tokens and the sitewide dark
+   remap. The credit note's greens are tuned for the light tint
+   and go murky (2.19:1) when the translucent tint composites
+   over the dark page — lift them to the greens the pre-rebuild
+   page-local dark block used. No :root, no token writes
+   (pinned by tests/e2e/marketing-tools.spec.ts).
+   ============================================================ */
+@media (prefers-color-scheme: dark){
+  /* body[data-page] prefix: the page's own <style> loads after this file,
+     so the counterpart needs cascade-proof specificity */
+  body[data-page="buy-audit"] .credit{color:#a9d8bc}
+  body[data-page="buy-audit"] .credit strong{color:#c4e8d1}
+}

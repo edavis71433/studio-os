@@ -466,6 +466,9 @@ footer.site a:focus-visible{
   .nav-sub{background:#241d38;border-color:#332B49;box-shadow:0 12px 34px rgba(0,0,0,.5)}
   .nav-sub a:hover{background:#2c2344}
   footer.site{background:#0f0c18}
+  /* the brand line is color:var(--paper), which flips DARK in this remap —
+     1.06:1 on the dark footer on every page. Keep it literally light. */
+  footer.site .brand{color:#EFEAF7}
   /* the brand mark and the industry line-icons draw their "ink"
      strokes as presentation attributes; CSS wins over those, so
      one rule relights every dark-on-dark stroke sitewide */

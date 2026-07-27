@@ -77,7 +77,7 @@
 .text-input{width:100%;border:1px solid var(--hair);border-radius:2px;padding:13px 15px;font-size:15px;
   font-family:var(--sans);color:var(--ink);background:var(--paper);transition:.15s;margin-bottom:8px}
 .text-input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(91,63,160,.25)}
-.text-input::placeholder{color:rgba(107,98,118,.6)}
+.text-input::placeholder{color:var(--muted)}
 
 .nav-btns{display:flex;align-items:center;gap:12px;margin-top:24px}
 .back-btn{background:transparent;border:1px solid var(--hair);color:var(--ink);border-radius:2px;
@@ -121,12 +121,20 @@
 .signal-title{font-size:13px;font-weight:550}
 .signal-badge{font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:3px 10px;
   border-radius:3px;white-space:nowrap}
+/* status classes (not inline styles) so the dark scheme can re-tune the
+   tones — light values match .score-grade; dark lifts live in tool-page.css */
+.signal-badge.sb-poor{background:rgba(178,59,59,.1);color:#b23b3b}
+.signal-badge.sb-ok{background:rgba(240,180,41,.16);color:#8a5a00}
+.signal-badge.sb-good{background:rgba(46,125,50,.1);color:#2e7d32}
 .signal-desc{font-size:12px;color:var(--muted);line-height:1.5}
 
 .opp-card{background:var(--p-mist);border-left:3px solid var(--brass);border-radius:3px;
   padding:28px;margin-bottom:20px}
+/* label color is a darkened --brass-deep: the token measures 4.12:1 on the
+   --p-mist card at 10.5px, under AA (review P8); tool-page.css's dark block
+   restores the lifted brass for dark */
 .opp-card .opp-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--brass-deep);margin-bottom:10px}
+  text-transform:uppercase;color:#7a5d33;margin-bottom:10px}
 .opp-card h3{font-family:var(--serif);font-size:22px;font-weight:380;margin-bottom:10px}
 .opp-card p{font-size:14px;color:var(--ink);line-height:1.7}
 
@@ -739,12 +747,10 @@ function showResults() {
   // were tuned for its dark hero, which is gone).
   document.getElementById('signalsGrid').innerHTML = signals.map(function(s) {
     var statusColors = { good: '#2e7d32', ok: '#8a5a00', poor: '#b23b3b' };
-    var badgeBg = { good: 'rgba(46,125,50,0.1)', ok: 'rgba(240,180,41,0.16)', poor: 'rgba(178,59,59,0.1)' };
     var col = statusColors[s.status];
-    var bg = badgeBg[s.status];
     return '<div class="signal-card" style="border-left:3px solid ' + col + ';">' +
       '<div class="signal-head"><div class="signal-title">' + s.title + '</div>' +
-      '<span class="signal-badge" style="background:' + bg + ';color:' + col + ';">' + s.badge + '</span></div>' +
+      '<span class="signal-badge sb-' + s.status + '">' + s.badge + '</span></div>' +
       '<p class="signal-desc" style="margin-top:8px;">' + s.analysis + '</p>' +
     '</div>';
   }).join('');
