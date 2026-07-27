@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 // ============================================================
@@ -38,7 +38,7 @@ const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
 const PAGES = [
   'index.html', 'services.html', 'web-design.html', 'seo-strategy.html',
   'monthly-retainer.html', 'pricing.html', 'how-we-work.html',
-  'the-experience.html', 'industries.html', 'restaurant-web-design.html',
+  'industries.html', 'restaurant-web-design.html',
   'salon-web-design.html', 'retail-web-design.html',
   'home-services-web-design.html', 'health-wellness-web-design.html',
   'tools.html', 'audit.html', 'ai-critique.html', 'report-card.html',
@@ -494,6 +494,65 @@ test.describe('MS2 money path (static pins)', () => {
     const html = read('monthly-retainer.html');
     expect(html).toMatch(/<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/);
     expect(html).toContain('<noscript><link href="https://fonts.googleapis.com/css2');
+  });
+});
+
+// ============================================================
+// MS4 — one story (docs/design/MARKETING-SITE-OVERHAUL.md §MS4, P1).
+//
+// the-experience.html retired into /how-we-work: its three additive
+// beats (02 one place / 03 approvals / 05 money) + the pmock workspace
+// figure moved over verbatim; everything else on it was duplicate.
+// /the-experience and /the-experience.html 301 to /how-we-work, and no
+// source file may reference the retired URL again.
+// ============================================================
+test.describe('MS4 one story (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('the-experience is gone from disk (page + its page-only stylesheet)', () => {
+    expect(existsSync(join(ROOT, 'the-experience.html')), 'the-experience.html deleted').toBe(false);
+    expect(existsSync(join(ROOT, 'the-experience.css')), 'the-experience.css deleted').toBe(false);
+  });
+
+  test('_redirects: /the-experience and /the-experience.html 301 to /how-we-work; the 200 rule is gone', () => {
+    const rules = parseRedirects();
+    for (const from of ['/the-experience', '/the-experience.html']) {
+      const matching = rules.filter((x) => x.from === from);
+      expect(matching, `${from}: exactly one rule (nothing shadows the 301)`).toHaveLength(1);
+      expect(matching[0].to, `${from} -> /how-we-work`).toBe('/how-we-work');
+      expect(matching[0].code, `${from} is a permanent redirect`).toBe('301');
+    }
+    // the 301 lands on a clean URL that itself resolves to a real file
+    const to = targetOf(rules, '/how-we-work');
+    expect(to && existsSync(join(ROOT, to.replace(/^\//, ''))), '301 chain resolves to a real file').toBe(true);
+  });
+
+  test('no source file references the-experience anymore (outside _redirects)', () => {
+    // root-level pages, scripts, styles, and the sitemap — the whole published
+    // surface. _redirects (the 301s) is the only place the old URL may live.
+    const files = readdirSync(ROOT).filter((f) => /\.(html|js|css|xml)$/.test(f));
+    for (const f of files) {
+      expect(read(f).includes('the-experience'), `${f}: references the retired the-experience URL`).toBe(false);
+    }
+  });
+
+  test('how-we-work carries the merged story: the three beats + the workspace figure', () => {
+    const html = read('how-we-work.html');
+    const main = mainOf(html, 'how-we-work.html');
+    // the three absorbed beats (the-experience's 02/03/05), moved verbatim
+    expect(main, 'beat: one place').toContain('Everything lives in one place.');
+    expect(main, 'beat: approvals').toContain('Reviewing and approving work is simple.');
+    expect(main, 'beat: money').toContain('Money is clear, never awkward.');
+    // the pmock workspace figure + its caption
+    expect(main, 'pmock figure moved over').toContain('class="pmock"');
+    expect(main, 'figure caption moved over').toContain('This is what you see when you log in');
+    expect(html, 'portal-mock.css loaded for the figure').toContain('href="portal-mock.css"');
+    // the not-a-step step 04 is deleted (its self-referential link died with it)
+    expect(main, 'step 04 deleted').not.toContain('See exactly what that looks like');
+    // still exactly ONE dark closer on the merged page
+    expect(main.match(/panel-dark|cta-band/g)?.length, 'one dark closer').toBe(1);
   });
 });
 

@@ -52,7 +52,6 @@ export const PAGES = [
   ['monthly-retainer.html', '/monthly-retainer', 'services'],
   ['pricing.html', '/pricing'],
   ['how-we-work.html', '/how-we-work'],
-  ['the-experience.html', '/the-experience'], // published until MS4 301s it into /how-we-work
   ['industries.html', '/industries'],
   ['restaurant-web-design.html', '/restaurant-web-design', 'industries'],
   ['salon-web-design.html', '/salon-web-design', 'industries'],

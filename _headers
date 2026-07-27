@@ -75,8 +75,6 @@
   Cache-Control: no-cache, must-revalidate
 /how-we-work
   Cache-Control: no-cache, must-revalidate
-/the-experience
-  Cache-Control: no-cache, must-revalidate
 /work
   Cache-Control: no-cache, must-revalidate
 /about

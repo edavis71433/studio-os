@@ -30,6 +30,10 @@
 # Pre-call intake retired into contact
 /start             /contact            301
 
+# One story: the-experience merged into how-we-work (MS4, P1)
+/the-experience         /how-we-work    301
+/the-experience.html    /how-we-work    301
+
 # Clean URLs for the tools (each keeps its own page; no longer funneled to a dead hub)
 /audit             /audit.html         200
 /ai-critique       /ai-critique.html   200
@@ -54,7 +58,6 @@
 /seo-strategy           /seo-strategy.html          200
 /monthly-retainer       /monthly-retainer.html      200
 /how-we-work            /how-we-work.html           200
-/the-experience         /the-experience.html        200
 /industries             /industries.html            200
 /work                   /work.html                  200
 /contact                /contact.html               200

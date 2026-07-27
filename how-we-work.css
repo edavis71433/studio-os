@@ -8,10 +8,14 @@
    This page and Growth Partnership are both chronological, so
    they deliberately do NOT share a device. Growth Partnership got
    a horizontal timeline (three points, a wide rail). This page
-   gets a vertical zig-zag narrative — five steps, alternating
+   gets a vertical zig-zag narrative — four steps, alternating
    left/right down a central guide line — a genuinely different
-   rhythm for a genuinely different pace (five steps in a single
+   rhythm for a genuinely different pace (four steps in a single
    engagement, not three stages of a multi-year drift).
+
+   MS4 added the workspace layer merged in from the retired
+   experience page: three equal-weight beat cards + the pmock
+   showcase figure (.hww-beats / .hww-proof, below).
    ============================================================ */
 
 body[data-page="how"] .hww-shot{
@@ -21,7 +25,7 @@ body[data-page="how"] .hww-shot{
 body[data-page="how"] .hww-shot img{ border:none; border-radius:16px; }
 
 /* ---------------------------------------------------------------
-   FIVE STEPS — vertical zig-zag
+   FOUR STEPS — vertical zig-zag
    --------------------------------------------------------------- */
 body[data-page="how"] .hww-steps-section{
   position:relative;
@@ -68,21 +72,69 @@ body[data-page="how"] .hww-step-card{
 }
 body[data-page="how"] .hww-step-card h2{ font-size:21px; margin-bottom:10px; }
 body[data-page="how"] .hww-step-card p{ color:var(--muted); font-size:15px; }
-body[data-page="how"] .hww-step-card .feel{
+body[data-page="how"] .hww-step-card .feel,
+body[data-page="how"] .hww-beat .feel{
   display:inline-flex; align-items:center; gap:8px; margin-top:14px;
   font-family:var(--mono); font-size:11.5px; letter-spacing:.04em;
   color:var(--brass-deep); text-transform:uppercase;
 }
-body[data-page="how"] .hww-step-card .feel::before{
+body[data-page="how"] .hww-step-card .feel::before,
+body[data-page="how"] .hww-beat .feel::before{
   content:""; width:5px; height:5px; border-radius:50%; background:var(--brass);
 }
 
-/* Dark mode: the white step cards become card surfaces; shadows
-   deepen so the zig-zag still reads as elevation. Light untouched. */
+/* ---------------------------------------------------------------
+   THE WORKSPACE, UP CLOSE — merged in from the retired page (MS4):
+   three equal-weight beat cards + the pmock showcase figure. The
+   cards reuse the step-card surface language; the figure keeps the
+   showcase treatment it had on the retired page. The pmock inside
+   deliberately keeps its own light skin in both schemes — it reads
+   as a screenshot artifact, same as on index/services.
+   --------------------------------------------------------------- */
+body[data-page="how"] .hww-beats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:22px;
+}
+body[data-page="how"] .hww-beat{
+  background:#fff;
+  border-radius:20px;
+  padding:28px 26px 24px;
+  box-shadow:0 22px 46px -32px rgba(27,21,37,.2);
+}
+body[data-page="how"] .hww-beat h3{
+  font-size:19px; font-weight:400; line-height:1.28; margin-bottom:10px;
+}
+body[data-page="how"] .hww-beat p{ color:var(--muted); font-size:14.5px; line-height:1.6; }
+
+body[data-page="how"] .hww-proof{
+  margin:14px 0 0;
+  border-radius:22px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 40px 76px -36px rgba(43,27,74,.32);
+}
+body[data-page="how"] .hww-proof-cap{
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--muted);
+  margin-top:16px; text-align:center;
+}
+
+@media(max-width:880px){
+  body[data-page="how"] .hww-beats{ grid-template-columns:1fr; }
+}
+
+/* Dark mode: the white step + beat cards become card surfaces (the
+   contact.css #241d38 precedent); shadows deepen so the zig-zag and
+   the showcase frame still read as elevation. Light untouched. */
 @media (prefers-color-scheme: dark){
-  body[data-page="how"] .hww-step-card{
+  body[data-page="how"] .hww-step-card,
+  body[data-page="how"] .hww-beat{
     background:#241d38;
     box-shadow:0 22px 46px -32px rgba(0,0,0,.55);
+  }
+  body[data-page="how"] .hww-proof{
+    background:#241d38;
+    box-shadow:0 40px 76px -36px rgba(0,0,0,.6);
   }
 }
 
