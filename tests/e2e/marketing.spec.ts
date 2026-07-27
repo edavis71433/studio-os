@@ -405,6 +405,22 @@ test.describe('MS2 money path (static pins)', () => {
     expect(read('how-we-work.html'), 'the range is how-we-work\'s own published number').toMatch(range);
   });
 
+  test('price-story truth: no absolute "no SEO price anywhere" claim; the $499 upsell sells only $499 content', () => {
+    // C1: the estimator publishes a standalone "SEO Strategy $800" add-on
+    // (its catalog framing is flagged for Eric, not silently rewritten), so
+    // an absolute "you won't find one anywhere on this site" clause on
+    // /pricing is falsified one click away. seo-strategy.html's softer
+    // phrasing ("There's no separate SEO price list") is the defensible form.
+    expect(read('pricing.html'), 'pricing: absolute SEO-price claim').not.toMatch(/anywhere on this site/i);
+    // C2: competitor analysis is exclusively the $899 Competitive
+    // Intelligence tier (audit.html's tier table, buy-audit's TIERS catalog,
+    // and the schema.org offers all agree). The free-score upsell sells the
+    // $499 Digital Health Check and may not promise competitor work.
+    const upsell = read('audit.html').match(/goes 10x deeper[^']*/)?.[0] ?? '';
+    expect(upsell, 'audit: free-score upsell copy found').toBeTruthy();
+    expect(upsell, 'audit: the $499 upsell may not promise the $899 tier\'s competitor work').not.toMatch(/competitor/i);
+  });
+
   test('monthly-retainer font loading matches index (preload + async swap + noscript)', () => {
     const html = read('monthly-retainer.html');
     expect(html).toMatch(/<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/);
