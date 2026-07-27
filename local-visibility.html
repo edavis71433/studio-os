@@ -615,7 +615,16 @@ function nextStep(from) {
     document.getElementById('q' + next).classList.add('active');
     document.getElementById('sd' + next).classList.add('active');
     currentStep = next;
+    focusStepHeading(next);
   }
+}
+
+// Keyboard/SR: hiding the old card would drop focus to <body> — move it to
+// the new question's heading (standard wizard pattern; showResults() already
+// focuses the results heading the same way).
+function focusStepHeading(step) {
+  var h = document.querySelector('#q' + step + ' h2');
+  if (h) { h.setAttribute('tabindex', '-1'); h.style.outline = 'none'; try { h.focus(); } catch (e) {} }
 }
 
 function prevStep(from) {
@@ -627,6 +636,7 @@ function prevStep(from) {
   document.getElementById('sd' + prev).textContent = prev;
   if (document.getElementById('sl' + prev)) document.getElementById('sl' + prev).classList.remove('done');
   currentStep = prev;
+  focusStepHeading(prev);
 }
 
 function calcScore() {

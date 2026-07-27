@@ -184,6 +184,10 @@ test.describe('tools family (static pins)', () => {
         sources.set(css, read(css));
       }
     }
+    // analytics.js injects its consent banner into every chrome-bearing page,
+    // so its markup is family markup too (P1: the banner's buttons were the
+    // last pill-anatomy survivors)
+    sources.set('analytics.js', read('analytics.js'));
     for (const [name, raw] of sources) {
       // scan styling, not prose: drop comments, and the theme-color meta
       // (which legitimately carries the brand hex for browser chrome)
@@ -636,6 +640,11 @@ test.describe('tools family (live)', () => {
     await expect(page.locator('#a-title')).toHaveText('Digital Health Check');
     await expect(page.locator('#a-price')).toHaveText('$499');
     await expect(page.locator('#a-includes li')).toHaveCount(8);
+    // P10: the tick icons are decorative — they must not reach the a11y tree
+    const exposedTicks = await page.evaluate(
+      () => [...document.querySelectorAll('#a-includes .tick svg')].filter((s) => !s.closest('[aria-hidden="true"]')).length
+    );
+    expect(exposedTicks, 'deliverable ticks hidden from assistive tech').toBe(0);
     // validation first
     await page.click('#a-go');
     await expect(page.locator('#a-err')).toBeVisible();
@@ -668,6 +677,36 @@ test.describe('tools family (live)', () => {
       const radius = await band.locator('form button').evaluate((el) => getComputedStyle(el).borderRadius);
       expect(radius, `${f}: ink button, not a pill`).toBe('2px');
     }
+  });
+
+  test('wizard step advance moves keyboard focus to the new question heading (P7)', async ({ page }) => {
+    // Standard wizard pattern: hiding the current card must not drop focus
+    // to <body> (which forces a full re-Tab through the chrome and leaves
+    // screen readers with no announcement). Forward AND backward.
+    const activeInfo = () =>
+      page.evaluate(() => {
+        const el = document.activeElement;
+        return { tag: el?.tagName ?? 'NONE', card: el?.closest('.q-card')?.id ?? null };
+      });
+    await page.goto('/pricing-estimator.html');
+    await page.click('#q1_new');
+    await page.focus('#q1next');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#q2')).toBeVisible();
+    expect(await activeInfo(), 'estimator: forward focus').toEqual({ tag: 'H2', card: 'q2' });
+    await page.click('#q2 .back-btn');
+    await expect(page.locator('#q1')).toBeVisible();
+    expect(await activeInfo(), 'estimator: backward focus').toEqual({ tag: 'H2', card: 'q1' });
+
+    await page.goto('/local-visibility.html');
+    await page.click('#q1_restaurant');
+    await page.focus('#q1next');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#q2')).toBeVisible();
+    expect(await activeInfo(), 'local-visibility: forward focus').toEqual({ tag: 'H2', card: 'q2' });
+    await page.click('#q2 .back-btn');
+    await expect(page.locator('#q1')).toBeVisible();
+    expect(await activeInfo(), 'local-visibility: backward focus').toEqual({ tag: 'H2', card: 'q1' });
   });
 
   test('form placeholders and brass micro-labels clear AA in the light scheme too', async ({ page }) => {

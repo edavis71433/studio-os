@@ -46,8 +46,8 @@
     b.innerHTML =
       '<span style="flex:1;min-width:200px;color:rgba(255,255,255,.8);line-height:1.5">Okay to use privacy-friendly analytics to see which pages help visitors most? Nothing runs unless you say yes &mdash; the site works fine either way. See the <a href="/privacy" style="color:#c4aee8;text-decoration:underline">Privacy Policy</a>.</span>' +
       '<span style="display:flex;gap:8px;flex-shrink:0">' +
-      '<button type="button" id="ddsCookieOk" style="background:#5b3fa0;color:#fff;border:none;padding:9px 20px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Allow analytics</button>' +
-      '<button type="button" id="ddsCookieNo" style="background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);padding:9px 16px;border-radius:100px;font-size:13px;cursor:pointer;font-family:inherit">No thanks</button>' +
+      '<button type="button" id="ddsCookieOk" style="background:#FBFAF7;color:#1B1525;border:none;padding:10px 20px;border-radius:2px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Allow analytics</button>' +
+      '<button type="button" id="ddsCookieNo" style="background:transparent;color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.28);padding:9px 16px;border-radius:2px;font-size:13px;cursor:pointer;font-family:inherit">No thanks</button>' +
       '</span>';
     document.body.appendChild(b);
 

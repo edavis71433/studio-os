@@ -221,7 +221,7 @@
 <div class="tool-wrap tool-wrap--narrow">
 
   <div id="progressWrap">
-    <div class="progress-label" id="progressLabel">Question 1 of 5</div>
+    <div class="progress-label" id="progressLabel" aria-live="polite">Question 1 of 5</div>
     <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:20%"></div></div>
   </div>
 
@@ -568,6 +568,11 @@ function go(from, to) {
   var pct = (to / 5) * 100;
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressLabel').textContent = to <= 5 ? 'Question ' + to + ' of 5' : 'Your estimate';
+  // Keyboard/SR: hiding the old card would drop focus to <body> — move it to
+  // the new question's heading (standard wizard pattern; the results
+  // transition already focuses its own heading the same way).
+  var h = document.querySelector('#q' + to + ' h2');
+  if (h) { h.setAttribute('tabindex', '-1'); h.style.outline = 'none'; try { h.focus(); } catch (e) {} }
 }
 
 function calcTier() {
