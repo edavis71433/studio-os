@@ -391,6 +391,23 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+🏁 **MARKETING OVERHAUL — ALL DECISION-FREE WORK LIVE (2026-07-27).**
+✅ MS6 MERGED TO MAIN @92a717b (Eric "Merge it"; Netlify). Review: no
+blockers; 3 nits fixed pre-merge. MS6 delivered the doc's §MS7 sweep: five
+capture forms tokenized (services/web-design/pricing/seo-strategy/monthly-
+retainer), ai-disclaimer rebuilt on the legal template (copy verbatim,
+pinned; pre-existing stray-brace dark bug fixed), start.html + contact-
+disclaimer.html deleted (orphaned, 301→/contact), email-signature/
+styleguide/a11y excluded from the public build + force-404'd.
+REMAINING = ERIC-GATED ONLY: §MS7.4 terms extension + privacy provider
+list (LEGAL-DRAFTS-166) · P6 SaaS namespace (get-started/signup/welcome —
+NOTE signup.html's no-plan fallback now lands on agency /pricing, wrong
+audience; needs the where-do-SaaS-plans-live decision) · estimator $800
+SEO add-on + "Package" catalog framing + 25% rush (P2) · /monthly-retainer
+→/growth-partnership rename (P5) · Results/Bacchus publish · P4a one-light
+strip · health-wellness private-intake claim (needs published backing) ·
+audit.html pre-existing :root fork (future sliver) · server cleanup: dead
+clever-api discovery_intake route + stale comment (start.html retired).
 ✅ MS4 MERGED TO MAIN @dbb3503 (Eric "Merge it", 2026-07-27; Netlify).
 ✅ MS5 MERGED TO MAIN @f22c7f8 (Eric "Merge it", 2026-07-27; Netlify).
 Review: no blockers; 4 items fixed pre-merge ($-safe stamp, unique-marker
