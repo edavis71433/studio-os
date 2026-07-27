@@ -381,7 +381,17 @@ class fixed family-wide + pinned · 4ad5a5a wizard focus mgmt + consent banner
 joins the system). Gates: marketing suites 115/0 ×3 projects, sync --check 29/
 29, pure 208/0/4, app tripwire 15/15. Shared-file blast radius: analytics.js
 4 lines (banner visuals only), styles.css +3 (dark counterparts).
-NEXT: MS4 (the-experience→how-we-work 301, P1) → MS5 industries → MS6
+**MS4 BUILT (3f9e7e9) + reviewed:** the-experience retired into how-we-work
+(P1) — beats 02/03/05 + Rosa's Bakery pmock moved verbatim, retitle "How it
+works", not-a-step 04 deleted, launch renumbered; page+css deleted, 301 pair
+for /the-experience(.html), sync manifest now 28 pages, 7 inbound links
+rewritten (+ work.html "isn't a mockup" honesty fix per doc §2). Review:
+CLEAN (3 notes, all addressed/recorded): false pmock-dark css comment fixed;
+DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
+4-card workspace grid trim + "Not credentials" framing fix; coverage note:
+the no-references pin scans root-level files only (fine today — repo-wide
+grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+NEXT: MS4 merge ask → MS5 industries (+ about.html leftovers) → MS6
 entry/legal → MS7 ghost deletions (incl. email-signature build removal).
 
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)

@@ -88,8 +88,9 @@ body[data-page="how"] .hww-beat .feel::before{
    three equal-weight beat cards + the pmock showcase figure. The
    cards reuse the step-card surface language; the figure keeps the
    showcase treatment it had on the retired page. The pmock inside
-   deliberately keeps its own light skin in both schemes — it reads
-   as a screenshot artifact, same as on index/services.
+   follows portal-mock.css's own scheme handling (it flips to the
+   app's dark family under prefers-color-scheme, same as on
+   index/services) — nothing here overrides it.
    --------------------------------------------------------------- */
 body[data-page="how"] .hww-beats{
   display:grid;
