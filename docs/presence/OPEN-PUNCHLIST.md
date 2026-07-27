@@ -392,8 +392,27 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
 ✅ MS4 MERGED TO MAIN @dbb3503 (Eric "Merge it", 2026-07-27; Netlify).
-NEXT: MS5 industries (+ about.html leftovers from MS4 §2-3) → MS6
-entry/legal → MS7 ghost deletions (incl. email-signature build removal).
+**MS5 BUILT (585fdc9 + 42c03b5):** industries family templatized per doc
+§MS5 — the five landers' ~80%-identical shell now propagates from
+scripts/industry-shell.template.html via sync-industry-shell.mjs (chrome
+propagator's sibling; --check in build-public.sh) into 5 delimited regions,
+{{industry}} in the closer H2 the only stamped variance; unique content
+(lede/approach/bullets/FAQs/schema) stays per-page. Double closer collapsed
+to soft-capture → ONE dark CTA → footer; soft-capture = MS3's tokenized
+component (tool-page.css reuse, inline-hex copy dead); Explore pills →
+.ind-chip (styles.css, radius 3px, tokens); industries.html process bridge
+→ /how-we-work; health-wellness "private" bullet softened to the FAQ's own
+"simple and calm". MS4 §2-3 leftovers done: about.html 4-card workspace
+grid trimmed to the founder-direct beat + /how-we-work handoff; "Not
+credentials" lede now owns the credentials it leans on (origin/beliefs/
+signature untouched). Red-first: 16 new pins watched fail → green (shell
+byte-identity + sync --check, pill/purple scan extended to the family incl.
+linked css, single-closer static+live, light+dark AA on every changed
+pair). Gates: marketing suites 140/0 ×3 projects (was 119/0), sync 28/28 +
+industry-shell 5/5, pure 208/0/4. Shared-file blast radius: styles.css +8
+(.ind-chip only), build-public.sh +1 check.
+NEXT: MS5 merge ask → MS6 proof/Results (P3: Bacchus permission?) → MS7
+entry/legal ghost deletions (incl. email-signature build removal).
 
 ## ✅ G13 SLICE 2 — THE IN-PLACE EDITOR: MERGED TO MAIN + LIVE via Netlify (2026-07-20)
 
