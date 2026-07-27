@@ -521,13 +521,9 @@ footer.site a:focus-visible{
   .portal-proof{background:#241d38;border-color:#332B49;box-shadow:0 30px 60px -34px rgba(0,0,0,.55)}
   .portal-proof figcaption{background:#241d38;border-top-color:#332B49}
   .portal-proof img,.hww-shot img,.about-portrait img,.about-life img{box-shadow:0 0 0 1px rgba(196,174,232,.12)}
-  /* the shared "free site review" box (inline-styled, identical
-     markup on nine pages) — box flips to a card, the plum button
-     inside stays #5b3fa0 + white */
-  div[style*="background:#EDE8F7"]{background:#241d38 !important}
-  div[style*="background:#EDE8F7"] h2{color:#EFEAF7 !important}
-  div[style*="background:#EDE8F7"] p{color:#A79DBE !important}
-  div[style*="background:#EDE8F7"] input{background:#171320 !important;color:#EFEAF7 !important;border-color:#3a3153 !important}
-  div[style*="background:#EDE8F7"] input::placeholder{color:rgba(239,234,247,.38)}
+  /* (MS6: the inline-styled "free site review" boxes are gone — every page
+     now uses tool-page.css's tokenized .soft-capture, whose dark surface
+     rides the token remap; the attribute-selector shims that served the
+     inline copies were removed with them.) */
   ::selection{background:rgba(196,174,232,.3);color:var(--ink)}
 }

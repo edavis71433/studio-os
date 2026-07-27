@@ -20,15 +20,30 @@
 /deno.lock         /404.html   404!
 /playwright.config.ts /404.html 404!
 
+# ── MS6: internal pages excluded from the public build (doc §MS7.2) ────────────
+# email-signature (mail-provider setup steps), styleguide (internal design
+# instructions), a11y (internal check page). build-public.sh keeps them out of
+# dist/; these forced rules are defense-in-depth for both URL spellings.
+/email-signature        /404.html   404!
+/email-signature.html   /404.html   404!
+/styleguide             /404.html   404!
+/styleguide.html        /404.html   404!
+/a11y                   /404.html   404!
+/a11y.html              /404.html   404!
+
 # Free Site Review maps to the real diagnostic tool specifically
 # (matches the nav label "Free site review" -> audit.html)
 /free-site-review  /audit              301
 
 # Deleted page: contact notice folded into Privacy
-/contact-disclaimer /privacy           301
+# (MS6: the file itself is deleted — both spellings answer with the 301)
+/contact-disclaimer      /privacy      301
+/contact-disclaimer.html /privacy      301
 
 # Pre-call intake retired into contact
+# (MS6: the file itself is deleted — both spellings answer with the 301)
 /start             /contact            301
+/start.html        /contact            301
 
 # One story: the-experience merged into how-we-work (MS4, P1)
 /the-experience         /how-we-work    301

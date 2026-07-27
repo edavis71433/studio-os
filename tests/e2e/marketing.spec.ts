@@ -721,6 +721,255 @@ test.describe('MS5 about.html leftovers (static pins)', () => {
   });
 });
 
+// ============================================================
+// MS6 — entry & legal sweep (docs/design/MARKETING-SITE-OVERHAUL.md §MS7,
+// built as MS6 per the approved build order — Results was footer-demoted
+// in MS1 per P3, so the doc's §MS6 slice shipped early and the entry/legal
+// sweep moved up a slot).
+//
+// Three jobs, written red-first against the pre-MS6 pages:
+//   1. The LAST inline-hex (#EDE8F7/#5b3fa0) 100px-pill soft-capture
+//      copies die. The punchlist recorded services + web-design; the
+//      red-first estate sweep found the SAME byte-identical band on
+//      pricing, seo-strategy, and monthly-retainer — all five join the
+//      tokenized .soft-capture component (and the styles.css
+//      div[style*="background:#EDE8F7"] dark shims that served the inline
+//      copies went with them), and the generalized pill/purple scan
+//      extends over them.
+//   2. The legal set (privacy/terms/accessibility/ai-disclaimer) rides ONE
+//      legal template: styles.css tokens only, no page <style> forks, no
+//      dark closer (legal pages end content -> footer). ai-disclaimer was
+//      the last purple-template survivor — a page-scoped :root fork, a
+//      100px pill badge, a dark legal-hero, and stray-brace CSS that
+//      trapped its dark-mode variant inside a <=900px media query.
+//      VISUAL/STRUCTURAL ONLY: the legal copy itself is Eric's
+//      (docs/design/LEGAL-DRAFTS-166.md) and is pinned UNCHANGED here.
+//   3. Ghost sweep (doc §MS7 1-2): start.html + contact-disclaimer.html
+//      deleted from disk (their 301s already do the job); the internal
+//      pages (email-signature, styleguide, a11y) stop glob-shipping in
+//      the public build and their URLs force-404.
+// ============================================================
+const MS6_CAPTURE_PAGES = [
+  'services.html', 'web-design.html', 'pricing.html', 'seo-strategy.html', 'monthly-retainer.html',
+];
+const LEGAL_PAGES = ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html'];
+const MS6_FAMILY = [...MS6_CAPTURE_PAGES, ...LEGAL_PAGES, '404.html'];
+const INTERNAL_PAGES = ['email-signature.html', 'styleguide.html', 'a11y.html'];
+
+test.describe('MS6 entry & legal sweep (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('no pills, no literal purple: the generalized scan extends to the entry/legal estate (incl. linked css)', () => {
+    // Same scan as marketing-tools.spec.ts (C4) / the MS5 family scan —
+    // pill-scale radii and literal purple fail in every estate source plus
+    // every page-local linked css. This is where services/web-design's
+    // 100px-pill captures and ai-disclaimer's purple-template <style> die.
+    // portal-mock.css joins the sanctioned shared layers: it is the
+    // decorative miniature of the CLIENT APP's UI (its own --pm-* palette,
+    // drawn as an illustration of a different product surface, blessed
+    // verbatim in MS4) — not marketing styling.
+    const SANCTIONED_SHARED = new Set(['styles.css', 'enhance.css', 'portal-mock.css']);
+    const sources = new Map<string, string>();
+    for (const f of MS6_FAMILY) {
+      const html = read(f);
+      sources.set(f, html);
+      for (const m of html.matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)) {
+        const href = m[1];
+        if (/^https?:/.test(href)) continue;
+        const css = href.replace(/^\//, '');
+        if (!SANCTIONED_SHARED.has(css)) sources.set(css, read(css));
+      }
+    }
+    for (const [name, raw] of sources) {
+      const src = raw
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/<meta name="theme-color"[^>]*>/g, '');
+      for (const decl of src.matchAll(/border-radius:([^;}"']*)/gi)) {
+        for (const t of decl[1].matchAll(/([\d.]+)(px|r?em)/g)) {
+          const limit = t[2] === 'px' ? 40 : 3;
+          expect(parseFloat(t[1]), `${name}: pill-scale border-radius "${decl[0].trim()}"`).toBeLessThan(limit);
+        }
+      }
+      expect(src, `${name}: literal purple hex outside the token system`).not.toMatch(/#5b3fa0\b/i);
+      expect(src, `${name}: literal purple rgb outside the token system`).not.toMatch(/rgb\(\s*91\s*,\s*63\s*,\s*160\s*\)/);
+    }
+  });
+
+  test('soft-capture is MS3\'s tokenized component on every money page that carries one — the LAST inline-hex copies are dead', () => {
+    for (const f of MS6_CAPTURE_PAGES) {
+      const html = read(f);
+      expect(html, `${f}: inline-hex soft capture`).not.toContain('#EDE8F7');
+      expect(html, `${f}: .soft-capture component`).toContain('soft-capture');
+      // the component's home loads, after the token owner
+      expect(html.indexOf('href="tool-page.css"'), `${f}: tool-page.css loads after styles.css`).toBeGreaterThan(
+        html.indexOf('href="styles.css"')
+      );
+      // the capture keeps its function: the same GET-to-/audit form,
+      // optional email and all — a reskin, not a rewrite
+      const capture = html.match(/<section[^>]*soft-capture[\s\S]*?<\/section>/)?.[0] ?? '';
+      expect(capture, `${f}: capture form still GETs /audit`).toMatch(/<form action="\/audit" method="get">/);
+      expect(capture, `${f}: optional email field kept`).toContain('aria-label="Your email (optional)"');
+      // and it still sits ABOVE the one dark closer (nothing interactive
+      // after the closer — the live MS2 single-closer pin enforces the rest)
+      expect(html.indexOf('soft-capture'), `${f}: capture above the closer`).toBeLessThan(html.indexOf('panel-dark'));
+    }
+    // nothing anywhere on the marketing estate paints the inline-hex band now
+    // (audit.html's page-local :root still DECLARES the hex as a token value —
+    // a pre-existing MS2-era fork outside this slice's fence, flagged)
+    for (const f of PAGES) {
+      expect(read(f), `${f}: inline-hex capture band survivor`).not.toContain('background:#EDE8F7');
+    }
+    // and styles.css no longer needs its inline-capture dark shims
+    expect(read('styles.css'), 'dead div[style*=EDE8F7] dark shim').not.toContain('div[style*="background:#EDE8F7"]');
+  });
+
+  test('the legal set rides ONE legal template: token styling only, standard hero, no dark closer, no page forks', () => {
+    for (const f of LEGAL_PAGES) {
+      const html = read(f);
+      // styles.css owns every token and both schemes — a legal page carries
+      // no <style> block, no :root fork, no page-scoped scheme flip
+      expect(html, `${f}: page-scoped <style> block`).not.toContain('<style');
+      expect(html, `${f}: page-scoped prefers-color-scheme`).not.toContain('prefers-color-scheme');
+      // the template anatomy: light hero (eyebrow + one h1), then content
+      const main = mainOf(html, f);
+      expect(main, `${f}: standard light hero`).toContain('<section class="hero">');
+      expect(main, `${f}: hero eyebrow`).toContain('class="eyebrow reveal"');
+      expect(html.match(/<h1[\s>]/g)?.length, `${f}: exactly one h1`).toBe(1);
+      // legal pages end content -> footer: NO dark band of any anatomy
+      expect(html.match(/panel-dark|cta-band|legal-hero/g), `${f}: dark band on a legal page`).toBeNull();
+      // references resolve on the clean-URL system, not legacy .html spellings
+      expect(main, `${f}: legacy portal-terms.html spelling`).not.toContain('href="portal-terms.html"');
+    }
+  });
+
+  test('ai-disclaimer: rebuilt on the legal template with its legal substance UNCHANGED (Eric owns the words)', () => {
+    const html = read('ai-disclaimer.html');
+    const main = mainOf(html, 'ai-disclaimer.html');
+    // the purple-template anatomy is dead (the :root fork, the pill badge,
+    // and the stray-brace CSS that trapped dark mode are all in the killed
+    // <style> block — pinned structurally above; the class names go too)
+    for (const ghost of ['legal-hero', 'legal-summary', 'class="updated"', 'concierge.js', 'hero-grid.css']) {
+      expect(html, `ai-disclaimer: purple-template remnant "${ghost}"`).not.toContain(ghost);
+    }
+    // the legal substance is retained verbatim — every section, the date,
+    // and the operative sentences (visual conformance only; content is
+    // docs/design/LEGAL-DRAFTS-166.md territory)
+    expect(main, 'date line kept').toContain('Last updated: June 25, 2026');
+    for (const h of ['Informational Only', 'No Warranty', 'No Guarantees of Outcomes',
+      'What We Send to the AI', 'Third-Party Sites', 'Limitation of Liability', 'Contact']) {
+      expect(main, `section kept: ${h}`).toContain(`>${h}</h2>`);
+    }
+    for (const sentence of [
+      'provided for general informational purposes only',
+      'no warranty of accuracy, completeness, or fitness for a particular purpose',
+      'does not ensure any specific result',
+      'Do not submit confidential information through the AI Tools',
+      'not a statement of fact about that business',
+      'not liable for any loss or damage arising from use of',
+    ]) {
+      expect(main, `operative sentence kept: "${sentence}"`).toContain(sentence);
+    }
+    // its in-body privacy link survives the rebuild
+    expect(main, 'privacy link kept').toContain('href="/privacy"');
+  });
+
+  test('entry pages load fonts the index way: preload + async swap + noscript (404 was blocking; ai-disclaimer nested its noscript)', () => {
+    for (const f of ['404.html', 'ai-disclaimer.html']) {
+      const html = read(f);
+      expect(html, `${f}: font preload`).toMatch(
+        /<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/
+      );
+      expect(html, `${f}: noscript fallback`).toContain('<noscript><link href="https://fonts.googleapis.com/css2');
+      expect(html, `${f}: nested noscript`).not.toMatch(/<noscript>[^<]*<link rel="preload"/);
+    }
+  });
+
+  test('ghost files are OFF DISK; their .html spellings 301 with the clean URLs (doc §MS7.1)', () => {
+    // /start and /contact-disclaimer 301s are pinned above (MS1); the files
+    // themselves were live unmonitored duplicates — now the redirect is the
+    // only thing that answers, in both spellings.
+    expect(existsSync(join(ROOT, 'start.html')), 'start.html deleted').toBe(false);
+    expect(existsSync(join(ROOT, 'contact-disclaimer.html')), 'contact-disclaimer.html deleted').toBe(false);
+    const rules = parseRedirects();
+    const r301 = (from: string) => rules.find((x) => x.from === from && x.code === '301');
+    expect(r301('/start.html')?.to, '/start.html 301').toBe('/contact');
+    expect(r301('/contact-disclaimer.html')?.to, '/contact-disclaimer.html 301').toBe('/privacy');
+    // no source file references the ghosts anymore (outside _redirects)
+    const files = readdirSync(ROOT).filter((f) => /\.(html|js|css|xml)$/.test(f));
+    for (const f of files) {
+      expect(read(f).includes('contact-disclaimer'), `${f}: references the deleted contact-disclaimer`).toBe(false);
+      expect(read(f).includes('start.html'), `${f}: references the deleted start.html`).toBe(false);
+    }
+  });
+
+  test('the public build excludes the internal pages; their URLs force-404 (doc §MS7.2)', () => {
+    // email-signature (mail-provider setup steps), styleguide (internal
+    // design instructions), and a11y (an internal check page) were
+    // guessable-URL public because the build glob-ships every root *.html.
+    // The build is the truth here, so RUN it and inspect dist/ — a comment
+    // in the script can't drift a green test.
+    execFileSync('bash', ['scripts/build-public.sh'], { cwd: ROOT });
+    for (const f of INTERNAL_PAGES) {
+      expect(existsSync(join(ROOT, 'dist', f)), `${f} staged into dist/`).toBe(false);
+    }
+    // ...while the public estate still ships (fail-visible, not fail-open)
+    for (const f of ['index.html', 'privacy.html', '404.html', 'services.html']) {
+      expect(existsSync(join(ROOT, 'dist', f)), `${f} missing from dist/`).toBe(true);
+    }
+    // _redirects force-404s both spellings as defense-in-depth (the files
+    // also physically no longer exist in the publish dir)
+    const rules = parseRedirects();
+    for (const page of INTERNAL_PAGES) {
+      const clean = '/' + page.replace(/\.html$/, '');
+      for (const from of [clean, `${clean}.html`]) {
+        const r = rules.find((x) => x.from === from);
+        expect(r?.to, `${from} forced 404 target`).toBe('/404.html');
+        expect(r?.code, `${from} forced 404 status`).toBe('404!');
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MS6 — live behavior (desktop)
+// ---------------------------------------------------------------------------
+test.describe('MS6 entry & legal sweep (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop behavior');
+  });
+
+  test('the tokenized capture renders on both service pages: p-mist band, ink button, light-scheme AA', async ({ page }) => {
+    for (const f of MS6_CAPTURE_PAGES) {
+      await page.goto(`/${f}`);
+      const band = page.locator('.soft-capture');
+      await expect(band, `${f}: one capture band`).toHaveCount(1);
+      expect(await band.evaluate((el) => getComputedStyle(el).backgroundColor), `${f}: p-mist token`).toBe('rgb(237, 232, 247)');
+      expect(await band.locator('form button').evaluate((el) => getComputedStyle(el).borderRadius), `${f}: ink button, not a pill`).toBe('2px');
+      expect(await contrastOf(page, '.soft-capture h2'), `${f}: capture heading (large)`).toBeGreaterThanOrEqual(3);
+      expect(await contrastOf(page, '.soft-capture p'), `${f}: capture copy`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  for (const path of ['/ai-disclaimer.html', '/privacy.html', '/accessibility.html', '/404.html']) {
+    test(`console-clean boot: ${path}`, async ({ page }) => {
+      const errors: string[] = [];
+      const external = /fonts\.googleapis|fonts\.gstatic|googletagmanager/;
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('console', (msg) => {
+        if (msg.type() !== 'error') return;
+        if (external.test(msg.text()) || external.test(msg.location()?.url ?? '')) return;
+        errors.push(`${msg.text()} @ ${msg.location()?.url ?? '?'}`);
+      });
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // MS5 — live behavior (desktop)
 // ---------------------------------------------------------------------------
@@ -998,5 +1247,27 @@ test.describe('dark scheme (chrome + closer fine print)', () => {
     expect(await contrastOf(page, 'main .textlink'), 'bridge link').toBeGreaterThanOrEqual(4.5);
     await page.goto('/about.html');
     expect(await contrastOf(page, 'main .textlink'), 'about handoff link').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('MS6: the legal template, the rebuilt ai-disclaimer, the 404 rescues, and the service captures read in dark', async ({ page }) => {
+    // ai-disclaimer's old page-scoped :root fork trapped its dark variant
+    // behind a <=900px media query — at desktop widths the page went
+    // dark-on-dark. Rebuilt on the legal template, styles.css's sitewide
+    // remap simply applies; measure the whole anatomy.
+    await page.goto('/ai-disclaimer.html');
+    expect(await contrastOf(page, 'main h1'), 'legal h1 (display)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, 'main h2'), 'legal section headings').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, 'main .lead-muted'), 'legal body copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main .lead-muted a'), 'legal in-body links').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/privacy.html');
+    expect(await contrastOf(page, 'main .lead-muted'), 'privacy body copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main .lead-muted a'), 'privacy in-body links').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/404.html');
+    expect(await contrastOf(page, 'main h1'), '404 headline').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, 'main p a'), '404 rescue links').toBeGreaterThanOrEqual(4.5);
+    // one capture page proves the tokenized band (byte-identical markup on both)
+    await page.goto('/services.html');
+    expect(await contrastOf(page, '.soft-capture h2'), 'capture heading (large)').toBeGreaterThanOrEqual(3);
+    expect(await contrastOf(page, '.soft-capture p'), 'capture copy').toBeGreaterThanOrEqual(4.5);
   });
 });

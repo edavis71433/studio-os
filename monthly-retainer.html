@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..480&family=Inter:wght@400;450;500;550;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="tool-page.css">
 <link rel="stylesheet" href="monthly-retainer.css">
 <link rel="stylesheet" href="portal-mock.css">
 <script src="/analytics.js" defer></script>
@@ -272,14 +273,16 @@
 </section>
 
 <!-- Soft capture: free site review (no popup, one calm ask). Sits ABOVE the
-     dark closer on purpose — the page ends dark CTA -> footer, one closer. -->
-<section aria-labelledby="softReviewH" style="max-width:1120px;margin:0 auto;padding:24px 24px 56px;">
-  <div style="background:#EDE8F7;border-radius:20px;padding:44px 28px;text-align:center;">
-    <h2 id="softReviewH" style="font-family:'Fraunces',Georgia,serif;font-weight:400;font-size:clamp(24px,3.4vw,32px);color:#1B1525;margin:0 0 10px;">Not sure what your site needs?</h2>
-    <p style="font-size:15px;color:#6B6276;line-height:1.7;max-width:520px;margin:0 auto 22px;">The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
-    <form action="/audit" method="get" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0;">
-      <input type="email" name="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)" style="padding:12px 18px;border:1px solid #d9d2e8;border-radius:100px;font-size:14px;font-family:inherit;min-width:min(280px,80vw);background:#fff;color:#1B1525;">
-      <button type="submit" style="background:#5b3fa0;color:#fff;border:none;padding:12px 24px;border-radius:100px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Get the free site review &rarr;</button>
+     dark closer on purpose — the page ends dark CTA -> footer, one closer.
+     MS6: the tokenized .soft-capture component (tool-page.css), replacing
+     the last inline-hex/pill copy — same form, same function. -->
+<section class="soft-capture-wrap" aria-labelledby="softReviewH">
+  <div class="soft-capture">
+    <h2 id="softReviewH" class="serif">Not sure what your site needs?</h2>
+    <p>The free site review checks your speed, search visibility, and mobile experience with real Google data. Instant results, right on the page &mdash; add your email only if you&rsquo;d like the findings sent to you too.</p>
+    <form action="/audit" method="get">
+      <input type="email" name="email" autocomplete="email" aria-label="Your email (optional)" placeholder="you@yourbusiness.com (optional)">
+      <button type="submit" class="btn btn-primary">Get the free site review &rarr;</button>
     </form>
   </div>
 </section>
