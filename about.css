@@ -44,6 +44,49 @@ body[data-page="about"] .ab-origin-copy p{ font-size:16px; line-height:1.7; }
 }
 
 /* ---------------------------------------------------------------
+   LIFE STRIP (Photos A5) — the three unused life/ candids as a
+   quiet band under the origin split. Square tiles so three very
+   different portrait frames read as one calm row; the portrait's
+   plum shadow scaled down so the strip reads as the same object
+   family, quieter. One shared mono caption, claim-free.
+   --------------------------------------------------------------- */
+body[data-page="about"] .ab-life-strip{ margin:44px 0 0; }
+body[data-page="about"] .ab-life-tiles{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+}
+body[data-page="about"] .ab-life-tile{
+  aspect-ratio:1/1; overflow:hidden;
+  border-radius:14px;
+  box-shadow:0 18px 36px -26px rgba(27,21,37,.26);
+}
+body[data-page="about"] .ab-life-tile img{
+  display:block; width:100%; height:100%; object-fit:cover;
+}
+/* square-crop art direction: keep each candid's subject in frame. The dog
+   frame also zooms slightly past a photo-strip sliver baked into the
+   source's left edge (the wrapper's overflow crops the bleed). */
+body[data-page="about"] .ab-life-tile:nth-child(1) img{ object-position:center 40%; transform:scale(1.09); transform-origin:100% 42%; }
+body[data-page="about"] .ab-life-tile:nth-child(2) img{ object-position:center 25%; }
+body[data-page="about"] .ab-life-tile:nth-child(3) img{ object-position:center 60%; }
+body[data-page="about"] .ab-life-strip figcaption{
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+  color:var(--muted); margin-top:12px; text-align:center;
+}
+@media(max-width:600px){
+  body[data-page="about"] .ab-life-strip{ margin-top:32px; }
+  body[data-page="about"] .ab-life-tiles{ gap:8px; }
+  body[data-page="about"] .ab-life-tile{ border-radius:10px; }
+}
+/* Dark: the photos stay as-is (photograph-as-artifact precedent);
+   the soft ring styles.css gives the other photo figures keeps the
+   tiles from dissolving into the dark surface. Light untouched. */
+@media (prefers-color-scheme: dark){
+  body[data-page="about"] .ab-life-tile{
+    box-shadow:0 0 0 1px rgba(196,174,232,.12), 0 18px 36px -26px rgba(0,0,0,.55);
+  }
+}
+
+/* ---------------------------------------------------------------
    THREE BELIEFS — manifesto list
    --------------------------------------------------------------- */
 body[data-page="about"] .ab-beliefs-section{

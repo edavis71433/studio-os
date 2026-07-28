@@ -34,8 +34,23 @@ body[data-page="work"] .decision-reveal .toggle-icon{
 body[data-page="work"] .decision-reveal[open] .toggle-icon{ transform:rotate(45deg); }
 
 /* ---------------------------------------------------------------
-   FOUR DECISIONS — editorial zig-zag essay.
+   DESK SHOT (Photos A6) — the one photograph this restrained page
+   allows itself: the decisions intro's claim ("the reasoning
+   underneath") made visible. Reuses styles.css's .hww-shot figure
+   language plus how-we-work.css's soft-shadow frame; the portrait
+   frame is art-directed to a contained 4:5 column so the essay
+   below keeps its rhythm.
    --------------------------------------------------------------- */
+body[data-page="work"] .wk-desk-shot{
+  max-width:440px;
+  margin:40px auto 0;
+  border-radius:16px;
+  box-shadow:0 28px 56px -34px rgba(27,21,37,.24);
+}
+body[data-page="work"] .wk-desk-shot img{
+  border:none; border-radius:16px;
+  aspect-ratio:4/5; object-fit:cover; object-position:center 32%;
+}
 body[data-page="work"] .wk-decisions{
   display:flex; flex-direction:column; gap:64px;
 }

@@ -1217,6 +1217,185 @@ async function contrastOf(page: Page, selector: string, pseudo?: string): Promis
   return Math.min(...pairs.map((p) => wcag(`rgb(${p.fg.join(',')})`, `rgb(${p.bg.join(',')})`)));
 }
 
+// ============================================================
+// Photos A — the repo-asset photo slots (docs/design/MARKETING-PHOTOS.md,
+// Group A). Six slots, zero NEW imagery: the same real founder photo
+// contact.html already ships lands beside every credential card ("who
+// you're hiring" gets a literal face), About's origin story gets the
+// three unused life/ candids, and Work's decisions intro gets the desk
+// shot. The plan's honesty law ("real people on this site = the real
+// founder only") isn't pinnable as an idea — but the touched sections
+// CAN be pinned to reference nothing outside the known real-photo list,
+// and every slot signs the anti-CLS contract (width/height + lazy +
+// async — these all sit below the fold).
+// ============================================================
+const REAL_PHOTOS = new Set([
+  // the founder, as already shipped on index/contact/about/how-we-work
+  'eric-davis-small.jpg', 'eric-davis-hero-avatar.jpg',
+  'eric-davis.jpg', 'eric-davis.webp',
+  'eric-davis-founder.jpg', 'eric-davis-founder.webp',
+  // the real life/ candids
+  'life/eric-dog.jpg', 'life/eric-gym.jpg', 'life/eric-rome.jpg', 'life/eric-work.jpg',
+]);
+const imgAttrs = (tag: string): Record<string, string> =>
+  Object.fromEntries([...tag.matchAll(/([a-zA-Z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+/** the contract every Group A photo signs: real asset, honest alt, no CLS, lazy */
+function pinPhoto(tag: string | undefined, ctx: string, src: string, w: number, h: number): Record<string, string> {
+  expect(tag, `${ctx}: <img> present`).toBeTruthy();
+  const a = imgAttrs(tag!);
+  expect(a.src, `${ctx}: src`).toBe(src);
+  expect(a.alt, `${ctx}: honest alt text`).toBeTruthy();
+  expect(+(a.width ?? NaN), `${ctx}: width attr`).toBe(w);
+  expect(+(a.height ?? NaN), `${ctx}: height attr`).toBe(h);
+  expect(a.loading, `${ctx}: below-the-fold loading`).toBe('lazy');
+  expect(a.decoding, `${ctx}: decoding`).toBe('async');
+  return a;
+}
+// the six touched sections, extracted the way each page anchors them —
+// shared by the per-slot pins and the real-asset allowlist sweep below
+const PHOTO_SLOTS: Record<string, () => string> = {
+  'pricing.html § who-you\'re-hiring card': () =>
+    read('pricing.html').match(/<div class="reveal mt-l"[^>]*paper-2[^>]*>[\s\S]*?<\/ul>\s*<\/div>/)?.[0] ?? '',
+  'services.html § who-you\'re-hiring card': () =>
+    read('services.html').match(/<div class="reveal mt-l"[^>]*paper-2[^>]*>[\s\S]*?<\/ul>\s*<\/div>/)?.[0] ?? '',
+  'monthly-retainer.html § who-stays card': () =>
+    read('monthly-retainer.html').match(/<div class="reveal" style="border:1px solid var\(--hair\);border-radius:18px[\s\S]*?<\/ul>/)?.[0] ?? '',
+  'audit.html § trust strip': () =>
+    read('audit.html').match(/<!-- TRUST STRIP -->[\s\S]*?<\/section>/)?.[0] ?? '',
+  'about.html § origin section': () =>
+    read('about.html').match(/<section class="pad ab-origin-section">[\s\S]*?<\/section>/)?.[0] ?? '',
+  'work.html § decisions section': () =>
+    read('work.html').match(/<section class="pad-sm wk-decisions-section">[\s\S]*?<\/section>/)?.[0] ?? '',
+};
+
+test.describe('Photos A — repo-asset slots (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('A1-A3: the credential cards carry the founder avatar — index\'s .hero-sig anatomy, label riding beside the face', () => {
+    const CARDS: Array<[string, string]> = [
+      ['pricing.html § who-you\'re-hiring card', "Who you're hiring"],
+      ['services.html § who-you\'re-hiring card', "Who you're hiring"],
+      ['monthly-retainer.html § who-stays card', 'Who stays on your account'],
+    ];
+    for (const [slot, label] of CARDS) {
+      const card = PHOTO_SLOTS[slot]();
+      expect(card, `${slot}: card found`).toBeTruthy();
+      // ONE .hero-sig wrapper holds both the face and the card's label —
+      // the index/contact anatomy reused, not a parallel CSS copy
+      const sig = card.match(/<div class="hero-sig"[^>]*>\s*(<img[^>]*>)[\s\S]{0,400}?<\/div>/);
+      expect(sig, `${slot}: .hero-sig wrapper`).toBeTruthy();
+      expect(sig![0], `${slot}: label rides beside the face`).toContain(label);
+      const a = pinPhoto(sig![1], `${slot} avatar`, 'eric-davis-small.jpg', 56, 56);
+      expect(a.alt, `${slot}: avatar alt`).toBe('Eric Davis');
+    }
+  });
+
+  test('A4: the audit trust strip\'s Founder cell gets the face beside the name — and ONLY that cell changed', () => {
+    const strip = PHOTO_SLOTS['audit.html § trust strip']();
+    expect(strip, 'trust strip found').toContain('footer-trust-inner');
+    const cell = strip.match(/>Founder<\/div>[\s\S]*?(<img[^>]*>)/);
+    const a = pinPhoto(cell?.[1], 'audit Founder cell avatar', 'eric-davis-small.jpg', 46, 46);
+    expect(a.alt, 'audit avatar alt').toBe('Eric Davis');
+    // the cell's copy is untouched beside it, and the avatar is the strip's
+    // ONLY img (the sibling cells stay text — no decoration creep)
+    expect(strip, 'name kept').toContain('Eric Davis</div>');
+    expect(strip, 'role kept').toContain('Web Design &amp; SEO Strategist');
+    expect(strip.match(/<img/g)?.length, 'one avatar, no strip-wide creep').toBe(1);
+  });
+
+  test('A1-A4 consistency: all four avatar slots are the SAME real photo — a recurring signature, not four faces', () => {
+    const srcs: string[] = [];
+    for (const f of ['pricing.html', 'services.html', 'monthly-retainer.html', 'audit.html']) {
+      for (const m of read(f).matchAll(/<img[^>]*src="([^"]*eric-davis[^"]*)"[^>]*>/g)) srcs.push(m[1]);
+    }
+    expect(srcs.length, 'four avatar slots sitewide').toBe(4);
+    expect([...new Set(srcs)], 'one asset, four surfaces').toEqual(['eric-davis-small.jpg']);
+  });
+
+  test('A5: About\'s origin section carries the 3-tile life strip — the unused candids, one shared caption', () => {
+    const section = PHOTO_SLOTS['about.html § origin section']();
+    const strip = section.match(/<figure class="ab-life-strip"[\s\S]*?<\/figure>/)?.[0] ?? '';
+    expect(strip, 'life-strip figure inside the origin section').toBeTruthy();
+    // a sibling BELOW the origin grid, not wedged inside the split
+    expect(section.indexOf('ab-life-strip'), 'strip sits after the grid').toBeGreaterThan(section.indexOf('ab-origin-grid'));
+    const tiles = [...strip.matchAll(/<img[^>]*>/g)].map((m) => m[0]);
+    expect(tiles.length, 'exactly 3 tiles').toBe(3);
+    pinPhoto(tiles[0], 'life strip tile 1', 'life/eric-dog.jpg', 512, 1024);
+    pinPhoto(tiles[1], 'life strip tile 2', 'life/eric-gym.jpg', 666, 1000);
+    pinPhoto(tiles[2], 'life strip tile 3', 'life/eric-rome.jpg', 512, 1024);
+    // eric-work.jpg belongs to /how-we-work (and now A6) — never this strip
+    expect(strip, 'the desk shot stays off the strip').not.toContain('eric-work.jpg');
+    expect(strip.match(/<figcaption/g)?.length, 'ONE mono caption for the whole strip').toBe(1);
+    // styling lives in the page\'s own layer, scoped like everything there
+    expect(read('about.css'), 'about.css owns the strip').toContain('body[data-page="about"] .ab-life-tiles');
+  });
+
+  test('A6: Work\'s decisions intro gets the desk shot — .hww-shot treatment, the caption names the method', () => {
+    const section = PHOTO_SLOTS['work.html § decisions section']();
+    const fig = section.match(/<figure class="hww-shot[^"]*"[^>]*>[\s\S]*?<\/figure>/)?.[0] ?? '';
+    expect(fig, 'framed figure inside the decisions section').toBeTruthy();
+    // it follows the "Not a portfolio." lead — an illustration of that exact
+    // claim (reasoning-on-paper), not a header decoration
+    expect(section.indexOf('Not a portfolio.'), 'figure sits after the lead').toBeLessThan(section.indexOf('<figure'));
+    pinPhoto(fig.match(/<img[^>]*>/)?.[0], 'work desk shot', 'life/eric-work.jpg', 512, 1024);
+    expect(fig, 'the caption').toContain('<figcaption>The reasoning happens on paper first.</figcaption>');
+  });
+
+  test('the honesty law, structurally: the six touched sections reference ONLY known real-photo assets', () => {
+    for (const [slot, extract] of Object.entries(PHOTO_SLOTS)) {
+      const src = extract();
+      expect(src, `${slot}: section found`).toBeTruthy();
+      const refs = [...src.matchAll(/(?:src|srcset)="([^"]+\.(?:jpe?g|webp|png|avif|gif))"/g)].map((m) => m[1]);
+      expect(refs.length, `${slot}: the slot actually ships imagery`).toBeGreaterThan(0);
+      for (const r of refs) {
+        expect(REAL_PHOTOS.has(r.replace(/^\//, '')), `${slot}: "${r}" is not on the real-photo list`).toBe(true);
+      }
+    }
+  });
+});
+
+test.describe('Photos A (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop behavior');
+  });
+
+  test('every Group A photo resolves and renders (no broken src); the avatar is a literal face-in-a-circle', async ({ page }) => {
+    const SLOTS: Array<[string, string, number]> = [
+      ['/pricing.html', 'main img[src="eric-davis-small.jpg"]', 1],
+      ['/services.html', 'main img[src="eric-davis-small.jpg"]', 1],
+      ['/monthly-retainer.html', 'main img[src="eric-davis-small.jpg"]', 1],
+      ['/audit.html', 'img[src="eric-davis-small.jpg"]', 1],
+      ['/about.html', '.ab-life-tiles img', 3],
+      ['/work.html', '.wk-decisions-section .hww-shot img', 1],
+    ];
+    for (const [url, sel, n] of SLOTS) {
+      await page.goto(url);
+      const imgs = page.locator(sel);
+      await expect(imgs, `${url}: ${sel}`).toHaveCount(n);
+      for (let i = 0; i < n; i++) {
+        await imgs.nth(i).scrollIntoViewIfNeeded(); // they're lazy — earn the load
+        await expect
+          .poll(() => imgs.nth(i).evaluate((el) => (el as HTMLImageElement).naturalWidth), { message: `${url}: ${sel} [${i}] decodes` })
+          .toBeGreaterThan(0);
+      }
+    }
+    // the .hero-sig treatment actually applied: round crop at avatar scale
+    await page.goto('/pricing.html');
+    const av = page.locator('.hero-sig img');
+    await expect(av, 'round avatar').toHaveCSS('border-radius', '50%');
+    expect(await av.evaluate((el) => (el as HTMLElement).offsetWidth), 'avatar scale').toBe(56);
+  });
+
+  test('the strip + desk-shot captions hold AA in the light scheme', async ({ page }) => {
+    await page.goto('/about.html');
+    expect(await contrastOf(page, '.ab-life-strip figcaption'), 'about strip caption').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/work.html');
+    expect(await contrastOf(page, '.wk-decisions-section .hww-shot figcaption'), 'work caption').toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 test.describe('dark scheme (chrome + closer fine print)', () => {
   test.use({ colorScheme: 'dark' });
   test.beforeEach(({}, testInfo) => {
@@ -1269,5 +1448,14 @@ test.describe('dark scheme (chrome + closer fine print)', () => {
     await page.goto('/services.html');
     expect(await contrastOf(page, '.soft-capture h2'), 'capture heading (large)').toBeGreaterThanOrEqual(3);
     expect(await contrastOf(page, '.soft-capture p'), 'capture copy').toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('Photos A: the life-strip and desk-shot captions read in dark', async ({ page }) => {
+    // the photographs themselves stay light (photograph-as-artifact — the
+    // pmock precedent); the captions are page-surface text and must hold AA
+    await page.goto('/about.html');
+    expect(await contrastOf(page, '.ab-life-strip figcaption'), 'about strip caption (dark)').toBeGreaterThanOrEqual(4.5);
+    await page.goto('/work.html');
+    expect(await contrastOf(page, '.wk-decisions-section .hww-shot figcaption'), 'work caption (dark)').toBeGreaterThanOrEqual(4.5);
   });
 });
