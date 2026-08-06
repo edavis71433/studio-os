@@ -396,7 +396,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     // An EMAILED-IN reply is the same event as a portal reply — the operator
     // must hear about it identically. Same thread key + 15-minute bucket as the
     // portal path, so a client replying in both places sends ONE email.
-    notifyStudioOfClientAction({
+    await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${refTarget.id}`,
       customerClientId: match.kind === 'client' ? match.id : null, projectId: refTarget.project_id || null,
       subject: String(refTarget.subject || subject || '').slice(0, 200), excerpt: text || subject,
@@ -436,7 +436,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       // An emailed-in project message notifies the operator exactly like a
       // portal one — SAME thread key (`proj:<id>`), so the 15-minute bucket is
       // shared across both doors and a client who emails AND posts sends one.
-      notifyStudioOfClientAction({
+      await notifyStudioOfClientAction({
         agencySiteId: siteId, kind: 'client_message', threadKey: `proj:${match.projectId}`,
         customerClientId: match.kind === 'client' ? match.id : null, projectId: match.projectId,
         subject: String(subject || '').slice(0, 200), excerpt: text || subject,
@@ -481,7 +481,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     }
     // Notify OUTSIDE the project guard — a project-less support thread is the
     // common shape for emailed-in clients and contacts alike.
-    notifyStudioOfClientAction({
+    await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${target.id}`,
       customerClientId: match.kind === 'client' ? match.id : null, projectId: target.project_id || null,
       subject: String(target.subject || subject || '').slice(0, 200), excerpt: text || subject,
@@ -501,7 +501,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   if (!newReq.ok) return json({ error: 'write_failed' }, 502);
   if (newReq.duplicate) return dropAck('duplicate_request', from_email);
   // A brand-new emailed-in request — the operator hears about it like a portal one.
-  notifyStudioOfClientAction({
+  await notifyStudioOfClientAction({
     agencySiteId: siteId, kind: 'client_request', threadKey: `req:${newReq.row?.id || externalId}`,
     customerClientId: match.kind === 'client' ? match.id : null, projectId: null,
     subject: String(subject || `Email from ${from_name || from_email}`).slice(0, 200), excerpt: text || subject,

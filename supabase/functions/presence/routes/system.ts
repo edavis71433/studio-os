@@ -52,6 +52,7 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'RESEND_KEY', required: false, enables: 'ALL email — lead notifications, one-tap approvals, digests, receipts (without it: email silently no-ops, logged)' },
     { name: 'EMAIL_FROM', required: false, enables: 'the From address (defaults to a studio address)' },
     { name: 'OPS_ALERT_EMAIL', required: false, enables: 'operational failure alerts (defaults to a studio address)' },
+    { name: 'AGENCY_SITE_ID', required: false, enables: 'the OPS_ALERT_EMAIL fallback for operator notifications, on the platform’s OWN agency site only — a site whose presence_identity.email AND owner-client email are both blank falls back to OPS_ALERT_EMAIL when, and only when, its site id matches this value (without it: that last-resort rung does not exist and the notification is skipped with a warn, which is the safe default — sending another tenant’s client activity to the platform operator would be a privacy breach)' },
     { name: 'RESEND_WEBHOOK_SECRET', required: false, enables: 'the Resend bounce/complaint webhook (/email/events) — bounces auto-suppress (without it: the endpoint 404s)' },
     { name: 'NURTURE_DRIP', required: false, enables: 'the day-7 free-review follow-up email (owner-approved outbound; set to 1 to activate)' },
   ],

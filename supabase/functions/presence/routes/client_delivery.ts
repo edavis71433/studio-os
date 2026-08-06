@@ -206,8 +206,8 @@ export async function handleClientUploadCreate(req: Request, site: SiteRow, prin
   await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'client_upload', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title } }) }).catch(() => {});
   // Tell the studio (email + bell + push). Throttled per project per 15 minutes,
-  // so a client dropping six files sends ONE email. Fire-and-forget.
-  notifyStudioOfClientAction({
+  // so a client dropping six files sends ONE email. Awaited but never fails this request (see notifyStudioOfClientAction).
+  await notifyStudioOfClientAction({
     agencySiteId: s, kind: 'client_upload', threadKey: `proj:${projectId}`,
     customerClientId: me, projectId, subject: title,
     excerpt: '', href: `/projects.html?project=${projectId}`,
@@ -319,8 +319,8 @@ export async function handleClientMessages(req: Request, site: SiteRow, principa
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   await clientEvent(s, id, 'message', principal, { message_id: rows(ins)[0].id, from: 'client' });
   // Tell the studio. Throttled per project per 15 minutes — the mirror of the
-  // studio→client throttle in project_comms.ts. Fire-and-forget.
-  notifyStudioOfClientAction({
+  // studio→client throttle in project_comms.ts. Awaited but never fails this request (see notifyStudioOfClientAction).
+  await notifyStudioOfClientAction({
     agencySiteId: s, kind: 'client_message', threadKey: `proj:${id}`,
     customerClientId: me, projectId: id, subject: '', excerpt: body,
     href: `/crm.html?project=${id}&tab=messages`,
@@ -365,8 +365,8 @@ export async function handleClientApprovalDecide(req: Request, site: SiteRow, pr
   await clientEvent(s, a.project_id, 'approval_decided', principal, { approval_id: id, decision: b.decision });
   // Tell the studio. bucket:false — a decision is TERMINAL (the status guard
   // above lets it happen once), so the period is the bare approval key and the
-  // email sends exactly once, ever. Fire-and-forget.
-  notifyStudioOfClientAction({
+  // email sends exactly once, ever. Awaited but never fails this request (see notifyStudioOfClientAction).
+  await notifyStudioOfClientAction({
     agencySiteId: s, kind: 'client_approval', threadKey: `approval:${id}`, bucket: false,
     customerClientId: me, projectId: a.project_id,
     subject: `${b.decision === 'approved' ? 'Approved' : b.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${clean(a.title, 120) || 'an approval'}`,
@@ -584,7 +584,7 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
           // on the SAME thread key as the request itself, so the 15-minute
           // bucket covers the whole conversation (open + rapid follow-ups = one
           // email). No projectId guard: this path is project-less by definition.
-          notifyStudioOfClientAction({
+          await notifyStudioOfClientAction({
             agencySiteId: s, kind: 'client_request', threadKey: `req:${open.id}`,
             customerClientId: me, projectId: null,
             subject: clean(open.subject, 200), excerpt: body || subject,
@@ -611,8 +611,8 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   // Tell the studio — DELIBERATELY OUTSIDE the `if (projectId)` guard above.
   // A project-less request is the COMMON path (the general composer), and
   // gating the notify on projectId would have silenced exactly the case Eric
-  // most needs to see. Fire-and-forget.
-  notifyStudioOfClientAction({
+  // most needs to see. Awaited but never fails this request (see notifyStudioOfClientAction).
+  await notifyStudioOfClientAction({
     agencySiteId: s, kind: 'client_request', threadKey: `req:${rows(ins)[0].id}`,
     customerClientId: me, projectId, subject, excerpt: body,
     href: projectId ? `/crm.html?project=${projectId}&tab=messages` : `/projects.html?support=${rows(ins)[0].id}`,
@@ -671,8 +671,8 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
   if (reqRow.project_id) await clientEvent(s, reqRow.project_id, 'support_message', principal, { request_id: id });
   // Tell the studio — again OUTSIDE the project guard (most requests carry no
   // project). Same thread key as the request, so a burst of replies inside the
-  // 15-minute window sends ONE email. Fire-and-forget.
-  notifyStudioOfClientAction({
+  // 15-minute window sends ONE email. Awaited but never fails this request (see notifyStudioOfClientAction).
+  await notifyStudioOfClientAction({
     agencySiteId: s, kind: 'client_request', threadKey: `req:${id}`,
     customerClientId: me, projectId: reqRow.project_id || null,
     subject: clean(reqRow.subject, 200), excerpt: body,

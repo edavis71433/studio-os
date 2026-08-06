@@ -502,25 +502,16 @@ test.describe('SS6 — inbox console quick wins', () => {
     await expect(rows.getByText('Approval decision from Marlow’s Kitchen')).toBeVisible();
   });
 
-  test('0116 — an upload folds into its project conversation row (count spans the thread, not just messages)', async ({ page }) => {
-    // The Inbox event read now carries client_upload/approval_decided/task_done,
-    // so a project row's `count` is latest-client-activity, not message-only.
-    const api = {
-      ...API,
-      '/portal/feed': { data: {
-        ...FEED.data,
-        client_messages: [
-          { ...FEED.data.client_messages[0], count: 5, needs_reply: true, unread: true },
-          FEED.data.client_messages[1],
-        ],
-      } },
-    };
-    await installApp(page, { api });
-    await page.goto('/inbox.html');
-    const row = page.locator('#rows [role=option]').filter({ hasText: 'Marlow’s Kitchen' }).first();
-    await expect(row).toBeVisible();
-    await expect(page.locator('.unread-dot').first()).toBeVisible();
-  });
+  // NOTE (R-fix F8): a second test used to live here — it hand-wrote a feed row
+  // with `count: 5, needs_reply: true, unread: true` and then asserted the row
+  // and its unread dot rendered. That is a browser test of the browser's own
+  // stub: it passed with the server-side widening fully reverted, so it covered
+  // nothing it claimed to. The shaping it meant to protect (which events fold
+  // into a project conversation, what the count spans, and when a thread needs a
+  // reply) is server logic, and it is now pure + directly tested:
+  // supabase/functions/presence/lib/inbox_feed.ts shapeClientConversations,
+  // driven by tests/presence/operator_notify_fixes_test.mjs (F6). Reverting the
+  // widened read or the from-client scoping fails THERE, as it should.
 });
 
 // ── Batch A (post-redesign audit) — inbox regressions ────────────────────────

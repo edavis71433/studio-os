@@ -23,6 +23,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
+import { shapeClientConversations, studioBellCount } from '../lib/inbox_feed.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -150,30 +151,34 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // so the owner sees there's something waiting without clicking into the portal.
   // All the reads already landed in the wave above; best-effort so the shell
   // never breaks on it.
+  // The arithmetic itself is PURE (lib/inbox_feed.ts studioBellCount) — including
+  // the two rules that used to be inline and untestable: the lead_followup ↔
+  // new-enquiry dedupe, and (R-fix F1) leaving the four client_* portal notices
+  // OUT of the count. Those notices are the operator email's throttle key and
+  // still render in the bell rail; counting them too double-counted every client
+  // action, and nothing ever cleared them, so the badge only ever rose.
   let attention_count = 0;
   try {
-    const filesPending = ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length;
-    // FIX 1 dedupe: the lead-followup cron already raises a per-lead notice for AGED
-    // 'new' leads (counted via nQ). Count only the still-fresh new enquiries not yet
-    // represented by a follow-up notice, so a single lead never stacks two signals.
-    const leadFollowups = ((nQ.json as any[]) || []).filter((n) => n.kind === 'lead_followup').length;
-    const newEnquiries = Math.max(0, ((eQ.json as any[])?.length || 0) - leadFollowups);
-    attention_count = ((nQ.json as any[])?.length || 0) + (iQ || 0) + (wQ || 0) + filesPending + newEnquiries + (cmQ || 0);
+    attention_count = studioBellCount({
+      notices: ((nQ.json as any[]) || []),
+      newEnquiries: ((eQ.json as any[])?.length || 0),
+      proposedPlans: (iQ || 0),
+      proposedWrites: (wQ || 0),
+      filesPending: ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length,
+      openFeedback: (cmQ || 0),
+      // P2-D: service delivery folds into the ONE attention surface (no second
+      // bell). Both slots resolve empty for a caller without view_all, so the
+      // predicate lives in the reads above, not in a second branch here.
+      openSupport: ((supQ.json as any[])?.length || 0),
+      clientEvents: ((msgQ.json as any[]) || []),
+      lastSeenAt: (seenQ.json as any[])?.[0]?.last_seen_at || null,
+    });
   } catch { /* the badge is best-effort — never block the shell on it */ }
 
-  // P2-D: fold service delivery into the ONE attention surface (no second bell).
+  // The bridged CUSTOMER's own badge (their unread client-visible delivery
+  // activity) needs reads that DEPEND on their bridge links, so it stays here.
   try {
-    if (seesFull) { // studio: open support requests + unread client messages need triage
-      attention_count += ((supQ.json as any[])?.length || 0);
-      const lastSeen = (seenQ.json as any[])?.[0]?.last_seen_at || null;
-      attention_count += ((msgQ.json as any[]) || []).filter((e) => {
-        if (lastSeen && String(e.created_at) <= String(lastSeen)) return false;
-        // detail.from='client' is stamped ONLY by the client door (client_delivery.ts)
-        // — actor_kind can't distinguish the customer from the studio owner (both
-        // 'client'), and the studio's own decisions must never ring its own bell.
-        return (e.detail || {}).from === 'client';
-      }).length;
-    } else if (site.client_id) { // bridged customer: their UNREAD client-visible delivery activity
+    if (!seesFull && site.client_id) {
       const links = customerLinks ?? (((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || []);
       if (links.length) {
         const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
@@ -305,7 +310,9 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // neither. The per-project row this feeds is "latest client activity on this
     // thread", so folding them in is the honest reading — a row's `count` now
     // spans the conversation, not only its messages.
-    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,client_upload,task_done)&select=project_id,detail,created_at&order=created_at.desc&limit=100`).catch(swallow) : noEnq,
+    // `kind` rides the select (R-fix F6): the shaper has to tell a widened kind
+    // apart from a plain message to know whether it awaits a studio reply.
+    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,client_upload,task_done)&select=project_id,kind,detail,created_at&order=created_at.desc&limit=100`).catch(swallow) : noEnq,
     // the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
     // authoritative "who are my customers" list + project→customer mapping.
     seesFull ? svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`).catch(swallow) : noEnq,
@@ -413,20 +420,13 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     try {
       // supR + evR landed in the initial wave above.
       // Summarize EVERY project conversation, not only the ones awaiting a reply, so
-      // the operator sees who they're talking with even after they've answered. evR is
-      // created_at.desc, so the FIRST event seen per project is its latest; `needs_reply`
-      // (that latest message came FROM the client) flags the ones still on the studio.
-      // latestClient = the newest event stamped from='client' (evR is created_at.desc,
-      // so the first client event seen per project is its latest) — the honest input
-      // to the per-thread unread rule (client activity newer than the reader's mark).
-      const convo = new Map<string, { latest: any; count: number; latestClient: any }>();
-      for (const e of ((evR.json as any[]) || [])) {
-        const pid = String(e.project_id || ''); if (!pid) continue;
-        const fromClient = (e.detail || {}).from === 'client';
-        const cur = convo.get(pid);
-        if (cur) { cur.count++; if (!cur.latestClient && fromClient) cur.latestClient = e; }
-        else convo.set(pid, { latest: e, count: 1, latestClient: fromClient ? e : null });
-      }
+      // the operator sees who they're talking with even after they've answered.
+      // The rules are PURE (lib/inbox_feed.ts shapeClientConversations) and carry
+      // two R-fixes (F6): a STUDIO-side event of a widened kind — projectEvent
+      // stamps no detail.from — no longer inflates the client-conversation count,
+      // and a client APPROVING cleanly no longer flips the thread to needs-reply
+      // (a rejection or change-request still does).
+      const convo = shapeClientConversations(((evR.json as any[]) || []));
       const sup = ((supR.json as any[]) || []);
       // A support row's honest "latest client activity" = max(the request itself,
       // its newest CLIENT-authored reply). updated_at can't drive unread: client
@@ -503,7 +503,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // so a pre-0113 database behaves exactly like today). Support rows also carry
       // their status so the list pane can chip "Support · open" without a second read.
       for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
-      for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = (cv.latest.detail || {}).from === 'client'; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClient ? String(cv.latestClient.created_at || '') : null, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
+      for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = cv.needsReply; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClientAt, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);
     } catch { /* best-effort — the inbox still renders without this section */ }

@@ -44,7 +44,11 @@ ok('FIXD: all detail sections still present (milestones/tasks/files/approvals/su
 // ═══ FIX 5 — client messages first-class in the Inbox + never dropped ═══
 ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /return json\(\{ data: \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries \}/.test(ws)); // slice 2 extended the feed additively (enquiries rows)
 ok('FIX5: OPEN support requests (incl. project-less) feed the section', /presence_support_requests\?site_id=eq\.\$\{site\.id\}&status=in\.\(open,in_progress\)/.test(ws));
-ok('FIX5: client project messages use the authoritative from=client signal', /\(e\.detail \|\| \{\}\)\.from === 'client'/.test(ws));
+// The from=client rule moved into the pure shaper/counter (lib/inbox_feed.ts) —
+// same authoritative signal, now behaviourally tested (operator_notify_fixes_test.mjs).
+ok('FIX5: client project messages use the authoritative from=client signal',
+  /\.from === 'client'/.test(read('supabase/functions/presence/lib/inbox_feed.ts'))
+  && /shapeClientConversations\(/.test(ws));
 ok('FIX5: section links to where the operator replies (the Client Record / the request)', /\/crm\.html\?project=\$\{/.test(ws) && /\/projects\.html\?support=\$\{r\.id\}/.test(ws));
 ok('FIX5: the section is NOT gated on the per-reader last-seen (not auto-read on open)', !/last_seen|activity_reads/.test(ws.slice(ws.indexOf('let client_messages'))));
 ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Messages from your clients/.test(inbox) && /feed\.client_messages/.test(inbox));

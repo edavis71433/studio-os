@@ -312,7 +312,14 @@ async function handleFirstRun(jwt: string, cors: Record<string, string>) {
 async function handleNotices(jwt: string, cors: Record<string, string>) {
   const site = await resolveSite(jwt);
   if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
-  const r = await asUser(jwt, `presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=3`);
+  // R-fix F2: the four client-portal kinds (0116) are BELL items, not plan items.
+  // The card renders `notices[0]` when nothing matches its priority list, so they
+  // showed up as a plum "outgrown your plan" card with a See-plans → pricing CTA.
+  // The card filters them too (presence.html PLAN_CARD_EXCLUDE); excluding them
+  // HERE additionally stops a chatty client from crowding a real billing notice
+  // out of this read's top-3 window. This endpoint has exactly one consumer (that
+  // card) — the bell rail reads its notices from /portal/feed, unfiltered.
+  const r = await asUser(jwt, `presence_plan_notices?site_id=eq.${site.id}&status=eq.active&kind=not.in.(client_message,client_upload,client_request,client_approval)&select=id,kind,headline,body,created_at&order=created_at.desc&limit=3`);
   const notices = (r.ok && Array.isArray(r.json)) ? r.json.map((n: any) => ({
     id: n.id, kind: n.kind, headline: n.headline, body: n.body,
     actions: ['upgrade', 'learn_more', 'dismiss'], // the only three, ever

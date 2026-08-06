@@ -10126,9 +10126,15 @@ const NOTICE_ACTION = {
   capacity:         { label: "See plans",               href: "pricing.html" },
 };
 const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "lead_followup", "capacity"];
+// The four client-portal notice kinds (migration 0116) belong to the BELL, not
+// to this card. They are in neither table above, so the `notices[0]` fallback
+// below happily rendered "New message from Acme Bakery" as a plum "outgrown your
+// plan" card with a See plans → pricing.html button. Client chatter is never a
+// plan problem — exclude it from this card's candidates entirely.
+const PLAN_CARD_EXCLUDE = ["client_message", "client_upload", "client_request", "client_approval"];
 async function renderPlanNotice() {
   let notices = [];
-  try { const r = await api("GET", "/commerce/notices"); notices = (r.data && r.data.notices) || []; }
+  try { const r = await api("GET", "/commerce/notices"); notices = ((r.data && r.data.notices) || []).filter((x) => PLAN_CARD_EXCLUDE.indexOf(x && x.kind) < 0); }
   catch (_) { return; }
   let n = null;
   for (const k of NOTICE_PRIORITY) { n = notices.find((x) => x.kind === k); if (n) break; }

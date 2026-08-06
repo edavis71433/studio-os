@@ -182,9 +182,11 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
 // emailCustomerByClient (same agency-site resolution, same brand, same
 // best-effort contract) so studio↔client mail has exactly one home.
 //
-// Fire-and-forget: callers do NOT await a result they act on, and this never
-// throws — a client's message must never fail because the operator's notice
-// or email did.
+// Callers never act on a result and this never throws — a client's message must
+// not fail because the operator's notice or email did. It is NOT, however,
+// fire-and-forget: an un-awaited chain can be torn down with the isolate before
+// the mail leaves. notifyStudioOfClientAction below owns that policy
+// (EdgeRuntime.waitUntil, else a capped inline await); call sites await IT.
 
 /** The four client actions the operator is emailed about (Eric's list). Each is
  *  also a `presence_plan_notices.kind` — widened by migration 0116. */
@@ -195,13 +197,23 @@ const escHtml = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':
 
 /** THROTTLE WINDOW. The notice model's unique key is (client_id, kind, period),
  *  and raiseNotice returns created=true ONLY on the first insert — so `period`
- *  IS the throttle. We key it `<thread>:<15-minute bucket>`: one email per
- *  conversation per quarter-hour, per kind. 15 minutes mirrors the existing
- *  outbound throttle in project_comms.ts (a studio→client message stacks no
- *  more than one email per 15 minutes) — same number, same reasoning, so the
- *  two directions of the same conversation behave alike. A client dropping six
- *  files into one project sends ONE email; a genuinely new thread 20 minutes
- *  later sends its own. */
+ *  IS the throttle. We key it `<thread>:<15-minute bucket>`.
+ *
+ *  What that DOES guarantee — one email per EXISTING thread per quarter-hour,
+ *  per kind. A client dropping six files into one project sends ONE email; six
+ *  messages on one project thread send one; replies onto one open support
+ *  request (portal or emailed in — both use `req:<id>`) send one. 15 minutes
+ *  mirrors the outbound throttle in project_comms.ts, so the two directions of
+ *  the same conversation behave alike.
+ *
+ *  What it does NOT — throttle across DIFFERENT threads. Opening a brand-new
+ *  service request mints a new request id (client_delivery.ts / inbound_email.ts),
+ *  so N new requests are N distinct threads and send N emails. That is the
+ *  intended reading (each is its own ticket, and collapsing them would hide
+ *  one), but it is NOT "one email per conversation per quarter-hour" — say the
+ *  weaker, true thing rather than the stronger, false one.
+ *  Terminal one-shot events (an approval decision) pass bucket:false: the period
+ *  is the bare thread key, so they email exactly once, ever. */
 const BUCKET_MS = 15 * 60 * 1000;
 export const noticePeriodFor = (threadKey: string, bucket = true): string =>
   bucket ? `${threadKey}:${Math.floor(Date.now() / BUCKET_MS)}` : threadKey;
@@ -211,24 +223,36 @@ export const noticePeriodFor = (threadKey: string, bucket = true): string =>
  *  which is by construction the STUDIO's own site (it comes from
  *  presence_service_links.agency_site_id), never a customer's site.
  *
- *    1. presence_identity.email — that site's own configured contact.
+ *    1. presence_identity.email — that site's own configured contact. This rung
+ *       WINS: whatever address sits in that one field is where every operator
+ *       notification for this site lands, and rungs 2-3 are only reached when
+ *       it is blank. (On the platform's own agency site that means the identity
+ *       card, not OPS_ALERT_EMAIL, decides Eric's inbox.)
  *    2. the site owner's OWN clients row (presence_sites.client_id → clients.
  *       email / contact_email). Still strictly that site's operator, so this
  *       can never cross tenants — it just closes the silent `if (!to) return`
  *       hole for a site whose identity card was never filled in.
  *    3. OPS_ALERT_EMAIL — the PLATFORM operator's address, and therefore ONLY
  *       legitimate for the platform's OWN agency site. Gated on an explicit
- *       AGENCY_SITE_ID env match: routing another tenant's client activity to
- *       the platform operator would be a privacy breach, so an unset or
+ *       AGENCY_SITE_ID env match (documented in the env manifest,
+ *       routes/system.ts): routing another tenant's client activity to the
+ *       platform operator would be a privacy breach, so an unset or
  *       non-matching AGENCY_SITE_ID means this rung simply does not exist.
- *  Nothing left → a clear warn and no send (never a throw, never a wrong inbox). */
+ *  Nothing left → a clear warn and no send (never a throw, never a wrong inbox).
+ *
+ *  The two independent rows (the site + its identity card) are read in ONE
+ *  wave — this helper sits on the front of a chain that must finish before an
+ *  edge response resolves, so every avoidable serial hop is latency the email
+ *  might not survive. */
 async function studioRecipient(agencySiteId: string): Promise<{ to: string; ownerClientId: string }> {
-  let ownerClientId = '';
-  let to = '';
-  const site = rows(await svc(`presence_sites?id=eq.${agencySiteId}&select=client_id&limit=1`))[0];
-  ownerClientId = site?.client_id ? String(site.client_id) : '';
-  const ident = rows(await svc(`presence_identity?site_id=eq.${agencySiteId}&select=business_name,email&limit=1`))[0];
-  to = String(ident?.email || '').trim();
+  const [siteR, identR] = await Promise.all([
+    svc(`presence_sites?id=eq.${agencySiteId}&select=client_id&limit=1`),
+    svc(`presence_identity?site_id=eq.${agencySiteId}&select=business_name,email&limit=1`),
+  ]);
+  const site = rows(siteR)[0];
+  const ownerClientId = site?.client_id ? String(site.client_id) : '';
+  const ident = rows(identR)[0];
+  let to = String(ident?.email || '').trim();
   if (!to && ownerClientId) {
     const owner = rows(await svc(`clients?id=eq.${ownerClientId}&select=email,contact_email&limit=1`))[0];
     to = String(owner?.email || owner?.contact_email || '').trim();
@@ -264,14 +288,63 @@ export interface ClientActionNotice {
   href: string;                     // a deep link into the RIGHT studio surface (site-relative)
 }
 
+/** How long an INLINE (non-edge) delivery may hold the client's request open.
+ *  A hung Resend must never stall a client's upload response — past the cap we
+ *  stop waiting and let the work finish (or not) on its own. */
+const NOTIFY_INLINE_CAP_MS = 3000;
+
+/** DELIVERY (the call sites' entry point). The work below is a multi-hop chain
+ *  ending at Resend, and an edge isolate is free to tear down the moment the
+ *  response resolves — an un-awaited `.catch(() => {})` was a coin flip on
+ *  whether the email ever left. For a feature whose entire purpose is sending
+ *  mail, silent non-delivery is the worst failure, so:
+ *
+ *    • EdgeRuntime.waitUntil (feature-detected — Supabase Edge Functions have
+ *      it, `deno run` and the tests do not) keeps the runtime alive for the
+ *      handed-off promise. The client's request pays nothing.
+ *    • Otherwise we AWAIT inline, capped by Promise.race, so the work really
+ *      completes before the response resolves without a hung dependency ever
+ *      stalling the client past `capMs`.
+ *
+ *  The original guarantee is unchanged and is what makes awaiting safe: this
+ *  never throws and never rejects, so a client's message/upload/approval can
+ *  never fail because the operator's notification did. Call sites `await` it
+ *  (an un-awaited fallback would keep nothing alive — that is the whole point). */
+export async function notifyStudioOfClientAction(n: ClientActionNotice, capMs = NOTIFY_INLINE_CAP_MS): Promise<void> {
+  try {
+    const work = deliverStudioNotification(n).catch(() => false);
+    const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt && typeof rt.waitUntil === 'function') { rt.waitUntil(work); return; }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([work, new Promise<false>((res) => { timer = setTimeout(() => res(false), capMs); })]);
+    if (timer !== undefined) clearTimeout(timer);   // never hold the isolate open on the winner's behalf
+  } catch { /* delivery is best-effort — the client's request comes first */ }
+}
+
 /** Tell the studio a client did something. Raises the notice on the ONE model
  *  (bell + web push) and — ONLY when that notice was newly created, i.e. this
  *  thread hasn't already notified inside the window — emails the operator.
- *  Returns true when an email actually went out. Never throws. */
-export async function notifyStudioOfClientAction(n: ClientActionNotice): Promise<boolean> {
+ *  Returns true when an email actually went out. Never throws.
+ *  This is the WORKER: call sites use notifyStudioOfClientAction above, which
+ *  owns the survive-the-response policy. Exported so it can be driven directly. */
+export async function deliverStudioNotification(n: ClientActionNotice): Promise<boolean> {
   try {
     if (!n?.agencySiteId || !n?.kind || !n?.threadKey) return false;
-    const { to, ownerClientId } = await studioRecipient(n.agencySiteId);
+    // ONE wave for every independent hop: the recipient (itself two parallel
+    // reads), WHO acted, WHAT it was about, and the notice module. These used to
+    // run strictly one after another — five serial round trips on the front of a
+    // chain that has to outlive the response.
+    const [recipient, whoRow, projRow, noticeMod] = await Promise.all([
+      studioRecipient(n.agencySiteId),
+      n.customerClientId
+        ? svc(`clients?id=eq.${n.customerClientId}&select=name,email&limit=1`).then((r) => rows(r)[0] || null).catch(() => null)
+        : Promise.resolve(null),
+      n.projectId
+        ? svc(`presence_projects?id=eq.${n.projectId}&site_id=eq.${n.agencySiteId}&deleted_at=is.null&select=name&limit=1`).then((r) => rows(r)[0] || null).catch(() => null)
+        : Promise.resolve(null),
+      import('./notice.ts'),
+    ]);
+    const { to, ownerClientId } = recipient;
     if (!ownerClientId) {
       // No owner client row → no key for the ONE notice model, so there is no
       // throttle to lean on. Sending unthrottled is worse than not sending.
@@ -285,16 +358,8 @@ export async function notifyStudioOfClientAction(n: ClientActionNotice): Promise
 
     // WHO acted + WHAT it was about (best-effort; the mail is still sendable
     // without either — mirrors how the booking/lead notifiers degrade).
-    let who = 'A client';
-    if (n.customerClientId) {
-      const c = rows(await svc(`clients?id=eq.${n.customerClientId}&select=name,email&limit=1`))[0];
-      who = String(c?.name || c?.email || 'A client').slice(0, 80);
-    }
-    let projectName = '';
-    if (n.projectId) {
-      const p = rows(await svc(`presence_projects?id=eq.${n.projectId}&site_id=eq.${n.agencySiteId}&deleted_at=is.null&select=name&limit=1`))[0];
-      projectName = String(p?.name || '').slice(0, 120);
-    }
+    const who = String(whoRow?.name || whoRow?.email || 'A client').slice(0, 80);
+    const projectName = String(projRow?.name || '').slice(0, 120);
 
     const subject = String(n.subject || '').slice(0, 200);
     const excerpt = String(n.excerpt || '').slice(0, 600);
@@ -303,7 +368,7 @@ export async function notifyStudioOfClientAction(n: ClientActionNotice): Promise
     // The notice IS the throttle: created===true only on the first insert for
     // this (owner, kind, thread + 15-minute bucket). Pre-0116 the CHECK
     // constraint rejects the insert → created=false → no email, no crash.
-    const { raiseNotice } = await import('./notice.ts');
+    const { raiseNotice } = noticeMod;
     const created = await raiseNotice({
       siteId: n.agencySiteId, clientId: ownerClientId, kind: n.kind,
       period: noticePeriodFor(n.threadKey, n.bucket !== false),
@@ -312,8 +377,12 @@ export async function notifyStudioOfClientAction(n: ClientActionNotice): Promise
     });
     if (!created) return false;   // already notified for this thread inside the window
 
-    const { sendEmail } = await import('../commerce/account.ts');
-    const { loadEmailBrand } = await import('./email_brand.ts');
+    // Past the throttle gate: the send module + the brand are independent — one
+    // wave, not two hops (the dynamic imports keep this file free of an import
+    // cycle through commerce/account.ts).
+    const [{ sendEmail }, { loadEmailBrand }] = await Promise.all([
+      import('../commerce/account.ts'), import('./email_brand.ts'),
+    ]);
     const brand = await loadEmailBrand(n.agencySiteId);
     const link = `${SITE_BASE()}${n.href.startsWith('/') ? n.href : `/${n.href}`}`;
     const html =

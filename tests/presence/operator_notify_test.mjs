@@ -41,7 +41,11 @@ Deno.env.set('PLATFORM_REPLY_TO', 'eric@davisdigitalstudio.com');
 Deno.env.set('OPS_ALERT_EMAIL', 'ops@davisdigitalstudio.com');
 Deno.env.set('AGENCY_SITE_ID', AGENCY);
 
-const { notifyStudioOfClientAction } = await import('../../supabase/functions/presence/lib/service_bridge.ts');
+// PART A drives the WORKER directly (deliverStudioNotification) — the exported
+// notifyStudioOfClientAction the call sites use is the delivery wrapper around
+// it (EdgeRuntime.waitUntil / capped inline await), pinned in
+// operator_notify_fixes_test.mjs (F3).
+const { deliverStudioNotification: notifyStudioOfClientAction } = await import('../../supabase/functions/presence/lib/service_bridge.ts');
 
 // ═══════════════════════ PART A · behavioral (fetch fake) ═══════════════════
 const realFetch = globalThis.fetch;
@@ -226,16 +230,16 @@ try {
 const br = read('supabase/functions/presence/lib/service_bridge.ts');
 
 ok('seam: notifyStudioOfClientAction lives in the bridge (beside the outbound helpers)', /export async function notifyStudioOfClientAction/.test(br));
-ok('seam: sendEmail is called with critical:true', /sendEmail\([\s\S]{0,400}?\{ critical: true \}\)/.test(br.slice(br.indexOf('notifyStudioOfClientAction'))));
+ok('seam: sendEmail is called with critical:true', /sendEmail\([\s\S]{0,400}?\{ critical: true \}\)/.test(br.slice(br.indexOf('deliverStudioNotification'))));
 {
   // ⚠ the load-bearing assertion: the operator send must NOT pass siteId.
-  const fn = br.slice(br.indexOf('export async function notifyStudioOfClientAction'));
+  const fn = br.slice(br.indexOf('export async function deliverStudioNotification'));
   const send = (fn.match(/sendEmail\([^;]*?\);/s) || [''])[0];
   ok('reply-to: the operator sendEmail call NEVER passes opts.siteId (feedback-loop hazard)', send.length > 0 && !/siteId/.test(send));
   ok('reply-to: the hazard is explained in a comment beside the send', /reply/i.test(fn.slice(0, fn.indexOf(send))) && /inbound/i.test(fn.slice(0, fn.indexOf(send))));
 }
 ok('seam: the OPS fallback is gated on the explicitly-named agency site (AGENCY_SITE_ID)', /AGENCY_SITE_ID/.test(br));
-ok('seam: raiseNotice gates the email (created===true only)', /raiseNotice/.test(br) && /created/.test(br.slice(br.indexOf('notifyStudioOfClientAction'))));
+ok('seam: raiseNotice gates the email (created===true only)', /raiseNotice/.test(br) && /created/.test(br.slice(br.indexOf('deliverStudioNotification'))));
 
 // the three existing notifiers are UNTOUCHED (adding an OPS fallback there would
 // misroute a client site's booking/lead/review mail to the platform operator).
@@ -287,7 +291,7 @@ const nt = read('supabase/functions/presence/lib/notifications.ts');
 ok('in-app: the bell badge filter includes client_upload + task_done', /kind=in\.\([^)]*client_upload[^)]*\)/.test(ws) && /kind=in\.\([^)]*task_done[^)]*\)/.test(ws));
 {
   // the Inbox rows read (workspace.ts feed) must no longer be message-only
-  const inbox = (ws.match(/presence_project_events\?site_id=eq\.\$\{site\.id\}&kind=[^&]*&select=project_id,detail,created_at/g) || [])[0] || '';
+  const inbox = (ws.match(/presence_project_events\?site_id=eq\.\$\{site\.id\}&kind=[^&]*&select=project_id,kind,detail,created_at/g) || [])[0] || '';
   ok('in-app: the Inbox row filter carries approval_decided + client_upload + task_done', /client_upload/.test(inbox) && /approval_decided/.test(inbox) && /task_done/.test(inbox));
 }
 ok('in-app: notifLabel labels client_upload + task_done (no more generic "Activity")', /client_upload:/.test(nt) && /task_done:/.test(nt));

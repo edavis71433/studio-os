@@ -10,6 +10,7 @@ const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
 const workspace = read('supabase/functions/presence/routes/workspace.ts');
+const bell = read('supabase/functions/presence/lib/inbox_feed.ts');   // the pure badge arithmetic
 const store = read('supabase/functions/presence/connected/store.ts');
 const inbox = read('inbox.html');
 const today = read('today.html');
@@ -17,10 +18,15 @@ const today = read('today.html');
 // ── FIX 1: new website enquiries ring the bell + show in the Inbox ───────────
 ok('FIX1: attention_count counts new form submissions (owner-scoped, status=new)',
   /seesFull \? svc\(`presence_form_submissions\?site_id=eq\.\$\{site\.id\}&spam=eq\.false&status=eq\.new/.test(workspace));
+// The badge ARITHMETIC moved to lib/inbox_feed.ts studioBellCount (pure, so the
+// rules below are now behaviourally tested in operator_notify_fixes_test.mjs);
+// the route still owns the reads and must still hand both inputs over.
 ok('FIX1: new-enquiry count is deduped against the lead_followup cron notice (no stacking)',
-  /const leadFollowups = \(\(nQ\.json[\s\S]*?\.kind === 'lead_followup'\)\.length/.test(workspace) &&
-  /const newEnquiries = Math\.max\(0, \(\(eQ\.json[\s\S]*?\) - leadFollowups\)/.test(workspace) &&
-  /\+ filesPending \+ newEnquiries/.test(workspace));
+  /const leadFollowups = notices\.filter\(\(n\) => n && n\.kind === 'lead_followup'\)\.length/.test(bell) &&
+  /const newEnquiries = Math\.max\(0, \(i\.newEnquiries \|\| 0\) - leadFollowups\)/.test(bell) &&
+  /\+ \(i\.filesPending \|\| 0\) \+ newEnquiries/.test(bell) &&
+  /newEnquiries: \(\(eQ\.json as any\[\]\)\?\.length \|\| 0\)/.test(workspace) &&
+  /notices: \(\(nQ\.json as any\[\]\) \|\| \[\]\)/.test(workspace));
 ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for the bell',
   /notices\.unshift\(\{[\s\S]*?kind: 'website_enquiry'/.test(workspace) &&
   /const newEnquiries = Math\.max\(0, \(\(\(enqQ\.ok[\s\S]*?\)\.length - leadFollowups\)/.test(workspace));
