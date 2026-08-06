@@ -473,6 +473,54 @@ test.describe('SS6 — inbox console quick wins', () => {
     await expect(page.locator('#pbody')).toHaveAttribute('aria-live', 'polite');
     expect(errors).toEqual([]);
   });
+
+  // ── Operator notifications (0116) — the newly-surfaced in-app rows ─────────
+  // client_upload / task_done events were missing from BOTH server-side event
+  // filters, so a client's file was invisible in-app end to end; approval
+  // decisions rang the bell but had no Inbox row. The server now emits them and
+  // raises four NEW notice kinds. The frontend must render every one of them
+  // without a per-kind allowlist — an unknown kind must never silently vanish.
+  test('0116 — the new client-activity notice kinds render as rows with their deep links', async ({ page }) => {
+    const api = {
+      ...API,
+      '/portal/feed': { data: {
+        ...FEED.data,
+        notices: [
+          ...FEED.data.notices,
+          { id: 'n-up', kind: 'client_upload', headline: 'New file from Marlow’s Kitchen', body: 'menu-final.pdf', href: '/projects.html' },
+          { id: 'n-req', kind: 'client_request', headline: 'New request from Marlow’s Kitchen', body: 'Can you refresh the gallery?', href: '/inbox.html' },
+          { id: 'n-ap', kind: 'client_approval', headline: 'Approval decision from Marlow’s Kitchen', body: 'Approved — Homepage copy', href: '/timeline.html' },
+        ],
+      } },
+    };
+    await installApp(page, { api });
+    await page.goto('/inbox.html');
+    const rows = page.locator('#rows');
+    // every new kind surfaces — none is filtered out for being unrecognised
+    await expect(rows.getByText('New file from Marlow’s Kitchen')).toBeVisible();
+    await expect(rows.getByText('New request from Marlow’s Kitchen')).toBeVisible();
+    await expect(rows.getByText('Approval decision from Marlow’s Kitchen')).toBeVisible();
+  });
+
+  test('0116 — an upload folds into its project conversation row (count spans the thread, not just messages)', async ({ page }) => {
+    // The Inbox event read now carries client_upload/approval_decided/task_done,
+    // so a project row's `count` is latest-client-activity, not message-only.
+    const api = {
+      ...API,
+      '/portal/feed': { data: {
+        ...FEED.data,
+        client_messages: [
+          { ...FEED.data.client_messages[0], count: 5, needs_reply: true, unread: true },
+          FEED.data.client_messages[1],
+        ],
+      } },
+    };
+    await installApp(page, { api });
+    await page.goto('/inbox.html');
+    const row = page.locator('#rows [role=option]').filter({ hasText: 'Marlow’s Kitchen' }).first();
+    await expect(row).toBeVisible();
+    await expect(page.locator('.unread-dot').first()).toBeVisible();
+  });
 });
 
 // ── Batch A (post-redesign audit) — inbox regressions ────────────────────────
