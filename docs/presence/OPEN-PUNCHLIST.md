@@ -392,6 +392,21 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
 🏁 **MARKETING OVERHAUL — ALL DECISION-FREE WORK LIVE (2026-07-27).**
+✅ PHOTOS GROUP A MERGED TO MAIN @9c4ec7c (Eric "Merge it", 2026-07-27;
+Netlify). Six repo-asset slots live: founder avatar on pricing/services/
+monthly-retainer credential cards + audit founder cell (alt follows the
+index precedent; audit's is decorative-empty beside the visible name),
+About's life strip (dog/gym/Rome), Work's desk shot. Review found ONE real
+defect — audit avatar became a 46×61 ellipse post-decode (enhance.css
+img{height:auto} beat .hero-sig; fixed with the inline box + a W===H
+circle pin on all four pages). GROUP B (9 slots, 12 AI images) GATED ON
+ERIC: Visual Studio prompts in docs/design/MARKETING-PHOTOS.md (G1,
+G2a-d, G3-G9) — he generates, sends here, I place with the same contract.
+NOTE 2026-07-27: the container twice restored a stale filesystem snapshot
+(repo at d1cb905 + old client.html WIP; scratchpad pw-sandbox.config.ts
+reverted). Recovery: park WIP in stash, checkout -B from origin, rewrite
+the sandbox config (absolute testDir, headless_shell-1194). Origin is
+always truth.
 ✅ MS6 MERGED TO MAIN @92a717b (Eric "Merge it"; Netlify). Review: no
 blockers; 3 nits fixed pre-merge. MS6 delivered the doc's §MS7 sweep: five
 capture forms tokenized (services/web-design/pricing/seo-strategy/monthly-
