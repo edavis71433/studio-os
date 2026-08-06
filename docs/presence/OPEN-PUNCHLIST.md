@@ -391,6 +391,49 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 📬 CLIENT MESSAGES LANDING AS SUPPORT REQUESTS — FIXED, AWAITING DEPLOY
+
+Eric (2026-07-27): "the messages from Hettie keep coming in as support requests."
+DIAGNOSIS (read-only, verified at tip): NOT a display bug — two structural
+defects + one fragility. (D1) routes/inbound_email.ts could ONLY write the
+support spine — even a bridged client with a live project — while EVERY
+outbound email (incl. project-message notifications) carries the inbound
+reply-to, so each reply minted a ticket; subject-only + open-only threading
+meant a new ticket per subject AND after every resolve, and even a reply to
+the auto-ack minted one. (D2) the portal's "Message your studio" composer
+minted a support request PER MESSAGE (client.html → POST /client/support).
+(D3) support rows tied to clients only by requester-key string matching, so
+a GoTrue-resolved uid or alternate address rendered her as an anonymous
+"Support request" row outside her CRM thread.
+
+FIX (85c506a→41319f8, 6 commits): F1 matched bridged client + ACTIVE +
+client_visible project → presence_project_messages (portal parity, incl. the
+kind:'message' event the inbox groups on); reference threading via
+In-Reply-To/References with reopen-on-append; support spine as fallback.
+F2 composer → newest active project thread, else ONE ongoing project-less
+conversation (service requests still mint real tickets). F3 migration 0115
+(client_id stamp + project-message external_id dedup) with write-time
+stamping, tolerant reads, precise-signal degradation. F4 inbox label.
+
+QUALITY TRAIL: review found a SECURITY BLOCKER — reference-thread append had
+no sender-ownership check, so any known sender whose mail carried another
+client's Message-Id (forged OR honestly accumulated via forward/reply-all)
+injected into the victim's thread AS the victim and reopened their tickets;
+and the test meant to pin identity-before-lookup ordering was VACUOUS
+(a faithful hoist passed 125/125). All 9 findings fixed; 4 mutations run
+by hand afterward, each caught: ownership check removed → 3 R1 tests fail ·
+pre-0115 legacy path skipping the check → same 3 · lookup hoisted above the
+stranger gate → the R2 ordering pin fails · project active/visible gate off
+→ 2 R3 tests fail. Gates: pure 209/0/4 (inbound_email 125→142,
+support_routing 15→19), e2e inbox+crm+portal 205/0, marketing 90 untouched.
+
+⚠️ NEEDS ERIC: merge + FUNCTION DEPLOY + run supabase/migrations/
+0115_support_client_link.sql. DEPLOY ORDER MATTERS: apply the SQL BEFORE or
+WITH the deploy — pre-0115 the project-message landing has no dedup key, so
+a webhook redelivery could duplicate a message. Behavior he'll notice: a
+client's emailed reply to a CLOSED ticket reopens it (was: minted a new
+anonymous ticket).
+
 🏁 **MARKETING OVERHAUL — ALL DECISION-FREE WORK LIVE (2026-07-27).**
 ✅ PHOTOS GROUP A MERGED TO MAIN @9c4ec7c (Eric "Merge it", 2026-07-27;
 Netlify). Six repo-asset slots live: founder avatar on pricing/services/
