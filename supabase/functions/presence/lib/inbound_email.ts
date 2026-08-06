@@ -298,17 +298,56 @@ export function selectAppendTarget<T extends { subject?: unknown; created_at?: u
   return matches.length ? matches.sort(byNewest)[0] : null;
 }
 
+// ── Reference threading (RFC 5322 In-Reply-To / References) ──────────────────
+/** The <message-id> tokens a reply carries in its In-Reply-To + References
+ *  headers, In-Reply-To first, deduped, order-preserving, capped at 20 entries
+ *  of ≤300 chars each. We store INBOUND Message-Ids as external_id (0114/0115),
+ *  so a reply inside a thread that STARTED with the sender's own email carries
+ *  one of these ids — that pins the reply to its own thread regardless of
+ *  subject rewrites or open-status. Pure. */
+export function referenceIds(headers: unknown): string[] {
+  const raw = `${headerValue(headers, 'in-reply-to')} ${headerValue(headers, 'references')}`;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of raw.matchAll(/<[^<>\s]+>/g)) {
+    const id = m[0].slice(0, 300);
+    if (!seen.has(id)) { seen.add(id); out.push(id); }
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 // ── Deploy-order tolerance + log masking ─────────────────────────────────────
-/** True when a PostgREST error is "the external_id column doesn't exist yet"
- *  (pre-0114). PGRST204 / Postgres 42703, or a message naming external_id — the
- *  ONLY column 0114 adds — so the route can retry the insert without the key
+/** True when a PostgREST error is "the <column> column doesn't exist yet"
+ *  (pre-0114 external_id / pre-0115 client_id). PGRST204 / Postgres 42703, or a
+ *  message naming the column — so a caller can retry the write without the key
  *  (never SILENTLY, only on this precise signal). Pure. */
-export function missingColumnSignal(json: unknown, text: unknown): boolean {
+export function missingColumnSignal(json: unknown, text: unknown, column = 'external_id'): boolean {
   const j = (json && typeof json === 'object') ? json as any : {};
   const code = String(j.code ?? '');
   if (code === 'PGRST204' || code === '42703') return true;
   const hay = `${String(j.message ?? '')} ${String(j.details ?? '')} ${String(text ?? '')}`.toLowerCase();
-  return /external_id/.test(hay) && /(column|schema cache|does not exist|could not find)/.test(hay);
+  return hay.includes(String(column).toLowerCase()) && /(column|schema cache|does not exist|could not find)/.test(hay);
+}
+
+/** Which OPTIONAL insert columns a PostgREST missing-column error asks us to
+ *  strip. [] when the error is NOT a missing-column signal at all. When it IS
+ *  (PGRST204/42703, or the message names a candidate): the candidates the
+ *  message actually NAMES — or, if none is named (a bare code), ALL candidates
+ *  (nothing else to go on; the retry must not loop). The route retries the
+ *  insert with exactly these stripped — precise, bounded, never a silent
+ *  strip-everything on an unrelated failure. Pure. */
+export function missingInsertColumns(json: unknown, text: unknown, candidates: string[]): string[] {
+  const list = Array.isArray(candidates) ? candidates.filter((c) => typeof c === 'string' && c) : [];
+  if (!list.length) return [];
+  const j = (json && typeof json === 'object') ? json as any : {};
+  const code = String(j.code ?? '');
+  const hay = `${String(j.message ?? '')} ${String(j.details ?? '')} ${String(text ?? '')}`.toLowerCase();
+  const named = list.filter((c) => hay.includes(c.toLowerCase()));
+  const signal = code === 'PGRST204' || code === '42703' ||
+    (named.length > 0 && /(column|schema cache|does not exist|could not find)/.test(hay));
+  if (!signal) return [];
+  return named.length ? named : list.slice();
 }
 
 /** Mask a recipient for logs (edge logs are operator-visible + retained). Pure. */

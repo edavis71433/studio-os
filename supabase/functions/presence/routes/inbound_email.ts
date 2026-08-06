@@ -24,7 +24,7 @@ import {
   parseInbound, parseAddress, siteIdFromAddress,
   parseAuthResults, senderAuthVerdict, autoResponderSignal, isSelfSender,
   filterSafe, filterKey, deriveRequesterKey, matchedStoredEmail, identityAliases,
-  selectAppendTarget, missingColumnSignal, maskEmail,
+  selectAppendTarget, missingColumnSignal, missingInsertColumns, referenceIds, maskEmail,
 } from '../lib/inbound_email.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,42 +79,56 @@ async function readBodyCapped(req: Request, max: number): Promise<string | null>
   return new TextDecoder().decode(buf);
 }
 
-/** Has this exact external_id already landed on this site (either support table)?
- *  Both reads are site-scoped. Best-effort: pre-0114 the external_id column
- *  doesn't exist, so PostgREST errors → treat as NOT landed (dedup degrades to the
- *  unique index once 0114 is applied; the code never blocks on the column). */
+/** Has this exact external_id already landed on this site (either support table,
+ *  or — F1 — the project-message thread)? All reads are site-scoped. Best-effort:
+ *  pre-0114/0115 the external_id column doesn't exist, so PostgREST errors →
+ *  treat that table as NOT landed (dedup degrades to the unique index once the
+ *  migration is applied; the code never blocks on the column). */
 async function alreadyLanded(siteId: string, externalId: string): Promise<boolean> {
   if (!externalId) return false;
   try {
     const enc = encodeURIComponent(externalId);
-    const [m, r] = await Promise.all([
+    const [m, r, p] = await Promise.all([
       svc(`presence_support_messages?site_id=eq.${siteId}&external_id=eq.${enc}&select=id&limit=1`),
       svc(`presence_support_requests?site_id=eq.${siteId}&external_id=eq.${enc}&select=id&limit=1`),
+      svc(`presence_project_messages?site_id=eq.${siteId}&external_id=eq.${enc}&select=id&limit=1`),
     ]);
-    if (!m.ok || !r.ok) return false;   // column missing (pre-0114) → not landed
-    return rows(m).length > 0 || rows(r).length > 0;
+    // per-table: a missing column (pre-migration) reads as "not landed" THERE
+    // without blinding the other tables' checks
+    if (m.ok && rows(m).length > 0) return true;
+    if (r.ok && rows(r).length > 0) return true;
+    if (p.ok && rows(p).length > 0) return true;
+    return false;
   } catch { return false; }
 }
 
 /** Insert a row carrying its external_id for idempotency. A unique-index conflict
  *  (409) means the message already landed → {duplicate}. ONLY on the precise
- *  missing-column signal (pre-0114) do we retry ONCE without the key — never
- *  silently stripping it. ANY other failure returns !ok so the route 502s and
- *  Resend retries (the message is landable, the failure was infra). */
-async function insertDeduped(table: string, row: Record<string, unknown>, externalId: string): Promise<{ ok: boolean; row?: any; duplicate?: boolean }> {
+ *  missing-column signal (pre-0114 external_id / pre-0115 client_id) do we retry
+ *  with EXACTLY the named optional column(s) stripped — never silently stripping
+ *  everything. `optionalKeys` names the row's OTHER deploy-order-tolerant columns
+ *  (e.g. client_id) so a pre-0115 database degrades to the old insert shape while
+ *  KEEPING the dedup key when only client_id is missing. ANY other failure
+ *  returns !ok so the route 502s and Resend retries (the message is landable,
+ *  the failure was infra). */
+async function insertDeduped(table: string, row: Record<string, unknown>, externalId: string, optionalKeys: string[] = []): Promise<{ ok: boolean; row?: any; duplicate?: boolean }> {
   const post = (body: unknown) => svc(table, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
-  let r = await post({ ...row, external_id: externalId });
-  if (r.ok && rows(r)[0]) return { ok: true, row: rows(r)[0] };
-  if (r.status === 409) return { ok: true, duplicate: true };   // unique(site_id, external_id) → already landed
-  if (missingColumnSignal(r.json, r.text)) {
-    r = await post(row);   // pre-0114 retry — WITHOUT the key, once, only on this signal
+  let attempt: Record<string, unknown> = { ...row, external_id: externalId };
+  // bounded: full → strip the named column(s) → strip all optional (≤3 attempts)
+  for (let i = 0; i < 3; i++) {
+    const r = await post(attempt);
     if (r.ok && rows(r)[0]) return { ok: true, row: rows(r)[0] };
-    if (r.status === 409) return { ok: true, duplicate: true };
+    if (r.status === 409) return { ok: true, duplicate: true };   // unique(site_id, external_id) → already landed
+    const present = ['external_id', ...optionalKeys].filter((k) => k in attempt);
+    const strip = missingInsertColumns(r.json, r.text, present);
+    if (!strip.length) return { ok: false };
+    attempt = { ...attempt };
+    for (const k of strip) delete attempt[k];
   }
   return { ok: false };
 }
 
-interface SiteIdentity { kind: 'client' | 'contact'; id: string; contactId: string | null; emails: string[]; candidates: number }
+interface SiteIdentity { kind: 'client' | 'contact'; id: string; contactId: string | null; emails: string[]; candidates: number; projectId: string | null }
 
 /** Resolve the inbound sender to a KNOWN identity ON THIS SITE. `clients` is
  *  matched by email (ilike, then an EXACT in-memory recheck — ilike only ever
@@ -133,20 +147,54 @@ async function matchSiteIdentity(siteId: string, fromEmail: string): Promise<Sit
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase() || String(c.contact_email || '').toLowerCase() === fromEmail.toLowerCase());
   const clientIds = clientRows.map((c) => String(c.id)).filter((id) => UUID_RE.test(id));
   if (clientIds.length) {
-    // bridged precedence: only a client with an ACTIVE link to THIS agency site is a valid sender here
-    const links = okRows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&customer_client_id=in.(${clientIds.join(',')})&select=customer_client_id&limit=25`));
+    // bridged precedence: only a client with an ACTIVE link to THIS agency site is
+    // a valid sender here. The link also carries the delivery PROJECT (F1): the
+    // matched client's NEWEST active link names the thread their email lands on.
+    const links = okRows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&customer_client_id=in.(${clientIds.join(',')})&select=customer_client_id,project_id,created_at&order=created_at.desc&limit=25`));
     const bridged = new Set(links.map((l) => String(l.customer_client_id)));
     const hit = clientRows.find((c) => bridged.has(String(c.id)));
-    if (hit) return { kind: 'client', id: String(hit.id), contactId: hit.contact_id ? String(hit.contact_id) : null, emails: [hit.email, hit.contact_email].filter((e) => e && String(e).trim()).map(String), candidates: clientRows.filter((c) => bridged.has(String(c.id))).length };
+    if (hit) {
+      const link = links.find((l) => String(l.customer_client_id) === String(hit.id));   // created_at.desc → newest first
+      const projectId = link?.project_id && UUID_RE.test(String(link.project_id)) ? String(link.project_id) : null;
+      return { kind: 'client', id: String(hit.id), contactId: hit.contact_id ? String(hit.contact_id) : null, emails: [hit.email, hit.contact_email].filter((e) => e && String(e).trim()).map(String), candidates: clientRows.filter((c) => bridged.has(String(c.id))).length, projectId };
+    }
   }
   // 2) a CRM contact on THIS site (site-scoped), matched the same way
   const contactRows = okRows(await svc(`presence_contacts?site_id=eq.${siteId}&email=ilike.${enc}&deleted_at=is.null&select=id,email,created_at&order=created_at.asc,id.asc&limit=25`))
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase());
   if (contactRows.length) {
     const c = contactRows[0];
-    return { kind: 'contact', id: String(c.id), contactId: null, emails: [c.email].filter((e) => e && String(e).trim()).map(String), candidates: contactRows.length };
+    return { kind: 'contact', id: String(c.id), contactId: null, emails: [c.email].filter((e) => e && String(e).trim()).map(String), candidates: contactRows.length, projectId: null };
   }
   return null;
+}
+
+/** F1 reference threading: the support thread a reply's In-Reply-To/References
+ *  point at. We store INBOUND Message-Ids as external_id on BOTH support tables,
+ *  so a reply inside a thread that started with (or ever contained) the sender's
+ *  own email carries a stored id. Returns the thread row (id, requester, status,
+ *  project_id, subject) or null. Pre-0114 (no external_id column) → null (the
+ *  precise missing-column signal only); any OTHER non-ok read throws InfraRead
+ *  so the route 502s (a flaky read must not silently fork a duplicate thread). */
+async function findThreadByReferences(siteId: string, refs: string[]): Promise<any | null> {
+  if (!refs.length) return null;
+  const list = refs.map((x) => filterKey(x)).join(',');
+  const q = async (path: string): Promise<any[]> => {
+    const r = await svc(path);
+    if (!r.ok) {
+      if (missingColumnSignal(r.json, r.text)) return [];   // pre-0114 → reference threading not available yet
+      throw new InfraRead();
+    }
+    return rows(r);
+  };
+  const [msgHits, reqHits] = await Promise.all([
+    q(`presence_support_messages?site_id=eq.${siteId}&deleted_at=is.null&external_id=in.(${list})&select=request_id,created_at&order=created_at.desc&limit=1`),
+    q(`presence_support_requests?site_id=eq.${siteId}&deleted_at=is.null&external_id=in.(${list})&select=id,created_at&order=created_at.desc&limit=1`),
+  ]);
+  const reqId = String(msgHits[0]?.request_id || reqHits[0]?.id || '');
+  if (!reqId) return null;
+  const enc = encodeURIComponent(reqId);
+  return (await q(`presence_support_requests?id=eq.${enc}&site_id=eq.${siteId}&deleted_at=is.null&select=id,subject,requester,status,project_id&limit=1`))[0] || null;
 }
 
 /** Auto-acknowledge the sender that their email landed. The SAME branded,
@@ -287,9 +335,64 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     aliases.push(a);
   }
 
-  // (16) the sender's OPEN threads on this site (any alias key), newest first.
-  //      SC1: okRows — a non-ok open-threads read 502s (retry) rather than reading
-  //      as "no open threads" and opening a DUPLICATE new request on a live sender.
+  // (16) REFERENCE THREADING (F1): before ANY subject/project routing, an
+  //      In-Reply-To/References id that matches a STORED inbound Message-Id pins
+  //      the reply to ITS OWN support thread — regardless of subject or
+  //      open-status. Appending to a resolved/closed thread REOPENS it (the
+  //      client answered; a closed ticket must not silently swallow the reply).
+  const refs = referenceIds(data.headers).filter((x) => filterSafe(x) !== null);
+  let refTarget: any = null;
+  if (refs.length) {
+    try { refTarget = await findThreadByReferences(siteId, refs); }
+    catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
+  }
+  if (refTarget) {
+    if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed_race', from_email);
+    const ins = await insertDeduped('presence_support_messages',
+      { site_id: siteId, request_id: refTarget.id, body: text || subject || '(no content)', author: refTarget.requester, author_kind: 'client' }, externalId);
+    if (!ins.ok) return json({ error: 'write_failed' }, 502);
+    if (ins.duplicate) return dropAck('duplicate_message', from_email);
+    // L1 bump — and the reopen: a reply onto a resolved/closed thread flips it
+    // back to open (resolved_at cleared) so the studio's queue surfaces it again.
+    const reopen = refTarget.status === 'resolved' || refTarget.status === 'closed';
+    await svc(`presence_support_requests?id=eq.${refTarget.id}&site_id=eq.${siteId}`, { method: 'PATCH',
+      body: JSON.stringify(reopen ? { status: 'open', resolved_at: null, updated_at: nowIso() } : { updated_at: nowIso() }) }).catch(() => {});
+    if (refTarget.project_id) {
+      await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ project_id: refTarget.project_id, site_id: siteId, kind: 'support_message', actor: refTarget.requester, actor_kind: 'client', client_visible: true, detail: { from: 'client', request_id: refTarget.id, via: 'email' } }) }).catch(() => {});
+    }
+    return ack();
+  }
+
+  // (17) PROJECT LANDING (F1): a bridged CLIENT with a live delivery project →
+  //      their email IS a project message, landed exactly as the portal composer
+  //      path (project_comms/client_delivery: audience client, author kind
+  //      client, plus the kind:'message' event with detail.from='client' the
+  //      workspace feed + inbox Messages grouping key on). The support spine is
+  //      only the fallback for clients with no live project (and contacts).
+  if (match.kind === 'client' && match.projectId) {
+    let proj: any = null;
+    try { proj = okRows(await svc(`presence_projects?id=eq.${match.projectId}&site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`))[0]; }
+    catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
+    if (proj) {
+      if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed_race', from_email);
+      const ins = await insertDeduped('presence_project_messages',
+        { site_id: siteId, project_id: match.projectId, audience: 'client', body: text || subject || '(no content)', author: requesterKey, author_kind: 'client' }, externalId);
+      if (!ins.ok) return json({ error: 'write_failed' }, 502);   // landable + infra failure → Resend retries
+      if (ins.duplicate) return dropAck('duplicate_message', from_email);
+      // the ONE activity log — same event the portal client door writes, so the
+      // studio bell/feed/Inbox treat an emailed message exactly like a portal one.
+      // (Mirrors the portal path: a client→studio message emails no one.)
+      await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ project_id: match.projectId, site_id: siteId, kind: 'message', actor: requesterKey, actor_kind: 'client', client_visible: true, detail: { from: 'client', message_id: ins.row?.id, via: 'email' } }) }).catch(() => {});
+      return ack();
+    }
+  }
+
+  // (18) SUPPORT SPINE (fallback): the sender's OPEN threads on this site (any
+  //      alias key), newest first. SC1: okRows — a non-ok open-threads read 502s
+  //      (retry) rather than reading as "no open threads" and opening a
+  //      DUPLICATE new request on a live sender.
   let openThreads;
   try {
     openThreads = aliases.length
@@ -297,11 +400,11 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       : [];
   } catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
 
-  // (17) append to the newest subject-matching open thread, else (18) open a new one
+  // append to the newest subject-matching open thread, else (19) open a new one
   const target = selectAppendTarget(openThreads, subject);
   if (target) {
     // D1: re-check dedupe RIGHT before the insert (cross-table race). HONEST CAVEAT:
-    // this narrows but cannot fully close a sub-second window between the two support
+    // this narrows but cannot fully close a sub-second window between the landing
     // tables' external_id keys — the per-table unique index catches a same-table
     // retry; a genuine cross-table collision in that window is the residual gap.
     if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed_race', from_email);
@@ -322,9 +425,14 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     return ack();
   }
 
-  // (18) a new support request, in the handleClientSupport shape
+  // (19) a new support request, in the handleClientSupport shape — stamped with
+  //      the matched client's id (F3) so read paths never have to re-derive WHO
+  //      this is by string-matching requester keys. client_id rides as an
+  //      OPTIONAL column: a pre-0115 database strips exactly it on the precise
+  //      missing-column signal and keeps the external_id dedup key.
   const newReq = await insertDeduped('presence_support_requests',
-    { site_id: siteId, project_id: null, subject: subject || `Email from ${from_name || from_email}`, body: text || subject || '', status: 'open', priority: 'normal', requester: requesterKey, requester_kind: 'client' }, externalId);
+    { site_id: siteId, project_id: null, subject: subject || `Email from ${from_name || from_email}`, body: text || subject || '', status: 'open', priority: 'normal', requester: requesterKey, requester_kind: 'client',
+      ...(match.kind === 'client' ? { client_id: match.id } : {}) }, externalId, match.kind === 'client' ? ['client_id'] : []);
   if (!newReq.ok) return json({ error: 'write_failed' }, 502);
   if (newReq.duplicate) return dropAck('duplicate_request', from_email);
   await ackSender(siteId, from_email);

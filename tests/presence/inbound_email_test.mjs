@@ -109,6 +109,19 @@ ok('I3: empty/normalizes-to-empty email subject → null (a NEW request, never b
 })());
 ok('selectAppendTarget: no open threads → null', L.selectAppendTarget([], 'anything') === null);
 
+// referenceIds (F1 reference threading — RFC 5322 In-Reply-To / References)
+ok('referenceIds: In-Reply-To + References <id> tokens, deduped, order-preserving', JSON.stringify(L.referenceIds({ 'In-Reply-To': '<a@x>', References: '<b@y> <a@x> <c@z>' })) === JSON.stringify(['<a@x>', '<b@y>', '<c@z>']));
+ok('referenceIds: absent/empty headers → []', L.referenceIds({}).length === 0 && L.referenceIds(null).length === 0);
+ok('referenceIds: array-of-{name,value} header shape', JSON.stringify(L.referenceIds([{ name: 'References', value: '<m1@x>' }])) === JSON.stringify(['<m1@x>']));
+ok('referenceIds: caps at 20 entries', L.referenceIds({ References: Array.from({ length: 30 }, (_, i) => `<m${i}@x>`).join(' ') }).length === 20);
+ok('referenceIds: ignores non-<...> junk between ids', JSON.stringify(L.referenceIds({ References: 'noise <a@x> more-noise' })) === JSON.stringify(['<a@x>']));
+
+// missingInsertColumns (F3 deploy-order tolerance — which optional columns to strip)
+ok('missingInsertColumns: names the missing column from the message', JSON.stringify(L.missingInsertColumns({ code: 'PGRST204', message: "Could not find the 'client_id' column" }, '', ['external_id', 'client_id'])) === JSON.stringify(['client_id']));
+ok('missingInsertColumns: bare 42703 with no name → ALL candidates', JSON.stringify(L.missingInsertColumns({ code: '42703' }, '', ['external_id', 'client_id'])) === JSON.stringify(['external_id', 'client_id']));
+ok('missingInsertColumns: unrelated error → []', L.missingInsertColumns({ code: '23505', message: 'duplicate key' }, '', ['external_id']).length === 0);
+ok('missingInsertColumns: message naming a candidate without a code still signals', JSON.stringify(L.missingInsertColumns({ message: 'column "external_id" does not exist' }, '', ['external_id', 'client_id'])) === JSON.stringify(['external_id']));
+
 // missingColumnSignal / maskEmail
 ok('missingColumnSignal: PGRST204', L.missingColumnSignal({ code: 'PGRST204' }, '') === true);
 ok('missingColumnSignal: 42703', L.missingColumnSignal({ code: '42703' }, '') === true);
@@ -141,7 +154,16 @@ function installFetch(cfg = {}) {
     if (url.includes('suppressed_emails')) return jr([]);
     if (url.includes('presence_settings') || url.includes('presence_identity')) return jr([]);
     if (url.includes('/auth/v1/admin/users')) return jr({ users: cfg.authUsers || [] });   // I1: auth-user-by-email lookup
-    if (url.includes('external_id=eq.')) return jr(cfg.landed ? [{ id: 'seen' }] : []);   // alreadyLanded (both tables)
+    if (url.includes('external_id=eq.')) return jr(cfg.landed ? [{ id: 'seen' }] : []);   // alreadyLanded (all landing tables)
+    // F1 reference threading: the stored-Message-Id lookups (external_id=in.(…))
+    if (url.includes('external_id=in.')) {
+      if (url.includes('presence_support_messages')) return jr(cfg.refMsgHits || [], cfg.refStatus || 200);
+      return jr(cfg.refReqHits || [], cfg.refStatus || 200);
+    }
+    if (url.includes('presence_support_requests?id=eq.')) return jr(cfg.reqById || []);   // the referenced thread row
+    if (url.includes('presence_project_messages') && method === 'POST') return (cfg.projMsgInsert || (() => jr([{ id: 'pm_1' }], 201)))(body);
+    if (url.includes('presence_project_messages')) return jr([]);
+    if (url.includes('presence_projects')) return jr(cfg.projects || []);   // F1: the bridged link's project
     if (url.includes('clients?or=')) return jr(cfg.clients || [], cfg.clientsStatus || 200);   // SB1: clientsStatus drives a 5xx
     if (url.includes('presence_service_links')) return jr(cfg.links || []);
     if (url.includes('presence_contacts')) return jr(cfg.contacts || []);
@@ -330,6 +352,106 @@ try {
     const calls = installFetch({ ...BRIDGED, openThreads: [{ id: 'thr_1', subject: 'RE: Website copy', requester: 'auth-123', project_id: null, created_at: '2026-06-01T00:00:00Z' }], msgInsert: () => jr({ code: '23505', message: 'duplicate key' }, 409) });
     const r = await handleInboundEmail(await sign(emailReceived()));
     ok('T2b: append insert 409 → 200 ack (duplicate), not 502', r.status === 200);
+  }
+
+  // ═══════════ PART C · comms routing fix (F1 project landing + reference threading, F3 client_id) ═══════════
+  const PROJECT_ID = '55555555-5555-4555-8555-555555555555';
+  const BRIDGED_PROJ = { ...BRIDGED, links: [{ customer_client_id: CLIENT_ID, project_id: PROJECT_ID, created_at: '2026-01-02T00:00:00Z' }], projects: [{ id: PROJECT_ID }] };
+
+  // F1: a bridged CLIENT with an active project → the email lands as a PROJECT
+  // MESSAGE (the portal composer's shape), NEVER on the support spine — even when
+  // an open support thread's subject matches (the old subject-append path).
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ, openThreads: [{ id: 'thr_1', subject: 'RE: Website copy', requester: 'auth-123', project_id: null, created_at: '2026-06-01T00:00:00Z' }] });
+    const r = await handleInboundEmail(await sign(emailReceived()));
+    const pm = calls.find((c) => c.method === 'POST' && c.url.includes('presence_project_messages'));
+    const supPosts = calls.filter((c) => c.method === 'POST' && /presence_support/.test(c.url));
+    const evt = calls.find((c) => c.method === 'POST' && c.url.includes('presence_project_events'));
+    ok('F1: bridged client w/ project → presence_project_messages in the portal shape', r.status === 200 && !!pm && pm.body.project_id === PROJECT_ID && pm.body.audience === 'client' && pm.body.author === 'auth-123' && pm.body.author_kind === 'client' && pm.body.body === 'Here are my edits.');
+    ok('F1: the project message carries external_id (0114-style dedup)', pm && pm.body.external_id === '<abc-123@acme.com>');
+    ok('F1: NOTHING lands on the support spine (no ticket, no support append)', supPosts.length === 0);
+    ok('F1: emits the kind:message project event {from:client, via:email, client_visible}', evt && evt.body.kind === 'message' && evt.body.detail.from === 'client' && evt.body.detail.via === 'email' && evt.body.client_visible === true && evt.body.actor_kind === 'client');
+  }
+
+  // F1: project-message insert 409 (unique external_id conflict) → duplicate ack, no support fallthrough
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ, projMsgInsert: () => jr({ code: '23505', message: 'duplicate key' }, 409) });
+    const r = await handleInboundEmail(await sign(emailReceived()));
+    ok('F1: duplicate project message (409) → 200 ack, no support insert', r.status === 200 && !calls.some((c) => c.method === 'POST' && /presence_support/.test(c.url)));
+  }
+
+  // F1 (pre-0115): presence_project_messages.external_id missing → ONE retry without the key
+  {
+    let n = 0;
+    const calls = installFetch({ ...BRIDGED_PROJ, projMsgInsert: () => { n++; return n === 1 ? jr({ code: 'PGRST204', message: "Could not find the 'external_id' column" }, 400) : jr([{ id: 'pm_2' }], 201); } });
+    const r = await handleInboundEmail(await sign(emailReceived()));
+    const posts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_project_messages'));
+    ok('F1: pre-0115 missing external_id on project messages → retried once without the key', r.status === 200 && posts.length === 2 && !('external_id' in (posts[1].body || {})));
+  }
+
+  // F1: client whose link's project is GONE (deleted/missing) → the support spine
+  // fallback (append-or-create) — and F3: the new request is STAMPED client_id.
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ, projects: [], openThreads: [] });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'A fresh topic' })));
+    const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('F1: no live project → falls back to a support request (spine preserved)', r.status === 200 && !!reqPost && !calls.some((c) => c.method === 'POST' && c.url.includes('presence_project_messages')));
+    ok('F3: the fallback support request is stamped client_id', reqPost && reqPost.body.client_id === CLIENT_ID);
+  }
+
+  // F3 (pre-0115): client_id column missing → retry WITHOUT client_id but KEEPING external_id
+  {
+    let n = 0;
+    const calls = installFetch({ ...BRIDGED_PROJ, projects: [], openThreads: [], reqInsert: () => { n++; return n === 1 ? jr({ code: 'PGRST204', message: "Could not find the 'client_id' column of 'presence_support_requests'" }, 400) : jr([{ id: 'req_c' }], 201); } });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Client id degrade' })));
+    const posts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('F3: pre-0115 missing client_id → retried without client_id, external_id KEPT', r.status === 200 && posts.length === 2 && !('client_id' in (posts[1].body || {})) && posts[1].body.external_id === '<abc-123@acme.com>');
+  }
+
+  // F3: a CRM-contact sender (not a bridged client) opens a request with NO client_id key
+  {
+    const calls = installFetch({ clients: [], contacts: [{ id: CONTACT_ID, email: 'jane@acme.com', created_at: '2026-01-01T00:00:00Z' }], openThreads: [] });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'From a contact' })));
+    const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('F3: contact-matched sender → support request WITHOUT a client_id key', r.status === 200 && !!reqPost && !('client_id' in (reqPost.body || {})));
+  }
+
+  // F1 reference threading: an In-Reply-To that matches a STORED inbound
+  // Message-Id pins the reply to ITS OWN support thread — beating BOTH the
+  // project landing and the subject match, regardless of open-status.
+  {
+    const calls = installFetch({
+      ...BRIDGED_PROJ,
+      refMsgHits: [{ request_id: 'thr_9', created_at: '2026-05-01T00:00:00Z' }],
+      reqById: [{ id: 'thr_9', subject: 'An older matter', requester: 'auth-123', status: 'resolved', project_id: null, created_at: '2026-04-01T00:00:00Z' }],
+    });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Totally different subject', headers: { 'In-Reply-To': '<ref-1@acme.com>' } })));
+    const msgPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    const patch = calls.find((c) => c.method === 'PATCH' && c.url.includes('id=eq.thr_9'));
+    ok('F1: reference hit → appends to the referenced thread (subject/status ignored)', r.status === 200 && !!msgPost && msgPost.body.request_id === 'thr_9' && msgPost.body.author === 'auth-123');
+    ok('F1: reference append beats the project landing (no project message)', !calls.some((c) => c.method === 'POST' && c.url.includes('presence_project_messages')));
+    ok('F1: appending to a RESOLVED thread REOPENS it (status back to open)', patch && patch.body.status === 'open' && patch.body.resolved_at === null);
+  }
+
+  // reference append on an OPEN thread: no status change, just the L1 bump
+  {
+    const calls = installFetch({
+      ...BRIDGED_PROJ,
+      refReqHits: [{ id: 'thr_8', created_at: '2026-05-02T00:00:00Z' }],
+      reqById: [{ id: 'thr_8', subject: 'Open matter', requester: 'auth-123', status: 'open', project_id: 'proj_z', created_at: '2026-05-01T00:00:00Z' }],
+    });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Re: Open matter', headers: { References: '<ref-2@acme.com>' } })));
+    const patch = calls.find((c) => c.method === 'PATCH' && c.url.includes('id=eq.thr_8'));
+    const evt = calls.find((c) => c.method === 'POST' && c.url.includes('presence_project_events'));
+    ok('F1: reference append on an open thread bumps updated_at without touching status', r.status === 200 && !!patch && !('status' in (patch.body || {})));
+    ok('F1: project-linked referenced thread still emits the support_message event', evt && evt.body.kind === 'support_message' && evt.body.detail.from === 'client');
+  }
+
+  // F1: an unknown sender STILL creates nothing — with reference headers present
+  {
+    const calls = installFetch({ clients: [], contacts: [], refMsgHits: [{ request_id: 'thr_9' }] });
+    const r = await handleInboundEmail(await sign(emailReceived({ headers: { 'In-Reply-To': '<ref-1@acme.com>' } })));
+    ok('F1: unknown sender + reference headers → 200 ack, NOTHING inserted (spam surface intact)', r.status === 200 && !calls.some((c) => c.method === 'POST' && (/presence_support/.test(c.url) || c.url.includes('presence_project_messages'))));
   }
 
   // I1: a bridged client whose contact has NO auth_user_id but who CAN log into the
