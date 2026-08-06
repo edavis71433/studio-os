@@ -239,7 +239,7 @@ document.addEventListener('click',(e)=>{
   if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
   if(om&&ob&&!om.hidden&&!e.target.closest('.ovf')){om.hidden=true;ob.setAttribute('aria-expanded','false');}
 });
-const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['support','Support']];
+const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['support','Support & requests']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
 const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='support'&&it.kind==='support');
 

@@ -100,10 +100,11 @@ test.describe('Inbox — split-view console', () => {
     await page.goto('/inbox.html');
     const rows = page.locator('#rows');
     await expect(rows.getByRole('option').first()).toBeVisible();
-    // Support view → only the support thread
+    // Support view → only the support thread (F4: labeled "Support & requests")
     await page.locator('#viewBtn').click();
+    await expect(page.locator('#viewMenu [data-view="support"]')).toHaveText('Support & requests');
     await page.locator('#viewMenu [data-view="support"]').click();
-    await expect(page.locator('#viewBtn')).toContainText('Support');
+    await expect(page.locator('#viewBtn')).toContainText('Support & requests');
     await expect(rows.getByRole('option')).toHaveCount(1);
     await expect(rows.getByRole('option').first()).toContainText('Logo tweak');
     // Needs your OK → only the approval
@@ -121,6 +122,49 @@ test.describe('Inbox — split-view console', () => {
     await page.locator('#viewMenu [data-view="messages"]').click();
     await expect(rows.getByRole('option')).toHaveCount(1);
     await expect(rows.getByRole('option').first()).toContainText('Marlow’s Kitchen');
+  });
+
+  // ── Comms routing fix pins ─────────────────────────────────────────────────
+  test('a client PROJECT message groups under Messages — never under Support (F1)', async ({ page }) => {
+    // the feed shape the fixed inbound door produces for an emailed client
+    // message: a type:'message' client_messages row (kind:'message' event), NOT a
+    // support row — the Inbox must file it under Messages and keep Support clean.
+    await installApp(page, { api: { ...API,
+      '/portal/feed': { data: { ...FEED.data,
+        client_messages: [
+          { type: 'message', project: 'Site build', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', client_id: 'c-1', client: 'Hettie’s Flowers', created_at: '2026-07-15T00:00:00Z', needs_reply: true, count: 1, thread_key: 'client:c-1', unread: true, href: '/crm.html?project=aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa&tab=messages' },
+        ],
+      } },
+    } });
+    await page.goto('/inbox.html');
+    const rows = page.locator('#rows');
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="messages"]').click();
+    await expect(rows.getByRole('option')).toHaveCount(1);
+    await expect(rows.getByRole('option').first()).toContainText('Hettie’s Flowers');
+    await expect(rows.getByRole('option').first().locator('.rchip')).toHaveText('Message');
+    // and the Support & requests view shows NO trace of it
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="support"]').click();
+    await expect(rows.getByRole('option')).toHaveCount(0);
+  });
+
+  test('a support row stamped with a client renders the CLIENT’S NAME, not "Support request" (F3)', async ({ page }) => {
+    await installApp(page, { api: { ...API,
+      '/portal/feed': { data: { ...FEED.data,
+        client_messages: [
+          // stamped (client_id resolved server-side → the feed carries the name)
+          { type: 'support', id: 's-7', subject: 'Please update our hours', status: 'open', project: '', client_id: 'c-9', client: 'Hettie’s Flowers', created_at: '2026-07-16T00:00:00Z', thread_key: 'support:s-7', unread: true, href: '/projects.html?support=s-7' },
+          // legacy unstamped row — the old anonymous fallback stays
+          { type: 'support', id: 's-8', subject: 'Anonymous ask', status: 'open', project: '', client_id: '', client: '', created_at: '2026-07-15T00:00:00Z', thread_key: 'support:s-8', unread: true, href: '/projects.html?support=s-8' },
+        ],
+      } },
+    } });
+    await page.goto('/inbox.html');
+    const rows = page.locator('#rows');
+    const stamped = rows.getByRole('option').filter({ hasText: 'Please update our hours' });
+    await expect(stamped).toContainText('Hettie’s Flowers');
+    await expect(rows.getByRole('option').filter({ hasText: 'Anonymous ask' })).toContainText('Support request');
   });
 
   test('support: reading pane changes status through PATCH /support/:id', async ({ page }) => {

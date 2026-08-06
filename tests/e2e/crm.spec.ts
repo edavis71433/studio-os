@@ -186,6 +186,35 @@ test.describe('Relationship view', () => {
     expect(JSON.parse((await posted).postData() || '{}')).toEqual({ body: 'On it!', audience: 'client' });
   });
 
+  // Comms routing pin (F1/F3): an EMAIL-landed client message is a plain
+  // kind:'message' timeline item on the record — it renders inline with the
+  // support ticket chronologically (one conversation), and the composer replies
+  // into the PROJECT thread, not a fresh support request.
+  test('an email-landed client message renders in the ONE record timeline beside support — reply goes to the project', async ({ page }) => {
+    await installApp(page, { api: {
+      '/crm/record': RECORD,
+      '/crm/activity': activityFx({
+        items: [
+          { id: 'conv:message:m2', kind: 'message', type: 'message', title: 'The client sent a message', body: 'Replying by email — new hours attached.', at: '2026-07-12T00:00:00Z', meta: null, href: null },
+          { id: 'conv:support:s1', kind: 'support', type: 'message', title: 'The client opened a support request — Old ticket', body: 'From before the fix', at: '2026-07-01T00:00:00Z', meta: 'Support · open', href: null },
+        ],
+        reply_to: `/projects/${PROJECT}/messages`,
+        reply_support_to: '/support/s1/messages',
+      }),
+    } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    // both channels render in the ONE merged timeline (bodies expand on demand)
+    await expect(page.getByText('The client sent a message')).toBeVisible();
+    await expect(page.getByText('The client opened a support request — Old ticket')).toBeVisible();
+    await page.locator('[data-x="conv:message:m2"]').click();
+    await expect(page.getByText('Replying by email — new hours attached.')).toBeVisible();
+    // with BOTH targets available the project thread wins (reply_to precedence)
+    await page.locator('#msgBody').fill('Got it — updating now.');
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/projects/${PROJECT}/messages`));
+    await page.locator('#msgForm button[type=submit]').click();
+    expect(JSON.parse((await posted).postData() || '{}')).toEqual({ body: 'Got it — updating now.', audience: 'client' });
+  });
+
   test('with only an open support thread, the reply POSTs {body} with no audience', async ({ page }) => {
     await installApp(page, { api: {
       '/crm/record': RECORD,
