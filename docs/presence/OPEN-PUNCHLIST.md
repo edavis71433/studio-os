@@ -391,6 +391,63 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 🔔 OPERATOR EMAIL NOTIFICATIONS — BUILT, AWAITING SQL + DEPLOY
+
+Eric (2026-08-06): "im not getting email notifications when people send
+messages, upload files etc." DIAGNOSIS: MISSING FEATURE, never built —
+`git log -S"sendEmail"` on the portal delivery routes returns ZERO commits.
+The pattern exists and works for bookings/reviews/leads (booking.ts:281,
+reviews.ts:140, commercial.ts:218 + lib/notice.ts's ONE notice model), and
+the LEGACY clever-api backend had the full portal relay (index.ts:539-543:
+client_message/file_uploaded/approval_action/brief_submitted/contract_acked
+→ ERIC) with ZERO live callers — it was left behind when the portal was
+rebuilt onto presence/client.html. Second defect found: client_upload and
+task_done were in NEITHER the bell filter nor the Inbox filter, so uploads
+were invisible in-app entirely.
+
+ERIC'S DECISIONS: all four events (message · upload · request · approval);
+INSTANT, throttled. Email copy approved-pending (sent in chat).
+
+BUILT (ca21130 → 8d4d7ea): notifyStudioOfClientAction seam in
+lib/service_bridge.ts; recipient chain identity.email → site owner's own
+clients.email → OPS_ALERT_EMAIL (gated on AGENCY_SITE_ID, agency site ONLY
+— reviewer verified at the schema level that a client action can NEVER
+email a different client); raiseNotice created-flag = the throttle (15-min
+bucket per thread; approvals once ever); migration 0116 widens the notice
+kind CHECK; in-app filters/labels/hrefs widened.
+
+QUALITY TRAIL: review found no privacy blocker but 8 findings, all fixed
+red-first (8d4d7ea, each proven load-bearing by targeted revert): (F1 HIGH)
+badge double-counted every action AND never returned to zero — the notice
+half had no teardown where every other per-event kind has one; fixed by
+excluding client_* kinds from the count (rows still throttle + still ride
+the bell rail). (F2) client chatter hijacked the plan-upgrade card with a
+"See plans → pricing.html" CTA. (F3) the notify was an un-awaited ~10-hop
+chain the edge isolate could tear down before sending — now
+EdgeRuntime.waitUntil with an awaited 3s-capped fallback, tail parallelized.
+(F4-F6, F8) env docs, honest throttle contract, studio approvals no longer
+inflate counts (needs_reply = client's newest QUESTION, not a clean
+approve), tautological e2e replaced.
+REPLY-TO HAZARD: operator mail omits opts.siteId so replies go to the human
+PLATFORM_REPLY_TO — otherwise Reply would post into /email/inbound, maybe
+onto a client's thread. Pinned by 2 tests + verified by hand.
+Gates: pure 211/0/4, e2e inbox+crm+portal 206/0, 9 presence.html specs
+134/0, deno check clean.
+
+⚠️ NEEDS ERIC: merge + run 0116 SQL + function deploy (SQL BEFORE/WITH the
+deploy — pre-migration the notice insert fails → no email, no crash).
+ALSO OWED: check presence_identity.email on the AGENCY site (/presence →
+About your business → The basics → Email). It's the PUBLIC website contact
+address AND rung 1 of the notification chain, and it WINS over rung 2 — if
+blank, his booking/review/lead emails have been silently dropping too
+(those three notifiers read it alone and were deliberately left untouched:
+adding a fallback there would misroute CLIENT-site notifications to Eric).
+FLAGGED, NOT BUILT: badge staleness (nothing polls — the bell only
+refreshes on navigation, so an email can beat the badge); critical:true
+missing on the weekly digest + ops alerts (same silent-suppression bug);
+sendEmail's text/plain lacks newlines on </td>; portal support-reply
+updated_at bump still missing (FOLLOW-UP comment in inbound_email.ts).
+
 ## 📬 CLIENT MESSAGES LANDING AS SUPPORT REQUESTS — FIXED, AWAITING DEPLOY
 
 Eric (2026-07-27): "the messages from Hettie keep coming in as support requests."
