@@ -23,6 +23,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -278,7 +279,10 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const cols = 'id,subject,status,project_id,requester,created_at,updated_at';
       const path = (sel: string) => `presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=${sel}&order=updated_at.desc&limit=25`;
       let r = await svc(path(`${cols},client_id`));
-      if (!r.ok) r = await svc(path(cols));
+      // R5: retry the narrow select ONLY on the precise missing-column signal
+      // (pre-0115 client_id) — a transient 5xx must not trigger a silent
+      // second read that happens to succeed and masks the flake.
+      if (!r.ok && missingColumnSignal(r.json, r.text, 'client_id')) r = await svc(path(cols));
       return r;
     })().catch(swallow) : noEnq,
     // kind=message events carry detail.from ('client'|'studio') — stamped by the

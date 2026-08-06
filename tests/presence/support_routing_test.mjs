@@ -18,6 +18,7 @@ Deno.env.set('RESEND_KEY', 'test-resend-key');
 Deno.env.set('EMAIL_FROM', 'Davis Digital Studio <eric@davisdigitalstudio.com>');
 
 const { handleClientSupport } = await import('../../supabase/functions/presence/routes/client_delivery.ts');
+const { handlePortalFeed } = await import('../../supabase/functions/presence/routes/workspace.ts');
 
 const ME = '22222222-2222-4222-8222-222222222222';        // the caller's clients.id
 const AS = '11111111-1111-4111-8111-111111111111';        // the agency site the delivery lives on
@@ -41,6 +42,8 @@ function installFetch(cfg = {}) {
     if (url.includes('presence_offerings')) return jr(cfg.offering || []);
     if (url.includes('clients?id=eq.')) return jr([{ id: ME, email: 'jane@acme.com' }]);
     if (url.includes('presence_support_messages') && method === 'POST') return (cfg.msgInsert || (() => jr([{ id: 'sm_1' }], 201)))(body);
+    // the workspace feed's open-requests read (R5) — distinguished by its status filter
+    if (url.includes('presence_support_requests') && method === 'GET' && url.includes('status=not.in.')) return (cfg.feedSup || (() => jr([])))(url.includes('client_id'));
     if (url.includes('presence_support_requests') && method === 'GET') return jr(cfg.openReqs || [], cfg.openReqsStatus || 200);
     if (url.includes('presence_support_requests') && method === 'POST') return (cfg.reqInsert || (() => jr([{ id: 'req_1' }], 201)))(body);
     if (url.includes('presence_support_requests') && method === 'PATCH') return jr(null, 204);
@@ -98,6 +101,44 @@ try {
     const calls = installFetch({ openReqs: [], openReqsStatus: 500 });
     const res = await handleClientSupport(post({ subject: 'Read flaked', body: 'Read flaked' }), SITE, PRINCIPAL, CORS);
     ok('F2: failed open-thread read → degrades to a new request (message never lost)', res.status === 201 && calls.some((c) => c.method === 'POST' && c.url.includes('presence_support_requests')));
+  }
+
+  // ═══ adversarial-review R-fixes ═══
+
+  // R4: general chat must never continue INSIDE a service ticket. When the newest
+  // open project-less request is a 'Service request: …' ticket, a casual message
+  // opens (or continues) a GENERAL conversation instead.
+  {
+    const calls = installFetch({ openReqs: [{ id: 'svc_1', subject: 'Service request: Logo pack', status: 'open', created_at: '2026-06-01T00:00:00Z' }] });
+    const res = await handleClientSupport(post({ subject: 'Quick question', body: 'Quick question' }), SITE, PRINCIPAL, CORS);
+    const msg = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    const newReq = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('R4: newest open request is a service ticket → chat does NOT append into it (new conversation)', res.status === 201 && !msg && !!newReq);
+  }
+  {
+    const calls = installFetch({ openReqs: [
+      { id: 'svc_1', subject: 'Service request: Logo pack', status: 'open', created_at: '2026-06-01T00:00:00Z' },
+      { id: 'gen_1', subject: 'General chat', status: 'open', created_at: '2026-05-01T00:00:00Z' },
+    ] });
+    const res = await handleClientSupport(post({ subject: 'Another note', body: 'Another note' }), SITE, PRINCIPAL, CORS);
+    const msg = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    ok('R4: …and continues the newest GENERAL conversation instead', res.status === 201 && !!msg && msg.body.request_id === 'gen_1');
+  }
+
+  // R5: the workspace feed's widened-select fallback retries ONLY on the precise
+  // missing-column signal — a transient 500 must not silently re-read narrow.
+  const FEED_SITE = { id: AS, client_id: null };
+  {
+    const calls = installFetch({ feedSup: (wide) => wide ? jr({ message: 'internal error' }, 500) : jr([]) });
+    const res = await handlePortalFeed('', FEED_SITE, { kind: 'client', userId: 'auth-123', email: 'jane@acme.com' }, CORS);
+    const supReads = calls.filter((c) => c.method === 'GET' && c.url.includes('status=not.in.'));
+    ok('R5: transient 500 on the widened select → NO narrow retry (not a schema signal)', res.status === 200 && supReads.length === 1);
+  }
+  {
+    const calls = installFetch({ feedSup: (wide) => wide ? jr({ code: 'PGRST204', message: "Could not find the 'client_id' column" }, 400) : jr([]) });
+    const res = await handlePortalFeed('', FEED_SITE, { kind: 'client', userId: 'auth-123', email: 'jane@acme.com' }, CORS);
+    const supReads = calls.filter((c) => c.method === 'GET' && c.url.includes('status=not.in.'));
+    ok('R5: precise missing-column signal → the narrow retry still happens (pre-0115 tolerance)', res.status === 200 && supReads.length === 2 && !supReads[1].url.includes('client_id'));
   }
 } finally {
   globalThis.fetch = realFetch;

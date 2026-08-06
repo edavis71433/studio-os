@@ -541,7 +541,14 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   // open-thread read falls through to a new request — the message never 500s.
   if (!serviceName && !hasBrief && !projectId) {
     try {
-      const open = rows(await svc(`presence_support_requests?site_id=eq.${s}&project_id=is.null&requester=eq.${encodeURIComponent(readerKey(principal))}&status=in.(open,in_progress)&deleted_at=is.null&select=id,status&order=created_at.desc&limit=1`))[0];
+      // R4: general chat must never continue INSIDE a service ticket — the
+      // Requests tab mints requests titled 'Service request: …' (client.html
+      // composer + the intake brief), and appending casual conversation there
+      // buries a quoted, actionable ticket. HEURISTIC on the subject prefix
+      // (a typed request-kind column is the real fix — deferred): take the
+      // newest open project-less request whose subject is NOT a service ticket.
+      const open = rows(await svc(`presence_support_requests?site_id=eq.${s}&project_id=is.null&requester=eq.${encodeURIComponent(readerKey(principal))}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,status&order=created_at.desc&limit=10`))
+        .find((t) => !String(t.subject || '').startsWith('Service request: '));
       if (open) {
         const mi = await svc('presence_support_messages', { method: 'POST', headers: { Prefer: 'return=representation' },
           body: JSON.stringify({ site_id: s, request_id: open.id, body: body || subject, author: readerKey(principal), author_kind: principal.kind }) });
