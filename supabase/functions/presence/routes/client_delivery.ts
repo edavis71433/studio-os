@@ -13,6 +13,7 @@ import { csatRatingsForProject } from '../lib/csat.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
@@ -531,8 +532,39 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   const body = (serviceName || hasBrief)
     ? composeServiceBrief(serviceName, hasBrief ? b.brief : null, b.body)
     : clean(b.body, 5000);
-  const ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: s, project_id: projectId, subject, body, status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
+  // F2: the general composer is CONVERSATIONAL. A plain project-less {subject,
+  // body} message APPENDS to this requester's NEWEST open project-less request —
+  // one ongoing conversation, never a new ticket per message (the server-side
+  // mirror of the inbound-email append-or-create). Service requests (service /
+  // brief — the portal Requests tab) and project-scoped posts are genuinely
+  // TICKETS and keep minting distinct requests. Best-effort: a failed
+  // open-thread read falls through to a new request — the message never 500s.
+  if (!serviceName && !hasBrief && !projectId) {
+    try {
+      const open = rows(await svc(`presence_support_requests?site_id=eq.${s}&project_id=is.null&requester=eq.${encodeURIComponent(readerKey(principal))}&status=in.(open,in_progress)&deleted_at=is.null&select=id,status&order=created_at.desc&limit=1`))[0];
+      if (open) {
+        const mi = await svc('presence_support_messages', { method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ site_id: s, request_id: open.id, body: body || subject, author: readerKey(principal), author_kind: principal.kind }) });
+        if (mi.ok && rows(mi)[0]) {
+          // L1 bump: the studio bell/feed windows are updated_at-keyed and a bare
+          // message INSERT never bumps them
+          await svc(`presence_support_requests?id=eq.${open.id}&site_id=eq.${s}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+          // the EXISTING request id — the portal opens that thread (one conversation)
+          return json({ data: { id: open.id, appended: true, message_id: rows(mi)[0].id } }, 201, cors);
+        }
+      }
+    } catch { /* fall through to a new request */ }
+  }
+  // F3: stamp the customer's identity AT WRITE TIME (client_id = the caller's own
+  // clients.id) so read paths never re-derive it by string-matching requester
+  // keys. Pre-0115 degrade: on the precise missing-column signal, retry once in
+  // the old insert shape (never on any other failure).
+  const reqRow = { site_id: s, project_id: projectId, subject, body, status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind };
+  let ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ ...reqRow, client_id: me }) });
+  if ((!ins.ok || !rows(ins)[0]) && missingColumnSignal((ins as any).json, (ins as any).text, 'client_id')) {
+    ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(reqRow) });
+  }
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (projectId) await clientEvent(s, projectId, 'support_opened', principal, { request_id: rows(ins)[0].id, subject });
   // service edge #2: auto-acknowledge the customer — a submitted ticket used to

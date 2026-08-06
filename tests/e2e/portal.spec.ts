@@ -503,27 +503,60 @@ test.describe('Client portal — Messages split view', () => {
     await expect(page.locator('.mrow', { hasText: 'Logo tweak' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('"Message your studio" composes in the pane; the first line becomes the subject', async ({ page }) => {
+  // Comms routing F2: the general composer is CONVERSATIONAL. With an active
+  // project it sends to the NEWEST active project's thread (the existing Path A);
+  // project-less it POSTs /client/support, whose server-side append-or-create
+  // keeps every composer message in ONE conversation.
+  test('"Message your studio" with an active project sends to the project thread — never a ticket (F2)', async ({ page }) => {
     await installApp(page, { api: MSG_API });
-    // the list fixture serves GET /client/support; the POST needs a created id back
-    await page.route('**/functions/v1/presence/client/support', (route) =>
+    const supPosts: string[] = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname)) supPosts.push(r.url()); });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) =>
       route.request().method() === 'POST'
-        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: SUP_GEN } }) })
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'mg9', body: 'Quick question about hosting', author_kind: 'client', created_at: '2026-07-09T00:00:00Z' } }) })
         : route.fallback());
     await page.goto('/client.html');
     await openMessagesTab(page);
     await page.getByRole('button', { name: 'Message your studio' }).click();
     const pane = page.locator('#mpane');
-    await pane.getByLabel('Message your studio').fill('Logo question\nWhere is the source file?');
+    await expect(pane.getByText('Goes straight to your project conversation.')).toBeVisible();
+    await pane.getByLabel('Message your studio').fill('Quick question about hosting');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
+    await pane.getByRole('button', { name: 'Send' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Quick question about hosting' });
+    await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
+    // the PROJECT conversation opens — and no support ticket was minted
+    await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toHaveAttribute('aria-selected', 'true');
+    expect(supPosts).toEqual([]);
+  });
+
+  test('project-less client: composer messages stay ONE conversation (append-or-create, F2)', async ({ page }) => {
+    await installApp(page, { api: { ...MSG_API, '/client/projects': { data: [] } } });
+    // the SERVER appends to the newest open project-less request and answers with
+    // ITS id — the portal opens that same thread instead of minting a new row
+    await page.route('**/functions/v1/presence/client/support', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: SUP_GEN, appended: true, message_id: 'sm9' } }) })
+        : route.fallback());
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await expect(page.getByText('2 conversations')).toBeVisible();   // the two support threads, no project rows
+    await page.getByRole('button', { name: 'Message your studio' }).click();
+    const pane = page.locator('#mpane');
+    await expect(pane.getByText('The first line becomes the subject.')).toBeVisible();
+    await pane.getByLabel('Message your studio').fill('One more thing\nAbout the logo');
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
     await pane.getByRole('button', { name: 'Send' }).click();
-    expect((await post).postDataJSON()).toEqual({ subject: 'Logo question', body: 'Logo question\nWhere is the source file?' });
-    await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
+    expect((await post).postDataJSON()).toEqual({ subject: 'One more thing', body: 'One more thing\nAbout the logo' });
+    // the EXISTING conversation opened — still 2 rows, no third ticket
+    await expect(page.locator('#mpane .mpname')).toHaveText('Logo tweak');
+    await expect(page.getByText('2 conversations')).toBeVisible();
   });
 
   test('compose failure: a 500 keeps the composer usable (toast + re-enabled button)', async ({ page }) => {
     await installApp(page, { api: MSG_API });
-    await page.route('**/functions/v1/presence/client/support', (route) =>
+    // the project path is the primary send now — fail exactly it
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/messages`, (route) =>
       route.request().method() === 'POST'
         ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed' }) })
         : route.fallback());
