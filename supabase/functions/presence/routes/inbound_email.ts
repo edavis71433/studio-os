@@ -26,6 +26,7 @@ import {
   filterSafe, filterKey, deriveRequesterKey, matchedStoredEmail, identityAliases,
   selectAppendTarget, missingColumnSignal, missingInsertColumns, referenceIds, messageIdVariants, maskEmail,
 } from '../lib/inbound_email.ts';
+import { notifyStudioOfClientAction } from '../lib/service_bridge.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -392,6 +393,15 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ project_id: refTarget.project_id, site_id: siteId, kind: 'support_message', actor: refTarget.requester, actor_kind: 'client', client_visible: true, detail: { from: 'client', request_id: refTarget.id, via: 'email' } }) }).catch(() => {});
     }
+    // An EMAILED-IN reply is the same event as a portal reply — the operator
+    // must hear about it identically. Same thread key + 15-minute bucket as the
+    // portal path, so a client replying in both places sends ONE email.
+    notifyStudioOfClientAction({
+      agencySiteId: siteId, kind: 'client_request', threadKey: `req:${refTarget.id}`,
+      customerClientId: match.kind === 'client' ? match.id : null, projectId: refTarget.project_id || null,
+      subject: String(refTarget.subject || subject || '').slice(0, 200), excerpt: text || subject,
+      href: refTarget.project_id ? `/crm.html?project=${refTarget.project_id}&tab=messages` : `/projects.html?support=${refTarget.id}`,
+    }).catch(() => {});
     return ack();
   }
 
@@ -423,6 +433,15 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       // (Mirrors the portal path: a client→studio message emails no one.)
       await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ project_id: match.projectId, site_id: siteId, kind: 'message', actor: storedEmail || requesterKey, actor_kind: 'client', client_visible: true, detail: { from: 'client', message_id: ins.row?.id, via: 'email' } }) }).catch(() => {});   // R9: actor is EMAIL-FIRST, matching projectEvent (principal.email || userId)
+      // An emailed-in project message notifies the operator exactly like a
+      // portal one — SAME thread key (`proj:<id>`), so the 15-minute bucket is
+      // shared across both doors and a client who emails AND posts sends one.
+      notifyStudioOfClientAction({
+        agencySiteId: siteId, kind: 'client_message', threadKey: `proj:${match.projectId}`,
+        customerClientId: match.kind === 'client' ? match.id : null, projectId: match.projectId,
+        subject: String(subject || '').slice(0, 200), excerpt: text || subject,
+        href: `/crm.html?project=${match.projectId}&tab=messages`,
+      }).catch(() => {});
       return ack();
     }
   }
@@ -460,6 +479,14 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ project_id: target.project_id, site_id: siteId, kind: 'support_message', actor: target.requester, actor_kind: 'client', client_visible: true, detail: { from: 'client', request_id: target.id, via: 'email' } }) }).catch(() => {});
     }
+    // Notify OUTSIDE the project guard — a project-less support thread is the
+    // common shape for emailed-in clients and contacts alike.
+    notifyStudioOfClientAction({
+      agencySiteId: siteId, kind: 'client_request', threadKey: `req:${target.id}`,
+      customerClientId: match.kind === 'client' ? match.id : null, projectId: target.project_id || null,
+      subject: String(target.subject || subject || '').slice(0, 200), excerpt: text || subject,
+      href: target.project_id ? `/crm.html?project=${target.project_id}&tab=messages` : `/projects.html?support=${target.id}`,
+    }).catch(() => {});
     return ack();
   }
 
@@ -473,6 +500,13 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       ...(match.kind === 'client' ? { client_id: match.id } : {}) }, externalId, match.kind === 'client' ? ['client_id'] : []);
   if (!newReq.ok) return json({ error: 'write_failed' }, 502);
   if (newReq.duplicate) return dropAck('duplicate_request', from_email);
+  // A brand-new emailed-in request — the operator hears about it like a portal one.
+  notifyStudioOfClientAction({
+    agencySiteId: siteId, kind: 'client_request', threadKey: `req:${newReq.row?.id || externalId}`,
+    customerClientId: match.kind === 'client' ? match.id : null, projectId: null,
+    subject: String(subject || `Email from ${from_name || from_email}`).slice(0, 200), excerpt: text || subject,
+    href: newReq.row?.id ? `/projects.html?support=${newReq.row.id}` : '/inbox.html',
+  }).catch(() => {});
   await ackSender(siteId, from_email);
   return ack();
 }

@@ -15,7 +15,10 @@ export function notifHref(kind: string, projectId: string | null, detail: Record
     case 'approval_decided':
       return base + (detail && detail.approval_id ? `#approval-${detail.approval_id}` : '#approvals');
     case 'message': return base + '#messages';
-    case 'deliverable_added': return base + '#files';
+    case 'deliverable_added':
+    case 'client_upload':            // a file the CLIENT sent — same Files surface
+      return base + '#files';
+    case 'task_done': return base + '#tasks';   // a client marked their to-do complete
     case 'task_created':
     case 'task_status_change':
       return base + (detail && detail.task_id ? `#task-${detail.task_id}` : '#tasks');
@@ -46,6 +49,10 @@ export function notifLabel(kind: string): string {
     milestone_created: 'A milestone was set',
     milestone_completed: 'A milestone was completed',
     deliverable_added: 'A file was shared',
+    // These two were missing entirely, so every client upload and completed
+    // client to-do rendered as the generic 'Activity'.
+    client_upload: 'A client sent a file',
+    task_done: 'A client marked a to-do done',
     approval_requested: 'Your approval is requested',
     approval_decided: 'An approval was decided',
     message: 'New message',

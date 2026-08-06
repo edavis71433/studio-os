@@ -99,7 +99,12 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     seesFull ? svc(`presence_activity_reads?site_id=eq.${site.id}&reader=eq.${encodeURIComponent(reader)}&select=last_seen_at&limit=1`).catch(swallow) : none,
     // FD-N: a client's message — AND their approval decisions / survey answers —
     // must reach the bell/Today, not only the Inbox.
-    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`).catch(swallow) : none,
+    // client_upload + task_done were absent here, so a client's FILE never rang
+    // the bell at all (uploads were invisible in-app end to end) and a completed
+    // client to-do went unseen. Both are stamped detail.from='client' by the
+    // client door, so the from-client filter below still keeps the studio's own
+    // actions out of its own badge.
+    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,survey_submitted,client_upload,task_done)&select=created_at,kind,detail,actor_kind&order=created_at.desc&limit=50`).catch(swallow) : none,
     // G11: open client feedback on the shared draft — one HEAD count (owner
     // surfaces only; null on any failure, incl. a database without 0112 yet).
     seesFull ? svcCount(`presence_section_comments?site_id=eq.${site.id}&author_kind=eq.client&status=eq.open&deleted_at=is.null`) : Promise.resolve(0),
@@ -234,6 +239,13 @@ const NOTICE_HREF: Record<string, string> = {
   client_feedback: '/presence.html#design',   // G11: a client left a note on the shared draft → the builder's Comments panel
   email_auth: '/presence.html#foundations',   // DNS #5: unauthenticated email → the Foundations desk (email/DNS setup)
   apex_drift: '/presence.html#foundations',   // DNS: apex points at the wrong place → Foundations (domain/DNS)
+  // 0116: the client portal's four operator-notifying actions. The EMAIL carries
+  // an id-precise deep link (project/support id); the bell's href is kind-only,
+  // so it lands on the surface that lists them.
+  client_message: '/inbox.html',      // a client wrote (portal or emailed in) → the Inbox conversation list
+  client_request: '/inbox.html',      // a support/service request opened or replied → same list (support rows live there)
+  client_upload: '/projects.html',    // a client sent a file → project Files
+  client_approval: '/timeline.html',  // a client decided an approval → the story lives on the timeline (matches approval_decided)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 
@@ -288,7 +300,12 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // kind=message events carry detail.from ('client'|'studio') — stamped by the
     // client door — so we can tell whose turn it is without the author_kind
     // ambiguity (a solo owner and their customer are both 'client').
-    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=eq.message&select=project_id,detail,created_at&order=created_at.desc&limit=100`).catch(swallow) : noEnq,
+    // Widened beyond kind=message: an approval DECISION was counted by the bell
+    // but had no Inbox row, and client uploads / completed client to-dos had
+    // neither. The per-project row this feeds is "latest client activity on this
+    // thread", so folding them in is the honest reading — a row's `count` now
+    // spans the conversation, not only its messages.
+    seesFull ? svc(`presence_project_events?site_id=eq.${site.id}&kind=in.(message,approval_decided,client_upload,task_done)&select=project_id,detail,created_at&order=created_at.desc&limit=100`).catch(swallow) : noEnq,
     // the Agency–Client Bridge for THIS studio (agency_site_id = my site) — the
     // authoritative "who are my customers" list + project→customer mapping.
     seesFull ? svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=project_id,customer_client_id&limit=200`).catch(swallow) : noEnq,

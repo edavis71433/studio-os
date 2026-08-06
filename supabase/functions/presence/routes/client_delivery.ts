@@ -8,7 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
-import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient } from '../lib/service_bridge.ts';
+import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient, notifyStudioOfClientAction } from '../lib/service_bridge.ts';
 import { csatRatingsForProject } from '../lib/csat.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
@@ -205,6 +205,13 @@ export async function handleClientUploadCreate(req: Request, site: SiteRow, prin
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
   await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'client_upload', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title } }) }).catch(() => {});
+  // Tell the studio (email + bell + push). Throttled per project per 15 minutes,
+  // so a client dropping six files sends ONE email. Fire-and-forget.
+  notifyStudioOfClientAction({
+    agencySiteId: s, kind: 'client_upload', threadKey: `proj:${projectId}`,
+    customerClientId: me, projectId, subject: title,
+    excerpt: '', href: `/projects.html?project=${projectId}`,
+  }).catch(() => {});
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 
@@ -311,6 +318,13 @@ export async function handleClientMessages(req: Request, site: SiteRow, principa
     body: JSON.stringify({ site_id: s, project_id: id, audience: 'client', body, author: readerKey(principal), author_kind: principal.kind }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   await clientEvent(s, id, 'message', principal, { message_id: rows(ins)[0].id, from: 'client' });
+  // Tell the studio. Throttled per project per 15 minutes — the mirror of the
+  // studio→client throttle in project_comms.ts. Fire-and-forget.
+  notifyStudioOfClientAction({
+    agencySiteId: s, kind: 'client_message', threadKey: `proj:${id}`,
+    customerClientId: me, projectId: id, subject: '', excerpt: body,
+    href: `/crm.html?project=${id}&tab=messages`,
+  }).catch(() => {});
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 
@@ -349,6 +363,16 @@ export async function handleClientApprovalDecide(req: Request, site: SiteRow, pr
     body: JSON.stringify({ status: b.decision, decided_by: readerKey(principal), decided_by_kind: principal.kind, decided_at: nowIso(), decision_note: clean(b.note, 1000) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   await clientEvent(s, a.project_id, 'approval_decided', principal, { approval_id: id, decision: b.decision });
+  // Tell the studio. bucket:false — a decision is TERMINAL (the status guard
+  // above lets it happen once), so the period is the bare approval key and the
+  // email sends exactly once, ever. Fire-and-forget.
+  notifyStudioOfClientAction({
+    agencySiteId: s, kind: 'client_approval', threadKey: `approval:${id}`, bucket: false,
+    customerClientId: me, projectId: a.project_id,
+    subject: `${b.decision === 'approved' ? 'Approved' : b.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${clean(a.title, 120) || 'an approval'}`,
+    excerpt: clean(b.note, 400),
+    href: `/crm.html?project=${a.project_id}&tab=approvals`,
+  }).catch(() => {});
   return json({ data: { status: b.decision } }, 200, cors);
 }
 
@@ -556,6 +580,16 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
           // L1 bump: the studio bell/feed windows are updated_at-keyed and a bare
           // message INSERT never bumps them
           await svc(`presence_support_requests?id=eq.${open.id}&site_id=eq.${s}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+          // A reply on an existing conversation is an event Eric wants — notify
+          // on the SAME thread key as the request itself, so the 15-minute
+          // bucket covers the whole conversation (open + rapid follow-ups = one
+          // email). No projectId guard: this path is project-less by definition.
+          notifyStudioOfClientAction({
+            agencySiteId: s, kind: 'client_request', threadKey: `req:${open.id}`,
+            customerClientId: me, projectId: null,
+            subject: clean(open.subject, 200), excerpt: body || subject,
+            href: `/projects.html?support=${open.id}`,
+          }).catch(() => {});
           // the EXISTING request id — the portal opens that thread (one conversation)
           return json({ data: { id: open.id, appended: true, message_id: rows(mi)[0].id } }, 201, cors);
         }
@@ -574,6 +608,15 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   }
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (projectId) await clientEvent(s, projectId, 'support_opened', principal, { request_id: rows(ins)[0].id, subject });
+  // Tell the studio — DELIBERATELY OUTSIDE the `if (projectId)` guard above.
+  // A project-less request is the COMMON path (the general composer), and
+  // gating the notify on projectId would have silenced exactly the case Eric
+  // most needs to see. Fire-and-forget.
+  notifyStudioOfClientAction({
+    agencySiteId: s, kind: 'client_request', threadKey: `req:${rows(ins)[0].id}`,
+    customerClientId: me, projectId, subject, excerpt: body,
+    href: projectId ? `/crm.html?project=${projectId}&tab=messages` : `/projects.html?support=${rows(ins)[0].id}`,
+  }).catch(() => {});
   // service edge #2: auto-acknowledge the customer — a submitted ticket used to
   // email no one. Best-effort, transactional, on the agency's brand.
   await emailCustomerByClient(s, me, 'We’ve got your request',
@@ -626,6 +669,15 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
     body: JSON.stringify({ site_id: s, request_id: id, body, author: readerKey(principal), author_kind: principal.kind }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   if (reqRow.project_id) await clientEvent(s, reqRow.project_id, 'support_message', principal, { request_id: id });
+  // Tell the studio — again OUTSIDE the project guard (most requests carry no
+  // project). Same thread key as the request, so a burst of replies inside the
+  // 15-minute window sends ONE email. Fire-and-forget.
+  notifyStudioOfClientAction({
+    agencySiteId: s, kind: 'client_request', threadKey: `req:${id}`,
+    customerClientId: me, projectId: reqRow.project_id || null,
+    subject: clean(reqRow.subject, 200), excerpt: body,
+    href: reqRow.project_id ? `/crm.html?project=${reqRow.project_id}&tab=messages` : `/projects.html?support=${id}`,
+  }).catch(() => {});
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 
