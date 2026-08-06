@@ -102,10 +102,23 @@ export async function handleProjectClientMessages(req: Request, jwt: string, sit
   const keys = [authId, client.email, client.contact_email]
     .filter((k) => k != null && String(k).trim() !== '')
     .map((k) => encodeURIComponent(`"${String(k).replace(/"/g, '')}"`));
-  if (!keys.length) return json({ data: [], customer, is_studio_view: true }, 200, cors);
-  const r = await svc(`presence_support_requests?site_id=eq.${site.id}&project_id=is.null&deleted_at=is.null&requester=in.(${keys.join(',')})&select=id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at&order=updated_at.desc&limit=100`);
-  if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load that customer’s messages just now.' }, 502, cors);
-  return json({ data: rows(r), customer, is_studio_view: true }, 200, cors);
+  // F3: PREFER the write-time client_id stamp (0115) — additive + best-effort
+  // (pre-0115 the filter 400s → the stamped list is simply empty); the
+  // key-matched read below remains the fallback for legacy unstamped rows.
+  const sel = 'id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at';
+  let stamped: any[] = [];
+  try { stamped = rows(await svc(`presence_support_requests?site_id=eq.${site.id}&project_id=is.null&client_id=eq.${custId}&deleted_at=is.null&select=${sel}&order=updated_at.desc&limit=100`)); } catch { stamped = []; }
+  if (!keys.length && !stamped.length) return json({ data: [], customer, is_studio_view: true }, 200, cors);
+  let keyed: any[] = [];
+  if (keys.length) {
+    const r = await svc(`presence_support_requests?site_id=eq.${site.id}&project_id=is.null&deleted_at=is.null&requester=in.(${keys.join(',')})&select=${sel}&order=updated_at.desc&limit=100`);
+    if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load that customer’s messages just now.' }, 502, cors);
+    keyed = rows(r);
+  }
+  const seen = new Set<string>();
+  const merged = [...stamped, ...keyed].filter((x) => { const id = String(x.id); if (seen.has(id)) return false; seen.add(id); return true; })
+    .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 100);
+  return json({ data: merged, customer, is_studio_view: true }, 200, cors);
 }
 
 // ═══ NOTIFICATIONS (derived view over the activity log + a per-reader last-seen) ═══

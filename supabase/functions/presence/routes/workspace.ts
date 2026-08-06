@@ -270,8 +270,17 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=50`) : noEnq,
     // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
     seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
-    // FIX 5 inputs: open support requests + client message events (owner-only, best-effort)
-    seesFull ? svc(`presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=id,subject,status,project_id,requester,created_at,updated_at&order=updated_at.desc&limit=25`).catch(swallow) : noEnq,
+    // FIX 5 inputs: open support requests + client message events (owner-only, best-effort).
+    // F3: the select PREFERS the write-time client_id stamp (0115); on a pre-0115
+    // database the widened select 400s, so it falls back to the old column list —
+    // rows keep flowing, grouping degrades to the requester-key match below.
+    seesFull ? (async () => {
+      const cols = 'id,subject,status,project_id,requester,created_at,updated_at';
+      const path = (sel: string) => `presence_support_requests?site_id=eq.${site.id}&status=not.in.(resolved,closed)&deleted_at=is.null&select=${sel}&order=updated_at.desc&limit=25`;
+      let r = await svc(path(`${cols},client_id`));
+      if (!r.ok) r = await svc(path(cols));
+      return r;
+    })().catch(swallow) : noEnq,
     // kind=message events carry detail.from ('client'|'studio') — stamped by the
     // client door — so we can tell whose turn it is without the author_kind
     // ambiguity (a solo owner and their customer are both 'client').
@@ -436,6 +445,9 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const clientIds = new Set<string>();
       for (const l of links) { const pid = String(l.project_id || ''); const cid = String(l.customer_client_id || ''); if (cid) { clientIds.add(cid); if (pid) { projToClient[pid] = cid; if (!clientToProject[cid]) clientToProject[cid] = pid; } } }
       for (const pid of pids) { const cid = projById[pid]?.client_id; if (cid) clientIds.add(cid); }
+      // F3: rows stamped at write time name their client directly — make sure the
+      // name lookup below covers them even when no bridge/project ties them in.
+      for (const r of sup) { if (r.client_id) clientIds.add(String(r.client_id)); }
       const clientById: Record<string, string> = {};       // client id → display name
       const requesterToClient: Record<string, string> = {}; // reader key → client id
       if (clientIds.size) {
@@ -453,8 +465,11 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
           for (const k of [authId, c.email, c.contact_email]) { if (k != null && String(k).trim() !== '') requesterToClient[String(k)] = cid; }
         }
       }
-      const clientFor = (pid: string, requester: string) => {
-        const cid = (pid && (projToClient[pid] || projById[pid]?.client_id)) || (requester ? requesterToClient[requester] : '') || '';
+      // F3: the write-time client_id stamp (0115) is PREFERRED; the bridge/project
+      // mapping and the requester-key string match remain the fallback for
+      // pre-stamp rows (deploy-order tolerant in both directions).
+      const clientFor = (pid: string, requester: string, stamped = '') => {
+        const cid = stamped || (pid && (projToClient[pid] || projById[pid]?.client_id)) || (requester ? requesterToClient[requester] : '') || '';
         return { client_id: cid, client: cid ? (clientById[cid] || 'Client') : '' };
       };
       // href: a request opens the CLIENT'S PROFILE (delivery view) wherever we can tie
@@ -466,7 +481,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // (threadUnread falls back to the old needs-reply heuristic when no mark exists,
       // so a pre-0113 database behaves exactly like today). Support rows also carry
       // their status so the list pane can chip "Support · open" without a second read.
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || '')); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = (cv.latest.detail || {}).from === 'client'; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClient ? String(cv.latestClient.created_at || '') : null, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20);

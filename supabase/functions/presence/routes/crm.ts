@@ -177,6 +177,12 @@ async function collectClientConversation(u: URL, site: SiteRow): Promise<{
     const seen = new Set<string>();
     const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };
     if (projectIds.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=in.(${projectIds.join(',')})&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse());
+    // F3: PREFER the write-time client_id stamp (0115) — a stamped project-less
+    // ticket ties to this record even when its requester key (an alternate email,
+    // a GoTrue-resolved uid) matches none of the derived identity keys. Additive
+    // + best-effort: pre-0115 the filter 400s → arr() is [] and the key-matched
+    // read below still serves every legacy row (addSup dedupes the overlap).
+    if (clientId) { try { addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&client_id=eq.${clientId}&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse()); } catch { /* additive */ } }
     if (ident.keys.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${ident.keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse());
     // newest open wins — computed across the UNION (project-scoped + project-less)
     // sorted by created_at, so an older project-less ticket can never outrank a

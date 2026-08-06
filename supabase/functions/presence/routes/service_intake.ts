@@ -125,8 +125,20 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
     let projectId: string | null = UUID_RE.test(b.project_id || '') ? b.project_id : null;
     if (projectId && !(await loadProject(site.id, projectId))) projectId = null;
     const priority = isSupportPriority(b.priority) ? b.priority : 'normal';
-    const ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind }) });
+    // F3: stamp client_id at write time when the requester resolves to one of
+    // THIS site's bridged customers (best-effort — a studio-side submitter simply
+    // doesn't resolve). Pre-0115 degrade: on the precise missing-column signal
+    // the insert retries once in the old shape (never on any other failure).
+    const { clientIdForRequester } = await import('../lib/service_bridge.ts');
+    const { missingColumnSignal } = await import('../lib/inbound_email.ts');
+    const clientId = (principal.kind === 'staff' || principal.kind === 'system') ? null
+      : await clientIdForRequester(site.id, { userId: (principal as any).userId, email: principal.email }).catch(() => null);
+    const reqRow = { site_id: site.id, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind };
+    let ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(clientId ? { ...reqRow, client_id: clientId } : reqRow) });
+    if ((!ins.ok || !rows(ins)[0]) && clientId && missingColumnSignal(ins.json, ins.text, 'client_id')) {
+      ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(reqRow) });
+    }
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
     const req0 = rows(ins)[0];
     if (projectId) await projectEvent(site.id, projectId, 'support_opened', principal, true, { request_id: req0.id, subject });

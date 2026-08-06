@@ -98,6 +98,41 @@ export async function linkForCustomerVia(customerClientId: string, table: string
   return link ? { link, row } : null;
 }
 
+/** F3: resolve a requester (their auth uid + email) to THIS agency site's
+ *  bridged customer — the write-time client_id stamp for support rows. Matches
+ *  the same identities the read paths key on (contacts.auth_user_id →
+ *  clients.contact_id; clients.email / contact_email — exact, case-insensitive)
+ *  and gates on an ACTIVE service_link to the agency site (tenant-safe: an
+ *  unbridged namesake never earns the stamp). Best-effort: null on any failure —
+ *  the caller falls back to an unstamped row, never blocks the write. */
+export async function clientIdForRequester(agencySiteId: string, requester: { userId?: string | null; email?: string | null }): Promise<string | null> {
+  try {
+    if (!agencySiteId) return null;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const email = String(requester?.email || '').trim().toLowerCase();
+    const uid = String(requester?.userId || '').trim();
+    const candidates: string[] = [];
+    if (email && !/[(),*"\\]/.test(email)) {
+      const enc = encodeURIComponent(email);
+      const byEmail = rows(await svc(`clients?or=(email.ilike.${enc},contact_email.ilike.${enc})&deleted_at=is.null&select=id,email,contact_email&limit=25`))
+        .filter((c) => String(c.email || '').toLowerCase() === email || String(c.contact_email || '').toLowerCase() === email);
+      for (const c of byEmail) { const id = String(c.id); if (UUID_RE.test(id) && !candidates.includes(id)) candidates.push(id); }
+    }
+    if (uid && UUID_RE.test(uid)) {
+      const contacts = rows(await svc(`contacts?auth_user_id=eq.${uid}&select=id&limit=10`)).map((c) => String(c.id)).filter((id) => UUID_RE.test(id));
+      if (contacts.length) {
+        for (const c of rows(await svc(`clients?contact_id=in.(${contacts.join(',')})&deleted_at=is.null&select=id&limit=25`))) {
+          const id = String(c.id); if (UUID_RE.test(id) && !candidates.includes(id)) candidates.push(id);
+        }
+      }
+    }
+    if (!candidates.length) return null;
+    const links = rows(await svc(`presence_service_links?agency_site_id=eq.${agencySiteId}&status=eq.active&customer_client_id=in.(${candidates.join(',')})&select=customer_client_id&limit=25`));
+    const bridged = new Set(links.map((l) => String(l.customer_client_id)));
+    return candidates.find((id) => bridged.has(id)) || null;
+  } catch { return null; }
+}
+
 /** Email the bridged customer about project activity that needs them (a studio
  *  message, an approval request). Without this, the delivery loop stalls unless
  *  the client habitually opens the portal — an approval could sit unseen forever.
