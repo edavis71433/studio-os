@@ -26,6 +26,13 @@
 --
 -- Additive + idempotent; RLS UNTOUCHED (both tables are RLS-on/policy-less,
 -- function-mediated — 0077/0078).
+--
+-- DEPLOY ORDER (R7): apply this migration BEFORE or WITH the function deploy.
+-- Pre-0115 the F1 project-message landing has NO external_id column, so its
+-- dedup degrades to nothing — a svix/Resend redelivery of the same webhook can
+-- land the SAME email as duplicate project messages until this index exists.
+-- (The support tables are already guarded by 0114; only the project-message
+-- landing is exposed by deploying the function first.)
 
 alter table public.presence_support_requests add column if not exists client_id uuid references public.clients(id) on delete set null;
 alter table public.presence_project_messages add column if not exists external_id text;

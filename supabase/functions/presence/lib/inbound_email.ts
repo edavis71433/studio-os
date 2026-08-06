@@ -317,6 +317,22 @@ export function referenceIds(headers: unknown): string[] {
   return out;
 }
 
+/** R6 — compare-time bracket normalization. A stored external_id is the id
+ *  AS-RECEIVED (data.message_id may lack the RFC 5322 angle brackets) while
+ *  referenceIds tokens are always bracketed — comparing only one form silently
+ *  breaks threading for the other. Returns every comparable form of an id
+ *  (as-given, bare, bracketed), deduped, order-preserving; the caller queries
+ *  `external_id=in.(…)` with ALL of them. Storage stays untouched (0114/0115
+ *  data compatibility — normalization happens at COMPARE time only). Pure. */
+export function messageIdVariants(id: unknown): string[] {
+  const s = String(id ?? '').trim();
+  if (!s) return [];
+  const bare = s.replace(/^<\s*/, '').replace(/\s*>\s*$/, '').trim();
+  const out: string[] = [];
+  for (const v of [s, bare, bare ? `<${bare}>` : '']) if (v && !out.includes(v)) out.push(v);
+  return out;
+}
+
 // ── Deploy-order tolerance + log masking ─────────────────────────────────────
 /** True when a PostgREST error is "the <column> column doesn't exist yet"
  *  (pre-0114 external_id / pre-0115 client_id). PGRST204 / Postgres 42703, or a
@@ -333,10 +349,13 @@ export function missingColumnSignal(json: unknown, text: unknown, column = 'exte
 /** Which OPTIONAL insert columns a PostgREST missing-column error asks us to
  *  strip. [] when the error is NOT a missing-column signal at all. When it IS
  *  (PGRST204/42703, or the message names a candidate): the candidates the
- *  message actually NAMES — or, if none is named (a bare code), ALL candidates
- *  (nothing else to go on; the retry must not loop). The route retries the
- *  insert with exactly these stripped — precise, bounded, never a silent
- *  strip-everything on an unrelated failure. Pure. */
+ *  message actually NAMES — or, if none is named (a bare code), only the
+ *  NON-DEDUP-CRITICAL candidates (R8): external_id is the idempotency key, and
+ *  a bare code naming no column can never justify silently landing a row
+ *  without dedup. If nothing non-critical remains, [] — the caller surfaces
+ *  the failure (502 → the webhook retries) instead of stripping the key. The
+ *  route retries the insert with exactly these stripped — precise, bounded,
+ *  never a silent strip-everything on an unrelated failure. Pure. */
 export function missingInsertColumns(json: unknown, text: unknown, candidates: string[]): string[] {
   const list = Array.isArray(candidates) ? candidates.filter((c) => typeof c === 'string' && c) : [];
   if (!list.length) return [];
@@ -347,7 +366,7 @@ export function missingInsertColumns(json: unknown, text: unknown, candidates: s
   const signal = code === 'PGRST204' || code === '42703' ||
     (named.length > 0 && /(column|schema cache|does not exist|could not find)/.test(hay));
   if (!signal) return [];
-  return named.length ? named : list.slice();
+  return named.length ? named : list.filter((c) => c !== 'external_id');   // R8: never strip the dedup key on a bare code
 }
 
 /** Mask a recipient for logs (edge logs are operator-visible + retained). Pure. */

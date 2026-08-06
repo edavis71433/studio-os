@@ -116,9 +116,21 @@ ok('referenceIds: array-of-{name,value} header shape', JSON.stringify(L.referenc
 ok('referenceIds: caps at 20 entries', L.referenceIds({ References: Array.from({ length: 30 }, (_, i) => `<m${i}@x>`).join(' ') }).length === 20);
 ok('referenceIds: ignores non-<...> junk between ids', JSON.stringify(L.referenceIds({ References: 'noise <a@x> more-noise' })) === JSON.stringify(['<a@x>']));
 
+// messageIdVariants (R6 — compare-time bracket normalization: stored external_id may
+// be bare (data.message_id without <>) while reference tokens are bracketed)
+ok('R6: messageIdVariants — bracketed token → bracketed AND bare forms', JSON.stringify(L.messageIdVariants('<a@x>')) === JSON.stringify(['<a@x>', 'a@x']));
+ok('R6: messageIdVariants — bare id → bare AND bracketed forms', JSON.stringify(L.messageIdVariants('a@x')) === JSON.stringify(['a@x', '<a@x>']));
+ok('R6: messageIdVariants — inner whitespace trimmed, deduped', JSON.stringify(L.messageIdVariants('< a@x >')) === JSON.stringify(['< a@x >', 'a@x', '<a@x>']));
+ok('R6: messageIdVariants — empty/blank → []', L.messageIdVariants('').length === 0 && L.messageIdVariants('   ').length === 0);
+
 // missingInsertColumns (F3 deploy-order tolerance — which optional columns to strip)
 ok('missingInsertColumns: names the missing column from the message', JSON.stringify(L.missingInsertColumns({ code: 'PGRST204', message: "Could not find the 'client_id' column" }, '', ['external_id', 'client_id'])) === JSON.stringify(['client_id']));
-ok('missingInsertColumns: bare 42703 with no name → ALL candidates', JSON.stringify(L.missingInsertColumns({ code: '42703' }, '', ['external_id', 'client_id'])) === JSON.stringify(['external_id', 'client_id']));
+// R8: a bare code naming NO column must never strip the dedup-critical external_id —
+// only the non-critical candidates. If external_id is the ONLY candidate, nothing is
+// strippable ([]) and the caller surfaces the error instead of landing undeduped.
+ok('R8: bare 42703 with no name → only non-dedup-critical candidates (never external_id)', JSON.stringify(L.missingInsertColumns({ code: '42703' }, '', ['external_id', 'client_id'])) === JSON.stringify(['client_id']));
+ok('R8: bare PGRST204, external_id the only candidate → [] (surface, never strip the key)', L.missingInsertColumns({ code: 'PGRST204' }, '', ['external_id']).length === 0);
+ok('R8: a message NAMING external_id still strips it (precise pre-0114 degrade intact)', JSON.stringify(L.missingInsertColumns({ code: 'PGRST204', message: "Could not find the 'external_id' column" }, '', ['external_id', 'client_id'])) === JSON.stringify(['external_id']));
 ok('missingInsertColumns: unrelated error → []', L.missingInsertColumns({ code: '23505', message: 'duplicate key' }, '', ['external_id']).length === 0);
 ok('missingInsertColumns: message naming a candidate without a code still signals', JSON.stringify(L.missingInsertColumns({ message: 'column "external_id" does not exist' }, '', ['external_id', 'client_id'])) === JSON.stringify(['external_id']));
 
@@ -356,7 +368,7 @@ try {
 
   // ═══════════ PART C · comms routing fix (F1 project landing + reference threading, F3 client_id) ═══════════
   const PROJECT_ID = '55555555-5555-4555-8555-555555555555';
-  const BRIDGED_PROJ = { ...BRIDGED, links: [{ customer_client_id: CLIENT_ID, project_id: PROJECT_ID, created_at: '2026-01-02T00:00:00Z' }], projects: [{ id: PROJECT_ID }] };
+  const BRIDGED_PROJ = { ...BRIDGED, links: [{ customer_client_id: CLIENT_ID, project_id: PROJECT_ID, created_at: '2026-01-02T00:00:00Z' }], projects: [{ id: PROJECT_ID, status: 'active', client_visible: true }] };
 
   // F1: a bridged CLIENT with an active project → the email lands as a PROJECT
   // MESSAGE (the portal composer's shape), NEVER on the support spine — even when
@@ -371,6 +383,7 @@ try {
     ok('F1: the project message carries external_id (0114-style dedup)', pm && pm.body.external_id === '<abc-123@acme.com>');
     ok('F1: NOTHING lands on the support spine (no ticket, no support append)', supPosts.length === 0);
     ok('F1: emits the kind:message project event {from:client, via:email, client_visible}', evt && evt.body.kind === 'message' && evt.body.detail.from === 'client' && evt.body.detail.via === 'email' && evt.body.client_visible === true && evt.body.actor_kind === 'client');
+    ok('R9: the message event actor is EMAIL-FIRST (projectEvent parity), not the uid key', evt && evt.body.actor === 'jane@acme.com');
   }
 
   // F1: project-message insert 409 (unique external_id conflict) → duplicate ack, no support fallthrough
@@ -447,11 +460,94 @@ try {
     ok('F1: project-linked referenced thread still emits the support_message event', evt && evt.body.kind === 'support_message' && evt.body.detail.from === 'client');
   }
 
-  // F1: an unknown sender STILL creates nothing — with reference headers present
+  // F1/R2: an unknown sender STILL creates nothing — even with a FULLY RESOLVABLE
+  // reference chain (refMsgHits AND reqById both configured). The original test
+  // left reqById unset, so the chain never completed and the no-insert assertion
+  // passed vacuously — a mutation hoisting reference threading above identity
+  // matching sailed through. Now the chain resolves, and we ALSO pin the ordering
+  // directly: a stranger's email must trigger NO stored-Message-Id lookup at all.
   {
-    const calls = installFetch({ clients: [], contacts: [], refMsgHits: [{ request_id: 'thr_9' }] });
+    const calls = installFetch({
+      clients: [], contacts: [],
+      refMsgHits: [{ request_id: 'thr_9', created_at: '2026-05-01T00:00:00Z' }],
+      reqById: [{ id: 'thr_9', subject: 'A real thread', requester: 'auth-123', status: 'open', project_id: null, created_at: '2026-04-01T00:00:00Z' }],
+    });
     const r = await handleInboundEmail(await sign(emailReceived({ headers: { 'In-Reply-To': '<ref-1@acme.com>' } })));
-    ok('F1: unknown sender + reference headers → 200 ack, NOTHING inserted (spam surface intact)', r.status === 200 && !calls.some((c) => c.method === 'POST' && (/presence_support/.test(c.url) || c.url.includes('presence_project_messages'))));
+    ok('F1/R2: unknown sender + RESOLVABLE reference chain → 200 ack, NOTHING inserted (spam surface intact)', r.status === 200 && !calls.some((c) => c.method === 'POST' && (/presence_support/.test(c.url) || c.url.includes('presence_project_messages'))));
+    ok('R2: identity matching precedes ANY thread lookup (no external_id=in. read for a stranger)', !calls.some((c) => c.url.includes('external_id=in.')));
+  }
+
+  // ═══════════ PART D · adversarial-review R-fixes ═══════════
+
+  // R1 (security BLOCKER): a reference hit on ANOTHER requester's thread must NOT
+  // append. Any known sender whose email carries a victim's stored Message-Id
+  // (forged, or honestly accumulated via forward/reply-all References) would
+  // otherwise inject into the victim's thread AS the victim — and reopen it.
+  {
+    const calls = installFetch({
+      ...BRIDGED_PROJ,
+      refMsgHits: [{ request_id: 'thr_victim', created_at: '2026-05-01T00:00:00Z' }],
+      reqById: [{ id: 'thr_victim', subject: 'Victim matter', requester: 'victim-uid-999', status: 'resolved', project_id: null, created_at: '2026-04-01T00:00:00Z' }],
+    });
+    const r = await handleInboundEmail(await sign(emailReceived({ headers: { 'In-Reply-To': '<stolen-ref@acme.com>' } })));
+    const supMsg = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    const patch = calls.find((c) => c.method === 'PATCH' && c.url.includes('id=eq.thr_victim'));
+    const pm = calls.find((c) => c.method === 'POST' && c.url.includes('presence_project_messages'));
+    ok('R1: reference hit on ANOTHER requester\'s thread → NO append as the victim', r.status === 200 && !supMsg);
+    ok('R1: the victim thread is untouched (no reopen / updated_at bump)', !patch);
+    ok('R1: ownership mismatch falls through to normal routing (project landing here)', !!pm && pm.body.project_id === PROJECT_ID);
+  }
+  // R1 continuity: a thread stamped with the MATCHED client's own client_id (its
+  // requester an alternate key from an earlier era) is still the sender's own.
+  {
+    const calls = installFetch({
+      ...BRIDGED_PROJ,
+      refMsgHits: [{ request_id: 'thr_alt', created_at: '2026-05-01T00:00:00Z' }],
+      reqById: [{ id: 'thr_alt', subject: 'Alt-key matter', requester: 'old-alt-uid', status: 'open', project_id: null, client_id: CLIENT_ID, created_at: '2026-04-01T00:00:00Z' }],
+    });
+    const r = await handleInboundEmail(await sign(emailReceived({ headers: { 'In-Reply-To': '<alt-ref@acme.com>' } })));
+    const supMsg = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    ok('R1: client_id match (same client, alternate requester key) still appends', r.status === 200 && !!supMsg && supMsg.body.request_id === 'thr_alt');
+  }
+
+  // R3: the project landing requires a LIVE (status=active), CLIENT-VISIBLE project —
+  // matching the portal composer's semantics. Completed/archived/hidden projects
+  // must not swallow email forever; the support spine is the fallback.
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ, projects: [{ id: PROJECT_ID, status: 'complete', client_visible: true }], openThreads: [] });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'After the project wrapped' })));
+    ok('R3: completed project → support spine, NOT a project message', r.status === 200 && !calls.some((c) => c.method === 'POST' && c.url.includes('presence_project_messages')) && !!calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests')));
+  }
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ, projects: [{ id: PROJECT_ID, status: 'active', client_visible: false }], openThreads: [] });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Hidden project' })));
+    ok('R3: client-invisible project → support spine (the client could not even READ that thread)', r.status === 200 && !calls.some((c) => c.method === 'POST' && c.url.includes('presence_project_messages')) && !!calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests')));
+  }
+
+  // R6: the stored-Message-Id lookup must match BOTH stored formats — external_id
+  // is stored as-received (data.message_id may lack angle brackets) while
+  // reference tokens are always bracketed.
+  {
+    const calls = installFetch({ ...BRIDGED_PROJ });
+    await handleInboundEmail(await sign(emailReceived({ headers: { 'In-Reply-To': '<ref-6@acme.com>' } })));
+    const look = calls.find((c) => c.url.includes('external_id=in.'));
+    const dec = look ? decodeURIComponent(look.url) : '';
+    ok('R6: reference lookup queries the bracketed AND the bare stored form', !!look && dec.includes('"<ref-6@acme.com>"') && dec.includes('"ref-6@acme.com"'));
+  }
+
+  // R8: a bare missing-column code naming NO column must never strip the dedup key.
+  {
+    let n = 0;
+    const calls = installFetch({ ...BRIDGED, openThreads: [], reqInsert: () => { n++; return n === 1 ? jr({ code: '42703' }, 400) : jr([{ id: 'req_r8' }], 201); } });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Bare 42703 degrade' })));
+    const posts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('R8: bare 42703 → retry strips ONLY client_id; external_id survives every attempt', r.status === 200 && posts.length === 2 && posts.every((p) => 'external_id' in (p.body || {})) && !('client_id' in (posts[1].body || {})));
+  }
+  {
+    const calls = installFetch({ ...BRIDGED, openThreads: [], reqInsert: () => jr({ code: '42703' }, 400) });
+    const r = await handleInboundEmail(await sign(emailReceived({ subject: 'Bare 42703 hard fail' })));
+    const posts = calls.filter((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('R8: bare 42703 persisting → 502 surfaced (never silently landed without dedup)', r.status === 502 && posts.every((p) => 'external_id' in (p.body || {})));
   }
 
   // I1: a bridged client whose contact has NO auth_user_id but who CAN log into the

@@ -24,7 +24,7 @@ import {
   parseInbound, parseAddress, siteIdFromAddress,
   parseAuthResults, senderAuthVerdict, autoResponderSignal, isSelfSender,
   filterSafe, filterKey, deriveRequesterKey, matchedStoredEmail, identityAliases,
-  selectAppendTarget, missingColumnSignal, missingInsertColumns, referenceIds, maskEmail,
+  selectAppendTarget, missingColumnSignal, missingInsertColumns, referenceIds, messageIdVariants, maskEmail,
 } from '../lib/inbound_email.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -178,7 +178,13 @@ async function matchSiteIdentity(siteId: string, fromEmail: string): Promise<Sit
  *  so the route 502s (a flaky read must not silently fork a duplicate thread). */
 async function findThreadByReferences(siteId: string, refs: string[]): Promise<any | null> {
   if (!refs.length) return null;
-  const list = refs.map((x) => filterKey(x)).join(',');
+  // R6: query BOTH comparable forms of every token (bracketed + bare) — the
+  // stored external_id is the id AS-RECEIVED (data.message_id may lack angle
+  // brackets) while reference tokens are always bracketed. Compare-time only;
+  // the storage format is untouched (0114/0115 data compatibility).
+  const vals = [...new Set(refs.flatMap((x) => messageIdVariants(x)).filter((x) => filterSafe(x) !== null))];
+  if (!vals.length) return null;
+  const list = vals.map((x) => filterKey(x)).join(',');
   const q = async (path: string): Promise<any[]> => {
     const r = await svc(path);
     if (!r.ok) {
@@ -194,7 +200,14 @@ async function findThreadByReferences(siteId: string, refs: string[]): Promise<a
   const reqId = String(msgHits[0]?.request_id || reqHits[0]?.id || '');
   if (!reqId) return null;
   const enc = encodeURIComponent(reqId);
-  return (await q(`presence_support_requests?id=eq.${enc}&site_id=eq.${siteId}&deleted_at=is.null&select=id,subject,requester,status,project_id&limit=1`))[0] || null;
+  const base = `presence_support_requests?id=eq.${enc}&site_id=eq.${siteId}&deleted_at=is.null`;
+  // R1: client_id rides along for the route's ownership check (the F3 stamp).
+  // Pre-0115 the widened select 400s on the precise missing-column signal
+  // (q → []) — retry the legacy column list so reference threading itself
+  // survives a database that has 0114 but not yet 0115.
+  const wide = await q(`${base}&select=id,subject,requester,status,project_id,client_id&limit=1`);
+  if (wide[0]) return wide[0];
+  return (await q(`${base}&select=id,subject,requester,status,project_id&limit=1`))[0] || null;
 }
 
 /** Auto-acknowledge the sender that their email landed. The SAME branded,
@@ -346,6 +359,24 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     try { refTarget = await findThreadByReferences(siteId, refs); }
     catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
   }
+  // R1 (security): the referenced thread must BELONG to the matched sender.
+  // findThreadByReferences matches external_id SITE-WIDE, and References ids
+  // travel across mailboxes (forward, reply-all) or can simply be forged — and
+  // the append below writes author = refTarget.requester. Without this check,
+  // ANY known sender (client or mere contact) whose email carries another
+  // requester's stored Message-Id could inject into the victim's thread AS the
+  // victim, and reopen their tickets. Ownership mirrors the subject path's
+  // alias semantics (requester ∈ the sender's aliases); the F3 client_id stamp
+  // also proves it when the thread's requester key is from an earlier era. On
+  // mismatch: fall through to project/subject routing as if nothing matched.
+  if (refTarget) {
+    const owned = aliases.includes(String(refTarget.requester || ''))
+      || (match.kind === 'client' && refTarget.client_id && String(refTarget.client_id) === match.id);
+    if (!owned) {
+      console.warn(`[inbound] reference thread belongs to another requester — ignored (R1) from ${maskEmail(from_email)}`);
+      refTarget = null;
+    }
+  }
   if (refTarget) {
     if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed_race', from_email);
     const ins = await insertDeduped('presence_support_messages',
@@ -372,8 +403,15 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   //      only the fallback for clients with no live project (and contacts).
   if (match.kind === 'client' && match.projectId) {
     let proj: any = null;
-    try { proj = okRows(await svc(`presence_projects?id=eq.${match.projectId}&site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`))[0]; }
+    try { proj = okRows(await svc(`presence_projects?id=eq.${match.projectId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,status,client_visible&limit=1`))[0]; }
     catch (e) { if (e instanceof InfraRead) return readFailed(); throw e; }
+    // R3: only a LIVE (status=active), CLIENT-VISIBLE project may receive the
+    // email as a project message — matching the portal composer's semantics and
+    // the client read gate (project_comms 404s a client on client_visible=false;
+    // a message they could never read must not land there). A completed/
+    // archived/on-hold/hidden project must not swallow mail forever → the
+    // support spine below is the fallback.
+    if (proj && (proj.status !== 'active' || proj.client_visible !== true)) proj = null;
     if (proj) {
       if (await alreadyLanded(siteId, externalId)) return dropAck('already_landed_race', from_email);
       const ins = await insertDeduped('presence_project_messages',
@@ -384,7 +422,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       // studio bell/feed/Inbox treat an emailed message exactly like a portal one.
       // (Mirrors the portal path: a client→studio message emails no one.)
       await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ project_id: match.projectId, site_id: siteId, kind: 'message', actor: requesterKey, actor_kind: 'client', client_visible: true, detail: { from: 'client', message_id: ins.row?.id, via: 'email' } }) }).catch(() => {});
+        body: JSON.stringify({ project_id: match.projectId, site_id: siteId, kind: 'message', actor: storedEmail || requesterKey, actor_kind: 'client', client_visible: true, detail: { from: 'client', message_id: ins.row?.id, via: 'email' } }) }).catch(() => {});   // R9: actor is EMAIL-FIRST, matching projectEvent (principal.email || userId)
       return ack();
     }
   }
