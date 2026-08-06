@@ -1239,12 +1239,16 @@ const REAL_PHOTOS = new Set([
 ]);
 const imgAttrs = (tag: string): Record<string, string> =>
   Object.fromEntries([...tag.matchAll(/([a-zA-Z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
-/** the contract every Group A photo signs: real asset, honest alt, no CLS, lazy */
-function pinPhoto(tag: string | undefined, ctx: string, src: string, w: number, h: number): Record<string, string> {
+/** the contract every Group A photo signs: real asset, honest alt, no CLS, lazy.
+ *  decorative=true means an EXPLICIT empty alt (the visible text beside the
+ *  image already carries the name — review F2's double-announce fix), never a
+ *  merely-missing one. */
+function pinPhoto(tag: string | undefined, ctx: string, src: string, w: number, h: number, decorative = false): Record<string, string> {
   expect(tag, `${ctx}: <img> present`).toBeTruthy();
   const a = imgAttrs(tag!);
   expect(a.src, `${ctx}: src`).toBe(src);
-  expect(a.alt, `${ctx}: honest alt text`).toBeTruthy();
+  if (decorative) expect(a.alt, `${ctx}: explicit decorative alt`).toBe('');
+  else expect(a.alt, `${ctx}: honest alt text`).toBeTruthy();
   expect(+(a.width ?? NaN), `${ctx}: width attr`).toBe(w);
   expect(+(a.height ?? NaN), `${ctx}: height attr`).toBe(h);
   expect(a.loading, `${ctx}: below-the-fold loading`).toBe('lazy');
@@ -1288,7 +1292,9 @@ test.describe('Photos A — repo-asset slots (static pins)', () => {
       expect(sig, `${slot}: .hero-sig wrapper`).toBeTruthy();
       expect(sig![0], `${slot}: label rides beside the face`).toContain(label);
       const a = pinPhoto(sig![1], `${slot} avatar`, 'eric-davis-small.jpg', 56, 56);
-      expect(a.alt, `${slot}: avatar alt`).toBe('Eric Davis');
+      // index/contact precedent (review F2): the alt names the role, not just
+      // the name — here the visible card copy does NOT repeat "Eric Davis"
+      expect(a.alt, `${slot}: avatar alt`).toBe('Eric Davis, founder of Davis Digital Studio');
     }
   });
 
@@ -1296,8 +1302,13 @@ test.describe('Photos A — repo-asset slots (static pins)', () => {
     const strip = PHOTO_SLOTS['audit.html § trust strip']();
     expect(strip, 'trust strip found').toContain('footer-trust-inner');
     const cell = strip.match(/>Founder<\/div>[\s\S]*?(<img[^>]*>)/);
-    const a = pinPhoto(cell?.[1], 'audit Founder cell avatar', 'eric-davis-small.jpg', 46, 46);
-    expect(a.alt, 'audit avatar alt').toBe('Eric Davis');
+    const a = pinPhoto(cell?.[1], 'audit Founder cell avatar', 'eric-davis-small.jpg', 46, 46, true);
+    // the visible "Eric Davis" sits right beside the face — a named alt would
+    // double-announce to screen readers (review F2), so this one is decorative
+    expect(a.alt, 'audit avatar alt (decorative beside the visible name)').toBe('');
+    // enhance.css's img{height:auto} beats .hero-sig's box (review F1) — the
+    // inline size is what keeps this avatar a circle instead of a 46×61 ellipse
+    expect(cell![1], 'audit avatar: inline box (enhance.css immunity)').toContain('style="width:46px;height:46px"');
     // the cell's copy is untouched beside it, and the avatar is the strip's
     // ONLY img (the sibling cells stay text — no decoration creep)
     expect(strip, 'name kept').toContain('Eric Davis</div>');
@@ -1381,11 +1392,23 @@ test.describe('Photos A (live, desktop)', () => {
           .toBeGreaterThan(0);
       }
     }
-    // the .hero-sig treatment actually applied: round crop at avatar scale
-    await page.goto('/pricing.html');
-    const av = page.locator('.hero-sig img');
-    await expect(av, 'round avatar').toHaveCSS('border-radius', '50%');
-    expect(await av.evaluate((el) => (el as HTMLElement).offsetWidth), 'avatar scale').toBe(56);
+    // the .hero-sig treatment actually applied on ALL FOUR avatar slots: round
+    // crop that stays a true circle AFTER decode (review F1: audit's enhance.css
+    // img{height:auto} once stretched it to 46×61 post-load — W===H is the pin)
+    for (const [url, size] of [
+      ['/pricing.html', 56], ['/services.html', 56],
+      ['/monthly-retainer.html', 56], ['/audit.html', 46],
+    ] as Array<[string, number]>) {
+      await page.goto(url);
+      const av = page.locator('.hero-sig img').first();
+      await av.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => av.evaluate((el) => (el as HTMLImageElement).naturalWidth), { message: `${url}: avatar decodes` })
+        .toBeGreaterThan(0);
+      await expect(av, `${url}: round avatar`).toHaveCSS('border-radius', '50%');
+      const box = await av.evaluate((el) => [(el as HTMLElement).offsetWidth, (el as HTMLElement).offsetHeight]);
+      expect(box, `${url}: a circle, not an ellipse — post-decode box`).toEqual([size, size]);
+    }
   });
 
   test('the strip + desk-shot captions hold AA in the light scheme', async ({ page }) => {
