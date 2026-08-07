@@ -16,7 +16,7 @@ import { getSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
-import { supportAgingDue, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
+import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
@@ -444,7 +444,8 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
 // A submitted support request that sits open/in_progress with no movement for a
 // few days would otherwise wait until someone happens to look. Mirroring the
 // lead/deal follow-up pattern exactly: same 15-min sweep, same notices rail,
-// send-once per request (period = the request id). The nudge goes to the OWNER
+// send-once per request PER WEEK (period = the request id + a 7-day bucket, so a
+// still-open request re-nudges rather than going quiet). The nudge goes to the OWNER
 // ONLY — the customer already got the calm auto-ack on submit; we never auto-
 // message them again here. Best-effort + graceful: pre-0095 the 'support_aging'
 // notice fails the kind check and raiseNotice returns false (no email, no throw).
@@ -466,7 +467,12 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
     const body = urgent
       ? `A ${r.priority}-priority support request has been waiting a few days without a reply — worth a look soon.`
       : 'A support request has been open a few days without a reply — a quick response keeps the customer confident.';
-    const fresh = await raiseNotice({ siteId: r.site_id, clientId, kind: 'support_aging', period: `support:${r.id}`, headline: `Waiting on you — ${subject}`, body });
+    // WEEKLY, not once-ever. `support:<id>` muted a request permanently after one
+    // fire — a ticket that genuinely stalled went silent while still waiting on the
+    // owner. supportAgingPeriod buckets by 7 days: send-once inside the week (the
+    // sweep runs every 15 min), and it speaks up again next week if it's STILL
+    // open. Resolve/close clears every bucket at once (clearNoticePrefix).
+    const fresh = await raiseNotice({ siteId: r.site_id, clientId, kind: 'support_aging', period: supportAgingPeriod(r.id, Date.now()), headline: `Waiting on you — ${subject}`, body });
     if (fresh) {
       nudged++;
       // Parity with lead/deal nudges: the owner also gets the email once (send-once
@@ -641,7 +647,14 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
       const noticeBody = email
         ? `The ${what} has been out a few days, so we sent the client one gentle reminder with a fresh link. If it stays quiet, a personal note lands best.`
         : `The ${what} has been out a few days, but there's no client email on the deal — add one to the contact, or reach out personally.`;
-      const fresh = await raiseNotice({ siteId: doc.site_id, clientId, kind: 'deal_followup', period: `remind:${doc.id}`, headline: `${email ? 'Reminder sent' : 'Still waiting'} — ${doc.title || `the ${what}`}`, body: noticeBody });
+      // A SILENT LEDGER, not a row. "Reminder sent — your agreement" is STATUS,
+      // not an ask: the studio has nothing to do about it, the deal history
+      // already records it, and nothing ever cleared it, so it sat in "Needs you"
+      // permanently. Recorded 'dismissed' exactly like runBookingReminders below:
+      // it still holds the unique (client, kind, period) key, so `fresh` is still
+      // the exact send-once gate for the client email — it simply stops being a
+      // thing that claims to need the owner.
+      const fresh = await raiseNotice({ siteId: doc.site_id, clientId, kind: 'deal_followup', period: `remind:${doc.id}`, status: 'dismissed', headline: `${email ? 'Reminder sent' : 'Still waiting'} — ${doc.title || `the ${what}`}`, body: noticeBody });
       if (!fresh) continue;
       if (!email) continue;
       try {

@@ -340,6 +340,20 @@ Deno.serve(async (req: Request) => {
           headline: `Paid — ${inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice')} (${amount})`,
           body: inv.purpose === 'deposit' ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
         });
+        // …and TAKE DOWN the "Still unpaid" reminder the same invoice raised.
+        // runInvoiceReminders (commerce/lifecycle.ts) raises deal_followup with
+        // period `invremind:<invoice id>` and nothing ever cleared it, so the
+        // moment money landed the owner's list showed BOTH lines about the same
+        // invoice — "Still unpaid — Deposit ($500)" directly above "Paid —
+        // Deposit ($500)" — forever. Money landing IS the teardown; this is also
+        // the ONLY way that row can clear, since an unpaid invoice is deliberately
+        // undismissable by hand (lib/inbox_feed.noticeDismissible).
+        // This function has no lib/notice.ts (it is a separate Edge Function with
+        // its own db() helper), so the clear mirrors clearNotice's shape here.
+        await db(
+          `presence_plan_notices?client_id=eq.${encodeURIComponent(siteRow.client_id)}&kind=eq.deal_followup&status=eq.active&period=eq.${encodeURIComponent(`invremind:${inv.id}`)}`,
+          'PATCH', { status: 'dismissed' },
+        );
       }
     } catch (e) { console.error(`[stripe-webhook] paid-echo best-effort failed for ${invoiceId}:`, e); }
     console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} paid (via ${via})`);

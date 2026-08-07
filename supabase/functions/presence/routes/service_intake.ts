@@ -10,8 +10,9 @@ import { isStudioSide, studioDenied, loadProject, projectEvent } from './project
 import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
 import {
   normalizeQuestions, normalizeAnswers,
-  isSupportStatus, canSupportTransition, isSupportPriority,
+  isSupportStatus, canSupportTransition, isSupportPriority, supportAgingPeriodPrefix,
 } from '../lib/intake.ts';
+import { clearNoticePrefix } from '../lib/notice.ts';
 import { offerCsat } from '../lib/csat.ts';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -172,6 +173,7 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     const patch: Record<string, unknown> = {};
     let resolvedNow = false;
+    let clearedNow = false;   // resolved OR closed — the two transitions that END the wait
     if (b.priority !== undefined) { if (!isSupportPriority(b.priority)) return json({ error: 'validation', message: 'Invalid priority.' }, 422, cors); patch.priority = b.priority; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
     if (b.resolution !== undefined) patch.resolution = clean(b.resolution, 2000);
@@ -181,6 +183,7 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
       patch.status = b.status;
       patch.resolved_at = b.status === 'resolved' ? nowIso() : (b.status === 'open' ? null : reqRow.resolved_at);
       resolvedNow = b.status === 'resolved' && reqRow.status !== 'resolved';
+      clearedNow = (b.status === 'resolved' || b.status === 'closed') && b.status !== reqRow.status;
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     // B5: optimistic guard — a status change pins the prior status in the WHERE so two
@@ -188,6 +191,17 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
     const guard = (b.status !== undefined && patch.status !== reqRow.status) ? `&status=eq.${reqRow.status}` : '';
     const up = await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}${guard}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That request just changed — refresh and try again.' }, 409, cors);
+    // ── TEARDOWN: doing the work clears the row ────────────────────────────────
+    // runSupportAging raises "Waiting on you — <subject>" on the notices rail, and
+    // nothing ever took it down: the owner could resolve the request and the row
+    // stayed forever. Resolving OR CLOSING ends the wait, so both clear it (a mere
+    // REPLY deliberately does not — a reply that goes unanswered is still waiting).
+    // Placed AFTER the guarded write, so a lost optimistic race never clears a
+    // notice for work that didn't land. Prefix-scoped because the nudge now
+    // re-fires on a weekly bucket: last week's row and this week's both go.
+    // Best-effort by construction (clearNoticePrefix never throws) — the studio's
+    // resolve must never fail over its own echo.
+    if (clearedNow && site.client_id) await clearNoticePrefix(site.client_id, 'support_aging', supportAgingPeriodPrefix(id));
     if (resolvedNow && reqRow.project_id) {
       await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
       // service edge #1: on resolve, offer the client a one-question CSAT (reuses

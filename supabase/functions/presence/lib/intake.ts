@@ -106,3 +106,26 @@ export function supportAgingDue(req: { status?: string; updated_at?: string | nu
   const ageDays = (now - upd) / 86400_000;
   return ageDays >= days && ageDays < SUPPORT_AGING_MAX_DAYS;
 }
+
+/** The dedupe `period` for a support-aging nudge — a WEEKLY bucket, not a
+ *  once-ever key.
+ *
+ *  The old key was `support:<id>`, so the very first nudge muted the request
+ *  forever: a genuinely stalled ticket went silent while it was still waiting on
+ *  the owner. A 7-day bucket keeps the nudge send-once *within* a week (no
+ *  storm — the sweep runs every 15 minutes) but lets a still-open request speak
+ *  up again the following week.
+ *
+ *  The bucket is `floor(now / 7d)` — deterministic, clock-free in tests, and
+ *  independent of timezone or locale (slots turn over Thursday 00:00 UTC, since
+ *  the epoch is a Thursday; which weekday it lands on doesn't matter, only that
+ *  it is stable and exactly 7 days wide). Every bucket shares the
+ *  `support:<id>:` prefix, which is what the resolve/close teardown clears. */
+const SUPPORT_AGING_BUCKET_MS = 7 * 86400_000;
+export function supportAgingPeriodPrefix(requestId: string): string {
+  return `support:${requestId}:`;
+}
+export function supportAgingPeriod(requestId: string, nowMs: number): string {
+  const w = Number.isFinite(nowMs) ? Math.floor(nowMs / SUPPORT_AGING_BUCKET_MS) : 0;
+  return `${supportAgingPeriodPrefix(requestId)}w${w}`;
+}

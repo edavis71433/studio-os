@@ -503,6 +503,10 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (deal.stage === 'converted' || deal.converted_at) return json({ error: 'won_deal', message: 'This deal became a customer — it can’t be deleted. Manage the customer from Projects.' }, 409, cors);
     const del = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
     if (!del.ok || !rows(del)[0]) return json({ error: 'write_failed' }, 502, cors);
+    // A deal that left the pipeline can't still be "waiting on you" — runDealFollowups
+    // raised deal_followup on `deal:<id>` and nothing took it down, so a deleted deal
+    // kept nagging from a list that no longer had anywhere to send the owner.
+    if (site.client_id) await clearNotice(site.client_id, 'deal_followup', `deal:${id}`);
     return json({ data: { ok: true, deleted: true } }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -1069,8 +1073,14 @@ export async function handleSalesContractTerm(req: Request, site: SiteRow, princ
  *  the deal's (agency) site so "ready to convert {name}" lands on the operator's
  *  Today / Attention / bell with a deep-link to Pipeline. Deals only ever live on
  *  agency sites, so this is operator-only by construction. Best-effort; the
- *  stable `period` makes it idempotent (once per deal per event). */
-async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' | 'signed'): Promise<void> {
+ *  stable `period` makes it idempotent (once per deal per event).
+ *
+ *  `docId` (the proposal/contract that just landed) is the TEARDOWN half: the
+ *  same client decision that raises "ready to convert" also ends the wait that
+ *  runSalesDocReminders was nudging about, so the `remind:<doc>` follow-up row
+ *  goes here. It rides this helper because this is the one place that has
+ *  already resolved the site's client_id — the clear costs no extra read. */
+async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' | 'signed', docId?: string): Promise<void> {
   try {
     const site = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
     if (!site?.client_id) return; // no owning client → nowhere calm to surface it
@@ -1080,6 +1090,8 @@ async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' 
       ? 'The client signed. Convert them to a customer to provision their workspace whenever you’re ready.'
       : 'The client accepted your proposal. Prepare the agreement to sign when you’re ready.';
     await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
+    // the document is decided — it is no longer waiting on anyone
+    if (docId) await clearNotice(site.client_id, 'deal_followup', `remind:${docId}`);
   } catch { /* non-fatal — the deal event + Pipeline still record it */ }
 }
 
@@ -1139,7 +1151,7 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision } });
   if (decision === 'accepted') {
     await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
-    await raiseDealReady(tok.site_id, dealId, 'accepted');   // W1: tell the studio
+    await raiseDealReady(tok.site_id, dealId, 'accepted', id);   // W1: tell the studio (and clear the proposal's reminder row)
   } else {
     // A decline deserves a heads-up too — silence here means the studio keeps
     // waiting on a deal that already said no. Best-effort, idempotent per deal.
@@ -1274,7 +1286,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
-  await raiseDealReady(tok.site_id, dealId, 'signed');   // W1: "ready to convert {name}" → operator Today/Attention/bell
+  await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
 
   // EXECUTED COPY: the email is the durable record ("you'll always be able to ask
   // for a copy" — now they don't have to ask). Full agreement text + signature
@@ -1408,7 +1420,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (outcome === 'already_converted') { // idempotent: return the existing customer/workspace (+ ensure the project handoff)
     const { actor, actor_kind } = actorOf(principal);
     const ph = await ensureProjectForDeal({ agencySiteId: site.id, deal, clientId: deal.converted_client_id, customerSiteId: deal.converted_site_id, actor, actorKind: actor_kind });
-    if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); } // already a customer → drop any lingering "ready to convert" notice
+    if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNotice(site.client_id, 'deal_followup', `deal:${dealId}`); } // already a customer → drop any lingering "ready to convert" + "follow up on this deal" notice
     return json({ data: { converted: true, client_id: deal.converted_client_id, site_id: deal.converted_site_id, project_id: ph.project?.id || deal.created_project_id || null, onboarding: '/get-started.html', idempotent: true } }, 200, cors);
   }
   if (outcome === 'blocked_lost') return json({ error: 'lost', message: 'A lost deal can’t be converted.' }, 409, cors);
@@ -1465,7 +1477,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
-  if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); } // the deal is a customer now — clear the "ready to convert" notice
+  if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNotice(site.client_id, 'deal_followup', `deal:${dealId}`); } // the deal is a customer now — clear the "ready to convert" + stale "follow up on this deal" notices
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
   // Seam 1: if the converting operator runs an AGENCY, add the new customer to

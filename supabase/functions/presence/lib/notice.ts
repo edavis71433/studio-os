@@ -15,6 +15,13 @@ export interface NoticeInput {
   period: string;    // dedupe scope: a stable event id or a 'YYYY-MM' bucket
   headline: string;
   body: string;
+  /** 'active' (default) = a real needs-you ROW on the bell / Today / Inbox.
+   *  'dismissed' = a SILENT LEDGER row: it still occupies the unique
+   *  (client_id, kind, period) key — so `created` is still the exact send-once /
+   *  throttle gate — but it never renders and never pushes. The codebase's
+   *  existing idiom for "this is a record that something was sent, not a thing
+   *  asking for you" (see runBookingReminders). */
+  status?: 'active' | 'dismissed';
 }
 
 /** Raise (or no-op if already present for this client/kind/period) a notice.
@@ -22,17 +29,19 @@ export interface NoticeInput {
  *  or bump a counter exactly once. */
 export async function raiseNotice(n: NoticeInput): Promise<boolean> {
   try {
+    const status = n.status === 'dismissed' ? 'dismissed' : 'active';
     const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
       method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify({
         site_id: n.siteId, client_id: n.clientId, kind: n.kind, period: n.period,
-        headline: n.headline.slice(0, 200), body: n.body.slice(0, 1000), status: 'active',
+        headline: n.headline.slice(0, 200), body: n.body.slice(0, 1000), status,
       }),
     });
     const created = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
     // A NEW notice also pushes to the owner's device (best-effort, gated on VAPID
-    // keys). Only on first creation so a re-raise never re-pushes.
-    if (created) {
+    // keys). Only on first creation so a re-raise never re-pushes — and never at
+    // all for a silent-ledger row, which by definition isn't asking for anything.
+    if (created && status === 'active') {
       try {
         const { pushToSite } = await import('../routes/push.ts');
         const href = (await import('../routes/workspace.ts')).noticeHref(n.kind);
@@ -50,6 +59,20 @@ export async function raiseNotice(n: NoticeInput): Promise<boolean> {
  *  Optional `period` narrows to one event. Best-effort. */
 export async function clearNotice(clientId: string, kind: string, period?: string): Promise<void> {
   const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active${period ? `&period=eq.${encodeURIComponent(period)}` : ''}`;
+  await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+}
+
+/** Clear every active notice of a kind whose `period` starts with `prefix`.
+ *
+ *  Needed once a dedupe key carries a rolling bucket: support-aging now re-nudges
+ *  weekly as `support:<id>:w<n>`, so "this request is handled" can no longer be
+ *  said with a single exact period — last week's row and this week's row are both
+ *  active and both must go. The prefix is always an internal, code-built key
+ *  (`support:<uuid>:`), never user text, so it carries no LIKE metacharacters;
+ *  the `*` is appended OUTSIDE the encoding so PostgREST reads it as the wildcard
+ *  rather than a literal. Best-effort, exactly like clearNotice. */
+export async function clearNoticePrefix(clientId: string, kind: string, prefix: string): Promise<void> {
+  const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active&period=like.${encodeURIComponent(prefix)}*`;
   await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
 }
 

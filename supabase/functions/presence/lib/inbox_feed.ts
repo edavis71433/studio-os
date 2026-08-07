@@ -27,7 +27,14 @@
  *  every other per-event notice kind, which has an explicit clearNotice
  *  teardown — nothing ever cleared it, so the badge only ever rose. Excluding
  *  the four here is exact (never an under-count) and needs no new teardown
- *  path: the half that IS counted already clears itself. */
+ *  path: the half that IS counted already clears itself.
+ *
+ *  FINISHED at the source: excluding them from the COUNT still left them
+ *  RENDERING as permanent rows, so the list and the badge said different things
+ *  and no amount of work made the rows go away. notifyStudioOfClientAction now
+ *  raises all four pre-dismissed (lib/service_bridge.ts) — a silent ledger that
+ *  is only ever the throttle key, exactly as described above. This set stays as
+ *  the belt-and-braces guard for rows raised before that change. */
 export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'client_message', 'client_upload', 'client_request', 'client_approval',
 ]);

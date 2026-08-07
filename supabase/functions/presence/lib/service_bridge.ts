@@ -368,10 +368,23 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
     // The notice IS the throttle: created===true only on the first insert for
     // this (owner, kind, thread + 15-minute bucket). Pre-0116 the CHECK
     // constraint rejects the insert → created=false → no email, no crash.
+    //
+    // It is ONLY the throttle — recorded 'dismissed', a silent ledger row.
+    // lib/inbox_feed.ts already documents why these four must not COUNT: every
+    // one of them is represented in the badge by the same action's other half
+    // (a project event, or an open support request), which counts AND clears
+    // itself. But excluding them from the count left them still RENDERING as
+    // permanent rows — nothing ever cleared them — so the list and the badge
+    // openly disagreed, and the rows never went away no matter what the operator
+    // did. Pre-dismissing finishes that fix at the source: no row, no
+    // double-count, no push, and — because `created` still reflects the FIRST
+    // insert on the unique (client, kind, period) key — the email throttle below
+    // is completely unaffected.
     const { raiseNotice } = noticeMod;
     const created = await raiseNotice({
       siteId: n.agencySiteId, clientId: ownerClientId, kind: n.kind,
       period: noticePeriodFor(n.threadKey, n.bucket !== false),
+      status: 'dismissed',
       headline,
       body: `${subject || LEAD[n.kind]}${excerpt ? ` — “${excerpt.slice(0, 160)}”` : ''}`,
     });
