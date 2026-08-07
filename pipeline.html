@@ -1879,7 +1879,12 @@ async function openDeal(id){
     // than being paid. The button is only rendered on a NOT-paid row, and the
     // server refuses a paid one anyway (409): the UI mirrors the rule, it doesn't
     // hold it. Destructive → confirm first, same idiom as data-del-prop above.
-    $('detailInner').querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!confirm('Void this invoice? It stops being payable — the payment link is switched off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});toast(r.already?'Already voided':'Invoice voided');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // The server switches the Stripe payment link off as part of the void, but it
+    // is best-effort by design — the invoice row is the authority, so a Stripe
+    // hiccup can never leave a void that didn't happen. `link_deactivated:false`
+    // is that hiccup, and it is the one outcome the operator must not be told is
+    // a clean success: the link they emailed the client may still take money.
+    $('detailInner').querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!confirm('Void this invoice? It stops being payable — we switch its payment link off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});const linkLive=!r.already&&!!r.data&&r.data.link_deactivated===false;toast(linkLive?'Invoice voided — but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.already?'Already voided':'Invoice voided',linkLive);openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // Payment schedule builder: deposit + balance, or N installments. Previews the
     // staged invoices (labels · due dates · amounts · running total = deal total),
     // then mints them via /sales/deals/:id/schedule. The client math mirrors the

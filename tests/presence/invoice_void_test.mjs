@@ -22,6 +22,7 @@
 Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
 Deno.env.set('SERVICE_ROLE_KEY', 'svc-key');
 Deno.env.set('SUPABASE_ANON_KEY', 'anon-key');
+Deno.env.set('STRIPE_SECRET', 'sk_test_fake');   // so deactivatePaymentLink really runs (F1a)
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -33,6 +34,10 @@ const delivery = read('supabase/functions/presence/routes/client_delivery.ts');
 const mig86 = read('supabase/migrations/0086_presence_invoices.sql');
 const mig117 = read('supabase/migrations/0117_deal_event_delete_kinds.sql');
 const mig118 = read('supabase/migrations/0118_deal_event_invoice_voided.sql');
+const mig116 = read('supabase/migrations/0116_operator_activity_notices.sql');
+const mig119 = read('supabase/migrations/0119_notice_invoice_void_paid.sql');
+const stripeLib = read('supabase/functions/presence/commerce/stripe.ts');
+const webhook = read('supabase/functions/stripe-webhook/index.ts');
 const pipeline = read('pipeline.html');
 
 const results = [];
@@ -107,7 +112,7 @@ const I_OTHER = '88888888-8888-4888-8888-888888888888';       // another tenant'
 }
 
 // ═══ A fake PostgREST — the filter grammar this route speaks ═════════════════
-const world = { invoices: [], events: [], notices: [], escaped: [], patches: [] };
+const world = { invoices: [], events: [], notices: [], escaped: [], patches: [], stripe: [] };
 const jres = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const matches = (row, key, expr) => {
   if (expr === 'is.null') return row[key] === null || row[key] === undefined;
@@ -122,9 +127,20 @@ const TABLES = { presence_invoices: 'invoices', presence_deal_events: 'events', 
 // A hook the race tests use to mutate the world BETWEEN the handler's read and
 // its PATCH — the only honest way to simulate a payment landing mid-flight.
 let onPatch = null;
+// F1a: a fake Stripe. `stripeDeactivate` picks what the Payment Link PATCH does —
+// 'ok' (Stripe confirms it is inactive), 'error' (a non-2xx: no such link, a
+// revoked key, a rate limit) or 'throw' (the network). All three used to be
+// byte-identical to the caller, which was the defect.
+let stripeDeactivate = 'ok';
 globalThis.fetch = (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
   const u = new URL(url);
+  if (u.hostname === 'api.stripe.com') {
+    world.stripe.push(u.pathname);
+    if (stripeDeactivate === 'throw') return Promise.reject(new Error('stripe unreachable'));
+    if (stripeDeactivate === 'error') return Promise.resolve(jres(400, { error: { message: 'No such payment link' } }));
+    return Promise.resolve(jres(200, { id: 'plink_1', active: false }));
+  }
   const table = u.pathname.replace('/rest/v1/', '');
   if (u.hostname !== 'example.supabase.co' || !TABLES[table]) { world.escaped.push(url); return Promise.resolve(jres(500, { error: 'escaped the fake' })); }
   const bucket = world[TABLES[table]];
@@ -159,7 +175,7 @@ const seed = () => {
     { id: I_VOID, site_id: SITE.id, deal_id: DEAL, title: 'Duplicate', amount_cents: 320000, purpose: 'service', status: 'void', stripe_url: null, stripe_payment_link_id: null, deleted_at: null },
     { id: I_OTHER, site_id: OTHER_SITE, deal_id: DEAL, title: 'Someone else’s invoice', amount_cents: 100000, purpose: 'service', status: 'open', stripe_url: null, stripe_payment_link_id: null, deleted_at: null },
   ];
-  world.events = []; world.escaped = []; world.patches = [];
+  world.events = []; world.escaped = []; world.patches = []; world.stripe = []; stripeDeactivate = 'ok';
   // The undismissable money row this invoice stranded on Today.
   world.notices = [
     { id: 'n1', client_id: SITE.client_id, kind: 'deal_followup', period: `invremind:${I_OPEN_SENT}`, status: 'active' },
@@ -296,6 +312,147 @@ const notice = (id) => world.notices.find((r) => r.id === id);
   ok('deal page: voiding confirms first (same idiom as the draft deletes)', /\[data-void-inv\][\s\S]{0,320}confirm\(/.test(pipeline));
   ok('deal page: it POSTs the right route and re-renders the deal', /api\('\/sales\/invoices\/'\+b\.dataset\.voidInv\+'\/void','POST'/.test(pipeline) && /\[data-void-inv\][\s\S]{0,600}openDeal\(id\)/.test(pipeline));
   ok('deal page: it toasts on success and on failure (page idiom)', /\[data-void-inv\][\s\S]{0,600}toast\([\s\S]{0,120}nice\(e\),true\)/.test(pipeline));
+}
+
+// ═══ 11. F1a: "voided" must not mean three different things ════════════════
+// deactivatePaymentLink returned void and swallowed BOTH a throw and a non-2xx,
+// so "Stripe confirmed the link is dead", "Stripe said no" and "Stripe was
+// unreachable" all produced the identical {"ok":true,"status":"void"} and the
+// operator was told a flat "Invoice voided". A client paying through a link the
+// studio believes is switched off is exactly the case this route exists to
+// prevent, so the one thing the operator must not be told is a guess.
+//
+// The ORDERING is unchanged and stays that way: the status write comes first, so
+// a Stripe hiccup can never leave a void that did not happen. Reporting the
+// outcome is additive to that.
+{
+  seed();
+  const okv = await doVoid(I_OPEN_SENT);
+  ok('link: the invoice’s payment link is deactivated at Stripe',
+    world.stripe.some((p) => p.includes('payment_links/plink_1')), JSON.stringify(world.stripe));
+  ok('link: a confirmed deactivation reports link_deactivated true', okv.body?.data?.link_deactivated === true, JSON.stringify(okv.body));
+
+  seed(); stripeDeactivate = 'error';
+  const err = await doVoid(I_OPEN_SENT);
+  ok('link: a NON-2XX from Stripe still voids the invoice (the row is the authority, not Stripe)',
+    err.status === 200 && inv(I_OPEN_SENT)?.status === 'void', JSON.stringify(err.body));
+  ok('link: …and it is reported as NOT deactivated', err.body?.data?.link_deactivated === false, JSON.stringify(err.body));
+
+  seed(); stripeDeactivate = 'throw';
+  const thr = await doVoid(I_OPEN_SENT);
+  ok('link: a THROWN Stripe call still voids the invoice', thr.status === 200 && inv(I_OPEN_SENT)?.status === 'void');
+  ok('link: …and is reported as not deactivated too (a 400 and a dead network are both "may still be live")',
+    thr.body?.data?.link_deactivated === false, JSON.stringify(thr.body));
+  ok('link: a failed deactivation never blocks the rest of the void (notice cleared, event written)',
+    notice('n1')?.status === 'dismissed' && world.events.length === 1);
+
+  seed();
+  const none = await doVoid(I_OPEN_UNSENT);
+  ok('link: an invoice that never had a link reports null — nothing to take down is not a failure',
+    none.body?.data?.link_deactivated === null, JSON.stringify(none.body));
+  ok('link: …and no Stripe call was made for it', world.stripe.length === 0, JSON.stringify(world.stripe));
+
+  // the point of the whole change: the three outcomes are DISTINGUISHABLE
+  seed(); const a = await doVoid(I_OPEN_SENT);
+  seed(); stripeDeactivate = 'error'; const b = await doVoid(I_OPEN_SENT);
+  ok('link: a confirmed deactivation and a failed one no longer return identical bodies',
+    JSON.stringify(a.body) !== JSON.stringify(b.body), JSON.stringify(a.body));
+
+  ok('link: deactivatePaymentLink REPORTS instead of swallowing (returns a boolean)',
+    /export async function deactivatePaymentLink\(linkId: string\): Promise<boolean>/.test(stripeLib), 'still Promise<void>?');
+  ok('link: …and a failure is logged loudly rather than dropped on the floor',
+    /console\.error\([^\n]*deactivate[\s\S]{0,200}?return false;/i.test(stripeLib));
+}
+
+// ═══ 12. F1a: the deal page tells the operator the truth ═══════════════════
+{
+  // the whole click handler: from the selector to the catch that re-enables the
+  // button (a non-greedy `});` stops at the api() call's own argument list)
+  const vi = pipeline.indexOf("[data-void-inv]')");
+  const vEnd = vi < 0 ? -1 : pipeline.indexOf('b.disabled=false;}});', vi);
+  const voidHandler = vEnd < 0 ? '' : pipeline.slice(vi, vEnd + 'b.disabled=false;}});'.length);
+  ok('deal page: the void toast branches on link_deactivated', /link_deactivated\s*===\s*false/.test(voidHandler), voidHandler.slice(0, 200));
+  ok('deal page: …and says the link may still be live', /may still be live/i.test(voidHandler), voidHandler.slice(0, 400));
+  ok('deal page: …and says what to do about it (switch it off in Stripe)', /in Stripe/i.test(voidHandler));
+  ok('deal page: a clean void still reads as a plain success', /Invoice voided'/.test(voidHandler));
+  ok('deal page: the confirm no longer promises a switch-off it cannot guarantee',
+    !/the payment link is switched off/.test(pipeline));
+}
+
+// ═══ 13. F1b: money against a WITHDRAWN invoice is visible in the app ══════
+// markPresenceInvoicePaid correctly refuses to resurrect a voided invoice — but
+// the ONLY record of that refusal was a console.log and a stripe_payments row,
+// neither of which is in the product. Two ordinary ways a client still pays one:
+// the deactivation silently failed (section 11), or they already had a Checkout
+// Session open — deactivating a Payment Link does NOT kill sessions already
+// minted from it. Either way the studio is holding money on an invoice it
+// withdrew and has to decide whether to refund, so it has to SEE it.
+{
+  const fn = (webhook.match(/const markPresenceInvoicePaid[\s\S]*?\n  \};/) || [''])[0];
+  ok('webhook: markPresenceInvoicePaid was found', fn.length > 400, `${fn.length} bytes`);
+  ok('webhook: a voided invoice is still NEVER flipped to paid (the guard is untouched)',
+    /if \(inv\.status !== 'open'\)/.test(fn) && /ok \(not open\)/.test(fn));
+  const notOpen = fn.slice(fn.indexOf("if (inv.status !== 'open')"), fn.indexOf('ok (not open)'));
+  ok('webhook: the not-open branch raises an operator notice when the invoice is VOID',
+    /inv\.status === 'void'/.test(notOpen) && /noticeVoidedInvoicePaid\(/.test(notOpen), notOpen);
+  ok('webhook: …and ONLY when it is void (a paid/unknown status is not a withdrawal)',
+    !/inv\.status !== 'void'/.test(notOpen));
+
+  const helper = (webhook.match(/const noticeVoidedInvoicePaid = async[\s\S]*?\n  \};/) || [''])[0];
+  ok('webhook: the notice is its own unit', helper.length > 300, `${helper.length} bytes`);
+  ok('webhook: it rides the ONE notice model (presence_plan_notices) — no second system',
+    /db\('presence_plan_notices', 'POST'/.test(helper));
+  ok('webhook: it is keyed per-invoice, so a Stripe retry raises nothing twice',
+    /period: `voidpaid:\$\{inv\.id\}`/.test(helper));
+  ok('webhook: it is an ACTIVE row — it needs the operator, it is not a silent ledger',
+    /status: 'active'/.test(helper));
+  ok('webhook: the copy says the money arrived AND that the invoice stays void',
+    /voided/i.test(helper) && /not been marked paid|has not been marked/i.test(helper));
+  ok('webhook: …and names the decision the operator has to make (refund it in Stripe)',
+    /refund/i.test(helper) && /Stripe/.test(helper));
+  ok('webhook: it can never affect payment processing — whole body swallowed, no throw',
+    /=>\s*\{\s*\n\s*try \{/.test(helper) && /\}\s*catch \([^)]*\) \{/.test(helper) && !/\bthrow\b/.test(helper));
+  ok('webhook: the refusal is logged as an ERROR now, not an ordinary log line',
+    /console\.error\([^\n]*VOIDED/.test(helper) || /console\.error\([^\n]*voided/i.test(helper));
+  ok('webhook: the notice kind is not one that claims the invoice was paid',
+    !/kind: 'invoice_paid'/.test(helper));
+  ok('webhook: it resolves the owning client before writing (a notice with no client is a no-op)',
+    /presence_sites\?id=eq\./.test(helper) && /if \(!clientId\) return/.test(helper));
+
+  // the bell/Today row has to LAND somewhere useful, and must not wear the
+  // green tick that means "paid, nothing to do"
+  ok('workspace: the new kind deep-links to the deal it happened on', /invoice_void_paid: '\/pipeline\.html'/.test(workspace));
+  const today = read('today.html');
+  ok('today: the row is NOT filed as good-news FYI (it needs a decision)',
+    !/NOTICE_FYI_KINDS = \[[^\]]*invoice_void_paid/.test(today));
+  ok('today: …and it does not borrow invoice_paid\u2019s green tick', /invoice_void_paid:/.test(today) && !/invoice_void_paid:'\ud83d\udc9a'/.test(today));
+}
+
+// ═══ 14. F1b: the notice kind's CHECK constraint (0119) ═══════════════════
+// raiseNotice / the webhook's insert are best-effort, so an un-widened CHECK does
+// not fail the payment — it drops the notice SILENTLY, which is the exact gap
+// being closed. Same ordering rule as 0116/0118: migrate BEFORE the deploy.
+{
+  const kinds = (sql) => {
+    const i = sql.indexOf('check (kind in (');
+    return (sql.slice(i, sql.indexOf('));', i)).replace(/--[^\n]*/g, '').match(/'[a-z_]+'/g) || []).map((x) => x.slice(1, -1));
+  };
+  const now = kinds(mig119);
+  ok('0119 widens the notice kind check', now.length > 0);
+  ok('0119 allows invoice_void_paid (the kind the webhook writes)', now.includes('invoice_void_paid'));
+  ok('0119 is ADDITIVE — every kind 0116 allowed is carried forward verbatim',
+    kinds(mig116).every((k) => now.includes(k)), kinds(mig116).filter((k) => !now.includes(k)).join(','));
+  ok('0119 is idempotent (drop if exists, then add)',
+    /drop constraint if exists presence_plan_notices_kind_check/.test(mig119) && /add constraint presence_plan_notices_kind_check/.test(mig119));
+  ok('0119 documents its rollback', /rollback:/.test(mig119));
+  ok('0119 states the deploy order and what a late migration silently costs',
+    /BEFORE/i.test(mig119) && /silent/i.test(mig119));
+  ok('0119 states it is additive · idempotent · RLS untouched',
+    /additive/i.test(mig119) && /idempotent/i.test(mig119) && /RLS/i.test(mig119));
+  // the new kind must NOT be protected — nothing in this app can ever clear it
+  // (the resolution is a Stripe refund), so only the operator can say it's done.
+  ok('the new kind is dismissable — its resolution happens outside this app',
+    !/'invoice_void_paid'/.test((feed.match(/NOTICE_PROTECTED_KINDS[\s\S]*?\]\)/) || [''])[0]));
 }
 
 const failed = results.filter((r) => !r.p);

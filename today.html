@@ -361,7 +361,7 @@ function render(moments, features, feed, ctx, dash, appts, deals){
   // ── the Needs-you action feed: one card, one row per item (icon · headline +
   //    meta · one CTA). Rows keep the .moment.todo identity — the attention
   //    math (cards === bell badge) is pinned on that class. ──
-  const NICON = { lead_followup:'✉️', message:'💬', support:'💬', invoice_paid:'💚' };
+  const NICON = { lead_followup:'✉️', message:'💬', support:'💬', invoice_paid:'💚', invoice_void_paid:'⚠️' };   // 0119: money on a WITHDRAWN invoice is not the green tick
   let feedRows = '';
   for(const n of notices){
     // Most rows now tear themselves down when the work is done. What's left gets

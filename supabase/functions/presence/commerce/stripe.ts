@@ -163,11 +163,30 @@ export async function createServiceRetainerLink(p: { productName: string; amount
   return { url: String(link.url), id: String(link.id), priceId: String(price.id) };
 }
 
-/** Deactivate a Payment Link so it can no longer be used (e.g. a pending retainer
- *  the studio canceled before the client ever authorized). Best-effort; never throws. */
-export async function deactivatePaymentLink(linkId: string): Promise<void> {
-  if (!STRIPE_SECRET || !linkId) return;
-  try { await stripeReq(`payment_links/${encodeURIComponent(linkId)}`, { active: 'false' }); } catch { /* best-effort */ }
+/** Deactivate a Payment Link so it can no longer be used (a pending retainer the
+ *  studio canceled before the client ever authorized; an invoice the studio
+ *  withdrew). Best-effort — it never throws — but it now REPORTS.
+ *
+ *  It used to return `void` and swallow both a throw and a non-2xx, so "Stripe
+ *  confirmed the link is dead", "Stripe said no" (revoked key, no such link, rate
+ *  limit) and "Stripe was unreachable" were byte-identical to every caller. The
+ *  void handler therefore told the operator a flat "Invoice voided" in all three
+ *  cases, and a client paying through a link the studio believes is switched off
+ *  is exactly what that route exists to prevent. `true` means Stripe CONFIRMED
+ *  the link is inactive; anything else is `false` and the caller must say so.
+ *
+ *  Even `true` is not a guarantee that nobody can pay: deactivating a Payment
+ *  Link does NOT kill Checkout Sessions already minted from it, so a client who
+ *  had the payment page open can still complete it. That case is caught on the
+ *  other side — stripe-webhook refuses to flip a voided invoice and raises an
+ *  `invoice_void_paid` operator notice. */
+export async function deactivatePaymentLink(linkId: string): Promise<boolean> {
+  if (!STRIPE_SECRET || !linkId) return false;
+  try { await stripeReq(`payment_links/${encodeURIComponent(linkId)}`, { active: 'false' }); return true; }
+  catch (e) {
+    console.error(`[stripe] could not deactivate payment link ${linkId}: ${String((e as Error)?.message || e)} — it may still be live`);
+    return false;
+  }
 }
 
 // A Billing Portal session — the customer manages payment method, cancels,

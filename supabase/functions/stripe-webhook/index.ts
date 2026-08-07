@@ -324,6 +324,53 @@ Deno.serve(async (req: Request) => {
     }
   };
 
+  // MONEY AGAINST A WITHDRAWN INVOICE — the one payment outcome the product had
+  // no record of. markPresenceInvoicePaid correctly refuses to resurrect a voided
+  // invoice (a void invoice stays void), but the ONLY trace of that refusal was a
+  // console.log and a stripe_payments row, and neither is inside the app.
+  //
+  // Two ordinary ways a client still pays one:
+  //   · POST /sales/invoices/:id/void deactivates the Stripe Payment Link, and
+  //     that call failed silently (Stripe said no, or was unreachable); or
+  //   · they already had a Checkout Session open. Deactivating a Payment Link
+  //     does NOT kill sessions already minted from it, so a client with the
+  //     payment page loaded can complete it afterwards.
+  //
+  // Either way the studio is holding money on an invoice it withdrew, and has to
+  // decide whether to refund it — so it has to SEE it. Raised on the ONE notice
+  // model everything else uses (presence_plan_notices, unique on
+  // (client_id, kind, period)), so it reaches the bell, Today and the Inbox with
+  // no second notification system. The period is the invoice id, so a Stripe
+  // retry of the same event re-raises nothing.
+  //
+  // DISMISSABLE by design (deliberately NOT in NOTICE_PROTECTED_KINDS): the
+  // resolution — refund in Stripe, or keep the money and re-raise the invoice —
+  // happens outside this application, so nothing here can ever tear the row down.
+  // An undismissable row with no automatic teardown is a permanent one.
+  //
+  // Best-effort and fully swallowed: it can never affect the 200 that stops
+  // Stripe retrying a payment we have already accepted. Requires migration 0119
+  // (the kind CHECK); pre-migration the insert is rejected, logged, and the
+  // payment is processed exactly as before.
+  const noticeVoidedInvoicePaid = async (inv: any, via: string): Promise<void> => {
+    try {
+      const siteRow = (await dbGet(`presence_sites?id=eq.${encodeURIComponent(String(inv?.site_id ?? ''))}&select=client_id&limit=1`))[0];
+      const clientId = String(siteRow?.client_id || '');
+      if (!clientId) return;
+      const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+      const what = inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice');
+      await db('presence_plan_notices', 'POST', {
+        site_id: inv.site_id, client_id: clientId, kind: 'invoice_void_paid',
+        period: `voidpaid:${inv.id}`, status: 'active',
+        headline: `Payment received on a withdrawn invoice — ${what} (${amount})`,
+        body: 'This invoice was voided, so it has not been marked paid — but the money did arrive. Refund it in Stripe, or raise a fresh invoice if the work is going ahead.',
+      });
+      console.error(`[stripe-webhook] payment landed on VOIDED presence_invoice ${inv.id} (via ${via}) — invoice left void, operator notice raised`);
+    } catch (e) {
+      console.error(`[stripe-webhook] could not raise the voided-invoice-paid notice for ${inv?.id}:`, e);
+    }
+  };
+
   // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
   // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
   const markPresenceInvoicePaid = async (invoiceId: string, via: string): Promise<Response> => {
@@ -345,6 +392,10 @@ Deno.serve(async (req: Request) => {
     }
     if (inv.status !== 'open') {
       console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} is '${inv.status}', not flipping (via ${via})`);
+      // A payment on a VOIDED invoice is money taken against something the studio
+      // withdrew — the refusal to flip it is right, but it must be VISIBLE.
+      // Only 'void': any other non-open status is not a withdrawal.
+      if (inv.status === 'void') await noticeVoidedInvoicePaid(inv, via);
       return new Response('ok (not open)', { status: 200 });
     }
     // return=representation so ONLY the write that actually flipped the row (the

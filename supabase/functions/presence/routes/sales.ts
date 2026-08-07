@@ -1022,10 +1022,26 @@ export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal
   // A withdrawn invoice must not still be payable. Best-effort and deliberately
   // AFTER the status write: the row is the authority, and a Stripe hiccup must
   // not leave a void that didn't happen.
-  if (inv.stripe_payment_link_id) await deactivatePaymentLink(String(inv.stripe_payment_link_id)).catch(() => {});
+  //
+  // But best-effort is not the same as SILENT. deactivatePaymentLink used to
+  // swallow a throw and a non-2xx alike, so a confirmed take-down, a Stripe
+  // refusal and a dead network all produced this identical body and the operator
+  // was told an unqualified "Invoice voided". `link_deactivated` rides back so
+  // the deal page can say the link may still be live and what to do about it.
+  //   true  → Stripe confirmed the link is inactive
+  //   false → it may still be live (Stripe said no, or could not be reached)
+  //   null  → there was no link to take down; that is not a failure
+  //
+  // Even `true` is not "nobody can pay this": deactivating a Payment Link does
+  // NOT kill Checkout Sessions already minted from it, so a client who had the
+  // page open can still complete it. That lands on the webhook, which refuses to
+  // resurrect the invoice and raises an `invoice_void_paid` operator notice
+  // (stripe-webhook/index.ts) — so the money is visible in-app either way.
+  let linkDeactivated: boolean | null = null;
+  if (inv.stripe_payment_link_id) linkDeactivated = await deactivatePaymentLink(String(inv.stripe_payment_link_id)).catch(() => false);
   // The deal's ledger is where "this money was withdrawn, by whom" lives.
   if (inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_voided', principal, { detail: { invoice_id: id, amount_cents: Number(inv.amount_cents) || 0, purpose: String(inv.purpose || 'service'), title: String(inv.title || '') } });
-  return json({ data: { ok: true, id, status: 'void' } }, 200, cors);
+  return json({ data: { ok: true, id, status: 'void', link_deactivated: linkDeactivated } }, 200, cors);
 }
 
 /** Email the client their non-expiring retainer authorization link, on the
