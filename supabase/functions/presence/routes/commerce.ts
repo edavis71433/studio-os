@@ -16,6 +16,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
 import { raiseNotice } from '../lib/notice.ts';
+import { noticeDismissible } from '../lib/inbox_feed.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -332,12 +333,31 @@ async function handleNotices(jwt: string, cors: Record<string, string>) {
 // old dismiss-all silently cleared unseen lifecycle notices whose send-once had
 // already fired, so they never reappeared. Scope the PATCH to {id} AND the
 // caller's own client_id (svc bypasses RLS, so the ownership check is explicit).
+//
+// This is also the route behind Today's "Done" button on the Needs-you list, so
+// it is now the enforcement point for WHAT MAY NOT BE HIDDEN. The client already
+// declines to draw the button for a protected row (the feed ships a `dismissible`
+// flag derived from the same rule), but a hand-rolled POST must not be able to
+// hide an unpaid invoice, a failed payment, a lapsed account, a pending deletion,
+// a site that is down, or a failed publish. The row is READ first — the kind and
+// period are what decide, and only the row itself can be trusted for those.
 async function handleNoticeDismiss(req: Request, jwt: string, cors: Record<string, string>) {
   const site = await resolveSite(jwt);
   if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
   let body: any = null;
   try { body = await req.json(); } catch { body = null; }
   const id = body && typeof body.id === 'string' ? body.id.trim() : '';
+  if (id) {
+    const row = (await svc(`presence_plan_notices?id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active&select=id,kind,period&limit=1`)).json?.[0];
+    // not the caller's own active notice → nothing to dismiss (never leak whose it is)
+    if (!row) return json({ error: 'not_found', message: 'That item isn’t on your list.' }, 404, cors);
+    if (!noticeDismissible(row.kind, row.period)) {
+      return json({
+        error: 'not_dismissable',
+        message: 'This one can’t be cleared by hand — it clears itself the moment it’s genuinely resolved.',
+      }, 409, cors);
+    }
+  }
   const scope = id
     ? `id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active`
     // no id (legacy caller): fall back to dismissing this client's capacity card

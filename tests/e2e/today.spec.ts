@@ -11,7 +11,8 @@ test.describe('Today', () => {
     const todo = page.locator('.moment.todo');
     await expect(todo).toHaveCount(2); // 1 notice + 1 approval
     await expect(page.locator('.moment.todo').first()).toContainText('A quote request is waiting for a reply');
-    await expect(page.locator('.moment.todo').first()).toHaveAttribute('href', '/leads.html');
+    // a notice row is a CONTAINER (link + a sibling Done button); the link is inside it
+    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/leads.html');
     await expect(page.getByText('Protect your email')).toBeVisible();
     // the moment card + its dismiss affordance
     await expect(page.getByRole('heading', { name: 'Add your holiday hours' })).toBeVisible();
@@ -182,7 +183,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await page.goto('/today.html');
     const feed = page.locator('.feedcard');
     await expect(feed).toBeVisible();
-    const rows = feed.locator('a.moment.todo');
+    const rows = feed.locator('.moment.todo');
     await expect(rows).toHaveCount(2);
     await expect(rows.first().locator('.fico')).toHaveAttribute('aria-hidden', 'true');
     await expect(rows.first().locator('.fmeta')).toContainText('Sam reached out about a day ago.');
@@ -195,8 +196,8 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
     await installApp(page);
     await page.goto(`/today.html?client=${CLIENT}`);
-    const rows = page.locator('.feedcard a.moment.todo');
-    await expect(rows.first()).toHaveAttribute('href', `/leads.html?client=${CLIENT}`);
+    const rows = page.locator('.feedcard .moment.todo');
+    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/leads.html?client=${CLIENT}`);
     await expect(rows.nth(1)).toHaveAttribute('href', `/presence.html?client=${CLIENT}#foundations`);
   });
 
@@ -224,7 +225,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
     await page.goto('/today.html');
-    await expect(page.locator('.feedcard a.moment.todo')).toHaveCount(2); // the feed is unharmed
+    await expect(page.locator('.feedcard .moment.todo')).toHaveCount(2); // the feed is unharmed
     await expect(page.locator('#rail-month')).toHaveCount(0);
   });
 
@@ -482,7 +483,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   test('a calm "Everything else looks good" line when needs exist but nothing more is worth a look', async ({ page }) => {
     await installApp(page, { api: { '/moments': { data: [] } } });
     await page.goto('/today.html');
-    await expect(page.locator('.feedcard a.moment.todo')).toHaveCount(2);
+    await expect(page.locator('.feedcard .moment.todo')).toHaveCount(2);
     await expect(page.getByText('Everything else looks good.')).toBeVisible();
   });
 
@@ -495,6 +496,93 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  // ── "Needs you" teardown: ONE Done for the genuine residue ────────────────
+  // Most rows now clear themselves when the work is done. What's left gets a
+  // single manual Done — but a manual dismiss is a statement about the ROW, and
+  // for money and legal obligations the row IS the obligation. Those are refused
+  // here AND at the route; they clear when the thing is genuinely resolved.
+  const feedOf = (notices: unknown[]) => ({ '/portal/feed': { data: {
+    role: 'business_owner', moments: [], pending_approvals: [], last_published: null, notices,
+  } } });
+  const NOTICE = {
+    id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true,
+    headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html',
+  };
+  const UNPAID = {
+    id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', kind: 'deal_followup', period: 'invremind:inv-1', dismissible: false,
+    headline: 'Still unpaid — Deposit ($500.00)', body: 'We nudged the client once with the same secure link.', href: '/pipeline.html',
+  };
+  const SYNTHETIC = {
+    id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
+    headline: '2 new enquiries came in', body: 'Someone reached out through your website.', href: '/leads.html',
+  };
+
+  test('a dismissable row offers Done — an unpaid invoice never does', async ({ page }) => {
+    await installApp(page, { api: feedOf([NOTICE, UNPAID]) });
+    await page.goto('/today.html');
+    const rows = page.locator('.feedcard .moment.todo');
+    await expect(rows).toHaveCount(2);
+    const ordinary = rows.filter({ hasText: 'A quote request is waiting' });
+    const unpaid = rows.filter({ hasText: 'Still unpaid' });
+    await expect(ordinary.locator('button[data-dismiss-notice]')).toHaveCount(1);
+    // the whole point: money can't be hidden by a click
+    await expect(unpaid.locator('button[data-dismiss-notice]')).toHaveCount(0);
+    await expect(unpaid.locator('.fcta')).toHaveText('Take care of it →');
+  });
+
+  test('a synthetic row (computed live, no server row) offers no Done', async ({ page }) => {
+    await installApp(page, { api: feedOf([SYNTHETIC]) });
+    await page.goto('/today.html');
+    const row = page.locator('.feedcard .moment.todo');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('2 new enquiries came in');
+    // dismissing it would 200 with no effect and be back on the next refresh
+    await expect(row.locator('button[data-dismiss-notice]')).toHaveCount(0);
+  });
+
+  test('clicking Done removes the row', async ({ page }) => {
+    const posted: string[] = [];
+    await installApp(page, { api: feedOf([NOTICE, UNPAID]) });
+    await page.route('**/functions/v1/presence/commerce/notices/dismiss', async (route) => {
+      posted.push(route.request().postData() || '');
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { dismissed: true } }) });
+    });
+    await page.goto('/today.html');
+    const ordinary = page.locator('.feedcard .moment.todo').filter({ hasText: 'A quote request is waiting' });
+    await expect(ordinary).toHaveCount(1);
+    await ordinary.getByRole('button', { name: /^Done/ }).click();
+    await expect(ordinary).toHaveCount(0);
+    // the EXISTING ownership-scoped route, carrying the row's id — no new endpoint
+    expect(posted).toEqual([JSON.stringify({ id: NOTICE.id })]);
+    // the unpaid row is untouched
+    await expect(page.locator('.feedcard .moment.todo')).toHaveCount(1);
+  });
+
+  test('the row never nests a button inside an anchor', async ({ page }) => {
+    await installApp(page, { api: feedOf([NOTICE]) });
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard .moment.todo button[data-dismiss-notice]')).toHaveCount(1);
+    // invalid HTML + unreachable for assistive tech — the button must be a SIBLING
+    await expect(page.locator('.feedcard a button')).toHaveCount(0);
+    await expect(page.locator('.feedcard a a')).toHaveCount(0);
+    const row = page.locator('.feedcard .moment.todo').first();
+    expect(await row.evaluate((el) => el.tagName)).toBe('DIV');
+    expect(await row.evaluate((el) => Array.from(el.children).map((c) => c.tagName).join(','))).toBe('A,BUTTON');
+  });
+
+  test('invoice_paid is good news — "Got it", never "Take care of it"', async ({ page }) => {
+    const PAID = {
+      id: 'cccccccc-3333-4333-8333-cccccccccccc', kind: 'invoice_paid', period: 'paid:inv-1', dismissible: true,
+      headline: 'Paid — Deposit ($500.00)', body: 'The deposit landed. You can start the work.', href: '/pipeline.html',
+    };
+    await installApp(page, { api: feedOf([PAID]) });
+    await page.goto('/today.html');
+    const row = page.locator('.feedcard .moment.todo');
+    await expect(row.getByRole('button', { name: /^Got it/ })).toHaveCount(1);
+    await expect(row.locator('.fcta')).toHaveCount(0);
+    await expect(page.getByText('Take care of it →')).toHaveCount(0);
   });
 
   test('no serious/critical axe violations on the full Lightning Home', async ({ page }, testInfo) => {

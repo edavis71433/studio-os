@@ -39,6 +39,43 @@ export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'client_message', 'client_upload', 'client_request', 'client_approval',
 ]);
 
+/** ── WHAT A "DONE" CLICK MAY NEVER HIDE ──────────────────────────────────────
+ *  Most needs-you rows now tear themselves down when the work is done, but some
+ *  genuine residue is left over, so the list carries a manual "Done". A manual
+ *  dismiss is a statement about the ROW, never about the obligation behind it —
+ *  and for money and legal obligations those two are the same thing. Hiding
+ *  "Still unpaid" does not make an invoice paid; hiding "Your card failed" or
+ *  "Your account lapsed" or "Deletion requested" or "Your site is down" or
+ *  "Publishing failed" only removes the one place the owner would have found
+ *  out. Every kind here clears the honest way instead:
+ *
+ *    deal_followup + invremind:  ← the money lands (stripe-webhook) or the
+ *                                  invoice is voided
+ *    payment_trouble             ← the billing sync sees a good charge
+ *    account_lapsed              ← the entitlement goes active again
+ *    deletion_requested          ← POST /commerce/delete-request/cancel
+ *    site_down                   ← the uptime heartbeat recovers
+ *    publish_failed              ← a publish succeeds
+ *
+ *  This is ONE rule with TWO enforcement points — the feed derives each row's
+ *  `dismissible` flag from it (so no button is even drawn), and the dismiss
+ *  route re-checks it (so a hand-rolled API call can't hide an unpaid invoice
+ *  either). Both import THIS function; there is deliberately no second copy. */
+export const NOTICE_PROTECTED_KINDS: ReadonlySet<string> = new Set([
+  'payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed',
+]);
+/** The invoice reminder rides the shared `deal_followup` kind, so the KIND alone
+ *  can't tell an unpaid invoice from an ordinary "follow up on this deal" — only
+ *  the period prefix can. That is exactly why the feed had to start exposing
+ *  `period`. Prefix-anchored, never a substring match. */
+export const NOTICE_PROTECTED_PERIOD_PREFIX = 'invremind:';
+export function noticeDismissible(kind: unknown, period: unknown): boolean {
+  const k = String(kind ?? '');
+  if (NOTICE_PROTECTED_KINDS.has(k)) return false;
+  if (k === 'deal_followup' && String(period ?? '').startsWith(NOTICE_PROTECTED_PERIOD_PREFIX)) return false;
+  return true;
+}
+
 export interface BellInput {
   /** active presence_plan_notices rows (kind only is used) */
   notices: Array<{ kind?: unknown }>;

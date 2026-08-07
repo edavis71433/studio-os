@@ -23,7 +23,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible } from '../lib/inbox_feed.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -279,7 +279,10 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.desc&limit=1`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id,title,summary,risk&limit=10`),
     svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id,provider_key,title,summary&limit=10`),
-    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
+    // `period` joins the select (a widening, no migration) because the KIND alone
+    // can't tell an unpaid-invoice reminder from an ordinary deal follow-up —
+    // both are `deal_followup`, and only one of them may ever be dismissed.
+    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,period,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
     svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,storage_path,alt_text,metadata&limit=10`), // DAM-2: files awaiting approval
     // FIX 1: brand-new website enquiries (owner surfaces only) — one synthetic feed
     // row so the bell + Inbox surface them like every other needs-you item.
@@ -341,7 +344,11 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,
   // so "a lead is waiting" / "your domain expires soon" surface on every page —
   // not only in the portal card. Each carries the href that resolves it.
-  const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, headline: n.headline, body: n.body, href: noticeHref(n.kind) }));
+  // `dismissible` is derived from the SAME pure rule POST /commerce/notices/dismiss
+  // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
+  // the server would refuse, and refuses one the client never drew. Synthetic rows
+  // below carry no id/period at all; the client's UUID guard is what excludes them.
+  const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHref(n.kind), dismissible: noticeDismissible(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing
@@ -354,7 +361,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     const leadFollowups = notices.filter((n) => n.kind === 'lead_followup').length;
     const newEnquiries = Math.max(0, (((enqQ.ok && enqQ.json) || []) as any[]).length - leadFollowups);
     if (newEnquiries > 0) notices.unshift({
-      id: 'new-enquiries', kind: 'website_enquiry',
+      id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
       body: 'Someone reached out through your website and is waiting to hear back.',
       href: noticeHref('website_enquiry'),
@@ -365,7 +372,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // the new-enquiries row: counted live, never stored, gone when resolved.
     const openFeedback = feedbackQ || 0;
     if (openFeedback > 0) notices.unshift({
-      id: 'client-feedback', kind: 'client_feedback',
+      id: 'client-feedback', kind: 'client_feedback', period: null, dismissible: false,
       headline: openFeedback === 1 ? 'Your client left a note on the draft' : `${openFeedback} notes from your client on the draft`,
       body: 'Feedback on the shared draft is waiting — read and resolve it in the builder’s Comments panel.',
       href: noticeHref('client_feedback'),
@@ -379,7 +386,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const tree = await treeP;
       const missing = tree ? tree.pages.flatMap((p: any) => p.sections.filter((s: any) => s.status === 'missing_required')) : [];
       if (missing.length > 0) notices.push({
-        id: 'missing-required', kind: 'missing_required',
+        id: 'missing-required', kind: 'missing_required', period: null, dismissible: false,
         headline: missing.length === 1 ? 'A section needs filling in before you can publish' : `${missing.length} sections need filling in before you can publish`,
         body: 'Add the missing details and your website is ready to go live.',
         href: noticeHref('missing_required'),
@@ -402,7 +409,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         ]);
         const lastSeen = ((seen.json as any[]) || [])[0]?.last_seen_at || null;
         const unread = (((ev.json as any[]) || [])).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
-        if (unread > 0) notices.unshift({ id: 'bridge-updates', kind: 'client_updates', headline: unread === 1 ? 'An update from your studio' : `${unread} updates from your studio`, body: 'New activity on your project — messages, files, or something to approve.', href: '/client.html' });
+        if (unread > 0) notices.unshift({ id: 'bridge-updates', kind: 'client_updates', period: null, dismissible: false, headline: unread === 1 ? 'An update from your studio' : `${unread} updates from your studio`, body: 'New activity on your project — messages, files, or something to approve.', href: '/client.html' });
       }
     } catch { /* best-effort — the bell still works without this row */ }
   }

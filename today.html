@@ -98,20 +98,29 @@
   section.home-sec{margin:0}
   /* the Needs-you feed: one card, one row per item. Each row KEEPS the
      .moment.todo identity (attention math + responsive pins), restyled from a
-     standalone card into an action-feed row: icon · headline+meta · one CTA. */
+     standalone card into an action-feed row: icon · headline+meta · one CTA.
+     A notice row is a CONTAINER, not a link: the <a> covers headline+meta and
+     the "Done" <button> is its SIBLING — a button may never nest inside an
+     anchor (invalid HTML, and assistive tech can't reach the inner control). */
   .feedcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-  .feedcard a.moment.todo{display:flex;align-items:center;gap:14px;background:transparent;border:0;border-radius:0;box-shadow:none;padding:14px 18px;border-top:1px solid var(--line);overflow:visible}
-  .feedcard a.moment.todo:first-child{border-top:0}
-  .feedcard a.moment.todo::before{display:none}
-  .feedcard a.moment.todo:hover{background:var(--accent-soft)}
-  .feedcard a.moment.todo:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .feedcard .moment.todo{display:flex;align-items:center;gap:14px;background:transparent;border:0;border-radius:0;box-shadow:none;padding:14px 18px;border-top:1px solid var(--line);overflow:visible}
+  .feedcard .moment.todo:first-child{border-top:0}
+  .feedcard .moment.todo::before{display:none}
+  .feedcard .moment.todo:hover{background:var(--accent-soft)}
+  .feedcard .moment.todo:focus-visible,.feedcard .frow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .feedcard .frow{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
   .fico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .fcta{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:6px 13px;white-space:nowrap}
-  @media (max-width:600px){.feedcard a.moment.todo{flex-wrap:wrap}.fcta{margin-left:50px}}
+  /* the manual "Done" — quiet by design: the row usually clears itself, this is
+     only for the residue. Never shown on money or legal obligations. */
+  .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 13px;white-space:nowrap;cursor:pointer}
+  .fdone:hover{color:var(--ink);border-color:var(--soft)}
+  .fdone:disabled{opacity:.5;cursor:default}
+  @media (max-width:600px){.feedcard .moment.todo{flex-wrap:wrap}.feedcard .frow{flex-wrap:wrap}.fcta{margin-left:50px}}
   .moment.calm.slim{padding:16px 18px}
   .moment.calm.slim h2{font-size:17px;margin-bottom:2px}
   .moment.calm.slim p{font-size:13.5px}
@@ -313,6 +322,16 @@ async function waitingCard(){
   const cols=document.getElementById('home-cols');if(cols)cols.classList.remove('norail');
 }
 
+// ── Needs-you row affordances ────────────────────────────────────────────────
+// A real notice row carries a database uuid; the four SYNTHETIC rows the feed
+// computes live (new-enquiries, client-feedback, missing-required, bridge-updates)
+// carry a slug instead. Only a real row can be dismissed — a Done on a synthetic
+// one would 200 with no effect and be back on the next refresh.
+const NOTICE_ID_RE = /^[0-9a-f-]{36}$/;
+// Kinds that are pure good news: they report, they don't ask. They get an
+// acknowledging affordance, never an imperative CTA.
+const NOTICE_FYI_KINDS = ['invoice_paid'];
+
 function render(moments, features, feed, ctx, dash, appts, deals){
   $('greeting').textContent = greet();
   const items = (moments||[]).filter(Boolean);
@@ -342,13 +361,30 @@ function render(moments, features, feed, ctx, dash, appts, deals){
   // ── the Needs-you action feed: one card, one row per item (icon · headline +
   //    meta · one CTA). Rows keep the .moment.todo identity — the attention
   //    math (cards === bell badge) is pinned on that class. ──
-  const NICON = { lead_followup:'✉️', message:'💬', support:'💬' };
+  const NICON = { lead_followup:'✉️', message:'💬', support:'💬', invoice_paid:'💚' };
   let feedRows = '';
   for(const n of notices){
-    feedRows += `<a class="moment attn todo" href="${esc(scopeHref(n.href||'/today.html'))}">
+    // Most rows now tear themselves down when the work is done. What's left gets
+    // ONE "Done" — but only when it is a REAL server row we can dismiss, and only
+    // when the feed says this obligation may be cleared by hand at all.
+    //   • the UUID guard: four synthetic rows (new-enquiries, client-feedback,
+    //     missing-required, bridge-updates) are computed live and have no row to
+    //     dismiss — a Done there would 200 and reappear on the next refresh.
+    //   • dismissible: money and legal obligations (an unpaid invoice, a failed
+    //     payment, a lapsed account, a pending deletion, a site that's down, a
+    //     failed publish) are refused here AND at the route. They clear when the
+    //     thing is genuinely resolved, never by a click.
+    const canDone = NOTICE_ID_RE.test(String(n.id||'')) && n.dismissible !== false;
+    // Good news with nothing to do doesn't get an imperative — "Got it", not
+    // "Take care of it →".
+    const fyi = NOTICE_FYI_KINDS.indexOf(n.kind) >= 0;
+    const label = fyi ? 'Got it' : 'Done';
+    feedRows += `<div class="moment attn todo">
+      <a class="frow" href="${esc(scopeHref(n.href||'/today.html'))}">
       <span class="fico" aria-hidden="true">${NICON[n.kind]||'🔔'}</span>
       <div class="fmain"><h3 class="fhead">${esc(n.headline||'Something needs a look')}</h3>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</div>
-      <span class="fcta">Take care of it →</span></a>`;
+      ${canDone && fyi ? '' : `<span class="fcta">${fyi?'Got it':'Take care of it →'}</span>`}</a>${
+      canDone ? `<button type="button" class="fdone" data-dismiss-notice="${esc(n.id)}" aria-label="${esc(label+' — '+(n.headline||'this item'))}">${label}</button>` : ''}</div>`;
   }
   for(const p of approvals){
     const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
@@ -456,6 +492,7 @@ function moreHost(){
 function wire(){
   document.querySelectorAll('[data-explain]').forEach(b => b.addEventListener('click', () => explain(b.getAttribute('data-explain'), b)));
   document.querySelectorAll('[data-dismiss]').forEach(b => b.addEventListener('click', () => dismiss(b.getAttribute('data-dismiss'), b)));
+  document.querySelectorAll('[data-dismiss-notice]').forEach(b => b.addEventListener('click', () => dismissNotice(b.getAttribute('data-dismiss-notice'), b)));
   const askBtn = $('askBtn'), q = $('q');
   if(askBtn){ askBtn.addEventListener('click', ask); q.addEventListener('keydown', e => { if(e.key==='Enter') ask(); }); }
 }
@@ -476,6 +513,25 @@ async function dismiss(id, btn){
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
       if(reduce){ card.remove(); }
       else { card.style.transition='opacity .3s ease, transform .3s ease'; card.style.opacity='0'; card.style.transform='translateY(-6px)'; setTimeout(()=>card.remove(), 300); }
+    }
+  }
+  catch(_){ btn.disabled = false; }
+}
+// ── "Done" on a needs-you row ────────────────────────────────────────────────
+// The residue: rows whose obligation the owner has genuinely handled somewhere
+// this app can't observe. Reuses the EXISTING ownership-scoped dismiss route (no
+// new endpoint) — the server re-checks that this particular row may be cleared
+// by hand, so a protected one is refused even if the button were ever drawn.
+// The row leaves optimistically only AFTER the write succeeds; on failure the
+// button comes back rather than lying about what happened.
+async function dismissNotice(id, btn){
+  const row = btn.closest('.moment'); btn.disabled = true;
+  try{
+    await apiPost('/commerce/notices/dismiss', { id });
+    if(row){
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if(reduce){ row.remove(); }
+      else { row.style.transition='opacity .25s ease'; row.style.opacity='0'; setTimeout(()=>row.remove(), 250); }
     }
   }
   catch(_){ btn.disabled = false; }

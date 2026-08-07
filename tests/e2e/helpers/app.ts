@@ -79,7 +79,9 @@ function defaults(): Record<string, Json> {
     '/portal/feed': { data: {
       role: 'business_owner',
       moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
-      notices: [{ id: 'n1', kind: 'lead_followup', headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html' }],
+      // a REAL notice row: a database uuid + the period/dismissible pair the feed
+      // now ships, so Today can decide whether to offer a manual "Done" at all.
+      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html' }],
       pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
       last_published: { created_at: '2026-07-05T00:00:00Z', completed_at: '2026-07-05T00:05:00Z' },
     } },

@@ -13,12 +13,15 @@
 //   3. a doc reminder                   → silent ledger, never a row
 //   4. sign/accept/convert/delete       → the deal_followup rows go
 //   5. the four client_* kinds          → silent ledger (badge + rows agree)
+//   6. invoice_paid                     → an FYI affordance, not "Take care of it"
+// Tier B (Part D/E): ONE "Done" button for the genuine residue, with money and
+//   legal obligations refused at BOTH ends (client render + server route).
 //
 // Part A is pure (no DB, no clock). Parts B/C drive the real handlers through a
 // globalThis.fetch PostgREST fake (the support_routing_test idiom) so the CLEAR
 // is observed as an actual write with the right (client_id, kind, period) — and,
 // just as load-bearing, is observed NOT to happen on the wrong transition.
-// Part D pins the surfaces that can only be read (the webhook, the sweeps).
+// Part D/E pin the surfaces that can only be read (today.html, the webhook).
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -41,6 +44,7 @@ const realFetch = globalThis.fetch;
 // PART A — the pure cores
 // ═══════════════════════════════════════════════════════════════════════════
 const { supportAgingPeriod } = await import('../../supabase/functions/presence/lib/intake.ts');
+const { noticeDismissible, NOTICE_PROTECTED_KINDS } = await import('../../supabase/functions/presence/lib/inbox_feed.ts');
 
 // A1 — the weekly re-nudge bucket. "Waiting on you" must not be permanently
 // muted by one fire: a genuinely stalled request speaks up again next week.
@@ -68,6 +72,26 @@ const { supportAgingPeriod } = await import('../../supabase/functions/presence/l
     !/NaN|undefined/.test(supportAgingPeriod(REQ, NaN)));
   ok('A1: every bucket shares the `support:<id>:` prefix the teardown clears',
     [t0, t0 + WEEK, t0 + 9 * WEEK].every((t) => supportAgingPeriod(REQ, t).startsWith(`support:${REQ}:`)));
+}
+
+// A2 — THE FOOTGUN GUARD. Money and legal obligations are never dismissable.
+{
+  ok('A2: an UNPAID invoice reminder (deal_followup + invremind:) can NEVER be dismissed',
+    noticeDismissible('deal_followup', 'invremind:inv-1') === false);
+  for (const k of ['payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed']) {
+    ok(`A2: ${k} can never be dismissed`, noticeDismissible(k, 'anything') === false);
+    ok(`A2: ${k} is in the shared protected set`, NOTICE_PROTECTED_KINDS.has(k));
+  }
+  ok('A2: an ORDINARY deal follow-up (deal:) IS dismissable', noticeDismissible('deal_followup', 'deal:d-1') === true);
+  ok('A2: a document reminder (remind:) IS dismissable', noticeDismissible('deal_followup', 'remind:doc-1') === true);
+  ok('A2: a declined-proposal follow-up IS dismissable', noticeDismissible('deal_followup', 'declined:d-1') === true);
+  ok('A2: support_aging IS dismissable', noticeDismissible('support_aging', `support:${REQ}:w1`) === true);
+  ok('A2: invoice_paid (good news) IS dismissable', noticeDismissible('invoice_paid', 'paid:inv-1') === true);
+  ok('A2: the invremind guard is prefix-anchored, not a substring match',
+    noticeDismissible('deal_followup', 'deal:not-invremind:x') === true);
+  ok('A2: the invremind guard applies ONLY to deal_followup', noticeDismissible('lead_followup', 'invremind:x') === true);
+  ok('A2: missing/garbage input never accidentally protects or exposes',
+    noticeDismissible(undefined, undefined) === true && noticeDismissible('deal_followup', null) === true);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -168,6 +192,63 @@ try {
 } finally { globalThis.fetch = realFetch; }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PART C — the dismiss route refuses money & legal, both ends
+// ═══════════════════════════════════════════════════════════════════════════
+const { handleCommerce } = await import('../../supabase/functions/presence/routes/commerce.ts');
+const CALLER = { kind: 'client', userId: 'u-1', email: 'eric@studio.test', jwt: 'jwt', tenantId: null, role: null, requestId: 'r' };
+
+function installDismissFetch(noticeRow) {
+  const calls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : input.url;
+    const method = (init.method || 'GET').toUpperCase();
+    let body = null; try { body = init.body ? JSON.parse(init.body) : null; } catch { /* */ }
+    calls.push({ url, method, body });
+    if (url.includes('presence_sites')) return jr([SITE]);
+    if (url.includes('presence_plan_notices') && method === 'GET') return jr(noticeRow ? [noticeRow] : []);
+    if (url.includes('presence_plan_notices')) return jr(null, 204);
+    return jr([]);
+  };
+  return calls;
+}
+const dismiss = (id) => new Request('https://x/functions/v1/presence/commerce/notices/dismiss', {
+  method: 'POST', body: JSON.stringify({ id }), headers: { 'content-type': 'application/json' },
+});
+const NID = '55555555-5555-4555-8555-555555555555';
+
+try {
+  // C1 — an unpaid invoice can NEVER be hidden by a click (server-side)
+  {
+    const calls = installDismissFetch({ id: NID, kind: 'deal_followup', period: 'invremind:inv-1' });
+    const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
+    ok('C1: the route REFUSES to dismiss an unpaid-invoice reminder', r.status >= 400, `status ${r.status}`);
+    ok('C1: …and writes nothing', patchNotice(calls).length === 0);
+  }
+  // C2 — every protected kind, server-side
+  for (const k of ['payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed']) {
+    const calls = installDismissFetch({ id: NID, kind: k, period: 'once' });
+    const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
+    ok(`C2: the route REFUSES ${k} (no write)`, r.status >= 400 && patchNotice(calls).length === 0, `status ${r.status}`);
+  }
+  // C3 — an ordinary deal follow-up IS dismissable, scoped to the caller's own client
+  {
+    const calls = installDismissFetch({ id: NID, kind: 'deal_followup', period: 'deal:d-1' });
+    const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
+    const p = patchNotice(calls);
+    ok('C3: an ordinary deal: follow-up IS dismissable', r.status === 200, `status ${r.status}`);
+    ok('C3: the write is scoped to the id AND the caller’s own client_id',
+      p.length === 1 && p[0].url.includes(`id=eq.${NID}`) && p[0].url.includes(`client_id=eq.${CLIENT}`), p[0]?.url || '');
+  }
+  // C4 — someone else's notice id resolves to nothing → refused, no write
+  {
+    const calls = installDismissFetch(null);
+    const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
+    ok('C4: an id that is not the caller’s own notice is refused with no write',
+      r.status >= 400 && patchNotice(calls).length === 0, `status ${r.status}`);
+  }
+} finally { globalThis.fetch = realFetch; }
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PART C2 — a pre-dismissed raise still returns created=true (email throttle)
 // ═══════════════════════════════════════════════════════════════════════════
 const { raiseNotice } = await import('../../supabase/functions/presence/lib/notice.ts');
@@ -228,6 +309,8 @@ const life = read('supabase/functions/presence/commerce/lifecycle.ts');
 const hook = read('supabase/functions/stripe-webhook/index.ts');
 const sales = read('supabase/functions/presence/routes/sales.ts');
 const bridge = read('supabase/functions/presence/lib/service_bridge.ts');
+const wsp = read('supabase/functions/presence/routes/workspace.ts');
+const cmrc = read('supabase/functions/presence/routes/commerce.ts');
 const si = read('supabase/functions/presence/routes/service_intake.ts');
 
 // D1 — the weekly re-nudge is wired into the sweep
@@ -263,10 +346,41 @@ ok('D5: notifyStudioOfClientAction raises the client_* kinds pre-dismissed (rows
 ok('D5: …and the created flag still gates the email (throttle intact)',
   /const created = await raiseNotice\(\{[\s\S]{0,500}?\}\);\s*\n\s*if \(!created\) return false;/.test(bridge));
 
+// D6 — the feed exposes what the client needs to decide (no migration, one field)
+ok('D6: the notices read selects `period`', /presence_plan_notices\?[^`]*select=id,kind,period,headline,body/.test(wsp));
+ok('D6: the mapping exposes a derived `dismissible` from the SAME pure rule the route enforces',
+  /dismissible: noticeDismissible\(n\.kind, n\.period\)/.test(wsp) && /noticeDismissible/.test(cmrc));
+ok('D6: the route and the client share ONE rule (no second, drifting copy)',
+  /from '\.\.\/lib\/inbox_feed\.ts'/.test(wsp) && /from '\.\.\/lib\/inbox_feed\.ts'/.test(cmrc));
+
 // D7 — the support teardown lives on the transition, not the request
 ok('D7: service_intake clears on resolve OR close, and only on a real transition',
   /clearedNow[\s\S]{0,200}?'resolved'[\s\S]{0,120}?'closed'/.test(si) && /if \(clearedNow[\s\S]{0,200}?clearNoticePrefix\(/.test(si));
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PART E — Today's row: one Done button, no nested interactive, guarded
+// ═══════════════════════════════════════════════════════════════════════════
+const today = read('today.html');
+const noticeRow = (today.match(/for\(const n of notices\)\{[\s\S]*?\n  \}/) || [''])[0];
+
+ok('E1: the row is no longer ONE anchor — the Done button is a SIBLING of the link',
+  /<button[^>]*data-dismiss-notice/.test(noticeRow) && !/<a[^>]*>[\s\S]*<button[\s\S]*<\/a>/.test(noticeRow), 'button must not nest inside the anchor');
+ok('E1: the link still covers headline + meta (the row still taps through)',
+  /<a class="frow"/.test(noticeRow) && /fhead/.test(noticeRow) && /fmeta/.test(noticeRow));
+ok('E1: the row keeps the .moment.todo identity the attention math is pinned on',
+  /class="moment attn todo"/.test(noticeRow));
+ok('E2: the Done button renders ONLY for a real (UUID) notice — synthetic rows have no server row to dismiss',
+  /\/\^\[0-9a-f-\]\{36\}\$\//.test(today) && /test\(\s*(?:String\()?n\.id/.test(today));
+ok('E2: …and ONLY when the server says the row is dismissible (money/legal excluded)',
+  /n\.dismissible !== false/.test(today));
+ok('E3: the button posts the EXISTING ownership-scoped route (no new route)',
+  /\/commerce\/notices\/dismiss/.test(today));
+ok('E3: clicking it removes the row from the list', /data-dismiss-notice/.test(today) && /dismissNotice/.test(today));
+ok('E4: invoice_paid is good news — an FYI affordance, never "Take care of it"',
+  /NOTICE_FYI_KINDS/.test(today) && /invoice_paid/.test(today) && /Got it/.test(noticeRow));
+ok('E5: shell.js stays a pure glance surface (no dismiss control in the bell)',
+  !/data-dismiss-notice/.test(read('shell.js')));
+
 const passed = results.filter(Boolean).length;
-console.log(`\n════ NEEDS-YOU TEARDOWN (Tier A): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
+console.log(`\n════ NEEDS-YOU TEARDOWN (Tier A + Tier B): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

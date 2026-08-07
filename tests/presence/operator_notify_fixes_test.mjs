@@ -92,7 +92,9 @@ const { notifyStudioOfClientAction, deliverStudioNotification } =
 
   const ws = read('supabase/functions/presence/routes/workspace.ts');
   ok('F1: the route computes the badge through the ONE pure helper', /studioBellCount\(/.test(ws));
-  ok('F1: the notice rows are STILL read + still surface in the bell rail', /presence_plan_notices\?site_id=eq\.\$\{site\.id\}&status=eq\.active&select=id,kind,headline,body/.test(ws));
+  // (the select may carry MORE columns — `period` joined it so the feed can mark
+  //  money/legal rows undismissable — but the rendering fields must all still be read)
+  ok('F1: the notice rows are STILL read + still surface in the bell rail', /presence_plan_notices\?site_id=eq\.\$\{site\.id\}&status=eq\.active&select=id,kind,(?:period,)?headline,body/.test(ws));
 }
 
 // the notice must still exist as the EMAIL THROTTLE KEY — excluding it from the
