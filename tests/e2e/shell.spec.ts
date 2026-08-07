@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // ── slice 7 fixtures: a nav whose Customers section is multi-item (the real
 // buildNav shape) so the context bar renders it as label + dropdown caret.
@@ -23,6 +24,27 @@ const crmCtx = () => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
   edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true,
   capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 0, nav: CRM_NAV,
+} });
+
+// ── a nav as long as Eric's real one ─────────────────────────────────────────
+// The phone sheet scrolls with this one, so its LAST row (Help) is only
+// reachable after scrolling — which is exactly where #dds-mbar used to sit on
+// top of it and eat the tap.
+const LONG_NAV = [
+  ...STUDIO_NAV.slice(0, -1),
+  { key: 'work', label: 'Work', items: [
+    { key: 'schedule', label: 'Schedule', href: '/schedule.html' },
+    { key: 'projects', label: 'Projects', href: '/projects.html' },
+    { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
+    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
+    { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
+  ] },
+  STUDIO_NAV[STUDIO_NAV.length - 1],       // Help stays last
+];
+const longNavCtx = () => ({ data: {
+  site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+  edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true,
+  capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 2, nav: LONG_NAV,
 } });
 
 // The one application shell (shell.js) — on every signed-in page. It draws nav,
@@ -392,6 +414,95 @@ test.describe('Context bar (slice 7)', () => {
     // the waffle opens the same panel too
     await page.locator('#dds-waffle').click();
     await expect(panel).toBeVisible();
+  });
+});
+
+// ── Touch: a tap must reach the item it lands on ─────────────────────────────
+// Eric's iPhone report: the menu opened, but tapping any item closed it and
+// navigated nowhere — the tap fell through to the page underneath. No spec in
+// this suite ever exercised touch (`grep -rn "\.tap(" tests/e2e/` was empty)
+// and none ever ACTIVATED a drawer item, which is exactly how it shipped.
+//
+// Chromium focuses a link on tap, so `.tap()` alone cannot reproduce it;
+// installIosFocusSemantics() supplies the one WebKit behaviour that can — a tap
+// blurs the focused element and focuses nothing, so panel `focusout` handlers
+// see a null relatedTarget mid-tap. See tests/e2e/helpers/ios-focus.ts.
+test.describe('iOS tap semantics — tapping a menu item navigates', () => {
+  for (const opener of ['#dds-mbar-menu', '#dds-waffle']) {
+    test(`mobile: the drawer opened by ${opener} navigates when an item is tapped`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'mobile', 'touch + the phone sheet');
+      await installApp(page);
+      await installIosFocusSemantics(page);
+      await page.goto('/today.html');
+      const panel = page.locator('#dds-drawer');
+      await page.locator(opener).tap();
+      await expect(panel).toBeVisible();
+      const link = panel.locator('a[href^="/inbox.html"]').first();
+      await expect(link).toBeVisible();
+      await link.tap();
+      // the ONE assertion the old specs never made: the tap DESTINATION opens
+      await page.waitForURL(/\/inbox\.html/, { timeout: 7_000 });
+      expect(new URL(page.url()).pathname).toBe('/inbox.html');
+    });
+  }
+
+  test('mobile: the drawer stays open when a tap blurs into nothing (null relatedTarget)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'touch + the phone sheet');
+    await installApp(page);
+    await installIosFocusSemantics(page);
+    await page.goto('/today.html');
+    const panel = page.locator('#dds-drawer');
+    await page.locator('#dds-mbar-menu').tap();
+    await expect(panel).toBeVisible();
+    // the exact iOS moment: focus leaves with relatedTarget === null
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(panel).toBeVisible();
+    await expect(page.locator('#dds-mbar-menu')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('mobile: the drawer’s LAST row clears the bottom bar and is tappable', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the bottom bar is phones-only');
+    await installApp(page, { api: { '/portal/context': longNavCtx() } });
+    await installIosFocusSemantics(page);
+    await page.goto('/today.html');
+    expect(page.viewportSize()!.width).toBeLessThanOrEqual(390);
+    // the one-time page hint floats above the sheet (z 2147483001, bottom 84px)
+    // and would answer the hit-test instead of the row — same dance today.spec
+    // does. Dismiss it so this test measures the BAR overlap and nothing else.
+    await page.locator('.dds-hint').getByRole('button', { name: 'Got it' }).click();
+    await expect(page.locator('.dds-hint')).toHaveCount(0);   // it fades for 200ms before it goes
+    const panel = page.locator('#dds-drawer');
+    await page.locator('#dds-mbar-menu').tap();
+    await expect(panel).toBeVisible();
+    // this nav is longer than the sheet — the last row is only reachable by
+    // scrolling, which is where the bottom bar used to sit on top of it
+    const last = panel.locator('.g a').last();
+    await expect(last).toHaveAttribute('href', /\/help\.html/);
+    await last.scrollIntoViewIfNeeded();
+    // hit-test the row's own centre point: it must be the row, not #dds-mbar
+    const hit = await last.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { isSelf: t === el, inBar: !!(t as Element | null)?.closest('#dds-mbar') };
+    });
+    expect(hit.inBar).toBe(false);
+    expect(hit.isSelf).toBe(true);
+    await last.tap();
+    await page.waitForURL(/\/help\.html/, { timeout: 7_000 });
+  });
+
+  test('tablet: a .dds-nav section item navigates when tapped', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'tablet', 'the flat bar shows ≥761px — and iPads have touch');
+    await installApp(page, { api: { '/portal/context': crmCtx() } });
+    await installIosFocusSemantics(page);
+    await page.goto('/today.html');
+    const btn = page.locator('.dds-nav .sec > button[data-sec="customers"]');
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="customers"]) .menu');
+    await btn.tap();
+    await expect(menu).toBeVisible();
+    await menu.getByRole('link', { name: 'Pipeline', exact: true }).tap();
+    await page.waitForURL(/\/pipeline\.html/, { timeout: 7_000 });
+    expect(new URL(page.url()).pathname).toBe('/pipeline.html');
   });
 });
 
