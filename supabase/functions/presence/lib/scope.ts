@@ -98,7 +98,7 @@ async function logScopedAccess(row: ScopeAuditRow): Promise<void> {
     if (!r.ok) throw new Error('audit_insert_' + r.status);
   } catch (_) {
     const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-    if (ops) sendEmail(ops, '[Studio OS ops] Scoped-access audit write failed', `<p>A scoped-access event could not be recorded (${row.outcome}/${row.reason || 'allowed'}) for client ${row.client_site_id}. Access was decided by authorization as normal; only the audit log failed.</p>`).catch(() => {});
+    if (ops) sendEmail(ops, '[Studio OS ops] Scoped-access audit write failed', `<p>A scoped-access event could not be recorded (${row.outcome}/${row.reason || 'allowed'}) for client ${row.client_site_id}. Access was decided by authorization as normal; only the audit log failed.</p>`, undefined, { critical: true }).catch(() => {});   // operator-directed ops mail: an unsubscribe must not silence a failing audit log
   }
 }
 

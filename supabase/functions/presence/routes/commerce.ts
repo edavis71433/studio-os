@@ -537,7 +537,7 @@ export async function handleCommerce(req: Request, route: string, method: string
         `<p>We’ve recorded your request to delete the account for <strong>${name}</strong>.</p><p>Deletion completes after ${days} days (on or after ${new Date(reqd.scheduled_for).toDateString()}). Until then, everything you own is still downloadable from your workspace — and if you change your mind, you can cancel the request from your account.</p>`,
         undefined, { critical: true }).catch(() => false);   // deletion confirmation = transactional; survives an opt-out
       const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-      if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion; scheduled ${reqd.scheduled_for}. The executor completes it after the cooling-off.</p>`).catch(() => {});
+      if (ops) sendEmail(ops, `[Studio OS ops] Deletion requested: ${name}`, `<p>Client ${site.client_id} (${name}) requested account deletion; scheduled ${reqd.scheduled_for}. The executor completes it after the cooling-off.</p>`, undefined, { critical: true }).catch(() => {});   // operator-directed: the executor purges data after the cooling-off
     }
     return json({ data: { ok: true, completes_within_days: days, scheduled_for: reqd.scheduled_for, already_pending: !reqd.created, emailed } }, 200, cors);
   }

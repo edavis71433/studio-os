@@ -57,14 +57,14 @@ ok('B3 inbound_email.ts: an emailed reply onto an open thread bumps updated_at',
 // ── door 3: the portal reply (routes/client_delivery.ts) ─────────────────────
 // Reported, not fixed: client_delivery.ts is being edited concurrently by
 // another agent in this tree (routes/sales.ts + the invoice-void work touches
-// handleClientBilling in the same file), so this gap is handed back rather than
-// raced. When it lands, flip this to `bumps(...)` — the assertion is written so
-// it FAILS LOUDLY the moment the gap is closed, which is the reminder to.
+// handleClientBilling in the same file), so it was handed back rather than raced.
+// It has since been CLOSED, and the negative assertion that guarded it has been
+// flipped to a positive one — every door onto a support thread now ages it.
 {
   const body = fnBody(delivery, 'export async function handleClientSupportMessage');
   ok('B3 client_delivery.ts: handleClientSupportMessage found', body.length > 0);
-  ok('B3 client_delivery.ts: KNOWN GAP — the portal reply still does not bump updated_at (handed back, see inbound_email.ts FOLLOW-UP)',
-    !bumps(body), 'the gap is CLOSED — good: delete this assertion and pin the bump instead');
+  ok('B3 client_delivery.ts: a client\'s portal reply freshens the thread', bumps(body),
+    'the portal door stopped bumping updated_at — a client\'s newest word would sort as old as the request');
 }
 
 const passed = results.filter((r) => r.p).length;

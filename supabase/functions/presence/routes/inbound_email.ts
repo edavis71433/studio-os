@@ -472,11 +472,11 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     // L1: bump the request's updated_at — the studio bell/feed windows are updated_at-
     // keyed and a bare message INSERT never bumps it. Best-effort PATCH.
     // The studio's own reply door (service_intake handleSupportMessage) now does
-    // the same. FOLLOW-UP, still open: the PORTAL reply path (client_delivery
-    // handleClientSupportMessage) shares this exact gap and should adopt the same
-    // bump — it is pinned as a known gap in
-    // tests/presence/support_thread_freshness_test.mjs, which fails loudly when
-    // the gap closes so the pin gets flipped rather than forgotten.
+    // the same. The other two doors onto a thread now do this too — the studio's
+    // own reply (service_intake handleSupportMessage) and the client's portal
+    // reply (client_delivery handleClientSupportMessage) — so a thread ages the
+    // same whichever way the newest word arrived. All three are pinned in
+    // tests/presence/support_thread_freshness_test.mjs.
     await svc(`presence_support_requests?id=eq.${target.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
     // project-linked → feed the ONE activity log (detail.from='client' audience invariant)
     if (target.project_id) {

@@ -676,6 +676,12 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
   const ins = await svc('presence_support_messages', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: s, request_id: id, body, author: readerKey(principal), author_kind: principal.kind }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
+  // L1 freshness: a reply through THIS door must age the thread like every other
+  // door does (inbound_email's append, service_intake's studio reply). Without it
+  // a client's newest word sorts as old as the request itself. Best-effort — the
+  // message is already written and must not be lost to a failed bump.
+  await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${s}`,
+    { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
   if (reqRow.project_id) await clientEvent(s, reqRow.project_id, 'support_message', principal, { request_id: id });
   // Tell the studio — again OUTSIDE the project guard (most requests carry no
   // project). Same thread key as the request, so a burst of replies inside the
