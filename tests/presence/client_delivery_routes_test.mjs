@@ -109,6 +109,68 @@ ok('documents: portal view_url mints via docViewerUrl (site-origin doc.html view
     (assetsRoute.match(/present\(/g) || []).length > 2 && (assetsRoute.match(/client: byClient\.get/g) || []).length === 1);
   ok('files-by-client: a project with no bridge link contributes no client (the pure core refuses to guess)',
     /if \(!client\) continue;/.test(dam));
+
+  // ── R-fixes: the client dimension must fail LOUDLY and WHOLLY, never partially ──
+  // svc() does not throw on a non-2xx (lib/db.ts returns { ok:false, json:null }), so
+  // the try/catch this replaced could not see a failed hop — it silently produced a
+  // half map, and a client file with no NAME then rendered as "Studio".
+  const cbm = (assetsRoute.match(/async function clientByMedia[\s\S]*?\n}\n/) || [''])[0];
+  ok('F10: hop 1 reads only LIVE deliverables — deleted_at=is.null is load-bearing (a deleted, older deliverable would outrank a live one)',
+    /presence_deliverables\?site_id=eq\.\$\{site\.id\}&deleted_at=is\.null/.test(cbm));
+  ok('F8: hop 1 orders by created_at AND id — created_at alone is not a total order for rows written in one transaction',
+    /order=created_at\.asc,id\.asc/.test(cbm));
+  ok('F2: every hop checks .ok explicitly — svc() returns { ok:false } on a non-2xx, it does not throw',
+    (cbm.match(/if \(!dlR\.ok\)/g) || []).length === 1 && (cbm.match(/if \(!links\)/g) || []).length === 1 && (cbm.match(/if \(!clients\)/g) || []).length === 1);
+  ok('F2: a failed hop degrades to an EMPTY map and LOGS which hop — never a half map, never silence',
+    /console\.error\(/.test(cbm) && (cbm.match(/bail\('hop [123]/g) || []).length === 3 && /return new Map\(\);/.test(cbm));
+  ok('F3: the in.() reads are CHUNKED — 2000 unchunked ids is ~74KB of query string, past the proxy request-line limit',
+    /const IN_CHUNK = \d+;/.test(assetsRoute)
+    && /svcInChunks\(\s*\(ids\) => `presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&project_id=in\.\(\$\{ids\}\)/.test(cbm)
+    && /svcInChunks\(\(ids\) => `clients\?id=in\.\(\$\{ids\}\)/.test(cbm)
+    && !/in\.\(\$\{projectIds\.join|in\.\(\$\{clientIds\.join/.test(assetsRoute));
+  ok('F3: one failed chunk fails the WHOLE hop — a partial in.() result would MISLABEL rows, not merely omit them',
+    /if \(reads\.some\(\(r\) => !r\.ok\)\) return null;/.test(assetsRoute));
+  // ── F4: hop 2 deliberately deviates from the bridge convention ──
+  // Twelve sibling reads filter status=eq.active because they gate ACCESS. This one
+  // answers "whose work is this file?", and a file delivered to a former client is
+  // still theirs — filtering to active would re-file their whole body of work under
+  // "Studio", a false claim of authorship. Pinned so it is never "fixed" by accident.
+  ok('F4: hop 2 intentionally does NOT filter status=eq.active — historical attribution is the point',
+    /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}[^`]*select=project_id,customer_client_id/.test(cbm)
+    && !/presence_service_links[^`]*status=eq\.active/.test(cbm));
+  ok('F4: the deviation is DOCUMENTED at the read, so a future reader sees the intent before the convention',
+    /only presence_service_links read in the codebase that omits it/i.test(cbm) && /former client|three years ago/i.test(cbm));
+  // ── F5: the recovered FILENAME is an operator affordance, not a portal one ──
+  // displayName's alt_text rung recovers a file's real uploaded name. Filenames
+  // routinely carry client identity ("Rivera-Builders-new-logo-FINAL-v3"), and an
+  // AGENCY site pools every bridged client's uploads in one presence_media table,
+  // while /portal/feed's pending-approval read is SITE-WIDE — so a client_reviewer
+  // there could enumerate the studio's other customers from filenames alone. The
+  // rung is therefore opt-in and the default is the pre-9059e5a name; only the
+  // operator route opts in.
+  ok('F5: the alt_text rung is OPT-IN — the pure core reads it only when asked',
+    /fromAltText\?: boolean/.test(dam) && /if \(opts\.fromAltText && alt && alt !== 'Photo'\)/.test(dam));
+  ok('F5: routes/assets.ts (operator-only) is the surface that opts in',
+    /displayName\(a, \{ hint, fromAltText: true \}\)/.test(assetsRoute));
+  ok('F5: /portal/feed names a pending file WITHOUT the opt-in — the portal shows what it showed before',
+    /kind: 'file', title: `Replace \$\{displayName\(m\)\}`/.test(ws) && !/fromAltText/.test(ws));
+  ok('F5: NO portal/client-reachable module passes the opt-in flag',
+    ['routes/client_delivery.ts', 'routes/workspace.ts', 'routes/project_comms.ts', 'lib/service_bridge.ts']
+      .every((p) => !/fromAltText/.test(read(`supabase/functions/presence/${p}`))));
+  ok('F5: routes/assets.ts is the ONLY module in the whole function that opts in',
+    (() => {
+      const dir = 'supabase/functions/presence';
+      const files = [];
+      const walk = (d) => { for (const e of Deno.readDirSync(new URL(`${d}/`, ROOT))) { if (e.isDirectory) walk(`${d}/${e.name}`); else if (e.name.endsWith('.ts')) files.push(`${d}/${e.name}`); } };
+      walk(dir);
+      const optIn = files.filter((f) => /fromAltText: true/.test(read(f)));
+      return optIn.length === 1 && optIn[0] === `${dir}/routes/assets.ts`;
+    })());
+  ok('F4: every OTHER presence_service_links read still filters status=eq.active (the access-gating convention is intact)',
+    ['lib/service_bridge.ts', 'routes/workspace.ts', 'routes/crm.ts', 'routes/client_delivery.ts', 'routes/project_comms.ts', 'routes/inbound_email.ts']
+      .every((p) => (read(`supabase/functions/presence/${p}`).match(/presence_service_links\?[^`]*/g) || [])
+        .filter((q) => /select=/.test(q))   // reads only; the upsert (?on_conflict=project_id) writes
+        .every((q) => /status=eq\.active/.test(q))));
 }
 
 const passed = results.filter((r) => r.p).length;

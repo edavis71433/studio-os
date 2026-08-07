@@ -106,31 +106,48 @@ export function fileKind(mime: string | null | undefined): FileKind {
   if (m === 'application/pdf') return 'document';
   return 'other';
 }
-/** A customer-friendly name. Prefers the human title they set (metadata.title),
- *  then the filename the upload actually carried (alt_text), then a cleaned
- *  filename from the storage path, then an optional caller hint (a deliverable's
- *  title), and only then a kind label. Pure.
+/** A customer-friendly name, in rungs: the human title they set (metadata.title),
+ *  then — ONLY when the caller opts in — the filename the upload actually carried
+ *  (alt_text), then a cleaned filename from the storage path, then an optional
+ *  caller hint (a deliverable's title), and only then a kind label. Pure.
  *
- *  Why alt_text is a NAME rung: createUpload names the storage OBJECT
+ *  Why alt_text is a NAME rung at all: createUpload names the storage OBJECT
  *  '<siteId>/<uuid>.<ext>', so the storage-basename rung below is deliberately
  *  blanked by the uuid strip — which used to leave the kind label as the ONLY
  *  name an image could ever have ("Photo", "Photo", "Photo"…). But the real
  *  filename was never lost: every upload door sends it as alt_text (files.html's
  *  picker defaults alt to the filename; client_delivery sends the client's title).
- *  Reading it here recovers the names of files already in the library, with no
+ *  Reading it recovers the names of files already in the library, with no
  *  migration. The callers now also write a durable metadata.title on upload, so
  *  the two decouple going forward: editing a photo's description never renames it.
  *  The literal 'Photo' is skipped on purpose — that is files.html's own fallback
- *  for a too-short filename, so honouring it would only echo the placeholder back. */
-export function displayName(a: Asset, hint?: string | null): string {
+ *  for a too-short filename, so honouring it would only echo the placeholder back.
+ *
+ *  Why that rung is OPT-IN (`fromAltText`), and must stay opt-in: filenames
+ *  routinely carry client identity — "Rivera-Builders-new-logo-FINAL-v3". An
+ *  AGENCY site holds EVERY bridged client's uploads in one presence_media table,
+ *  and /portal/feed's pending-approval read is site-wide, so a client_reviewer
+ *  invited to that site could enumerate the studio's other customers from
+ *  filenames alone. Recovering the real name is an OPERATOR affordance; the
+ *  privacy-preserving name is therefore the DEFAULT, and a surface that wants the
+ *  real one has to ask. Opted in by routes/assets.ts only (GET /assets is not in
+ *  reviewerAllowed). No /portal/* or /client/* caller may pass it — pinned by
+ *  tests/presence/client_delivery_routes_test.mjs. */
+export interface NameOptions {
+  /** the deliverable's title — the LAST name rung before a kind label */
+  hint?: string | null;
+  /** OPERATOR SURFACES ONLY: recover the real filename from alt_text */
+  fromAltText?: boolean;
+}
+export function displayName(a: Asset, opts: NameOptions = {}): string {
   const title = String((a.metadata as Record<string, unknown> | null | undefined)?.title || '').trim();
   if (title) return title.slice(0, 200);
   const alt = String(a.alt_text || '').trim();
-  if (alt && alt !== 'Photo') return alt.slice(0, 200);
+  if (opts.fromAltText && alt && alt !== 'Photo') return alt.slice(0, 200);
   const base = (a.storage_path || '').split('/').pop() || '';
   const cleaned = base.replace(/\.[a-z0-9]+$/i, '').replace(/^[0-9a-f-]{20,}$/i, '');
   if (cleaned) return cleaned.slice(0, 200);
-  const h = String(hint || '').trim();
+  const h = String(opts.hint || '').trim();
   if (h) return h.slice(0, 200);
   return fileKind(a.mime) === 'document' ? 'Document' : fileKind(a.mime) === 'image' ? 'Photo' : 'File';
 }
@@ -181,7 +198,12 @@ export function clientsByMedia(
   for (const c of clients || []) { const id = String(c?.id || ''); if (id) nameOfClient.set(id, String(c?.name || '').trim()); }
   const out = new Map<string, MediaClient>();
   for (const d of deliverables || []) {
-    const media = String(d?.media_id || ''); if (!media || out.has(media)) continue;  // first deliverable wins — stable, no flapping
+    // The rule is "the FIRST deliverable that RESOLVES TO A CLIENT wins" — this
+    // guard precedes the no-client `continue` below, so an earlier deliverable on
+    // an unlinked project doesn't claim the media and doesn't block a later linked
+    // one either. Stable, no flapping, PROVIDED the caller's order is total (the
+    // route orders created_at.asc,id.asc — created_at alone is not).
+    const media = String(d?.media_id || ''); if (!media || out.has(media)) continue;
     const project = String(d?.project_id || '');
     const client = clientOfProject.get(project) || '';
     if (!client) continue;   // a project with no bridge link has no client to name — never guess

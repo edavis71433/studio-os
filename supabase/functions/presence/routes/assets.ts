@@ -50,6 +50,15 @@ const LIST_THUMB_CAP = 160;   // sign at most this many thumbnails per list call
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
 
+// ── file naming on the OPERATOR side ─────────────────────────────────────────
+// displayName's alt_text rung — the one that recovers a file's REAL uploaded
+// filename — is opt-in, because filenames routinely carry client identity and an
+// agency site holds every bridged client's uploads in one table. /assets is
+// operator-only (not in reviewerAllowed, routes/workspace.ts), so this file, and
+// only this file, opts in. A /portal/* or /client/* surface must call
+// displayName() plain, which is why the flag lives here and not at the default.
+const fileName = (a: Asset, hint?: string | null): string => displayName(a, { hint, fromAltText: true });
+
 async function loadAssets(siteId: string): Promise<Asset[]> {
   const r = await svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=${ASSET_COLS}&order=created_at.desc&limit=1000`);
   return arr(r) as Asset[];
@@ -110,17 +119,81 @@ async function liveMediaIds(site: SiteRow): Promise<Set<string>> {
 // OPERATOR-ONLY. GET /assets is not in reviewerAllowed (routes/workspace.ts), so a
 // client_reviewer gets 403 before reaching this; and this map is built HERE, in
 // the operator handler, so no /client/* response can ever carry it.
+//
+// DEGRADATION CONTRACT — read this before touching the hops below. The client
+// dimension is an ORGANIZER over a file list that must ALWAYS render, so no
+// failure here may cost the owner their files. But svc() does NOT throw on a
+// non-2xx: it returns { ok:false, json:null }, so a bare try/catch never sees a
+// failed read — it just yields []. Each hop is therefore checked EXPLICITLY, and
+// any failure degrades to an EMPTY map (no client dimension at all) plus one log
+// line naming the hop. Never a HALF map: a file whose client we resolved but
+// whose NAME we lost is precisely the row a consumer would mislabel.
+const IN_CHUNK = 100;   // ids per `in.()`. 100 uuids ≈ 3.7KB of query string — inside the
+                        // ~8KB request-line limit typical of the proxy in front of PostgREST.
+                        // The 2000 ids hop 1 can yield are ~74KB unchunked: a hard failure.
+
+/** Read an `in.(…)` filter in bounded chunks, in parallel. `pathFor` receives one
+ *  comma-joined id list and returns the FULL PostgREST path (so each call site keeps
+ *  its own scoping filters literal and greppable). Returns null if ANY chunk failed —
+ *  the caller must then degrade wholesale, never to a partial, mislabelling map. */
+async function svcInChunks(pathFor: (ids: string) => string, ids: string[]): Promise<any[] | null> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) chunks.push(ids.slice(i, i + IN_CHUNK));
+  const reads = await Promise.all(chunks.map((c) => svc(pathFor(c.join(',')))));
+  if (reads.some((r) => !r.ok)) return null;
+  return reads.flatMap((r) => arr(r));
+}
+
 async function clientByMedia(site: SiteRow): Promise<Map<string, MediaClient>> {
+  // one log, naming the hop — the silence this replaces made a whole-library
+  // mislabel look exactly like a studio that simply has no client files
+  const bail = (hop: string): Map<string, MediaClient> => {
+    console.error(`[assets] client dimension unavailable — ${hop} failed. The file list is unaffected; files are simply not grouped by client this read.`);
+    return new Map();
+  };
   try {
-    const dl = arr(await svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,project_id,title,created_at&order=created_at.asc&limit=2000`));
+    // Hop 1 — this site's LIVE deliverables. `deleted_at=is.null` is load-bearing:
+    // a deleted deliverable must never attribute its media to that client, and being
+    // OLDER it would outrank a live one under the first-wins rule in clientsByMedia.
+    // `id` is the tiebreaker, not decoration: rows written in one transaction share
+    // created_at and PostgREST's order between them is undefined, so without it
+    // "first wins" is not a total order and two reads can attribute differently.
+    const dlR = await svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,project_id,title,created_at&order=created_at.asc,id.asc&limit=2000`);
+    if (!dlR.ok) return bail('hop 1 (deliverables)');
+    const dl = arr(dlR);
     if (!dl.length) return new Map();
     const projectIds = [...new Set(dl.map((d) => String(d.project_id || '')).filter(Boolean))];
     if (!projectIds.length) return new Map();
-    const links = arr(await svc(`presence_service_links?agency_site_id=eq.${site.id}&project_id=in.(${projectIds.join(',')})&select=project_id,customer_client_id&limit=2000`));
+    // Hop 2 — the agency↔customer bridge. DELIBERATELY WITHOUT `status=eq.active`,
+    // and it is the only presence_service_links read in the codebase that omits it.
+    // Every sibling read (service_bridge.ts, workspace.ts, crm.ts, client_delivery.ts,
+    // project_comms.ts, inbound_email.ts) is answering "may this customer act NOW?",
+    // where an ended relationship must not grant access. This read answers a
+    // different, historical question — "whose work is this file?" — and a file
+    // delivered to a client three years ago is still THEIR work. Filtering to active
+    // would silently re-file a former client's whole body of work under "Studio",
+    // which is a false claim of authorship, not a safety win. No access is granted
+    // here: the map only ever labels rows in the operator's own file list.
+    // Pinned by tests/presence/client_delivery_routes_test.mjs — do not "fix" this
+    // into active-only without changing that test on purpose.
+    const links = await svcInChunks(
+      (ids) => `presence_service_links?agency_site_id=eq.${site.id}&project_id=in.(${ids})&select=project_id,customer_client_id&limit=${IN_CHUNK}`,
+      projectIds,
+    );
+    if (!links) return bail('hop 2 (service links)');
     const clientIds = [...new Set(links.map((l) => String(l.customer_client_id || '')).filter(Boolean))];
-    const clients = clientIds.length ? arr(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=500`)) : [];
+    if (!clientIds.length) return new Map();
+    // Hop 3 — the names. Chunked for the same reason, and checked for the same one:
+    // a failure here used to leave every client file with client_name:'' — which the
+    // roster then read as "no client at all" and labelled "Studio".
+    const clients = await svcInChunks((ids) => `clients?id=in.(${ids})&select=id,name&limit=${IN_CHUNK}`, clientIds);
+    if (!clients) return bail('hop 3 (client names)');
     return clientsByMedia(dl, links, clients);
-  } catch { return new Map(); }   // the client dimension is an ORGANIZER — its failure must never cost the owner their file list
+  } catch (e) {
+    // the client dimension is an ORGANIZER — its failure must never cost the owner their file list
+    console.error(`[assets] client dimension unavailable — ${String((e as Error)?.message || e)}. The file list is unaffected.`);
+    return new Map();
+  }
 }
 
 async function policyFor(site: SiteRow): Promise<ApprovalPolicy> {
@@ -140,7 +213,7 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null; clie
     ...a,
     // the deliverable's title is the LAST name rung — it only speaks for a file
     // that has no title, no alt text and no readable storage basename of its own
-    name: displayName(a, c?.title),
+    name: fileName(a, c?.title),
     kind: fileKind(a.mime),
     favorite: isFavorite(a),
     in_use: opts.in_use,
@@ -365,7 +438,7 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
   const [refMap, live, thumb, download] = await Promise.all([
     referencedRefs(site), liveMediaIds(site),
     signThumb(asset.storage_path, asset.mime || ''),
-    signDownload(asset.storage_path, `${displayName(asset)}`),
+    signDownload(asset.storage_path, `${fileName(asset)}`),
   ]);
   const usage = (refMap.get(id) || []).map((r) => ({ ...r, live: live.has(id) }));
   // versions: the immediate prior (what this replaced) + whether a newer exists
@@ -373,7 +446,7 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
   let prior: { id: string; name: string; created_at?: string } | null = null;
   if (typeof meta.replaces === 'string') {
     const p = await loadAsset(site.id, meta.replaces, true);
-    if (p) prior = { id: p.id, name: displayName(p), created_at: p.created_at };
+    if (p) prior = { id: p.id, name: fileName(p), created_at: p.created_at };
   }
   const supersededBy = typeof meta.replaced_by === 'string' ? String(meta.replaced_by) : null;
   return json({ data: {
@@ -476,7 +549,7 @@ export async function handleAssetRemoveBackground(site: SiteRow, principal: Prin
   if (!bytes) return json({ error: 'image_unreadable', message: 'We couldn’t open that photo just now — nothing was changed. Try again in a moment.' }, 502, cors);
 
   const dims = editSizeFor(asset.width, asset.height);
-  const name = displayName(asset);
+  const name = fileName(asset);
   const plan: VisualPlan = {
     kind: 'general',
     title: `Background removed: ${name.slice(0, 60)}`,
@@ -514,7 +587,7 @@ export async function handleAssetRemoveBackground(site: SiteRow, principal: Prin
 export async function handleAssetDownload(site: SiteRow, id: string, cors: Record<string, string>) {
   const asset = await loadAsset(site.id, id);
   if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
-  const url = await signDownload(asset.storage_path, displayName(asset));
+  const url = await signDownload(asset.storage_path, fileName(asset));
   return url ? json({ data: { url } }, 200, cors) : json({ error: 'download_failed', message: 'Could not prepare that download — try again.' }, 502, cors);
 }
 
@@ -650,16 +723,16 @@ export async function handleAssetReplace(req: Request, site: SiteRow, principal:
     newMeta.submitted_at = now;
     newMeta.submitted_by = principal.email || principal.userId || '';
     await svc(`presence_media?id=eq.${withId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ ...newPatch, metadata: newMeta, asset_status: 'pending' }) });
-    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Submitted a replacement for ${displayName(oldA)} — awaiting approval`, principal, provenance: 'human', fields: ['asset_status'] });
-    return json({ data: { ok: true, pending: true, status: 'pending_approval', replaces: displayName(oldA), message: 'Sent for approval — it goes live once someone approves it.' } }, 200, cors);
+    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Submitted a replacement for ${fileName(oldA)} — awaiting approval`, principal, provenance: 'human', fields: ['asset_status'] });
+    return json({ data: { ok: true, pending: true, status: 'pending_approval', replaces: fileName(oldA), message: 'Sent for approval — it goes live once someone approves it.' } }, 200, cors);
   }
 
   // IMMEDIATE: repoint now (solo owner, or an unused file, or optional-not-submitted)
   await svc(`presence_media?id=eq.${withId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ ...newPatch, metadata: newMeta }) });
   const affected = await repointReferences(site, id, withId);
   await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: now, metadata: { ...(oldA.metadata || {}), replaced_by: withId, replaced_at: now } }) });
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Replaced ${displayName(oldA)}`, principal, provenance: 'human', fields: ['storage_path'] });
-  return json({ data: { ok: true, pending: false, replaced: displayName(oldA), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: withId, action: 'update', summary: `Replaced ${fileName(oldA)}`, principal, provenance: 'human', fields: ['storage_path'] });
+  return json({ data: { ok: true, pending: false, replaced: fileName(oldA), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
 }
 
 export async function handleAssetRollback(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
@@ -674,8 +747,8 @@ export async function handleAssetRollback(site: SiteRow, principal: Principal, i
   await svc(`presence_media?id=eq.${priorId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: null, metadata: { ...(prior.metadata || {}), replaced_by: null } }) });
   const affected = await repointReferences(site, id, priorId);
   await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: now, metadata: { ...(cur.metadata || {}), rolled_back_to: priorId, rolled_back_at: now } }) });
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: priorId, action: 'restore', summary: `Restored previous version of ${displayName(prior)}`, principal, provenance: 'human', fields: ['storage_path'] });
-  return json({ data: { ok: true, restored: displayName(prior), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: priorId, action: 'restore', summary: `Restored previous version of ${fileName(prior)}`, principal, provenance: 'human', fields: ['storage_path'] });
+  return json({ data: { ok: true, restored: fileName(prior), affects: affected, requires_publish: affected.length > 0 } }, 200, cors);
 }
 
 export async function handleAssetDuplicate(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
@@ -683,7 +756,7 @@ export async function handleAssetDuplicate(site: SiteRow, principal: Principal, 
   if (!src) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
   const newPath = await copyObject(site.id, src.storage_path, src.mime || 'image/jpeg');
   if (!newPath) return json({ error: 'copy_failed', message: 'Could not duplicate that file — try again.' }, 502, cors);
-  const meta = { ...(src.metadata || {}), title: `${displayName(src)} (copy)` };
+  const meta = { ...(src.metadata || {}), title: `${fileName(src)} (copy)` };
   delete (meta as Record<string, unknown>).replaces; delete (meta as Record<string, unknown>).replaced_by;
   const ins = await svc('presence_media', {
     method: 'POST', headers: { Prefer: 'return=representation' },
@@ -694,7 +767,7 @@ export async function handleAssetDuplicate(site: SiteRow, principal: Principal, 
     }),
   });
   if (!(ins.ok && arr(ins)[0])) return json({ error: 'copy_failed', message: 'Could not save the duplicate — try again.' }, 502, cors);
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: arr(ins)[0].id, action: 'create', summary: `Duplicated ${displayName(src)}`, principal, provenance: 'human', fields: ['storage_path'] });
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: arr(ins)[0].id, action: 'create', summary: `Duplicated ${fileName(src)}`, principal, provenance: 'human', fields: ['storage_path'] });
   return json({ data: { ok: true, asset: present(arr(ins)[0]) } }, 201, cors);
 }
 

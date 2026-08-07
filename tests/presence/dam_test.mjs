@@ -104,23 +104,43 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
 // createUpload names the storage OBJECT '<siteId>/<uuid>.<ext>', so the storage
 // basename rung is deliberately blanked by the uuid strip — which left the kind
 // label ('Photo') as the only name an image ever got. But the REAL filename was
-// captured all along: every door writes it to alt_text. displayName reads it.
+// captured all along: every door writes it to alt_text. displayName reads it —
+// but ONLY for a caller that opts in (fromAltText), because a filename routinely
+// carries a client's name and an agency site pools every client's uploads.
 {
-  const N = (o) => displayName({ id: 'x', storage_path: 'site-uuid/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', ...o });
+  const OP = { fromAltText: true };   // what routes/assets.ts (operator-only) passes
+  const N = (o) => displayName({ id: 'x', storage_path: 'site-uuid/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', ...o }, OP);
   ok('an image whose only name is its alt_text shows THAT, never the literal "Photo"',
     N({ alt_text: 'storefront-at-dusk' }) === 'storefront-at-dusk');
   ok('a renamed file still wins: metadata.title outranks alt_text',
     N({ alt_text: 'storefront-at-dusk', metadata: { title: 'Hero image' } }) === 'Hero image');
   ok('the literal "Photo" in alt_text is NOT taken as a name — it is files.html\'s own upload fallback, and a readable storage basename beats it',
-    displayName({ id: 'x', storage_path: 'site/brochure-final.webp', mime: 'image/webp', alt_text: 'Photo' }) === 'brochure-final');
+    displayName({ id: 'x', storage_path: 'site/brochure-final.webp', mime: 'image/webp', alt_text: 'Photo' }, OP) === 'brochure-final');
   ok('a nameless image still falls back to the kind label (nothing is ever blank)',
     N({ alt_text: '' }) === 'Photo' && N({ alt_text: '   ' }) === 'Photo');
   ok('alt_text ranks ABOVE the storage basename — it is the filename the browser sent, the object name is a uuid',
-    displayName({ id: 'x', storage_path: 'site/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.pdf', mime: 'application/pdf', alt_text: 'Spring brochure' }) === 'Spring brochure');
+    displayName({ id: 'x', storage_path: 'site/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.pdf', mime: 'application/pdf', alt_text: 'Spring brochure' }, OP) === 'Spring brochure');
   ok('a deliverable title is used only when the row itself has no name',
-    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: '' }, 'Kitchen rough-in') === 'Kitchen rough-in' &&
-    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: 'porch.jpg' }, 'Kitchen rough-in') === 'porch.jpg');
+    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: '' }, { ...OP, hint: 'Kitchen rough-in' }) === 'Kitchen rough-in' &&
+    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: 'porch.jpg' }, { ...OP, hint: 'Kitchen rough-in' }) === 'porch.jpg');
   ok('alt_text is bounded like every other name rung (200)', N({ alt_text: 'z'.repeat(400) }).length === 200);
+
+  // ── F5: the alt_text rung is OPT-IN, and the DEFAULT is the privacy-preserving
+  // name. An agency site holds every bridged client's uploads in one
+  // presence_media table and /portal/feed's pending read is site-wide, so a
+  // client_reviewer must never be shown a filename like "Rivera-Builders-…".
+  // This restores the naming a portal caller saw at 9059e5a, exactly.
+  const LEAK = { id: 'x', storage_path: 'agency-site/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.png', mime: 'image/png', alt_text: 'Rivera-Builders-new-logo-FINAL-v3' };
+  ok('F5: a caller that does NOT opt in never sees the filename — it gets the kind label, as before',
+    displayName(LEAK) === 'Photo' && !/Rivera/.test(displayName(LEAK)));
+  ok('F5: the operator opting in DOES get the real filename (the Files win is kept)',
+    displayName(LEAK, OP) === 'Rivera-Builders-new-logo-FINAL-v3');
+  ok('F5: opting out changes nothing but that rung — a title the owner typed still wins for everyone',
+    displayName({ ...LEAK, metadata: { title: 'New logo' } }) === 'New logo');
+  ok('F5: opting out does not cost the readable storage basename either',
+    displayName({ id: 'x', storage_path: 'agency-site/brochure-final.pdf', mime: 'application/pdf', alt_text: 'Rivera-Builders-contract' }) === 'brochure-final');
+  ok('F5: a bare second argument can no longer switch the rung on by accident — options are named',
+    displayName(LEAK, 'Kitchen rough-in') === 'Photo');
 }
 
 // ═══ Files by client: media → client, through the delivery graph ═══
@@ -153,9 +173,18 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
     return n.get('z')?.client_id === 'c1' && n.get('z')?.client_name === '';
   })());
   ok('empty inputs never throw', clientsByMedia([], [], []).size === 0);
-  ok('the FIRST deliverable for a media wins (stable, no flapping)', (() => {
+  // F8: the rule is NOT "the first deliverable wins" — the out.has(media) guard
+  // precedes the no-client `continue`, so an earlier deliverable on an UNLINKED
+  // project neither claims the media nor blocks a later linked one. Name it
+  // honestly and pin both halves; the route supplies a TOTAL order
+  // (created_at.asc,id.asc) so "first" is well-defined across reads.
+  ok('the first deliverable THAT RESOLVES TO A CLIENT wins (stable, no flapping)', (() => {
     const n = clientsByMedia([{ media_id: 'm', project_id: 'p1' }, { media_id: 'm', project_id: 'p2' }], links, clients);
     return n.get('m')?.client_id === 'c1';
+  })());
+  ok('an earlier deliverable on an UNLINKED project does not claim the media — a later linked one still resolves', (() => {
+    const n = clientsByMedia([{ media_id: 'm', project_id: 'p9' }, { media_id: 'm', project_id: 'p2' }], links, clients);
+    return n.get('m')?.client_id === 'c2' && n.get('m')?.client_name === 'Poole Dental';
   })());
 }
 
