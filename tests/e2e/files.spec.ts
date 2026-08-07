@@ -97,11 +97,59 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(logoRow).toContainText('39 KB');
     await expect(logoRow).toContainText('today');
     await expect(logoRow).toContainText('On your site');
-    await expect(logoRow).toContainText('Live');
     const docRow = table.locator('tbody tr', { hasText: 'Contract' });
     await expect(docRow).toContainText('PDF');
     await expect(docRow).toContainText('117 KB');
-    await expect(docRow).toContainText('Not used');
+    await expect(docRow).toContainText('Not on your site');
+  });
+
+  // STATUS was theatre. asset_status is `not null default 'approved'` and NO
+  // upload path ever sets it, so every file was born "Approved" with nobody
+  // having approved anything — and under the 'immediate' policy (what a solo
+  // studio runs on) there is no approval step to have approved it WITH. The chip
+  // now only claims something where the claim can be true.
+  test('status: under the immediate policy the chip reads “—”, not an Approved nobody gave', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: filesApi });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Contract' })).toBeVisible();
+    await expect(table.locator('tbody .sbadge')).toHaveCount(0);
+    expect(await table.locator('tbody').innerText()).not.toMatch(/Approved/);
+    await expect(table.locator('tbody tr', { hasText: 'Contract' }).locator('td').last()).toHaveText('—');
+  });
+
+  test('status: where an approval step DOES exist, the chip is real again', async ({ page }) => {
+    await pinTable(page);
+    const api = { ...filesApi, '/assets': { data: { ...filesApi['/assets'].data, policy: 'required' } } };
+    await installApp(page, { api });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Logo' }).locator('.sbadge')).toHaveText('Live');
+    await expect(table.locator('tbody tr', { hasText: 'Contract' }).locator('.sbadge')).toHaveText('Approved');
+  });
+
+  test('status: Archived survives the suppression — it is a real move the owner made', async ({ page }) => {
+    await pinTable(page);
+    const ARCH = { ...CONTRACT, id: 'dddddddd-4444-4444-8444-dddddddddddd', name: 'Old flyer', state: 'archived', asset_status: 'archived' };
+    const api = { ...filesApi, '/assets': { data: { ...filesApi['/assets'].data, assets: [LOGO, ARCH] } } };
+    await installApp(page, { api });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Old flyer' }).locator('.sbadge')).toHaveText('Archived');
+  });
+
+  // WHERE USED reads exactly four website surfaces (logo, share image, service
+  // photo, post hero). Project deliverables are not in that graph, so a file a
+  // client sent for a live job could only ever read "Not used" — which sounds
+  // like "nobody wants this". The label now says what was actually measured.
+  test('where used says what it MEASURED — “Not on your site”, never a bare “Not used”', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: filesApi });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Contract' })).toContainText('Not on your site');
+    expect(await table.locator('tbody').innerText()).not.toMatch(/Not used/);
   });
 
   test('client-upload provenance: the "by client" chip renders from the server-stamped media marker (A10 sibling)', async ({ page }) => {

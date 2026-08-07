@@ -111,6 +111,7 @@
   .badge.pend{background:var(--warn-soft);color:var(--warn)}
   .sbadge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin:4px 0}
   .sbadge.live{background:var(--good-soft);color:var(--good)} .sbadge.pending{background:var(--warn-soft);color:var(--warn)} .sbadge.approved{background:var(--p-soft);color:var(--p)} .sbadge.draft,.sbadge.archived{background:var(--line);color:var(--soft)}
+  .sdash{color:var(--faint)}
   .amuted{font-size:12.5px;color:var(--faint);margin-top:4px}
 
   /* multi-select */
@@ -522,6 +523,16 @@ function isClientUpload(a){
   if(a.client_upload===true)return true;
   return String(a.note||(a.metadata&&a.metadata.note)||'').startsWith('Uploaded by the client');
 }
+// ── STATUS: only claim what can be true ──────────────────────────────────────
+// asset_status is `not null default 'approved'` (0063) and NO upload path sets
+// it, so every file arrives "Approved" with nobody having approved anything. And
+// under the 'immediate' policy — what a solo studio runs on — there is no
+// approval step at all; bulkBar() already hides the Approve button for exactly
+// this reason. So the chip is suppressed there. Two states survive the
+// suppression for opposite reasons: 'archived' is a real move the owner made, and
+// 'live'/'pending' are withheld not for want of truth — 'live' is what the Where
+// used column already says, and 'pending' cannot occur under this policy.
+function stateShown(st){ return S.policy!=='immediate' || st==='archived'; }
 function tableHtml(rows){
   const allSel=rows.length&&rows.every(a=>S.selected.has(a.id));
   const ckTh=S.canEdit?`<th scope="col" class="ck"><input type="checkbox" id="ckAll" aria-label="Select all files"${allSel?' checked':''}></th>`:'';
@@ -541,8 +552,8 @@ function tableHtml(rows){
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
       <td class="num">${esc(when(a.created_at))||'—'}${isClientUpload(a)?'<span class="fromclient">by client</span>':''}</td>
-      <td><span class="use"><span class="dot ${a.in_use?'used':'un'}"></span>${a.in_use?'On your site':'Not used'}</span></td>
-      <td><span class="sbadge ${esc(st)}">${esc(stateLbl)}</span></td>
+      <td><span class="use"><span class="dot ${a.in_use?'used':'un'}"></span>${a.in_use?'On your site':'Not on your site'}</span></td>
+      <td>${stateShown(st)?`<span class="sbadge ${esc(st)}">${esc(stateLbl)}</span>`:`<span class="sdash" title="Your plan has no approval step — files are available the moment they land.">—</span>`}</td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Files"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -572,7 +583,7 @@ function renderNudge(){
   const by={};S.health.forEach(f=>{by[f.kind]=(by[f.kind]||0)+1;});
   const parts=[];
   if(by.missing_alt)parts.push(`<b>${by.missing_alt}</b> need a description`);
-  if(by.unused)parts.push(`<b>${by.unused}</b> unused`);
+  if(by.unused)parts.push(`<b>${by.unused}</b> aren’t on your site`);   // the finding measures the WEBSITE graph only — say so (a client's project file is not "unused")
   if(by.oversized)parts.push(`<b>${by.oversized}</b> large`);
   if(by.duplicate)parts.push(`<b>${by.duplicate}</b> look duplicated`);
   if(!parts.length)return'';
@@ -581,7 +592,7 @@ function renderNudge(){
 function tile(a){
   const t=a.thumb?`style="background-image:url('${esc(a.thumb)}')"`:'';
   const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
-  const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not used';
+  const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not on your site';
   const badge=a.state==='pending'?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
   const sel=S.selectMode&&S.selected.has(a.id);
   if(S.selectMode){
@@ -705,7 +716,7 @@ function renderDetail(){
   const meta=a.metadata||{};
   const st=a.state||(a.in_use?'live':'approved');const ap=a.approval||{};
   const stateLbl={live:'Live on your site',pending:'Waiting for approval',approved:'Approved',draft:'Draft',archived:'Archived'}[st]||st;
-  const stateBadge=`<span class="sbadge ${st}">${stateLbl}</span>`;
+  const stateBadge=stateShown(st)?`<span class="sbadge ${st}">${stateLbl}</span>`:'';   // same honesty rule as the roster's Status column
   const approvedLine=ap.approved_by?`<div class="amuted">Approved by ${esc(ap.approved_by)}${ap.approved_at?' · '+when(ap.approved_at):''}</div>`:(ap.submitted_by&&st==='pending'?`<div class="amuted">Submitted by ${esc(ap.submitted_by)}${ap.submitted_at?' · '+when(ap.submitted_at):''}</div>`:'');
   const approveCtrls=(st==='pending'&&ed)?`<div class="vrow" style="background:var(--warn-soft);color:var(--warn)">This replacement is waiting to go live.<span style="margin-left:auto;display:flex;gap:8px"><button class="btn" onclick="decideFile('${a.id}','approve')">Approve</button><button class="btn warn" onclick="decideFile('${a.id}','reject')">Ask for changes</button></span></div>`:'';
   $('panel').innerHTML=`
