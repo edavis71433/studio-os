@@ -95,7 +95,15 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
   // links it (contactless deal) — the same two-step the create form already does.
   const pipe2 = read('pipeline.html');
   ok('contact-edit: the deal page has a Contact block (name / email / phone) in Details', /id="ed-cname"/.test(pipe2) && /id="ed-cemail"/.test(pipe2) && /id="ed-cphone"/.test(pipe2));
-  ok('contact-edit: Save patches an existing contact, else creates one and links it to the deal', /api\('\/sales\/contacts\/'\+c\.id,'PATCH'/.test(pipe2) && /api\('\/sales\/contacts','POST'[\s\S]{0,400}contact_id:/.test(pipe2));
+  ok('contact-edit: Save patches an existing contact, else creates one and links it to the deal', /api\('\/sales\/contacts\/'\+c\.id,'PATCH'/.test(pipe2) && /const link=\(cid\)=>api\('\/sales\/deals\/'\+id,'PATCH',\{contact_id:cid\}\)/.test(pipe2) && /api\('\/sales\/contacts','POST'[\s\S]{0,600}await link\(cid\)/.test(pipe2));
+  // create-then-link is TWO calls: if the link fails, a plain retry used to mint a
+  // SECOND contact (server dedupe keys on (site,email), so a name-only contact
+  // duplicated every time). The row we created is remembered and reused —
+  // but a DEDUPED row belongs to someone else and is never re-patched.
+  ok('contact-edit: a failed link can’t duplicate the contact on retry', /let madeContactId=null/.test(pipe2) && /if\(madeContactId\)\{[\s\S]{0,220}await link\(madeContactId\)/.test(pipe2) && /if\(!nc\.deduped\)madeContactId=cid/.test(pipe2));
+  // …and a dedupe that hands back somebody ELSE's contact is never covered by a
+  // bare "Saved" — both create paths name whose contact got linked.
+  ok('contact-edit: a deduped (someone else’s) contact is announced, not swapped in silently', /const dedupeNote=\(row,typedName,typedEmail\)=>/.test(pipe2) && /already belongs to \$\{who\|\|'another contact'\}/.test(pipe2) && /return nc\.deduped\?dedupeNote\(nc\.data,cn,ce\):null/.test(pipe2) && /if\(c&&c\.deduped\)cnote=dedupeNote\(c\.data,cname,email\)/.test(pipe2));
   ok('contact-edit: a no-email send says exactly WHY and points at the fix', /no client email on this deal, so nothing was sent[\s\S]{0,200}Add their email in Details/.test(pipe2));
 }
 

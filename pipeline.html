@@ -970,6 +970,20 @@ $('newDeal').onclick=openNewDeal;
 // the toolbar's copy of "Manage services" (openManageServices is defined below —
 // this handler only runs on click, long after the whole script has evaluated)
 {const mst=$('mngServicesTop'); if(mst) mst.onclick=()=>openManageServices();}
+// POST /sales/contacts dedupes on (site, email): an address that already belongs
+// to someone returns THAT contact (200, deduped:true) and we link it, quietly
+// dropping the name and phone that were just typed. Linking the person who owns
+// the address is usually right — silently swapping who this deal is with is not.
+// So every create path says, in one line, whose contact it linked and what of
+// the typed details it did not keep. (The EDIT path refuses outright instead —
+// sales.ts answers 409 email_taken there, because renaming an existing contact
+// onto someone else's address is never the intent.)
+const dedupeNote=(row,typedName,typedEmail)=>{
+  const who=String((row&&row.name)||'').trim();
+  const addr=String((row&&row.email)||typedEmail||'').trim();
+  const dropped=typedName&&who&&typedName!==who?` The name you typed (${typedName}) wasn’t kept.`:'';
+  return `${addr||'That email'} already belongs to ${who||'another contact'} — linked ${who?'them':'that contact'} to this deal.${dropped}`;
+};
 $('f-cancel').onclick=()=>$('formDlg').close();
 $('dealForm').onsubmit=async(e)=>{
   e.preventDefault();
@@ -978,12 +992,13 @@ $('dealForm').onsubmit=async(e)=>{
   const cname=$('f-name').value.trim(); const cphone=$('f-phone').value.trim();
   const btn=e.submitter; if(btn)btn.disabled=true;
   try{
-    let contactId=null;
+    let contactId=null, cnote='';
     // capture a real name/phone if given (no more "jane.doe" contacts from the email)
     if(email||cname){ const c=await api('/sales/contacts','POST',{email:email||undefined,name:cname||(email?email.split('@')[0]:'New contact'),phone:cphone||undefined}); contactId=c.data&&c.data.id;
+      if(c&&c.deduped)cnote=dedupeNote(c.data,cname,email);   // an existing contact was linked, not a new one — say so
       CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false; }   // BOTH contact caches are stale now — the Table's name join AND the search index (visibleDeals gates its refetch on !CONTACT_TEXT); refetch on the next render
     const created=await api('/sales/deals','POST',{title,contact_id:contactId});
-    $('formDlg').close(); toast('Deal added'); load();
+    $('formDlg').close(); toast(cnote?'Deal added. '+cnote:'Deal added'); load();
     if(created&&created.data&&created.data.id) openDeal(created.data.id);   // straight into the deal — no hunting the list
   }catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
 };
@@ -1282,23 +1297,49 @@ async function openDeal(id){
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     // Saving Details saves the CONTACT too. An existing contact is patched in
     // place; a contactless deal mints one and links it — the same two-step the
-    // create form already does (POST /sales/contacts dedupes on (site,email), so
-    // re-entering a known address reuses that row instead of duplicating it).
+    // create form already does. Two things that two-step has to get right:
+    //
+    //   IDEMPOTENCE. Create and link are separate calls. If the link fails the
+    //   contact already exists, so a plain retry would mint a SECOND one. The
+    //   server's dedupe keys on (site,email), which self-heals an email-bearing
+    //   contact — but a NAME-ONLY or phone-only contact duplicated on every
+    //   retry. So we remember the row we just created and reuse it, patching in
+    //   whatever the operator changed before retrying.
+    //
+    //   HONESTY. That same (site,email) dedupe hands back SOMEBODY ELSE'S row
+    //   when the address is already taken, and links it — silently discarding
+    //   the name and phone just typed, after which the fields repaint with the
+    //   other person's details. The edit path refuses this outright (409
+    //   email_taken); the create path shouldn't, because linking the person who
+    //   already owns that address is usually the right answer — but it must SAY
+    //   so, in the same breath, rather than let "Saved" cover a swap.
+    let madeContactId=null;   // survives a failed link, so a retry can't duplicate
     const saveContactPart=async()=>{
       const eN=$('ed-cname'),eE=$('ed-cemail'),eP=$('ed-cphone');
-      if(!eN&&!eE&&!eP)return;   // block not rendered (defensive)
+      if(!eN&&!eE&&!eP)return null;   // block not rendered (defensive)
       const cn=(eN?eN.value:'').trim(), ce=(eE?eE.value:'').trim(), cp=(eP?eP.value:'').trim();
       const stale=()=>{CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false;};   // both contact caches (Table name join + search index) are now stale
+      const link=(cid)=>api('/sales/deals/'+id,'PATCH',{contact_id:cid});
       if(c&&c.id){
-        if(cn===(c.name||'')&&ce===(c.email||'')&&cp===(c.phone||''))return;   // untouched — no needless write
-        await api('/sales/contacts/'+c.id,'PATCH',{name:cn,email:ce,phone:cp}); stale(); return;
+        if(cn===(c.name||'')&&ce===(c.email||'')&&cp===(c.phone||''))return null;   // untouched — no needless write
+        await api('/sales/contacts/'+c.id,'PATCH',{name:cn,email:ce,phone:cp}); stale(); return null;
       }
-      if(!cn&&!ce){ if(cp) throw new Error('A contact needs a name or an email — a phone number on its own isn’t enough.'); return; }
+      if(!cn&&!ce){ if(cp) throw new Error('A contact needs a name or an email — a phone number on its own isn’t enough.'); return null; }
+      if(madeContactId){   // an earlier Save already created this one — only the link failed
+        await api('/sales/contacts/'+madeContactId,'PATCH',{name:cn,email:ce,phone:cp}); stale();
+        await link(madeContactId); return null;
+      }
       const nc=await api('/sales/contacts','POST',{name:cn||ce.split('@')[0],email:ce||undefined,phone:cp||undefined});
       const cid=nc&&nc.data&&nc.data.id; stale();
-      if(cid) await api('/sales/deals/'+id,'PATCH',{contact_id:cid});
+      if(!cid)return null;
+      // Only a row WE created is ours to reuse and re-patch. A deduped row
+      // belongs to someone else — retrying it is already safe (the server hands
+      // back the same row), and patching it would rename that other person.
+      if(!nc.deduped)madeContactId=cid;
+      await link(cid);
+      return nc.deduped?dedupeNote(nc.data,cn,ce):null;
     };
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
     // The stage's preset to-dos FILL the input — they never post on their own, so

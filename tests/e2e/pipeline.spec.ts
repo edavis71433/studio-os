@@ -713,6 +713,59 @@ test.describe('deal page — Contact block (ask 2)', () => {
     expect(calls.indexOf(create!)).toBeLessThan(calls.indexOf(link!));
   });
 
+  // Saving a contactless deal is TWO calls — create the contact, then link it.
+  // If the link fails, the contact already exists; a plain retry used to POST a
+  // second one. Server dedupe keys on (site, email) only, so an email-bearing
+  // contact self-heals but a NAME-ONLY contact duplicated on every retry.
+  test('a failed LINK doesn’t leave a duplicate contact behind on retry', async ({ page }) => {
+    const creates: string[] = [];
+    let linkFails = true;
+    await installApp(page, { api: CONTACT_API });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      const method = route.request().method();
+      if (method === 'GET') return route.fallback();
+      if (path === '/sales/contacts' && method === 'POST') {
+        creates.push(route.request().postData() || '');
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-new', name: 'Jo Vance' } }) });
+      }
+      if (path === `/sales/deals/${DEAL3}` && method === 'PATCH' && (route.request().postData() || '').includes('contact_id')) {
+        if (linkFails) { linkFails = false; return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ message: 'That didn’t go through.' }) }); }
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.locator('#ed-cname').fill('Jo Vance');            // NAME ONLY — no email to dedupe on
+    await page.locator('#ed-save').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('didn’t go through');
+    expect(creates).toHaveLength(1);
+    // retry the identical save — the contact from the first attempt is REUSED
+    await page.locator('#ed-save').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Saved');
+    expect(creates).toHaveLength(1);
+  });
+
+  // The server's (site, email) dedupe hands back SOMEBODY ELSE's contact row and
+  // links it — discarding the name and phone that were just typed. The edit path
+  // already refuses this with a 409; the create path must at least say so.
+  test('an email that already belongs to someone else says whose — never a silent swap', async ({ page }) => {
+    await installApp(page, { api: CONTACT_API });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (route.request().method() === 'GET') return route.fallback();
+      if (path === '/sales/contacts') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '555-0000' }, deduped: true }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.locator('#ed-cname').fill('Jo Vance');
+    await page.locator('#ed-cemail').fill('dana@example.com');   // already Dana Lee's
+    await page.locator('#ed-save').click();
+    const toast = page.locator('.dds-toast').last();
+    await expect(toast).toContainText('dana@example.com');
+    await expect(toast).toContainText('Dana Lee');
+    await expect(toast).toContainText('Jo Vance');               // …and that the typed name was NOT kept
+  });
+
   test('a phone with no name or email is refused with a plain reason (never a silent no-op)', async ({ page }) => {
     await installApp(page, { api: CONTACT_API });
     await page.goto(`/pipeline.html?deal=${DEAL3}`);

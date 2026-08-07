@@ -560,9 +560,13 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
     // agreement form can default to their own saved wording ahead of the
     // built-in one. Exactly ONE row: a body is up to 50KB, which is why the
     // plain list (100 rows) never carries bodies at all. Site-scoped like the
-    // list, and kind=contract already excludes the reserved proposal-kind rows.
+    // list. This is the ONE route that hands a BODY to the deal page, and that
+    // body is seeded straight into the agreement textarea — so the reserved
+    // rows are excluded BOTH ways, by kind AND by name, exactly like the plain
+    // list. __crm_contact_fields__'s body is contact field-definition JSON; one
+    // mislabelled row and a client would be reading it as their contract.
     if (new URL(req.url).searchParams.get('with_body') === 'contract') {
-      const one = await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.contract&deleted_at=is.null&select=id,name,title,body,updated_at&order=updated_at.desc&limit=1`);
+      const one = await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.contract&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&select=id,name,title,body,updated_at&order=updated_at.desc&limit=1`);
       return one.ok ? json({ data: rows(one) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
     }
     // the reserved rows (services catalog + contact field defs) are NOT reusable templates — keep them out of the list
