@@ -391,6 +391,27 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 🔕 "NEEDS YOU" ITEMS CAN'T BE RESOLVED (Eric, 2026-08-07) — QUEUED
+
+"also should be able to resolve these some way." The Today/attention "NEEDS
+YOU" list gives every row ONE action — "Take care of it →" (a navigation) —
+and no way to dismiss, snooze, or mark handled. His screenshot shows 9+
+rows including stale test data ("test 2", "hey", "test") he cannot clear,
+plus real ones (Hettie's FTP-screenshots request, an unpaid $400 deposit,
+proposal/agreement reminders). A list that only grows is a list he stops
+reading.
+RELATED — the SAME defect class the operator-notification review caught
+(F1): per-event notices had NO teardown where booking/review/deal_signed
+all have explicit clearNotice calls. That was fixed by EXCLUDING client_*
+kinds from the badge count; this ask is the other half — an actual resolve
+action on the row itself. Do them as one piece of work: a resolve/dismiss
+affordance + whatever teardown each row type needs (support request →
+close/reply, invoice → mark paid or dismiss the nudge, proposal/agreement
+reminder → dismiss, stale test rows → delete).
+Investigate too: WHY the "open a few days without a reply" rows persist —
+if replying doesn't clear them, that's a bug, not a missing button.
+SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
+
 ## 📁 FILES — ORGANIZE + FILTER BY CLIENT (Eric, 2026-08-07) — QUEUED
 
 "when you're done files should be able to be organized and filtered by
