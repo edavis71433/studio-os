@@ -696,18 +696,104 @@ test.describe('B4 — attention badge freshness', () => {
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Inbox');
   });
 
+  // ── the three claims B4 makes about HOW the refresh behaves ────────────────
+  // Each of these was asserted only in prose before: the block was seven green
+  // tests that all still passed with the behaviour removed.
+
+  test('the 60s window is claimed BEFORE the request goes out (a tab-flipper cannot stack reads)', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 3);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('3');
+    const afterBoot = probe.hits;
+    await leaveTheThrottleWindow(page);
+
+    // Five flips inside ONE synchronous script. Nothing can await, so no `.then`
+    // has run when the fifth fires. If the window were claimed in the callback
+    // instead of before the request, all five would sail past the throttle check
+    // and five reads would go out at once — precisely the stacking the throttle
+    // exists to prevent, and precisely what the awaited flips in the test above
+    // cannot see (each of those yields long enough for the callback to land).
+    await page.evaluate(() => {
+      for (let i = 0; i < 5; i++) {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }
+    });
+    await page.waitForTimeout(150);
+    expect(probe.hits).toBe(afterBoot + 1);            // ONE read, not five
+  });
+
+  test('a FAILING endpoint waits out the full window — it is not retried on every flip', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 5);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('5');
+    const afterBoot = probe.hits;
+
+    probe.status = 500;                                // every refresh from here fails
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect.poll(() => probe.hits).toBe(afterBoot + 1);
+
+    // Six more returns, each a full round-trip, still inside the same 60s window.
+    // The window was claimed before the request, so a FAILED read has spent it
+    // exactly like a successful one. Asserting the badge here proves nothing — a
+    // 500 leaves the last good value whether the throttle held or not, which is
+    // why the 500 test above cannot see this. Only the HIT COUNT can.
+    for (let i = 0; i < 6; i++) { await flipAway(page); await flipBack(page); }
+    await page.waitForTimeout(150);
+    expect(probe.hits).toBe(afterBoot + 1);            // still ONE — the failure spent the window
+    await expect(page.locator('#dds-bell .dot')).toHaveText('5');
+
+    // …and the window still EXPIRES: a failure must throttle, never wedge shut.
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect.poll(() => probe.hits).toBe(afterBoot + 2);
+
+    probe.status = 200; probe.count = 9;
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('9');
+  });
+
   test('the refresh does not disturb an open layer', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'desktop popover behaviour');
+    test.skip(testInfo.project.name === 'mobile', 'the flat bar is hidden on phones');
     await installApp(page);
     const probe = await contextProbe(page, 2);
     await page.clock.install();
     await page.goto('/today.html');
-    await page.locator('#dds-profile').click();
-    await expect(page.locator('.dds-pop')).toContainText('Sign out');
+
+    // A NAV SECTION DROPDOWN, not the profile popover. The popover is appended to
+    // document.body (shell.js toggleProfile), so it survives a full re-render
+    // either way and cannot tell paintBell() from render() — the layer a
+    // re-render actually destroys is the one inside `root`, which is this.
+    const btn = page.locator('.dds-nav .sec > button[data-sec="website"]');
+    const menu = page.locator('.dds-nav .sec:has(button[data-sec="website"]) .menu');
+    await btn.click();
+    await expect(menu).toBeVisible();
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+
     probe.count = 8;
     await leaveTheThrottleWindow(page);
     await flipAway(page); await flipBack(page);
-    await expect(page.locator('#dds-bell .dot')).toHaveText('8');
-    await expect(page.locator('.dds-pop')).toContainText('Sign out');   // the menu stayed open
+    await expect(page.locator('#dds-bell .dot')).toHaveText('8');   // the badge DID repaint
+    await expect(menu).toBeVisible();                               // …and the open menu survived it
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('.dds-nav .sec.open')).toHaveCount(1);
+
+    // the body-level layer is undisturbed too (it always was — kept as the pair)
+    await page.keyboard.press('Escape');
+    await page.locator('#dds-profile').click();
+    await expect(page.locator('.dds-pop')).toContainText('Sign out');
+    probe.count = 4;
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('4');
+    await expect(page.locator('.dds-pop')).toContainText('Sign out');
   });
 });
