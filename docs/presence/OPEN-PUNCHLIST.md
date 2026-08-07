@@ -561,6 +561,61 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## 📱 MOBILE MENU DEAD ON REAL iOS — FIXED, AWAITING DEPLOY (2026-08-07)
+
+Eric, from his phone: "I was looking at studio in Mobile view and none of the
+buttons on the menu work" + a screenshot showing the drawer OPEN with every
+item rendered, then: "The menu closes, but leaves you on the same page."
+
+ROOT CAUSE (shell.js:754, since 9926614 — ~3 WEEKS LIVE): panels that close
+on `focusout` treated a NULL relatedTarget as "focus left the document".
+iOS Safari does NOT focus a link on tap — it blurs the current element, so
+focusout fires with relatedTarget null, closeDrawer() runs, shell.css's
+display:none un-renders the panel BETWEEN pointerdown AND click, and the
+anchor is gone before its navigation resolves. Captured trace showed the tap
+then FALLS THROUGH to page content underneath — so a menu tap could silently
+activate an unrelated control. Desktop fine (a click focuses the anchor).
+
+SIX SITES, same wrong premise: shell.js:754 (drawer), shell.js:343 (.dds-nav
+.sec — breaks iPad, that nav shows ≥761px and iPads have touch),
+analytics.html:449 (period filter — reproduced failing), pipeline.html:1194
+(worse — it REMOVES the node), projects.html:688, nav.js:73.
+⚠️ CORRECTION TO MY FIRST READ: I told Eric nav.js broke the marketing site
+for customers. WRONG — that submenu's visibility is CSS :hover/:focus-within
+(styles.css:69), so taps worked; the bug was an ARIA LIE (announcing
+aria-expanded=false over an open menu). An a11y defect, not broken nav.
+Fix shape everywhere: `if (!to) return;` before the containment check. The
+forfeited case (focus leaving the document) leaves a panel open behind a
+switched tab — invisible and harmless.
+
+ALSO FIXED: the drawer's LAST ROW was unreachable — #dds-mbar (z 2147483000)
+covers .dds-drawer (2147482999). Eric's real nav is longer than the fixture's
+so this hid a genuine destination. Drawer now insets above the bar
+(72px + env(safe-area-inset-bottom)) inside the ≤760.98px block; the bar
+keeps the higher z-index so Menu can still close what it opened.
+
+WHY IT REACHED HIM — THE REAL LESSON: `grep -rn "\.tap(" tests/e2e/` returned
+ZERO across all 30 specs. Nothing ever exercised touch; the mobile projects
+set a phone viewport but drive clicks. And no test ever ACTIVATED a drawer
+item (shell.spec.ts:159 only read an href). Even .tap() wouldn't catch it —
+Chromium focuses links on tap; only WebKit's semantics break it, and the
+sandbox has no WebKit. So tests/e2e/helpers/ios-focus.ts now emulates the
+observable half (capture-phase pointerdown → blur activeElement, text inputs
+excluded), and 8 touch specs assert items NAVIGATE. RED before (7 failed),
+green after.
+FOUND WHILE FIXING: pipeline.spec.ts:563 was PINNING the forfeited branch
+(its menu is the last focusable element, so a forward Tab genuinely yields a
+null relatedTarget) — re-pointed at a real Tab-out and a second test now
+records the trade-off explicitly. Whole-tree grep confirms no other handler
+shares the premise (client.html has none; presence.html's four blur
+listeners never read relatedTarget).
+NOTED, NOT FIXED: .dds-hint (z 2147483001) outranks the drawer and lingers
+~200ms at opacity:0 while still hit-testable (shell.js:896) — a brief real
+tap-eater at the bottom of every phone page. Pre-existing, once-per-user.
+Gates: pure 222/0/4, chrome 28/28, shell 5/5, e2e desktop 477/0, mobile
+377/1 (the known portal.spec.ts:533), tablet 377/0.
+FRONTEND ONLY — no SQL, Netlify auto-deploys on merge.
+
 ## 🔧 GAP SWEEP — BUILT, AWAITING SQL + DEPLOY (2026-08-07)
 
 Eric: "please do all of things you can do and any gaps you see make the
