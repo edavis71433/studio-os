@@ -449,7 +449,11 @@ function wireDash(){
   if(filters)filters.addEventListener('focusout',(e)=>{
     if(pm.hidden)return;
     const to=e.relatedTarget;
-    if(!to||!filters.contains(to))closeMenu();   // focus left chip+menu → close, no focus steal
+    // a NULL relatedTarget is NOT "focus left the document": iOS Safari blurs
+    // on tap without focusing anything, so closing here would hide the option
+    // between pointerdown and click and the period would never switch.
+    if(!to)return;                             // iOS tap / focus left the document — keep open
+    if(!filters.contains(to))closeMenu();      // focus left chip+menu → close, no focus steal
   });
   // PERIOD is committed only on a successful render (loadDash) — a failed
   // switch leaves the chip, checkmarks and state exactly as they were.

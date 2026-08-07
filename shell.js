@@ -333,12 +333,17 @@
         else { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
       });
       // focus leaving the section (menu AND trigger) closes it — no stuck-open
-      // panel after Tab-out. Never steals focus back on this path. relatedTarget
-      // is null when focus leaves the document — close then too.
+      // panel after Tab-out. Never steals focus back on this path. A NULL
+      // relatedTarget is NOT "focus left the document": on iOS Safari a tap
+      // blurs the current element and focuses nothing, so closing here would
+      // un-render the menu between pointerdown and click and eat the tap
+      // (.dds-nav shows ≥761px and iPads have touch). Only a demonstrable move
+      // to an element OUTSIDE the section closes it.
       sec.addEventListener('focusout', function (e) {
         if (!sec.classList.contains('open')) return;
         var to = e.relatedTarget;
-        if (to && sec.contains(to)) return;   // focus moved WITHIN the section — keep open
+        if (!to) return;                      // iOS tap / focus left the document — keep open
+        if (sec.contains(to)) return;         // focus moved WITHIN the section — keep open
         sec.classList.remove('open'); b.setAttribute('aria-expanded', 'false');
       });
       var menu = sec.querySelector('.menu');
@@ -691,13 +696,18 @@
       if (links.length) links[e.key === 'ArrowDown' ? Math.min(i + 1, links.length - 1) : Math.max(i - 1, 0)].focus();
     });
     // focus Tabbing out of the panel closes it (no stuck-open panel + stale
-    // aria-expanded). Focus is NOT stolen back on this path. relatedTarget is
-    // null when focus leaves the document — close then too; a move INTO the
-    // panel (or onto either trigger — its click handles the toggle) keeps it.
+    // aria-expanded). Focus is NOT stolen back on this path. A NULL
+    // relatedTarget is NOT "focus left the document": on iOS Safari a tap does
+    // not focus a link, it only blurs the current element — closing here would
+    // set display:none between pointerdown and click, so the tap misses the
+    // item and falls through to the page underneath. Only a demonstrable move
+    // to an element OUTSIDE the panel closes it; a move INTO the panel (or onto
+    // either trigger — its click handles the toggle) keeps it.
     drawer.addEventListener('focusout', function (e) {
       if (!drawer.classList.contains('open')) return;
       var to = e.relatedTarget;
-      if (to && (drawer.contains(to) || to.id === 'dds-waffle' || to.id === 'dds-mbar-menu')) return;
+      if (!to) return;                        // iOS tap / focus left the document — keep open
+      if (drawer.contains(to) || to.id === 'dds-waffle' || to.id === 'dds-mbar-menu') return;
       closeDrawer();
     });
     document.body.appendChild(drawer);

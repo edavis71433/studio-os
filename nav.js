@@ -72,8 +72,14 @@
     sub.addEventListener('focusin', open);
     sub.addEventListener('focusout', function(e){
       // only close if focus left the whole submenu group, not moving
-      // between two links inside it
-      if(!sub.contains(e.relatedTarget)) close();
+      // between two links inside it. A NULL relatedTarget is NOT "focus left
+      // the document": iOS Safari blurs on tap without focusing anything, so
+      // acting on it mid-tap would flip aria-expanded to "false" over a menu
+      // that is still on screen (:hover/:focus-within drive the visuals) — and
+      // any future close() that hides the menu would eat the tap outright.
+      var to = e.relatedTarget;
+      if(!to) return;                       // iOS tap / focus left the document — keep open
+      if(!sub.contains(to)) close();
     });
 
     sub.escapeClose = function(){

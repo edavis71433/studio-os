@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Pipeline (redesign slice 3): a 3-way List · Board · Table display (persisted),
 // the Table as a sortable list view whose rows open the SAME full-screen drawer,
@@ -568,13 +569,73 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await move.click();
     const items = page.locator('#board .bc-menu button');
     await expect(items.first()).toBeFocused();
-    // walk to the last option (proposal → contract · qualified · lost), then Tab OUT
+    // walk the options (proposal → contract · qualified · lost) …
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(2)).toBeFocused();
+    // … then Tab OUT to a real element outside the menu. Shift+Tab from the
+    // first option lands on the invoker: focus demonstrably left the menu, so
+    // the menu goes and aria-expanded resets.
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await expect(items.first()).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#board .bc-menu')).toHaveCount(0);
+    await expect(move).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  // Touch. This menu was the worst of the six null-relatedTarget sites: it does
+  // not hide, it `menu.remove()`s — so on iOS the option was DESTROYED between
+  // pointerdown and click and the tap landed on the card underneath (which
+  // opens the deal). See tests/e2e/helpers/ios-focus.ts.
+  test('touch: tapping a Move option actually moves the deal', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await installIosFocusSemantics(page);
+    let moved: string | null = null;
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, (route) => {
+      moved = JSON.parse(route.request().postData() || '{}').to;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto('/pipeline.html');
+    const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
+    await move.tap();
+    const menu = page.locator('#board .bc-menu');
+    await expect(menu).toBeVisible();
+    await menu.locator('button[data-to="contract"]').tap();
+    await expect.poll(() => moved).toBe('contract');
+  });
+
+  // The deliberately forfeited half of the mobile focusout fix. The Move menu
+  // is the LAST focusable thing on the board, so a forward Tab leaves the
+  // document entirely and `relatedTarget` is null — indistinguishable from an
+  // iOS tap, which fires the identical event mid-gesture. The menu must NOT be
+  // removed on a null relatedTarget (that is what ate every tap on a real
+  // iPhone), so this one case leaves an open menu behind a switched tab:
+  // invisible, and the next real interaction closes it. Pinned so the trade-off
+  // is explicit rather than an accident.
+  test('leaving the document entirely leaves the menu open (the iOS-safety trade-off)', async ({ page }, testInfo) => {
+    // one width is enough: the premise (this menu is the last focusable thing
+    // on the page) is a desktop-layout fact, and Tab order is what's under test
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'keyboard Tab order at one width');
+    await pinBoard(page);
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
+    await move.click();
+    const items = page.locator('#board .bc-menu button');
+    await expect(items.first()).toBeFocused();
+    // prove the premise: forward-Tab off the last option focuses nothing
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
     await expect(items.nth(2)).toBeFocused();
     await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BODY');
+    await expect(page.locator('#board .bc-menu')).toHaveCount(1);
+    // …and any real interaction still closes it
+    await page.locator('h1').click();
     await expect(page.locator('#board .bc-menu')).toHaveCount(0);
-    await expect(move).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('?stage=<open stage> keeps a persisted Board choice — only won/lost force List', async ({ page }) => {

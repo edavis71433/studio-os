@@ -1191,7 +1191,11 @@ function wireBoard(){
       // Tab-out closes too (no zombie open menu with aria-expanded=true) —
       // WITHOUT stealing focus back: the user chose to leave, let them land
       // where Tab took them. relatedTarget inside the menu = arrow/tab within.
-      menu.addEventListener('focusout',(ev)=>{if(!menu.isConnected||menu.contains(ev.relatedTarget))return;menu.remove();btn.setAttribute('aria-expanded','false');});
+      // A NULL relatedTarget is NOT "focus left the document": iOS Safari blurs
+      // on tap without focusing anything, and contains(null) is false — the menu
+      // would be REMOVED between pointerdown and click, so the tap lands on the
+      // card underneath instead of the move it aimed at.
+      menu.addEventListener('focusout',(ev)=>{const to=ev.relatedTarget;if(!to)return;if(!menu.isConnected||menu.contains(to))return;menu.remove();btn.setAttribute('aria-expanded','false');});
       menu.addEventListener('keydown',(ev)=>{
         const items=[...menu.querySelectorAll('button')]; const i=items.indexOf(document.activeElement);
         if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close();}

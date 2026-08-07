@@ -685,7 +685,10 @@ async function openProject(id){
       sbtn.addEventListener('click',()=>{const open=smenu.hidden;smenu.hidden=!open;sbtn.setAttribute('aria-expanded',open?'true':'false');if(open){const f=smenu.querySelector('button');if(f)f.focus();}});
       sbtn.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!smenu.hidden){e.preventDefault();close();}});
       const sdd=sbtn.closest('.statusdd');
-      if(sdd)sdd.addEventListener('focusout',(e)=>{if(!smenu.hidden&&!(e.relatedTarget&&sdd.contains(e.relatedTarget)))close();});
+      // a NULL relatedTarget is NOT "focus left the document": iOS Safari blurs
+      // on tap without focusing anything, so closing here would hide the option
+      // between pointerdown and click and the status would never change.
+      if(sdd)sdd.addEventListener('focusout',(e)=>{const to=e.relatedTarget;if(!to)return;if(!smenu.hidden&&!sdd.contains(to))close();});
       smenu.addEventListener('keydown',(e)=>{
         const opts=[...smenu.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
         if(e.key==='Escape'){e.preventDefault();close();sbtn.focus();}

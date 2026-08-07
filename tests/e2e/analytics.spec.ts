@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Slice 8 — analytics.html is the Business dashboard: the Salesforce Lightning
 // "Reports & Dashboards" treatment. Two bands (Sales · Your website), an
@@ -116,6 +117,27 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.locator('#periodMenu')).toBeVisible();
     await page.getByRole('heading', { name: 'Business dashboard' }).click();
     await expect(page.locator('#periodMenu')).toBeHidden();
+  });
+
+  // The same null-relatedTarget focusout bug that ate Eric's menu taps: on iOS
+  // a tap blurs the chip and focuses nothing, `.filters` closes the popup
+  // mid-tap, and the period option is gone before the click lands on it.
+  // See tests/e2e/helpers/ios-focus.ts.
+  test('touch: tapping a Period option actually switches the period', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await installIosFocusSemantics(page);
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
+      const period = new URL(route.request().url()).searchParams.get('period');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(period === 'last_30' ? DASH_30 : DASH) });
+    });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await page.locator('#periodBtn').tap();
+    await expect(page.locator('#periodMenu')).toBeVisible();
+    await page.locator('#periodMenu [data-period="last_30"]').tap();
+    await expect(page.locator('#periodBtn')).toContainText('Last 30 days');
+    await expect(page.getByText('$99,900', { exact: true })).toBeVisible();   // re-fetched
   });
 
   test('Refresh re-fetches the dashboard route', async ({ page }) => {
