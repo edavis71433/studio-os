@@ -13,6 +13,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { applyPlaceholders, buildPlaceholderValues } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
@@ -555,6 +556,15 @@ async function loadTemplate(siteId: string, id: string, kind: 'proposal' | 'cont
 }
 export async function handleSalesTemplates(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
+    // Opt-in: the studio's NEWEST saved agreement, WITH its body — so an empty
+    // agreement form can default to their own saved wording ahead of the
+    // built-in one. Exactly ONE row: a body is up to 50KB, which is why the
+    // plain list (100 rows) never carries bodies at all. Site-scoped like the
+    // list, and kind=contract already excludes the reserved proposal-kind rows.
+    if (new URL(req.url).searchParams.get('with_body') === 'contract') {
+      const one = await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.contract&deleted_at=is.null&select=id,name,title,body,updated_at&order=updated_at.desc&limit=1`);
+      return one.ok ? json({ data: rows(one) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
+    }
     // the reserved rows (services catalog + contact field defs) are NOT reusable templates — keep them out of the list
     const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
     return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
@@ -630,11 +640,20 @@ export async function handleSalesServices(req: Request, site: SiteRow, principal
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
-/** Fill {{client_name}} / {{deal_title}} from the deal. */
+/** Fill a template's {{tokens}} from the deal — see lib/doc_placeholders.ts for
+ *  the full list and, more importantly, what each one degrades to when the deal
+ *  doesn't have the data. This half does the two site-scoped reads (the contact,
+ *  and the studio's own business_name — the same presence_identity row
+ *  loadEmailBrand and the client's bizName() use); the substitution itself is
+ *  pure and unit-tested. Both reads are best-effort: a template must still draft
+ *  when identity or the contact can't be read, degrading to readable text rather
+ *  than leaving a literal {{token}} in something a client is asked to sign. */
 async function fillPlaceholders(siteId: string, deal: any, text: string): Promise<string> {
-  let clientName = '';
-  try { if (deal.contact_id) clientName = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name&limit=1`))[0]?.name || ''; } catch { /* best-effort */ }
-  return text.replace(/\{\{\s*client_name\s*\}\}/g, clientName || 'the client').replace(/\{\{\s*deal_title\s*\}\}/g, String(deal.title || 'the project'));
+  let contact: { name?: string; company?: string } | null = null;
+  let studioName = '';
+  try { if (deal.contact_id) contact = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,company&limit=1`))[0] || null; } catch { /* best-effort */ }
+  try { studioName = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0]?.business_name || ''; } catch { /* best-effort */ }
+  return applyPlaceholders(text, buildPlaceholderValues({ deal, contact, studioName }));
 }
 
 // ═══ PROPOSALS ═══

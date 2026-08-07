@@ -844,3 +844,61 @@ test.describe('services catalog — starter list (ask 1)', () => {
     await expect(page.locator('#svcStarterNote')).toHaveCount(0);
   });
 });
+
+// ── CRM deal page (ask 4): the studio's real agreement is the default ────────
+test.describe('agreement form — the studio’s standard contract (ask 4)', () => {
+  test('an empty agreement form opens with the real 19-section agreement, placeholders FILLED', async ({ page }) => {
+    await installApp(page, { api: API });                                      // '/sales/templates': { data: [] } → no saved templates
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.locator('#addCon').click();
+    const body = page.locator('#conForm textarea');
+    await expect(body).toBeVisible();
+    await expect.poll(async () => (await body.inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
+    const text = await body.inputValue();
+    expect(text).toContain('DAVIS DIGITAL STUDIO');
+    expect(text).toContain('Project Agreement & Scope of Work');
+    expect(text).toContain('19. ENTIRE AGREEMENT');
+    expect(text).not.toContain('SAMPLE');
+    // the placeholders are RESOLVED — a client must never receive a raw token
+    expect(text).not.toMatch(/\{\{/);
+    expect(text).toContain('Test Studio');                                     // {{studio_name}} ← /identity
+    expect(text).toContain('Acme');                                            // {{client_company}} ← the contact
+    expect(text).toContain('Acme website');                                    // {{deal_title}}
+    expect(text).toContain('$5,000');                                          // {{deal_value}}
+    expect(text).toContain('$2,500');                                          // 50/50 deposit + balance
+    // the title is prefilled too, and everything stays editable
+    await expect(page.locator('#conForm input').first()).toHaveValue('Service agreement — Sam Rivera');
+    await expect(body).toBeEditable();
+  });
+
+  test('a SAVED agreement template wins over the built-in default', async ({ page }) => {
+    const saved = { data: [{ id: 'tpl-1', kind: 'contract', name: 'My agreement', title: 'My agreement', line_items: [], updated_at: past(1) }] };
+    await installApp(page, { api: { ...API, '/sales/templates': saved } });
+    await page.route('**/functions/v1/presence/sales/templates?with_body=contract', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: 'tpl-1', name: 'My agreement', title: 'My agreement', body: 'MY OWN WORDING for {{client_company}} — {{deal_value}}.' }] }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.locator('#addCon').click();
+    const body = page.locator('#conForm textarea');
+    await expect.poll(async () => await body.inputValue(), { timeout: 7000 }).toContain('MY OWN WORDING');
+    const text = await body.inputValue();
+    expect(text).toBe('MY OWN WORDING for Acme — $5,000.');                     // his tokens filled too
+    expect(text).not.toContain('DAVIS DIGITAL STUDIO');                         // the built-in default stood aside
+  });
+
+  test('a deal with no value and no contact degrades readably — no {{tokens}}, no misleading $0', async ({ page }) => {
+    const BARE = { data: { ...CONTACTLESS.data, deal: { ...CONTACTLESS.data.deal, expected_value_cents: 0, title: '' }, contracts: [] } };
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL3}`]: BARE, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.locator('#addCon').click();
+    const body = page.locator('#conForm textarea');
+    await expect.poll(async () => (await body.inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
+    const text = await body.inputValue();
+    expect(text).not.toMatch(/\{\{/);
+    expect(text).toContain('[project fee]');
+    expect(text).toContain('[50% deposit]');
+    expect(text).toContain('[50% balance]');
+    expect(text).toContain('the client');
+    expect(text).toContain('the project');
+    expect(text).not.toMatch(/\$0(?!\d)/);                                      // never a made-up price
+  });
+});
