@@ -466,47 +466,26 @@ function docPlaceholderValues(d,c,biz,now){
 }
 const fillDocPlaceholders=(text,vals)=>{let out=String(text==null?'':text);for(const k of Object.keys(vals)){out=out.replace(new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}','g'),()=>vals[k]);}return out;};
 
-// ── The studio's standard agreement ─────────────────────────────────────────
-// Eric's real Project Agreement & Scope of Work (19 sections). It is the DEFAULT
-// an empty agreement form opens with, so he never has to paste it in. It's plain
-// text on purpose — sign.html, lib/documents.ts and the Document of Record all
-// render an escaped body under `pre-wrap`, and sign.html is bound to
+/* ==== agreement packages: start (extracted + EXECUTED by tests/presence/agreement_packages_test.mjs) ==== */
+// ── The studio's standard agreement — ONE PER PACKAGE ───────────────────
+// There used to be exactly one agreement, and its cover page hardcoded
+// "Package: Custom + Photography" along with that package's what's-included and
+// not-included lists. Every deal got that document whatever was actually sold,
+// so a Growth client signed a page promising art-directed photography they were
+// never buying. The fix is one agreement PER PACKAGE, and the scope of work
+// lives INSIDE it: cover page → scope of work → legal terms. One document, one
+// signature — there is no second scope PDF to lose.
+//
+// The LEGAL TERMS (sections 1-19) are this ONE const, spliced into every
+// package. Never copied. Two packages whose §12 kill fee differs by a word are
+// two different contracts and nobody chose the difference;
+// tests/presence/agreement_packages_test.mjs demands byte-identity.
+//
+// It's plain text on purpose — sign.html, lib/documents.ts and the Document of
+// Record all render an escaped body under `pre-wrap`, and sign.html is bound to
 // content_hash integrity, so ALL formatting lives in this text and nowhere else.
 // Every word stays editable in the form before anything is saved or sent.
-const DDS_CONTRACT_TEMPLATE=`{{studio_name_upper}}
-Project Agreement & Scope of Work
-
-PROJECT SUMMARY
-
-Studio:         {{studio_name}}
-Client:         {{client_company}}
-Project:        {{deal_title}}
-Package:        Custom + Photography
-Project fee:    {{deal_value}} (flat)
-Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch
-Revisions:      2 rounds per major deliverable included
-Timeline:       Estimate confirmed at discovery; depends on timely client input
-Effective date: {{today}}
-
-WHAT'S INCLUDED IN THIS PACKAGE
-
-Bespoke custom website design (not a template), art-directed to the brand
-Art-directed photography direction for a distinctive, professional look
-Mobile-first, fast-loading build with on-page SEO foundations
-Google Business Profile setup/optimization and local SEO basics
-Title tags, meta descriptions, headings, sitemap, and indexing setup
-Private client portal: progress tracking, approvals, files, messages, invoices
-Two rounds of revisions per major deliverable
-30-day post-launch check-in
-
-NOT INCLUDED (QUOTED SEPARATELY IF NEEDED)
-
-Ongoing website support / maintenance (available as a monthly plan)
-Paid advertising management (Google Ads, social ads)
-Custom photography shoot costs (photographer fees, location, talent)
-Copywriting beyond standard page content, e-commerce, or custom integrations
-
-PROJECT AGREEMENT
+const DDS_AGREEMENT_LEGAL=`PROJECT AGREEMENT
 
 This Project Agreement ("Agreement") is entered into between {{studio_name}} ("Studio") and the client identified in the project portal ("Client") (individually and collectively referred to as “Party” or “Parties”). By signing this Agreement in the client portal, Client agrees to be bound by its terms.
 
@@ -598,6 +577,282 @@ IN WITNESS WHEREOF, the parties have signed this Agreement as of the date set fo
 ________________________________               ________________________________
 {{studio_name}}                                         [Client Name / Title]
 Date: ____________                                         Date: ____________`;
+
+// ── The packages, in offer order ──────────────────────────────────
+// Each entry is { label, cover, scope } — the cover page (whose "Package:" line
+// must read the label) and, where the package has one, the scope of work that
+// goes between the cover and the legal terms. `body` is ASSEMBLED below.
+//
+// growth's scope is Eric's standard skeleton: general prose verbatim, with the
+// industry-specific parts left as [BRACKETED] fill-in points he completes per
+// client. That is deliberate and load-bearing — a salon must never receive a
+// contract promising Tock reservations and a wine club. unfilledBlanks() below
+// counts what's still unfilled, and the deal page warns before sending.
+//
+// EXTENSION POINT — adding a package is adding one entry here: a label, a cover
+// page whose "Package:" line matches it, and (optionally) a scope. Nothing else
+// changes: the chooser, the seeding and the tests all read this map.
+// OWED: Eric has published a "Template build" tier but has given no scope
+// content for it, so it is deliberately NOT invented here — a made-up scope in
+// a signed document is worse than no package at all. When he writes that scope,
+// add a third entry (key template_build, label "Template build", its own cover
+// and scope) and it appears in the chooser automatically.
+const DDS_AGREEMENT_PACKAGES={
+  growth:{label:'Growth',cover:`{{studio_name_upper}}
+Project Agreement & Scope of Work
+
+PROJECT SUMMARY
+
+Studio:         {{studio_name}}
+Client:         {{client_company}}
+Project:        {{deal_title}}
+Package:        Growth
+Project fee:    {{deal_value}} (flat)
+Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch
+Revisions:      2 rounds included — see Scope of Work §6 and Agreement §3
+Timeline:       Estimate confirmed at discovery; depends on timely client input
+Effective date: {{today}}
+
+This is one document and one signature. The scope of work below says exactly what is being built; the Project Agreement that follows it sets the terms that govern the work.`,scope:`SCOPE OF WORK — GROWTH PACKAGE
+
+This document defines exactly what is being built, what it costs, what each of us is responsible for, and how the project runs from start to finish. It replaces the proposal for the purpose of describing the work, and it is the reference we both come back to if a question comes up later.
+
+Please read it before signing. If anything here does not match what you expected, tell me now rather than after we start. Changing scope on paper is easy. Changing it mid build is not.
+
+1. THE PACKAGE
+
+Growth package.
+
+Growth package, one time project fee                    {{deal_value}}
+Deposit due at signing, 50 percent                      {{deposit_amount}}
+Balance due at launch, 50 percent                       {{balance_amount}}
+
+The project fee is fixed. It does not change based on how many hours the work takes. It changes only if you and I agree in writing to add something that is not described in this document.
+
+2. WHAT GETS BUILT
+
+Everything below is included in the Growth package fee.
+
+THE SITE BUILD
+
+New website — Built on [PLATFORM] . Set up and configured by me. You can update it yourself afterward without touching code.
+
+Your branding applied — Your colors, fonts, and logo applied across every page so the site does not look like the stock template.
+
+Five core pages — [LIST THE FIVE CORE PAGES] . Written and built specifically for you.
+
+[KEY CONTENT ITEM — e.g. a real text menu, a services list, a treatment list] — Presented as live, readable text rather than photo scans, so Google can read and rank it.
+
+[BOOKING OR ENQUIRY INTEGRATION — e.g. Tock, Calendly, your booking system] — Placed on every page and wired to your account so customers can act from anywhere on the site.
+
+Contact form — A form block, configured and tested so inquiries reach the inbox you specify.
+
+Custom 404 page — A branded page when someone hits a broken link, designed to keep visitors on the site rather than dumping them on the platform default.
+
+Two revision rounds — Two rounds of consolidated feedback before launch. See section 6.
+
+Launch walkthrough video — A recorded video showing you how to update your own content after launch.
+
+Included automatically through the platform, with no setup required: mobile responsiveness, SSL padlock, XML sitemap and robots file, and fast load speed through a global content delivery network.
+
+REVENUE PAGES
+
+These are the pages built around how this business actually makes money. They are specific to you.
+
+[REVENUE PAGE 1] — [WHAT IT MEANS]
+
+[REVENUE PAGE 2] — [WHAT IT MEANS]
+
+[REVENUE PAGE 3] — [WHAT IT MEANS]
+
+[ANY IMPORTANT CLARIFICATION ON WHAT A REVENUE PAGE DOES NOT INCLUDE — for example, a signup and email capture flow does not include recurring billing, subscription payment processing, member account management, or shipping logistics. If a feature like that is wanted, say plainly that it is a separate project and will be quoted separately.]
+
+SEO AND VISIBILITY
+
+Page titles and meta descriptions — Written for every page and targeted to real keywords, not filled with placeholder text.
+
+Keyword research with SEMrush — Research into what [CITY OR MARKET] customers actually search for, such as [EXAMPLE SEARCH TERM] or [EXAMPLE SEARCH TERM] , and the site built around those terms.
+
+Google Search Console setup — Tells Google the site exists, submits the sitemap, and sets up monitoring for crawl errors going forward.
+
+Google Business Profile optimization — The listing that appears in Maps for searches like [CATEGORY] near me. Hours, photos, and key links all updated and made consistent with the site.
+
+Google Analytics 4 with event tracking — Installed and configured so you can see who visits, where they come from, what they look at, and which forms they complete.
+
+REPORTING
+
+Monthly traffic and lead report — A plain English summary sent each month for three months after launch: visitors, what they looked at, and how many filled out a form.
+
+Reporting runs for three months following the launch date and then ends. Ongoing reporting after that point is available under a separate monthly arrangement if you want it.
+
+3. SITE MAP
+
+The site launches with [NUMBER] pages.
+
+[LIST EVERY PAGE, NUMBERED]
+
+Additional pages beyond these are not included. If you want more, they can be added by written change order as described in section 6.
+
+4. WHAT IS NOT INCLUDED
+
+Being specific here protects both of us. If something you assumed was included appears on this list, raise it now.
+
+- Photography and videography of any kind.
+- Logo design, rebranding, or creation of new brand assets. I apply your existing branding. I do not create it.
+- Custom code or custom development of any kind. These are quoted separately.
+- Online store, e-commerce checkout, product sales, or gift card sales through the website.
+- Recurring billing, subscription payment processing, or member account management.
+- Event ticketing or ticket sales through the website.
+- Business email setup or migration of existing email accounts.
+- Ongoing SEO work, content updates, blog writing, or link building after launch.
+- Social media management or paid advertising of any kind.
+- Ongoing site maintenance, content changes, or calendar updates after launch and handoff.
+- Copywriting beyond the pages listed in section 3.
+- Third party subscription costs. See section 8.
+[ADD ANY EXCLUSION SPECIFIC TO THIS CLIENT]
+
+Anything on this list can be added to the project, or handled later under a separate arrangement. It simply is not covered by the fee in section 1.
+
+5. WHAT YOU PROVIDE
+
+The project cannot move without these. They are listed in full in the checklist that came with your welcome email.
+
+- All written content and business information: hours, address, phone, service details, and the story behind the business.
+- All photography, including images of the space, the work, and the team.
+- Logo files and any existing brand guidelines, colors, or fonts.
+- An active [PLATFORM] account in your name, with me added as a contributor.
+- [ANY OTHER ACCOUNT NEEDED FOR AN INTEGRATION — e.g. an active booking or reservation account]
+
+6. REVISIONS AND CHANGES
+
+REVISION ROUNDS
+
+Two rounds of consolidated feedback are included before launch. A round means one collected set of changes, sent together, not a stream of individual requests over several days.
+
+CHANGES TO SCOPE
+
+Anything not described in this document is handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
+
+This is not me being rigid. It is how the fixed fee stays fixed and the launch date stays real.
+
+7. PROCESS AND TIMELINE
+
+The estimate below assumes content arrives on schedule. It is a plan, not a guarantee.
+
+Kickoff — Agreement signed, deposit received, questionnaire and checklist returned, domain transfer started. Week 1.
+
+Content — You send content and photography. I review it and flag gaps. Weeks 1 to 2.
+
+Build — Site built on a private preview link. Your current site stays live and untouched. Weeks 2 to 5.
+
+Review — You review the preview and send one consolidated round of feedback. Week 5.
+
+Revisions — Round one and round two applied. Weeks 5 to 6.
+
+Launch — Final approval, balance paid, domain pointed to the new site, everything verified. Week 6 or 7.
+
+Handoff — Walkthrough video delivered, old site cancelled once stable. Week 7.
+
+Reporting — Three monthly traffic and lead reports. Months 1 to 3 after launch.
+
+8. PAYMENT AND THIRD PARTY COSTS
+
+PROJECT FEE
+
+The project fee of {{deal_value}} is paid in two parts. Fifty percent, or {{deposit_amount}} , is due at signing and before work begins. The remaining fifty percent, or {{balance_amount}} , is due at launch. The site goes live once the balance is received.
+
+COSTS YOU PAY DIRECTLY
+
+These are not part of the project fee. They are billed to you by the providers, in your name, on your own payment method.
+
+[PLATFORM] subscription — [APPROXIMATE COST] . Covers hosting, SSL, sitemap, mobile responsiveness, and all platform features marked as included above.
+
+Domain registration — Annual, varies. Billed by the registrar.
+
+[ANY OTHER THIRD PARTY SERVICE] — [APPROXIMATE COST] . [NOTE]
+
+Every account is created in your name and remains under your control. I am added as a collaborator so I can do the work, and you can remove my access at any time.
+
+9. LAUNCH, ACCEPTANCE, AND SUPPORT
+
+The site is considered accepted when it goes live with your approval. For fourteen days after launch I will fix, at no charge, anything that is broken or does not work as described in this document. Broken means broken. It does not mean new requests or changes of mind, which are handled as change orders.
+
+After that fourteen day window, the site is yours to run. The walkthrough video shows you how to update your content yourself. If you would rather I handle ongoing updates, SEO, and reporting, that is a separate monthly arrangement and we can talk about it whenever you are ready.
+
+10. ABOUT SEARCH RESULTS
+
+Worth stating plainly, in writing, before we start.
+
+The site will be significantly better than the current one on day one. It will be faster, readable by Google, correctly structured, and built around real keywords. That part is immediate.
+
+Actually climbing in search results is not immediate. Realistically it takes about six months before you see a meaningful change in how much traffic search brings you, and that assumes the site stays current and your Google Business Profile stays accurate. Anyone who promises you faster than that is not being straight with you.
+
+11. SCOPE ACKNOWLEDGMENT
+
+By signing this agreement, both parties confirm they have read this scope of work and agree that it accurately describes the project, the fee, and the responsibilities of each side. The legal terms that govern the work follow below.`},
+  custom_photo:{label:'Custom + Photography',cover:`{{studio_name_upper}}
+Project Agreement & Scope of Work
+
+PROJECT SUMMARY
+
+Studio:         {{studio_name}}
+Client:         {{client_company}}
+Project:        {{deal_title}}
+Package:        Custom + Photography
+Project fee:    {{deal_value}} (flat)
+Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch
+Revisions:      2 rounds per major deliverable included
+Timeline:       Estimate confirmed at discovery; depends on timely client input
+Effective date: {{today}}
+
+WHAT'S INCLUDED IN THIS PACKAGE
+
+Bespoke custom website design (not a template), art-directed to the brand
+Art-directed photography direction for a distinctive, professional look
+Mobile-first, fast-loading build with on-page SEO foundations
+Google Business Profile setup/optimization and local SEO basics
+Title tags, meta descriptions, headings, sitemap, and indexing setup
+Private client portal: progress tracking, approvals, files, messages, invoices
+Two rounds of revisions per major deliverable
+30-day post-launch check-in
+
+NOT INCLUDED (QUOTED SEPARATELY IF NEEDED)
+
+Ongoing website support / maintenance (available as a monthly plan)
+Paid advertising management (Google Ads, social ads)
+Custom photography shoot costs (photographer fees, location, talent)
+Copywriting beyond standard page content, e-commerce, or custom integrations`,scope:''},
+};
+// ONE assembly, so the legal terms cannot drift between packages: cover, then
+// the scope if the package has one, then the shared §1-19 — always last, so the
+// document a client reads ends at the signature block.
+Object.keys(DDS_AGREEMENT_PACKAGES).forEach((k)=>{const p=DDS_AGREEMENT_PACKAGES[k];p.body=[p.cover,p.scope,DDS_AGREEMENT_LEGAL].filter(Boolean).join('\n\n');});
+const DDS_PACKAGE_KEYS=Object.keys(DDS_AGREEMENT_PACKAGES);
+
+// ── Fill-in blanks ──────────────────────────────────────────
+// An ALL-CAPS bracketed marker — [PLATFORM], [LIST THE FIVE CORE PAGES] — is a
+// blank the operator still has to complete. Deliberately NOT the placeholder
+// filler's own honest degradations ([project fee], [50% deposit]) nor the
+// signature block's [Client Name / Title]: those are lower/mixed case, they are
+// correct as they stand, and nagging about them would train him to click past
+// the warning that matters. A bracket that never closes on its line is not a
+// blank either.
+const DDS_BLANK_RE=/\[[A-Z]{2}[^\]\n]*\]/g;
+const unfilledBlanks=(text)=>String(text==null?'':text).match(DDS_BLANK_RE)||[];
+/* ==== agreement packages: end ==== */
+
+// The send-time editorial guard. NOT a block, and deliberately not a server
+// refusal: sending a half-filled draft to himself to read on a phone is a real
+// thing he does, and the server's job is contract integrity, not proofreading.
+// It just refuses to let [LIST THE FIVE CORE PAGES] reach a client unnoticed —
+// so it counts what's left and names the first few, in the page's own confirm
+// idiom. Returns true when it's fine to send.
+function confirmBlanks(text){
+  const b=unfilledBlanks(text);
+  if(!b.length)return true;
+  const shown=b.slice(0,3).map(x=>x.length>46?x.slice(0,44)+'…]':x).join(', ');
+  return confirm('This agreement still has '+b.length+' fill-in '+(b.length===1?'blank':'blanks')+' — '+shown+(b.length>3?', and '+(b.length-3)+' more':'')+'.\n\nThe client will see them exactly as written. Send it anyway?');
+}
 
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
@@ -1389,7 +1644,14 @@ async function openDeal(id){
     // via the page's Print button). `table` is the plural /sales/* segment.
     const openDoc=async(table,docId,el)=>{if(el)el.disabled=true;try{const r=await api('/sales/'+table+'/'+docId+'/document');if(r&&r.url)window.open(r.url,'_blank','noopener');else toast('Couldn’t open the document just now.',true);}catch(e){toast(nice(e),true);}finally{if(el)el.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
-    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // Sending a SAVED draft is the other half of the blanks guard — the draft may
+    // have been seeded weeks ago and never completed. The deal read carries each
+    // agreement's body for exactly this check; if it somehow doesn't, the guard
+    // stands aside rather than nagging about a document it can't see.
+    $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{
+      const k=(data.contracts||[]).find(x=>x.id===b.dataset.sendContract);
+      if(k&&k.body&&!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+      b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
     $('detailInner').querySelectorAll('[data-doc-prop]').forEach(b=>b.onclick=()=>openDoc('proposals',b.dataset.docProp,b));
@@ -1481,33 +1743,66 @@ async function openDeal(id){
       const saveCon=async(v)=>{if(!v.body)throw new Error('Add the agreement text.');const r=await api('/sales/deals/'+id+'/contracts','POST',{title:v.title,body:v.body});return r.data&&r.data.id;};
       miniForm($('conForm'),[{name:'title',label:'Title',placeholder:'Service agreement'},{name:'body',label:'Agreement text',type:'textarea',placeholder:'The terms of our engagement…',draft:'con-'+id}],
         async(v)=>{await saveCon(v);toast('Agreement saved as a draft — send it when you’re ready.');openDeal(id);},
-        {saveLabel:'Save draft',alt:{label:'Save & send for signature →',run:async(v)=>{const cid=await saveCon(v);await sendContractById(cid);}}});
+        // Send is the moment the blanks stop being his business and become the
+        // client's. Warn FIRST, before the draft is written, so declining leaves
+        // the form exactly as he left it. Declining throws (miniForm's runWith
+        // toasts it and re-enables the buttons) — nothing is saved, nothing sent.
+        {saveLabel:'Save draft',alt:{label:'Save & send for signature →',run:async(v)=>{
+          if(!confirmBlanks(v.body))throw new Error('Not sent — fill in the blanks, then send it.');
+          const cid=await saveCon(v);await sendContractById(cid);}}});
       // An agreement form should never open as a blank page. PRECEDENCE:
       //   1. a restored draft — his own unsaved words always win (ddsDraftRestore
       //      already ran inside miniForm, so a non-empty body ends this here)
       //   2. his newest SAVED agreement template, if he has one
-      //   3. the studio's standard agreement (DDS_CONTRACT_TEMPLATE)
+      //   3. the CHOSEN package's built-in agreement (DDS_AGREEMENT_PACKAGES)
       // Each step re-checks !bodyEl.value, so a slow fetch can never paint over
       // something he started typing. Placeholders are filled HERE because this
       // body is posted verbatim (the server fills them only on the
       // draft-from-template path). Every word stays editable.
-      const f=$('conForm'); const titleEl=f.querySelector('input'); const bodyEl=f.querySelector('textarea');
+      const f=$('conForm'); const form=f.querySelector('form'); const titleEl=f.querySelector('input'); const bodyEl=f.querySelector('textarea');
+      // ── Which package? ────────────────────────────────────────────────
+      // A select, not a guess. The deal's proposal line items might HINT at the
+      // package, but inferring it would silently put the wrong scope of work in
+      // front of a client — so it defaults to the first package and he switches
+      // in one click. Same idiom as the stage to-do presets and the convert plan.
+      let PKG=DDS_PACKAGE_KEYS[0], SEEDED='', VALS=null;
+      if(form&&bodyEl){
+        const lab=document.createElement('label'); lab.htmlFor='conPkg'; lab.textContent='Package — its scope of work is written into this agreement';
+        const sel=document.createElement('select'); sel.id='conPkg';
+        sel.innerHTML=DDS_PACKAGE_KEYS.map(k=>`<option value="${esc(k)}">${esc(DDS_AGREEMENT_PACKAGES[k].label)}</option>`).join('');
+        sel.value=PKG;
+        form.insertBefore(sel,form.firstChild); form.insertBefore(lab,sel);
+        const seedPkg=(k)=>{if(!VALS||!bodyEl)return;bodyEl.value=fillDocPlaceholders(DDS_AGREEMENT_PACKAGES[k].body,VALS);SEEDED=bodyEl.value;};
+        sel.onchange=()=>{
+          const k=sel.value;
+          // Only his OWN words are worth a confirm — anything we seeded is ours
+          // to replace. SEEDED is whatever we last put in the box.
+          if(bodyEl.value&&bodyEl.value!==SEEDED&&!confirm('Replace the agreement text with the '+DDS_AGREEMENT_PACKAGES[k].label+' package? Your edits here would be lost.')){sel.value=PKG;return;}
+          PKG=k; seedPkg(k);
+          toast(DDS_AGREEMENT_PACKAGES[k].label+' agreement loaded — every word is still editable');
+        };
+      }
       if(bodyEl&&!bodyEl.value){
         const who=((c&&c.name)||d.title||'').trim();
         if(titleEl&&!titleEl.value)titleEl.value=who?('Service agreement — '+who):'Service agreement';
         bodyEl.style.minHeight='260px'; // a full-page agreement — let it breathe
         (async()=>{
           const biz=await bizName().catch(()=>'');
+          const vals=docPlaceholderValues(d,c,biz); VALS=vals;   // the chooser needs these too
           if(bodyEl.value)return;
-          const vals=docPlaceholderValues(d,c,biz);
           if(conTpls.length){   // 2 — his own saved wording beats ours
             try{const r=await api('/sales/templates?with_body=contract');const t=(r.data||[])[0];
-              if(t&&t.body&&!bodyEl.value){bodyEl.value=fillDocPlaceholders(t.body,vals);return;}
+              if(t&&t.body&&!bodyEl.value){bodyEl.value=fillDocPlaceholders(t.body,vals);SEEDED=bodyEl.value;return;}
             }catch(e){/* fall through to the standard agreement */}
           }
           if(bodyEl.value)return;
-          bodyEl.value=fillDocPlaceholders(DDS_CONTRACT_TEMPLATE,vals);   // 3
+          bodyEl.value=fillDocPlaceholders(DDS_AGREEMENT_PACKAGES[PKG].body,vals);   // 3
+          SEEDED=bodyEl.value;
         })();
+      }else if(bodyEl){
+        // A restored draft won, but the chooser still has to work — give it the
+        // values it needs without touching what he typed.
+        (async()=>{const biz=await bizName().catch(()=>'');VALS=docPlaceholderValues(d,c,biz);})();
       }
     };
     // saved templates: one-tap draft-from-template + save-as-template

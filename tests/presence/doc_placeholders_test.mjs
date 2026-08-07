@@ -101,46 +101,62 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
   ok('the mirror degrades identically ([project fee] / [50% deposit] / [50% balance])', /\[project fee\]/.test(pipe) && /\[50% deposit\]/.test(pipe) && /\[50% balance\]/.test(pipe));
   ok('the mirror falls back to the same studio name', pipe.includes(`'${'Davis Digital Studio'}'`));
 
-  ok('the studio’s standard agreement ships as DDS_CONTRACT_TEMPLATE', /const DDS_CONTRACT_TEMPLATE=`/.test(pipe));
-  const tpl = (pipe.match(/const DDS_CONTRACT_TEMPLATE=`([\s\S]*?)`;/) || [])[1] || '';
-  ok('the agreement is the real document (not a stub)', tpl.length > 10000 && tpl.length < 50000, `${tpl.length} chars`);   // clean(b.body, 50000)
-  ok('the agreement carries all 19 sections, numbered once each', (() => {
-    const heads = [...tpl.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
-    return heads.length === 19 && heads.every((n, i) => n === i + 1);
-  })(), [...tpl.matchAll(/^(\d+)\. /gm)].map((m) => m[1]).join(','));
-  ok('the SAMPLE disclaimer is gone', !/\bSAMPLE\b/.test(tpl));
-  ok('every {{token}} the agreement uses is one the filler knows', (() => {
-    const used = [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))];
-    return used.length > 0 && used.every((t) => PLACEHOLDER_TOKENS.includes(t));
-  })(), [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))].join(','));
-  ok('an empty agreement form prefers a SAVED template, then the standard agreement',
-    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=fillDocPlaceholders\(DDS_CONTRACT_TEMPLATE,vals\)/.test(pipe));
+  // There is no longer ONE agreement: pipeline.html ships one PER PACKAGE, with
+  // the scope of work inside it. The set itself (shared §1-19, the Growth scope,
+  // the fill-in blanks) is agreement_packages_test.mjs's job — what belongs HERE
+  // is that EVERY package body speaks only tokens this filler knows, and names
+  // exactly one legal party. So the rules below run over all of them.
+  ok('the studio’s standard agreements ship as DDS_AGREEMENT_PACKAGES', /const DDS_AGREEMENT_PACKAGES=\{/.test(pipe));
+  const BODIES = (() => {
+    const a = pipe.indexOf('/* ==== agreement packages: start'), b = pipe.indexOf('/* ==== agreement packages: end ==== */');
+    if (a < 0 || b < a) return {};
+    const m = new Function(`${pipe.slice(a, b)}\nreturn DDS_AGREEMENT_PACKAGES;`)();
+    return Object.fromEntries(Object.keys(m).map((k) => [k, m[k].body]));
+  })();
+  const NAMES = Object.keys(BODIES);
+  ok('at least the two shipped packages are extractable', NAMES.length >= 2, NAMES.join(','));
+  for (const k of NAMES) {
+    const tpl = BODIES[k];
+    ok(`${k}: the agreement is the real document (not a stub)`, tpl.length > 10000 && tpl.length < 50000, `${tpl.length} chars`);   // clean(b.body, 50000)
+    ok(`${k}: the legal terms carry all 19 sections, numbered once each`, (() => {
+      const legal = tpl.slice(tpl.indexOf('\nPROJECT AGREEMENT\n\n'));
+      const heads = [...legal.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+      return heads.length === 19 && heads.every((n, i) => n === i + 1);
+    })());
+    ok(`${k}: the SAMPLE disclaimer is gone`, !/\bSAMPLE\b/.test(tpl));
+    ok(`${k}: every {{token}} the agreement uses is one the filler knows`, (() => {
+      const used = [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))];
+      return used.length > 0 && used.every((t) => PLACEHOLDER_TOKENS.includes(t));
+    })(), [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))].join(','));
+
+    // ── The default contract must name exactly ONE legal party: the TENANT'S own
+    // studio. Three places used to hardcode "Davis Digital Studio" — the
+    // letterhead, the operative parties clause, and the signature block — so a
+    // non-DDS tenant's client would have been asked to sign a binding clause
+    // naming a company that is not their counterparty.
+    ok(`${k}: the letterhead is the studio’s own name (uppercased), not a hardcode`, tpl.startsWith('{{studio_name_upper}}\n'));
+    ok(`${k}: the operative parties clause names the studio by token`, /entered into between \{\{studio_name\}\} \("Studio"\)/.test(tpl));
+    // presence_identity carries no PERSON name (business_name/email/phone only), so
+    // the signature block prints the BUSINESS above the rule and leaves the printed
+    // name blank — never a hardcoded "Eric Davis" on someone else's contract.
+    ok(`${k}: the signature block names the studio, never a hardcoded person`, /\n\{\{studio_name\}\} +\[Client Name \/ Title\]/.test(tpl) && !/Eric Davis/.test(tpl));
+    ok(`${k}: NO hardcoded studio identity survives anywhere in the agreement`, !/Davis Digital Studio/i.test(tpl));
+
+    // …and the rendered result, for a tenant who is not Eric and for Eric himself.
+    const fillFor = (biz) => applyPlaceholders(tpl, buildPlaceholderValues({ deal: {}, contact: null, studioName: biz, now: AT }));
+    const tenant = fillFor('Northwind Web Co.');
+    ok(`${k}: a non-DDS tenant’s agreement never names Davis Digital Studio`, !/Davis Digital Studio/i.test(tenant));
+    ok(`${k}: a non-DDS tenant’s letterhead is THEIR name, uppercased`, tenant.startsWith('NORTHWIND WEB CO.\n'));
+    ok(`${k}: a non-DDS tenant is the Studio in the operative parties clause`, tenant.includes('entered into between Northwind Web Co. ("Studio")'));
+    ok(`${k}: a non-DDS tenant signs in their own name`, /\nNorthwind Web Co\. +\[Client Name \/ Title\]/.test(tenant));
+    const dds = fillFor('');   // Eric's own site, via the fallback chain
+    ok(`${k}: Eric’s own site still reads exactly as his document does`, dds.startsWith('DAVIS DIGITAL STUDIO\n')
+      && dds.includes('entered into between Davis Digital Studio ("Studio")')
+      && /\nDavis Digital Studio +\[Client Name \/ Title\]/.test(dds));
+  }
+  ok('an empty agreement form prefers a SAVED template, then the CHOSEN package’s agreement',
+    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=fillDocPlaceholders\(DDS_AGREEMENT_PACKAGES\[PKG\]\.body,vals\)/.test(pipe));
   ok('the unreachable starterAgreement’s dead branch is gone', !/starterAgreement/.test(pipe));
-
-  // ── The default contract must name exactly ONE legal party: the TENANT'S own
-  // studio. Three places used to hardcode "Davis Digital Studio" — the
-  // letterhead, the operative parties clause, and the signature block — so a
-  // non-DDS tenant's client would have been asked to sign a binding clause
-  // naming a company that is not their counterparty.
-  ok('the letterhead is the studio’s own name (uppercased), not a hardcode', tpl.startsWith('{{studio_name_upper}}\n'));
-  ok('the operative parties clause names the studio by token', /entered into between \{\{studio_name\}\} \("Studio"\)/.test(tpl));
-  // presence_identity carries no PERSON name (business_name/email/phone only), so
-  // the signature block prints the BUSINESS above the rule and leaves the printed
-  // name blank — never a hardcoded "Eric Davis" on someone else's contract.
-  ok('the signature block names the studio, never a hardcoded person', /\n\{\{studio_name\}\} +\[Client Name \/ Title\]/.test(tpl) && !/Eric Davis/.test(tpl));
-  ok('NO hardcoded studio identity survives anywhere in the agreement', !/Davis Digital Studio/i.test(tpl));
-
-  // …and the rendered result, for a tenant who is not Eric and for Eric himself.
-  const fillFor = (biz) => applyPlaceholders(tpl, buildPlaceholderValues({ deal: {}, contact: null, studioName: biz, now: AT }));
-  const tenant = fillFor('Northwind Web Co.');
-  ok('a non-DDS tenant’s agreement never names Davis Digital Studio', !/Davis Digital Studio/i.test(tenant));
-  ok('a non-DDS tenant’s letterhead is THEIR name, uppercased', tenant.startsWith('NORTHWIND WEB CO.\n'));
-  ok('a non-DDS tenant is the Studio in the operative parties clause', tenant.includes('entered into between Northwind Web Co. ("Studio")'));
-  ok('a non-DDS tenant signs in their own name', /\nNorthwind Web Co\. +\[Client Name \/ Title\]/.test(tenant));
-  const dds = fillFor('');   // Eric's own site, via the fallback chain
-  ok('Eric’s own site still reads exactly as his document does', dds.startsWith('DAVIS DIGITAL STUDIO\n')
-    && dds.includes('entered into between Davis Digital Studio ("Studio")')
-    && /\nDavis Digital Studio +\[Client Name \/ Title\]/.test(dds));
   ok('the stale DDS-Contract-Custom-Package-SAMPLE.docx is gone from the repo root', (() => {
     try { Deno.statSync(new URL('../../DDS-Contract-Custom-Package-SAMPLE.docx', import.meta.url)); return false; } catch { return true; }
   })());
@@ -227,9 +243,13 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
       '', 'no tokens here at all',
     ];
     for (const [i, b] of bodies.entries()) ok(`fillDocPlaceholders ≡ applyPlaceholders — body ${i}`, mirror.fillDocPlaceholders(b, vals) === applyPlaceholders(b, vals));
-    // and the whole shipped agreement, end to end
-    const tplSrc = (pipe.match(/const DDS_CONTRACT_TEMPLATE=`([\s\S]*?)`;/) || [])[1] || '';
-    ok('the two fillers agree on the FULL shipped agreement', tplSrc.length > 10000 && mirror.fillDocPlaceholders(tplSrc, vals) === applyPlaceholders(tplSrc, vals));
+    // and every shipped agreement, end to end
+    const a = pipe.indexOf('/* ==== agreement packages: start'), z = pipe.indexOf('/* ==== agreement packages: end ==== */');
+    const map = new Function(`${pipe.slice(a, z)}\nreturn DDS_AGREEMENT_PACKAGES;`)();
+    for (const k of Object.keys(map)) {
+      const tplSrc = map[k].body;
+      ok(`the two fillers agree on the FULL shipped agreement — ${k}`, tplSrc.length > 10000 && mirror.fillDocPlaceholders(tplSrc, vals) === applyPlaceholders(tplSrc, vals));
+    }
   }
 }
 

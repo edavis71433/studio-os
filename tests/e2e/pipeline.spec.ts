@@ -1098,3 +1098,186 @@ test.describe('deal page — remove an unsent draft', () => {
     await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();        // still there to try again
   });
 });
+
+// ── An agreement PER PACKAGE ────────────────────────────────────────────────
+// The old single template hardcoded "Package: Custom + Photography" on its cover
+// and carried that package's what's-included list, so every deal — Growth or not
+// — got that document. pipeline.html now ships one agreement per package with
+// the scope of work INSIDE it (cover → scope → legal terms: one document, one
+// signature), and the form asks which package before it seeds anything.
+const DEAL5 = '55555555-5555-4555-8555-555555555555';
+const GROWTH_DEAL = { data: {
+  deal: { id: DEAL5, title: 'Bacchus website', stage: 'contract', expected_value_cents: 640000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Bacchus Wine Bar', notes: '' },
+  proposals: [], contracts: [], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} };
+const PKG_API = { ...API, [`/sales/deals/${DEAL5}`]: GROWTH_DEAL, [`/sales/deals/${DEAL5}/tasks`]: { data: [] } };
+const conBody = (page: import('@playwright/test').Page) => page.locator('#conForm textarea');
+const seeded = async (page: import('@playwright/test').Page) => {
+  await expect.poll(async () => (await conBody(page).inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
+  return conBody(page).inputValue();
+};
+
+test.describe('agreement — one per package', () => {
+  test('the form asks which package, defaults to the first, and seeds Growth with the deal’s fees', async ({ page }) => {
+    await installApp(page, { api: PKG_API });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+
+    // the chooser offers every shipped package, in order, and defaults sensibly
+    const pick = page.locator('#conPkg');
+    await expect(pick).toBeVisible();
+    await expect(pick.locator('option')).toHaveText(['Growth', 'Custom + Photography']);
+    await expect(pick).toHaveValue('growth');
+
+    const text = await seeded(page);
+    // the cover names THIS package — never another one's
+    expect(text).toContain('Package:        Growth');
+    expect(text).not.toContain('Custom + Photography');
+    // the scope of work is IN the agreement, ahead of the legal terms
+    expect(text).toContain('SCOPE OF WORK — GROWTH PACKAGE');
+    for (const h of ['1. THE PACKAGE', '4. WHAT IS NOT INCLUDED', '11. SCOPE ACKNOWLEDGMENT']) expect(text).toContain(`\n${h}\n`);
+    expect(text.indexOf('SCOPE OF WORK — GROWTH PACKAGE')).toBeLessThan(text.indexOf('\nPROJECT AGREEMENT\n'));
+    expect(text).toContain('19. ENTIRE AGREEMENT');
+    // the fee lines are FILLED from the deal — $6,400 split 50/50
+    expect(text).not.toMatch(/\{\{/);
+    expect(text).toContain('Growth package, one time project fee                    $6,400');
+    expect(text).toContain('Deposit due at signing, 50 percent                      $3,200');
+    expect(text).toContain('Balance due at launch, 50 percent                       $3,200');
+    expect(text).toContain('Bacchus Wine Bar');                                  // {{client_company}}
+    expect(text.split('\n')[0]).toBe('TEST STUDIO');                             // one legal seller, still
+    // the fill-in blanks survive into the box so he can complete them
+    expect(text).toContain('[LIST THE FIVE CORE PAGES]');
+    await expect(conBody(page)).toBeEditable();
+  });
+
+  test('choosing Custom + Photography swaps to that agreement, scope and all', async ({ page }) => {
+    await installApp(page, { api: PKG_API });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    await seeded(page);
+    await page.locator('#conPkg').selectOption('custom_photo');
+    await expect(page.locator('.dds-toast')).toContainText('Custom + Photography agreement loaded');
+    const text = await conBody(page).inputValue();
+    expect(text).toContain('Package:        Custom + Photography');
+    expect(text).toContain('Art-directed photography direction');                // its own what's-included list
+    expect(text).not.toContain('SCOPE OF WORK — GROWTH PACKAGE');                // …and none of Growth's scope
+    expect(text).not.toContain('[LIST THE FIVE CORE PAGES]');
+    expect(text).not.toMatch(/\{\{/);
+    expect(text).toContain('$6,400');
+  });
+
+  test('the legal terms are byte-identical whichever package is chosen', async ({ page }) => {
+    await installApp(page, { api: PKG_API });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    const growth = await seeded(page);
+    await page.locator('#conPkg').selectOption('custom_photo');
+    const custom = await conBody(page).inputValue();
+    const legalOf = (t: string) => t.slice(t.indexOf('\nPROJECT AGREEMENT\n\n'));
+    expect(legalOf(growth).length).toBeGreaterThan(10000);
+    expect(legalOf(growth)).toBe(legalOf(custom));                               // one shared const, not two copies
+  });
+
+  test('switching away from words HE typed asks first; declining keeps them', async ({ page }) => {
+    await installApp(page, { api: PKG_API });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    await seeded(page);
+    await conBody(page).fill('MY OWN WORDING, typed by hand.');
+    page.once('dialog', (d) => { expect(d.message()).toContain('Custom + Photography'); d.dismiss(); });
+    await page.locator('#conPkg').selectOption('custom_photo');
+    await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
+    await expect(page.locator('#conPkg')).toHaveValue('growth');                 // …and the select snapped back
+  });
+});
+
+// ── The unfilled-blanks guard ───────────────────────────────────────────────
+// The Growth skeleton ships 25 [BRACKETED] fill-in points. A client must never
+// receive "[LIST THE FIVE CORE PAGES]" — but a half-filled draft sent to himself
+// is legitimate, so this warns and lets him through, never blocks.
+test.describe('agreement — the unfilled-blanks warning', () => {
+  const postsTo = async (page: import('@playwright/test').Page, calls: string[]) =>
+    page.route('**/functions/v1/presence/sales/**', async (route) => {
+      if (route.request().method() === 'GET') return route.fallback();
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      calls.push(path);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-new' }, url: 'https://example.test/sign/x', emailed: true }) });
+    });
+
+  test('Save & send warns, names the blanks, and sends nothing when he declines', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: PKG_API });
+    await postsTo(page, calls);
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    await seeded(page);
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await page.locator('#conForm .row2 .btn:not(.ghost)').click();               // Save & send for signature →
+    await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
+    expect(msg).toContain('25 fill-in blanks');
+    expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
+    expect(msg).toContain('Send it anyway?');
+    expect(calls).toHaveLength(0);                                              // not even saved as a draft
+  });
+
+  test('…and sends it anyway when he says yes — the warning never blocks', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: PKG_API });
+    await postsTo(page, calls);
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    await seeded(page);
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#conForm .row2 .btn:not(.ghost)').click();
+    await expect.poll(() => calls).toContain(`/sales/deals/${DEAL5}/contracts`);
+    await expect.poll(() => calls).toContain('/sales/contracts/k-new/send');
+  });
+
+  test('no warning at all once every blank is filled', async ({ page }) => {
+    const calls: string[] = [];
+    let dialogs = 0;
+    await installApp(page, { api: PKG_API });
+    await postsTo(page, calls);
+    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    const text = await seeded(page);
+    await conBody(page).fill(text.replace(/\[[A-Z]{2}[^\]\n]*\]/g, 'Squarespace'));
+    await page.locator('#conForm .row2 .btn:not(.ghost)').click();
+    await expect.poll(() => calls).toContain('/sales/contracts/k-new/send');
+    expect(dialogs).toBe(0);
+  });
+
+  test('a SAVED draft still full of blanks warns at its own Send button', async ({ page }) => {
+    const withBlanks = { data: { ...GROWTH_DEAL.data, contracts: [
+      { id: 'k-blank', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'Five core pages: [LIST THE FIVE CORE PAGES] built on [PLATFORM].' },
+    ] } };
+    const calls: string[] = [];
+    await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: withBlanks } });
+    await postsTo(page, calls);
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await page.locator('[data-send-contract="k-blank"]').first().click();
+    await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
+    expect(msg).toContain('2 fill-in blanks');
+    expect(calls).toHaveLength(0);
+  });
+
+  test('a SAVED draft with nothing left to fill sends straight out', async ({ page }) => {
+    const done = { data: { ...GROWTH_DEAL.data, contracts: [
+      { id: 'k-done', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'Five core pages: Home, About, Menu, Events, Contact — built on Squarespace.' },
+    ] } };
+    const calls: string[] = [];
+    let dialogs = 0;
+    await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: done } });
+    await postsTo(page, calls);
+    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('[data-send-contract="k-done"]').first().click();
+    await expect.poll(() => calls).toContain('/sales/contracts/k-done/send');
+    expect(dialogs).toBe(0);
+  });
+});

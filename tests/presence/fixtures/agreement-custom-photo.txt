@@ -1,0 +1,125 @@
+{{studio_name_upper}}
+Project Agreement & Scope of Work
+
+PROJECT SUMMARY
+
+Studio:         {{studio_name}}
+Client:         {{client_company}}
+Project:        {{deal_title}}
+Package:        Custom + Photography
+Project fee:    {{deal_value}} (flat)
+Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch
+Revisions:      2 rounds per major deliverable included
+Timeline:       Estimate confirmed at discovery; depends on timely client input
+Effective date: {{today}}
+
+WHAT'S INCLUDED IN THIS PACKAGE
+
+Bespoke custom website design (not a template), art-directed to the brand
+Art-directed photography direction for a distinctive, professional look
+Mobile-first, fast-loading build with on-page SEO foundations
+Google Business Profile setup/optimization and local SEO basics
+Title tags, meta descriptions, headings, sitemap, and indexing setup
+Private client portal: progress tracking, approvals, files, messages, invoices
+Two rounds of revisions per major deliverable
+30-day post-launch check-in
+
+NOT INCLUDED (QUOTED SEPARATELY IF NEEDED)
+
+Ongoing website support / maintenance (available as a monthly plan)
+Paid advertising management (Google Ads, social ads)
+Custom photography shoot costs (photographer fees, location, talent)
+Copywriting beyond standard page content, e-commerce, or custom integrations
+
+PROJECT AGREEMENT
+
+This Project Agreement ("Agreement") is entered into between {{studio_name}} ("Studio") and the client identified in the project portal ("Client") (individually and collectively referred to as “Party” or “Parties”). By signing this Agreement in the client portal, Client agrees to be bound by its terms.
+
+1. SCOPE OF WORK
+
+Studio agrees to provide web design, search engine optimization (SEO) strategy, and related digital services as described in the project proposal or scope of work document provided to Client. The proposal specifies the exact page count and deliverables included in the project.
+Included copywriting: Clear, SEO-aware website copy for the number of core pages stated in the proposal (typically up to seven (7) pages for a custom build, such as Home, About, Services, Contact, and related core pages). Copy is written from the Client's intake questionnaire, existing materials, and the discovery conversation.
+Copywriting quoted separately: Blog posts or article programs, long-form sales pages, product descriptions for e-commerce catalogs, email or advertising campaigns, scripts, customer-interview-based case studies, and substantial rewrites of Client-supplied copy beyond light editing.
+Any services, features, or deliverables not expressly included in the agreed scope constitute "out-of-scope work" and will be quoted separately in writing before proceeding. Studio reserves the right to decline out-of-scope requests.
+
+2. PAYMENT TERMS
+
+A non-refundable deposit of 50% of the total project fee is due before work begins. The remaining 50% is due upon project completion, prior to live site launch, DNS transfer, or handoff of final files. All payments are due within 7 days of invoice. Invoices unpaid after 14 days will result in a pause in work. Invoices unpaid after 30 days accrue interest at 1.5% per month (18% per annum). Client is responsible for any collection costs or attorney fees incurred by Studio to recover unpaid amounts.
+
+3. REVISIONS
+
+Each project includes two (2) rounds of revisions per major deliverable. For purposes of this Agreement, the "major deliverables" are: (a) the initial design concept or mockup; (b) the built-out pages prior to launch; and (c) the final pre-launch site. Each of these may be revised up to two (2) times. Revisions are defined as reasonable modifications within the original scope — not new features, new pages, or changes in creative direction. Additional revision rounds, or revisions requested after final approval of a deliverable, are billed at $95/hour. All revision requests must be submitted through the client portal within 7 calendar days of delivery. Requests submitted after this window may be treated as new work.
+
+4. TIMELINE & DELAYS
+
+Project timelines are estimates based on timely Client participation. Studio's timeline obligations are contingent on Client providing required content, feedback, approvals, and access within 5 business days of each request. Client-caused delays extending the project by more than 14 calendar days will result in a revised delivery date. Projects inactive for 30 or more days due to Client non-response will be closed and restarted upon request and at Studio's discretion, subject to a restart fee.
+
+5. CLIENT RESPONSIBILITIES
+
+Client agrees to: (a) provide all required content, assets, brand materials, and login credentials in a timely manner; (b) ensure all content provided is accurate and does not infringe on third-party rights; (c) designate one point of contact for approvals; (d) respond to requests within 5 business days. Studio is not responsible for errors, omissions, or delays caused by incomplete or inaccurate client-provided content.
+
+6. INTELLECTUAL PROPERTY
+
+Upon receipt of full and final payment, Client owns all custom design and an irrevocable license to use Studio’s copy and code created specifically for this project. Studio retains the right to display completed work in its portfolio and marketing materials unless Client requests otherwise in writing. Studio retains ownership of all pre-existing tools, frameworks, methodologies, and templates used in the project.
+Client agrees to assign to the Studio, for no additional consideration, the rights, title, and interest to all documents, work product, and other materials that are delivered under this Agreement (collectively, the "Deliverables") and all other writings, technology, inventions, discoveries, processes, techniques, methods, ideas, concepts, research, proposals, and materials, and all other work product of any nature whatsoever, that are created, prepared, produced, authored, edited, modified, conceived, or reduced to practice in the course of performing the Services (collectively, and including the Deliverables, "Work Product"), and all patents, copyrights, trademarks (together with the goodwill symbolized thereby), trade secrets, know-how, and other confidential or proprietary information, and other intellectual property rights (collectively "Intellectual Property Rights") therein, including the right to sue, counterclaim, and recover for all past, present, and future infringement, misappropriation, or dilution thereof.
+The Studio is and will remain, the sole and exclusive owner of all right, title, and interest in and to any documents, specifications, data, know-how, methodologies, software, and other materials provided to you by the Studio ("Studio Materials"), and all Intellectual Property Rights therein. Client has no right or license to reproduce or use any Studio Materials except solely during the Term to the extent necessary to perform obligations under this Agreement. All other rights in and to the Studio Materials are expressly reserved by the Studio.
+Client Data. Client retains ownership of its pre-existing data and materials (“Client Data”), and grants Studio a worldwide, royalty-free, non-exclusive license to use, reproduce, modify, analyze, and create derivative works from Client Data as necessary to perform the Services, to improve or enhance Studio’s service offerings, and for internal analytics, quality assurance, and recordkeeping. Studio will maintain commercially reasonable administrative, technical, and physical safeguards to protect Client Data. Client acknowledges that Services involve communications, digital tools, and third-party platforms outside Studio’s control, and Studio does not guarantee absolute security, uninterrupted availability, or error-free transmission of Client Data. Client is solely responsible for ensuring it has all rights, permissions, and consents necessary to provide Client Data to Studio and all such Client Data does not infringe, misappropriate, or violate any rights of third parties and is accurate, complete, and lawful for the intended use.
+
+7. THIRD-PARTY TOOLS & PLATFORMS
+
+Client's project may rely on third-party platforms including but not limited to web hosting, payment processors, form services, email providers, analytics tools, and content management systems. Studio is not responsible for downtime, pricing changes, feature removals, data loss, or policy changes by any third party. Additional work required due to third-party changes is subject to separate billing.
+
+8. RESULTS DISCLAIMER
+
+Studio makes no guarantees of specific search engine rankings, traffic levels, lead volumes, or revenue outcomes. SEO and digital marketing results vary based on industry competition, geographic market, content quality, client business factors, and Google algorithm changes. Any projections shared are illustrative only and do not constitute financial forecasts or guarantees.
+
+9. CONFIDENTIALITY
+
+Both parties agree to keep the other's proprietary business information, pricing, and client data confidential. Studio will not share Client logins, business data, or confidential information with third parties, except as required to deliver the project (e.g., hosting platforms). Each Party agrees to use the Confidential Information of the other Party solely for the purposes of this Agreement. "Confidential Information" excludes information that was already known, becomes publicly available, is lawfully obtained from another source, or is independently developed. The receiving Party will restrict access to Confidential Information to those with a need to know and will ensure they are bound by confidentiality obligations as protective as those in this Agreement. The receiving Party will not disclose Confidential Information to third parties without the disclosing Party's written consent, except when required by law, in which case prior notice will be provided. The confidentiality obligations will survive the termination or expiration of this Agreement and apply to all discussions concerning potential business arrangements, including proposals, quotes, and negotiations.
+
+10. LIMITATION OF LIABILITY
+
+In no event shall studio be liable to client or to any third party for any loss of use, revenue, or profit or loss of data or diminution in value, or for any consequential, incidental, indirect, exemplary, special, or punitive damages whether arising out of breach of contract, tort (including negligence), or otherwise, regardless of whether such damage was foreseeable and whether or not company has been advised of the possibility of such damages, and notwithstanding the failure of any agreed or other remedy of its essential purpose. in no event shall studio’s total liability exceed the fees paid by client to studio under this agreement in the twelve (12) months immediately preceding the event giving rise to the claim; provided however such limitation shall not apply to damages arising out of a party’s indemnification obligations.
+
+11. Severability.  If any provision in this Agreement is held invalid or unenforceable, in whole or in part, the remainder of the provisions or enforceable parts of this Agreement shall not be affected, and shall be enforced to the fullest extent permitted by law.
+
+12. TERMINATION & KILL FEE
+
+Either party may terminate this Agreement with 7 days written notice. If Client terminates after work has begun: (a) all work completed to date will be invoiced at the pro-rata project rate or hourly rate of $95/hour, whichever is greater; (b) the initial deposit is non-refundable; (c) a kill fee equal to 25% of the remaining unbilled balance is due upon termination to cover lost scheduling and opportunity cost. If Studio terminates without cause, Client receives a pro-rata refund of any unused deposit. Completed deliverables will be provided to Client upon payment of all outstanding amounts.
+
+13. INDEPENDENT CONTRACTOR RELATIONSHIP
+
+In the performance of this Agreement, Studio will act as, and for all purposes hereunder shall be considered, an independent contractor, and neither Studio nor any of its employees or agents shall be considered an employee or agent of Client.
+
+14. FORCE MAJEURE
+
+Neither party shall be in default if performance is delayed or prevented by circumstances beyond reasonable control, including illness, family emergency, natural disaster, government action, or internet infrastructure failure. The affected party shall notify the other within 5 business days and make reasonable efforts to resume performance.
+
+15. INDEMNIFICATION
+
+Client Indemnification. Client shall indemnify, defend, and hold harmless Studio and its officers, directors, employees, agents, successors, and assigns from and against any and all losses, damages, liabilities, deficiencies, claims, actions, judgments, settlements, interest, awards, penalties, fines, costs, or expenses of whatever kind, including reasonable attorneys’ fees (collectively, "Losses"), arising out of or relating to: (i) any materials or information provided by Client to Studio for use in connection with the Services, including any allegation that such materials infringe or misappropriate the intellectual property rights of a third party or are false, misleading, or otherwise unlawful; (ii) any subpoena, discovery request, investigation, inquiry, enforcement action, or other legal or governmental process relating to Client, its business, products, services, or public communications; (iii) Client’s gross negligence, willful misconduct, or breach of this Agreement; (iv) any public statements, disclosures, claims, content, or messaging created, approved, or supplied by Client; or (v) any reputational, publicity, crisis, or media-related fallout arising from strategies or tactics approved by Client.
+Studio Indemnification. Studio shall indemnify, defend, and hold harmless Client and its officers, directors, employees, agents, successors, and assigns from and against any and all Losses arising out of or relating to: (i) any Deliverables or Services that, as provided by Studio and without Client modification, infringe the intellectual property rights of a third party; provided that the Deliverables were used by Client strictly in accordance with this Agreement or (ii) Studio’s gross negligence, willful misconduct, or breach of this Agreement.
+
+16. NOTICE OF INDEMNIFICATION
+
+Party seeking indemnification hereunder (the "Indemnified Party") shall promptly notify the other Party (the "Indemnifying Party") in writing of any claim, action, or demand for which indemnity is sought within thirty (30) days of its receipt thereof.  The provisions of this section will survive the termination of this Agreement.
+
+17. DISPUTE RESOLUTION
+
+The parties agree to attempt to resolve any dispute amicably and to meet and confer through good-faith negotiation for a minimum period of thirty (30) days from the initial notice of any alleged loss or claim before pursuing formal remedies. If negotiation fails, disputes shall be resolved by binding arbitration in Los Angeles County, California, under the rules of the American Arbitration Association, unless the amount in dispute qualifies for California Small Claims Court in which case either party may elect small claims jurisdiction.
+
+18. GOVERNING LAW
+
+This Agreement is governed by the laws of the State of California, without regard to its conflict of law provisions. Venue for any proceedings shall be Los Angeles County, California.
+
+19. ENTIRE AGREEMENT
+
+This Agreement, together with any project proposal or scope of work document, constitutes the entire agreement between the parties regarding the project and supersedes all prior discussions and representations. Modifications must be in writing and agreed to by both parties. Signed acknowledgment in the client portal constitutes a legally binding and valid electronic signature in accordance with applicable law.
+
+ACKNOWLEDGMENT
+
+IN WITNESS WHEREOF, the parties have signed this Agreement as of the date set forth below:
+
+________________________________               ________________________________
+{{studio_name}}                                         [Client Name / Title]
+Date: ____________                                         Date: ____________
