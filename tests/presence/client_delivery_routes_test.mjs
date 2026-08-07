@@ -78,6 +78,39 @@ ok('documents: portal view_url mints via docViewerUrl (site-origin doc.html view
     /client_upload: isClientUpload\(a\)/.test(assetsRoute));
 }
 
+// ── the CLIENT dimension on Files is OPERATOR-ONLY (Files-by-client) ─────────
+// The studio roster learns which client a file belongs to by joining
+// presence_deliverables → presence_service_links → clients. That join lives
+// entirely inside the operator's GET /assets. The portal must gain NOTHING from
+// it: cross-client isolation there is enforced by the bridge (0079) and was a
+// deliberate hardening — a client_name leaking into a /client/* bundle would
+// name one customer to another.
+{
+  const assetsRoute = read('supabase/functions/presence/routes/assets.ts');
+  const ws = read('supabase/functions/presence/routes/workspace.ts');
+  const dam = read('supabase/functions/presence/lib/dam.ts');
+  ok('files-by-client: the media→client map is built inside the OPERATOR list handler',
+    /async function clientByMedia\(site: SiteRow\)/.test(assetsRoute) && /handleAssetsList[\s\S]*?clientByMedia\(site\)/.test(assetsRoute));
+  ok('files-by-client: the join is scoped to the operator\'s OWN site on every hop',
+    /presence_deliverables\?site_id=eq\.\$\{site\.id\}/.test(assetsRoute) && /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}/.test(assetsRoute));
+  ok('files-by-client: it is NOT the ?client= tenant switch — the customer\'s OWN site is never consulted',
+    !/customer_site_id/.test(assetsRoute) && /clientByMedia[\s\S]*?presence_service_links\?agency_site_id/.test(assetsRoute));
+  ok('isolation: NO /client/* route emits client_id / client_name / clientsByMedia',
+    !/client_name/.test(cd) && !/clientsByMedia|clientByMedia/.test(cd));
+  ok('isolation: the pure core is imported by the operator route only (not the client door)',
+    /clientsByMedia/.test(assetsRoute) && /export function clientsByMedia/.test(dam) && !/clientsByMedia/.test(cd));
+  ok('isolation: GET /assets is operator-only — a reviewer\'s only /assets door is POST :id/status',
+    /export function reviewerAllowed/.test(ws)
+    && ws.includes("method === 'POST' && /^\\/assets\\/[0-9a-f-]{36}\\/status$/")
+    && (ws.match(/method === 'GET'[^\n]*/g) || []).every((l) => /portal\/context|portal\/feed/.test(l) && !/assets/.test(l)));
+  ok('present(): the client fields are ADDITIVE — undefined for a file that was never delivered',
+    /client_id: c\?\.client_id \|\| undefined/.test(assetsRoute) && /client_name: c\?\.client_name \|\| undefined/.test(assetsRoute) && /project_id: c\?\.project_id \|\| undefined/.test(assetsRoute));
+  ok('present(): only the LIST handler ever supplies a client — every other call site omits it',
+    (assetsRoute.match(/present\(/g) || []).length > 2 && (assetsRoute.match(/client: byClient\.get/g) || []).length === 1);
+  ok('files-by-client: a project with no bridge link contributes no client (the pure core refuses to guess)',
+    /if \(!client\) continue;/.test(dam));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ CLIENT BRIDGE ROUTES (P2-D hardening): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

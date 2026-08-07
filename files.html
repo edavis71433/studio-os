@@ -36,6 +36,13 @@
   .col .ic{width:17px;height:17px;flex:none;opacity:.85}
   .col .n{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
   .col.on .n{color:var(--p)}
+  /* the Clients rail — a second dimension over the same list, not a second rail */
+  .railsec{display:flex;flex-direction:column;gap:2px;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  @media (max-width:720px){.railsec{flex-direction:row;align-items:center;margin-top:0;border-top:none;border-left:1px solid var(--line);padding:0 0 0 12px}}
+  .railhead{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:0 11px 4px;white-space:nowrap}
+  @media (max-width:720px){.railhead{padding:0 4px 0 0}}
+  .railmore{background:none;border:none;font:inherit;font-size:12.5px;color:var(--p);cursor:pointer;text-align:left;padding:4px 11px;border-radius:8px;white-space:nowrap}
+  .railmore:hover{background:var(--p-soft)}
 
   /* toolbar */
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
@@ -222,6 +229,9 @@ const IC={
   starO:'<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   arch:'<path d="M3 6h18v3H3zM5 9v11h14V9M9 13h6" fill="none" stroke="currentColor" stroke-width="1.6"/>',
   search:'<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.8"/>',
+  person:'<circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  studio:'<path d="M4 20V9.5L12 4l8 5.5V20z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 20v-6h5v6" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  people:'<circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 13.6a6.5 6.5 0 0 1 4 5.9" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
 };
 const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
@@ -238,7 +248,7 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',caps:[],policy:'immediate',assets:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
+let S={col:'all',q:'',client:'',caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 let LOADED_AT=0;
@@ -259,6 +269,10 @@ const TCOLS=[
   ['use','Where used',(a)=>a.in_use?1:0],
   ['state','Status',(a)=>String(a.state||'')],
 ];
+// Whose work a file belongs to. Shown only once the studio actually has client
+// files — a column of nothing but "Studio" is noise. '~' sorts Studio last.
+const TCOL_CLIENT=['client','Client',(a)=>String(a.client_name||'~~~').toLowerCase()];
+function tcols(){return RAILC.length?[TCOLS[0],TCOL_CLIENT,...TCOLS.slice(1)]:TCOLS;}
 let SORT={key:'added',dir:-1};   // newest first — the old "Recent" default
 // ── rail counts: named collections come from /assets/collections; kind/favorite/
 //    brand and the archive remainder derive from the last UNFILTERED, unsearched
@@ -275,6 +289,29 @@ function deriveRailCounts(rows,total){
   // excludes archived — the difference is the Archive count. Exact only while
   // the library fits the read limit; beyond that stay honest and omit it.
   RAILN.archive=(typeof total==='number'&&rows.length<300&&total>=rows.length)?(total-rows.length):undefined;
+}
+// ── the CLIENT dimension — "organized and filtered by client, not all just there
+//    at once" ─────────────────────────────────────────────────────────────────
+// Derived from the SAME unfiltered read every other rail count comes from.
+// /assets resolves each file's client through the delivery graph (deliverables →
+// service_links → clients) and ships client_id/client_name as optional fields —
+// a file that carries none was never delivered on a client project, which is not
+// "unassigned": those are the studio's OWN marks — logo, brand shots, site
+// photography. They live under "Studio".
+let RAILC=[];        // [{id,name,n}] sorted by count desc
+let RAILC_STUDIO=0;  // files with no client
+let CLIENTS_OPEN=false;
+const CLIENT_CAP=8;  // show the busiest few; the rest ride behind More…
+function deriveClientRail(rows){
+  const by=new Map();let studio=0;
+  rows.forEach(r=>{
+    const id=String(r.client_id||'');
+    if(!id){studio++;return;}
+    const e=by.get(id)||{id,name:String(r.client_name||'').trim()||'A client',n:0};
+    e.n++;by.set(id,e);
+  });
+  RAILC=[...by.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name));
+  RAILC_STUDIO=studio;
 }
 function railN(key){
   // counts render ONLY once a collections read has SUCCEEDED (countsOk) — unknown
@@ -356,6 +393,27 @@ function qstr(){
   p.set('limit','300');
   return p.toString();
 }
+// The filters that run over the page the server returned. Kind and Favorites
+// already worked this way; the client dimension joins them — it COMPOSES with a
+// collection rather than replacing it, so "Photos ∧ Rivera Builders" is a view.
+//   Scale: the list read is capped (limit=300 here, the server clamps to 500),
+//   so filtering here is exactly as honest as the kind/favourite filters that
+//   ship today. Past ~15 clients this graduates to a SERVER-side filter through
+//   the existing .f/qstr() mechanism — a COLS entry already carries query params
+//   — with no rework of this UI.
+function applyFilters(){
+  let rows=S.full;
+  const c=COLS.find(x=>x.key===S.col);
+  if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
+  if(c&&c.favs)rows=rows.filter(r=>r.favorite);
+  if(S.client==='studio')rows=rows.filter(r=>!r.client_id);
+  else if(S.client)rows=rows.filter(r=>String(r.client_id||'')===S.client);
+  S.assets=rows;
+  // any change to the row set prunes selections that are no longer visible —
+  // bulk actions only ever act on rows the user can SEE, and the bulkbar count
+  // always equals the visible checked rows
+  const keep=new Set(rows.map(r=>r.id));S.selected=new Set([...S.selected].filter(id=>keep.has(id)));
+}
 // soft=true (the ↻ refresh): any failure keeps the current list and toasts —
 // leads.html's soft-fail contract; the in-place trouble state is for hard loads.
 async function load(soft){
@@ -376,17 +434,10 @@ async function load(soft){
     renderTrouble(a);return;
   }
   const full=(a.body.data&&a.body.data.assets)||[];
-  let rows=full;
-  const c=COLS.find(x=>x.key===S.col);
-  if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
-  if(c&&c.favs)rows=rows.filter(r=>r.favorite);
+  S.full=full;
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
-  if(S.col==='all'&&!S.q.trim())deriveRailCounts(full,a.body.data&&a.body.data.total);
-  S.assets=rows;
-  // any read that changes the row set prunes selections that are no longer
-  // visible — bulk actions only ever act on rows the user can SEE, and the
-  // bulkbar count always equals the visible checked rows
-  {const keep=new Set(rows.map(r=>r.id));S.selected=new Set([...S.selected].filter(id=>keep.has(id)));}
+  if(S.col==='all'&&!S.q.trim()){deriveRailCounts(full,a.body.data&&a.body.data.total);deriveClientRail(full);}
+  applyFilters();
   S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
   S.countsOk=!!col.ok;   // collections failure degrades the rail count-less, with a notice — never fake zeros
   S.counts=buildCounts((col.ok&&col.body.data)||[]);
@@ -402,7 +453,7 @@ function renderTrouble(a){
   $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav><div>
     <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
     <div class="lmeta">Couldn’t load just now</div></header>${inner}</div></div>`;
-  document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();}));
+  wireRail();
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load());
 }
@@ -418,7 +469,39 @@ function railHtml(){
   return COLS.map(c=>{
     const n=railN(c.key);
     return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}"${S.col===c.key?' aria-current="true"':''}>${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n!==undefined?`<span class="n">${n}</span>`:''}</button>`;
-  }).join('');
+  }).join('')+clientRailHtml();
+}
+// The Clients section of the same rail. It appears only once files actually
+// belong to clients — an empty "Clients" heading is scaffolding, not a feature.
+function clientRailHtml(){
+  if(!RAILC.length)return'';
+  const row=(key,label,ic,n)=>{
+    const on=S.client===key;
+    return `<button class="col ${on?'on':''}" data-client="${esc(key)}"${on?' aria-current="true"':''}>${svg(IC[ic],'ic')}<span>${esc(label)}</span>${n===undefined?'':`<span class="n">${n}</span>`}</button>`;
+  };
+  const shown=CLIENTS_OPEN?RAILC:RAILC.slice(0,CLIENT_CAP);
+  const rest=RAILC.length-shown.length;
+  const more=rest>0||CLIENTS_OPEN
+    ? `<button class="railmore" id="clientsMore" aria-expanded="${CLIENTS_OPEN?'true':'false'}">${CLIENTS_OPEN?'Show fewer':`${rest} more…`}</button>`:'';
+  return `<div class="railsec" role="group" aria-label="Clients"><div class="railhead">Clients</div>`+
+    row('','All clients','people',undefined)+
+    shown.map(c=>row(c.id,c.name,'person',c.n)).join('')+
+    (RAILC_STUDIO?row('studio','Studio','studio',RAILC_STUDIO):'')+
+    more+`</div>`;
+}
+// One rail, three surfaces (roster, stock, trouble) — so its wiring lives once.
+// A collection re-reads the server; a client is a lens over the page already in
+// hand, so it re-filters in place. Clicking the active client clears it.
+function wireRail(){
+  document.querySelectorAll('#rail [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();});
+  document.querySelectorAll('#rail [data-client]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.client;
+    S.client=(v&&S.client===v)?'':v;
+    if(!S.loadedOnce)return load();
+    applyFilters();render();
+    const nb=document.querySelector('#rail [data-client="'+CSS.escape(S.client)+'"]');if(nb)nb.focus();
+  });
+  const cm=$('clientsMore');if(cm)cm.onclick=()=>{CLIENTS_OPEN=!CLIENTS_OPEN;render();const nb=$('clientsMore');if(nb)nb.focus();};
 }
 function stockTile(im){
   return `<figure class="tile" style="margin:0"><img src="${esc(im.thumb)}" alt="${esc(im.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block">`+
@@ -438,7 +521,7 @@ function renderStock(){
     <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
-  document.querySelectorAll('#rail .col').forEach(b=>b.addEventListener('click',()=>{S.col=b.dataset.col;load();}));
+  wireRail();
   const srf=$('refreshBtn'); if(srf)srf.addEventListener('click',()=>{loadStock().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));});
   // no sq.focus() here — auto-stealing focus on every render broke keyboard flow
   // through the rail (the render is reached from rail clicks, not just typing)
@@ -463,13 +546,13 @@ async function addStock(id,alt,credit,btn){
   else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
 }
 function sortRows(rows){
-  const col=TCOLS.find(x=>x[0]===SORT.key)||TCOLS[3];
+  const col=tcols().find(x=>x[0]===SORT.key)||TCOLS.find(x=>x[0]==='added');
   const r=[...rows];
   r.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return r;
 }
 function lheadHtml(shown){
-  const sortCol=TCOLS.find(x=>x[0]===SORT.key)||TCOLS[3];
+  const sortCol=tcols().find(x=>x[0]===SORT.key)||TCOLS.find(x=>x[0]==='added');
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
@@ -536,7 +619,7 @@ function stateShown(st){ return S.policy!=='immediate' || st==='archived'; }
 function tableHtml(rows){
   const allSel=rows.length&&rows.every(a=>S.selected.has(a.id));
   const ckTh=S.canEdit?`<th scope="col" class="ck"><input type="checkbox" id="ckAll" aria-label="Select all files"${allSel?' checked':''}></th>`:'';
-  const ths=ckTh+TCOLS.map(([k,label])=>{
+  const ths=ckTh+tcols().map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('');
@@ -549,6 +632,7 @@ function tableHtml(rows){
     return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
       ${ckTd}
       <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2">${esc(a.name)}</span></span></td>
+      ${RAILC.length?`<td>${esc(a.client_name||'Studio')}</td>`:''}
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
       <td class="num">${esc(when(a.created_at))||'—'}${isClientUpload(a)?'<span class="fromclient">by client</span>':''}</td>
@@ -609,7 +693,7 @@ function tile(a){
   </div>`;
 }
 function wire(){
-  document.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();});
+  wireRail();
   // grid tiles open on click/Enter/Space; table rows do too, but never from a
   // click on the row's own controls (checkbox / future buttons)
   document.querySelectorAll('.tile[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});

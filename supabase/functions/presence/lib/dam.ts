@@ -148,6 +148,48 @@ export function isClientUpload(a: Asset): boolean {
   return String(meta.note || '').startsWith('Uploaded by the client');
 }
 
+// ── Files by client: media → the client whose work it belongs to ─────────────
+// "Files should be able to be organized and filtered by client — not all just
+// there at once." The linkage already exists and needs no new column: a project
+// file is recorded as a DELIVERABLE (presence_deliverables: media_id, project_id,
+// title), and the agency↔customer BRIDGE (presence_service_links, UNIQUE per
+// project) names the customer that project is being delivered for. Three hops,
+// every one on the AGENCY site — which is exactly where a client's uploads land
+// (client_delivery.ts calls createUpload(link.agency_site_id, …)).
+//
+// This is emphatically NOT the ?client= scope switch: that repoints the whole
+// request at the client's OWN presence_sites row, whose media is their website's
+// — a different, unrelated set of files that would merely LOOK like it worked.
+//
+// Pure: the route hands over three already-loaded row sets. OPERATOR-ONLY by
+// construction — nothing here is reachable from a /client/* response.
+export interface DeliverableRef { media_id?: string | null; project_id?: string | null; title?: string | null }
+export interface ServiceLinkRef { project_id?: string | null; customer_client_id?: string | null }
+export interface ClientRef { id?: string | null; name?: string | null }
+export interface MediaClient { client_id: string; client_name: string; project_id: string; title: string }
+export function clientsByMedia(
+  deliverables: DeliverableRef[],
+  links: ServiceLinkRef[],
+  clients: ClientRef[],
+): Map<string, MediaClient> {
+  const clientOfProject = new Map<string, string>();
+  for (const l of links || []) {
+    const p = String(l?.project_id || ''); const c = String(l?.customer_client_id || '');
+    if (p && c && !clientOfProject.has(p)) clientOfProject.set(p, c);
+  }
+  const nameOfClient = new Map<string, string>();
+  for (const c of clients || []) { const id = String(c?.id || ''); if (id) nameOfClient.set(id, String(c?.name || '').trim()); }
+  const out = new Map<string, MediaClient>();
+  for (const d of deliverables || []) {
+    const media = String(d?.media_id || ''); if (!media || out.has(media)) continue;  // first deliverable wins — stable, no flapping
+    const project = String(d?.project_id || '');
+    const client = clientOfProject.get(project) || '';
+    if (!client) continue;   // a project with no bridge link has no client to name — never guess
+    out.set(media, { client_id: client, client_name: nameOfClient.get(client) || '', project_id: project, title: String(d?.title || '').trim() });
+  }
+  return out;
+}
+
 // ── DAM-1 (Files): "where used" — the website-awareness value-add ─────────────
 // A single, complete usage model mirroring exactly what the renderer serializes:
 // settings.logo_media_id, settings.og_media_id, offerings.media_id, posts.hero_

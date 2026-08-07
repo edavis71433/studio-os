@@ -36,8 +36,8 @@ import { saveVisualPlan, attachVariations, getVisualPlan, withPreviews } from '.
 import {
   searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
-  fileKind, isFavorite, isClientUpload, replaceNeedsApproval, fileState,
-  normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef,
+  fileKind, isFavorite, isClientUpload, replaceNeedsApproval, fileState, clientsByMedia,
+  normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef, type MediaClient,
 } from '../lib/dam.ts';
 import { socialCropList } from '../lib/social_crops.ts';
 import { composeSocialCards, HEADLINE_MAX } from '../lib/social_card.ts';
@@ -94,6 +94,35 @@ async function liveMediaIds(site: SiteRow): Promise<Set<string>> {
   } catch { return new Set(); }
 }
 
+// ── the CLIENT dimension: which of my clients does this file belong to? ──────
+// "Files should be able to be organized and filtered by client — not all just
+// there at once." No migration: the linkage already exists as three indexed
+// reads, ALL on this same site — a project file is recorded as a deliverable
+// (presence_deliverables: media_id, project_id, title; 0076), and the
+// agency↔customer bridge (presence_service_links, UNIQUE per project; 0079)
+// names the customer that project is delivered for.
+//
+// This is deliberately NOT the ?client= / x-dds-scope-site path. That switches
+// TENANT to the client's own presence_sites row, whose media is their WEBSITE's
+// — a different, unrelated set of files. The files a client sent this studio
+// live here, on the agency site (client_delivery.ts uploads to agency_site_id).
+//
+// OPERATOR-ONLY. GET /assets is not in reviewerAllowed (routes/workspace.ts), so a
+// client_reviewer gets 403 before reaching this; and this map is built HERE, in
+// the operator handler, so no /client/* response can ever carry it.
+async function clientByMedia(site: SiteRow): Promise<Map<string, MediaClient>> {
+  try {
+    const dl = arr(await svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,project_id,title,created_at&order=created_at.asc&limit=2000`));
+    if (!dl.length) return new Map();
+    const projectIds = [...new Set(dl.map((d) => String(d.project_id || '')).filter(Boolean))];
+    if (!projectIds.length) return new Map();
+    const links = arr(await svc(`presence_service_links?agency_site_id=eq.${site.id}&project_id=in.(${projectIds.join(',')})&select=project_id,customer_client_id&limit=2000`));
+    const clientIds = [...new Set(links.map((l) => String(l.customer_client_id || '')).filter(Boolean))];
+    const clients = clientIds.length ? arr(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=500`)) : [];
+    return clientsByMedia(dl, links, clients);
+  } catch { return new Map(); }   // the client dimension is an ORGANIZER — its failure must never cost the owner their file list
+}
+
 async function policyFor(site: SiteRow): Promise<ApprovalPolicy> {
   try {
     const ent = await svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=plan&limit=1`);
@@ -104,11 +133,14 @@ async function policyFor(site: SiteRow): Promise<ApprovalPolicy> {
 }
 
 /** Shape one asset for the UI (calm, customer-facing fields). */
-function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {}) {
+function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null; client?: MediaClient | null } = {}) {
   const meta = (a.metadata || {}) as Record<string, unknown>;
+  const c = opts.client || null;
   return {
     ...a,
-    name: displayName(a),
+    // the deliverable's title is the LAST name rung — it only speaks for a file
+    // that has no title, no alt text and no readable storage basename of its own
+    name: displayName(a, c?.title),
     kind: fileKind(a.mime),
     favorite: isFavorite(a),
     in_use: opts.in_use,
@@ -117,6 +149,14 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {
     // media row's metadata; surface the explicit boolean here so the UI contract
     // never depends on string-matching the note. Additive; omitted when false.
     client_upload: isClientUpload(a) ? true : undefined,
+    // WHICH client's work this file belongs to, from the delivery graph. Additive
+    // and optional in exactly the same way — omitted entirely when the file was
+    // never delivered on a linked project (the studio's own brand marks and site
+    // photography), which the roster groups under "Studio". Operator-only: only
+    // handleAssetsList passes `client`, and /assets is never reviewer-reachable.
+    client_id: c?.client_id || undefined,
+    client_name: c?.client_name || undefined,
+    project_id: c?.project_id || undefined,
     // DAM-2: approval state + who/when, from reused metadata (no new columns)
     state: fileState(a.asset_status, !!opts.in_use, !!meta.pending_replace),
     approval: { approved_by: meta.approved_by || null, approved_at: meta.approved_at || null, submitted_by: meta.submitted_by || null, submitted_at: meta.submitted_at || null, pending_replace: !!meta.pending_replace },
@@ -126,7 +166,7 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null } = {
 // ── the library ──────────────────────────────────────────────────────────────
 export async function handleAssetsList(req: Request, site: SiteRow, cors: Record<string, string>) {
   const url = new URL(req.url);
-  const [assets, refMap, live] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site)]);
+  const [assets, refMap, live, byClient] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site), clientByMedia(site)]);
   const refs = refsSet(refMap);
   const rows = searchAssets(assets, {
     collection: url.searchParams.get('collection') || undefined,
@@ -141,7 +181,7 @@ export async function handleAssetsList(req: Request, site: SiteRow, cors: Record
   const thumbs = await Promise.all(page.slice(0, LIST_THUMB_CAP).map((a) => signThumb(a.storage_path, a.mime || '')));
   const used = usageMap(page, refs);
   return json({ data: {
-    assets: page.map((a, i) => present(a, { in_use: used[a.id], thumb: i < LIST_THUMB_CAP ? thumbs[i] : null })),
+    assets: page.map((a, i) => present(a, { in_use: used[a.id], thumb: i < LIST_THUMB_CAP ? thumbs[i] : null, client: byClient.get(a.id) })),
     total: assets.length, shown: page.length,
     live_count: [...live].length,
     policy: await policyFor(site),

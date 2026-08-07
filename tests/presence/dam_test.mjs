@@ -6,7 +6,7 @@
 import {
   assetApprovalPolicy, assetAvailable, nextAssetStatus, detectDuplicates, dupKey,
   usageMap, canDelete, assetHealth, collectionsOf, tagsOf, searchAssets, isClientUpload,
-  displayName,
+  displayName, clientsByMedia,
 } from '../../supabase/functions/presence/lib/dam.ts';
 
 const results = [];
@@ -121,6 +121,42 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
     displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: '' }, 'Kitchen rough-in') === 'Kitchen rough-in' &&
     displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: 'porch.jpg' }, 'Kitchen rough-in') === 'porch.jpg');
   ok('alt_text is bounded like every other name rung (200)', N({ alt_text: 'z'.repeat(400) }).length === 200);
+}
+
+// ═══ Files by client: media → client, through the delivery graph ═══
+// presence_deliverables (media_id, project_id) → presence_service_links
+// (project_id → customer_client_id, UNIQUE per project) → clients.name.
+// All on the AGENCY site — the files clients uploaded live there, NOT on the
+// client's own presence_sites row (that is their website's media).
+{
+  const dl = [
+    { media_id: 'm1', project_id: 'p1', title: 'Kitchen rough-in' },
+    { media_id: 'm2', project_id: 'p1', title: '' },
+    { media_id: 'm3', project_id: 'p2', title: 'Signed contract' },
+    { media_id: 'm4', project_id: 'p9', title: 'Orphan' },          // project has no bridge link
+  ];
+  const links = [
+    { project_id: 'p1', customer_client_id: 'c1' },
+    { project_id: 'p2', customer_client_id: 'c2' },
+  ];
+  const clients = [{ id: 'c1', name: 'Rivera Builders' }, { id: 'c2', name: 'Poole Dental' }];
+  const m = clientsByMedia(dl, links, clients);
+  ok('a delivered file resolves to its client', m.get('m1')?.client_id === 'c1' && m.get('m1')?.client_name === 'Rivera Builders');
+  ok('two files on one project share the client', m.get('m2')?.client_id === 'c1');
+  ok('a second client resolves independently', m.get('m3')?.client_name === 'Poole Dental');
+  ok('a project with NO service link yields no client (never a guess)', m.has('m4') === false);
+  ok('a media with no deliverable at all is simply absent (→ Studio)', m.has('m-never-delivered') === false);
+  ok('the project id rides along for the drill-through', m.get('m3')?.project_id === 'p2');
+  ok('the deliverable title rides along as a name hint', m.get('m1')?.title === 'Kitchen rough-in');
+  ok('a client row with no name still resolves by id (empty name, never "undefined")', (() => {
+    const n = clientsByMedia([{ media_id: 'z', project_id: 'p1' }], links, [{ id: 'c1' }]);
+    return n.get('z')?.client_id === 'c1' && n.get('z')?.client_name === '';
+  })());
+  ok('empty inputs never throw', clientsByMedia([], [], []).size === 0);
+  ok('the FIRST deliverable for a media wins (stable, no flapping)', (() => {
+    const n = clientsByMedia([{ media_id: 'm', project_id: 'p1' }, { media_id: 'm', project_id: 'p2' }], links, clients);
+    return n.get('m')?.client_id === 'c1';
+  })());
 }
 
 const passed = results.filter((r) => r.p).length;

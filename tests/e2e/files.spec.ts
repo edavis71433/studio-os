@@ -13,6 +13,21 @@ const CONTRACT = { id: 'cccccccc-3333-4333-8333-cccccccccccc', name: 'Contract',
   // top-level boolean (isClientUpload) — this mock certifies that true contract
   client_upload: true, metadata: { client_upload: true, note: 'Uploaded by the client.' } };
 
+// Files-by-client fixtures: /assets emits client_id/client_name/project_id for a
+// file that was DELIVERED on a project linked to a customer (the deliverables →
+// service_links → clients join, all on the agency site). LOGO carries none — it
+// is the studio's own brand mark.
+const RIVERA = { id: 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee', name: 'Kitchen rough-in', kind: 'image', mime: 'image/jpeg', in_use: false, favorite: false, alt_text: 'Kitchen rough-in', tags: [], collection: '', asset_status: 'approved', state: 'approved', bytes: 220000, created_at: '2026-07-01T00:00:00Z',
+  client_id: 'c1111111-1111-4111-8111-c11111111111', client_name: 'Rivera Builders', project_id: 'p1111111-1111-4111-8111-p11111111111' };
+const POOLE = { id: 'ffffffff-6666-4666-8666-ffffffffffff', name: 'Waiting room', kind: 'image', mime: 'image/jpeg', in_use: false, favorite: false, alt_text: 'Waiting room', tags: [], collection: '', asset_status: 'approved', state: 'approved', bytes: 90000, created_at: '2026-07-02T00:00:00Z',
+  client_id: 'c2222222-2222-4222-8222-c22222222222', client_name: 'Poole Dental', project_id: 'p2222222-2222-4222-8222-p22222222222' };
+const RIVERA2 = { ...RIVERA, id: 'eeeeeeee-5555-4555-8555-eeeeeeee0002', name: 'Site survey', created_at: '2026-07-03T00:00:00Z' };
+const byClientApi = (extra: Record<string, unknown> = {}) => ({
+  '/assets/collections': { data: [] },
+  '/assets/health': { data: { findings: [] } },
+  '/assets': { data: { assets: [LOGO, CONTRACT, RIVERA, RIVERA2, POOLE], total: 5, shown: 5, live_count: 1, policy: 'immediate' }, ...extra },
+});
+
 const filesApi = {
   '/assets/collections': { data: [{ name: 'Brand', count: 1 }] },
   '/assets/health': { data: { findings: [] } },
@@ -150,6 +165,99 @@ test.describe('Files (the DAM, customer-facing)', () => {
     const table = page.locator('.tscroll table');
     await expect(table.locator('tbody tr', { hasText: 'Contract' })).toContainText('Not on your site');
     expect(await table.locator('tbody').innerText()).not.toMatch(/Not used/);
+  });
+
+  // ── Files by client — Eric: "files should be able to be organized and
+  //    filtered by client … not all just there at once." ──────────────────────
+  test('clients rail: lists each client with a count, plus Studio for the studio\'s own files', async ({ page }) => {
+    await installApp(page, { api: byClientApi() });
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('Kitchen rough-in');
+    const rail = page.locator('.rail');
+    await expect(rail).toContainText('Clients');
+    await expect(rail.locator('[data-client="c1111111-1111-4111-8111-c11111111111"] .n')).toHaveText('2');
+    await expect(rail.locator('[data-client="c2222222-2222-4222-8222-c22222222222"] .n')).toHaveText('1');
+    await expect(rail.locator('[data-client="studio"] .n')).toHaveText('2');   // LOGO + CONTRACT: never delivered on a linked project
+    // sorted by count, descending — the busiest client first
+    const labels = await rail.locator('[data-client]:not([data-client=""]):not([data-client="studio"]) span:not(.n)').allInnerTexts();
+    expect(labels).toEqual(['Rivera Builders', 'Poole Dental']);
+  });
+
+  test('clients rail: picking a client filters the table to that client only', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: byClientApi() });
+    await page.goto('/files.html');
+    const body = page.locator('.tscroll tbody');
+    await expect(body.locator('tr')).toHaveCount(5);
+    await page.locator('[data-client="c1111111-1111-4111-8111-c11111111111"]').click();
+    await expect(body.locator('tr')).toHaveCount(2);
+    await expect(body).toContainText('Kitchen rough-in');
+    await expect(body).toContainText('Site survey');
+    await expect(body).not.toContainText('Waiting room');
+    await expect(body).not.toContainText('Logo');
+    await expect(page.locator('[data-client="c1111111-1111-4111-8111-c11111111111"]')).toHaveAttribute('aria-current', 'true');
+    // and back to everything
+    await page.locator('[data-client=""]').click();
+    await expect(body.locator('tr')).toHaveCount(5);
+  });
+
+  test('clients rail: “Studio” holds the files that were never delivered on a client project', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: byClientApi() });
+    await page.goto('/files.html');
+    await page.locator('[data-client="studio"]').click();
+    const body = page.locator('.tscroll tbody');
+    await expect(body.locator('tr')).toHaveCount(2);
+    await expect(body).toContainText('Logo');
+    await expect(body).toContainText('Contract');
+    await expect(body).not.toContainText('Kitchen rough-in');
+  });
+
+  test('clients rail: the client filter composes with a collection — it never replaces it', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: byClientApi() });
+    await page.goto('/files.html');
+    await page.locator('[data-client="c1111111-1111-4111-8111-c11111111111"]').click();
+    await page.locator('[data-col="documents"]').click();
+    // Rivera's two files are both photos — a Documents ∧ Rivera view is honestly empty
+    await expect(page.locator('#root .empty')).toContainText('Nothing here yet.');
+    await page.locator('[data-col="photos"]').click();
+    await expect(page.locator('.tscroll tbody tr')).toHaveCount(2);
+  });
+
+  test('clients rail: absent entirely when no file belongs to a client (no empty scaffolding)', async ({ page }) => {
+    await installApp(page, { api: filesApi });
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('Logo');
+    await expect(page.locator('.rail')).not.toContainText('Clients');
+    await expect(page.locator('[data-client]')).toHaveCount(0);
+    await expect(page.locator('.tscroll thead')).not.toContainText('Client');
+  });
+
+  test('the table gains a sortable Client column once clients exist — “Studio” for the rest', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: byClientApi() });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('thead')).toContainText('Client');
+    await expect(table.locator('tbody tr', { hasText: 'Kitchen rough-in' })).toContainText('Rivera Builders');
+    await expect(table.locator('tbody tr', { hasText: 'Logo' })).toContainText('Studio');
+    await table.locator('[data-sort="client"]').click();
+    await expect(table.locator('thead th', { hasText: 'Client' })).toHaveAttribute('aria-sort', 'ascending');
+  });
+
+  test('clients rail: past the cap the list collapses behind a More… disclosure', async ({ page }) => {
+    const many = Array.from({ length: 11 }, (_, i) => ({
+      ...RIVERA, id: `eeeeeeee-5555-4555-8555-eeee0000000${i}`.slice(0, 36), name: `File ${i}`,
+      client_id: `c${i}111111-1111-4111-8111-c11111111111`, client_name: `Client ${String.fromCharCode(65 + i)}`,
+    }));
+    await installApp(page, { api: { '/assets/collections': { data: [] }, '/assets/health': { data: { findings: [] } },
+      '/assets': { data: { assets: many, total: many.length, shown: many.length, policy: 'immediate' } } } });
+    await page.goto('/files.html');
+    await expect(page.locator('.rail')).toContainText('Clients');
+    await expect(page.locator('[data-client]:not([data-client=""])')).toHaveCount(8);
+    await page.locator('#clientsMore').click();
+    await expect(page.locator('[data-client]:not([data-client=""])')).toHaveCount(11);
   });
 
   test('client-upload provenance: the "by client" chip renders from the server-stamped media marker (A10 sibling)', async ({ page }) => {
