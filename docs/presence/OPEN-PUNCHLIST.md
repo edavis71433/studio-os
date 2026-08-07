@@ -391,6 +391,24 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 📁 FILES — ORGANIZE + FILTER BY CLIENT (Eric, 2026-08-07) — QUEUED
+
+"when you're done files should be able to be organized and filtered by
+client...not all just there at once." The studio Files page (files.html)
+groups ONLY by kind (All files · Favorites · Photos · Stock Library · Brand
+· Documents · Templates · Downloads · Archive) — every client's files land
+in one undifferentiated list. Wants client as a first-class organizing +
+filter dimension.
+ALSO OBSERVED in his screenshot (investigate as part of this): all 8 files
+render with NAME = "Photo", identical to the KIND column — the real
+filename appears to be missing/not surfaced, so the list is unscannable
+even before client grouping. Every row also reads "Not used" in WHERE USED
+and "BY CLIENT" provenance (that provenance stamp is the SS-wave security
+fix working as intended).
+SEQUENCED: after the CRM deal-page four (services preset dropdown ·
+deal contact info + contract-out unblock · to-do dropdown · new contract
+template), per "do all these things first".
+
 ## 🔔 OPERATOR EMAIL NOTIFICATIONS — BUILT, AWAITING SQL + DEPLOY
 
 Eric (2026-08-06): "im not getting email notifications when people send
