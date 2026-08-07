@@ -232,7 +232,10 @@ html.dds-embed #detailWrap{padding-top:0}
   <div class="summary" id="summary" aria-live="polite"></div>
   <!-- not tabs — chips that filter/switch in place, so: role=group + aria-pressed -->
   <div class="bar" id="filters" role="group" aria-label="Filter by stage"></div>
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <!-- "Manage services" also lives here: it used to be reachable ONLY from
+       inside an open deal's Proposals section, so the catalog that unhides the
+       proposal line-item dropdown was effectively undiscoverable. -->
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
   <!-- NOT aria-live: renderTable() swaps the whole innerHTML per sort click, and a
@@ -334,6 +337,25 @@ const PIPELINE_GUIDANCE={
     todos:['Note why it didn’t fit','Set a reminder to check back']},
 };
 const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
+// ── Starter services ────────────────────────────────────────────────────────
+// The proposal line-item dropdown already exists; it's simply hidden while the
+// services catalog is empty, so a brand-new studio never discovers it. When the
+// catalog IS empty, "Manage services" opens PRE-FILLED with these — the studio's
+// OWN published prices, not invented ones — unsaved until Save is pressed, and
+// every row editable or deletable first.
+//   $1,500 template build ....... pricing.html:123, pricing-estimator.html:620-621
+//   $3,800 custom + photography .. pricing-estimator.html:638-639
+//   $400/mo Growth Partnership ... pricing.html:137
+//   $99 / $499 / $899 audits ..... audit.html:578-580, 592-594, 609-611
+//                                  (tier names as published; pricing.html:156-157)
+const DDS_STARTER_SERVICES=[
+  {name:'Website — Template build',price:1500},
+  {name:'Website — Custom + Photography',price:3800},
+  {name:'Growth Partnership (monthly)',price:400},
+  {name:'Site audit — Starter Audit',price:99},
+  {name:'Site audit — Digital Health Check',price:499},
+  {name:'Site audit — Competitive Intelligence',price:899},
+];
 // The Kanban board's open-stage columns (won/lost are OUTCOMES, not columns —
 // exactly like the summary's OPEN_STAGES).
 const BOARD_STAGES=['lead','qualified','proposal','contract'];
@@ -835,6 +857,9 @@ function wireBoard(){
 // ── new deal: an accessible in-dialog form (no prompt) ──
 function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
 $('newDeal').onclick=openNewDeal;
+// the toolbar's copy of "Manage services" (openManageServices is defined below —
+// this handler only runs on click, long after the whole script has evaluated)
+{const mst=$('mngServicesTop'); if(mst) mst.onclick=()=>openManageServices();}
 $('f-cancel').onclick=()=>$('formDlg').close();
 $('dealForm').onsubmit=async(e)=>{
   e.preventDefault();
@@ -897,8 +922,13 @@ async function openManageServices(){
   const host=$('svcRows'); host.innerHTML='<div class="mut">Loading…</div>'; $('svcDlg').showModal();
   let list=[];
   try{const r=await api('/sales/services');list=(r.data||[]).map(s=>({name:s.name,price:(s.price_cents/100)}));}catch(e){toast(nice(e),true);}
-  if(!list.length)list=[{name:'',price:''}]; // an empty starter row to type into
-  host.innerHTML=list.map(svcRowHtml).join('');
+  // An EMPTY catalog is the whole reason the proposal dropdown never appears, and
+  // a single blank row doesn't hint at what to type. Seed the studio's own
+  // published prices instead — pre-filled but UNSAVED (nothing is written until
+  // Save), and every row still editable or deletable.
+  const starter=!list.length;
+  if(starter)list=DDS_STARTER_SERVICES.slice();
+  host.innerHTML=(starter?'<div class="mut" id="svcStarterNote" style="margin-bottom:4px">Starting points from your pricing page — edit or delete any, then Save.</div>':'')+list.map(svcRowHtml).join('');
   setTimeout(()=>{const f=host.querySelector('.svc-name');if(f)f.focus();},20);
 }
 $('svcRows').addEventListener('click',(e)=>{const del=e.target.closest('.svc-del');if(!del)return;del.closest('.svc-row').remove();if(!$('svcRows').querySelector('.svc-row'))$('svcRows').insertAdjacentHTML('beforeend',svcRowHtml());});

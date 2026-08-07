@@ -770,3 +770,77 @@ test.describe('deal page — stage-aware to-do presets (ask 3)', () => {
     await expect(page.locator('#dt-preset option')).toContainText(['Pick a to-do for this stage…', 'Call them', 'Send an intro email', 'Book a discovery call', 'Look at their current site', 'Something else…']);
   });
 });
+
+// ── CRM deal page (ask 1): the services catalog seeds itself ─────────────────
+// The proposal line-item DROPDOWN already existed — it was hidden only because
+// the catalog was empty (hasCat false). NOTE: the shared API fixture stubs
+// '/sales/services' as { data: [] }, which now renders the starter rows; that is
+// deliberate and is exactly what these cases assert.
+const STARTER = [
+  ['Website — Template build', '1500'],
+  ['Website — Custom + Photography', '3800'],
+  ['Growth Partnership (monthly)', '400'],
+  ['Site audit — Starter Audit', '99'],
+  ['Site audit — Digital Health Check', '499'],
+  ['Site audit — Competitive Intelligence', '899'],
+] as const;
+
+test.describe('services catalog — starter list (ask 1)', () => {
+  test('“Manage services” is reachable from the page toolbar, not just inside a deal', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#mngServicesTop')).toBeVisible();
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcDlg')).toBeVisible();
+  });
+
+  test('an EMPTY catalog opens pre-filled with the studio’s own prices — and writes nothing until Save', async ({ page }) => {
+    let puts = 0;
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/sales/services', async (route) => {
+      if (route.request().method() === 'PUT') { puts++; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }); }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
+    });
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcStarterNote')).toContainText('Starting points from your pricing page');
+    await expect(page.locator('#svcRows .svc-row')).toHaveCount(STARTER.length);
+    for (const [i, [name, price]] of STARTER.entries()) {
+      await expect(page.locator('#svcRows .svc-row').nth(i).locator('.svc-name')).toHaveValue(name);
+      await expect(page.locator('#svcRows .svc-row').nth(i).locator('.svc-price')).toHaveValue(price);
+    }
+    // merely LOOKING at them persists nothing
+    expect(puts).toBe(0);
+    await page.locator('#svcCancel').click();
+    expect(puts).toBe(0);
+  });
+
+  test('the starter rows are editable and deletable, and Save sends exactly what’s on screen', async ({ page }) => {
+    let body = '';
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/sales/services', async (route) => {
+      if (route.request().method() === 'PUT') { body = route.request().postData() || ''; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }); }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
+    });
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await page.locator('#svcRows .svc-row').nth(0).locator('.svc-price').fill('1750');   // his price, not ours
+    await page.locator('#svcRows .svc-row').nth(5).locator('.svc-del').click();          // drop one he doesn't sell
+    await page.locator('#svcSave').click();
+    await expect.poll(() => body).not.toBe('');
+    const sent = JSON.parse(body).services;
+    expect(sent).toHaveLength(5);
+    expect(sent[0]).toEqual({ name: 'Website — Template build', price_cents: 175000 });
+    expect(sent[2]).toEqual({ name: 'Growth Partnership (monthly)', price_cents: 40000 });
+    expect(sent.some((s: { name: string }) => s.name.includes('Competitive Intelligence'))).toBe(false);
+  });
+
+  test('a catalog that already has services is shown as-is — no starter note, no seeding', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: 'Logo refresh', price_cents: 60000 }] } } });
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
+    await expect(page.locator('#svcRows .svc-name').first()).toHaveValue('Logo refresh');
+    await expect(page.locator('#svcStarterNote')).toHaveCount(0);
+  });
+});
