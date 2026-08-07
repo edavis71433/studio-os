@@ -536,3 +536,178 @@ test.describe('Batch A regressions — shell', () => {
     expect(await read()).toBe('#2a1b4a');
   });
 });
+
+// ── B4 — the bell badge refreshes when the tab comes back ────────────────────
+// CTX.attention_count was baked in at page load and only moved on navigation, so
+// a client message could arrive, email the operator, and the badge still read
+// stale while the tab sat open — the email beat the badge. The shell now
+// re-reads /portal/context on visibilitychange (the ONE endpoint that produces
+// the count), throttled to at most once per 60s, and NEVER polls: a background
+// tab must not generate traffic forever.
+test.describe('B4 — attention badge freshness', () => {
+  /** Fixture context with a settable attention_count. */
+  const ctxWith = (attention_count: number) => ({ data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+    edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true,
+    capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count, nav: STUDIO_NAV,
+  } });
+
+  /** Route /portal/context through a counter whose payload the test can swap. */
+  async function contextProbe(page: import('@playwright/test').Page, initial: number) {
+    const state = { count: initial, hits: 0, status: 200 };
+    await page.route('**/functions/v1/presence/portal/context**', (route) => {
+      state.hits++;
+      if (state.status !== 200) return route.fulfill({ status: state.status, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ctxWith(state.count)) });
+    });
+    return state;
+  }
+  /** Background the tab, then bring it back — what a real tab-flip does. */
+  const flipAway = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const flipBack = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  /** boot()'s own /portal/context read primes the 60s window, so every test that
+   *  wants a refresh has to leave it first. Making that explicit here is half the
+   *  point of the throttle. */
+  const leaveTheThrottleWindow = (page: import('@playwright/test').Page) => page.clock.fastForward(61_000);
+
+  test('returning to the tab re-reads the count and repaints the badge', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 2);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('2');
+    const afterBoot = probe.hits;
+
+    probe.count = 7;                                   // a client message landed while the tab was away
+    await leaveTheThrottleWindow(page);
+    await flipAway(page);
+    await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('7');
+    expect(probe.hits).toBe(afterBoot + 1);            // exactly ONE extra read
+  });
+
+  test('a count that drops to zero removes the badge', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 3);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('3');
+    probe.count = 0;
+    await leaveTheThrottleWindow(page);
+    await flipAway(page);
+    await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveCount(0);
+  });
+
+  test('throttled: a tab-flipper cannot hammer the endpoint (≤ once per 60s)', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 1);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('1');
+    const afterBoot = probe.hits;
+
+    // boot primed the window: a flip RIGHT NOW buys nothing (the badge is fresh)
+    probe.count = 4;
+    await flipAway(page); await flipBack(page);
+    await page.waitForTimeout(1);
+    expect(probe.hits).toBe(afterBoot);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('1');
+
+    // past the window, the next return DOES refresh — exactly once
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('4');
+    expect(probe.hits).toBe(afterBoot + 1);
+
+    // …and six more flips inside the new window buy nothing again
+    probe.count = 99;
+    for (let i = 0; i < 6; i++) { await flipAway(page); await flipBack(page); }
+    await page.waitForTimeout(1);
+    expect(probe.hits).toBe(afterBoot + 1);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('4');   // still the last good value
+
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('9+');  // 99 renders as 9+
+    expect(probe.hits).toBe(afterBoot + 2);
+  });
+
+  test('no polling: a tab left open (foreground or background) generates no traffic', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 2);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('2');
+    const afterBoot = probe.hits;
+    await flipAway(page);                       // backgrounded, and left alone
+    await page.clock.fastForward(30 * 60_000);
+    await page.waitForTimeout(1);
+    expect(probe.hits).toBe(afterBoot);          // not one extra request — no interval exists
+    await flipBack(page);                        // it takes a RETURN to spend a request
+    await expect.poll(() => probe.hits).toBe(afterBoot + 1);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('2');
+  });
+
+  test('a failed refresh keeps the last good badge and never breaks the shell', async ({ page }) => {
+    await installApp(page);
+    const probe = await contextProbe(page, 5);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('5');
+
+    probe.status = 500;                          // the refresh read fails
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await page.waitForTimeout(150);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('5');   // last good value survives
+
+    // the shell is still fully alive after the failure
+    await expect(page.locator('#dds-shell .dds-nav')).toContainText('Inbox');
+    await page.locator('#dds-profile').click();
+    await expect(page.locator('.dds-pop')).toContainText('Sign out');
+
+    // …and a later, healthy return still recovers (the failure didn't wedge it)
+    probe.status = 200; probe.count = 6;
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('6');
+  });
+
+  test('a malformed refresh payload never clears a good badge', async ({ page }) => {
+    await installApp(page);
+    await contextProbe(page, 6);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-bell .dot')).toHaveText('6');
+    // 200 OK, but nothing usable in it
+    await page.route('**/functions/v1/presence/portal/context**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: null }) }));
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await page.waitForTimeout(150);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('6');
+    await expect(page.locator('#dds-shell .dds-nav')).toContainText('Inbox');
+  });
+
+  test('the refresh does not disturb an open layer', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'desktop popover behaviour');
+    await installApp(page);
+    const probe = await contextProbe(page, 2);
+    await page.clock.install();
+    await page.goto('/today.html');
+    await page.locator('#dds-profile').click();
+    await expect(page.locator('.dds-pop')).toContainText('Sign out');
+    probe.count = 8;
+    await leaveTheThrottleWindow(page);
+    await flipAway(page); await flipBack(page);
+    await expect(page.locator('#dds-bell .dot')).toHaveText('8');
+    await expect(page.locator('.dds-pop')).toContainText('Sign out');   // the menu stayed open
+  });
+});

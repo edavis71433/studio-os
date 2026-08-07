@@ -214,6 +214,11 @@
     }
     return items;
   }
+  // The bell's contents (icon + badge) — factored out of render() so the B4
+  // refresh below can repaint JUST the badge without re-rendering the whole bar
+  // (a re-render would tear down any open dropdown under the operator's cursor).
+  function bellInner(n) { return '🔔' + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+
   function render() {
     var nav = (CTX && CTX.nav) || [];
     var activeKey = activeItemKey(location.pathname, nav);
@@ -263,7 +268,7 @@
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
-        '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">🔔' + (att > 0 ? '<span class="dot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</button>' +
+        '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">?</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
       '</div>';
@@ -468,6 +473,58 @@
     }
   }
   function hasCrm() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'customers'; }); }
+
+  // ── B4: the attention badge refreshes when the tab comes back ───────────────
+  // CTX.attention_count used to be baked in at page load and only moved on
+  // navigation, so a client message could arrive, email the operator, and the
+  // badge would still read stale while the tab sat open — the email beat the
+  // badge. Refresh on RETURN TO THE TAB only.
+  //
+  // ENDPOINT: /portal/context. It is the only surface that produces
+  // attention_count (workspace.ts computes it there via studioBellCount);
+  // /portal/feed returns the bell RAIL — notices, approvals, moments — and no
+  // count, and it is not cheaper (its own ~14-query wave plus a content-tree
+  // read). Reusing the count's own endpoint keeps one source of truth.
+  //
+  // NO INTERVAL, deliberately: a polling timer would have a backgrounded tab
+  // generating traffic forever, against the single most expensive read in the
+  // app. visibilitychange fires only when someone actually comes back.
+  //
+  // THROTTLE: at most one read per 60s, and the window is CLAIMED BEFORE the
+  // request goes out — so a tab-flipper cannot stack requests, and a failing
+  // endpoint waits out the full window instead of being retried on every flip.
+  // boot() primes the clock because boot's own /portal/context read IS a read of
+  // this endpoint; a badge is therefore never more than ~60s stale.
+  //
+  // DEGRADES SILENTLY: a failed, non-OK, malformed or non-numeric response is
+  // NOT a zero. Anything short of a good number leaves the last good badge
+  // exactly where it is, and nothing here can throw into the shell.
+  var ATTENTION_THROTTLE_MS = 60000;
+  var lastAttentionAt = 0;
+  function markAttentionFresh() { lastAttentionAt = Date.now(); }
+  function paintBell() {
+    var b = document.getElementById('dds-bell');
+    if (b) b.innerHTML = bellInner((CTX && CTX.attention_count) || 0);
+  }
+  function refreshAttention() {
+    if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
+    if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;
+    markAttentionFresh();                                         // claim the window BEFORE the request
+    try {
+      api('/portal/context').then(function (r) {
+        if (!r || !r.ok || !r.body || !r.body.data) return;        // a failed read is not "nothing needs you"
+        var n = r.body.data.attention_count;
+        if (typeof n !== 'number' || !isFinite(n) || n < 0) return; // keep the last good badge
+        if (!CTX || n === CTX.attention_count) return;
+        CTX.attention_count = n;
+        try { window.__ddsContext = CTX; } catch (_) { /* */ }
+        paintBell();                                              // badge only — never a full re-render
+      })['catch'](function () { /* keep the last good badge */ });
+    } catch (_) { /* the shell must never break over its own badge */ }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') refreshAttention();
+  });
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
   var notif;
@@ -1112,6 +1169,7 @@
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
           CTX = r.body.data; render();
+          markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
           try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17
           // queries incl. 3× auth). The shell already fetched it — publish it so
