@@ -493,6 +493,53 @@ NO MIGRATION. Needs merge + FUNCTION DEPLOY (sales.ts + 2 lib files).
 Pre-existing, not ours: broadcasts.spec.ts:172 fails on main too (verified
 in a clean worktree at b168a9f).
 
+## ✅ "NEEDS YOU" TEARDOWN — BUILT, AWAITING DEPLOY (2026-08-07)
+
+Eric: "also should be able to resolve these some way." RECON FOUND THE REAL
+DEFECT: of ~30 notice kinds only 5 had teardown, ALL infrastructure recovery.
+Every business obligation cleared NEVER. Resolving a support request did not
+clear "Waiting on you" (and the period was once-ever, so it could never
+re-raise — a permanent tombstone). Paying an invoice ADDED "Paid" while
+"Still unpaid" stayed, both forever. "Reminder sent" was status, not an ask.
+So the fix is TEARDOWN FIRST, button second — a dismiss button alone would
+have taught him to sweep real work out of sight.
+ERIC'S DECISIONS: "Waiting on you" clears on RESOLVE/CLOSE only (not reply)
++ weekly re-nudge · "Reminder sent" stops rendering entirely.
+
+BUILT (70713f6): Tier A — support_aging clears on resolve/close (weekly
+bucket `support:<id>:w<floor(now/7d)>`, cleared by prefix); stripe webhook
+dismisses invremind: on payment; doc reminders raised pre-dismissed (the
+codebase's own booking_reminder pattern); remind:/deal: cleared on sign,
+accept, convert, delete; the four client_* kinds raised row-silent;
+invoice_paid gets "Got it" not "Take care of it". Tier B — a "Done" button
+reusing POST /commerce/notices/dismiss, sibling <button> not nested in the
+row's <a>, synthetic rows excluded, MONEY AND LEGAL REFUSED at BOTH the feed
+(dismissible flag) and the route.
+
+REVIEW FOUND A BLOCKER I INTRODUCED (23cb7e3 fixes all): (F1) I protected
+payment_trouble + account_lapsed — which have NO teardown anywhere — making
+them PERMANENTLY unclearable, strictly worse than before (and stranding
+agency/portfolio.ts's billing_issue flag + attention_center's count). Fixed
+by removing them AND adding a biconditional guard test: a kind is protected
+IF AND ONLY IF something can clear it. (F2) the invremind clear ran LAST in
+the webhook's best-effort try, so an earlier throw stranded the row and
+Stripe's retry short-circuits on already-paid — now runs first, outside that
+try, AND on the already-paid path so a retry heals it. (F3) presence.html's
+plan card swallowed the 409 and removed the card anyway — now honest.
+(F4) row-silent had silently killed WEB PUSH for the four client_* kinds —
+push decoupled from row visibility (`push?: boolean`). (F5) filterSafe on
+the like-prefix. (F6) legacy support:<id> rows also cleared. (F7) the money
+guard now fails closed on a missing period.
+Mutation testing found 2 survivors in my own F2 fix; both re-pinned.
+Gates: pure 217/0/4, e2e 175/4 desktop + 77/3 mobile+tablet, 26 mutations
+all caught. NO MIGRATION. Needs merge + FUNCTION DEPLOY (touches
+stripe-webhook + several routes).
+REPORTED, NOT FIXED: there is NO void path for invoices (pipeline.html
+renders a "Voided" state nothing can produce) — an invoice raised in error
+can only be cleared by paying it. And deletion_requested cannot be re-raised
+after a cancel (period:'once' + a surviving dismissed row) — pre-existing,
+now load-bearing because the kind IS protected.
+
 ## 🔕 "NEEDS YOU" ITEMS CAN'T BE RESOLVED (Eric, 2026-08-07) — QUEUED
 
 "also should be able to resolve these some way." The Today/attention "NEEDS
