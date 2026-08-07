@@ -920,9 +920,18 @@ test.describe('services catalog — starter list (ask 1)', () => {
     await expect(price).toHaveValue('1750');
   });
 
-  // …but a genuinely blank row still gets the caret, so "Add a service" and an
-  // empty editor are still one keystroke away from typing.
-  test('a BLANK row still gets the caret', async ({ page }) => {
+  // …but a genuinely blank row is still one keystroke away from typing: an
+  // editor that opens on a nameless row takes the caret straight away.
+  test('an editor that opens BLANK still takes the caret', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: '', price_cents: 0 }] } } });
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
+    await expect(page.locator('#svcRows .svc-name').first()).toHaveValue('');
+    await expect(page.locator('#svcRows .svc-name').first()).toBeFocused();
+  });
+
+  test('"Add a service" focuses the row it just added', async ({ page }) => {
     await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: 'Logo refresh', price_cents: 60000 }] } } });
     await page.goto('/pipeline.html');
     await page.locator('#mngServicesTop').click();
