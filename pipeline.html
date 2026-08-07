@@ -1646,11 +1646,19 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // Sending a SAVED draft is the other half of the blanks guard — the draft may
     // have been seeded weeks ago and never completed. The deal read carries each
-    // agreement's body for exactly this check; if it somehow doesn't, the guard
-    // stands aside rather than nagging about a document it can't see.
+    // agreement's body for exactly this check. If the body is MISSING (review F2:
+    // this page deploys via Netlify the moment main moves, while the function
+    // deploys separately — so a new page can briefly run against a server whose
+    // deal read predates the widened select), do NOT stand aside silently. We
+    // cannot check what we cannot see, so we say exactly that and let him
+    // decide, rather than sending a possibly-blank-laden agreement in silence.
     $('detailInner').querySelectorAll('[data-send-contract]').forEach(b=>b.onclick=async()=>{
       const k=(data.contracts||[]).find(x=>x.id===b.dataset.sendContract);
-      if(k&&k.body&&!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+      if(k&&typeof k.body==='string'){
+        if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+      }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
+        toast('Not sent — open it with View / print to check it first.');return;
+      }
       b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));

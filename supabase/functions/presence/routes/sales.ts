@@ -1172,7 +1172,12 @@ export async function handleSalesProposalDelete(site: SiteRow, principal: Princi
   if (p.status !== 'draft') return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
   const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&deleted_at=is.null&select=id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
-  if (!up.ok || !rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  // Two different things fail here and the operator must not be told the wrong
+  // one (review F1): !up.ok is infrastructure — nothing was removed, try again;
+  // an ok PATCH matching NO row is the genuine race (a send/sign landed between
+  // our read and our write), and that document really did leave the drafts.
+  if (!up.ok) return json({ error: 'conflict', message: 'Couldn’t remove it just now — nothing changed. Try again.' }, 409, cors);
+  if (!rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
   // The row is hidden, so the deal's history is the only place the removal shows.
   await dealEvent(site.id, p.deal_id, 'proposal_deleted', principal, { detail: { proposal_id: id, title: String(p.title || '') } });
   return json({ data: { ok: true, id } }, 200, cors);
@@ -1235,7 +1240,8 @@ export async function handleSalesContractDelete(site: SiteRow, principal: Princi
   if (c.status !== 'draft') return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&deleted_at=is.null&select=id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
-  if (!up.ok || !rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  if (!up.ok) return json({ error: 'conflict', message: 'Couldn’t remove it just now — nothing changed. Try again.' }, 409, cors);   // review F1: infra failure ≠ race
+  if (!rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
   await dealEvent(site.id, c.deal_id, 'contract_deleted', principal, { detail: { contract_id: id, title: String(c.title || '') } });
   return json({ data: { ok: true, id } }, 200, cors);
 }

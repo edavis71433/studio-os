@@ -657,7 +657,7 @@ const DEAL3 = '33333333-3333-4333-8333-333333333333';
 const CONTACTLESS = { data: {
   deal: { id: DEAL3, title: 'Nameless enquiry', stage: 'contract', expected_value_cents: 380000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: null, converted_client_id: null, retainer: null },
   contact: null,
-  proposals: [], contracts: [{ id: 'k-1', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null }],
+  proposals: [], contracts: [{ id: 'k-1', title: 'Service agreement', status: 'draft', body: 'A complete agreement with no blanks left in it.', signer_name: null, signed_at: null, version: 1, terms_snapshot: null }],
   events: [], timeline: [], invoices: [], last_contacted_at: null,
 } };
 const CONTACT_API = { ...API, [`/sales/deals/${DEAL3}`]: CONTACTLESS, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } };
