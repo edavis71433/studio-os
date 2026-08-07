@@ -128,6 +128,7 @@ async function liveMediaIds(site: SiteRow): Promise<Set<string>> {
 // any failure degrades to an EMPTY map (no client dimension at all) plus one log
 // line naming the hop. Never a HALF map: a file whose client we resolved but
 // whose NAME we lost is precisely the row a consumer would mislabel.
+const DELIVERABLE_CAP = 2000;   // rows hop 1 reads (see the saturation warning below)
 const IN_CHUNK = 100;   // ids per `in.()`. 100 uuids ≈ 3.7KB of query string — inside the
                         // ~8KB request-line limit typical of the proxy in front of PostgREST.
                         // The 2000 ids hop 1 can yield are ~74KB unchunked: a hard failure.
@@ -158,10 +159,15 @@ async function clientByMedia(site: SiteRow): Promise<Map<string, MediaClient>> {
     // `id` is the tiebreaker, not decoration: rows written in one transaction share
     // created_at and PostgREST's order between them is undefined, so without it
     // "first wins" is not a total order and two reads can attribute differently.
-    const dlR = await svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,project_id,title,created_at&order=created_at.asc,id.asc&limit=2000`);
+    const dlR = await svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,project_id,title,created_at&order=created_at.asc,id.asc&limit=${DELIVERABLE_CAP}`);
     if (!dlR.ok) return bail('hop 1 (deliverables)');
     const dl = arr(dlR);
     if (!dl.length) return new Map();
+    // F9: the cap is ASCENDING, so saturating it drops the NEWEST deliverables —
+    // the recent work most likely to be looked at. Those files stay in the list,
+    // they simply lose their client label. Not silent any more; raising the cap
+    // properly needs a keyset page on (created_at,id), which is a change of its own.
+    if (dl.length >= DELIVERABLE_CAP) console.warn(`[assets] client dimension: the ${DELIVERABLE_CAP}-deliverable read SATURATED — the most recent deliverables are not attributed this read.`);
     const projectIds = [...new Set(dl.map((d) => String(d.project_id || '')).filter(Boolean))];
     if (!projectIds.length) return new Map();
     // Hop 2 — the agency↔customer bridge. DELIBERATELY WITHOUT `status=eq.active`,
