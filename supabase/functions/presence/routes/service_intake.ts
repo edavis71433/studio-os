@@ -10,9 +10,9 @@ import { isStudioSide, studioDenied, loadProject, projectEvent } from './project
 import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
 import {
   normalizeQuestions, normalizeAnswers,
-  isSupportStatus, canSupportTransition, isSupportPriority, supportAgingPeriodPrefix,
+  isSupportStatus, canSupportTransition, isSupportPriority, supportAgingPeriodPrefix, supportAgingLegacyPeriod,
 } from '../lib/intake.ts';
-import { clearNoticePrefix } from '../lib/notice.ts';
+import { clearNotice, clearNoticePrefix } from '../lib/notice.ts';
 import { offerCsat } from '../lib/csat.ts';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -201,7 +201,17 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
     // re-fires on a weekly bucket: last week's row and this week's both go.
     // Best-effort by construction (clearNoticePrefix never throws) — the studio's
     // resolve must never fail over its own echo.
-    if (clearedNow && site.client_id) await clearNoticePrefix(site.client_id, 'support_aging', supportAgingPeriodPrefix(id));
+    //
+    // BOTH SHAPES. The prefix (`support:<id>:`) covers every weekly bucket, but
+    // its trailing colon — the thing that stops `support:abc:` reaching
+    // `support:abcd:` — is also what makes it unable to match the PRE-BUCKET
+    // period, which was the exact string `support:<id>`. Without the second call
+    // every notice raised before this deploy is orphaned: permanently "Waiting on
+    // you" for a request the owner has already finished.
+    if (clearedNow && site.client_id) {
+      await clearNoticePrefix(site.client_id, 'support_aging', supportAgingPeriodPrefix(id));
+      await clearNotice(site.client_id, 'support_aging', supportAgingLegacyPeriod(id));
+    }
     if (resolvedNow && reqRow.project_id) {
       await projectEvent(site.id, reqRow.project_id, 'support_resolved', principal, true, { request_id: id });
       // service edge #1: on resolve, offer the client a one-question CSAT (reuses

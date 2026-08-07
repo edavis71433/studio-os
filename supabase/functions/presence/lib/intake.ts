@@ -129,3 +129,14 @@ export function supportAgingPeriod(requestId: string, nowMs: number): string {
   const w = Number.isFinite(nowMs) ? Math.floor(nowMs / SUPPORT_AGING_BUCKET_MS) : 0;
   return `${supportAgingPeriodPrefix(requestId)}w${w}`;
 }
+/** The period shape used BEFORE the weekly bucket: the exact string
+ *  `support:<id>`, with no trailing colon.
+ *
+ *  `LIKE 'support:<id>:%'` cannot match it — the trailing colon in the prefix is
+ *  load-bearing (it is what stops `support:abc:` reaching `support:abcd:`), and
+ *  it is exactly what excludes the legacy row. So every row raised before the
+ *  bucket deployed would have been orphaned: permanently "Waiting on you" for a
+ *  request that was resolved. The teardown clears BOTH shapes. */
+export function supportAgingLegacyPeriod(requestId: string): string {
+  return `support:${requestId}`;
+}

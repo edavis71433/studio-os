@@ -1090,7 +1090,12 @@ async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' 
       ? 'The client signed. Convert them to a customer to provision their workspace whenever you’re ready.'
       : 'The client accepted your proposal. Prepare the agreement to sign when you’re ready.';
     await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
-    // the document is decided — it is no longer waiting on anyone
+    // the document is decided — it is no longer waiting on anyone.
+    // BELT-AND-BRACES ONLY: runDocumentReminders now raises `remind:<doc>` as a
+    // silent ledger row (status 'dismissed'), so for anything raised after that
+    // change there is no ACTIVE row here to clear and this line is a no-op. It
+    // stays for the rows raised BEFORE it — those are still active, and this is
+    // the only thing that takes them down. Delete it once none can be left.
     if (docId) await clearNotice(site.client_id, 'deal_followup', `remind:${docId}`);
   } catch { /* non-fatal — the deal event + Pipeline still record it */ }
 }
