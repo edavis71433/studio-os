@@ -1012,6 +1012,20 @@ async function openDeal(id){
             :nextStages.includes('lost')?`<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button class="btn ghost" id="markLost" style="border-color:transparent;color:var(--soft)">Mark as lost (not a fit)</button></div>`:''}
           <div id="lostForm"></div></div>
         <div class="sec"><h3>Details</h3>
+          <!-- CONTACT first: without a client email NOTHING sends itself — the
+               agreement, the deposit and the welcome all fall back to "copy the
+               link yourself". This block edits the linked contact in place, or
+               creates one and links it when the deal has none. -->
+          <div style="border-bottom:1px solid var(--line,#e9e4dc);padding-bottom:12px;margin-bottom:12px">
+            <div class="mut" style="font-weight:600;color:var(--ink,inherit);margin-bottom:6px">Contact</div>
+            <label class="mut" for="ed-cname">Client name</label>
+            <input id="ed-cname" type="text" maxlength="120" value="${esc((c&&c.name)||'')}" placeholder="e.g. Sam Rivera" style="display:block;width:100%;box-sizing:border-box;margin-top:2px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+            <label class="mut" for="ed-cemail" style="display:block;margin-top:8px">Client email</label>
+            <input id="ed-cemail" type="email" maxlength="160" autocomplete="off" value="${esc((c&&c.email)||'')}" placeholder="e.g. sam@example.com" style="display:block;width:100%;box-sizing:border-box;margin-top:2px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+            <label class="mut" for="ed-cphone" style="display:block;margin-top:8px">Phone</label>
+            <input id="ed-cphone" type="tel" maxlength="40" value="${esc((c&&c.phone)||'')}" placeholder="Optional" style="display:block;max-width:220px;margin-top:2px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+            <div class="mut" id="ed-cnote" style="margin-top:6px;font-size:12px">${(c&&c.email)?'Agreements, proposals and payment links email themselves to this address.':'Add their email and agreements, proposals and payment links will send themselves. Without it, you have to copy every link by hand.'}</div>
+          </div>
           <label class="mut" for="ed-value">Deal value (USD)</label><br>
           <input id="ed-value" type="number" step="0.01" min="0" value="${d.expected_value_cents?(d.expected_value_cents/100):''}" placeholder="2500" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
           <label class="mut" for="ed-close" style="display:block;margin-top:8px">Expected close</label>
@@ -1103,7 +1117,25 @@ async function openDeal(id){
     const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — a note for your own records',placeholder:'e.g. Went with someone cheaper'}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    // Saving Details saves the CONTACT too. An existing contact is patched in
+    // place; a contactless deal mints one and links it — the same two-step the
+    // create form already does (POST /sales/contacts dedupes on (site,email), so
+    // re-entering a known address reuses that row instead of duplicating it).
+    const saveContactPart=async()=>{
+      const eN=$('ed-cname'),eE=$('ed-cemail'),eP=$('ed-cphone');
+      if(!eN&&!eE&&!eP)return;   // block not rendered (defensive)
+      const cn=(eN?eN.value:'').trim(), ce=(eE?eE.value:'').trim(), cp=(eP?eP.value:'').trim();
+      const stale=()=>{CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false;};   // both contact caches (Table name join + search index) are now stale
+      if(c&&c.id){
+        if(cn===(c.name||'')&&ce===(c.email||'')&&cp===(c.phone||''))return;   // untouched — no needless write
+        await api('/sales/contacts/'+c.id,'PATCH',{name:cn,email:ce,phone:cp}); stale(); return;
+      }
+      if(!cn&&!ce){ if(cp) throw new Error('A contact needs a name or an email — a phone number on its own isn’t enough.'); return; }
+      const nc=await api('/sales/contacts','POST',{name:cn||ce.split('@')[0],email:ce||undefined,phone:cp||undefined});
+      const cid=nc&&nc.data&&nc.data.id; stale();
+      if(cid) await api('/sales/deals/'+id,'PATCH',{contact_id:cid});
+    };
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
     const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
@@ -1118,11 +1150,16 @@ async function openDeal(id){
     // and — critically — tells the operator honestly whether it was EMAILED or
     // only prepared (so a not-emailed doc is never mistaken for delivered).
     const copyToClip=(url)=>{if(!url)return;if(navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});};
-    const sendProposalById=async(pid)=>{const r=await api('/sales/proposals/'+pid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[pid]=r.url;toast(r.emailed?('Proposal sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):'Proposal prepared — it wasn’t emailed, so copy the link and send it yourself.');copyToClip(r.url);openDeal(id);};
+    // The #1 reason a send silently does nothing: the deal has no client email
+    // (emailSalesDoc/emailInvoice return false). Say exactly that, and where the
+    // fix is — never a vague "it wasn't emailed".
+    const NO_EMAIL=!(c&&c.email);
+    const noEmailWhy=(what,linkName)=>what+' prepared — there’s no client email on this deal, so nothing was sent. The '+linkName+' is copied to your clipboard. Add their email in Details to send it automatically.';
+    const sendProposalById=async(pid)=>{const r=await api('/sales/proposals/'+pid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[pid]=r.url;toast(r.emailed?('Proposal sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):(NO_EMAIL?noEmailWhy('Proposal','link'):'Proposal prepared — it wasn’t emailed, so copy the link and send it yourself.'));copyToClip(r.url);openDeal(id);};
     const sendContractById=async(cid)=>{const r=await api('/sales/contracts/'+cid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[cid]=r.url;
       // The sign→pay moment only works if a deposit is WAITING when they sign.
       const hasOpenDeposit=(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
-      toast(r.emailed?('Agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.')):'Agreement prepared — it wasn’t emailed, so copy the signing link and send it yourself.');
+      toast(r.emailed?('Agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.')):(NO_EMAIL?noEmailWhy('Agreement','signing link'):'Agreement prepared — it wasn’t emailed, so copy the signing link and send it yourself.'));
       copyToClip(r.url);openDeal(id);};
     // Copy an already-sent doc's link (send is idempotent → re-fetches the link).
     const copyDocLink=async(kind,docId)=>{try{let url=LINKS[docId];if(!url){const r=await api('/sales/'+(kind==='contract'?'contracts':'proposals')+'/'+docId+'/send','POST',{});url=r.url;if(url)LINKS[docId]=url;}if(!url){toast('No signing link is available — check your email settings.',true);return;}copyToClip(url);toast(kind==='contract'?'Signing link copied':'Link copied');}catch(e){toast(nice(e),true);}};
@@ -1251,7 +1288,9 @@ async function openDeal(id){
       try{
         const r=await api('/sales/deals/'+id+'/invoice','POST',body);
         const label=body.purpose==='deposit'?'Deposit request':'Invoice';
-        toast((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));
+        toast(r.emailed?((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+' — emailed to the client')
+          :(NO_EMAIL&&r.url?noEmailWhy(label,'payment link')
+          :((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+(r.url?' — link copied':''))));
         if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});
         openDeal(id);
       }catch(e){

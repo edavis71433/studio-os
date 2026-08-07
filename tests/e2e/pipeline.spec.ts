@@ -648,3 +648,87 @@ test.describe('Deal drawer Path', () => {
     await expect(page.locator('.backbar')).toBeHidden();                       // and the backbar
   });
 });
+
+// ── CRM deal page (ask 2): the deal's CONTACT is editable ────────────────────
+// The real bug: a deal created with neither a name nor an email had contact_id
+// null forever, so emailSalesDoc always returned false and contracts/proposals/
+// invoices could never send themselves — with no way to fix it from the deal.
+const DEAL3 = '33333333-3333-4333-8333-333333333333';
+const CONTACTLESS = { data: {
+  deal: { id: DEAL3, title: 'Nameless enquiry', stage: 'contract', expected_value_cents: 380000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: null, converted_client_id: null, retainer: null },
+  contact: null,
+  proposals: [], contracts: [{ id: 'k-1', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null }],
+  events: [], timeline: [], invoices: [], last_contacted_at: null,
+} };
+const CONTACT_API = { ...API, [`/sales/deals/${DEAL3}`]: CONTACTLESS, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } };
+
+test.describe('deal page — Contact block (ask 2)', () => {
+  test('renders pre-filled for a deal that HAS a contact, and Save patches that contact', async ({ page }) => {
+    let patched: { url: string; body: string } | null = null;
+    await installApp(page, { api: CONTACT_API });
+    await page.route('**/functions/v1/presence/sales/contacts/**', async (route) => {
+      patched = { url: route.request().url(), body: route.request().postData() || '' };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-1' } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    // pre-filled from data.contact — no hunting to crm.html to edit it
+    await expect(page.locator('#ed-cname')).toHaveValue('Sam Rivera');
+    await expect(page.locator('#ed-cemail')).toHaveValue('sam@example.com');
+    await expect(page.locator('#ed-cphone')).toHaveValue('');
+    await expect(page.locator('#ed-cnote')).toContainText('email themselves');
+    await page.locator('#ed-cphone').fill('555-0101');
+    await page.locator('#ed-save').click();
+    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    expect(patched!.url).toContain('/sales/contacts/ct-1');
+    expect(JSON.parse(patched!.body)).toEqual({ name: 'Sam Rivera', email: 'sam@example.com', phone: '555-0101' });
+  });
+
+  test('a CONTACTLESS deal gains a contact: create, then link it to the deal', async ({ page }) => {
+    const calls: Array<{ path: string; method: string; body: string }> = [];
+    await installApp(page, { api: CONTACT_API });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      const method = route.request().method();
+      if (method !== 'GET') {
+        calls.push({ path, method, body: route.request().postData() || '' });
+        if (path === '/sales/contacts') return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-new', name: 'Jo Vance', email: 'jo@example.com' } }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+      }
+      return route.fallback();
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await expect(page.locator('#ed-cname')).toHaveValue('');
+    await expect(page.locator('#ed-cnote')).toContainText('Add their email');
+    await page.locator('#ed-cname').fill('Jo Vance');
+    await page.locator('#ed-cemail').fill('jo@example.com');
+    await page.locator('#ed-save').click();
+    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    // two steps, in order: create the contact, then LINK it via the deal PATCH
+    const create = calls.find((c) => c.path === '/sales/contacts' && c.method === 'POST');
+    const link = calls.find((c) => c.path === `/sales/deals/${DEAL3}` && c.method === 'PATCH' && c.body.includes('contact_id'));
+    expect(create).toBeTruthy();
+    expect(JSON.parse(create!.body)).toMatchObject({ name: 'Jo Vance', email: 'jo@example.com' });
+    expect(link).toBeTruthy();
+    expect(JSON.parse(link!.body).contact_id).toBe('ct-new');
+    expect(calls.indexOf(create!)).toBeLessThan(calls.indexOf(link!));
+  });
+
+  test('a phone with no name or email is refused with a plain reason (never a silent no-op)', async ({ page }) => {
+    await installApp(page, { api: CONTACT_API });
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.locator('#ed-cphone').fill('555-0199');
+    await page.locator('#ed-save').click();
+    await expect(page.locator('.dds-toast')).toContainText('needs a name or an email');
+  });
+
+  test('sending with NO client email says exactly why, and points at the fix', async ({ page }) => {
+    await installApp(page, { api: CONTACT_API });
+    await page.route(`**/functions/v1/presence/sales/contracts/k-1/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://example.test/sign/abc', emailed: false }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.locator('[data-send-contract="k-1"]').first().click();
+    const toast = page.locator('.dds-toast');
+    await expect(toast).toContainText('there’s no client email on this deal, so nothing was sent');
+    await expect(toast).toContainText('Add their email in Details');
+  });
+});

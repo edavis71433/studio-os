@@ -457,6 +457,23 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0));
     if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    // The deal's CONTACT is editable AFTER creation. Both the name and the email
+    // are optional on the create form, so a deal can start with contact_id null —
+    // and a null contact is exactly why emailSalesDoc/emailInvoice return false,
+    // meaning nothing (agreement, proposal, deposit, welcome) can ever send
+    // itself. Without this branch such a deal could never gain a contact. Same
+    // tenant guard the POST above uses; an explicit null (or '') clears the link,
+    // and a malformed id is an honest 422 rather than a silent unlink.
+    if (b.contact_id !== undefined) {
+      const raw = b.contact_id;
+      if (raw === null || raw === '') patch.contact_id = null;
+      else if (!UUID_RE.test(String(raw))) return json({ error: 'bad_contact', message: 'That contact isn’t in this workspace.' }, 422, cors);
+      else {
+        const c = await svc(`presence_contacts?id=eq.${raw}&site_id=eq.${site.id}&select=id&limit=1`);
+        if (!rows(c)[0]) return json({ error: 'bad_contact', message: 'That contact isn’t in this workspace.' }, 422, cors);
+        patch.contact_id = raw;
+      }
+    }
     // "Next step + when" — the one field that keeps a solo seller's pipeline
     // honest (columns arrive with migration 0089; harmless to omit before then).
     if (b.next_step !== undefined) patch.next_step = clean(b.next_step, 200);

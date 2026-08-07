@@ -75,6 +75,30 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
   ok('R6: expected_value_cents is bounded (min 0, max 1_000_000_00) like line items', (sales.match(/Math\.min\(1_000_000_00, Math\.max\(0, Math\.trunc\(Number\(b\.expected_value_cents\)\)/g) || []).length >= 2);
 }
 
+// ── The deal's CONTACT is EDITABLE after creation ────────────────────────────
+// A deal created with neither a name nor an email gets contact_id = null (both
+// fields are optional on the create form) — and a null contact is exactly why
+// emailSalesDoc returns false, so an agreement/proposal/invoice could never
+// auto-send and convert-to-customer could never mint a portal login. Before this
+// the deal PATCH had NO contact_id branch, so such a deal could never gain one.
+{
+  const dealFn = sales.indexOf('export async function handleSalesDeal');
+  const patchAt = sales.indexOf("if (req.method === 'PATCH') {", dealFn);
+  const delAt = sales.indexOf("if (req.method === 'DELETE') {", dealFn);
+  const patchBlock = (dealFn > 0 && patchAt > 0 && delAt > patchAt) ? sales.slice(patchAt, delAt) : '';
+  ok('contact-edit: the deal PATCH accepts contact_id', /b\.contact_id !== undefined/.test(patchBlock) && /patch\.contact_id/.test(patchBlock));
+  ok('contact-edit: the contact is TENANT-GUARDED (site-scoped lookup, same as the POST)', /presence_contacts\?id=eq\.\$\{[^}]+\}&site_id=eq\.\$\{site\.id\}/.test(patchBlock));
+  ok('contact-edit: a foreign / unknown contact is refused with a 422 (never silently attached)', /bad_contact[\s\S]{0,200}422/.test(patchBlock) && (patchBlock.match(/'bad_contact'/g) || []).length >= 2);
+  ok('contact-edit: an explicit null (or blank) CLEARS the link', /patch\.contact_id = null/.test(patchBlock));
+  ok('contact-edit: a malformed contact_id is a 422 — never a quiet clear', /UUID_RE\.test\(String\(raw\)\)[\s\S]{0,180}422/.test(patchBlock));
+  // the drawer edits the contact in place (existing contact) or mints one and
+  // links it (contactless deal) — the same two-step the create form already does.
+  const pipe2 = read('pipeline.html');
+  ok('contact-edit: the deal page has a Contact block (name / email / phone) in Details', /id="ed-cname"/.test(pipe2) && /id="ed-cemail"/.test(pipe2) && /id="ed-cphone"/.test(pipe2));
+  ok('contact-edit: Save patches an existing contact, else creates one and links it to the deal', /api\('\/sales\/contacts\/'\+c\.id,'PATCH'/.test(pipe2) && /api\('\/sales\/contacts','POST'[\s\S]{0,400}contact_id:/.test(pipe2));
+  ok('contact-edit: a no-email send says exactly WHY and points at the fix', /no client email on this deal, so nothing was sent[\s\S]{0,200}Add their email in Details/.test(pipe2));
+}
+
 // ── convert reuses the ONE provisioning path (no second provisioner) ──
 ok('convert: reuses provisionForSignup (idempotent)', /provisionForSignup\(\{ clientId/.test(sales));
 ok('convert: rolls back the client on provision failure', /clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}/.test(sales));
