@@ -561,6 +561,69 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## 🔧 GAP SWEEP — BUILT, AWAITING SQL + DEPLOY (2026-08-07)
+
+Eric: "please do all of things you can do and any gaps you see make the
+changes." Closed every reported-not-fixed item from the day's reviews.
+Commits 5ca624c→4579 2f7 (12).
+
+TWO REAL GAPS:
+1. INVOICE VOID — pipeline.html rendered a "Voided" state NOTHING could
+   produce; an invoice raised in error could only be cleared by PAYING it,
+   and it stranded a permanently-undismissable "Still unpaid" row. Now
+   POST /sales/invoices/:id/void: open (sent or not) → voidable, PAID → 409
+   never, void → idempotent; guard doubled into the PATCH WHERE; clears the
+   invremind notice; Stripe link deactivated AFTER the status write so a
+   Stripe hiccup can't leave a void that didn't happen.
+   ⚠️ CAUGHT A MONEY BUG: the client portal gated its pay button on
+   `status !== 'paid'` — a VOIDED invoice would have kept a live payment
+   link in front of the client. Unreachable before only because voiding
+   didn't exist. Now allow-lists `status === 'open'`.
+2. DELETION RE-REQUEST — `deletion_requested` used period 'once' and cancel
+   DISMISSED rather than deleted, so a second request after a cancel raised
+   NOTHING: no notice, no bell, no email, silently. Period is now
+   per-request; a cancelled request cannot be resurrected.
+
+NOTIFICATION HONESTY BACKLOG (all four flagged earlier, now closed):
+· EIGHT operator-directed sends could be silenced by one unsubscribe click
+  ("your scheduled jobs are failing", "a site is down") — now critical
+  (still respects bounce/complaint; NO customer mail gained the flag).
+· text/plain welded labels to values ("ProjectWebsite refresh") — new
+  htmlToPlainText; also fixes self-closed <br/> which never broke.
+· all THREE doors onto a support thread now bump updated_at (the portal
+  reply and the studio's own reply both didn't).
+· the bell badge refreshes on tab-return, 60s throttle claimed BEFORE the
+  request, no interval, keep-last-good.
+
+REVIEW: NO BLOCKERS — 22 invoice statuses driven, every client-facing money
+surface verified to refuse a voided invoice, 0118 kind-set proven equal to
+what the code writes. BUT 5 of 10 mutations ESCAPED: correct code, unguarded.
+All closed (db860ca/2de3918/45792f7):
+(F1) a voided invoice paid via a STALE Stripe link left NO in-app trace —
+     deactivatePaymentLink swallowed both throw and non-2xx so all three
+     outcomes returned byte-identical success. Now returns a boolean, the
+     operator is told when the link may still be live, and the webhook
+     raises an `invoice_void_paid` notice when money lands on a withdrawn
+     invoice (it still refuses to un-void it).
+(F2) the critical-flag guard pinned 6 of 8 sites — now DERIVED: it scans
+     every sendEmail bound from OPS_ALERT_EMAIL, so a ninth is covered the
+     day it lands. Nearest-preceding-assignment binding, because file-wide
+     would have demanded critical on customer mail in lifecycle.ts.
+(F3) all three badge claims were unpinned (throttle-before-request,
+     failing-endpoint, open-layer) — the layer test opened a popover that
+     lives on document.body and survives a re-render either way; now opens
+     a nav dropdown inside root. M8/M9/M10 all fail now.
+(F4) the sentinel invariant was asserted, not enforced. (F5) delete-request
+     never checked its insert — it reported "recorded" and could strand an
+     ACTIVE protected notice with no deletion row behind it.
+Gates: pure 222/0/4, e2e 334/12/0 desktop, deno check clean.
+⚠️ NEEDS ERIC: merge + run 0118 AND 0119 + function deploy. SQL BEFORE the
+deploy — dealEvent and raiseNotice are best-effort, so an un-widened CHECK
+drops the ledger line / the notice SILENTLY.
+NOTE: deploy #30 failed on a Docker Hub rate limit pulling the supabase
+edge-runtime image (`toomanyrequests`) — infrastructure, not code; the
+re-run succeeded. It will recur; just re-run.
+
 ## ✅ FILES — BY CLIENT + REAL FILENAMES — BUILT, AWAITING DEPLOY (2026-08-07)
 
 Eric: "files should be able to be organized and filtered by client...not all
