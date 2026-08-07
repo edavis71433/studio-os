@@ -74,6 +74,17 @@
         table scrolls in its OWN container — the page never overflows sideways ── */
   .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+  /* Name and Client both hold free text, so both are bounded and ellipsised
+     rather than allowed to wrap or to push Where-used off the edge — the full
+     value stays available as a title. The name is what the owner scans for, so
+     it gets the wider budget. */
+  .tscroll td.cli,.tscroll th.cli{white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+  .tscroll .ncell{max-width:230px}
+  .tscroll .ncell .nm2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* the Client column adds a seventh column; buy its width back from the gutters
+     rather than from Where-used, which would otherwise fall off the right edge */
+  .tscroll table.wide tbody td{padding-left:10px;padding-right:10px}
+  .tscroll table.wide thead th .thb{padding-left:10px;padding-right:10px}
   .tscroll thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   .tscroll thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   .tscroll thead th .thb:hover{color:var(--p)}
@@ -270,9 +281,18 @@ const TCOLS=[
   ['state','Status',(a)=>String(a.state||'')],
 ];
 // Whose work a file belongs to. Shown only once the studio actually has client
-// files — a column of nothing but "Studio" is noise. '~' sorts Studio last.
+// files — a column of nothing but "Studio" is noise. '~~~' sorts Studio last.
 const TCOL_CLIENT=['client','Client',(a)=>String(a.client_name||'~~~').toLowerCase()];
-function tcols(){return RAILC.length?[TCOLS[0],TCOL_CLIENT,...TCOLS.slice(1)]:TCOLS;}
+// STATUS earns its column only where it can say something. Under the 'immediate'
+// policy there is no approval step (see stateShown below), so the column would be
+// nothing but em-dashes — dead width that pushed Where-used off the screen once
+// Client arrived. It returns the moment a row has a state worth reporting: an
+// archived file, or a plan that really does have an approval step.
+function showStateCol(){return S.policy!=='immediate'||S.assets.some(a=>String(a.state||'')==='archived');}
+function tcols(){
+  const base=showStateCol()?TCOLS:TCOLS.filter(c=>c[0]!=='state');
+  return RAILC.length?[base[0],TCOL_CLIENT,...base.slice(1)]:base;
+}
 let SORT={key:'added',dir:-1};   // newest first — the old "Recent" default
 // ── rail counts: named collections come from /assets/collections; kind/favorite/
 //    brand and the archive remainder derive from the last UNFILTERED, unsearched
@@ -621,7 +641,7 @@ function tableHtml(rows){
   const ckTh=S.canEdit?`<th scope="col" class="ck"><input type="checkbox" id="ckAll" aria-label="Select all files"${allSel?' checked':''}></th>`:'';
   const ths=ckTh+tcols().map(([k,label])=>{
     const on=SORT.key===k;
-    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+    return `<th scope="col"${k==='client'?' class="cli"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('');
   const trs=rows.map(a=>{
     const t=a.thumb?` style="background-image:url('${esc(a.thumb)}')"`:'';
@@ -631,16 +651,16 @@ function tableHtml(rows){
     const ckTd=S.canEdit?`<td class="ck"><input type="checkbox" data-pick="${esc(a.id)}" aria-label="Select ${esc(a.name)}"${S.selected.has(a.id)?' checked':''}></td>`:'';
     return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
       ${ckTd}
-      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2">${esc(a.name)}</span></span></td>
-      ${RAILC.length?`<td>${esc(a.client_name||'Studio')}</td>`:''}
+      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span></span></td>
+      ${RAILC.length?`<td class="cli" title="${esc(a.client_name||'Studio')}">${esc(a.client_name||'Studio')}</td>`:''}
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
       <td class="num">${esc(when(a.created_at))||'—'}${isClientUpload(a)?'<span class="fromclient">by client</span>':''}</td>
       <td><span class="use"><span class="dot ${a.in_use?'used':'un'}"></span>${a.in_use?'On your site':'Not on your site'}</span></td>
-      <td>${stateShown(st)?`<span class="sbadge ${esc(st)}">${esc(stateLbl)}</span>`:`<span class="sdash" title="Your plan has no approval step — files are available the moment they land.">—</span>`}</td>
+      ${showStateCol()?`<td>${stateShown(st)?`<span class="sbadge ${esc(st)}">${esc(stateLbl)}</span>`:`<span class="sdash" title="Your plan has no approval step — files are available the moment they land.">—</span>`}</td>`:''}
     </tr>`;
   }).join('');
-  return `<div class="tscroll"><table aria-label="Files"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  return `<div class="tscroll"><table${RAILC.length?' class="wide"':''} aria-label="Files"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 // The bulk-action bar — one move applied to the current selection. Approve appears
 // only where an approval step actually applies (never as empty friction).

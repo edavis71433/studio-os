@@ -104,9 +104,10 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');
     const table = page.locator('.tscroll table');
-    for (const th of ['Name', 'Kind', 'Size', 'Added', 'Where used', 'Status']) {
+    for (const th of ['Name', 'Kind', 'Size', 'Added', 'Where used']) {
       await expect(table.locator('thead')).toContainText(th);
     }
+    await expect(table.locator('thead')).not.toContainText('Status');   // no approval step on this plan — see the status tests below
     const logoRow = table.locator('tbody tr', { hasText: 'Logo' });
     await expect(logoRow).toContainText('Photo');
     await expect(logoRow).toContainText('39 KB');
@@ -123,7 +124,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
   // having approved anything — and under the 'immediate' policy (what a solo
   // studio runs on) there is no approval step to have approved it WITH. The chip
   // now only claims something where the claim can be true.
-  test('status: under the immediate policy the chip reads “—”, not an Approved nobody gave', async ({ page }) => {
+  test('status: under the immediate policy there is no Approved nobody gave — the column stands down', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');
@@ -131,7 +132,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(table.locator('tbody tr', { hasText: 'Contract' })).toBeVisible();
     await expect(table.locator('tbody .sbadge')).toHaveCount(0);
     expect(await table.locator('tbody').innerText()).not.toMatch(/Approved/);
-    await expect(table.locator('tbody tr', { hasText: 'Contract' }).locator('td').last()).toHaveText('—');
+    await expect(table.locator('thead')).not.toContainText('Status');
   });
 
   test('status: where an approval step DOES exist, the chip is real again', async ({ page }) => {
@@ -144,14 +145,18 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(table.locator('tbody tr', { hasText: 'Contract' }).locator('.sbadge')).toHaveText('Approved');
   });
 
-  test('status: Archived survives the suppression — it is a real move the owner made', async ({ page }) => {
+  // An archived file is a real move the owner made, so it brings the column back
+  // — and the rows around it, whose status is only the default nobody set, read “—”.
+  test('status: Archived brings the column back, and its neighbours read “—”, never Approved', async ({ page }) => {
     await pinTable(page);
     const ARCH = { ...CONTRACT, id: 'dddddddd-4444-4444-8444-dddddddddddd', name: 'Old flyer', state: 'archived', asset_status: 'archived' };
     const api = { ...filesApi, '/assets': { data: { ...filesApi['/assets'].data, assets: [LOGO, ARCH] } } };
     await installApp(page, { api });
     await page.goto('/files.html');
     const table = page.locator('.tscroll table');
+    await expect(table.locator('thead')).toContainText('Status');
     await expect(table.locator('tbody tr', { hasText: 'Old flyer' }).locator('.sbadge')).toHaveText('Archived');
+    await expect(table.locator('tbody tr', { hasText: 'Logo' }).locator('.sdash')).toHaveText('—');
   });
 
   // WHERE USED reads exactly four website surfaces (logo, share image, service
@@ -226,6 +231,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
   });
 
   test('clients rail: absent entirely when no file belongs to a client (no empty scaffolding)', async ({ page }) => {
+    await pinTable(page);   // the Client-column half of this needs the table on every viewport
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('Logo');
