@@ -42,6 +42,8 @@ const filesApi = {
 // persistence test needs the user's own toggle choice to survive the reload)
 const pinTable = (page: Page) =>
   page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:files')) localStorage.setItem('dds-display:files', 'table'); } catch { /* denied */ } });
+const pinGrid = (page: Page) =>
+  page.addInitScript(() => { try { localStorage.setItem('dds-display:files', 'grid'); } catch { /* denied */ } });
 
 const LIST_RE = /\/functions\/v1\/presence\/assets(\?|$)/;   // the list read ONLY (not /collections, /health, /:id)
 const ok = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
@@ -159,6 +161,53 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(table.locator('tbody tr', { hasText: 'Logo' }).locator('.sdash')).toHaveText('—');
   });
 
+  // ── Nit A: the Grid tile's Pending badge was NOT gated by the same rule as the
+  //    table's Status column, so the two surfaces would have contradicted each
+  //    other about the same file the moment a 'pending' row existed. ──────────
+  test('grid: the Pending badge obeys the SAME honesty rule as the table\'s Status column', async ({ page }) => {
+    await pinGrid(page);
+    const PEND = { ...LOGO, id: 'dddddddd-4444-4444-8444-dddddddddd01', name: 'New logo', state: 'pending', asset_status: 'pending', in_use: false };
+    let policy = 'immediate';
+    await installApp(page, { api: filesApi });
+    await page.route(LIST_RE, (route) => route.fulfill(ok({ data: { assets: [PEND], total: 1, shown: 1, policy } })));
+    await page.goto('/files.html');
+    await expect(page.locator('.grid .tile')).toHaveCount(1);
+    // no approval step exists under this plan — a "Pending" badge would claim a
+    // step nobody can take, exactly what the table refuses to say
+    await expect(page.locator('.grid .badge.pend')).toHaveCount(0);
+    policy = 'required';
+    await page.reload();
+    await expect(page.locator('.grid .badge.pend')).toHaveText('Pending');
+  });
+
+  // ── Nit B: a sortable column can VANISH (Status when the plan has no approval
+  //    step and nothing is archived; Client when no file belongs to one). The
+  //    sort used to fall back to Added incidentally, leaving the header with no
+  //    arrow at all. Make the revert explicit and total. ──────────────────────
+  test('a sort on a column that VANISHES reverts to Added explicitly — header, order and .lmeta all agree', async ({ page }) => {
+    await pinTable(page);
+    const ARCH = { ...CONTRACT, id: 'dddddddd-4444-4444-8444-dddddddddddd', name: 'Old flyer', state: 'archived', asset_status: 'archived' };
+    await installApp(page, { api: filesApi });
+    await page.route(LIST_RE, (route) => {
+      const q = new URL(route.request().url()).searchParams.get('q') || '';
+      // the search drops the only archived file — Status then has nothing to say
+      if (q) return route.fulfill(ok({ data: { assets: [LOGO], total: 2, shown: 1, policy: 'immediate' } }));
+      return route.fulfill(ok({ data: { assets: [LOGO, ARCH], total: 2, shown: 2, policy: 'immediate' } }));
+    });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('thead')).toContainText('Status');
+    await table.locator('[data-sort="state"]').click();
+    await expect(table.locator('thead th', { hasText: 'Status' })).toHaveAttribute('aria-sort', 'ascending');
+    await expect(page.locator('.lhead .lmeta')).toContainText('Sorted by Status — ascending');
+    await page.locator('#q').fill('logo');
+    await expect(table.locator('thead')).not.toContainText('Status');
+    // the revert is REAL, not incidental: Added carries the arrow again and the
+    // .lmeta line describes the order the rows are actually in
+    await expect(table.locator('thead th', { hasText: 'Added' })).toHaveAttribute('aria-sort', 'descending');
+    await expect(page.locator('.lhead .lmeta')).toContainText('Sorted by Added — descending');
+  });
+
   // WHERE USED reads exactly four website surfaces (logo, share image, service
   // photo, post hero). Project deliverables are not in that graph, so a file a
   // client sent for a live job could only ever read "Not used" — which sounds
@@ -250,6 +299,50 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(table.locator('tbody tr', { hasText: 'Logo' })).toContainText('Studio');
     await table.locator('[data-sort="client"]').click();
     await expect(table.locator('thead th', { hasText: 'Client' })).toHaveAttribute('aria-sort', 'ascending');
+  });
+
+  // ── F1: never call a client's work "Studio" ────────────────────────────────
+  // The cell fell back to 'Studio' while the rail fell back to 'A client', so the
+  // two surfaces contradicted each other about the SAME file — and "Studio" is a
+  // claim of authorship over a client's work. Reachable with no code change at
+  // all: a clients.name that is blank or whitespace, a failed client-names hop
+  // (every client file then arrives with client_name ''), or more customers than
+  // that hop returns. The distinction is client_id, not the name.
+  test('a client file whose NAME we don\'t have is still theirs — never "Studio", and the rail agrees', async ({ page }) => {
+    await pinTable(page);
+    // exactly what a blank clients.name / a failed hop 3 produces: an id, no name
+    const NAMELESS = { ...RIVERA, id: 'eeeeeeee-5555-4555-8555-eeeeeeee0003', name: 'Porch framing', client_name: '' };
+    const WHITESPACE = { ...POOLE, id: 'ffffffff-6666-4666-8666-ffffffff0002', name: 'Reception desk', client_name: '   ' };
+    await installApp(page, { api: { '/assets/collections': { data: [] }, '/assets/health': { data: { findings: [] } },
+      '/assets': { data: { assets: [LOGO, NAMELESS, WHITESPACE], total: 3, shown: 3, policy: 'immediate' } } } });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    const cell = (row: string) => table.locator('tbody tr', { hasText: row }).locator('td.cli');
+    await expect(cell('Porch framing')).toHaveText('A client');
+    await expect(cell('Reception desk')).toHaveText('A client');
+    // the studio's OWN mark — no client_id at all — is still, correctly, Studio
+    await expect(cell('Logo')).toHaveText('Studio');
+    // …and the rail says exactly the same thing about the same files
+    const rail = page.locator('.rail');
+    await expect(rail.locator(`[data-client="${NAMELESS.client_id}"]`)).toContainText('A client');
+    await expect(rail.locator(`[data-client="${WHITESPACE.client_id}"]`)).toContainText('A client');
+    await expect(rail.locator('[data-client="studio"] .n')).toHaveText('1');
+    // and no part of a CLIENT's row calls it the studio's — the title= tooltip included
+    for (const row of ['Porch framing', 'Reception desk']) {
+      expect(await table.locator('tbody tr', { hasText: row }).innerHTML()).not.toMatch(/Studio/);
+    }
+  });
+
+  test('the Client column sorts a nameless client by its LABEL — only the studio\'s own files sort last', async ({ page }) => {
+    await pinTable(page);
+    const NAMELESS = { ...RIVERA, id: 'eeeeeeee-5555-4555-8555-eeeeeeee0004', name: 'Porch framing', client_name: '' };
+    await installApp(page, { api: { '/assets/collections': { data: [] }, '/assets/health': { data: { findings: [] } },
+      '/assets': { data: { assets: [LOGO, POOLE, NAMELESS], total: 3, shown: 3, policy: 'immediate' } } } });
+    await page.goto('/files.html');
+    const table = page.locator('.tscroll table');
+    await table.locator('[data-sort="client"]').click();
+    // 'A client' < 'Poole Dental' < Studio (which always sorts last)
+    expect(await table.locator('tbody td.cli').allInnerTexts()).toEqual(['A client', 'Poole Dental', 'Studio']);
   });
 
   test('clients rail: past the cap the list collapses behind a More… disclosure', async ({ page }) => {

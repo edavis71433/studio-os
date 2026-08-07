@@ -280,9 +280,24 @@ const TCOLS=[
   ['use','Where used',(a)=>a.in_use?1:0],
   ['state','Status',(a)=>String(a.state||'')],
 ];
+// ── whose work is this? ONE fallback, two surfaces ──────────────────────────
+// The Client cell and the Clients rail describe the SAME file, so they must never
+// disagree about it. They used to: the cell fell back to 'Studio' and the rail to
+// 'A client'. That is not cosmetic — "Studio" is a CLAIM OF AUTHORSHIP over a
+// client's work, and it was reachable with no code change at all (a clients.name
+// that is blank or whitespace; a failed client-names hop; more customers than that
+// hop returned). The distinction that matters is not "do we have a name" but "is
+// there a client at all": a file with a client_id belongs to that client whether or
+// not we can name them. Only a file with NO client is the studio's own.
+function clientLabel(a){
+  const nm=String((a&&a.client_name)||'').trim();
+  if(nm)return nm;
+  return (a&&a.client_id)?'A client':'Studio';
+}
 // Whose work a file belongs to. Shown only once the studio actually has client
-// files — a column of nothing but "Studio" is noise. '~~~' sorts Studio last.
-const TCOL_CLIENT=['client','Client',(a)=>String(a.client_name||'~~~').toLowerCase()];
+// files — a column of nothing but "Studio" is noise. '~~~' sorts Studio last;
+// a client we can't NAME sorts under its label, not with the studio's own files.
+const TCOL_CLIENT=['client','Client',(a)=>a&&a.client_id?clientLabel(a).toLowerCase():'~~~'];
 // STATUS earns its column only where it can say something. Under the 'immediate'
 // policy there is no approval step (see stateShown below), so the column would be
 // nothing but em-dashes — dead width that pushed Where-used off the screen once
@@ -327,7 +342,7 @@ function deriveClientRail(rows){
   rows.forEach(r=>{
     const id=String(r.client_id||'');
     if(!id){studio++;return;}
-    const e=by.get(id)||{id,name:String(r.client_name||'').trim()||'A client',n:0};
+    const e=by.get(id)||{id,name:clientLabel(r),n:0};   // the SAME fallback the table cell uses — they can never disagree
     e.n++;by.set(id,e);
   });
   RAILC=[...by.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name));
@@ -565,14 +580,28 @@ async function addStock(id,alt,credit,btn){
   else if(r.status===503){toast('Stock library isn’t enabled yet');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
   else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
 }
+// ── the sort and the columns must agree ─────────────────────────────────────
+// Both sortable columns can VANISH: Status when the plan has no approval step and
+// nothing is archived, Client when no file belongs to a client. Sorting by a column
+// that is no longer on screen used to revert to Added incidentally — each caller
+// re-did the same `||` fallback, and the header lost its arrow while .lmeta quietly
+// said "Sorted by Added", which is honest but unexplained. Do it ONCE, explicitly,
+// and write the revert back into SORT so the order, the .lmeta line and the header
+// arrow are three views of one fact.
+const ADDED_SORT={key:'added',dir:-1};   // the default: newest first
+function normalizeSort(){
+  if(tcols().some(c=>c[0]===SORT.key))return;
+  SORT={...ADDED_SORT};   // the hidden column's sort really did revert — say so everywhere
+}
+function activeSortCol(){ return tcols().find(x=>x[0]===SORT.key)||TCOLS.find(x=>x[0]==='added'); }
 function sortRows(rows){
-  const col=tcols().find(x=>x[0]===SORT.key)||TCOLS.find(x=>x[0]==='added');
+  const col=activeSortCol();
   const r=[...rows];
   r.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return r;
 }
 function lheadHtml(shown){
-  const sortCol=tcols().find(x=>x[0]===SORT.key)||TCOLS.find(x=>x[0]==='added');
+  const sortCol=activeSortCol();
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
@@ -587,6 +616,7 @@ function lheadHtml(shown){
   </header>`;
 }
 function render(){
+  normalizeSort();   // a column that vanished takes its sort with it — before anything reads SORT
   const rows=sortRows(S.assets);
   const nudge=renderNudge();
   const notice=S.countsOk?'':`<div class="notice">Collection counts aren’t available just now — your files are all here.</div>`;
@@ -652,7 +682,7 @@ function tableHtml(rows){
     return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
       ${ckTd}
       <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span></span></td>
-      ${RAILC.length?`<td class="cli" title="${esc(a.client_name||'Studio')}">${esc(a.client_name||'Studio')}</td>`:''}
+      ${RAILC.length?(()=>{const cl=clientLabel(a);return `<td class="cli" title="${esc(cl)}">${esc(cl)}</td>`;})():''}
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
       <td class="num">${esc(when(a.created_at))||'—'}${isClientUpload(a)?'<span class="fromclient">by client</span>':''}</td>
@@ -697,7 +727,10 @@ function tile(a){
   const t=a.thumb?`style="background-image:url('${esc(a.thumb)}')"`:'';
   const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
   const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not on your site';
-  const badge=a.state==='pending'?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
+  // the Pending badge obeys the SAME honesty rule as the table's Status column
+  // (stateShown) — otherwise Grid and Table would contradict each other about
+  // the same file the moment a 'pending' row existed
+  const badge=(a.state==='pending'&&stateShown('pending'))?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
   const sel=S.selectMode&&S.selected.has(a.id);
   if(S.selectMode){
     return `<div class="tile ${sel?'sel':''}" data-pick="${a.id}" role="button" tabindex="0" aria-pressed="${sel?'true':'false'}" aria-label="${sel?'Deselect':'Select'} ${esc(a.name)}">
