@@ -44,35 +44,69 @@ export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
  *  genuine residue is left over, so the list carries a manual "Done". A manual
  *  dismiss is a statement about the ROW, never about the obligation behind it —
  *  and for money and legal obligations those two are the same thing. Hiding
- *  "Still unpaid" does not make an invoice paid; hiding "Your card failed" or
- *  "Your account lapsed" or "Deletion requested" or "Your site is down" or
- *  "Publishing failed" only removes the one place the owner would have found
- *  out. Every kind here clears the honest way instead:
+ *  "Still unpaid" does not make an invoice paid; hiding "Deletion requested" or
+ *  "Your site is down" or "Publishing failed" only removes the one place the
+ *  owner would have found out.
  *
- *    deal_followup + invremind:  ← the money lands (stripe-webhook) or the
- *                                  invoice is voided
- *    payment_trouble             ← the billing sync sees a good charge
- *    account_lapsed              ← the entitlement goes active again
- *    deletion_requested          ← POST /commerce/delete-request/cancel
- *    site_down                   ← the uptime heartbeat recovers
- *    publish_failed              ← a publish succeeds
+ *  ── THE ENTRY PRICE: A KIND MAY ONLY BE PROTECTED IF SOMETHING CLEARS IT ────
+ *  Protection without a teardown is not a guard, it is a TRAP: the row becomes
+ *  permanent, both dismiss surfaces refuse it forever, and everything derived
+ *  from an active notice (agency/portfolio.ts's `billing_issue` flag, the
+ *  attention badge in lib/attention_center.ts) stays lit for work that is long
+ *  since done. So every kind below names the code that takes it down:
  *
- *  This is ONE rule with TWO enforcement points — the feed derives each row's
- *  `dismissible` flag from it (so no button is even drawn), and the dismiss
- *  route re-checks it (so a hand-rolled API call can't hide an unpaid invoice
- *  either). Both import THIS function; there is deliberately no second copy. */
+ *    deal_followup + invremind:  ← the money lands — stripe-webhook's paid echo
+ *                                  clears it (first, and again on a retry of an
+ *                                  already-paid invoice)
+ *    deletion_requested          ← POST /commerce/delete-cancel (routes/commerce.ts)
+ *    site_down                   ← the uptime heartbeat recovers (monitor/heartbeat.ts)
+ *    publish_failed              ← a publish succeeds (routes/publish.ts)
+ *
+ *  NOT protected, deliberately: `payment_trouble` and `account_lapsed`. They read
+ *  like the most protection-worthy kinds in the product, and they were in this
+ *  set for exactly one commit — but they have NO AUTOMATIC TEARDOWN anywhere:
+ *  commerce/lifecycle.ts raises them on a 'YYYY-MM' bucket and no billing-sync,
+ *  entitlement or webhook path has ever cleared them. Protecting them meant a
+ *  customer who fixed their card kept a permanent "Your card failed" row, a
+ *  permanent portfolio `billing_issue` flag, and a permanently inflated badge,
+ *  with both dismiss surfaces answering 409. The operator's hand is the ONLY
+ *  teardown these two have, so it must stay. If a real teardown is ever written
+ *  (the billing sync seeing a good charge is the obvious home), add it back here
+ *  — tests/presence/needs_you_rfixes_test.mjs enforces that biconditional in
+ *  both directions and will tell you.
+ *
+ *  This is ONE rule with THREE enforcement points — the feed derives each row's
+ *  `dismissible` flag from it (so no button is even drawn on Today), the plum
+ *  card in presence.html does the same, and the dismiss route re-checks it (so a
+ *  hand-rolled API call can't hide an unpaid invoice either). All three import
+ *  THIS function; there is deliberately no second copy. */
 export const NOTICE_PROTECTED_KINDS: ReadonlySet<string> = new Set([
-  'payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed',
+  'deletion_requested', 'site_down', 'publish_failed',
 ]);
 /** The invoice reminder rides the shared `deal_followup` kind, so the KIND alone
  *  can't tell an unpaid invoice from an ordinary "follow up on this deal" — only
  *  the period prefix can. That is exactly why the feed had to start exposing
- *  `period`. Prefix-anchored, never a substring match. */
+ *  `period`. Prefix-anchored, never a substring match.
+ *
+ *  Its ONE teardown is the money landing. There is no second escape: nothing in
+ *  the platform can void a `presence_invoices` row — pipeline.html renders a
+ *  "Voided" state but no route ever writes status:'void' — so an invoice raised
+ *  in error can only be cleared by paying it or by a hand-written DB update.
+ *  That is a real gap, recorded here so the guard's justification stays honest;
+ *  it is not a reason to weaken the guard. */
 export const NOTICE_PROTECTED_PERIOD_PREFIX = 'invremind:';
 export function noticeDismissible(kind: unknown, period: unknown): boolean {
   const k = String(kind ?? '');
   if (NOTICE_PROTECTED_KINDS.has(k)) return false;
-  if (k === 'deal_followup' && String(period ?? '').startsWith(NOTICE_PROTECTED_PERIOD_PREFIX)) return false;
+  // FAIL CLOSED. A deal_followup with no period cannot be shown to be an
+  // ordinary follow-up, and "can't tell" must never resolve to "hide the unpaid
+  // invoice". Unreachable while `period` stays `text not null` (migration 0037)
+  // and `kind` stays CHECK-constrained — but a money guard must not rest on a DB
+  // constraint holding in a different file.
+  if (k === 'deal_followup') {
+    const p = period == null ? '' : String(period);
+    if (p === '' || p.startsWith(NOTICE_PROTECTED_PERIOD_PREFIX)) return false;
+  }
   return true;
 }
 

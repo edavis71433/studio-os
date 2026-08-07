@@ -78,9 +78,18 @@ const { noticeDismissible, NOTICE_PROTECTED_KINDS } = await import('../../supaba
 {
   ok('A2: an UNPAID invoice reminder (deal_followup + invremind:) can NEVER be dismissed',
     noticeDismissible('deal_followup', 'invremind:inv-1') === false);
-  for (const k of ['payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed']) {
+  // R-fix F1: payment_trouble + account_lapsed are NOT here. They shipped
+  // protected for one commit despite having no teardown anywhere in the
+  // codebase, which made them permanently unclearable — a trap, not a guard.
+  // needs_you_rfixes_test.mjs enforces "protected ⇒ a teardown exists" over the
+  // whole set, in both directions for those two.
+  for (const k of ['deletion_requested', 'site_down', 'publish_failed']) {
     ok(`A2: ${k} can never be dismissed`, noticeDismissible(k, 'anything') === false);
     ok(`A2: ${k} is in the shared protected set`, NOTICE_PROTECTED_KINDS.has(k));
+  }
+  for (const k of ['payment_trouble', 'account_lapsed']) {
+    ok(`A2: ${k} IS dismissable — nothing automatic ever clears it, so the operator must be able to`,
+      noticeDismissible(k, '2026-08') === true && !NOTICE_PROTECTED_KINDS.has(k));
   }
   ok('A2: an ORDINARY deal follow-up (deal:) IS dismissable', noticeDismissible('deal_followup', 'deal:d-1') === true);
   ok('A2: a document reminder (remind:) IS dismissable', noticeDismissible('deal_followup', 'remind:doc-1') === true);
@@ -90,8 +99,11 @@ const { noticeDismissible, NOTICE_PROTECTED_KINDS } = await import('../../supaba
   ok('A2: the invremind guard is prefix-anchored, not a substring match',
     noticeDismissible('deal_followup', 'deal:not-invremind:x') === true);
   ok('A2: the invremind guard applies ONLY to deal_followup', noticeDismissible('lead_followup', 'invremind:x') === true);
+  // R-fix F7: a deal_followup with no period FAILS CLOSED. "Can't tell" must
+  // never resolve to "hide the unpaid invoice" — the guard no longer leans on
+  // `period text not null` holding in migration 0037.
   ok('A2: missing/garbage input never accidentally protects or exposes',
-    noticeDismissible(undefined, undefined) === true && noticeDismissible('deal_followup', null) === true);
+    noticeDismissible(undefined, undefined) === true && noticeDismissible('deal_followup', null) === false);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,21 +142,25 @@ try {
     const calls = installSupportFetch(base);
     await handleSupportOne(triage({ status: 'resolved' }), 'jwt', SITE, STAFF, REQ, CORS);
     const p = patchNotice(calls);
-    ok('B1: resolving a support request clears its notice (exactly one teardown write)', p.length === 1, `${p.length} writes`);
-    ok('B1: the clear is scoped to THIS owner client_id', p[0] && p[0].url.includes(`client_id=eq.${CLIENT}`), p[0]?.url || '');
-    ok('B1: the clear is scoped to kind=support_aging', p[0] && p[0].url.includes('kind=eq.support_aging'), p[0]?.url || '');
+    // R-fix F6: TWO writes — the weekly-bucket prefix AND the pre-bucket exact
+    // period `support:<id>`, which the prefix's (load-bearing) trailing colon can
+    // never match. Every row raised before the bucket deployed was orphaned.
+    ok('B1: resolving a support request clears its notice (both period shapes)', p.length === 2, `${p.length} writes`);
+    ok('B1: the clear is scoped to THIS owner client_id', p.every((c) => c.url.includes(`client_id=eq.${CLIENT}`)), p.map((c) => c.url).join(' | '));
+    ok('B1: the clear is scoped to kind=support_aging', p.every((c) => c.url.includes('kind=eq.support_aging')), p.map((c) => c.url).join(' | '));
     ok('B1: the clear targets every weekly bucket of THIS request (period prefix)',
-      p[0] && /period=like\./.test(p[0].url) && p[0].url.includes(encodeURIComponent(`support:${REQ}:`)), p[0]?.url || '');
-    ok('B1: the clear only touches ACTIVE rows', p[0] && p[0].url.includes('status=eq.active'), p[0]?.url || '');
+      p.some((c) => /period=like\./.test(c.url) && c.url.includes(encodeURIComponent(`support:${REQ}:`))), p.map((c) => c.url).join(' | '));
+    ok('B1: …and the legacy exact period too', p.some((c) => c.url.includes(`period=eq.${encodeURIComponent(`support:${REQ}`)}&`) || c.url.endsWith(`period=eq.${encodeURIComponent(`support:${REQ}`)}`)), p.map((c) => c.url).join(' | '));
+    ok('B1: the clear only touches ACTIVE rows', p.every((c) => c.url.includes('status=eq.active')), p.map((c) => c.url).join(' | '));
     ok('B1: the clear dismisses (never deletes) — the ledger survives',
-      p[0] && p[0].body && p[0].body.status === 'dismissed', JSON.stringify(p[0]?.body));
+      p.every((c) => c.body && c.body.status === 'dismissed'), JSON.stringify(p.map((c) => c.body)));
   }
 
   // B2 — CLOSE clears too (Eric: "resolve OR close", not reply)
   {
     const calls = installSupportFetch(base);
     await handleSupportOne(triage({ status: 'closed' }), 'jwt', SITE, STAFF, REQ, CORS);
-    ok('B2: CLOSING a support request also clears its notice', patchNotice(calls).length === 1);
+    ok('B2: CLOSING a support request also clears its notice', patchNotice(calls).length === 2);
   }
 
   // B3 — the wrong transitions must NOT clear
@@ -225,10 +241,18 @@ try {
     ok('C1: …and writes nothing', patchNotice(calls).length === 0);
   }
   // C2 — every protected kind, server-side
-  for (const k of ['payment_trouble', 'account_lapsed', 'deletion_requested', 'site_down', 'publish_failed']) {
+  for (const k of ['deletion_requested', 'site_down', 'publish_failed']) {
     const calls = installDismissFetch({ id: NID, kind: k, period: 'once' });
     const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
     ok(`C2: the route REFUSES ${k} (no write)`, r.status >= 400 && patchNotice(calls).length === 0, `status ${r.status}`);
+  }
+  // …and the two that have NO teardown are ACCEPTED, because refusing them would
+  // leave the operator with no way at all to clear a resolved billing problem.
+  for (const k of ['payment_trouble', 'account_lapsed']) {
+    const calls = installDismissFetch({ id: NID, kind: k, period: '2026-08' });
+    const r = await handleCommerce(dismiss(NID), '/commerce/notices/dismiss', 'POST', CALLER, CORS);
+    ok(`C2: the route ACCEPTS ${k} (its only teardown is the operator's hand)`,
+      r.status === 200 && patchNotice(calls).length === 1, `status ${r.status}`);
   }
   // C3 — an ordinary deal follow-up IS dismissable, scoped to the caller's own client
   {
@@ -344,7 +368,11 @@ ok('D4: the deal DELETE path clears too', /deleted_at[\s\S]{0,600}?clearNotice\(
 ok('D5: notifyStudioOfClientAction raises the client_* kinds pre-dismissed (rows and badge finally agree)',
   /raiseNotice\(\{[\s\S]{0,300}?clientId: ownerClientId[\s\S]{0,300}?status: 'dismissed'/.test(bridge));
 ok('D5: …and the created flag still gates the email (throttle intact)',
-  /const created = await raiseNotice\(\{[\s\S]{0,500}?\}\);\s*\n\s*if \(!created\) return false;/.test(bridge));
+  /const created = await raiseNotice\(\{[\s\S]{0,1200}?\}\);\s*\n\s*if \(!created\) return false;/.test(bridge));
+// R-fix F4: row-silent must not mean notification-silent. The push these four
+// used to fire died with the pre-dismissal; it is asked for EXPLICITLY now.
+ok('D5: …and the four client kinds still reach the owner’s device (push is explicit, not derived from status)',
+  /raiseNotice\(\{[\s\S]{0,900}?status: 'dismissed',[\s\S]{0,900}?push: true,/.test(bridge));
 
 // D6 — the feed exposes what the client needs to decide (no migration, one field)
 ok('D6: the notices read selects `period`', /presence_plan_notices\?[^`]*select=id,kind,period,headline,body/.test(wsp));
