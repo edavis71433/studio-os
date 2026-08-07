@@ -391,6 +391,61 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 🧾 CRM DEAL PAGE — FOUR FIXES BUILT (Eric, 2026-08-07) — AWAITING DEPLOY
+
+Eric's four asks off the Bacchus deal screenshot. Recon → build → review →
+fixes. Commits 09a0281 / b44e4d1 / 7b9370b / ee027bb, R-fixes 21828c7 /
+4e64896 / 16b0d35.
+
+1. CONTACT EDITING (the real bug) — `presence_deals.contact_id` was set ONLY
+   at create; `handleSalesDeal` PATCH never accepted it, so a deal created
+   without an email could NEVER gain one, and `emailSalesDoc` silently
+   returned false. Now: contact_id patchable (tenant-guarded, 422 on
+   foreign), Contact block at the TOP of Details (create-or-update), honest
+   toasts naming the cause + the fix. Convert-to-customer starts working for
+   previously-contactless deals as a side effect.
+   NOTE for Eric: the signing link was ALREADY copied to his clipboard on
+   send — he was never fully blocked, just never told.
+2. TO-DO DROPDOWN — optional `todos` on StageGuidance, all six stages;
+   select fills a still-editable input; POST unchanged.
+3. SERVICES — the dropdown ALREADY existed on proposal line items; it was
+   invisible because the catalog was empty. Now seeds 6 real published
+   services (prices verified against pricing.html / pricing-estimator.html /
+   audit.html — audit tiers use the PUBLISHED names Digital Health Check /
+   Competitive Intelligence, not the "Full/Deep" shorthand) pre-filled but
+   UNSAVED; "Manage services" surfaced in the toolbar.
+4. CONTRACT — Eric's new 2026-07 agreement is the default. His source had
+   TWO §16s and §9's heading glued into §8; both fixed in the .docx sent
+   back to him (he approved: "yes please fix the numbering"). Template is
+   the 19 sections VERBATIM, SAMPLE disclaimer stripped, Word cover table
+   re-flowed to plain text with placeholders that autofill from the deal
+   (his ask: "autofilled when i enter in their info from the lead").
+
+QUALITY TRAIL — review found 2 BLOCKERS, both fixed:
+(F1) the template hardcoded "Davis Digital Studio" in the LETTERHEAD, the
+     OPERATIVE PARTIES CLAUSE and the SIGNATURE BLOCK while only the cover
+     page used {{studio_name}} — a non-DDS tenant would send a contract
+     naming the wrong counterparty. The code it replaced (starterAgreement)
+     got this right. Now all four speak one identity; signature renders the
+     BUSINESS line only (presence_identity has no owner/person column — an
+     honest blank printed-name line beats naming the wrong person).
+     ⚠️ ERIC: his name no longer appears in the signature block. If he wants
+     "Eric Davis" printed there it needs a new identity field.
+(F2) the client/server placeholder hand-mirror was pinned only TEXTUALLY —
+     the reviewer broke the deposit-split math and all 271 tests passed.
+     Now the pure suite EXECUTES the client mirror and demands output
+     equality over 13 cases; both mutations re-run and now fail loudly.
+Plus: F3 autofocus stole keystrokes into the wrong field (real input bug),
+F4 the new with_body=contract read could have returned the contact-fields
+sentinel JSON into the agreement textarea, F5 retry-duplicate contacts,
+F6 silent contact substitution, F7 {{today}} local-vs-UTC on the EFFECTIVE
+DATE, F8 dead starterAgreement deleted.
+Gates: pure 213/0/4, e2e pipeline+crm 64/0 on desktop+tablet+mobile,
+repeat-each=10 on the flaky one → 10/10, deno check clean.
+NO MIGRATION. Needs merge + FUNCTION DEPLOY (sales.ts + 2 lib files).
+Pre-existing, not ours: broadcasts.spec.ts:172 fails on main too (verified
+in a clean worktree at b168a9f).
+
 ## 🔕 "NEEDS YOU" ITEMS CAN'T BE RESOLVED (Eric, 2026-08-07) — QUEUED
 
 "also should be able to resolve these some way." The Today/attention "NEEDS
