@@ -290,6 +290,40 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { status: 200 });
   };
 
+  // ── TAKE DOWN the "Still unpaid" reminder the paid invoice raised ──────────
+  // runInvoiceReminders (commerce/lifecycle.ts) raises deal_followup with period
+  // `invremind:<invoice id>`, and money landing is that row's ONLY teardown —
+  // an unpaid-invoice reminder is deliberately undismissable by hand
+  // (lib/inbox_feed.noticeDismissible) and no route in the platform can void an
+  // invoice either. So this clear cannot be allowed to be skipped.
+  //
+  // It used to be the LAST statement of the paid-echo try{}: a throw at the deal
+  // event POST or the site lookup jumped straight past it, and Stripe's retry
+  // then short-circuited on `already paid` and never re-ran the echo — money
+  // landed, row stranded, forever. It is now (a) its OWN unit that swallows
+  // everything, (b) the FIRST thing the echo does, and (c) run on the
+  // already-paid path too, so a retry heals a row a previous attempt stranded.
+  // Returns the owning client_id so the echo below need not re-read the site.
+  // Never throws; its result never affects payment processing.
+  //
+  // This function has no lib/notice.ts (it is a separate Edge Function with its
+  // own db() helper), so the clear mirrors clearNotice's shape here.
+  const clearInvoiceReminder = async (inv: any): Promise<string> => {
+    try {
+      const siteRow = (await dbGet(`presence_sites?id=eq.${encodeURIComponent(String(inv?.site_id ?? ''))}&select=client_id&limit=1`))[0];
+      const clientId = String(siteRow?.client_id || '');
+      if (!clientId) return '';
+      await db(
+        `presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.deal_followup&status=eq.active&period=eq.${encodeURIComponent(`invremind:${inv.id}`)}`,
+        'PATCH', { status: 'dismissed' },
+      );
+      return clientId;
+    } catch (e) {
+      console.error(`[stripe-webhook] invremind clear best-effort failed for ${inv?.id}:`, e);
+      return '';
+    }
+  };
+
   // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
   // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
   const markPresenceInvoicePaid = async (invoiceId: string, via: string): Promise<Response> => {
@@ -301,7 +335,14 @@ Deno.serve(async (req: Request) => {
       console.error(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} not found (via ${via}) — acking so Stripe stops retrying`);
       return new Response('ok (unknown invoice)', { status: 200 });
     }
-    if (inv.status === 'paid') return new Response('ok (already paid)', { status: 200 });
+    if (inv.status === 'paid') {
+      // The healing path. A retry lands here whenever a previous attempt flipped
+      // the row but died before (or during) its echo. The clear is idempotent —
+      // it matches only still-ACTIVE invremind rows — so re-running it costs one
+      // no-op PATCH and is the only thing that can rescue a stranded reminder.
+      await clearInvoiceReminder(inv);
+      return new Response('ok (already paid)', { status: 200 });
+    }
     if (inv.status !== 'open') {
       console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} is '${inv.status}', not flipping (via ${via})`);
       return new Response('ok (not open)', { status: 200 });
@@ -321,6 +362,13 @@ Deno.serve(async (req: Request) => {
     if (!Array.isArray(flippedRows) || flippedRows.length === 0) {
       return new Response('ok (already flipped by a concurrent event)', { status: 200 });
     }
+    // FIRST, before anything that can throw: take the "Still unpaid" row down.
+    // Everything after it is an ADDITION to the owner's view; this is a REMOVAL
+    // of a line that now contradicts reality ("Still unpaid — Deposit ($500)"
+    // directly above "Paid — Deposit ($500)"), and it is the only clear that row
+    // will ever get. Ordering is the whole fix — it is deliberately not inside
+    // the echo's try{}, because that try is what used to swallow its turn.
+    const clientId = await clearInvoiceReminder(inv);
     // The owner-facing echo: a deal event (Pipeline history) + a notice (bell /
     // Today / Inbox) — without these, payment was invisible inside the app.
     try {
@@ -332,28 +380,13 @@ Deno.serve(async (req: Request) => {
           detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents) || 0, purpose: inv.purpose },
         });
       }
-      const siteRow = (await dbGet(`presence_sites?id=eq.${encodeURIComponent(inv.site_id)}&select=client_id&limit=1`))[0];
-      if (siteRow?.client_id) {
+      if (clientId) {
         await db('presence_plan_notices', 'POST', {
-          site_id: inv.site_id, client_id: siteRow.client_id, kind: 'invoice_paid',
+          site_id: inv.site_id, client_id: clientId, kind: 'invoice_paid',
           period: `paid:${inv.id}`, status: 'active',
           headline: `Paid — ${inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice')} (${amount})`,
           body: inv.purpose === 'deposit' ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
         });
-        // …and TAKE DOWN the "Still unpaid" reminder the same invoice raised.
-        // runInvoiceReminders (commerce/lifecycle.ts) raises deal_followup with
-        // period `invremind:<invoice id>` and nothing ever cleared it, so the
-        // moment money landed the owner's list showed BOTH lines about the same
-        // invoice — "Still unpaid — Deposit ($500)" directly above "Paid —
-        // Deposit ($500)" — forever. Money landing IS the teardown; this is also
-        // the ONLY way that row can clear, since an unpaid invoice is deliberately
-        // undismissable by hand (lib/inbox_feed.noticeDismissible).
-        // This function has no lib/notice.ts (it is a separate Edge Function with
-        // its own db() helper), so the clear mirrors clearNotice's shape here.
-        await db(
-          `presence_plan_notices?client_id=eq.${encodeURIComponent(siteRow.client_id)}&kind=eq.deal_followup&status=eq.active&period=eq.${encodeURIComponent(`invremind:${inv.id}`)}`,
-          'PATCH', { status: 'dismissed' },
-        );
       }
     } catch (e) { console.error(`[stripe-webhook] paid-echo best-effort failed for ${invoiceId}:`, e); }
     console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} paid (via ${via})`);
