@@ -105,6 +105,41 @@ export async function createContactAndClient(
 const RESEND_INBOUND_DOMAIN = Deno.env.get('RESEND_INBOUND_DOMAIN') || '';
 const PLATFORM_REPLY_TO = Deno.env.get('PLATFORM_REPLY_TO') || 'eric@davisdigitalstudio.com';
 
+// ── the text/plain alternative ───────────────────────────────────────────────
+// A plain-text part improves deliverability (spam-scoring) and serves text-only
+// clients — but only if it READS. Derived from the body HTML, and the structure
+// that carries the meaning has to survive the tag strip:
+//
+//   • cell ends (</td>, </th>) become a real SEPARATOR. Without this every
+//     table-based email in this codebase (booking, review, the operator
+//     notifications) renders "ProjectWebsite refresh" — the label welded to its
+//     value — because the two <td>s are adjacent text once the tags are gone.
+//   • block ends (</tr>, </p>, </div>, </li>, </h1-6>, </blockquote>, list and
+//     table ends) become a LINE BREAK, so a row is a row and a bullet is a line.
+//   • <br>, <br/> and <br /> all break (the old pattern matched only the bare
+//     form, so a self-closed <br/> silently glued two lines together).
+//
+// A row-final separator is dropped rather than left dangling, so "A: B" — not
+// "A: B: ". SENTINEL is a control character that cannot occur in email copy, so
+// it can't collide with the text it is separating. Exported because the exact
+// output is pinned by tests/presence/operational_mail_test.mjs.
+const SENTINEL = '';
+export function htmlToPlainText(html: string | null | undefined): string {
+  return String(html ?? '')
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/\s*(td|th)\s*>/gi, SENTINEL)
+    .replace(/<\s*\/\s*(p|div|tr|li|ul|ol|h[1-6]|blockquote|table|thead|tbody|section|article)\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    // tighten the horizontal whitespace the source HTML's own indentation leaves
+    // around a separator, so the row-final test below sees the newline it needs
+    .replace(new RegExp(`[^\\S\\r\\n]*${SENTINEL}[^\\S\\r\\n]*`, 'g'), SENTINEL)
+    .replace(new RegExp(`${SENTINEL}+(?=\\n|$)`, 'g'), '')   // last cell of a row → no dangling separator
+    .replace(new RegExp(`${SENTINEL}+`, 'g'), ': ')          // between cells → label: value
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
@@ -121,12 +156,9 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     // the customer's Brand Kit when the caller passes it). No second email engine.
     const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT);
     // A plain-text alternative improves deliverability (spam-scoring) and serves
-    // text-only clients — derived from the body HTML (tags stripped, entities decoded).
-    const text = String(html || '')
-      .replace(/<\s*(br|\/p|\/div|\/tr|\/h[1-6])\s*>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-      .replace(/\n{3,}/g, '\n\n').trim();
+    // text-only clients — derived from the body HTML (see htmlToPlainText: cell
+    // and block boundaries survive the tag strip, so a table still reads).
+    const text = htmlToPlainText(html);
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
