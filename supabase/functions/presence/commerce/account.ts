@@ -123,9 +123,22 @@ const PLATFORM_REPLY_TO = Deno.env.get('PLATFORM_REPLY_TO') || 'eric@davisdigita
 // "A: B: ". SENTINEL is a control character that cannot occur in email copy, so
 // it can't collide with the text it is separating. Exported because the exact
 // output is pinned by tests/presence/operational_mail_test.mjs.
+//
+// "cannot occur in email copy" was a claim about INPUT, not a property of this
+// function — so it is now ENFORCED rather than assumed: any SENTINEL already in
+// the source is stripped on entry, BEFORE any tag becomes one. Without that, a
+// \x01 riding in on a subject line, a filename, a client's message excerpt or a
+// pasted-in body survived the tag strip and was rewritten into ": " by the
+// between-cells pass — `alpha\x01beta` came out `alpha: beta`, a label/value
+// split invented out of nothing. No email body in this codebase can reach it
+// today (every one is studio-authored HTML); the guard is here because the next
+// caller will interpolate something it did not write, and an invariant a
+// function depends on should be one the function establishes, not one it hopes
+// its callers keep.
 const SENTINEL = '';
 export function htmlToPlainText(html: string | null | undefined): string {
   return String(html ?? '')
+    .replace(new RegExp(SENTINEL, 'g'), '')                 // the separator is OURS — never the caller's
     .replace(/<\s*br\s*\/?\s*>/gi, '\n')
     .replace(/<\s*\/\s*(td|th)\s*>/gi, SENTINEL)
     .replace(/<\s*\/\s*(p|div|tr|li|ul|ol|h[1-6]|blockquote|table|thead|tbody|section|article)\s*>/gi, '\n')

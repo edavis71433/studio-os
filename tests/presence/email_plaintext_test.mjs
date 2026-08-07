@@ -62,6 +62,25 @@ if (typeof account.htmlToPlainText === 'function') {
   ok('B2: entities still decode', account.htmlToPlainText('<p>Tom &amp; Jerry &lt;3 &quot;x&quot;&nbsp;y</p>') === 'Tom & Jerry <3 "x" y');
   ok('B2: blank runs still collapse to one blank line', !/\n\n\n/.test(account.htmlToPlainText('<p>a</p><div></div><div></div><div></div><p>b</p>')));
   ok('B2: an empty body is an empty string (never throws)', account.htmlToPlainText('') === '' && account.htmlToPlainText(undefined) === '');
+
+  // ── the SENTINEL is a property of the function, not a hope about its input ──
+  // The cell separator is a private control character (\x01) chosen because it
+  // "cannot occur in email copy". That is a claim about INPUT, and the function
+  // could not enforce it: a \x01 arriving in a subject line, a filename, a client
+  // message excerpt or a pasted-in body used to survive the tag strip and get
+  // rewritten into ": " by the between-cells pass — `alpha\x01beta` came out
+  // `alpha: beta`, a label/value split invented out of nothing. Every email body
+  // in this codebase is studio-authored HTML today, so nothing hits it; the guard
+  // is here because the next caller interpolates something it did not write.
+  ok('B2: a stray SENTINEL in the copy cannot forge a label/value split',
+    account.htmlToPlainText('<p>alphabeta</p>') === 'alphabeta',
+    JSON.stringify(account.htmlToPlainText('<p>alphabeta</p>')));
+  ok('B2: a stray SENTINEL cannot forge a row end either',
+    account.htmlToPlainText('<td>Project</td><td>Website</td>') === 'Project: Website',
+    JSON.stringify(account.htmlToPlainText('<td>Project</td><td>Website</td>')));
+  ok('B2: the real cell separator still works beside a stripped one',
+    account.htmlToPlainText('<td>A</td><td>B</td>') === 'A: B',
+    JSON.stringify(account.htmlToPlainText('<td>A</td><td>B</td>')));
 }
 
 // ── and it is what actually rides on the wire ────────────────────────────────
