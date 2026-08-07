@@ -957,6 +957,77 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired }, 200, cors);
 }
 
+/** WITHDRAW an invoice that should never have been raised.
+ *
+ *  `presence_invoices.status` has carried 'void' since 0086 and pipeline.html has
+ *  always rendered a "Voided" row — but NOTHING in the platform ever wrote it, so
+ *  the state was unreachable. An invoice raised in error (wrong amount, wrong
+ *  deal, duplicate of a plan stage) could only be cleared by PAYING it. Worse, it
+ *  stranded the money notice: `deal_followup` + `invremind:<id>` is deliberately
+ *  UNDISMISSABLE (lib/inbox_feed.ts — hiding "Still unpaid" does not make an
+ *  invoice paid), and its ONLY teardown was the Stripe paid echo. A mistaken
+ *  invoice therefore left a permanent "Still unpaid" row on Today with no way out.
+ *  This route is that second teardown, and clearing the notice is half its point.
+ *
+ *  ── WHICH STATUSES MAY BE VOIDED ────────────────────────────────────────────
+ *  This table has no draft/sent split — an invoice is `open` from the moment it
+ *  is minted, and "sent" is merely the presence of `stripe_url` (the Stripe link
+ *  the client was emailed). So:
+ *
+ *    open, never sent   → VOID. It was a mistake before it left the building.
+ *    open, already sent → VOID, deliberately. This is the case that MATTERS: the
+ *                         wrong invoice you already emailed is exactly the one
+ *                         you need to withdraw, and refusing here would leave the
+ *                         gap open for every invoice that ever reached a client.
+ *                         It is not a quiet retraction — the Stripe payment link
+ *                         is deactivated so the withdrawn amount cannot still be
+ *                         charged, and the deal ledger records who voided what.
+ *    paid               → NEVER. 409. Money changed hands; a paid invoice is a
+ *                         financial record and a receipt the client is holding.
+ *                         Refunds are Stripe's job, not a status rewrite.
+ *    void               → IDEMPOTENT 200 (`already: true`), the same shape
+ *                         handleSalesProposalDecide / handleSalesContractSign use
+ *                         for "you already got what you asked for". Nothing is
+ *                         re-written, no second event, no second notice clear.
+ *
+ *  Modelled on handleSalesProposalDelete: UUID validated before interpolation,
+ *  site-scoped read, an authoritative status guard, and that SAME guard in the
+ *  PATCH's WHERE so a payment landing mid-flight wins the race rather than being
+ *  overwritten by a void. `!up.ok` (infrastructure — nothing changed) and an ok
+ *  PATCH matching no row (the genuine race) are told apart honestly, and the race
+ *  branch re-reads so the operator is told WHICH thing happened rather than
+ *  guessing. Unlike the draft deletes this is NOT a soft delete: a voided invoice
+ *  stays visible as "Voided" — the withdrawal is part of the record, not a hole. */
+export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const inv = rows(await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`))[0];
+  if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
+  if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back.' }, 409, cors);
+  if (inv.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
+  const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id`,
+    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'void', updated_at: nowIso() }) });
+  if (!up.ok) return json({ error: 'conflict', message: 'Couldn’t void it just now — nothing changed. Try again.' }, 409, cors);   // infrastructure ≠ race (review F1)
+  if (!rows(up)[0]) {
+    // The genuine race: the row moved between our read and our write. Say WHICH —
+    // "the payment landed" and "your other tab already voided it" are different
+    // answers and the operator must not be handed the wrong one.
+    const now = rows(await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&select=status&limit=1`))[0];
+    if (now?.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
+    if (now?.status === 'paid') return json({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }, 409, cors);
+    return json({ error: 'conflict', message: 'This invoice changed while you were voiding it — reload and take another look.' }, 409, cors);
+  }
+  // HALF THE POINT: take down the undismissable "Still unpaid" row. Exact period,
+  // so only THIS invoice's reminder goes — other deals' follow-ups are untouched.
+  await clearNotice(site.client_id, 'deal_followup', `invremind:${id}`);
+  // A withdrawn invoice must not still be payable. Best-effort and deliberately
+  // AFTER the status write: the row is the authority, and a Stripe hiccup must
+  // not leave a void that didn't happen.
+  if (inv.stripe_payment_link_id) await deactivatePaymentLink(String(inv.stripe_payment_link_id)).catch(() => {});
+  // The deal's ledger is where "this money was withdrawn, by whom" lives.
+  if (inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_voided', principal, { detail: { invoice_id: id, amount_cents: Number(inv.amount_cents) || 0, purpose: String(inv.purpose || 'service'), title: String(inv.title || '') } });
+  return json({ data: { ok: true, id, status: 'void' } }, 200, cors);
+}
+
 /** Email the client their non-expiring retainer authorization link, on the
  *  studio's brand. Best-effort — it never blocks setup; the link is still returned. */
 async function emailRetainerLink(siteId: string, dealId: string, url: string, amountCents: number, interval: 'month' | 'year'): Promise<boolean> {

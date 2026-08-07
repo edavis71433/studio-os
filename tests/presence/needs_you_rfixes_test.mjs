@@ -179,19 +179,27 @@ function teardownFor(kind) {
   ok('F2: the clear can never fail payment processing (its result is ignored, never rethrown)',
     !/return await clearInvoiceReminder|throw[\s\S]{0,40}clearInvoiceReminder/.test(hook));
 
-  // (b) the documented "or void the invoice" escape does not exist — no route in
-  // the platform ever writes status:'void' on presence_invoices. pipeline.html
-  // renders a "Voided" state, but nothing can produce it. The guard's comment
-  // must not offer an escape the product does not have.
+  // (b) THE SECOND ESCAPE, now that it exists. This assertion used to run the
+  // other way: the guard's comment was forbidden from promising an "or void the
+  // invoice" exit, because no route in the platform ever wrote status:'void' on
+  // presence_invoices — pipeline.html rendered a "Voided" state nothing could
+  // produce, so a mistaken invoice left a PERMANENT undismissable "Still unpaid"
+  // row. POST /sales/invoices/:id/void closes that (routes/sales.ts,
+  // tests/presence/invoice_void_test.mjs), so the biconditional flips: the write
+  // must exist, it must clear THIS notice, and the comment must name it. A
+  // protected kind may only stay protected while every teardown it claims is real.
   const feed = read('supabase/functions/presence/lib/inbox_feed.ts');
-  ok('F2b: the guard comment no longer promises an invoice-void escape that no route implements',
-    !/invoice is voided|void the invoice/i.test(feed));
-  ok('F2b: …and the gap is recorded where the next reader will find it',
-    /no route[\s\S]{0,120}void/i.test(feed));
-  // the fact the comment now rests on — no PATCH anywhere flips an invoice to
-  // 'void'. (Matched on the WRITE shape, so the prose above doesn't self-satisfy.)
-  ok('F2b: (fact check) nothing in the platform writes an invoice to status void',
-    !/presence_invoices[\s\S]{0,300}?PATCH[\s\S]{0,300}?status:\s*['"`]void['"`]/.test(FN_SRC));
+  ok('F2b: the invoice-void escape is real — a route PATCHes presence_invoices to status void',
+    /presence_invoices[\s\S]{0,300}?PATCH[\s\S]{0,300}?status: 'void'/.test(FN_SRC));
+  ok('F2b: that route clears the invremind notice (a teardown, not just a status flip)',
+    /status: 'void'[\s\S]{0,1200}?clearNotice\([^)]*'deal_followup', `invremind:/.test(FN_SRC));
+  ok('F2b: the guard comment names the void route as the second teardown',
+    /\/sales\/invoices\/:id\/void/.test(feed));
+  ok('F2b: the comment no longer claims no route can void an invoice',
+    !/no route ever writes status:'void'/.test(feed));
+  // The guard itself is NOT weakened: a paid invoice is still never voidable.
+  ok('F2b: a PAID invoice is still refused (the money guard stands)',
+    /if \(inv\.status === 'paid'\) return json\(\{ error: 'already_paid'/.test(FN_SRC));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

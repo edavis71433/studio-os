@@ -25,6 +25,10 @@ const workspace = read('supabase/functions/presence/routes/workspace.ts');
 const mig74 = read('supabase/migrations/0074_p2c_sales_lifecycle.sql');
 const mig88 = read('supabase/migrations/0088_notice_kinds.sql');
 const mig117 = read('supabase/migrations/0117_deal_event_delete_kinds.sql');
+// 0118 (invoice_voided) is the CURRENT superset. The "sales.ts only writes
+// allowed kinds" check below must run against the latest migration, or adding a
+// kind correctly would fail this suite; 0117's own properties are still pinned.
+const mig118 = read('supabase/migrations/0118_deal_event_invoice_voided.sql');
 const pipeline = read('pipeline.html');
 
 const results = [];
@@ -63,10 +67,13 @@ const C_SIGNED = '88888888-8888-4888-8888-888888888888';
     kinds(mig88).every((k) => now.includes(k)), kinds(mig88).filter((k) => !now.includes(k)).join(','));
   ok('0117 is idempotent (drop if exists, then add)', /drop constraint if exists presence_deal_events_kind_check/.test(mig117));
   ok('0117 documents its rollback', /rollback:/.test(mig117));
-  // and the code writes ONLY kinds the constraint allows
+  // and the code writes ONLY kinds the CURRENT constraint allows
+  const latest = kinds(mig118);
+  ok('0118 carries the whole 0117 superset forward (the chain never narrows)',
+    latest.length > 0 && now.every((k) => latest.includes(k)), now.filter((k) => !latest.includes(k)).join(','));
   for (const k of sales.match(/dealEvent\([^,]+, [^,]+, '([a-z_]+)'/g) || []) {
     const kind = k.match(/'([a-z_]+)'$/)[1];
-    ok(`sales.ts writes deal-event kind '${kind}' — allowed by the check`, now.includes(kind));
+    ok(`sales.ts writes deal-event kind '${kind}' — allowed by the check`, latest.includes(kind));
   }
 }
 

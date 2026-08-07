@@ -24,7 +24,10 @@ ok('saas: points to service billing when the customer has invoices', /has_servic
 ok('service: /client/billing handler exists + is routed', /export async function handleClientBilling/.test(client) && /route === '\/client\/billing' && method === 'GET'/.test(index));
 ok('service: labeled billing_type "service" + explicitly separate from SaaS', /billing_type: 'service'/.test(client) && /billed separately/i.test(client));
 ok('service: scoped to the caller\'s own customer (tenant-safe, multi-tenant presence_invoices)', /presence_invoices\?customer_client_id=eq\.\$\{me\}&deleted_at=is\.null/.test(client));
-ok('service: exposes a pay link ONLY for unpaid invoices', /i\.status !== 'paid' && i\.stripe_url\) \? i\.stripe_url : null/.test(client));
+// Allow-list, not a not-paid test: `status !== 'paid'` was harmless only while
+// 'void' was unreachable. POST /sales/invoices/:id/void now makes it reachable,
+// and a WITHDRAWN invoice must never come with a live pay button.
+ok('service: exposes a pay link ONLY for an OPEN invoice (never paid, never voided)', /i\.status === 'open' && i\.stripe_url\) \? i\.stripe_url : null/.test(client));
 
 // ── Studio surface: sees the customer's SaaS status, read-only, distinguished ──
 ok('studio: project view surfaces the customer SaaS status (read-only)', /customer_saas/.test(projects) && /managed_by_customer: true/.test(projects));

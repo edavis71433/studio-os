@@ -57,7 +57,10 @@ export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
  *
  *    deal_followup + invremind:  ← the money lands — stripe-webhook's paid echo
  *                                  clears it (first, and again on a retry of an
- *                                  already-paid invoice)
+ *                                  already-paid invoice) — OR the studio voids
+ *                                  the invoice (POST /sales/invoices/:id/void,
+ *                                  routes/sales.ts), the exit an invoice raised
+ *                                  in error needs and never had
  *    deletion_requested          ← POST /commerce/delete-cancel (routes/commerce.ts)
  *    site_down                   ← the uptime heartbeat recovers (monitor/heartbeat.ts)
  *    publish_failed              ← a publish succeeds (routes/publish.ts)
@@ -88,12 +91,14 @@ export const NOTICE_PROTECTED_KINDS: ReadonlySet<string> = new Set([
  *  the period prefix can. That is exactly why the feed had to start exposing
  *  `period`. Prefix-anchored, never a substring match.
  *
- *  Its ONE teardown is the money landing. There is no second escape: nothing in
- *  the platform can void a `presence_invoices` row — pipeline.html renders a
- *  "Voided" state but no route ever writes status:'void' — so an invoice raised
- *  in error can only be cleared by paying it or by a hand-written DB update.
- *  That is a real gap, recorded here so the guard's justification stays honest;
- *  it is not a reason to weaken the guard. */
+ *  It has TWO teardowns, and it needed both. The first is the money landing
+ *  (stripe-webhook's paid echo). The second is POST /sales/invoices/:id/void —
+ *  because an invoice raised in error is never going to be paid, and while
+ *  `status:'void'` was unreachable (pipeline.html rendered a "Voided" state that
+ *  no route could ever produce) a mistaken invoice left a PERMANENT, refusable
+ *  "Still unpaid" row with no exit but paying it. The void handler calls
+ *  clearNotice on exactly this period; a PAID invoice is still never voidable,
+ *  so the guard is not weakened — the obligation now has an honest way to end. */
 export const NOTICE_PROTECTED_PERIOD_PREFIX = 'invremind:';
 export function noticeDismissible(kind: unknown, period: unknown): boolean {
   const k = String(kind ?? '');

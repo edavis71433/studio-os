@@ -27,7 +27,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
-import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
@@ -678,6 +678,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // "bill this now" action; generates the Stripe link on demand like the deposit path.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesInvoiceSend(req, site, principal, m[1], cors);
+    // WITHDRAW an invoice raised in error — the only exit an unpaid invoice has
+    // other than being paid, and the second teardown for the undismissable
+    // `deal_followup`/`invremind:<id>` money notice. Never a paid one (409).
+    // Studio-gated & site-scoped like every authed /sales/* route.
+    m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/void$/);
+    if (m && method === 'POST') return handleSalesInvoiceVoid(site, principal, m[1], cors);
     // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
     // year" on a deal. A separate service-purpose Stripe subscription, distinct
     // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.

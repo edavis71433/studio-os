@@ -56,8 +56,11 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   const list = rows(r).map((i) => ({
     id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
     amount: (Number(i.amount_cents) || 0) / 100, status: i.status, due_date: i.due_date, paid_at: i.paid_at,
-    // only expose a pay link for something that isn't already paid
-    pay_url: (i.status !== 'paid' && i.stripe_url) ? i.stripe_url : null,
+    // Only an OPEN invoice is payable. This was `!== 'paid'`, which was harmless
+    // only while 'void' was unreachable — now that POST /sales/invoices/:id/void
+    // exists, a not-paid test would hand the client a live pay button for an
+    // invoice their studio has WITHDRAWN. Allow-list the one payable state.
+    pay_url: (i.status === 'open' && i.stripe_url) ? i.stripe_url : null,
     created_at: i.created_at,
   }));
   const open = list.filter((i) => i.status !== 'paid' && i.status !== 'void' && i.status !== 'canceled');

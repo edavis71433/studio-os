@@ -1342,3 +1342,122 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     expect(dialogs).toBe(0);
   });
 });
+
+// ── Voiding an invoice raised in error ───────────────────────────────────────
+// `presence_invoices.status` has allowed 'void' since migration 0086 and this
+// page has always rendered a "Voided" row — but nothing in the platform ever
+// wrote it, so the state was unreachable and the render was dead code. An
+// invoice raised in error could only be cleared by PAYING it, and the
+// undismissable `deal_followup`/`invremind:<id>` money notice it stranded had no
+// teardown but the money landing.
+//
+// POST /sales/invoices/:id/void is that second exit. The control mirrors the
+// server's rule exactly — an OPEN invoice (sent or not) can be withdrawn, a PAID
+// one never can — and the page must not offer what the API refuses.
+const DEAL6 = '66666666-6666-4666-8666-666666666666';
+const INV_SENT = 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaaa';
+const INV_UNSENT = 'aaaaaaa2-2222-4222-8222-aaaaaaaaaaaa';
+const INV_PAID = 'aaaaaaa3-3333-4333-8333-aaaaaaaaaaaa';
+const INV_VOID = 'aaaaaaa4-4444-4444-8444-aaaaaaaaaaaa';
+
+const invoiceDeal = (invoices: unknown[]) => ({ data: {
+  deal: { id: DEAL6, title: 'Acme website', stage: 'contract', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [], events: [], timeline: [], invoices, last_contacted_at: null,
+} });
+
+const OPEN_SENT = { id: INV_SENT, title: 'Website build', amount_cents: 320000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/x', due_date: null, paid_at: null };
+const OPEN_UNSENT = { id: INV_UNSENT, title: 'Deposit', amount_cents: 50000, purpose: 'deposit', status: 'open', stripe_url: null, due_date: null, paid_at: null };
+const PAID = { id: INV_PAID, title: 'Discovery', amount_cents: 90000, purpose: 'service', status: 'paid', stripe_url: 'https://pay.example/p', due_date: null, paid_at: past(2) };
+const VOIDED = { id: INV_VOID, title: 'Duplicate build', amount_cents: 320000, purpose: 'service', status: 'void', stripe_url: null, due_date: null, paid_at: null };
+
+test.describe('invoice — the Void control', () => {
+  const invApi = (invoices: unknown[]) => ({ ...API, [`/sales/deals/${DEAL6}`]: invoiceDeal(invoices), [`/sales/deals/${DEAL6}/tasks`]: { data: [] } });
+
+  test('Void is offered on an OPEN invoice — sent or not — and never on a paid or already-voided one', async ({ page }) => {
+    await installApp(page, { api: invApi([OPEN_SENT, OPEN_UNSENT, PAID, VOIDED]) });
+    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    // The already-emailed invoice is exactly the one that needs withdrawing.
+    await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
+    await expect(page.locator(`[data-void-inv="${INV_UNSENT}"]`)).toBeVisible();
+    // Money changed hands — no control at all, matching the server's 409.
+    await expect(page.locator(`[data-void-inv="${INV_PAID}"]`)).toHaveCount(0);
+    // Already withdrawn — nothing left to do.
+    await expect(page.locator(`[data-void-inv="${INV_VOID}"]`)).toHaveCount(0);
+    // …and the paid row still says Paid, so the guard is visible, not just absent.
+    const paidRow = page.locator('.lr').filter({ hasText: 'Discovery' });
+    await expect(paidRow).toContainText('Paid');
+  });
+
+  test('the existing "Voided" render displays correctly now a row can reach that state', async ({ page }) => {
+    await installApp(page, { api: invApi([VOIDED]) });
+    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    const row = page.locator('.lr').filter({ hasText: 'Duplicate build' });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Voided');
+    await expect(row).toContainText('$3,200');   // the amount stays legible — a void is a record, not a hole
+    // A withdrawn invoice offers no way to charge it and no "due now" nag.
+    await expect(row).not.toContainText('due now');
+    await expect(row.locator(`[data-send-inv="${INV_VOID}"]`)).toHaveCount(0);
+    await expect(row.locator('[data-copy-pay]')).toHaveCount(0);
+    // The printable Document of Record survives — the withdrawal is on the record.
+    await expect(row.locator(`[data-doc-inv="${INV_VOID}"]`)).toBeVisible();
+  });
+
+  test('confirming a void POSTs the route and the row re-renders as Voided', async ({ page }) => {
+    const calls: Array<{ path: string; method: string }> = [];
+    let voided = false;
+    await installApp(page, { api: invApi([OPEN_SENT]) });
+    // The re-read after the void returns the SAME invoice, now withdrawn — so the
+    // assertion is on what the page draws from fresh server state, not optimism.
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      const method = route.request().method();
+      if (method === 'POST' && path === `/sales/invoices/${INV_SENT}/void`) {
+        calls.push({ path, method });
+        voided = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, id: INV_SENT, status: 'void' } }) });
+      }
+      if (method === 'GET' && path === `/sales/deals/${DEAL6}`) {
+        const body = invoiceDeal([voided ? { ...OPEN_SENT, status: 'void', stripe_url: null } : OPEN_SENT]);
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      }
+      return route.fallback();
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
+
+    // Destructive → confirms first, and declining sends nothing.
+    page.once('dialog', (d) => d.dismiss());
+    await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
+    await expect.poll(() => calls.length).toBe(0);
+    await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
+
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
+    await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
+    expect(msg).toContain('Void this invoice?');
+    await expect.poll(() => calls.map((c) => c.path)).toContain(`/sales/invoices/${INV_SENT}/void`);
+    // …and the drawer re-renders the row in the state the server now reports.
+    const row = page.locator('.lr').filter({ hasText: 'Website build' });
+    await expect(row).toContainText('Voided');
+    await expect(row).not.toContainText('Awaiting payment');
+    await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toHaveCount(0);
+  });
+
+  test('a refused void (the payment landed first) surfaces the server’s reason and leaves the row alone', async ({ page }) => {
+    await installApp(page, { api: invApi([OPEN_SENT]) });
+    await page.route('**/functions/v1/presence/sales/invoices/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    page.once('dialog', (d) => d.accept());
+    await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
+    await expect(page.locator('.dds-toast')).toContainText('financial record');
+    // Nothing was hidden on a refusal — the invoice is still there and still sendable.
+    await expect(page.locator('.lr').filter({ hasText: 'Website build' })).toContainText('Awaiting payment');
+    await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeEnabled();
+  });
+});
