@@ -148,13 +148,28 @@ function teardownFor(kind) {
   const fn = (hook.match(/const markPresenceInvoicePaid[\s\S]*?\n  \};/) || [''])[0];
   ok('F2: markPresenceInvoicePaid was found in the webhook source', fn.length > 400, `${fn.length} bytes`);
 
-  ok('F2: the invoice-reminder clear is its OWN never-throwing unit, not a trailing statement',
-    /const clearInvoiceReminder = async[\s\S]{0,900}?catch/.test(hook));
+  // its OWN unit — and a unit that genuinely swallows, not one that merely has
+  // the word `catch` somewhere near it.
+  const helper = (hook.match(/const clearInvoiceReminder = async[\s\S]*?\n  \};/) || [''])[0];
+  ok('F2: the invoice-reminder clear is its own function, not a trailing statement', helper.length > 200, `${helper.length} bytes`);
+  ok('F2: …whose whole body is wrapped in try/catch (it can never throw at its caller)',
+    /=>\s*\{\s*\n\s*try \{/.test(helper) && /\}\s*catch \([^)]*\) \{/.test(helper), helper.slice(0, 140));
+  const catchBody = (helper.match(/\}\s*catch \([^)]*\) \{([\s\S]*?)\n    \}/) || ['', ''])[1];
+  ok('F2: …whose catch SWALLOWS — it logs and degrades to "no client", it never rethrows',
+    /return\s+''/.test(catchBody) && !/\bthrow\b/.test(catchBody), JSON.stringify(catchBody.slice(0, 140)));
 
-  const iClear = fn.indexOf('clearInvoiceReminder(inv)');
-  const iEvent = fn.indexOf('presence_deal_events');
-  ok('F2: the clear runs BEFORE the deal-event POST that could throw past it',
-    iClear >= 0 && iEvent >= 0 && iClear < iEvent, `clear@${iClear} event@${iEvent}`);
+  // BEFORE the deal-event POST — measured inside the ECHO only. Measuring across
+  // the whole function let the already-paid path's call satisfy this, so deleting
+  // the echo's call passed: the ordering that is the entire fix went unpinned.
+  const echo = fn.slice(fn.indexOf('already flipped by a concurrent event'));
+  const iClear = echo.indexOf('clearInvoiceReminder(inv)');
+  const iEvent = echo.indexOf('presence_deal_events');
+  ok('F2: the echo clears FIRST, before the deal-event POST that could throw past it',
+    iClear > 0 && iEvent > 0 && iClear < iEvent, `clear@${iClear} event@${iEvent}`);
+  ok('F2: …and outside the echo’s try{} — the try is what used to swallow its turn',
+    iClear > 0 && iClear < echo.indexOf('    try {'), `clear@${iClear} try@${echo.indexOf('    try {')}`);
+  ok('F2: the invoice_paid notice reuses the client the clear resolved (one site read, one truth)',
+    /const clientId = await clearInvoiceReminder\(inv\);/.test(echo) && /if \(clientId\) \{/.test(echo));
 
   // the healing path: a retry of an already-paid invoice must still clear.
   ok('F2: the ALREADY-PAID short-circuit clears too, so a Stripe retry heals a stranded row',
