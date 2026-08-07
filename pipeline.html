@@ -316,13 +316,22 @@ const stageBadge=(s,signed)=>{
 // Per-stage "Path" guidance — the calm one-line tip + suggested next action, so
 // a non-technical owner always knows what to do next. Mirrors the source of
 // truth in lib/pipeline_guidance.ts (which the test imports).
+// `todos` are the obvious next to-dos AT each stage — the deal page's to-do
+// dropdown, so the box is never a blank "what do I write here?". Every one stays
+// editable before it's added; they're starting points, not a checklist to obey.
 const PIPELINE_GUIDANCE={
-  lead:{tip:'A new enquiry — reach out while they’re still interested.',action:'Get in touch and learn what they need'},
-  qualified:{tip:'They’re a fit. Show them what working together looks like.',action:'Send a proposal they can accept online'},
-  proposal:{tip:'Your proposal is with them — a gentle nudge often seals it.',action:'Follow up, then send the agreement once they say yes'},
-  contract:{tip:'Agreement’s out — once they sign, they can pay right away.',action:'Get it signed, then request the deposit'},
-  won:{tip:'They’re your customer now. Time to do great work.',action:'Open their project and kick things off'},
-  lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change'},
+  lead:{tip:'A new enquiry — reach out while they’re still interested.',action:'Get in touch and learn what they need',
+    todos:['Call them','Send an intro email','Book a discovery call','Look at their current site']},
+  qualified:{tip:'They’re a fit. Show them what working together looks like.',action:'Send a proposal they can accept online',
+    todos:['Send the proposal','Confirm scope and budget','Set a decision date']},
+  proposal:{tip:'Your proposal is with them — a gentle nudge often seals it.',action:'Follow up, then send the agreement once they say yes',
+    todos:['Follow up on the proposal','Answer their questions','Send the agreement once they say yes']},
+  contract:{tip:'Agreement’s out — once they sign, they can pay right away.',action:'Get it signed, then request the deposit',
+    todos:['Follow up on the agreement','Request the deposit','Book the kickoff call']},
+  won:{tip:'They’re your customer now. Time to do great work.',action:'Open their project and kick things off',
+    todos:['Open their project','Send the welcome + kickoff details','Collect content and access']},
+  lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change',
+    todos:['Note why it didn’t fit','Set a reminder to check back']},
 };
 const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
 // The Kanban board's open-stage columns (won/lost are OUTCOMES, not columns —
@@ -1037,7 +1046,13 @@ async function openDeal(id){
           <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ed-save">Save details</button></div>
         </div>
         <div class="sec"><h3>To-dos</h3><div id="dealTasks" class="mut">Loading…</div>
-          <div class="row2" style="margin-top:8px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
+          <!-- The blank box was the problem: at every stage there are two or
+               three obvious next to-dos. Offer THIS stage's as a dropdown that
+               FILLS the input (same pattern as the proposal line-item picker) —
+               still fully editable before Add, and "Something else…" keeps the
+               free-text path first-class. The POST is unchanged. -->
+          <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
+          <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
@@ -1138,7 +1153,16 @@ async function openDeal(id){
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast('Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
-    const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
+    // The stage's preset to-dos FILL the input — they never post on their own, so
+    // every one is still editable (or datable) before Add. Same contract as the
+    // proposal line-item picker: '' clears, '__custom__' hands over to free text.
+    const dtp=$('dt-preset'); if(dtp){ const stageTodos=guidanceFor(d.stage).todos||[];
+      dtp.onchange=()=>{const v=dtp.value;const ti=$('dt-title');if(!ti)return;
+        if(v===''||v==='__custom__'){ti.value='';}
+        else {const t=stageTodos[+v];if(t)ti.value=t;}
+        ti.focus();};
+    }
+    const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';if($('dt-preset'))$('dt-preset').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
     // Activity quick-log: pick a kind, jot what happened (optional except a note),
     // optionally date it, "Log it". A logged activity feeds the merged timeline +
     // "last contacted", so the drawer + card refresh after saving.

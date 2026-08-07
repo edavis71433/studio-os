@@ -256,12 +256,18 @@ const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
 const PIPELINE_GUIDANCE={
-  lead:{tip:'A new enquiry — reach out while they’re still interested.',action:'Get in touch and learn what they need'},
-  qualified:{tip:'They’re a fit. Show them what working together looks like.',action:'Send a proposal they can accept online'},
-  proposal:{tip:'Your proposal is with them — a gentle nudge often seals it.',action:'Follow up, then send the agreement once they say yes'},
-  contract:{tip:'Agreement’s out — once they sign, they can pay right away.',action:'Get it signed, then request the deposit'},
-  won:{tip:'They’re your customer now. Time to do great work.',action:'Open their project and kick things off'},
-  lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change'},
+  lead:{tip:'A new enquiry — reach out while they’re still interested.',action:'Get in touch and learn what they need',
+    todos:['Call them','Send an intro email','Book a discovery call','Look at their current site']},
+  qualified:{tip:'They’re a fit. Show them what working together looks like.',action:'Send a proposal they can accept online',
+    todos:['Send the proposal','Confirm scope and budget','Set a decision date']},
+  proposal:{tip:'Your proposal is with them — a gentle nudge often seals it.',action:'Follow up, then send the agreement once they say yes',
+    todos:['Follow up on the proposal','Answer their questions','Send the agreement once they say yes']},
+  contract:{tip:'Agreement’s out — once they sign, they can pay right away.',action:'Get it signed, then request the deposit',
+    todos:['Follow up on the agreement','Request the deposit','Book the kickoff call']},
+  won:{tip:'They’re your customer now. Time to do great work.',action:'Open their project and kick things off',
+    todos:['Open their project','Send the welcome + kickoff details','Collect content and access']},
+  lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change',
+    todos:['Note why it didn’t fit','Set a reminder to check back']},
 };
 const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
 // forward one · back one · →lost; never →won (convert-only — server re-checks)

@@ -732,3 +732,41 @@ test.describe('deal page — Contact block (ask 2)', () => {
     await expect(toast).toContainText('Add their email in Details');
   });
 });
+
+// ── CRM deal page (ask 3): the to-do box knows what stage the deal is at ─────
+test.describe('deal page — stage-aware to-do presets (ask 3)', () => {
+  test('the dropdown offers THIS stage’s to-dos and fills the still-editable input', async ({ page }) => {
+    let posted = '';
+    await installApp(page, { api: API });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/tasks`, async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      posted = route.request().postData() || '';
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'tk-1' } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);                            // DEAL is at stage 'proposal'
+    const pick = page.locator('#dt-preset');
+    await expect(pick).toBeVisible();
+    await expect(pick.locator('option')).toContainText([
+      'Pick a to-do for this stage…', 'Follow up on the proposal', 'Answer their questions', 'Send the agreement once they say yes', 'Something else…',
+    ]);
+    // picking a preset FILLS the input — it does not post on its own
+    await pick.selectOption({ label: 'Follow up on the proposal' });
+    await expect(page.locator('#dt-title')).toHaveValue('Follow up on the proposal');
+    expect(posted).toBe('');
+    // …and it stays editable before Add
+    await page.locator('#dt-title').fill('Follow up on the proposal — call, not email');
+    await page.locator('#dt-add').click();
+    await expect.poll(() => posted).not.toBe('');
+    expect(JSON.parse(posted).title).toBe('Follow up on the proposal — call, not email');
+    // "Something else…" hands back to a blank free-text box
+    await pick.selectOption('__custom__');
+    await expect(page.locator('#dt-title')).toHaveValue('');
+  });
+
+  test('a lead-stage deal is offered the LEAD to-dos, not the proposal ones', async ({ page }) => {
+    const LEAD_DETAIL = { data: { ...DEAL_DETAIL.data, deal: { ...DEAL_DETAIL.data.deal, id: DEAL2, stage: 'lead' } } };
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL2}`]: LEAD_DETAIL, [`/sales/deals/${DEAL2}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL2}`);
+    await expect(page.locator('#dt-preset option')).toContainText(['Pick a to-do for this stage…', 'Call them', 'Send an intro email', 'Book a discovery call', 'Look at their current site', 'Something else…']);
+  });
+});

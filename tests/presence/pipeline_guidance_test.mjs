@@ -67,6 +67,47 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('won is terminal — no board moves out of it', boardMoveTargets('won').length === 0);
 }
 
+// ═══ 5. Stage to-do presets — the deal page's to-do dropdown ═══
+// The to-do box was a bare "what do I write here?" input. Each stage now offers
+// a short list of the obvious next to-dos, still fully editable before Add. The
+// server caps a task title at 200 chars (clean(b.title, 200)), so a preset that
+// exceeds it would be silently truncated — pinned here.
+{
+  let allPresent = true, countOk = true, allBounded = true, allTrimmed = true, allPlain = true, noDupes = true;
+  for (const s of STAGES) {
+    const todos = PIPELINE_GUIDANCE[s].todos;
+    if (!Array.isArray(todos) || todos.length === 0) { allPresent = false; continue; }
+    if (todos.length < 2 || todos.length > 5) countOk = false;
+    if (new Set(todos).size !== todos.length) noDupes = false;
+    for (const t of todos) {
+      if (typeof t !== 'string' || !t) { allPresent = false; continue; }
+      if (t.length > 200) allBounded = false;                  // clean(b.title, 200) in routes/sales.ts
+      if (t !== t.trim()) allTrimmed = false;
+      if (/[<>]/.test(t)) allPlain = false;
+    }
+  }
+  ok('every ladder stage offers to-do presets', allPresent);
+  ok('to-do presets are a short, scannable 2–5 per stage', countOk);
+  ok('every to-do preset fits the server’s 200-char title cap', allBounded);
+  ok('to-do presets have no stray leading/trailing whitespace', allTrimmed);
+  ok('to-do presets carry no raw HTML markup', allPlain);
+  ok('no stage repeats the same to-do twice', noDupes);
+  // `todos` is OPTIONAL on the interface, so nothing that reads PIPELINE_GUIDANCE
+  // breaks — but the shipped data must actually carry it for every stage.
+  ok('guidanceFor() carries the to-dos through the fallback path too', Array.isArray(guidanceFor('not-a-real-stage').todos));
+
+  // pipeline.html mirrors this table by hand (the existing convention) — a drift
+  // between the source of truth and the mirror is what the deal page would show.
+  const pipe = Deno.readTextFileSync(new URL('pipeline.html', import.meta.resolve('../../')));
+  let mirrored = true, missing = '';
+  for (const s of STAGES) for (const t of (PIPELINE_GUIDANCE[s].todos || [])) if (!pipe.includes(t)) { mirrored = false; missing = missing || `${s}: ${t}`; }
+  ok('pipeline.html mirrors every to-do preset (no hand-mirror drift)', mirrored, missing);
+  ok('the deal page offers the presets as a <select> beside the free-text input', /id="dt-preset"/.test(pipe) && /id="dt-title"/.test(pipe) && /__custom__/.test(pipe));
+  // crm.html is deliberately left alone — to-dos are read-only there.
+  const crm = Deno.readTextFileSync(new URL('crm.html', import.meta.resolve('../../')));
+  ok('crm.html is NOT given the preset picker (to-dos are read-only there)', !/id="dt-preset"/.test(crm));
+}
+
 const passed = results.filter((r) => r.p).length;
 const failed = results.length - passed;
 console.log(`\n════ PIPELINE GUIDANCE: ${passed}/${results.length} passed${failed ? `, ${failed} FAILED` : ''} ════`);
