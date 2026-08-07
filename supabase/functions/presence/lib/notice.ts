@@ -7,6 +7,8 @@
 // dedupe scope (use a stable id like `pub:<id>` for once-per-event, or a month
 // bucket for once-per-month). Best-effort; never throws.
 import { svc } from './db.ts';
+// the ONE filter-grammar rule (pure, no imports of its own — no cycle)
+import { filterSafe } from './inbound_email.ts';
 
 export interface NoticeInput {
   siteId: string;
@@ -22,6 +24,19 @@ export interface NoticeInput {
    *  existing idiom for "this is a record that something was sent, not a thing
    *  asking for you" (see runBookingReminders). */
   status?: 'active' | 'dismissed';
+  /** Should a NEW row also buzz the owner's device?
+   *
+   *  Defaults to `status === 'active'`, which is right for almost everything —
+   *  but it is a DEFAULT, never a derivation. "Is a row drawn?" and "must the
+   *  owner be reached?" are different questions, and conflating them silently
+   *  killed the four client_* pushes the moment those kinds became silent-ledger
+   *  rows: "a client just messaged you" is the most time-sensitive notification
+   *  in the product, and it stopped firing with nothing to show for it.
+   *  notifyStudioOfClientAction now passes `push: true` explicitly, so those four
+   *  reach the device while staying out of the list; the sales doc reminder
+   *  (`status: 'dismissed'`, no push) stays silent, which is what it should be.
+   *  Only ever fires on FIRST creation — a re-raise never re-pushes. */
+  push?: boolean;
 }
 
 /** Raise (or no-op if already present for this client/kind/period) a notice.
@@ -39,9 +54,12 @@ export async function raiseNotice(n: NoticeInput): Promise<boolean> {
     });
     const created = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
     // A NEW notice also pushes to the owner's device (best-effort, gated on VAPID
-    // keys). Only on first creation so a re-raise never re-pushes — and never at
-    // all for a silent-ledger row, which by definition isn't asking for anything.
-    if (created && status === 'active') {
+    // keys). Only on first creation so a re-raise never re-pushes. WHETHER to
+    // push is its own explicit decision — `status` only defaults it (see the
+    // `push` field above); a silent-ledger row that genuinely is urgent can and
+    // must still reach the device.
+    const wantsPush = n.push === undefined ? status === 'active' : n.push === true;
+    if (created && wantsPush) {
       try {
         const { pushToSite } = await import('../routes/push.ts');
         const href = (await import('../routes/workspace.ts')).noticeHref(n.kind);
@@ -67,12 +85,34 @@ export async function clearNotice(clientId: string, kind: string, period?: strin
  *  Needed once a dedupe key carries a rolling bucket: support-aging now re-nudges
  *  weekly as `support:<id>:w<n>`, so "this request is handled" can no longer be
  *  said with a single exact period — last week's row and this week's row are both
- *  active and both must go. The prefix is always an internal, code-built key
- *  (`support:<uuid>:`), never user text, so it carries no LIKE metacharacters;
- *  the `*` is appended OUTSIDE the encoding so PostgREST reads it as the wildcard
- *  rather than a literal. Best-effort, exactly like clearNotice. */
+ *  active and both must go.
+ *
+ *  ── WHY THE GUARD ───────────────────────────────────────────────────────────
+ *  This is the one helper in the file that builds a PATTERN rather than an exact
+ *  match, and a pattern that widens is a silent mass-dismiss. Two ways that
+ *  happens, both invisible at the call site:
+ *    · `encodeURIComponent` leaves `_ * ! ~ ' ( ) - .` alone, and PostgREST's
+ *      `like` reads BOTH `*` and `_` as wildcards — so a prefix carrying either
+ *      quietly matches rows it was never meant to.
+ *    · `,` `(` `)` `"` `\` are PostgREST FILTER GRAMMAR — they don't widen the
+ *      pattern, they break out of the value.
+ *  Today's single caller passes a twice-gated UUID, so neither can happen; that
+ *  is a property of the CALLER, not of this function, and the next caller will
+ *  not know it. So the guard lives here: filter grammar (and an empty prefix,
+ *  which would clear every row of the kind) is REFUSED outright rather than
+ *  quietly widened, using the same `filterSafe` rule the inbound-email reads use;
+ *  `_` and `%` in the literal part are escaped for LIKE. The trailing `*` is
+ *  appended OUTSIDE the encoding, so it is the ONLY wildcard that can ever reach
+ *  PostgREST. Best-effort, exactly like clearNotice. */
+const likeLiteral = (s: string): string => s.replace(/[\\%_]/g, '\\$&');
 export async function clearNoticePrefix(clientId: string, kind: string, prefix: string): Promise<void> {
-  const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active&period=like.${encodeURIComponent(prefix)}*`;
+  const safe = filterSafe(prefix);
+  if (safe === null) {
+    // Refuse, loudly, rather than clear more than we were asked to.
+    console.error(`[notice] refusing clearNoticePrefix for ${kind}: unsafe period prefix ${JSON.stringify(prefix)}`);
+    return;
+  }
+  const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active&period=like.${encodeURIComponent(likeLiteral(safe))}*`;
   await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
 }
 

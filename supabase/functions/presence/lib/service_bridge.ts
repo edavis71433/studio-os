@@ -385,6 +385,13 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
       siteId: n.agencySiteId, clientId: ownerClientId, kind: n.kind,
       period: noticePeriodFor(n.threadKey, n.bucket !== false),
       status: 'dismissed',
+      // …but STILL buzz the device. Row-silent is not notification-silent: "a
+      // client just messaged you" is the most time-sensitive thing the operator
+      // can be told, and it is exactly what the pre-dismissed row must not stop.
+      // Explicit, because raiseNotice would otherwise default push off for a
+      // dismissed row — and that default silently killed all four of these
+      // pushes when this line first became a silent ledger.
+      push: true,
       headline,
       body: `${subject || LEAD[n.kind]}${excerpt ? ` — “${excerpt.slice(0, 160)}”` : ''}`,
     });
