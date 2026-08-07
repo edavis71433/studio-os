@@ -219,6 +219,13 @@ html.dds-embed .dds-waffle{display:none!important}
   #dds-mbar a:active,#dds-mbar button:active{background:var(--dds-p-soft,#efeafa)}
   #dds-mbar a[aria-current="page"]{color:var(--dds-p,#5b3fa0)}
   #dds-mbar .mdot{display:inline-block;min-width:16px;padding:0 4px;border-radius:999px;background:var(--dds-p,#5b3fa0);color:#fff;font-size:10.5px;line-height:16px;vertical-align:2px}
+  /* …and because it stays above, the drawer must END where the bar begins.
+     With inset-bottom:0 the bar covered the sheet's LAST row: on a long nav
+     that row is a real destination, un-tappable (the tap hits #dds-mbar).
+     Same 72px + safe-area the body reserves, so the sheet scrolls its final
+     row into clear space instead of under the bar. Raising the drawer's
+     z-index instead is NOT an option — see the note above. */
+  .dds-drawer{inset:var(--dds-shell-h) 0 calc(72px + env(safe-area-inset-bottom,0px)) 0}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
   /* keep toasts + one-time hints clear of the bar */
   .dds-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));pointer-events:none}
