@@ -843,6 +843,40 @@ test.describe('services catalog — starter list (ask 1)', () => {
     await expect(page.locator('#svcRows .svc-name').first()).toHaveValue('Logo refresh');
     await expect(page.locator('#svcStarterNote')).toHaveCount(0);
   });
+
+  // The editor no longer opens on one blank row, so a late autofocus is a real
+  // input bug, not a test flake: an operator with six pre-filled rows in front of
+  // them clicks a PRICE, starts typing, and a focus() firing 20ms after the paint
+  // redirects those keystrokes into the first name field ("1750Website — …").
+  test('a PRE-FILLED editor never steals the caret — the operator’s first click wins', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/sales/services', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }));
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcRows .svc-row').first()).toBeVisible();
+    await page.waitForTimeout(200);                                   // well past the old 20ms focus()
+    // nothing inside the seeded editor may have grabbed the caret
+    await expect(page.locator('#svcRows .svc-name').first()).not.toBeFocused();
+    // …so a click on a price owns it, and the keystrokes land in the price
+    const price = page.locator('#svcRows .svc-row').nth(0).locator('.svc-price');
+    await price.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('1750');
+    await expect(page.locator('#svcRows .svc-row').nth(0).locator('.svc-name')).toHaveValue(STARTER[0][0]);
+    await expect(price).toHaveValue('1750');
+  });
+
+  // …but a genuinely blank row still gets the caret, so "Add a service" and an
+  // empty editor are still one keystroke away from typing.
+  test('a BLANK row still gets the caret', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: 'Logo refresh', price_cents: 60000 }] } } });
+    await page.goto('/pipeline.html');
+    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
+    await page.locator('#svcAdd').click();
+    await expect(page.locator('#svcRows .svc-name').nth(1)).toBeFocused();
+  });
 });
 
 // ── CRM deal page (ask 4): the studio's real agreement is the default ────────
@@ -855,13 +889,21 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
     await expect(body).toBeVisible();
     await expect.poll(async () => (await body.inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
     const text = await body.inputValue();
-    expect(text).toContain('DAVIS DIGITAL STUDIO');
     expect(text).toContain('Project Agreement & Scope of Work');
     expect(text).toContain('19. ENTIRE AGREEMENT');
     expect(text).not.toContain('SAMPLE');
     // the placeholders are RESOLVED — a client must never receive a raw token
     expect(text).not.toMatch(/\{\{/);
     expect(text).toContain('Test Studio');                                     // {{studio_name}} ← /identity
+    // ONE legal seller, everywhere: this tenant is "Test Studio", so the
+    // letterhead, the operative parties clause and the signature block must all
+    // name THEM — a contract that binds a company the client never dealt with is
+    // not a contract they can sign.
+    expect(text.split('\n')[0]).toBe('TEST STUDIO');                           // letterhead ← {{studio_name_upper}}
+    expect(text).toContain('entered into between Test Studio ("Studio")');     // the operative parties clause
+    expect(text).toMatch(/\nTest Studio +\[Client Name \/ Title\]/);           // the signature block
+    expect(text).not.toMatch(/Davis Digital Studio/i);                         // …and never anyone else's name
+    expect(text).not.toContain('Eric Davis');                                  // nor anyone else's PERSON
     expect(text).toContain('Acme');                                            // {{client_company}} ← the contact
     expect(text).toContain('Acme website');                                    // {{deal_title}}
     expect(text).toContain('$5,000');                                          // {{deal_value}}

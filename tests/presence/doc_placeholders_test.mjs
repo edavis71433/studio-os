@@ -23,7 +23,7 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
 
 // ═══ 1. Every token the shipped template uses is understood ═══
 {
-  const TEMPLATE_TOKENS = ['studio_name', 'client_company', 'deal_title', 'deal_value', 'deposit_amount', 'balance_amount', 'today'];
+  const TEMPLATE_TOKENS = ['studio_name', 'studio_name_upper', 'client_company', 'deal_title', 'deal_value', 'deposit_amount', 'balance_amount', 'today'];
   const missing = TEMPLATE_TOKENS.filter((t) => !(t in FULL));
   ok('every token the studio’s agreement uses is filled', missing.length === 0, missing.join(','));
   ok('{{client_name}} — the ORIGINAL token — still works (back-compatible)', 'client_name' in FULL && FULL.client_name === 'Sam Rivera');
@@ -35,6 +35,10 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
   ok('client_company prefers the company', FULL.client_company === 'Marlow’s Kitchen');
   ok('deal_title is the deal title', FULL.deal_title === 'Marlow’s Kitchen website');
   ok('studio_name is the studio’s own name', FULL.studio_name === 'Davis Digital Studio');
+  // The letterhead is set in caps in Eric's own document, so the SAME identity
+  // gets a second, uppercased token rather than a hardcoded company name.
+  ok('studio_name_upper is that same name, uppercased', FULL.studio_name_upper === 'DAVIS DIGITAL STUDIO'
+    && buildPlaceholderValues({ deal: {}, contact: null, studioName: 'Northwind Web Co.', now: AT }).studio_name_upper === 'NORTHWIND WEB CO.');
   ok('deal_value formats like the app’s money() — $3,800', FULL.deal_value === '$3,800');
   ok('deposit/balance are the 50/50 split §2 of the agreement states', FULL.deposit_amount === '$1,900' && FULL.balance_amount === '$1,900', `${FULL.deposit_amount} / ${FULL.balance_amount}`);
   ok('today is a long-form US date', FULL.today === 'August 7, 2026', FULL.today);
@@ -55,6 +59,7 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
   ok('a contact with a name but no company → the NAME stands in for the company', buildPlaceholderValues({ deal: {}, contact: { name: 'Sam Rivera' }, studioName: '', now: AT }).client_company === 'Sam Rivera');
   ok('no title → deal_title reads "the project"', BARE.deal_title === 'the project');
   ok('no studio name → the studio’s legal name, never blank', BARE.studio_name === 'Davis Digital Studio');
+  ok('no studio name → the letterhead token degrades the same way', BARE.studio_name_upper === 'DAVIS DIGITAL STUDIO');
   // A missing amount must NOT become "$0" — that is a misleading number in a
   // document someone signs. It becomes an obvious fill-me-in bracket instead.
   ok('a 0 / missing value → "[project fee]", never $0', BARE.deal_value === '[project fee]');
@@ -108,11 +113,124 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
     const used = [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))];
     return used.length > 0 && used.every((t) => PLACEHOLDER_TOKENS.includes(t));
   })(), [...new Set([...tpl.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]))].join(','));
-  ok('an empty agreement form prefers a SAVED template, then the standard agreement, then the starter',
-    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=DDS_CONTRACT_TEMPLATE\?fillDocPlaceholders\(DDS_CONTRACT_TEMPLATE,vals\):starterAgreement\(/.test(pipe));
+  ok('an empty agreement form prefers a SAVED template, then the standard agreement',
+    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=fillDocPlaceholders\(DDS_CONTRACT_TEMPLATE,vals\)/.test(pipe));
+  ok('the unreachable starterAgreement’s dead branch is gone', !/starterAgreement/.test(pipe));
+
+  // ── The default contract must name exactly ONE legal party: the TENANT'S own
+  // studio. Three places used to hardcode "Davis Digital Studio" — the
+  // letterhead, the operative parties clause, and the signature block — so a
+  // non-DDS tenant's client would have been asked to sign a binding clause
+  // naming a company that is not their counterparty.
+  ok('the letterhead is the studio’s own name (uppercased), not a hardcode', tpl.startsWith('{{studio_name_upper}}\n'));
+  ok('the operative parties clause names the studio by token', /entered into between \{\{studio_name\}\} \("Studio"\)/.test(tpl));
+  // presence_identity carries no PERSON name (business_name/email/phone only), so
+  // the signature block prints the BUSINESS above the rule and leaves the printed
+  // name blank — never a hardcoded "Eric Davis" on someone else's contract.
+  ok('the signature block names the studio, never a hardcoded person', /\n\{\{studio_name\}\} +\[Client Name \/ Title\]/.test(tpl) && !/Eric Davis/.test(tpl));
+  ok('NO hardcoded studio identity survives anywhere in the agreement', !/Davis Digital Studio/i.test(tpl));
+
+  // …and the rendered result, for a tenant who is not Eric and for Eric himself.
+  const fillFor = (biz) => applyPlaceholders(tpl, buildPlaceholderValues({ deal: {}, contact: null, studioName: biz, now: AT }));
+  const tenant = fillFor('Northwind Web Co.');
+  ok('a non-DDS tenant’s agreement never names Davis Digital Studio', !/Davis Digital Studio/i.test(tenant));
+  ok('a non-DDS tenant’s letterhead is THEIR name, uppercased', tenant.startsWith('NORTHWIND WEB CO.\n'));
+  ok('a non-DDS tenant is the Studio in the operative parties clause', tenant.includes('entered into between Northwind Web Co. ("Studio")'));
+  ok('a non-DDS tenant signs in their own name', /\nNorthwind Web Co\. +\[Client Name \/ Title\]/.test(tenant));
+  const dds = fillFor('');   // Eric's own site, via the fallback chain
+  ok('Eric’s own site still reads exactly as his document does', dds.startsWith('DAVIS DIGITAL STUDIO\n')
+    && dds.includes('entered into between Davis Digital Studio ("Studio")')
+    && /\nDavis Digital Studio +\[Client Name \/ Title\]/.test(dds));
   ok('the stale DDS-Contract-Custom-Package-SAMPLE.docx is gone from the repo root', (() => {
     try { Deno.statSync(new URL('../../DDS-Contract-Custom-Package-SAMPLE.docx', import.meta.url)); return false; } catch { return true; }
   })());
+}
+
+// ═══ 7. The client mirror is EXECUTED and compared, not just pattern-matched ══
+// §6 reads pipeline.html as text, which pins that the mirror EXISTS — it cannot
+// see the mirror DRIFT. A behavioural divergence (Math.floor for Math.round, a
+// dropped fallback) sails straight past a regex and reaches a client as a wrong
+// number in a document they sign. So: pull the two mirror functions out of the
+// page, run them, and demand OUTPUT EQUALITY with the server filler on a table
+// of inputs chosen to discriminate — odd cents, absent contact, company-absent-
+// but-name-present, zero/null, and an amount past the thousands separators.
+// (Extraction idiom: design_studio_test.mjs — brace-match the source, new Function.)
+{
+  const pipe = Deno.readTextFileSync(new URL('../../pipeline.html', import.meta.url));
+  // `function NAME(...) {...}` — brace-match from its start
+  const fn = (name) => {
+    const start = pipe.indexOf('function ' + name + '(');
+    if (start < 0) throw new Error('function not found: ' + name);
+    let depth = 0;
+    for (let j = pipe.indexOf('{', start); j < pipe.length; j++) {
+      if (pipe[j] === '{') depth++;
+      else if (pipe[j] === '}' && --depth === 0) return pipe.slice(start, j + 1);
+    }
+    throw new Error('unbalanced braces for ' + name);
+  };
+  // `const NAME=<one-line arrow>;`
+  const arrow = (name) => {
+    const line = pipe.split('\n').find((l) => l.startsWith('const ' + name + '='));
+    if (!line) throw new Error('const not found: ' + name);
+    return line;
+  };
+  const mirror = new Function(`${arrow('docMoney')}\n${fn('docPlaceholderValues')}\n${arrow('fillDocPlaceholders')}\nreturn { docPlaceholderValues, fillDocPlaceholders };`)();
+  ok('the mirror EXECUTES (extracted straight from pipeline.html)', typeof mirror.docPlaceholderValues === 'function' && typeof mirror.fillDocPlaceholders === 'function');
+
+  // Each row is a case the two implementations could plausibly disagree on.
+  const CASES = [
+    ['whole thousands', { title: 'Acme website', expected_value_cents: 380000 }, { name: 'Sam Rivera', company: 'Marlow’s Kitchen' }, 'Davis Digital Studio'],
+    ['odd cents — $3,333.33 (round-half up on the split)', { title: 'Rebuild', expected_value_cents: 333333 }, { name: 'Sam' }, 'Northwind Web Co.'],
+    ['odd cents — $1,000.01', { title: 'Refresh', expected_value_cents: 100001 }, { name: 'Sam', company: 'Acme' }, ''],
+    ['odd cents — $0.99 (round vs floor differ by a penny)', { title: 'Tiny', expected_value_cents: 99 }, { name: 'Sam' }, 'Studio B'],
+    ['no contact at all', { title: 'Anon', expected_value_cents: 250000 }, null, 'Studio B'],
+    ['company absent, name present (the fallback rung)', { title: 'Solo', expected_value_cents: 120000 }, { name: 'Dana Fox', company: '' }, 'Studio B'],
+    ['company present, name absent', { title: 'Corp', expected_value_cents: 120000 }, { name: '', company: 'Ironwood LLC' }, 'Studio B'],
+    ['zero value', { title: 'TBD', expected_value_cents: 0 }, { name: 'Sam' }, 'Studio B'],
+    ['null value', { title: 'TBD', expected_value_cents: null }, { name: 'Sam' }, 'Studio B'],
+    ['no deal fields at all', {}, null, ''],
+    ['huge value — $1,234,567.89', { title: 'Enterprise', expected_value_cents: 123456789 }, { name: 'Sam', company: 'Big Co' }, 'Studio B'],
+    ['huge whole value — $10,000,000', { title: 'Enterprise', expected_value_cents: 1000000000 }, { name: 'Sam' }, 'Studio B'],
+    ['whitespace-only names degrade like absent ones', { title: '   ', expected_value_cents: 5000 }, { name: '  ', company: '  ' }, '   '],
+  ];
+  let drift = '';
+  for (const [label, deal, contact, biz] of CASES) {
+    const server = buildPlaceholderValues({ deal, contact, studioName: biz, now: AT });
+    const client = mirror.docPlaceholderValues(deal, contact, biz, AT);
+    const keys = [...new Set([...Object.keys(server), ...Object.keys(client)])].sort();
+    const bad = keys.filter((k) => server[k] !== client[k]);
+    ok(`mirror ≡ server — ${label}`, bad.length === 0, bad.map((k) => `${k}: server=${JSON.stringify(server[k])} client=${JSON.stringify(client[k])}`).join(' · '));
+    if (bad.length) drift = label;
+  }
+  ok('the client mirror and the server filler never disagree on any case', !drift, drift);
+
+  // {{today}} — the Effective date of a signed document. The two halves must
+  // agree, so BOTH format in UTC: the same deal drafted from the empty form and
+  // from a saved template can otherwise carry different dates across midnight.
+  {
+    const edge = new Date(Date.UTC(2026, 7, 8, 3, 30, 0));   // 8 Aug UTC; still 7 Aug in every US zone
+    const prevTz = Deno.env.get('TZ');
+    Deno.env.set('TZ', 'America/Los_Angeles');                // the operator's clock, not the server's
+    const local = mirror.docPlaceholderValues({}, null, '', edge).today;
+    const server = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', now: edge }).today;
+    if (prevTz === undefined) Deno.env.delete('TZ'); else Deno.env.set('TZ', prevTz);
+    ok('{{today}} is UTC on BOTH sides (the contract’s Effective date can’t straddle midnight)', local === server, `${local} vs ${server}`);
+    ok('the mirror pins timeZone:UTC explicitly', /timeZone:\s*'UTC'/.test(fn('docPlaceholderValues')));
+  }
+
+  // Substitution itself must agree too — same body, same values, same output.
+  {
+    const vals = buildPlaceholderValues({ deal: { title: 'Acme', expected_value_cents: 100001 }, contact: { name: 'Sam' }, studioName: 'Northwind Web Co.', now: AT });
+    const bodies = [
+      '{{studio_name_upper}}\n{{studio_name}} / {{ client_company }} / {{deal_title}} / {{deal_value}} = {{deposit_amount}} + {{balance_amount}} on {{today}}. Hi {{client_name}}.',
+      '{{not_a_token}} stays put; {{deal_value}} does not.',
+      '', 'no tokens here at all',
+    ];
+    for (const [i, b] of bodies.entries()) ok(`fillDocPlaceholders ≡ applyPlaceholders — body ${i}`, mirror.fillDocPlaceholders(b, vals) === applyPlaceholders(b, vals));
+    // and the whole shipped agreement, end to end
+    const tplSrc = (pipe.match(/const DDS_CONTRACT_TEMPLATE=`([\s\S]*?)`;/) || [])[1] || '';
+    ok('the two fillers agree on the FULL shipped agreement', tplSrc.length > 10000 && mirror.fillDocPlaceholders(tplSrc, vals) === applyPlaceholders(tplSrc, vals));
+  }
 }
 
 const passed = results.filter((r) => r.p).length;

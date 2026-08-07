@@ -23,7 +23,7 @@ export interface PlaceholderInput {
  *  the two never drift, and so a caller can document what a template may use. */
 export const PLACEHOLDER_TOKENS = [
   'client_name', 'client_company', 'deal_title', 'deal_value',
-  'deposit_amount', 'balance_amount', 'today', 'studio_name',
+  'deposit_amount', 'balance_amount', 'today', 'studio_name', 'studio_name_upper',
 ] as const;
 
 /** The studio's legal name — the last-resort fallback when presence_identity
@@ -61,6 +61,11 @@ export function buildPlaceholderValues(input: PlaceholderInput): Record<string, 
   // with each other: an odd total ($1,000.01) would otherwise read
   // "$500.01 + $500", which looks like a typo in a document someone signs.
   const withCents = [cents, deposit, balance].some((c) => c % 100 !== 0);
+  // ONE studio identity, offered in two casings. The agreement's letterhead is
+  // set in caps, and a letterhead that says one company while the operative
+  // parties clause says another would name two different legal sellers — so the
+  // caps version is a TOKEN off the same value, never a second hardcoded name.
+  const studio = String(input.studioName || '').trim() || STUDIO_NAME_FALLBACK;
   return {
     client_name: name || 'the client',
     client_company: company || name || 'the client',
@@ -69,7 +74,8 @@ export function buildPlaceholderValues(input: PlaceholderInput): Record<string, 
     deposit_amount: hasValue ? formatMoney(deposit, withCents) : '[50% deposit]',
     balance_amount: hasValue ? formatMoney(balance, withCents) : '[50% balance]',
     today: formatLongDate(input.now || new Date()),
-    studio_name: String(input.studioName || '').trim() || STUDIO_NAME_FALLBACK,
+    studio_name: studio,
+    studio_name_upper: studio.toUpperCase(),
   };
 }
 

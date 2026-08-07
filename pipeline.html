@@ -438,15 +438,20 @@ const bizName=()=>(BIZQ=BIZQ||api('/identity').then(r=>(r.data&&r.data.business_
 // must ALREADY be filled — otherwise a client receives literal {{tokens}} in a
 // document they're being asked to sign. Missing data degrades to a readable
 // bracket ("[project fee]"), never to a misleading $0.
-// One deliberate difference from the server copy: {{today}} is the operator's
-// LOCAL date here (it's the date they're sitting down to send it), where the
-// server formats in UTC.
+// There is NO deliberate difference from the server copy — the two must agree
+// output-for-output, and tests/presence/doc_placeholders_test.mjs §7 EXECUTES
+// this mirror and compares it against buildPlaceholderValues() to keep it that
+// way. {{today}} is formatted in UTC here for exactly that reason: it is the
+// contract's Effective date, and the same deal drafted from the empty form
+// (this code) versus from a saved template (the server) must not carry two
+// different dates because the operator happened to be west of Greenwich.
 const docMoney=(cents,forceCents)=>{const v=cents/100;return '$'+v.toLocaleString('en-US',(!forceCents&&Number.isInteger(v))?{minimumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
 function docPlaceholderValues(d,c,biz,now){
   const name=((c&&c.name)||'').trim(), company=((c&&c.company)||'').trim();
   const cents=Math.trunc(Number(d&&d.expected_value_cents))||0, has=cents>0;
   const dep=Math.round(cents/2), bal=cents-dep;
   const wc=[cents,dep,bal].some(x=>x%100!==0);   // the trio agrees on precision
+  const studio=String(biz||'').trim()||'Davis Digital Studio';   // ONE identity, two casings
   return {
     client_name:name||'the client',
     client_company:company||name||'the client',
@@ -454,8 +459,9 @@ function docPlaceholderValues(d,c,biz,now){
     deal_value:has?docMoney(cents,wc):'[project fee]',
     deposit_amount:has?docMoney(dep,wc):'[50% deposit]',
     balance_amount:has?docMoney(bal,wc):'[50% balance]',
-    today:(now||new Date()).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),
-    studio_name:String(biz||'').trim()||'Davis Digital Studio',
+    today:(now||new Date()).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}),
+    studio_name:studio,
+    studio_name_upper:studio.toUpperCase(),
   };
 }
 const fillDocPlaceholders=(text,vals)=>{let out=String(text==null?'':text);for(const k of Object.keys(vals)){out=out.replace(new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}','g'),()=>vals[k]);}return out;};
@@ -467,7 +473,7 @@ const fillDocPlaceholders=(text,vals)=>{let out=String(text==null?'':text);for(c
 // render an escaped body under `pre-wrap`, and sign.html is bound to
 // content_hash integrity, so ALL formatting lives in this text and nowhere else.
 // Every word stays editable in the form before anything is saved or sent.
-const DDS_CONTRACT_TEMPLATE=`DAVIS DIGITAL STUDIO
+const DDS_CONTRACT_TEMPLATE=`{{studio_name_upper}}
 Project Agreement & Scope of Work
 
 PROJECT SUMMARY
@@ -502,7 +508,7 @@ Copywriting beyond standard page content, e-commerce, or custom integrations
 
 PROJECT AGREEMENT
 
-This Project Agreement ("Agreement") is entered into between Davis Digital Studio ("Studio") and the client identified in the project portal ("Client") (individually and collectively referred to as “Party” or “Parties”). By signing this Agreement in the client portal, Client agrees to be bound by its terms.
+This Project Agreement ("Agreement") is entered into between {{studio_name}} ("Studio") and the client identified in the project portal ("Client") (individually and collectively referred to as “Party” or “Parties”). By signing this Agreement in the client portal, Client agrees to be bound by its terms.
 
 1. SCOPE OF WORK
 
@@ -590,66 +596,8 @@ ACKNOWLEDGMENT
 IN WITNESS WHEREOF, the parties have signed this Agreement as of the date set forth below:
 
 ________________________________               ________________________________
-Eric Davis, Davis Digital Studio                                         [Client Name / Title]
+{{studio_name}}                                         [Client Name / Title]
 Date: ____________                                         Date: ____________`;
-
-// The DEFAULT starter agreement — a calm, plain-language first draft for an
-// owner with no saved templates yet. Saved templates stay the power path; this
-// only ever fills an EMPTY form, and every word is editable before sending.
-function starterAgreement(d,c,accepted,biz){
-  const STUDIO=biz||'Davis Digital Studio LLC';
-  const client=(c&&(c.company||c.name))||d.title||'[Client name]';
-  const work=accepted
-    ? `${d.title||'The project'} — the work set out in the proposal you accepted${accepted.title&&accepted.title!=='Proposal'?' (“'+accepted.title+'”)':''}. The specific deliverables, pages, and features are those described in that accepted proposal, which forms part of this agreement.`
-    : '[Describe the work — the specific website, pages, features, and services included. Anything not listed here is a separate project.]';
-  const total=accepted?money0(propTotals(accepted.line_items).total):'[total price]';
-  const invest=accepted
-    ? `The total investment for this project is ${total}, matching the proposal you accepted.`
-    : `The total investment for this project is ${total}.`;
-  const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  return `SERVICE AGREEMENT
-
-This agreement is between ${STUDIO} (“the Studio,” “I,” or “me”) and ${client} (“you” or “the Client”), dated ${today}. It’s written in plain language on purpose — it says what we’ve both agreed in words we can each read and understand. Please read it, edit anything that needs adjusting, and sign at the bottom. Signing means you agree to these terms.
-
-1. What I’ll do
-${work}
-
-2. Investment and payment
-${invest}
-Payment schedule: a deposit of [deposit amount, e.g. 50%] is due to reserve your spot and begin work. The remaining balance is invoiced [as milestones are reached / on completion — choose one]. Invoices are due within [7] days of being sent. Work may pause on any invoice more than [14] days past due, and a late fee of [1.5%] per month may apply to overdue balances. All payments are made through the secure payment links I send; I never store your card details.
-
-3. Timeline
-I’ll begin work once this agreement is signed and the deposit is received. I’ll aim to complete the project by [target date], assuming I receive what I need from you on time. Dates are good-faith estimates, not guarantees — if something needs to move, we’ll tell each other early and adjust together.
-
-4. What I need from you
-To keep things on track, I’ll need: your content (text, photos, logos, and any logins) when I ask for it; honest, consolidated feedback within [3–5] business days of each review; and one point of contact who can give final approvals on your behalf. If these run late, the timeline moves with them, and I’m not responsible for delays caused by waiting on you.
-
-5. Revisions and changes
-Reasonable revisions to the work described above are included as we go. A “change” — new pages, new features, added scope, or a change in direction after approval — is welcome, but it’s new work: I’ll quote it in writing and we’ll both agree before I start. This keeps your budget predictable and surprise-free.
-
-6. Ownership and your content
-When your final payment clears, the finished, delivered work is yours to use. Until then, all work remains my property. Your own content — your words, images, brand, and customer information — is always yours, and you can export and take it with you at any time. Any third-party materials (fonts, stock images, plugins, hosting) remain under their own licenses, and any recurring fees for them are your responsibility. I may show the finished work in my portfolio and mention that I built it, unless you ask me in writing not to.
-
-7. Hosting, maintenance, and after launch
-This agreement covers building and delivering the project above. Ongoing hosting, updates, monitoring, and support are provided under a separate plan or retainer — ask me and I’ll explain the options. Once the project is delivered and paid for, this agreement is complete unless we’ve agreed to continued care in writing.
-
-8. If something goes wrong (the honest limits)
-I put real care into this work, but I can’t promise specific business results (sales, rankings, traffic). I provide the work “as delivered.” To the fullest extent the law allows, my total responsibility to you for any claim is limited to the amount you’ve paid me for this project, and I’m not liable for indirect or consequential losses. You’re responsible for the legality and accuracy of the content and materials you provide me.
-
-9. Ending the agreement
-Either of us can end this agreement with written notice. If you end it, you pay for all work completed up to that point, any non-refundable deposits stand, and you keep everything you’ve paid for. I may end it if invoices go unpaid or if I’m unable to get what I need to continue.
-
-10. The basics
-I work as an independent contractor, not an employee. This agreement, plus any accepted proposal, is the whole agreement between us and replaces any earlier conversations. It’s governed by the laws of the State of California. If any part of it can’t be enforced, the rest still stands. Changes to this agreement need to be in writing and agreed by both of us.
-
-By signing below, you agree to the terms above.
-
-
-Signed for the Client — ${client}
-
-
-Signed for the Studio — ${STUDIO}`;
-}
 
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
@@ -1091,7 +1039,15 @@ async function openManageServices(){
   const starter=!list.length;
   if(starter)list=DDS_STARTER_SERVICES.slice();
   host.innerHTML=(starter?'<div class="mut" id="svcStarterNote" style="margin-bottom:4px">Starting points from your pricing page — edit or delete any, then Save.</div>':'')+list.map(svcRowHtml).join('');
-  setTimeout(()=>{const f=host.querySelector('.svc-name');if(f)f.focus();},20);
+  // Focus ONLY a genuinely blank first row. The editor now opens pre-filled (the
+  // studio's saved catalog, or their published prices), so an operator has every
+  // reason to click a PRICE straight away — and a focus() landing a beat after
+  // the paint would redirect their first keystrokes into the name field
+  // ("1750Website — Template build"). Same hazard the board's move-menu reasons
+  // about above: never issue a late focus over something the user may already
+  // have aimed at. No timeout at all — the dialog is already open, so a blank
+  // row can take the caret synchronously.
+  const first=host.querySelector('.svc-name'); if(first&&!first.value)first.focus();
 }
 $('svcRows').addEventListener('click',(e)=>{const del=e.target.closest('.svc-del');if(!del)return;del.closest('.svc-row').remove();if(!$('svcRows').querySelector('.svc-row'))$('svcRows').insertAdjacentHTML('beforeend',svcRowHtml());});
 $('svcAdd').onclick=()=>{$('svcRows').insertAdjacentHTML('beforeend',svcRowHtml());const names=$('svcRows').querySelectorAll('.svc-name');names[names.length-1].focus();};
@@ -1482,7 +1438,6 @@ async function openDeal(id){
       //      already ran inside miniForm, so a non-empty body ends this here)
       //   2. his newest SAVED agreement template, if he has one
       //   3. the studio's standard agreement (DDS_CONTRACT_TEMPLATE)
-      //   4. starterAgreement() — the last-resort plain draft
       // Each step re-checks !bodyEl.value, so a slow fetch can never paint over
       // something he started typing. Placeholders are filled HERE because this
       // body is posted verbatim (the server fills them only on the
@@ -1491,7 +1446,6 @@ async function openDeal(id){
       if(bodyEl&&!bodyEl.value){
         const who=((c&&c.name)||d.title||'').trim();
         if(titleEl&&!titleEl.value)titleEl.value=who?('Service agreement — '+who):'Service agreement';
-        const accepted=(data.proposals||[]).find(p=>p.status==='accepted');
         bodyEl.style.minHeight='260px'; // a full-page agreement — let it breathe
         (async()=>{
           const biz=await bizName().catch(()=>'');
@@ -1503,7 +1457,7 @@ async function openDeal(id){
             }catch(e){/* fall through to the standard agreement */}
           }
           if(bodyEl.value)return;
-          bodyEl.value=DDS_CONTRACT_TEMPLATE?fillDocPlaceholders(DDS_CONTRACT_TEMPLATE,vals):starterAgreement(d,c,accepted,biz);   // 3, else 4
+          bodyEl.value=fillDocPlaceholders(DDS_CONTRACT_TEMPLATE,vals);   // 3
         })();
       }
     };
