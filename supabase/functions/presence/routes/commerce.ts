@@ -503,7 +503,29 @@ export async function handleCommerce(req: Request, route: string, method: string
     const days = coolingOffDays();
     const reqd = await requestDeletion(site.client_id, site.id, 'customer');
     const name = await businessNameFor(site.client_id);
-    await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'deletion_requested', period: 'once',
+    // ── PERIOD = THIS REQUEST, not 'once' ────────────────────────────────────
+    // The notice model dedupes on (client_id, kind, period) with
+    // `resolution=ignore-duplicates`, and the cancel path below DISMISSES the row
+    // rather than deleting it. With a literal 'once' the dismissed row kept the
+    // key forever, so every LATER deletion request returned created=false: no
+    // notice, no bell, no Today row, no push — silently. That is the worst
+    // possible flow to lose, and `deletion_requested` is in
+    // NOTICE_PROTECTED_KINDS precisely because it must never go unseen.
+    //
+    // The dedupe scope is therefore the open request's own row id — exactly what
+    // lib/notice.ts documents `period` to be ("a stable event id"). 'once' was
+    // only ever correct if an account could be deleted once ever; cancel exists
+    // because it cannot. This keeps every property that mattered:
+    //   · an idempotent re-click resolves to the SAME open request → the SAME
+    //     period → still one row, still no second push or email;
+    //   · a CANCELLED request's notice stays dismissed under its OWN period and
+    //     can never be resurrected — a re-raise mints a different key;
+    //   · nothing is hard-deleted, so the dismissed rows remain the history of
+    //     what was asked and withdrawn.
+    // `id` is null only if the insert itself failed (in which case there is no
+    // request to announce); fall back to the old key rather than raise under an
+    // empty period.
+    await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'deletion_requested', period: reqd.id ? `del:${reqd.id}` : 'once',
       headline: 'Your deletion request is recorded',
       body: `Your account and data will be deleted after ${days} days. Until then you can still download everything you own — or cancel this request.` });
     // Email the confirmation ONCE — only when this POST actually created a new
@@ -524,6 +546,11 @@ export async function handleCommerce(req: Request, route: string, method: string
     const site = jwt ? await resolveSite(jwt) : null;
     if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
     const done = await cancelDeletion(site.client_id);
+    // Dismiss EVERY active deletion notice for this client, whatever its period —
+    // the period is now per-request, and this is the one teardown the protected
+    // kind has (lib/inbox_feed.ts). Dismiss, never delete: the row is the record
+    // that a request was raised and withdrawn, and the next request raises its
+    // own row under its own key rather than reviving this one.
     if (done) await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.deletion_requested&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
     return json({ data: { ok: true, canceled: done, message: done ? 'Your deletion request was canceled — your account stays active.' : 'There was no pending deletion request.' } }, 200, cors);
   }

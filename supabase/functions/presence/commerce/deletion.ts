@@ -18,16 +18,23 @@ export function coolingOffDays(): number { const n = Number(Deno.env.get('ACCOUN
 
 /** Record (or refresh) a deletion request — idempotent per client. `created` is
  *  true only when a NEW open request was inserted, so the caller can send the
- *  confirmation email once rather than on every (idempotent) re-request. */
-export async function requestDeletion(clientId: string, siteId: string, requestedBy: string): Promise<{ ok: boolean; scheduled_for: string; created: boolean }> {
+ *  confirmation email once rather than on every (idempotent) re-request.
+ *
+ *  `id` is the OPEN request's row id — the newly inserted one, or the existing
+ *  one an idempotent re-click resolved to. It is the stable identity of THIS
+ *  request, and routes/commerce.ts uses it as the deletion notice's dedupe
+ *  `period` so a second request (after a cancel) raises a genuinely new notice
+ *  instead of colliding with the first one's row forever. */
+export async function requestDeletion(clientId: string, siteId: string, requestedBy: string): Promise<{ ok: boolean; scheduled_for: string; created: boolean; id: string | null }> {
   const scheduled = new Date(Date.now() + coolingOffDays() * 86400_000).toISOString();
   // reactivate a canceled one or create fresh; never duplicate an open request
   const open = rows(await svc(`presence_account_deletions?client_id=eq.${enc(clientId)}&status=in.(pending,executing)&select=id,scheduled_for&limit=1`))[0];
-  if (open) return { ok: true, scheduled_for: open.scheduled_for, created: false };
+  if (open) return { ok: true, scheduled_for: open.scheduled_for, created: false, id: open.id ? String(open.id) : null };
   const ins = await svc('presence_account_deletions', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ client_id: clientId, site_id: siteId, requested_by: requestedBy, requested_at: nowIso(), scheduled_for: scheduled, status: 'pending' }) });
   await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, { method: 'PATCH', body: JSON.stringify({ deletion_requested_at: nowIso() }) }).catch(() => {}); // compat
-  return { ok: !!rows(ins)[0], scheduled_for: rows(ins)[0]?.scheduled_for || scheduled, created: !!rows(ins)[0] };
+  const row = rows(ins)[0];
+  return { ok: !!row, scheduled_for: row?.scheduled_for || scheduled, created: !!row, id: row?.id ? String(row.id) : null };
 }
 
 /** Cancel a pending deletion during the cooling-off window. */

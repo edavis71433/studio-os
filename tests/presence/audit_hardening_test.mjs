@@ -28,7 +28,7 @@ ok('reconcile: driftsFrom compares grace PRESENCE (clears a stale anchor on reco
 
 // ── deletion executor: stop billing BEFORE revoking access ──
 ok('deletion: cancels Stripe BEFORE flipping entitlement to deleted', deletion.indexOf('cancelSubscription(ent.stripe_subscription_id)') < deletion.indexOf("body: JSON.stringify({ status: 'deleted' })"));
-ok('deletion: request reports created so the confirmation email sends once', /created: boolean/.test(deletion) && /created: !!rows\(ins\)\[0\]/.test(deletion) && /if \(reqd\.created\)/.test(commerce));
+ok('deletion: request reports created so the confirmation email sends once', /created: boolean/.test(deletion) && /created: !!row,/.test(deletion) && /if \(reqd\.created\)/.test(commerce));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E POST-AUDIT HARDENING (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
