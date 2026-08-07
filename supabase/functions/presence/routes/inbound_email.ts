@@ -470,9 +470,13 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     if (!ins.ok) return json({ error: 'write_failed' }, 502);   // landable + infra failure → Resend retries
     if (ins.duplicate) return dropAck('duplicate_message', from_email);
     // L1: bump the request's updated_at — the studio bell/feed windows are updated_at-
-    // keyed and a bare message INSERT never bumps it. Best-effort PATCH. FOLLOW-UP:
-    // the portal reply path (client_delivery handleClientSupportMessage) shares this
-    // exact gap and should adopt the same bump.
+    // keyed and a bare message INSERT never bumps it. Best-effort PATCH.
+    // The studio's own reply door (service_intake handleSupportMessage) now does
+    // the same. FOLLOW-UP, still open: the PORTAL reply path (client_delivery
+    // handleClientSupportMessage) shares this exact gap and should adopt the same
+    // bump — it is pinned as a known gap in
+    // tests/presence/support_thread_freshness_test.mjs, which fails loudly when
+    // the gap closes so the pin gets flipped rather than forgotten.
     await svc(`presence_support_requests?id=eq.${target.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
     // project-linked → feed the ONE activity log (detail.from='client' audience invariant)
     if (target.project_id) {

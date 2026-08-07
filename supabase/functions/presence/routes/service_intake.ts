@@ -266,6 +266,15 @@ export async function handleSupportMessage(req: Request, jwt: string, site: Site
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
   // a studio reply on an open request bumps it to in_progress (best-effort, guarded)
   if (studio && reqRow.status === 'open') await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}&status=eq.open`, { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) }).catch(() => {});
+  // L1 (same fix as routes/inbound_email.ts): bump the request's updated_at. A
+  // bare INSERT into presence_support_messages never touches the parent row, but
+  // updated_at is what the studio bell, the Inbox feed and this route's own
+  // `order=updated_at.desc` sort by — so without this a thread that JUST moved
+  // sinks below stale ones. Unconditional: the status PATCH above bumps it only
+  // for a studio reply on an `open` request, which leaves every reply on an
+  // in_progress thread (and every CLIENT reply through this door) unfreshened.
+  // Best-effort — a reply must never fail over its own ordering hint.
+  await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
   if (reqRow.project_id) await projectEvent(site.id, reqRow.project_id, 'support_message', principal, true, { request_id: id });
   // I2: notify an email-native requester that the studio replied (best-effort, throttled).
   if (studio) emailStudioSupportReply(site, reqRow, body, String(rows(ins)[0].id)).catch(() => {});
