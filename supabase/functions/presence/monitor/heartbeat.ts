@@ -171,9 +171,13 @@ async function onConfirmedDown(site: HeartbeatSite & { client_id: string }, url:
     const brand = await loadEmailBrand(site.id).catch(() => undefined);
     await sendEmail(email, DOWN_HEADLINE, `<p>${DOWN_BODY}</p>`, brand, { critical: true }).catch(() => {});
   }
-  // operator heads-up too — a customer outage is worth an ops eye
+  // operator heads-up too — a customer outage is worth an ops eye. critical:true
+  // for the same reason the customer's copy above carries it: this is
+  // OPERATIONAL mail to the platform operator about his own platform, and a
+  // marketing opt-out must not be able to silence "a site is down". (A
+  // bounce/complaint still suppresses it — account.ts:112-116.)
   const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-  if (ops) sendEmail(ops, `[Studio OS ops] Site down: ${url}`, `<p>${url} failed ${DOWN_THRESHOLD} consecutive uptime probes. The owner has been notified; we clear it automatically on recovery.</p>`).catch(() => {});
+  if (ops) sendEmail(ops, `[Studio OS ops] Site down: ${url}`, `<p>${url} failed ${DOWN_THRESHOLD} consecutive uptime probes. The owner has been notified; we clear it automatically on recovery.</p>`, undefined, { critical: true }).catch(() => {});
 }
 
 // Recovery → clear the down notice (idempotent) + one calm "back online" email.

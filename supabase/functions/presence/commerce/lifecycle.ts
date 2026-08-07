@@ -292,7 +292,12 @@ export async function runWeeklyDigest(): Promise<{ sent: number; skipped_no_emai
 <li><strong>${n(leads)}</strong> lead${n(leads) === 1 ? '' : 's'} waiting more than 2 days for a reply</li>
 <li><strong>${n(fails)}</strong> failed publish${n(fails) === 1 ? '' : 'es'} this week</li>
 </ul>${numbersHtml}<p style="margin-top:22px">Details live in Stripe, the leads inbox, and /system/health. The watchdog emails you separately if production ever goes dark.</p>`;
-  const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html);
+  // critical:true — `to` IS OPS_ALERT_EMAIL: this is the OPERATOR's own weekly
+  // operational digest of his own platform (failed publishes, payment trouble,
+  // leads going stale), not marketing. Without the flag one unsubscribe click
+  // silently ends the Monday routine forever, and `sent` would keep reading 1.
+  // Bounces/complaints still suppress it (account.ts:112-116).
+  const ok = await sendEmail(to, '[Studio OS] Your week in one glance', html, undefined, { critical: true });
   await svc('presence_ops_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ last_digest_at: new Date().toISOString() }) });
   // a failed weekly send IS tick-worthy (failures>0 → sweepIssues flags it)
   return ok ? { sent: 1 } : { sent: 0, failures: 1 };
@@ -359,8 +364,10 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
             `<p><strong>${site.custom_domain}</strong> ${when}${info?.registrar ? ` at <strong>${info.registrar}</strong>` : ''}.</p><p>Renewing at your registrar (auto-renew is the calm option) keeps your website and email answering. Nothing is needed on our side — this is just the reminder registrars are quiet about.</p>`, brand);
         }
         if (soon) {
+          // OPERATIONAL, to the platform operator (critical:true — an opt-out
+          // must not silence it; a bounce/complaint still does).
           const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-          if (ops) sendEmail(ops, `[Studio OS ops] Domain ${when}: ${site.custom_domain}`, `<p>Customer domain ${site.custom_domain} ${when}. They have been notified.</p>`).catch(() => {});
+          if (ops) sendEmail(ops, `[Studio OS ops] Domain ${when}: ${site.custom_domain}`, `<p>Customer domain ${site.custom_domain} ${when}. They have been notified.</p>`, undefined, { critical: true }).catch(() => {});
         }
       }
     }
@@ -977,8 +984,10 @@ export async function runApexDriftWatch(limit = 10): Promise<{ checked: number; 
           sendEmail(cl.json[0].email, `Action needed: ${site.custom_domain} isn’t pointing at your site`,
             `<p><strong>${site.custom_domain}</strong> isn’t pointing at your website right now.</p><p>${res.reason}</p><p>The platform can prepare the exact DNS record to fix it — the preferred setup (an ALIAS/CNAME-flattening record where your host supports it) follows your site automatically and never needs updating.</p>`, brand, { critical: true }).catch(() => {});
         }
+        // OPERATIONAL, to the platform operator (critical:true — same reason the
+        // customer's copy above carries it: the domain is actively broken).
         const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-        if (ops) sendEmail(ops, `[Studio OS ops] Apex drift: ${site.custom_domain}`, `<p>${site.custom_domain}: ${res.reason} (expected ${target || NETLIFY_APEX_IP}; observed A=[${res.aRecords.join(', ')}] CNAME=[${res.cnames.join(', ')}]). Customer notified.</p>`).catch(() => {});
+        if (ops) sendEmail(ops, `[Studio OS ops] Apex drift: ${site.custom_domain}`, `<p>${site.custom_domain}: ${res.reason} (expected ${target || NETLIFY_APEX_IP}; observed A=[${res.aRecords.join(', ')}] CNAME=[${res.cnames.join(', ')}]). Customer notified.</p>`, undefined, { critical: true }).catch(() => {});
       }
     } else if (res.ok) {
       await clearNotice(site.client_id, 'apex_drift');   // recovered — the bell tells the truth

@@ -293,9 +293,15 @@ export async function retryFailedRuns(limit = 20): Promise<CycleResult> {
 }
 
 // Operator alert — best-effort email; the failure is always in the ledger too.
+// critical:true — this is OPERATIONAL mail to the platform operator about his
+// own platform, not marketing. maySend suppresses non-critical mail for an
+// opted-out address silently, so a single unsubscribe click would otherwise kill
+// "your scheduled jobs are failing" with no signal anywhere. It still respects a
+// bounce/complaint (account.ts:112-116) — a dead address stays dead.
 async function alertFailures(runType: string, failures: number, total: number, failed: SiteRunResult[]): Promise<void> {
   const lines = failed.slice(0, 20).map((f) => `• ${f.site_id}: ${f.error || Object.entries(f.steps).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'failed'}`).join('<br>');
   await sendEmail(OPS_ALERT_EMAIL, `Studio OS — ${failures}/${total} scheduled ${runType} runs failed`,
     `<p>The scheduled ${runType} had ${failures} failure(s) of ${total}. They're recorded in presence_scheduled_runs and eligible for automatic retry.</p><p>${lines}</p>`,
+    undefined, { critical: true },
   ).catch(() => {});
 }

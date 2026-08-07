@@ -123,8 +123,12 @@ export async function runDeletionSweep(limit = 25): Promise<{ due: number; compl
     if (res.ok) {
       await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'completed', executed_at: nowIso(), error: '' }) });
       completed++;
+      // OPERATIONAL, to the platform operator: an executed deletion is
+      // irreversible and the follow-on deep purge is a MANUAL step, so this is
+      // the one notice that must never be lost to a marketing opt-out
+      // (critical:true; a bounce/complaint still suppresses it).
       const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-      if (ops) sendEmail(ops, `[Studio OS ops] Account deletion completed: ${d.client_id}`, `<p>Deletion executed for client ${d.client_id}. Financial records retained for tax/audit. Deep purge (if required) is a manual operator step.</p>`).catch(() => {});
+      if (ops) sendEmail(ops, `[Studio OS ops] Account deletion completed: ${d.client_id}`, `<p>Deletion executed for client ${d.client_id}. Financial records retained for tax/audit. Deep purge (if required) is a manual operator step.</p>`, undefined, { critical: true }).catch(() => {});
     } else {
       // failed → back to pending for retry, record the reason (operator-visible)
       await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'pending', error: res.error || 'unknown' }) });
