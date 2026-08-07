@@ -369,7 +369,7 @@ const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).incl
 // sync with crm.html by hand, like the stage maps above).
 const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
-const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project'};
+const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed'};
 function evtLabel(e){
   const d=(e&&e.detail)||{};
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
@@ -1125,13 +1125,18 @@ async function openDeal(id){
       const canRevise=!superseded&&(p.status==='sent'||p.status==='declined');
       const act=superseded?'':p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
       const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
+      // A draft was never sent to anyone, so a mistaken one (the duplicate you
+      // meant to overwrite) can simply go. The moment it IS sent it becomes part
+      // of the record and this control disappears — the SAME condition DELETE
+      // /sales/proposals/:id enforces, so the page never offers a refused action.
+      const del=p.status==='draft'?`<button class="btn ghost" data-del-prop="${p.id}" title="Remove this draft — it was never sent, so nothing the client saw changes" aria-label="Delete draft proposal ${esc(p.title||'Proposal')}">Delete</button>`:'';
       // viewed-tracking + expiry (#205): tell the operator whether the prospect opened
       // it and when it lapses. first_viewed_at/expires_at are null before migration 0107.
       const vbits=[];
       if(p.first_viewed_at)vbits.push('👁 Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
       if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?'⏳ Expired':'Expires '+exp.toLocaleDateString());}
       const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
-      return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button></span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
+      return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{
@@ -1140,9 +1145,12 @@ async function openDeal(id){
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
       const act=k.status==='draft'?`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `:k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
+      // Same rule as the proposal, and it matters more here: sent means someone
+      // holds a signing link, and a signature is permanent. Draft only.
+      const del=k.status==='draft'?`<button class="btn ghost" data-del-con="${k.id}" title="Remove this draft — it was never sent for signature" aria-label="Delete draft agreement ${esc(k.title||'Agreement')}">Delete</button>`:'';
       const termEnd=(k.terms_snapshot&&k.terms_snapshot.term_end)||'';
       const renewRow=signed?`<div class="row2" style="margin-top:6px;align-items:center"><label class="mut" for="con-term-${k.id}" style="margin:0">Renewal date (optional)</label><input type="date" id="con-term-${k.id}" value="${esc(termEnd)}" style="max-width:170px"><button class="btn ghost" data-set-term="${k.id}">Save</button></div><div class="mut" style="font-size:12px;margin-top:2px">We’ll remind you ~30 and ~7 days before it ends — nothing auto-renews.</div>`:'';
-      return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button></span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
+      return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
@@ -1509,6 +1517,11 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-tpl-con]').forEach(b=>b.onclick=()=>miniForm($('conForm'),[{name:'name',label:'Template name',placeholder:'e.g. Standard service agreement'}],async(v)=>{if(!v.name){toast('Give the template a name.',true);return;}await api('/sales/templates','POST',{kind:'contract',name:v.name,from_contract_id:b.dataset.tplCon});toast('Saved — it’ll appear on every deal.');openDeal(id);}));
     // a saved template can be retired right where it's offered (deals already drafted from it are untouched)
     $('detailInner').querySelectorAll('[data-del-tpl]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this saved template? Proposals and agreements already drafted from it are untouched.'))return;b.disabled=true;try{await api('/sales/templates/'+b.dataset.delTpl,'DELETE');toast('Template removed');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // A mistaken DRAFT can be taken off the deal — only ever a draft (these
+    // controls don't render on anything sent or signed, and the server refuses
+    // it anyway). Confirm first, like every other destructive action here.
+    $('detailInner').querySelectorAll('[data-del-prop]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this draft proposal? It was never sent, so nothing the client saw changes.'))return;b.disabled=true;try{await api('/sales/proposals/'+b.dataset.delProp,'DELETE');toast('Draft removed');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-del-con]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this draft agreement? It was never sent for signature.'))return;b.disabled=true;try{await api('/sales/contracts/'+b.dataset.delCon,'DELETE');toast('Draft removed');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // ONE sender for both kinds; understands the server's honesty guard: if an
     // OPEN invoice exists at a different amount, offer "resend that one" or
     // "send another" (force) — never a silent surprise.

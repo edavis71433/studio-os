@@ -1006,3 +1006,95 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
     expect(text).not.toMatch(/\$0(?!\d)/);                                      // never a made-up price
   });
 });
+
+// ── Removing an unsent draft (Eric's duplicate $3,200 proposal) ─────────────
+// Two drafts of the same proposal landed on one deal and there was no way to
+// take either off. The rule is the server's: only a never-sent DRAFT goes, and
+// it goes softly. The deal page must offer Delete on exactly those rows — a
+// sent proposal or a signed agreement is a record and shows no control at all,
+// so the page can never ask for something the API would refuse.
+const DEAL4 = '44444444-4444-4444-8444-444444444444';
+const DRAFTS = { data: {
+  deal: { id: DEAL4, title: 'Bacchus', stage: 'proposal', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [
+    { id: 'p-dup', title: 'Website build', status: 'draft', version: 1, line_items: [{ label: 'Build', qty: 1, unit_cents: 320000 }], first_viewed_at: null, expires_at: null },
+    { id: 'p-sent', title: 'Website build', status: 'sent', version: 1, line_items: [{ label: 'Build', qty: 1, unit_cents: 320000 }], first_viewed_at: null, expires_at: null },
+  ],
+  contracts: [
+    { id: 'k-draft', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null },
+    { id: 'k-signed', title: 'Service agreement', status: 'signed', signer_name: 'Sam Rivera', signed_at: past(2), version: 1, terms_snapshot: null },
+  ],
+  events: [], timeline: [], invoices: [], last_contacted_at: null,
+} };
+const DRAFT_API = { ...API, [`/sales/deals/${DEAL4}`]: DRAFTS, [`/sales/deals/${DEAL4}/tasks`]: { data: [] } };
+
+const rowFor = (page: import('@playwright/test').Page, sel: string) => page.locator(`#detailInner .lr:has(${sel})`);
+
+test.describe('deal page — remove an unsent draft', () => {
+  test('a DRAFT proposal offers Delete and removes on confirm; a SENT one offers nothing', async ({ page }) => {
+    const calls: Array<{ path: string; method: string }> = [];
+    await installApp(page, { api: DRAFT_API });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (route.request().method() === 'GET') return route.fallback();
+      calls.push({ path, method: route.request().method() });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+
+    // the draft row carries a Delete; the sent row carries none
+    await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();
+    await expect(page.locator('[data-del-prop="p-sent"]')).toHaveCount(0);
+    // …and the sent row's own controls are still there, so this is a targeted absence
+    await expect(page.locator('[data-link-proposal="p-sent"]')).toBeVisible();
+    await expect(rowFor(page, '[data-link-proposal="p-sent"]')).not.toContainText('Delete');
+
+    // destructive → confirm first; dismissing does nothing at all
+    page.once('dialog', (d) => d.dismiss());
+    await page.locator('[data-del-prop="p-dup"]').click();
+    expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
+
+    // accepting sends the DELETE, then re-renders the deal and says so plainly
+    page.once('dialog', (d) => d.accept());
+    await page.locator('[data-del-prop="p-dup"]').click();
+    await expect(page.locator('.dds-toast')).toContainText('Draft removed');
+    expect(calls).toContainEqual({ path: '/sales/proposals/p-dup', method: 'DELETE' });
+  });
+
+  test('a DRAFT agreement offers Delete; a SIGNED one never does', async ({ page }) => {
+    const calls: Array<{ path: string; method: string }> = [];
+    await installApp(page, { api: DRAFT_API });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (route.request().method() === 'GET') return route.fallback();
+      calls.push({ path, method: route.request().method() });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+
+    await expect(page.locator('[data-del-con="k-draft"]')).toBeVisible();
+    await expect(page.locator('[data-del-con="k-signed"]')).toHaveCount(0);
+    // the signed row still shows its evidence — nothing about it became removable
+    await expect(rowFor(page, '[data-doc-con="k-signed"]')).toContainText('Signed');
+    await expect(rowFor(page, '[data-doc-con="k-signed"]')).not.toContainText('Delete');
+
+    page.once('dialog', (d) => d.accept());
+    await page.locator('[data-del-con="k-draft"]').click();
+    await expect(page.locator('.dds-toast')).toContainText('Draft removed');
+    expect(calls).toContainEqual({ path: '/sales/contracts/k-draft', method: 'DELETE' });
+  });
+
+  test('a server refusal is surfaced honestly, and the row stays', async ({ page }) => {
+    await installApp(page, { api: DRAFT_API });
+    await page.route('**/functions/v1/presence/sales/proposals/**', async (route) => {
+      if (route.request().method() !== 'DELETE') return route.fallback();
+      return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    page.once('dialog', (d) => d.accept());
+    await page.locator('[data-del-prop="p-dup"]').click();
+    await expect(page.locator('.dds-toast')).toContainText('already sent');
+    await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();        // still there to try again
+  });
+});

@@ -1147,6 +1147,32 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   return json({ data: { status: decision } }, 200, cors);
 }
 
+/** Remove a proposal that was never sent (the mistaken duplicate draft).
+ *
+ *  Only `status='draft'` goes. The moment a proposal is sent it stops being a
+ *  working document and becomes part of the record between the studio and the
+ *  client — sent, accepted and declined all stay, and say so (409). The guard
+ *  lives HERE, not in the deal page: hiding a button would leave the route open.
+ *
+ *  The removal is SOFT — `deleted_at`, the same shape handleSalesTemplateDelete
+ *  uses. Every read already filters `deleted_at=is.null`, so the row leaves the
+ *  deal immediately while staying recoverable in the table. `status=eq.draft`
+ *  rides in the PATCH's WHERE as well as the read, so a send landing between the
+ *  two loses the race rather than quietly deleting a sent proposal. */
+export async function handleSalesProposalDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title&limit=1`);
+  const p = rows(r)[0];
+  if (!p) return json({ error: 'not_found' }, 404, cors);
+  if (p.status !== 'draft') return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&deleted_at=is.null&select=id`,
+    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
+  if (!up.ok || !rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  // The row is hidden, so the deal's history is the only place the removal shows.
+  await dealEvent(site.id, p.deal_id, 'proposal_deleted', principal, { detail: { proposal_id: id, title: String(p.title || '') } });
+  return json({ data: { ok: true, id } }, 200, cors);
+}
+
 // ═══ CONTRACTS ═══
 export async function handleSalesContractCreate(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
@@ -1185,6 +1211,28 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
   await dealEvent(site.id, c.deal_id, 'contract_sent', principal, { detail: { contract_id: id } });
   const emailed = await emailSalesDoc(site.id, c.deal_id, 'contract', link);   // auto-send to the contact
   return json({ data: rows(up)[0], url: link, content_hash: c.content_hash, emailed }, 200, cors);
+}
+
+/** Remove an agreement that was never sent for signature.
+ *
+ *  Same rule as the proposal, and it matters more: `sent` means somebody is
+ *  holding a signing link, `signed` is an executed agreement and `voided` is the
+ *  record of one being withdrawn. None of those may be removed by any path — a
+ *  signature is permanent. Only a `draft` goes, and softly (`deleted_at`), with
+ *  `status=eq.draft` in the PATCH's WHERE so a send that lands mid-flight wins.
+ *  `content_hash` and the signing evidence are never touched. */
+export async function handleSalesContractDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const r = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title&limit=1`);
+  const c = rows(r)[0];
+  if (!c) return json({ error: 'not_found' }, 404, cors);
+  if (c.status === 'signed') return json({ error: 'already_signed', message: 'This agreement is signed — it stays on the record.' }, 409, cors);
+  if (c.status !== 'draft') return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&deleted_at=is.null&select=id`,
+    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
+  if (!up.ok || !rows(up)[0]) return json({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }, 409, cors);
+  await dealEvent(site.id, c.deal_id, 'contract_deleted', principal, { detail: { contract_id: id, title: String(c.title || '') } });
+  return json({ data: { ok: true, id } }, 200, cors);
 }
 
 /** Public (token) contract signing — version-integrity enforced. */

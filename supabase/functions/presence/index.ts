@@ -27,7 +27,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
-import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
@@ -700,6 +700,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalRevise(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesContractSend(req, site, principal, m[1], cors);
+    // Remove a draft that was never sent — the mistaken duplicate. A SOFT delete,
+    // and only ever on status='draft': once something is sent, decided or signed
+    // it is the record between studio and client and the handler refuses (409).
+    // Studio-gated & site-scoped like every authed /sales/* route above.
+    m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleSalesProposalDelete(site, principal, m[1], cors);
+    m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleSalesContractDelete(site, principal, m[1], cors);
     // Mint the printable Document-of-Record URL for the deal drawer (proposal /
     // contract / invoice). Studio-gated & site-scoped like every authed /sales/*.
     m = route.match(/^\/sales\/(proposals|contracts|invoices)\/([0-9a-f-]{36})\/document$/);
