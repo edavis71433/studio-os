@@ -107,13 +107,31 @@ export function fileKind(mime: string | null | undefined): FileKind {
   return 'other';
 }
 /** A customer-friendly name. Prefers the human title they set (metadata.title),
- *  else a cleaned filename from the storage path, else a kind label. Pure. */
-export function displayName(a: Asset): string {
+ *  then the filename the upload actually carried (alt_text), then a cleaned
+ *  filename from the storage path, then an optional caller hint (a deliverable's
+ *  title), and only then a kind label. Pure.
+ *
+ *  Why alt_text is a NAME rung: createUpload names the storage OBJECT
+ *  '<siteId>/<uuid>.<ext>', so the storage-basename rung below is deliberately
+ *  blanked by the uuid strip — which used to leave the kind label as the ONLY
+ *  name an image could ever have ("Photo", "Photo", "Photo"…). But the real
+ *  filename was never lost: every upload door sends it as alt_text (files.html's
+ *  picker defaults alt to the filename; client_delivery sends the client's title).
+ *  Reading it here recovers the names of files already in the library, with no
+ *  migration. The callers now also write a durable metadata.title on upload, so
+ *  the two decouple going forward: editing a photo's description never renames it.
+ *  The literal 'Photo' is skipped on purpose — that is files.html's own fallback
+ *  for a too-short filename, so honouring it would only echo the placeholder back. */
+export function displayName(a: Asset, hint?: string | null): string {
   const title = String((a.metadata as Record<string, unknown> | null | undefined)?.title || '').trim();
   if (title) return title.slice(0, 200);
+  const alt = String(a.alt_text || '').trim();
+  if (alt && alt !== 'Photo') return alt.slice(0, 200);
   const base = (a.storage_path || '').split('/').pop() || '';
   const cleaned = base.replace(/\.[a-z0-9]+$/i, '').replace(/^[0-9a-f-]{20,}$/i, '');
   if (cleaned) return cleaned.slice(0, 200);
+  const h = String(hint || '').trim();
+  if (h) return h.slice(0, 200);
   return fileKind(a.mime) === 'document' ? 'Document' : fileKind(a.mime) === 'image' ? 'Photo' : 'File';
 }
 export function isFavorite(a: Asset): boolean {

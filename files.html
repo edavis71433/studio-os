@@ -931,7 +931,13 @@ async function uploadFiles(files){
     if(!up.ok){fail++;firstErr=firstErr||(up.body&&up.body.message)||'';continue;}
     let put; try{put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});}catch(_){put={ok:false};}
     if(!put.ok){fail++;continue;}
-    if(isDoc)await api('/assets/'+up.body.data.media_id,'PATCH',{name}).catch(()=>{});
+    // Give EVERY upload a durable name, not just PDFs. This used to be `if(isDoc)`
+    // — the reason a studio's photos all read "Photo" while its documents read
+    // fine: only the PDF branch ever wrote metadata.title, so an image's only
+    // name was its alt text (and 'Photo' when the filename was too short to use).
+    // Writing the title here decouples NAME from DESCRIPTION for good: refining a
+    // photo's alt text in the detail panel can never rename the file again.
+    if(name.trim())await api('/assets/'+up.body.data.media_id,'PATCH',{name}).catch(()=>{});
     ok++;
   }
   toast(fail

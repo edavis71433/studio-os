@@ -336,6 +336,28 @@ test.describe('Files (the DAM, customer-facing)', () => {
     expect(uploadCalls).toBe(2);
   });
 
+  // The "eight rows all called Photo" bug: only the PDF branch ever wrote a
+  // durable metadata.title, so an image's name was whatever alt text happened to
+  // hold. Every upload now gets the title — images included.
+  test('every upload gets a durable name — an IMAGE is PATCHed with its filename, not only PDFs', async ({ page }) => {
+    await installApp(page, { api: filesApi });
+    const named: Array<{ id: string; name: string }> = [];
+    const MID = '11111111-1111-4111-8111-111111111111';
+    await page.route(/\/functions\/v1\/presence\/media\/upload-url/, (route) =>
+      route.fulfill(ok({ data: { media_id: MID, upload_url: 'http://127.0.0.1:4173/__e2e_put__', storage_path: 'presence-media/x.png' } })));
+    await page.route(/__e2e_put__/, (route) => route.fulfill({ status: 200, body: '' }));
+    await page.route(new RegExp('/functions/v1/presence/assets/' + MID + '$'), (route) => {
+      const b = JSON.parse(route.request().postData() || '{}');
+      if (route.request().method() === 'PATCH') named.push({ id: MID, name: b.name });
+      return route.fulfill(ok({ data: { ok: true } }));
+    });
+    await page.goto('/files.html');
+    await expect(page.locator('#root')).toContainText('Logo');
+    await page.setInputFiles('#picker', [{ name: 'storefront-at-dusk.png', mimeType: 'image/png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) }]);
+    await expect(page.locator('.dds-toast')).toContainText('Uploaded 1 file');
+    expect(named).toEqual([{ id: MID, name: 'storefront-at-dusk' }]);
+  });
+
   test('a read that removes a selected row PRUNES the selection — bulk never acts on hidden rows', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });

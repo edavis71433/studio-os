@@ -122,9 +122,14 @@ export async function handleClientUploadUrl(req: Request, site: SiteRow, princip
   // convention as lib/media.ts importImage (a post-create PATCH); the explicit
   // boolean + the human note are exactly what the frontend detection reads.
   // Best-effort: a failed stamp must never block the upload.
+  // The title carries through as metadata.title, not only as alt_text: this PATCH
+  // is a WHOLESALE metadata replace, so anything it omits is gone. Without the
+  // title the studio's Files roster had nothing durable to name the file by and
+  // fell back to the kind label — every client upload reading "Photo".
+  const upTitle = clean(b?.title, 200);
   await svc(`presence_media?id=eq.${(res as { media_id: string }).media_id}&site_id=eq.${link.agency_site_id}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ metadata: { client_upload: true, note: 'Uploaded by the client.' } }) }).catch(() => {});
+    body: JSON.stringify({ metadata: { client_upload: true, note: 'Uploaded by the client.', ...(upTitle ? { title: upTitle } : {}) } }) }).catch(() => {});
   return json({ data: res }, 200, cors); // { media_id, upload_url, storage_path }
 }
 // ── Post-verification of a client upload (the declared-bytes bypass) ─────────

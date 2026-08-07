@@ -6,6 +6,7 @@
 import {
   assetApprovalPolicy, assetAvailable, nextAssetStatus, detectDuplicates, dupKey,
   usageMap, canDelete, assetHealth, collectionsOf, tagsOf, searchAssets, isClientUpload,
+  displayName,
 } from '../../supabase/functions/presence/lib/dam.ts';
 
 const results = [];
@@ -97,6 +98,29 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
   ok('the note prefix alone is enough (deploy-order tolerant)', isClientUpload(noteOnly) === true);
   ok('a studio-uploaded row carries NO marker', isClientUpload(studioRow) === false && isClientUpload(studioNote) === false);
   ok('metadata-less rows never throw', isClientUpload({ ...A('s3'), metadata: null }) === false);
+}
+
+// ═══ Files: the NAME a file shows (the "8 rows all called Photo" bug) ═══
+// createUpload names the storage OBJECT '<siteId>/<uuid>.<ext>', so the storage
+// basename rung is deliberately blanked by the uuid strip — which left the kind
+// label ('Photo') as the only name an image ever got. But the REAL filename was
+// captured all along: every door writes it to alt_text. displayName reads it.
+{
+  const N = (o) => displayName({ id: 'x', storage_path: 'site-uuid/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', ...o });
+  ok('an image whose only name is its alt_text shows THAT, never the literal "Photo"',
+    N({ alt_text: 'storefront-at-dusk' }) === 'storefront-at-dusk');
+  ok('a renamed file still wins: metadata.title outranks alt_text',
+    N({ alt_text: 'storefront-at-dusk', metadata: { title: 'Hero image' } }) === 'Hero image');
+  ok('the literal "Photo" in alt_text is NOT taken as a name — it is files.html\'s own upload fallback, and a readable storage basename beats it',
+    displayName({ id: 'x', storage_path: 'site/brochure-final.webp', mime: 'image/webp', alt_text: 'Photo' }) === 'brochure-final');
+  ok('a nameless image still falls back to the kind label (nothing is ever blank)',
+    N({ alt_text: '' }) === 'Photo' && N({ alt_text: '   ' }) === 'Photo');
+  ok('alt_text ranks ABOVE the storage basename — it is the filename the browser sent, the object name is a uuid',
+    displayName({ id: 'x', storage_path: 'site/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.pdf', mime: 'application/pdf', alt_text: 'Spring brochure' }) === 'Spring brochure');
+  ok('a deliverable title is used only when the row itself has no name',
+    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: '' }, 'Kitchen rough-in') === 'Kitchen rough-in' &&
+    displayName({ id: 'x', storage_path: 's/6f1c2b7a-9e44-4a01-9f2b-7c1d8e2a3b55.webp', mime: 'image/webp', alt_text: 'porch.jpg' }, 'Kitchen rough-in') === 'porch.jpg');
+  ok('alt_text is bounded like every other name rung (200)', N({ alt_text: 'z'.repeat(400) }).length === 200);
 }
 
 const passed = results.filter((r) => r.p).length;
