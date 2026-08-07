@@ -561,6 +561,72 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## ✅ FILES — BY CLIENT + REAL FILENAMES — BUILT, AWAITING DEPLOY (2026-08-07)
+
+Eric: "files should be able to be organized and filtered by client...not all
+just there at once" + every row showed NAME = "Photo".
+
+FILENAMES WERE NEVER LOST. `displayName` (lib/dam.ts) had three rungs:
+metadata.title → storage basename → kind label. Rung 2 is dead BY DESIGN
+(createUpload names objects `<siteId>/<uuid>.<ext>`; dam strips
+/^[0-9a-f-]{20,}$/). And only PDFs ever got a metadata.title PATCH
+(`files.html` had an `if(isDoc)` guard) — so for an image the literal
+'Photo' was the ONLY rung that could fire. The real name was in
+`alt_text` all along, already selected, already shipped to the browser.
+One rung recovers all 8 rows retroactively — no write, NO MIGRATION.
+Also fixed: images now PATCH metadata.title; the client-upload metadata
+PATCH (a wholesale replace) no longer drops `title`.
+
+TWO COLUMNS STOPPED LYING: asset_status is `not null default 'approved'`
+and NOTHING ever sets it — every file was born "Approved" with nobody
+approving anything, and Eric's edition is policy='immediate' (no approval
+step exists). The column now stands down unless it has something true to
+say (archived brings it back). "Not used" only ever measured 4 website
+surfaces — project deliverables aren't in the graph, so a client's upload
+for live work could NEVER read anything else → "Not on your site".
+
+CLIENT RAIL: presence_media has NO client column, and every client's upload
+lands on the AGENCY site — so the page was structurally incapable of
+separating them. Built from the existing 3-hop join (deliverables →
+service_links → clients), operator-side only. NO MIGRATION.
+⚠️ THE TRAP AVOIDED: the `?client=`/x-dds-scope-site drill-in would have
+scoped to the CLIENT'S OWN SITE — their website's media, not what they
+uploaded to Eric's projects — and would have LOOKED correct. Pinned by a
+test asserting customer_site_id never appears in assets.ts.
+
+REVIEW: no blocker; 11 findings, the important ones fixed (c0507cc/9c5882d/
+d82b4ef). (F1 HIGH) a client's file could render as "Studio" — claiming the
+studio owns their work — because an empty name became an absent field, and
+the rail and cell had DIFFERENT fallbacks ('A client' vs 'Studio'); now one
+shared `clientLabel()`. (F2) the try/catch couldn't fire — `svc()` returns
+{ok:false} rather than throwing — so hop 3 failing mislabelled every client
+file; now each hop checks .ok, bails to an EMPTY map (never a half map) and
+logs which hop. (F3) unbounded in.() lists (2000 ids ≈ 74KB vs an ~8KB
+request line) → chunked at 100, parallel, any chunk failing fails the hop.
+(F4) hop 2 is the only service_links read omitting status=eq.active — KEPT
+deliberately (a former client's work is still theirs; filtering would re-file
+it under "Studio" — a false authorship claim) and pinned. (F8) added an
+id.asc tiebreaker — "first deliverable wins" wasn't a total order. (F10) a
+surviving mutation (dropping deleted_at) now killed. 8/8 mutations killed.
+F5 — MY DECISION, delegated by Eric ("whatever you think is best"): the
+filename fix had leaked real filenames into /portal/feed's site-wide pending
+list, where a client_reviewer on an AGENCY site could enumerate other
+clients' identities from filenames alone (the repro was literally
+`Replace Rivera-Builders-new-logo-FINAL-v3`). FIXED: the alt_text rung is
+now OPT-IN (`fromAltText`), so privacy is the default and a caller must ask
+deliberately. Exactly ONE file in the whole backend opts in (routes/
+assets.ts) — pinned by a test that walks the tree and counts.
+Gates: pure 217/0/4, files.spec 117/117 ×3 viewports, portal untouched.
+NO MIGRATION. Needs merge + FUNCTION DEPLOY.
+DEFERRED (reviewer's view recorded): F6 the Status column's return
+re-introduces in-container scroll (that's the shared roster anatomy working,
+not a regression); F7 a truncated client name is desktop-only readable — the
+rail's full names + tap-to-filter is the touch path; the detail slide-over
+would need a new server read (deliberate slice, not a drive-by); F9 the
+2000-deliverable cap truncates the NEWEST work because the order is
+ascending — now WARNS instead of failing silently; a proper fix is a keyset
+page on (created_at,id).
+
 ## 📁 FILES — ORGANIZE + FILTER BY CLIENT (Eric, 2026-08-07) — QUEUED
 
 "when you're done files should be able to be organized and filtered by
