@@ -502,6 +502,23 @@ export async function handleCommerce(req: Request, route: string, method: string
     if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
     const days = coolingOffDays();
     const reqd = await requestDeletion(site.client_id, site.id, 'customer');
+    // ── THE WRITE HAS TO HAVE HAPPENED ──────────────────────────────────────
+    // `reqd.ok` was never read. When the presence_account_deletions insert
+    // failed, this route still told the customer "Your deletion request is
+    // recorded", still returned {ok:true}, and still raised the notice — under
+    // the `reqd.id ? … : 'once'` fallback, because there was no row to key on.
+    // `deletion_requested` is a PROTECTED kind (lib/inbox_feed.ts): the operator
+    // cannot dismiss it by hand. So a failed insert could strand an ACTIVE,
+    // undismissable "your account will be deleted" row with no deletion behind
+    // it and no way to take it down — cancelDeletion finds no pending row, so it
+    // returns false and the dismiss below never runs.
+    //
+    // Refuse instead. Nothing was written, so nothing is claimed: the notice is
+    // not raised, no confirmation goes out, and the customer is told plainly
+    // that nothing changed. 502 rather than 500 — the failure is the upstream
+    // write, not this route. A deletion the customer believes is scheduled and
+    // which is not is the worst way for this to fail.
+    if (!reqd.ok) return json({ error: 'unavailable', message: 'We couldn’t record your deletion request just now — nothing has changed on your account. Please try again in a moment.' }, 502, cors);
     const name = await businessNameFor(site.client_id);
     // ── PERIOD = THIS REQUEST, not 'once' ────────────────────────────────────
     // The notice model dedupes on (client_id, kind, period) with

@@ -69,6 +69,7 @@ const TABLES = {
   presence_plan_notices: 'notices', presence_entitlements: 'entitlements',
 };
 let uid = 0;
+let breakDeletionInsert = false;   // F5 hook — see section 9
 globalThis.fetch = (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
   const u = new URL(url);
@@ -88,6 +89,9 @@ globalThis.fetch = (input, init) => {
   if (method === 'GET') return Promise.resolve(jres(200, filtered()));
   if (method === 'POST') {
     const body = JSON.parse(init.body);
+    // F5: let a test make the deletion INSERT fail — the one outcome the route
+    // never used to look at.
+    if (table === 'presence_account_deletions' && breakDeletionInsert) return Promise.resolve(jres(500, { message: 'insert exploded' }));
     const conflict = u.searchParams.get('on_conflict');
     const prefer = String((init.headers || {}).Prefer || '');
     if (conflict && /ignore-duplicates/.test(prefer)) {
@@ -223,6 +227,45 @@ const openDeletions = () => world.deletions.filter((d) => d.status === 'pending'
   const c = await cancel();
   ok('cancel with no pending request: reported as not canceled', c.status === 200 && c.body?.data?.canceled === false);
   ok('cancel with no pending request: nothing was touched', world.notices.length === 0 && world.deletions.length === 0);
+}
+
+// ═══ 9. F5: an insert that FAILED must never be reported as recorded ══════
+// Pre-existing, and cheap: the route never looked at `reqd.ok`. When the
+// presence_account_deletions insert failed it still told the client "Your
+// deletion request is recorded" and returned {ok:true}, and it still raised the
+// notice — under the `reqd.id ? ... : 'once'` fallback, because there was no row
+// to key on. `deletion_requested` is a PROTECTED kind (lib/inbox_feed.ts): the
+// operator cannot dismiss it by hand. So a failed insert could strand an ACTIVE,
+// undismissable "your account will be deleted" row with no deletion behind it
+// and no cancel path to take it down (cancelDeletion finds no pending row, so
+// `done` is false and the dismiss never runs).
+//
+// The route now refuses instead: nothing written, nothing claimed, 502 and an
+// honest message. The per-request period change above already narrows the
+// stranding — a later successful request keys on its own row id rather than
+// colliding with the stranded 'once' — but "we recorded it" was still a lie, and
+// this is the assertion that makes it one the suite can catch.
+{
+  seed();
+  breakDeletionInsert = true;
+  const r = await request();
+  breakDeletionInsert = false;
+
+  ok('insert failed: the route does NOT return 200 ok', r.status !== 200, `status ${r.status} body ${JSON.stringify(r.body)}`);
+  ok('insert failed: it is a 502 — an upstream write that did not happen', r.status === 502, String(r.status));
+  ok('insert failed: it never claims the request is recorded', !/recorded/i.test(JSON.stringify(r.body)), JSON.stringify(r.body));
+  ok('insert failed: the message tells the customer nothing changed and to try again',
+    /nothing/i.test(r.body?.message || '') && /again/i.test(r.body?.message || ''), JSON.stringify(r.body));
+  ok('insert failed: no deletion row exists', world.deletions.length === 0, JSON.stringify(world.deletions));
+  ok('insert failed: NO protected notice is stranded (it could never be dismissed by hand)',
+    allNotices().length === 0, JSON.stringify(world.notices));
+
+  // …and the failure wedges nothing: the very next attempt behaves normally.
+  const good = await request();
+  ok('after a failed attempt, a retry records the request properly', good.status === 200 && openDeletions().length === 1, JSON.stringify(good.body));
+  ok('after a failed attempt, the retry\u2019s notice is keyed to ITS row (never the \'once\' fallback)',
+    activeNotices().length === 1 && activeNotices()[0].period === `del:${openDeletions()[0].id}`, JSON.stringify(world.notices));
+  ok('no request escaped the fake PostgREST', world.escaped.length === 0, world.escaped[0] || '');
 }
 
 const failed = results.filter((r) => !r.p);
