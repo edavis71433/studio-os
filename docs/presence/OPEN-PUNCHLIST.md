@@ -391,6 +391,53 @@ DEFERRED from doc MS4 §2-3 → fold into MS5/MS6: about.html near-duplicate
 4-card workspace grid trim + "Not credentials" framing fix; coverage note:
 the no-references pin scans root-level files only (fine today — repo-wide
 grep clean). Gates: 119/0 ×3 projects, sync 28/28, pure 208/0/4.
+## 📄 DELETE DRAFTS + AN AGREEMENT PER PACKAGE (Eric, 2026-08-07) — AWAITING SQL + DEPLOY
+
+Two asks off the Bacchus deal: "theres no where for me to delete those"
+(two duplicate $3,200 proposal drafts) and "this needs to be included in the
+agreement for my growth package" (his Bacchus scope-of-work PDF).
+ERIC'S DECISIONS: delete = UNSENT DRAFTS ONLY · one template PER PACKAGE ·
+scope lives INSIDE the agreement (one document, one signature) · Growth
+scope = standard skeleton + fill-in blanks.
+
+DELETE (1a0f04a): there was NO delete route for proposals or contracts at
+all — every mistaken draft was permanent. Now DELETE /sales/proposals/:id +
+/contracts/:id, soft (deleted_at), status guard server-side and
+authoritative (signed → 409 always; the guard also rides the PATCH WHERE so
+a send landing mid-flight loses the race), audit event on the deal history.
+⚠️ NEEDS MIGRATION 0117 — presence_deal_events.kind has a CHECK and
+dealEvent() is best-effort, so PRE-0117 a delete SUCCEEDS WITH NO AUDIT
+TRACE. Apply 0117 BEFORE the function deploy.
+
+PACKAGES (65b4e07): DDS_AGREEMENT_LEGAL (§1-19, 14,964 chars) is now ONE
+shared const spliced into every package — verified byte-identical at
+RUNTIME across packages AND byte-identical to the pre-split template, so
+the words a client signs did not change. Packages: growth (cover + the
+Bacchus scope generalized, 25,563 chars) and custom_photo (byte-for-byte
+carry-over, fixture-snapshotted). A <select> chooser, no inference (guessing
+would put the wrong scope in front of a client); SEEDED tracking protects
+typed work. unfilledBlanks() warns at send on BOTH paths, deliberately
+ignoring the honest degradations ([project fee]) and [Client Name / Title].
+THE GROWTH SCOPE: Eric's PDF was unreadable by the usual tools (subset fonts
++ 1-byte codes); extracted by decoding per-font ToUnicode CMaps. It was
+BACCHUS-SPECIFIC despite "that's the standard package" — Tock, wine club,
+catering, venue rental, 8-page sitemap, Pasadena keywords. Generalized to 25
+marked [BLANKS]; §10 "About search results" kept verbatim (the best
+paragraph in it). ⚠️ TEMPLATE BUILD PACKAGE OWED — Eric has published the
+tier but given no scope; a commented extension point + a test that fails if
+someone invents one.
+
+REVIEW: NO BLOCKERS (6 mutations, every status value driven, every
+client-reaching send path driven incl. 3 the suite missed). 3 LOW, 2 fixed
+in 4448679: (F1) every PATCH failure was reported as "already sent" —
+infra failure now says "couldn't remove it just now, nothing changed";
+(F2) the blanks guard stood aside silently when the deal read omitted body
+(new page + stale function window) — now it ASKS. (F3) is the 0117 deploy
+ordering above. Reviewer also noted the contracts read has no LIMIT
+(pre-existing shape; ~50KB/agreement) — cheap insurance if deals ever carry
+many agreements.
+Gates: pure 215/0/4, e2e pipeline+crm 76/0 on desktop+tablet+mobile.
+
 ## 🧾 CRM DEAL PAGE — FOUR FIXES BUILT (Eric, 2026-08-07) — AWAITING DEPLOY
 
 Eric's four asks off the Bacchus deal screenshot. Recon → build → review →
