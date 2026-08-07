@@ -10151,12 +10151,24 @@ async function renderPlanNotice() {
   const acts = el("div", "doa");
   const up = el("a", "textact", act.label);
   up.href = act.href; up.style.textDecoration = "none";
-  const dismiss = el("button", "quietact", "Dismiss");
-  dismiss.addEventListener("click", async () => {
-    try { await api("POST", "/commerce/notices/dismiss", { id: n.id }); } catch (_) {}
-    card.remove();
-  });
-  acts.appendChild(up); acts.appendChild(dismiss);
+  acts.appendChild(up);
+  // R-fix F3: this Dismiss used to swallow the server's refusal (catch(_){}) and
+  // call card.remove() unconditionally — so on a protected notice (a pending
+  // deletion, a down site, a failed publish, an unpaid invoice: NOTICE_PRIORITY
+  // can surface all of them) the operator watched the card disappear and found it
+  // back on the next load. Two honest changes: the button is not drawn at all for
+  // a row the server would refuse, and when it IS drawn the card only goes if the
+  // dismiss actually landed — a refusal is said out loud, never mimed.
+  if (n.dismissible !== false) {
+    const dismiss = el("button", "quietact", "Dismiss");
+    dismiss.addEventListener("click", async () => {
+      dismiss.disabled = true;
+      try { await api("POST", "/commerce/notices/dismiss", { id: n.id }); }
+      catch (err) { dismiss.disabled = false; toast(nice(err), true); return; }
+      card.remove();
+    });
+    acts.appendChild(dismiss);
+  }
   card.appendChild(acts);
   host.hidden = false;
   host.insertBefore(card, host.firstChild);

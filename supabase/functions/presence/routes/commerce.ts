@@ -320,9 +320,17 @@ async function handleNotices(jwt: string, cors: Record<string, string>) {
   // HERE additionally stops a chatty client from crowding a real billing notice
   // out of this read's top-3 window. This endpoint has exactly one consumer (that
   // card) — the bell rail reads its notices from /portal/feed, unfiltered.
-  const r = await asUser(jwt, `presence_plan_notices?site_id=eq.${site.id}&status=eq.active&kind=not.in.(client_message,client_upload,client_request,client_approval)&select=id,kind,headline,body,created_at&order=created_at.desc&limit=3`);
+  // R-fix F3: this card is the THIRD dismiss surface, and it was the one that
+  // LIED — it swallowed the route's 409 and removed the card anyway, so the
+  // operator watched a protected notice vanish and found it back on reload.
+  // NOTICE_PRIORITY can surface protected kinds, so the card needs the same
+  // `dismissible` truth Today's list gets: read `period` (the only thing that can
+  // tell an unpaid-invoice reminder from an ordinary deal follow-up) and derive
+  // the flag from the ONE shared rule — never a second copy of the list.
+  const r = await asUser(jwt, `presence_plan_notices?site_id=eq.${site.id}&status=eq.active&kind=not.in.(client_message,client_upload,client_request,client_approval)&select=id,kind,period,headline,body,created_at&order=created_at.desc&limit=3`);
   const notices = (r.ok && Array.isArray(r.json)) ? r.json.map((n: any) => ({
     id: n.id, kind: n.kind, headline: n.headline, body: n.body,
+    dismissible: noticeDismissible(n.kind, n.period),
     actions: ['upgrade', 'learn_more', 'dismiss'], // the only three, ever
   })) : [];
   return json({ data: { notices } }, 200, cors);
