@@ -65,6 +65,16 @@
   /* ── C2 search under the list-pane header — the rosters' .search anatomy ── */
   .lhead .search{width:100%;margin-top:8px;font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 12px;outline:none}
   .lhead .search:focus{border-color:var(--p)}
+  /* ── the client · project lenses (Eric: "messages still cant be filtered by
+     project/contact unless i go through their profile"). Native <select>s on
+     purpose: ONE tap opens the system picker on his phone, and they wrap onto
+     their own line under the search when the pane is narrow. An active lens is
+     lit like pipeline.html's chosen stage chip, so a narrowed list never looks
+     like an empty one. ── */
+  .lfilters{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .lfilters select{flex:1 1 45%;min-width:0;font-size:13px;padding:6px 9px;border-radius:999px;background:var(--bg)}
+  .lfilters select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
+  .lclear{margin-top:12px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── two-line rows (SLDS split-view listbox idiom) ── */
@@ -230,6 +240,32 @@ function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/(
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
 let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest partial notice (both → the boot error)
 let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// ── the client · project lenses (D-filter) ───────────────────────────────────
+// Eric: "messages still cant be filtered by project/contact unless i go through
+// their profile". This is a LENS, not a relocation. Every option is derived from
+// the rows THIS feed already handed us, so a lens can never surface a thread the
+// Inbox wasn't already entitled to list, and #181 is untouched: a client's
+// messages remain ONE grouped row whose body is still their record thread — we
+// only narrow WHICH rows the list shows. The client id itself comes from 0115's
+// durable support→client link (preferred server-side over the old requester
+// string match), so filtering by client can't drift a known client's messages
+// into the anonymous bucket the way the derived match could.
+let FCLIENT='',FPROJECT='';
+const QP=()=>new URLSearchParams(location.search);
+// The repo's established query-param idiom: crm.html addresses a customer as
+// ?client_id= and a project as ?project= (pipeline.html's ?stage=/?deal= builds
+// its canonical URL the same way, via listUrl + history.replaceState).
+// DELIBERATELY NOT `client=` — that param is the agency drill-in SCOPE that
+// shell.js's carryScopeGlobally propagates; it is read here and written back
+// FIRST so a scoped operator keeps their tenant through every lens change.
+function inboxUrl(){
+  const p=new URLSearchParams(),c=QP().get('client')||'';
+  if(c)p.set('client',c);
+  if(FCLIENT)p.set('client_id',FCLIENT);
+  if(FPROJECT)p.set('project',FPROJECT);
+  const q=p.toString();return location.pathname+(q?'?'+q:'');
+}
+function readFiltersFromUrl(){const q=QP();FCLIENT=q.get('client_id')||'';FPROJECT=q.get('project')||'';}
 // SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 // one delegated closer for both header menus (attached ONCE — renderConsole may
@@ -249,6 +285,13 @@ const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='messag
 function buildItems(feed,leads,notifs){
   const items=[];
   const clientMsgs=(feed.client_messages||[]);
+  // project NAME → id, harvested from the rows that carry both. Deploy-order
+  // tolerance (both directions): a pre-lens function build stamps no project_id
+  // on SUPPORT rows, but it does stamp the project NAME — so a support thread
+  // still joins the right project lens instead of silently dropping out of it.
+  const pidByName={};
+  for(const c of clientMsgs){const pid=String(c.project_id||''),nm=String(c.project||'');if(pid&&nm&&!pidByName[nm])pidByName[nm]=pid;}
+  const pidOf=(c)=>String(c.project_id||'')||(c.project?(pidByName[String(c.project)]||''):'');
   const groups=new Map();   // thread key → {name, rows}
   for(const c of clientMsgs.filter(x=>x.type==='message')){
     // NEVER drop a row: a pre-slice-2 function emits unbridged rows with neither
@@ -266,16 +309,23 @@ function buildItems(feed,leads,notifs){
     // real per-thread unread when the feed carries it (slice 2); older function
     // builds degrade to the needs-reply heuristic (deploy-order tolerance)
     const unread=g.rows.some(r=>r.unread!=null?!!r.unread:!!r.needs_reply);
+    // EVERY project this grouped conversation spans. #181 keeps one row per
+    // client even when that client has two projects — so the row must answer to
+    // EITHER project's lens rather than only the newest one's.
+    const projects=[],seenP=new Set();
+    for(const r of g.rows){const pid=pidOf(r);if(pid&&!seenP.has(pid)){seenP.add(pid);projects.push({id:pid,name:String(r.project||'')});}}
     items.push({kind:'message',id:'msg:'+key,thread_key:key,name:g.name,when:String(latest.created_at||''),
       preview:needs?'Sent you a message':'You replied — waiting on them',chip:'Message',chipCls:'',
       unread,needs,count:g.rows.reduce((n,r)=>n+(Number(r.count)||1),0),
-      client_id:String(latest.client_id||''),project_id:String(latest.project_id||''),href:String(latest.href||'')});
+      client_id:String(latest.client_id||''),project_id:String(latest.project_id||''),projects,href:String(latest.href||'')});
   }
   for(const c of clientMsgs.filter(x=>x.type==='support')){
+    const pid=pidOf(c);
     items.push({kind:'support',id:'sup:'+c.id,support_id:String(c.id||''),thread_key:c.thread_key||('support:'+c.id),
       name:c.client||'Support request',when:String(c.created_at||''),preview:c.subject||'A support request',
       chip:'Support'+(c.status?' · '+String(c.status).replace(/_/g,' '):''),chipCls:'support',status:String(c.status||'open'),
-      unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),href:String(c.href||'')});
+      unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),
+      project_id:pid,projects:pid?[{id:pid,name:String(c.project||'')}]:[],href:String(c.href||'')});
   }
   for(const p of (feed.pending_approvals||[])){
     items.push({kind:'approval',id:'ok:'+p.id,name:p.title||'A change is ready',when:'',
@@ -307,7 +357,11 @@ function buildSystem(feed,notifs){
   // Project activity = the studio's OWN worklog; support/client messages already
   // have first-class rows above, so they're filtered out here (as before).
   const activity=(Array.isArray(notifs)?notifs:[]).filter(n=>n.kind!=='support_message'&&n.kind!=='message').slice(0,12);
-  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:'⚙',label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,href:scoped(notifLink(n))}));
+  // project_id rides along so the project lens keeps that project's OWN worklog
+  // rows in view. It is only ever used to MATCH — never to name a lens option
+  // (a notification carries no project name, and an unnamed dropdown entry is
+  // exactly the dead affordance we're avoiding).
+  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:'⚙',label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,project_id:String(n.project_id||''),href:scoped(notifLink(n))}));
   for(const n of notices)rows.push({sys:true,id:'sys:not:'+n.id,icon:'👀',label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
   // moments render ACTIVE (undimmed, no ✓) — the feed only carries the still-open
   // ones, and the old page listed them as live items; they stay counted in TOTAL.
@@ -338,6 +392,7 @@ function renderConsole(){
           </div>
         </div>
         <input class="search" id="q" type="search" aria-label="Search conversations" placeholder="Search conversations…" value="${esc(Q)}">
+        <div class="lfilters" id="lfilters" hidden></div>
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -384,7 +439,71 @@ function renderConsole(){
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();rows.classList.add('kbd');ACTIVE=e.key==='ArrowDown'?Math.min(ACTIVE+1,vis.length-1):Math.max(ACTIVE-1,0);paintActive();}
     else if(e.key==='Enter'&&ACTIVE>=0&&vis[ACTIVE]){e.preventDefault();activateRow(vis[ACTIVE]);}
   });
+  renderLenses();
 }
+
+// ── the client · project lenses ───────────────────────────────────────────────
+// Options are built ONLY from the rows already loaded — no extra read, no roster
+// of clients this operator can't already see here. A lens that could return
+// nothing is never offered: no client rows → no client select; no NAMED project
+// on any row → no project select at all (the alternative, a dropdown that is
+// always empty, is the defect we were told not to ship).
+function lensOptions(){
+  const cl=new Map(),pr=new Map();
+  for(const it of ITEMS){
+    if(it.client_id&&it.name)cl.set(String(it.client_id),String(it.name));
+    for(const p of (it.projects||[]))if(p.id&&p.name&&!pr.has(String(p.id)))pr.set(String(p.id),String(p.name));
+  }
+  const byName=(a,b)=>a.name.localeCompare(b.name);
+  const out={clients:[...cl].map(([id,name])=>({id,name})).sort(byName),projects:[...pr].map(([id,name])=>({id,name})).sort(byName)};
+  // A linked/bookmarked lens whose thread has since resolved leaves an id with
+  // no row behind it. Keep the filter ON (the empty state has to explain the
+  // narrowing that is really in force) but say plainly that it matches nothing.
+  if(FCLIENT&&!cl.has(FCLIENT))out.clients.unshift({id:FCLIENT,name:'Not in this inbox',unknown:true});
+  if(FPROJECT&&!pr.has(FPROJECT))out.projects.unshift({id:FPROJECT,name:'Not in this inbox',unknown:true});
+  return out;
+}
+function renderLenses(){
+  const host=$('lfilters');if(!host)return;
+  const o=lensOptions();
+  const sel=(id,label,all,list,cur)=>`<select id="${id}" aria-label="${esc(label)}" data-on="${cur?'1':'0'}"><option value="">${esc(all)}</option>`+
+    list.map(x=>`<option value="${esc(x.id)}"${x.id===cur?' selected':''}>${esc(x.name)}</option>`).join('')+`</select>`;
+  let h='';
+  if(o.clients.length)h+=sel('fClient','Filter by client','All clients',o.clients,FCLIENT);
+  if(o.projects.length)h+=sel('fProject','Filter by project','All projects',o.projects,FPROJECT);
+  host.innerHTML=h;host.hidden=!h;
+  const fc=$('fClient');if(fc)fc.addEventListener('change',()=>applyLens('client',fc.value));
+  const fp=$('fProject');if(fp)fp.addEventListener('change',()=>applyLens('project',fp.value));
+}
+// Changing a lens repaints the LIST only — the <select> nodes are left standing
+// so focus (and the phone's just-dismissed picker) survives, the same contract
+// C2's search input holds.
+function applyLens(which,val){
+  if(which==='client')FCLIENT=val;else FPROJECT=val;
+  history.replaceState(null,'',inboxUrl());   // pipeline.html's listUrl idiom: the narrowed view is linkable
+  ACTIVE=-1;
+  if(SEL&&!visibleRows().some(r=>r.id===SEL))SEL='';   // never strand the pane on a row the list no longer shows
+  const fc=$('fClient'),fp=$('fProject');
+  if(fc){fc.value=FCLIENT;fc.setAttribute('data-on',FCLIENT?'1':'0');}
+  if(fp){fp.value=FPROJECT;fp.setAttribute('data-on',FPROJECT?'1':'0');}
+  renderList();renderPane();
+}
+function clearLenses(){
+  Q='';FCLIENT='';FPROJECT='';
+  history.replaceState(null,'',inboxUrl());
+  const qi=$('q');if(qi)qi.value='';
+  ACTIVE=-1;renderLenses();renderList();renderPane();
+  if(qi)qi.focus();
+}
+// ONE delegated handler for every "clear" the empty states offer (list pane and
+// reading pane) — they are re-rendered constantly; per-render listeners pile up.
+document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.closest('[data-clear]')){e.preventDefault();clearLenses();}});
+// back/forward must never leave the chrome disagreeing with the URL
+window.addEventListener('popstate',()=>{
+  readFiltersFromUrl();ACTIVE=-1;
+  if(SEL&&!visibleRows().some(r=>r.id===SEL))SEL='';
+  renderLenses();renderList();renderPane();
+});
 // C2: the search filters EVERYTHING the list shows — conversations (name ·
 // preview · chip) and system rows (label · tag) alike.
 function rowMatch(r){
@@ -392,7 +511,32 @@ function rowMatch(r){
   const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+(r.chip||''));
   return hay.toLowerCase().includes(q);
 }
-function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])].filter(rowMatch);}
+// The lenses narrow by IDENTITY, not by text — a client row answers to its own
+// client_id (0115's durable link, resolved server-side), a conversation to every
+// project it actually spans. A row with no such link (an approval, a website
+// enquiry, an unattributed conversation, a notice) simply isn't part of that
+// client's or project's world, so a live lens leaves it out; the empty state
+// below says which lens did it.
+const itemClients=(r)=>(r.sys||!r.client_id)?[]:[String(r.client_id)];
+const itemProjects=(r)=>r.sys?(r.project_id?[String(r.project_id)]:[]):((r.projects||[]).map(p=>String(p.id)).filter(Boolean));
+function lensMatch(r){
+  if(FCLIENT&&itemClients(r).indexOf(FCLIENT)<0)return false;
+  if(FPROJECT&&itemProjects(r).indexOf(FPROJECT)<0)return false;
+  return true;
+}
+function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])].filter(lensMatch).filter(rowMatch);}
+// Every narrowing that is actually in force, in plain words. The VIEW is left
+// out on purpose — it has its own visible control and its own older copy.
+function activeLens(){
+  const o=lensOptions(),bits=[];
+  if(Q.trim())bits.push('“'+esc(Q.trim())+'”');
+  if(FCLIENT)bits.push('client “'+esc(lensLabel(o.clients,FCLIENT))+'”');
+  if(FPROJECT)bits.push('project “'+esc(lensLabel(o.projects,FPROJECT))+'”');
+  return bits;
+}
+const lensLabel=(list,id)=>{const f=list.filter(x=>x.id===id)[0];return f?f.name:'Not in this inbox';};
+const joinBits=(b)=>b.length<3?b.join(' and '):(b.slice(0,-1).join(', ')+' and '+b[b.length-1]);
+const clearLabel=(n)=>'Clear '+(n===1?'this filter':'these filters');
 function paintActive(){
   const rows=$('rows');const vis=visibleRows();
   rows.querySelectorAll('.row').forEach((el,i)=>el.classList.toggle('kfocus',i===ACTIVE));
@@ -423,7 +567,15 @@ function renderList(){
     if(miss){ln.textContent=`Part of your inbox couldn’t load just now — ${miss} may be missing. Refresh to try again.`;ln.hidden=false;}
     else ln.hidden=true;
   }
-  if(!vis.length){rows.innerHTML=`<li class="lempty" role="presentation">${Q.trim()?`Nothing here matches “${esc(Q)}”.`:VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;renderPane();return;}
+  // An empty list must name what emptied it and hand back a one-press way out —
+  // this codebase's recurring defect is the empty state that won't say why.
+  if(!vis.length){
+    const bits=activeLens();
+    rows.innerHTML=`<li class="lempty" role="presentation">${bits.length
+      ?`Nothing here matches ${joinBits(bits)}.<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`
+      :VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;
+    renderPane();return;
+  }
   let h='';
   for(const it of vis){
     if(it.sys){
@@ -479,10 +631,15 @@ function renderPane(){
     // — support resolve/close, lead archive, refresh() pruning a vanished SEL.
     const c=$('console');if(c)c.classList.remove('pane-open');
     const anyInView=visibleRows().some(r=>!r.sys);
+    const bits=activeLens();
     // the GLOBAL all-clear only when the inbox is empty overall; an empty
-    // filtered view gets its own copy (there may be work in other views).
+    // filtered view gets its own copy (there may be work in other views). A
+    // LENS emptied it → say that, not "check Everything": switching views would
+    // not bring the rows back, and blaming the wrong control is the defect.
     host.innerHTML=anyInView
       ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Pick a conversation</h2><p class="muted">Choose a row on the left — it opens right here.</p></div>`
+      :bits.length
+      ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing matches this filter</h2><p class="muted">Nothing here matches ${joinBits(bits)}.</p><p class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></p></div>`
       :ITEMS.length
         ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing in this view</h2><p class="muted">Nothing in this view — check Everything.</p></div>`
         :`<div class="center" style="margin:auto"><div class="allclear"><div class="allart" aria-hidden="true">🌤</div>✓ Nothing needs you right now — the platform is watching the rest.<p style="margin-top:12px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p></div></div>`;
@@ -798,6 +955,7 @@ async function refresh(){
   if(!ok){toast('Couldn’t refresh just now.');return;}
   DRAFT=snapComposer();   // an in-progress reply survives the pane rebuild (restored by the pane loaders)
   if(SEL&&!ITEMS.some(x=>x.id===SEL))SEL='';
+  renderLenses();   // a resolved thread can retire a lens option — repaint them off the fresh feed
   renderList();renderPane();
 }
 
@@ -896,6 +1054,7 @@ async function saveFaq(){
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your inbox.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 async function load(){
+  readFiltersFromUrl();   // a linked ?client_id=/?project= view lands already narrowed
   const ok=await loadData();
   if(!ok){trouble();return;}
   renderConsole();renderList();renderPane();

@@ -571,3 +571,302 @@ test.describe('Batch A regressions — inbox', () => {
     await expect(row.locator('.rwhen')).toHaveText('1 week ago');
   });
 });
+
+// ── The client · project lenses ──────────────────────────────────────────────
+// Eric: "messages still cant be filtered by project/contact unless i go through
+// their profile". These pin the LENS contract, and the line it must not cross:
+// #181 routed a client's messages to their record (the Inbox lists ONE grouped
+// row per client), and 0115 gave a support request a DURABLE client_id instead
+// of a re-derived requester-string match. The lenses narrow which of those rows
+// show — they never regroup a row, never add one, and never widen the read.
+const P1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';   // Marlow — Site build
+const P2 = 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa';   // Marlow — Menu refresh (the SAME client, a 2nd project)
+const P3 = 'aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa';   // Beacon — Rebrand
+
+const LENS_FEED = { data: {
+  role: 'business_owner',
+  moments: [],
+  notices: [],
+  pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
+  last_published: null,
+  client_messages: [
+    { type: 'message', project: 'Site build', project_id: P1, client_id: 'c-1', client: 'Marlow’s Kitchen', created_at: '2026-07-15T00:00:00Z', needs_reply: true, count: 2, thread_key: 'client:c-1', unread: true, href: `/crm.html?project=${P1}&tab=messages` },
+    // same client, a SECOND project — #181 keeps one row; it must answer to both project lenses
+    { type: 'message', project: 'Menu refresh', project_id: P2, client_id: 'c-1', client: 'Marlow’s Kitchen', created_at: '2026-07-12T00:00:00Z', needs_reply: false, count: 1, thread_key: 'client:c-1', unread: false, href: `/crm.html?project=${P2}&tab=messages` },
+    { type: 'message', project: 'Rebrand', project_id: P3, client_id: 'c-2', client: 'Beacon Bakery', created_at: '2026-07-14T00:00:00Z', needs_reply: true, count: 1, thread_key: 'client:c-2', unread: true, href: `/crm.html?project=${P3}&tab=messages` },
+    // a support thread carrying 0115's stamped client_id AND the project it sits on
+    { type: 'support', id: 's-1', subject: 'Logo tweak', status: 'open', project: 'Rebrand', project_id: P3, client_id: 'c-2', client: 'Beacon Bakery', created_at: '2026-07-13T00:00:00Z', thread_key: 'support:s-1', unread: true, href: `/crm.html?project=${P3}&tab=messages` },
+  ],
+  enquiries: [
+    { id: 'l-9', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', status: 'new', created_at: '2026-07-10T00:00:00Z', thread_key: 'lead:l-9', unread: true },
+  ],
+} };
+
+const LENS_API = {
+  '/portal/feed': LENS_FEED,
+  '/notifications': { data: [
+    { kind: 'milestone_done', label: 'Milestone reached — Design', href: `/projects/${P1}`, project_id: P1, created_at: '2026-07-09T00:00:00Z', read: false },
+  ], unread_count: 1 },
+  '/forms/inbox': { data: { submissions: [], unread: 0 } },
+  '/crm/activity': { data: { upcoming: [], items: [], reply_to: null, reply_support_to: null } },
+};
+
+// the CONVERSATION rows only — the dimmed system rows are asserted separately
+const rowTexts = (page: import('@playwright/test').Page) =>
+  page.locator('#rows [role=option]:not(.sysrow) .rname').allTextContents();
+
+test.describe('Inbox lenses — filter by client and by project without a profile round-trip', () => {
+  test('the client lens is one action from the list header and narrows to that client', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    const rows = page.locator('#rows');
+    // everything is here first: 2 client rows + 1 support + 1 enquiry + 1 approval
+    await expect(rows.getByRole('option')).toHaveCount(6);   // + 1 system activity row
+    // ONE action: the lens sits in the list-pane header, no navigation
+    const lens = page.locator('#fClient');
+    await expect(lens).toBeVisible();
+    await lens.selectOption('c-2');
+    expect(page.url()).not.toContain('/crm.html');           // never left the Inbox
+    // Beacon's conversation AND Beacon's support thread — nothing else
+    expect(await rowTexts(page)).toEqual(['Beacon Bakery', 'Beacon Bakery']);
+    await expect(page.locator('#lmeta')).toContainText('2 conversations');
+    // the active lens is lit, so a narrowed list can't be mistaken for an empty inbox
+    await expect(lens).toHaveAttribute('data-on', '1');
+  });
+
+  test('the project lens narrows too — and a client with TWO projects keeps ONE row (#181) that answers to both', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    const lens = page.locator('#fProject');
+    await expect(lens).toBeVisible();
+    // only projects the loaded rows actually name are offered — no dead options
+    await expect(lens.locator('option')).toHaveText(['All projects', 'Menu refresh', 'Rebrand', 'Site build']);
+    // Marlow's single grouped row is reachable from EITHER of her projects
+    await lens.selectOption(P1);
+    expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
+    await lens.selectOption(P2);
+    expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
+    // and the project's own worklog row stays with it under the lens
+    await lens.selectOption(P1);
+    await expect(page.locator('#rows .sysrow')).toHaveCount(1);
+    // Beacon's project brings its conversation AND its support thread
+    await lens.selectOption(P3);
+    expect(await rowTexts(page)).toEqual(['Beacon Bakery', 'Beacon Bakery']);
+    await expect(page.locator('#rows .sysrow')).toHaveCount(0);
+  });
+
+  test('the lenses combine with each other, with the view dropdown, and with search', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    // client + project together
+    await page.locator('#fClient').selectOption('c-2');
+    await page.locator('#fProject').selectOption(P3);
+    expect(await rowTexts(page)).toEqual(['Beacon Bakery', 'Beacon Bakery']);
+    // + the Support view → only the support thread survives all three
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="support"]').click();
+    await expect(page.locator('#rows [role=option]')).toHaveCount(1);
+    await expect(page.locator('#rows [role=option]').first()).toContainText('Logo tweak');
+    // the lens survives the view change (renderConsole rebuilds the header)
+    await expect(page.locator('#fClient')).toHaveValue('c-2');
+    // back to Everything, + search: the search still narrows INSIDE the lens
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="everything"]').click();
+    await page.locator('#q').fill('Logo tweak');
+    await expect(page.locator('#rows [role=option]')).toHaveCount(1);
+    await expect(page.locator('#rows [role=option]').first()).toContainText('Beacon Bakery');
+    // a search term that matches a row OUTSIDE the lens returns nothing — the
+    // lens is a hard boundary, not a hint
+    await page.locator('#q').fill('Marlow');
+    await expect(page.locator('#rows')).toContainText('Nothing here matches');
+  });
+
+  test('the lens round-trips through the URL: linkable in, replaceState out, reload-stable', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    // IN: a linked/bookmarked narrowed view lands already narrowed
+    await page.goto(`/inbox.html?client_id=c-1&project=${P2}`);
+    expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
+    await expect(page.locator('#fClient')).toHaveValue('c-1');
+    await expect(page.locator('#fProject')).toHaveValue(P2);
+    // OUT: changing a lens rewrites the URL (pipeline.html's listUrl idiom)
+    await page.locator('#fProject').selectOption(P1);
+    expect(new URL(page.url()).searchParams.get('project')).toBe(P1);
+    expect(new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
+    // clearing a lens drops its param entirely rather than leaving an empty one
+    await page.locator('#fClient').selectOption('');
+    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    // and that URL, reloaded, is the same view
+    await page.reload();
+    await expect(page.locator('#fProject')).toHaveValue(P1);
+    expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
+  });
+
+  test('a filtered-empty list NAMES the filter that emptied it and clears it in one press', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    // Marlow has no support thread — Support + the Marlow lens is honestly empty
+    await page.locator('#fClient').selectOption('c-1');
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="support"]').click();
+    const rows = page.locator('#rows');
+    await expect(rows).toContainText('client “Marlow’s Kitchen”');
+    // both lenses + a search term are all named, in one sentence
+    await page.locator('#viewBtn').click();
+    await page.locator('#viewMenu [data-view="everything"]').click();
+    await page.locator('#fProject').selectOption(P3);
+    await page.locator('#q').fill('zzz-nobody');
+    await expect(rows).toContainText('“zzz-nobody”');
+    await expect(rows).toContainText('client “Marlow’s Kitchen”');
+    await expect(rows).toContainText('project “Rebrand”');
+    // ONE press puts everything back — lenses, search box and URL together
+    await rows.getByRole('button', { name: 'Clear these filters' }).click();
+    await expect(page.locator('#fClient')).toHaveValue('');
+    await expect(page.locator('#fProject')).toHaveValue('');
+    await expect(page.locator('#q')).toHaveValue('');
+    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    expect(new URL(page.url()).searchParams.has('project')).toBe(false);
+    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+  });
+
+  test('the reading pane blames the LENS, not the view, when a lens emptied the list', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the reading pane is a ≥760px surface; <760px stacks to the list');
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    await page.locator('#fClient').selectOption('c-1');
+    await page.locator('#fProject').selectOption(P3);   // Marlow ∩ Beacon's project = nothing
+    const pane = page.locator('#rpane');
+    await expect(pane).toContainText('Nothing matches this filter');
+    await expect(pane).toContainText('client “Marlow’s Kitchen”');
+    await expect(pane).toContainText('project “Rebrand”');
+    await expect(pane).not.toContainText('check Everything');   // the old, wrong blame
+    await pane.getByRole('button', { name: 'Clear these filters' }).click();
+    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+  });
+
+  test('a stale linked lens says "Not in this inbox" instead of quietly showing everything', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    // the bookmark of a conversation that has since resolved
+    await page.goto('/inbox.html?client_id=c-gone');
+    await expect(page.locator('#rows [role=option]')).toHaveCount(0);
+    await expect(page.locator('#rows')).toContainText('client “Not in this inbox”');
+    await expect(page.locator('#fClient')).toHaveValue('c-gone');
+    await page.locator('#rows').getByRole('button', { name: 'Clear this filter' }).click();
+    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+  });
+
+  test('a lens can only ever REMOVE rows — it never reveals anything the Inbox was not already showing', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: LENS_API });
+    page.on('request', (r) => { const u = r.url(); if (u.includes('/functions/v1/presence')) calls.push(new URL(u).pathname.replace(/^.*presence/, '')); });
+    await page.goto('/inbox.html');
+    const all = await rowTexts(page);
+    const seenUnfiltered = new Set(all);
+    const before = calls.length;
+    for (const v of ['c-1', 'c-2']) {
+      await page.locator('#fClient').selectOption(v);
+      const got = await rowTexts(page);
+      expect(got.length).toBeLessThanOrEqual(all.length);
+      for (const name of got) expect(seenUnfiltered.has(name)).toBe(true);
+    }
+    await page.locator('#fClient').selectOption('');
+    for (const v of [P1, P2, P3]) {
+      await page.locator('#fProject').selectOption(v);
+      const got = await rowTexts(page);
+      expect(got.length).toBeLessThanOrEqual(all.length);
+      for (const name of got) expect(seenUnfiltered.has(name)).toBe(true);
+    }
+    // and no lens ever went back to the server — no client roster, no widened
+    // read; the options are built from the feed already in hand
+    expect(calls.length).toBe(before);
+    // the client lens offers ONLY clients the feed already named on a row
+    await expect(page.locator('#fClient option')).toHaveText(['All clients', 'Beacon Bakery', 'Marlow’s Kitchen']);
+  });
+
+  test('no client rows → no lens chrome at all (a reviewer/client feed grows no dropdown)', async ({ page }) => {
+    // handlePortalFeed omits client_messages entirely unless the caller sees the
+    // full workspace — the lenses must simply not exist in that shape.
+    await installApp(page, { api: { ...LENS_API,
+      '/portal/feed': { data: { role: 'client_reviewer', moments: [], notices: [], pending_approvals: [], last_published: null, client_messages: [], enquiries: [] } },
+      '/notifications': { data: [], unread_count: 0 },
+    } });
+    await page.goto('/inbox.html');
+    await expect(page.locator('#lfilters')).toBeHidden();
+    await expect(page.locator('#fClient')).toHaveCount(0);
+    await expect(page.locator('#fProject')).toHaveCount(0);
+  });
+
+  test('a feed whose rows name no project offers no project lens (never a dropdown that cannot return anything)', async ({ page }) => {
+    await installApp(page, { api: { ...LENS_API,
+      '/portal/feed': { data: { ...LENS_FEED.data, client_messages: [
+        { type: 'support', id: 's-2', subject: 'A project-less ask', status: 'open', project: '', project_id: '', client_id: 'c-3', client: 'Hettie’s Flowers', created_at: '2026-07-15T00:00:00Z', thread_key: 'support:s-2', unread: true, href: '/projects.html?support=s-2' },
+      ] } },
+      '/notifications': { data: [], unread_count: 0 },
+    } });
+    await page.goto('/inbox.html');
+    await expect(page.locator('#fClient')).toBeVisible();     // the client link is real (0115 stamped it)
+    await expect(page.locator('#fProject')).toHaveCount(0);   // no project link exists — so no lens
+  });
+
+  test('deploy-order: a support row with a project NAME but no project_id still joins that project lens', async ({ page }) => {
+    // the pre-lens function build: message rows carry project_id, support rows
+    // carry only the name. The page resolves the id from the name index rather
+    // than silently dropping the thread out of its own project.
+    await installApp(page, { api: { ...LENS_API,
+      '/portal/feed': { data: { ...LENS_FEED.data, client_messages: [
+        { type: 'message', project: 'Rebrand', project_id: P3, client_id: 'c-2', client: 'Beacon Bakery', created_at: '2026-07-14T00:00:00Z', needs_reply: true, count: 1, thread_key: 'client:c-2', unread: true, href: '' },
+        { type: 'support', id: 's-1', subject: 'Logo tweak', status: 'open', project: 'Rebrand', client_id: 'c-2', client: 'Beacon Bakery', created_at: '2026-07-13T00:00:00Z', thread_key: 'support:s-1', unread: true, href: '' },
+      ] } },
+      '/notifications': { data: [], unread_count: 0 },
+    } });
+    await page.goto('/inbox.html');
+    await page.locator('#fProject').selectOption(P3);
+    await expect(page.locator('#rows [role=option]')).toHaveCount(2);
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(1);
+  });
+
+  test('the agency drill-in scope survives every lens change (?client= is never touched)', async ({ page }) => {
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html?client=site-77');
+    // the lens writes its own params and leaves the scope param first and intact
+    await page.locator('#fClient').selectOption('c-1');
+    let u = new URL(page.url());
+    expect(u.searchParams.get('client')).toBe('site-77');
+    expect(u.searchParams.get('client_id')).toBe('c-1');
+    // the scoped read header still goes out with the scope on it
+    const req = page.waitForRequest((r) => r.url().includes('/portal/feed'));
+    await page.locator('#refreshBtn').click();
+    expect((await req).headers()['x-dds-scope-site']).toBe('site-77');
+    // clearing the lenses does not clear the tenant
+    await page.locator('#fProject').selectOption(P1);
+    await page.locator('#fClient').selectOption('');
+    u = new URL(page.url());
+    expect(u.searchParams.get('client')).toBe('site-77');
+    expect(u.searchParams.has('client_id')).toBe(false);
+  });
+
+  test('mobile: the lenses sit in the list header, narrow in one tap, and never strand the pane', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the phone is the point — he uses it');
+    await installApp(page, { api: LENS_API });
+    await page.goto('/inbox.html');
+    // both lenses are on screen with the list, above the fold, no menu to open
+    await expect(page.locator('#fClient')).toBeInViewport();
+    await expect(page.locator('#fProject')).toBeInViewport();
+    await page.locator('#fClient').selectOption('c-1');
+    expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
+    // open the row, come back, then narrow to a DIFFERENT client: the previous
+    // selection must not survive as a ghost that pushes the pane back in over
+    // a list it is no longer part of (<760px there is no split view to fall
+    // back on — a stranded pane hides the whole Inbox).
+    await page.locator('#rows [role=option]').first().click();
+    await expect(page.locator('#rpane')).toBeVisible();
+    await expect(page.locator('.lpane')).toBeHidden();
+    await page.locator('#paneBack').click();
+    await expect(page.locator('.lpane')).toBeVisible();
+    await page.locator('#fClient').selectOption('c-2');
+    await expect(page.locator('#rpane')).toBeHidden();
+    await expect(page.locator('#rows [role=option][aria-selected="true"]')).toHaveCount(0);
+    expect(await rowTexts(page)).toEqual(['Beacon Bakery', 'Beacon Bakery']);
+    // and the lenses are still right there in the list header, no menu, no scroll
+    await expect(page.locator('#fClient')).toBeInViewport();
+  });
+});
