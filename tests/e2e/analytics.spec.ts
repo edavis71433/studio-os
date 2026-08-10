@@ -460,6 +460,95 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('Not measured yet')).toHaveCount(0);
   });
 
+  // ── the hosting gate: an established site at THEIR domain is not a draft ────
+  // 9d955c6 gated purely on last_published_at, so a client whose website has been
+  // live at their own domain for years — and which we do not host, so we will
+  // never publish it — was told "Publish the site first". Search Console reports
+  // on a verified DOMAIN property whoever serves the pages; there is nothing to
+  // publish and the ask was useless. These pin the corrected distinction.
+  test('an EXTERNAL client is never told to publish — the ask is for their address', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = { no_domain: true, external: true, record_href: '/presence.html#monitor' };
+    D.data.website.hosting = {
+      hosted: false, external: true, domain: null, domain_verified: false,
+      visitors_measurable: false, visitors_reason: 'Visitor counts can’t come from here — this website isn’t hosted by the studio, so there’s no counter on its pages.',
+      search_measurable: true, search_reason: 'Search numbers will work as soon as we know their website address — Google reports on a domain, whoever hosts it.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    // the wrong advice must be GONE, not merely reworded
+    await expect(page.getByText('Publish the site first')).toHaveCount(0);
+    await expect(page.getByText('Google can’t measure a draft')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Publish the site →' })).toHaveCount(0);
+    // and the right one in its place, pointing where the address is recorded
+    await expect(page.getByText('Where is their website?').first()).toBeVisible();
+    await expect(page.getByText('nothing to publish').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Add their website address →' }).first())
+      .toHaveAttribute('href', '/presence.html#monitor');
+  });
+
+  test('an EXTERNAL client with a known domain gets the connect path, not the publish nudge', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = null;                       // ready to connect
+    D.data.website.hosting = {
+      hosted: false, external: true, domain: 'acmebakery.com', domain_verified: true,
+      visitors_measurable: false, visitors_reason: 'Visitor counts can’t come from here — acmebakery.com isn’t hosted by the studio, so there’s no counter on its pages.',
+      search_measurable: true, search_reason: 'Search numbers work fine: Google reports on the domain acmebakery.com, whoever hosts it.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('Publish the site first')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Search Console →' }).first())
+      .toHaveAttribute('href', '/connections.html');
+  });
+
+  test('an EXTERNAL client is told WHICH numbers exist and why the others cannot', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;                      // no beacon ever runs on their pages
+    D.data.website.search = { clicks: 38, impressions: 4100, period: '2026-06', top_terms: [] };
+    D.data.website.hosting = {
+      hosted: false, external: true, domain: 'acmebakery.com', domain_verified: true,
+      visitors_measurable: false, visitors_reason: 'Visitor counts can’t come from here — acmebakery.com isn’t hosted by the studio, so there’s no counter on its pages. Their own analytics (or a connected Google Analytics) is where those numbers live.',
+      search_measurable: true, search_reason: 'Search numbers work fine: Google reports on the domain acmebakery.com, whoever hosts it.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    // stated once, up front: what works, what does not, and the domain in question
+    const note = page.locator('.bandnote');
+    await expect(note).toBeVisible();
+    await expect(note).toContainText('acmebakery.com isn’t hosted by the studio');
+    await expect(note).toContainText('Search numbers work:');
+    await expect(note).toContainText('Visitor numbers can’t:');
+    // search still shows its REAL numbers — hosting never blocked it
+    await expect(page.getByText('4,100 times seen in search').first()).toBeVisible();
+    // and the visitor cards give the cause instead of a lie or a silent zero
+    await expect(page.getByText('Not measured here').first()).toBeVisible();
+    await expect(page.getByText('none of its pages carry our counter').first()).toBeVisible();
+    await expect(page.getByText('Visitor counts appear once your site is collecting them')).toHaveCount(0);
+    await expect(page.getByText('Once people start visiting, the trend shows here')).toHaveCount(0);
+  });
+
+  test('a site WE host keeps the ordinary empty states — no external wording leaks', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish' };
+    D.data.website.hosting = {
+      hosted: true, external: false, domain: null, domain_verified: false,
+      visitors_measurable: true, visitors_reason: 'Visitor numbers come from this website itself — every page we publish carries the counter.',
+      search_measurable: true, search_reason: 'Search numbers come from Google Search Console once this website is live and connected.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.locator('.bandnote')).toHaveCount(0);
+    await expect(page.getByText('Not measured here')).toHaveCount(0);
+    // 9d955c6 REGRESSION GUARD: our own draft still gets the publish nudge
+    await expect(page.getByText('Publish the site first').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+      .toHaveAttribute('href', '/presence.html#publish');
+  });
+
   test('published and genuinely not connected → the connect CTA is finally right', async ({ page }) => {
     const D = JSON.parse(JSON.stringify(DASH));
     D.data.website.search = null;
@@ -739,6 +828,24 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByRole('heading', { name: 'Publish the site first' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Publish Cedar Studio →' }))
       .toHaveAttribute('href', '/presence.html?client=s3#publish');
+  });
+
+  test('clients whose site we DON’T host are asked for their address, never to publish', async ({ page }) => {
+    const PF = JSON.parse(JSON.stringify(PORTFOLIO));
+    PF.data.insights = [{
+      key: 'search_no_domain', title: 'Tell us where their website is',
+      sentence: '1 of 3 clients has a website you don’t host, and no address on file. Google reports on a domain whoever hosts it — record the address and their search numbers start arriving. Nothing needs publishing.',
+      number: 1, tone: 'neutral',
+      sites: [{ id: 's3', name: 'Cedar Studio', href: '/presence.html?client=s3#monitor', cta: 'Add the website for Cedar Studio' }],
+      href: '/presence.html?client=s3#monitor', cta: 'Add the website for Cedar Studio',
+    }];
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': PF } });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('heading', { name: 'Tell us where their website is' })).toBeVisible();
+    await expect(page.getByText('Nothing needs publishing.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Publish the site first' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Add the website for Cedar Studio →' }))
+      .toHaveAttribute('href', '/presence.html?client=s3#monitor');
   });
 
   test('an older function build (href only, no sites[]) still renders its single link', async ({ page }) => {
