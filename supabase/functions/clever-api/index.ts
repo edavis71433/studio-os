@@ -7605,7 +7605,26 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
             lmessage ? lmessage.slice(0, 300) : '',
           ], { label: 'Open your enquiries →', href: 'https://davisdigitalstudio.com/leads.html' })); } catch (_) {}
 
-        return json({ ok: true, id: lead && lead.id }, 200, reqCors);
+        // ACKNOWLEDGE THE ENQUIRER — the promise on the contact page ("I reply
+        // personally, usually within one business day" + "You'll also get a short
+        // email confirming this went through") was made by contact.html but kept
+        // by no one: the contact_reply shell below had zero callers, so the person
+        // who just reached out heard nothing. Same wording as contact_reply, same
+        // CLIENT_OPTS (from Eric, real Reply-To — replying continues the thread).
+        // Best-effort: the lead is already recorded and Eric already notified.
+        let ackEmailed = false;
+        if (lemail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lemail)) {
+          try {
+            ackEmailed = await emailOk(lemail, `Thanks for reaching out to Davis Digital Studio`,
+              notifyShell(`Thanks for reaching out${lname ? `, ${lname}` : ''}`, [
+                `I got your message and I'll get back to you personally, usually within one business day.`,
+                `In the meantime, feel free to reply to this email with anything else you'd like me to know.`,
+                `— Eric Davis, Davis Digital Studio`,
+              ], { label: 'See my work →', href: 'https://davisdigitalstudio.com/work' }), CLIENT_OPTS);
+          } catch (_) { /* the enquiry itself is safe — never fail intake over the ack */ }
+        }
+
+        return json({ ok: true, id: lead && lead.id, acked: ackEmailed }, 200, reqCors);
       }
 
       // ── LEAD LIST (admin) ──

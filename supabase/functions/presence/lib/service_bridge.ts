@@ -187,6 +187,49 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
   } catch { return false; }
 }
 
+/** THE SITE-LIVE MOMENT — tell the client their website is live, with the link.
+ *  Until this, the "site_live" checklist tick was the only thing that happened:
+ *  the studio's board moved and the client heard nothing about the single most
+ *  celebratory moment of the whole engagement.
+ *
+ *  SEND-ONCE CONTRACT (who calls this and when): both doors to "live" —
+ *  routes/publish.ts (in-request) and lib/deploy_reconcile.ts (async reconcile)
+ *  — call this ONLY when tickChecklistForCustomerSite('site_live') returns true,
+ *  i.e. the one race-safe PATCH (`status=neq.done` + return=representation)
+ *  just transitioned the step. A re-publish, a reconcile pass over the same
+ *  deploy, or a step the studio already ticked by hand all return false and
+ *  never re-send — the checklist tick IS the dedupe, no second ledger needed.
+ *  (Corollary, deliberate: a delivery project with no seeded checklist sends
+ *  nothing — there is no fresh-transition signal to gate on, and every
+ *  handed-off project has been seeded since the 0120 backfill.)
+ *
+ *  Resolves the customer's site → the ACTIVE service link (tenant-safe, same
+ *  hop the tick used) → the live URL from the site row, then reuses
+ *  emailBridgedCustomer wholesale (studio brand, critical send, the "open your
+ *  project" deep link). The operator already hears about the publish through
+ *  existing rails — this is the CLIENT's email only. Best-effort: never throws. */
+export async function emailCustomerSiteLive(customerSiteId: string): Promise<boolean> {
+  try {
+    if (!customerSiteId) return false;
+    const [linkR, siteR] = await Promise.all([
+      svc(`presence_service_links?customer_site_id=eq.${customerSiteId}&status=eq.active&select=project_id,agency_site_id&order=created_at.desc&limit=1`),
+      svc(`presence_sites?id=eq.${customerSiteId}&select=custom_domain,netlify_site_id&limit=1`),
+    ]);
+    const link = rows(linkR)[0];
+    if (!link?.project_id || !link?.agency_site_id) return false;   // not a bridged delivery — nothing to celebrate on this channel
+    const siteRow = rows(siteR)[0];
+    const host = siteRow?.custom_domain ? String(siteRow.custom_domain)
+      : (siteRow?.netlify_site_id ? `${siteRow.netlify_site_id}.netlify.app` : '');
+    if (!host) return false;
+    const liveUrl = `https://${host}`;
+    const body =
+      `<p>It’s official — your website is live. Here it is:</p>` +
+      `<p><a href="${escHtml(liveUrl)}" style="font-weight:600">${escHtml(host)}</a></p>` +
+      `<p>Go take a look and enjoy the moment. Next we’ll walk through everything together so you know exactly how it all works — and if you spot anything you’d like changed, just reply and tell me.</p>`;
+    return await emailBridgedCustomer(String(link.agency_site_id), String(link.project_id), 'Your website is live — here’s the link', body);
+  } catch { return false; }
+}
+
 // ── OPERATOR NOTIFICATIONS — the mirror image of the two helpers above ───────
 // A client acting in the portal (a message, a file, a request, an approval
 // decision) used to reach the studio ONLY as an in-app row nobody was watching.

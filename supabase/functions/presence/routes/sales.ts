@@ -12,7 +12,7 @@ import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
-import { loadEmailBrand } from '../lib/email_brand.ts';
+import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
@@ -1853,7 +1853,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const managed = await linkAgencyPortfolio(principal, acct.siteId, email);
 
   // 4) ACCESS + onboarding handoff — the one-tap sign-in invite (shared helper).
-  const invited = await sendCustomerInvite(email, isNewLogin);
+  const invited = await sendCustomerInvite(site.id, email, isNewLogin);
 
   // 5) SERVICE-DELIVERY HANDOFF (Agency–Client Bridge): create the authoritative
   //    project on THIS (agency) site for the new customer + link the tenant-safe
@@ -1892,7 +1892,7 @@ export async function handleSalesResendInvite(req: Request, site: SiteRow, princ
   const contact = deal.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=email&limit=1`))[0] : null;
   const email = clean(contact?.email, 160).toLowerCase();
   if (!email || !validEmail(email)) return json({ error: 'no_email', message: 'This customer has no email on file, so there’s nothing to send. Add an email to their contact first.' }, 409, cors);
-  const sent = await sendCustomerInvite(email, false);
+  const sent = await sendCustomerInvite(site.id, email, false);
   if (!sent) return json({ error: 'send_failed', message: 'We couldn’t send the welcome email just now — please try again in a moment.' }, 502, cors);
   await dealEvent(site.id, dealId, 'note', principal, { detail: buildActivityDetail('email', `Welcome email re-sent to ${email}`, nowIso()) });
   return json({ data: { sent: true, email } }, 200, cors);
@@ -2024,8 +2024,15 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
 
 /** The one-tap sign-in invite. A brand-new login gets a signed set-password link
  *  (they never chose a password) that lands them straight in the EXISTING guided
- *  first-run (via ?next=); an existing login gets a welcome. Best-effort. */
-async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<boolean> {
+ *  first-run (via ?next=); an existing login gets a welcome. Best-effort.
+ *
+ *  ON THE STUDIO'S BRAND, in the studio's voice — never the platform's. The
+ *  client just signed with THEIR studio; a "welcome to Studio OS" from an
+ *  unknown sender reads like phishing and breaks the same secrecy rule
+ *  emailSalesDoc documents ("never the platform name"). `siteId` is the
+ *  STUDIO's site (every caller holds it), so loadEmailBrand resolves the same
+ *  name + accent the proposal/contract/invoice emails already wear. */
+async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean): Promise<boolean> {
   if (!email) return false;
   // App pages (set-password/get-started/portal) ARE served on the primary site —
   // build-public.sh copies every root .html into dist/ and _redirects blocks only
@@ -2035,6 +2042,11 @@ async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<
   // GoTrue's redirect allow-list, so the recovery link silently falls back to the
   // Site URL — i.e. lands on the home page. SITE_URL env should be set to this too.
   const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const brand = await loadEmailBrand(siteId).catch(() => EMAIL_BRAND_DEFAULT);
+  // A studio that never filled its identity card resolves to the platform-default
+  // brand name; the subject then stays bare rather than greeting the client from
+  // a product they've never heard of.
+  const studioName = brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name : '';
   // Every provisioned customer needs to CREATE their password. Always send a signed
   // set-password link that lands them in the guided first-run; if it can't be generated
   // they can still get in passwordlessly (one-time email code) at the portal.
@@ -2043,12 +2055,21 @@ async function sendCustomerInvite(email: string, _isNewLogin: boolean): Promise<
   // Studio OS operator surfaces. (/client.html is whitelisted in set-password.html's
   // NEXT_OK.) Self-running workspaces are a different persona (self-serve signup).
   const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
+  const btnStyle = `display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none`;
   const cta = link
-    ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land in your client portal.`
-    : `<a href="${base}/portal.html">Sign in at your portal →</a> — we’ll email you a one-time code, no password needed.`;
-  sendEmail(email, 'Your workspace is ready — welcome to Studio OS',
-    `<p>Welcome! Your workspace is set up and ready.</p><p>${cta}</p><p style="font-size:13px;color:#6b6478">You can always sign in any time at <a href="${base}/portal.html">your portal</a>.</p>`,
-  undefined, { critical: true }).catch(() => {});   // login access = transactional
+    ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
+    : `<p class="cta"><a href="${base}/portal.html" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
+  sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
+    `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
+    `<ul style="margin:8px 0;padding-left:20px">` +
+    `<li>watch your project’s progress as it happens</li>` +
+    `<li>message me directly — I read everything</li>` +
+    `<li>share files and approve work</li>` +
+    `<li>see every invoice and payment in one place</li>` +
+    `</ul>` +
+    cta +
+    `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html">your portal</a>. If anything looks off, just reply and tell me.</p>`,
+  brand, { critical: true }).catch(() => {});   // login access = transactional
   return true;
 }
 
@@ -2177,7 +2198,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   if (acct.alreadyExisted) {
     return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, external_domain: externalDomain, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
   }
-  const invited = await sendCustomerInvite(email, acct.isNewLogin);
+  const invited = await sendCustomerInvite(site.id, email, acct.isNewLogin);
   await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'create', summary: `Added ${businessName} as a customer`, principal, provenance: 'human' }).catch(() => {});
   return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, external_domain: externalDomain, portal_url: portalUrl } }, 201, cors);
 }

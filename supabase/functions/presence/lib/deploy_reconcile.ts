@@ -53,8 +53,14 @@ export async function reconcileOnePublish(p: InflightPublish, nowMs: number): Pr
     // The OTHER door to "live" — an async deploy that finished after the request
     // returned. The checklist's "Site live" step must tick from both, or a slow
     // deploy silently costs the studio 10%. Same idempotent tick as routes/publish.ts;
-    // dynamic import keeps this leaf module import-cycle-free.
-    await import('./service_bridge.ts').then((m) => m.tickChecklistForCustomerSite(String(p.site_id), 'site_live', 'publish-reconcile', 'system')).catch(() => false);
+    // dynamic import keeps this leaf module import-cycle-free. A FRESH tick
+    // (true = the step just transitioned) also sends the client their "your
+    // website is live" email — same send-once gate as routes/publish.ts, so
+    // whichever door reaches "live" first sends it, and only that door.
+    await import('./service_bridge.ts').then(async (m) => {
+      const fresh = await m.tickChecklistForCustomerSite(String(p.site_id), 'site_live', 'publish-reconcile', 'system');
+      if (fresh) await m.emailCustomerSiteLive(String(p.site_id));
+    }).catch(() => false);
   } else if (outcome === 'failed') {
     await svc(`presence_publishes?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error_text: 'deploy: netlify reported error (reconciled)', completed_at: nowIso }) });
   }

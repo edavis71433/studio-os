@@ -139,7 +139,7 @@
         <div class="hc-row active"><span class="hc-n">01</span><span>Your note just landed in my inbox</span><span class="hc-tick now">just now</span></div>
         <div class="hc-row"><span class="hc-n">02</span><span>I read it and reply, personally</span><span class="hc-tick">within 1 business day</span></div>
         <div class="hc-row dim"><span class="hc-n">03</span><span>We talk it through &mdash; 20&ndash;30 minutes, no pitch</span><span class="hc-tick"></span></div>
-        <div class="hc-foot">You'll also get a short email confirming this went through &mdash; worth a peek at your inbox (and spam folder, just in case).</div>
+        <div class="hc-foot" id="ackFoot">You'll also get a short email confirming this went through &mdash; worth a peek at your inbox (and spam folder, just in case).</div>
       </aside>
 
       <p class="lead-muted mt-l" style="font-size:15px">Want to lock in a time now instead of waiting? <a href="https://calendly.com/eric-davisdigitalstudio/30min" target="_blank" rel="noopener" style="color:var(--p)">Pick a slot on my calendar &rarr;</a></p>
@@ -241,9 +241,13 @@ function submitContact(ev){
   btn.disabled = true;
   btn.textContent = 'Sending\u2026';
 
-  function showThanks(){
+  // `acked` = the CRM path confirmed intake (it emails a short acknowledgement).
+  // The Formspree fallback sends no ack email, so promising one there would be
+  // a lie — hide that line when the fallback carried the message.
+  function showThanks(acked){
     form.style.display = 'none';
     document.getElementById('thanks').style.display = 'block';
+    if (!acked) { var ackFoot = document.getElementById('ackFoot'); if (ackFoot) ackFoot.style.display = 'none'; }
     var expect = document.querySelector('.ct-expect');
     if (expect) expect.style.display = 'none';
     // Move focus to the confirmation so screen-reader and keyboard users are
@@ -278,7 +282,7 @@ function submitContact(ev){
   })
   .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
   .then(function(res){
-    if (res.ok && res.j && res.j.ok) { showThanks(); }
+    if (res.ok && res.j && res.j.ok) { showThanks(true); }
     else { throw new Error('crm_failed'); }
   })
   .catch(function(){
@@ -295,7 +299,7 @@ function submitContact(ev){
         message: goal || 'Not provided'
       })
     })
-    .then(function(r){ if (r.ok) { showThanks(); } else { throw new Error('bad_status'); } })
+    .then(function(r){ if (r.ok) { showThanks(false); } else { throw new Error('bad_status'); } })
     .catch(function(){
       btn.disabled = false;
       btn.innerHTML = original;

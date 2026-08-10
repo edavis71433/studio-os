@@ -136,7 +136,7 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   // IDEMPOTENT existing-email: returns a friendly already_exists (with a link), never a duplicate
   ok('add-customer: existing email → friendly already_exists (no duplicate, no new invite)', /if \(acct\.alreadyExisted\)/.test(sales) && /already_exists: true/.test(sales) && /alreadyExisted = true/.test(sales));
   // the invite only fires for a genuinely new setup (after the already-exists early return)
-  ok('add-customer: sends the sign-in invite only for a new setup', (() => { const h = sales.indexOf('handleSalesAddCustomer'); const already = sales.indexOf('if (acct.alreadyExisted)', h); const invite = sales.indexOf('sendCustomerInvite(email, acct.isNewLogin)', h); return already > 0 && invite > already; })());
+  ok('add-customer: sends the sign-in invite only for a new setup', (() => { const h = sales.indexOf('handleSalesAddCustomer'); const already = sales.indexOf('if (acct.alreadyExisted)', h); const invite = sales.indexOf('sendCustomerInvite(site.id, email, acct.isNewLogin)', h); return already > 0 && invite > already; })());
   // reuses an existing bridge instead of minting a duplicate empty project on retry
   ok('add-customer: idempotent bridge — reuses an existing link (no duplicate project)', /linksForCustomer\(clientId\)/.test(sales) && /links\.find\(\(l\) => l\.agency_site_id === agencySiteId\)/.test(sales));
   // the shared bridge helper is the SINGLE non-deal bridge path (no parallel bridge):

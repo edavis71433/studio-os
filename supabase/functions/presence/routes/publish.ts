@@ -19,7 +19,7 @@ import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/pub
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
-import { tickChecklistForCustomerSite } from '../lib/service_bridge.ts';
+import { tickChecklistForCustomerSite, emailCustomerSiteLive } from '../lib/service_bridge.ts';
 import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
@@ -195,7 +195,12 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // and idempotent: the PATCH matches only a not-yet-done row, so the tenth
   // re-publish writes nothing. A site with no delivery bridge — every ordinary
   // self-serve customer — resolves to no link and this is one cheap read.
-  if (live) await tickChecklistForCustomerSite(site.id, 'site_live', 'publish', 'system').catch(() => false);
+  // The FRESH tick (true = the step just transitioned) is also the send-once
+  // gate for the client's "your website is live" email — see
+  // emailCustomerSiteLive's contract: a re-publish returns false and never
+  // re-sends. Both best-effort: neither may fail a publish.
+  if (live) await tickChecklistForCustomerSite(site.id, 'site_live', 'publish', 'system').catch(() => false)
+    .then((fresh) => fresh ? emailCustomerSiteLive(site.id) : false).catch(() => false);
 
   await writeChangeEvent({ siteId: site.id, entityType: kind, entityId: null, action: kind, summary, principal, provenance: 'human' });
   logStages(live ? 'live' : 'deploying');   // M5: terminal telemetry (deploying = handed to reconcile)

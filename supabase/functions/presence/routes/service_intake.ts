@@ -224,31 +224,49 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
 }
 
 /** I2: when the STUDIO posts a support reply, also notify the requester by EMAIL —
- *  otherwise an email-NATIVE customer (one who filed via /email/inbound and never
- *  opens the portal) never learns the studio replied; the loop is half-open. Best-
- *  effort, mirrors project_comms' bridge-nudge idiom: branded, critical (survives a
- *  marketing opt-out), throttled (if a studio message on THIS request already went
- *  out < 15 min ago, the earlier email already carries the thread — don't stack),
- *  and siteId is passed so reply_to = the site's inbound address (R1: the reply
- *  lands right back on /email/inbound). The recipient is the request's `requester`
- *  ONLY when it is an email address — an auth-uid requester means a portal user who
- *  is reached in-app, so we skip silently (also skip if it can't be resolved).
- *  Never blocks or fails the reply. `insId` is the just-inserted message, excluded
- *  from the throttle probe. */
+ *  otherwise the customer never learns the studio replied; the loop is half-open.
+ *  Best-effort, mirrors project_comms' bridge-nudge idiom: branded, critical
+ *  (survives a marketing opt-out), throttled (if a studio message on THIS request
+ *  already went out < 15 min ago, the earlier email already carries the thread —
+ *  don't stack).
+ *
+ *  TWO REQUESTER SHAPES, BOTH REACHED:
+ *    • a literal email (an email-native customer who filed via /email/inbound) —
+ *      sent directly, with siteId so reply_to = the site's inbound address (R1:
+ *      the reply lands right back on /email/inbound);
+ *    • an auth-uid (EVERY portal-composer client — readerKey stores their user
+ *      id). These used to be skipped silently ("reached in-app" = an unread row
+ *      nobody was watching). Their real inbox is resolved through the service
+ *      link — the request's F3 client_id stamp when present, else the same
+ *      clientIdForRequester resolution the ack path uses — and the reply goes
+ *      out via emailCustomerByClient (studio brand, portal deep link, reply_to
+ *      = the site's inbound address).
+ *  A requester we can't turn into an inbox is a LOUD warn, never silence.
+ *  Never blocks or fails the reply. `insId` is the just-inserted message,
+ *  excluded from the throttle probe. */
 async function emailStudioSupportReply(site: SiteRow, reqRow: any, body: string, insId: string): Promise<void> {
   try {
-    const to = String(reqRow?.requester || '').trim();
-    if (!EMAIL_RE.test(to)) return;   // auth-uid requester (portal user) or unresolved → skip silently
+    const requester = String(reqRow?.requester || '').trim();
     const prev = rows(await svc(`presence_support_messages?request_id=eq.${reqRow.id}&site_id=eq.${site.id}&deleted_at=is.null&id=neq.${insId}&author_kind=neq.client&select=created_at&order=created_at.desc&limit=1`))[0];
-    if (prev && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000) return;   // throttle
-    const { sendEmail } = await import('../commerce/account.ts');
-    const { loadEmailBrand } = await import('../lib/email_brand.ts');
-    const brand = await loadEmailBrand(site.id);
+    if (prev && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000) return;   // throttle — one email per request per quarter-hour
     const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
-    await sendEmail(to, 'A reply from your studio',
-      `<p>Your studio replied to your message:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote><p>Just reply to this email to continue the conversation.</p>`,
-      brand, { critical: true, siteId: site.id });
-  } catch { /* best-effort — the email must never block or fail the studio reply */ }
+    const replyHtml = `<p>You have a reply on your support request:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote><p>Just reply to this email to continue the conversation.</p>`;
+    if (EMAIL_RE.test(requester)) {   // email-native requester — the existing direct branch, unchanged
+      const { sendEmail } = await import('../commerce/account.ts');
+      const { loadEmailBrand } = await import('../lib/email_brand.ts');
+      const brand = await loadEmailBrand(site.id);
+      await sendEmail(requester, 'A reply from your studio', replyHtml, brand, { critical: true, siteId: site.id });
+      return;
+    }
+    // auth-uid requester (portal composer) → resolve their inbox via the bridge.
+    const { clientIdForRequester, emailCustomerByClient } = await import('../lib/service_bridge.ts');
+    const clientId = (reqRow?.client_id && UUID_RE.test(String(reqRow.client_id))) ? String(reqRow.client_id)
+      : (UUID_RE.test(requester) ? await clientIdForRequester(site.id, { userId: requester }) : null);
+    const sent = clientId ? await emailCustomerByClient(site.id, clientId, 'A reply from your studio', replyHtml) : false;
+    if (!sent) console.warn(`[support-reply] request ${reqRow?.id} on site ${site.id}: requester ${requester ? '(uid)' : '(empty)'} resolved to no reachable email — the reply exists only in-app (non-fatal)`);
+  } catch (e) {
+    console.warn(`[support-reply] email for request ${reqRow?.id} on site ${site?.id} failed: ${String((e as Error)?.message || e)} (non-fatal)`);
+  }
 }
 
 export async function handleSupportMessage(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
