@@ -516,7 +516,15 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   // client already had (0031); everything about what we can measure follows from
   // this one fact, so it is read, never assumed.
   const hosted = site.edition !== 'monitor';
-  const extConn = hosted ? null : arr(await safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) || {})[0] || null;
+  // The recorded external address matters in TWO shapes, not one: a monitor-
+  // edition workspace (their site lives elsewhere, full stop) AND a hosted-
+  // edition site that has never published — a rebuild-in-progress whose client
+  // is already live at their own domain. For both, presence_monitor_connections
+  // holds the one fact Search Console needs. Once a hosted site HAS published,
+  // its own domain is the property (gscDomainFor puts custom_domain first) and
+  // any stale record is ignored here.
+  const extConn = (hosted && site.last_published_at) ? null
+    : arr(await safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) || {})[0] || null;
   const externalDomain = extConn?.domain ? String(extConn.domain) : null;
   const okRows = (r: unknown): any[] | null => (r && (r as { ok?: boolean }).ok ? arr(r as { json?: unknown }) : null);
 
@@ -591,7 +599,11 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   else if (readiness === 'no_domain') {
     search = { no_domain: true, external: true, record_href: '/presence.html#monitor' };
   } else if (readiness === 'draft') {
-    search = { draft: true, publish_href: '/presence.html#publish' };
+    // `record_href` rides along so the page can offer the honest alternative:
+    // a draft here does NOT always mean nothing is live anywhere — if the
+    // client's site is already live on another platform, recording that
+    // address (the same monitor-connection row) starts search numbers now.
+    search = { draft: true, publish_href: '/presence.html#publish', record_href: '/presence.html#monitor' };
   } else if (readiness === 'waiting') {
     search = { waiting: true, external: !hosted, domain: externalDomain };
   } else if (gsc.hasData) {

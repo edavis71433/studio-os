@@ -867,3 +867,115 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
   });
 });
+
+// ── The DOOR: recording an external website for an EXISTING client ───────────
+// Eric's report: the scoped card said "Add their website address →" but the link
+// landed on a screen with no visible affordance ("the other screenshot"), and a
+// hosted-edition rebuild whose client is already live elsewhere was trapped at
+// "Publish the site". Three fixes, end to end:
+//   • the draft search state now ALSO names the record-the-address door,
+//   • /presence.html#monitor routes to the Business view and shows the card for
+//     a NON-monitor client whose site has never published here,
+//   • recording a URL round-trips: POST /monitor/connect, then the card shows
+//     the pending connection (the readiness flip itself is pinned in
+//     tests/presence/external_client_door_test.mjs — pure searchReadinessState).
+const PRESENCE_REBUILD_API = {
+  // a hosted-edition site that has NEVER published — the rebuild-in-progress
+  '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', last_published_at: null, template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Acme Bakery' }, location: {} } },
+  '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
+  '/media': { data: [] }, '/settings': { data: {} }, '/health': { data: {} }, '/notes': { data: [] },
+  '/changes': { data: { count: 0, first_publish: true, changes: [], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
+  '/moments': { data: [] },
+  '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, updated_at: null, updated_by: null } },
+  '/schedule': { data: { scheduled: [] } },
+  '/content-library': { data: [] },
+  '/knowledge/docs': { data: [] },
+  '/monitor/connection': { data: null },
+};
+
+test.describe('External website door (existing client)', () => {
+  test('the draft search state offers BOTH doors — publish here, or record the address elsewhere', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish', record_href: '/presence.html#monitor' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    // the publish nudge survives — for a genuine greenfield it is still right
+    await expect(page.getByText('Publish the site first').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Publish the site →' }).first()).toBeVisible();
+    // …and the alternative is named beside it, pointing where the address is recorded
+    await expect(page.getByRole('link', { name: 'Record that website’s address' }).first())
+      .toHaveAttribute('href', '/presence.html#monitor');
+  });
+
+  test('the record link carries the operator’s client scope, like every CTA on the page', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish', record_href: '/presence.html#monitor' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html?client=site-9');
+    await expect(page.getByRole('link', { name: 'Record that website’s address' }).first())
+      .toHaveAttribute('href', '/presence.html?client=site-9#monitor');
+  });
+
+  test('an older function build (draft without record_href) degrades to publish-only — no dead link', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('Publish the site first').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Record that website’s address' })).toHaveCount(0);
+  });
+
+  test('#monitor lands a NON-monitor client on a screen that can act: card visible, rebuild wording', async ({ page }) => {
+    await installApp(page, { api: PRESENCE_REBUILD_API });
+    await page.goto('/presence.html#monitor');
+    await expect(page.locator('#view-business')).toBeVisible();
+    await expect(page.locator('#monitorCard')).toBeVisible();
+    const btn = page.locator('#btnMonitorConnect');
+    await expect(btn).toBeVisible();
+    await expect(btn).toHaveText('Record the website’s address');   // not the monitor edition’s "Connect my website"
+    await expect(page.locator('#monitorCard .docsub')).toContainText('Already live somewhere else?');
+  });
+
+  test('a PUBLISHED hosted site keeps the card hidden — no second "website" surface', async ({ page }) => {
+    const API = JSON.parse(JSON.stringify(PRESENCE_REBUILD_API));
+    (API['/site'] as any).data.site.last_published_at = '2026-06-01T00:00:00Z';
+    await installApp(page, { api: API });
+    await page.goto('/presence.html#monitor');
+    await expect(page.locator('#view-business')).toBeVisible();
+    await expect(page.locator('#monitorCard')).toBeHidden();
+  });
+
+  test('recording a URL round-trips: POST /monitor/connect, then the pending connection renders', async ({ page }) => {
+    await installApp(page, { api: PRESENCE_REBUILD_API });
+    // stateful /monitor mock registered AFTER installApp so it wins: GET answers
+    // null until the POST lands, then answers the stored row — the real flow.
+    let conn: Record<string, unknown> | null = null;
+    let postedBody: Record<string, unknown> | null = null;
+    await page.route(/\/functions\/v1\/presence\/monitor\//, (route) => {
+      const req = route.request();
+      const path = new URL(req.url()).pathname;
+      if (req.method() === 'POST' && path.endsWith('/monitor/connect')) {
+        postedBody = req.postDataJSON();
+        conn = { site_id: 's1', url: 'https://acmebakery.com/', domain: 'acmebakery.com', platform: 'custom', method: 'meta', token: 'dds-e2e', status: 'pending', verified_at: null, last_checked_at: null, last_check_note: '', instructions: 'Add this tag inside your homepage’s <head>: <meta name="dds-site-verification" content="dds-e2e">' };
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: conn }) });
+      }
+      if (req.method() === 'GET' && path.endsWith('/monitor/connection')) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: conn }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto('/presence.html#monitor');
+    await page.locator('#btnMonitorConnect').click();
+    await page.getByLabel('Your website’s address').fill('https://acmebakery.com');
+    await page.locator('#monitorAddWrap [data-act="add"]').click();
+    // the POST carried the URL (the server derives domain + proof token from it)
+    await expect.poll(() => postedBody && (postedBody as any).url).toBe('https://acmebakery.com');
+    // …and the card now shows the recorded website, waiting on the ownership proof
+    await expect(page.locator('#monitorStatus')).toContainText('https://acmebakery.com/');
+    await expect(page.locator('#monitorStatus')).toContainText('waiting on verification');
+    await expect(page.locator('#btnMonitorConnect')).toBeHidden();
+  });
+});

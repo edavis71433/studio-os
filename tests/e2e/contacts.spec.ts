@@ -363,3 +363,74 @@ test.describe('Contacts — studio scope is not regressed', () => {
     await expect(page.locator('a[data-noscope]')).toHaveAttribute('href', '/contacts.html');
   });
 });
+
+// ── Add a customer — the work-type dropdown no longer strands the external case ──
+// Eric: "there isn't a selection for their site being on another platform to
+// track." Two <option>s shared value="business_os_only", so build-elsewhere-and-
+// track was indistinguishable from no-site-work — and only one of them should
+// ask for the website address. Distinct values now; the UI-only no-site key is
+// mapped back to the real plan before the wire (the server whitelist would
+// silently default an unknown key to the HOSTED plan). The dialog is duplicated
+// by hand in customers.html — byte-identity is pinned by
+// tests/presence/external_client_door_test.mjs, so these flows hold on both pages.
+test.describe('Contacts — Add-a-customer work-type dropdown', () => {
+  const openDialog = async (page: Page) => {
+    await installApp(page);
+    await mockContacts(page);
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+  };
+
+  test('every dropdown value is distinct and the four real situations are all offered', async ({ page }) => {
+    await openDialog(page);
+    const values = await page.locator('#cu-edition option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value));
+    expect(values).toEqual(['presence', 'business_os_only', 'business_os_no_site', 'presence_monitor']);
+    expect(new Set(values).size).toBe(values.length);
+  });
+
+  test('build-elsewhere and monitor ask where the website lives; hosted-here and no-site do not', async ({ page }) => {
+    await openDialog(page);
+    const wrap = page.locator('#cu-website-wrap');
+    await expect(wrap).toBeHidden();                                    // default: hosted here
+    await page.locator('#cu-edition').selectOption('business_os_only'); // building elsewhere → track it
+    await expect(wrap).toBeVisible();
+    await page.locator('#cu-edition').selectOption('business_os_no_site');
+    await expect(wrap).toBeHidden();                                    // no site work → nothing to ask
+    await page.locator('#cu-edition').selectOption('presence_monitor');
+    await expect(wrap).toBeVisible();                                   // monitoring an existing site
+  });
+
+  test('build-elsewhere submits the Business OS plan WITH the website address', async ({ page }) => {
+    await openDialog(page);
+    let posted: Record<string, unknown> | null = null;
+    await page.route(/\/functions\/v1\/presence\/sales\/customers/, (route: Route) => {
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { created: true, invited: true, portal_url: 'https://example.com/portal.html', external_domain: 'acmebakery.com' } }) });
+    });
+    await page.locator('#cu-name').fill('Jane Doe');
+    await page.locator('#cu-email').fill('jane@acmebakery.com');
+    await page.locator('#cu-biz').fill('Acme Bakery');
+    await page.locator('#cu-edition').selectOption('business_os_only');
+    await page.locator('#cu-website').fill('acmebakery.com');
+    await page.locator('#cu-submit').click();
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    expect(posted).toMatchObject({ mode: 'provision', email: 'jane@acmebakery.com', edition: 'business_os_only', website_url: 'acmebakery.com' });
+  });
+
+  test('no-site-work submits the SAME Business OS plan (mapped, never the raw UI key) and no website_url', async ({ page }) => {
+    await openDialog(page);
+    let posted: Record<string, unknown> | null = null;
+    await page.route(/\/functions\/v1\/presence\/sales\/customers/, (route: Route) => {
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { created: true, invited: true, portal_url: 'https://example.com/portal.html' } }) });
+    });
+    await page.locator('#cu-email').fill('sam@smithco.com');
+    await page.locator('#cu-edition').selectOption('business_os_no_site');
+    await page.locator('#cu-submit').click();
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    expect(posted).toMatchObject({ mode: 'provision', email: 'sam@smithco.com', edition: 'business_os_only' });
+    expect((posted as unknown as Record<string, unknown>).website_url).toBeUndefined();
+    expect((posted as unknown as Record<string, unknown>).edition).not.toBe('business_os_no_site');
+  });
+});

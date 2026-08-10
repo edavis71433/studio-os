@@ -7,7 +7,7 @@
 // fetches and DNS lookups. Nothing on the customer's website, DNS, hosting,
 // or infrastructure is ever modified. Monitor sites only.
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { verifyConnection, fetchExternalSite } from '../monitor/external.ts';
 import { assessMigrationReadiness } from '../monitor/readiness.ts';
@@ -24,15 +24,34 @@ const instructions = (method: string, token: string, domain: string) =>
   : method === 'file' ? `Place a file at /dds-verify-${token}.txt on your website containing exactly: ${token}`
   : `Add this tag inside your homepage's <head>: <meta name="dds-site-verification" content="${token}">`;
 
-export async function handleMonitorGet(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_monitor_connections?site_id=eq.${site.id}&select=${CONN_SELECT}&limit=1`);
+export async function handleMonitorGet(_jwt: string, site: SiteRow, cors: Record<string, string>) {
+  // Service-role read, deliberately. `site` only reaches this handler after
+  // index.ts authorized the caller for it (owner via resolveSite/RLS, agency
+  // operator via resolveScopedSite — fail-closed — and client_reviewers are
+  // refused at the reviewer boundary). The previous asUser read answered NULL
+  // for a scoped operator (RLS: my_presence_site_ids covers only the caller's
+  // OWN clients), so the card showed "Connect" over an existing connection —
+  // and one more tap would merge-duplicate a fresh token over a VERIFIED row.
+  const r = await svc(`presence_monitor_connections?site_id=eq.${site.id}&select=${CONN_SELECT}&limit=1`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t check the connection just now.' }, 502, cors);
   const c = r.json?.[0] ?? null;
   return json({ data: c ? { ...c, instructions: instructions(c.method, c.token, c.domain) } : null }, 200, cors);
 }
 
 export async function handleMonitorConnect(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (site.edition !== 'monitor') return json({ error: 'not_monitor', message: 'This website is hosted here — there’s nothing to connect.' }, 400, cors);
+  // Who may record an external website address here:
+  //   edition 'monitor'                 — always (this workspace exists to observe one).
+  //   edition 'presence', UNPUBLISHED   — yes: a rebuild-in-progress whose client is
+  //     already live at their own domain. Recording it feeds Search Console now
+  //     (gscDomainFor prefers a recorded external domain over the unpublished
+  //     hosting subdomain) WITHOUT flipping the edition — a bare edition flip is
+  //     unsafe (provisionForSignup re-syncs edition from the entitlement plan, and
+  //     'monitor' would revoke drafting/publishing at the index.ts boundary).
+  //   edition 'presence', PUBLISHED     — refused: the website we host IS their
+  //     website; its own domain is the Search Console property.
+  if (site.edition !== 'monitor' && site.last_published_at) {
+    return json({ error: 'not_monitor', message: 'This website is hosted and published here — its own address is what Google reports on. There’s nothing elsewhere to record.' }, 400, cors);
+  }
   let body: { url?: string; method?: string } = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right.' }, 400, cors); }
   let url: URL;

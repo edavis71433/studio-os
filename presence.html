@@ -1520,6 +1520,17 @@ function routeHash() {
   if (h === "publish") { openRitual(); return; }
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
+  // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
+  // record_href). The card lives far down the Business view; without the scroll,
+  // the link lands on a screen where the affordance it promised isn't in sight.
+  if (h === "monitor") {
+    go("business");
+    setTimeout(() => {
+      const m = $("monitorCard");
+      if (m && !m.hidden) { m.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    }, 350);   // after boot's renderMonitorCard has decided visibility
+    return;
+  }
   const v = HASH_VIEWS[h];
   if (v && $("view-" + v)) go(v);
 }
@@ -2497,9 +2508,34 @@ function renderFoundations(f, plans, launch, dom) {
 }
 
 // ── M11: Presence Monitor — connect an existing website; observe only ──
+// Who sees this card (the truth table the analytics "Add their website address"
+// CTA depends on):
+//   edition 'monitor'                → always. The workspace exists to watch an
+//                                      external site (presence_monitor) or runs
+//                                      business tools around one (business_os_only).
+//   edition 'presence', UNPUBLISHED  → yes, with rebuild wording: the business may
+//                                      already be live at its own domain while the
+//                                      new site is drafted here. Recording that
+//                                      address starts Search Console numbers now
+//                                      (the gsc sync prefers a recorded external
+//                                      domain over the unpublished netlify
+//                                      subdomain). The edition is NOT flipped —
+//                                      a bare flip is unsafe (provisionForSignup
+//                                      re-syncs edition from the plan; 'monitor'
+//                                      would revoke drafting/publishing).
+//   edition 'presence', PUBLISHED    → hidden. The website we host IS their
+//                                      website; a second "website" surface here
+//                                      would compete with the true one.
 async function renderMonitorCard() {
-  if (S.site?.edition !== "monitor") { $("monitorCard").hidden = true; return; }
+  const monitorEdition = S.site?.edition === "monitor";
+  const unpublishedHosted = !monitorEdition && !(S.site && S.site.last_published_at);
+  if (!monitorEdition && !unpublishedHosted) { $("monitorCard").hidden = true; return; }
   $("monitorCard").hidden = false;
+  if (unpublishedHosted) {
+    const sub = document.querySelector("#monitorCard .docsub");
+    if (sub) sub.textContent = "Already live somewhere else? Record that website’s address and its Google search numbers can start arriving while the new site is built here — nothing on it is ever changed from here.";
+    $("btnMonitorConnect").textContent = "Record the website’s address";
+  }
   const wrap = $("monitorStatus"); wrap.innerHTML = "";
   try {
     const r = await api("GET", "/monitor/connection");

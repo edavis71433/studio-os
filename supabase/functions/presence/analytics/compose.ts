@@ -132,8 +132,15 @@ export function searchReadinessState(x: {
   if (!x.hosted && !x.externalDomain) return 'no_domain';
   // A site WE host that has never gone live: Google has never been able to visit
   // it, and the sync asks for the previous full calendar month, so connecting
-  // today fetches a month in which nothing existed. Publishing genuinely is first.
-  if (x.hosted && !x.lastPublishedAt) return 'draft';
+  // today fetches a month in which nothing existed. Publishing genuinely is first
+  // — UNLESS Eric has recorded that the client is ALREADY LIVE at their own
+  // domain elsewhere (a rebuild-in-progress: presence_monitor_connections holds
+  // the address, and lib/gsc.ts gscDomainFor already prefers a recorded external
+  // domain over the unpublished netlify subdomain for exactly this row). Their
+  // established search numbers exist NOW, at that domain, whoever hosts it;
+  // holding them hostage to our publish date was the same lie as the external
+  // "publish first" bug, one edition over.
+  if (x.hosted && !x.lastPublishedAt && !x.externalDomain) return 'draft';
   if (x.gscConnected) return 'waiting';
   return 'connect';
 }

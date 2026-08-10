@@ -199,7 +199,9 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
 {
   const contacts = read('contacts.html');
   ok('ui: a prominent "+ Add a customer" action + dialog', /id="addCust"/.test(contacts) && /openAddCustomer/.test(contacts) && /id="custDlg"/.test(contacts));
-  ok('ui: posts to /sales/customers with name/business_name/email/edition', /api\('\/sales\/customers','POST'/.test(contacts) && /business_name/.test(contacts) && /edition:\$\('cu-edition'\)\.value/.test(contacts));
+  // `edition:cuPlan()` — the UI-only 'business_os_no_site' answer is mapped to
+  // the real Business OS plan key before it reaches the wire (external_client_door_test).
+  ok('ui: posts to /sales/customers with name/business_name/email/edition', /api\('\/sales\/customers','POST'/.test(contacts) && /business_name/.test(contacts) && /edition:cuPlan\(\)/.test(contacts));
   ok('ui: SERVICE language (never SaaS plan words) + "never pay for software"', /never pay for software/.test(contacts) && /What kind of work is this\?/.test(contacts) && !/subscription|SaaS|per month|\/mo/i.test(contacts.slice(contacts.indexOf('custDlg'), contacts.indexOf('custDlg') + 1400)));
   ok('ui: success state shows "Invitation sent to {email}" + the already-exists case', /Invitation sent to/.test(contacts) && /already_exists/.test(contacts) && /already have a workspace/.test(contacts));
   ok('ui: labels wired to inputs (for/id) + focus managed', /for="cu-email"/.test(contacts) && /id="cu-email"/.test(contacts) && /\$\('cu-name'\)\.focus\(\)/.test(contacts));

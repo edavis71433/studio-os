@@ -164,7 +164,7 @@
         <select id="cu-edition">
           <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
           <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
-          <option value="business_os_only">Just their client workspace / business tools — no site work</option>
+          <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
           <option value="presence_monitor">Just monitoring a site they already have</option>
         </select>
         <div id="cu-website-wrap" style="display:none">
@@ -403,14 +403,28 @@ function wireList(){
 // sync by hand: set up an existing customer with their own workspace + a
 // sign-in invitation, or just connect them by email. POST /sales/customers
 // (handleSalesAddCustomer) reads mode/name/business_name/email/edition. ──
-// `presence` is the only option where the site lives HERE. Every other answer
-// means we don't host it — so ask where it actually is, because that domain is
-// the one thing Search Console needs and the one thing we currently never learn.
 function cuHostedHere(){return $('cu-edition').value==='presence';}
+// The four dropdown answers map to THREE server plans (sales.ts CONVERT_PLANS):
+// 'business_os_no_site' is the same Business OS plan as the build-elsewhere
+// option — the server knows no such key, and an unknown value would silently
+// default to 'presence', the hosted plan: exactly wrong for a no-site customer.
+// Distinct values exist because two <option>s sharing value="business_os_only"
+// made "building elsewhere AND wants their site tracked" indistinguishable from
+// "no site work at all" — Eric's external-client case fell into that crack.
+function cuPlan(){const v=$('cu-edition').value;return v==='business_os_no_site'?'business_os_only':v;}
+// Who gets asked "where is their website?": every answer where a site exists (or
+// will exist) somewhere we don't host — build-elsewhere and monitor. That domain
+// is the one thing Search Console needs and the one thing we otherwise never
+// learn. The no-site-work answer isn't asked (there is no site to track); the
+// door stays open later on their website page (presence.html#monitor).
+function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_only'||v==='presence_monitor';}
 function syncCuSignup(){
   const s=$('cu-signup');if(s)s.style.display=cuHostedHere()?'':'none';
-  const w=$('cu-website-wrap');if(w)w.style.display=cuHostedHere()?'none':'';
+  const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
 }
+// TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
+// themselves — connect by email" (connect). The mode governs which fields show and
+// what the server does; connect provisions nothing.
 function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
 function syncCuMode(){
   const connect=cuMode()==='connect';
@@ -441,12 +455,12 @@ $('custForm').onsubmit=async(e)=>{
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
   const body=mode==='connect'
     ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value,
-       website_url:(!cuHostedHere()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
+    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
+       website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds it.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }
     const d=(r.body&&r.body.data)||{};

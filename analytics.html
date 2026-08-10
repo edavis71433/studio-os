@@ -212,12 +212,15 @@ function card(cls,title,sub,body,foot){
 }
 function kpi(value,kd,mod){return `<p class="kn${mod?' '+mod:''}">${value}</p><p class="kd">${kd}</p>`;}
 // SLDS illustration empty state: aria-hidden art + REQUIRED heading + one line.
-function emptyState(h,line){
+// `extraHtml` (optional) is trusted, pre-built markup — the one caller (the
+// draft search state's "already live elsewhere" alternative) escapes its own
+// pieces. Text content stays esc'd exactly as before.
+function emptyState(h,line,extraHtml){
   return `<div class="empty"><svg width="72" height="44" viewBox="0 0 72 44" aria-hidden="true" focusable="false">
     <rect x="6" y="10" width="60" height="28" rx="6" fill="none" stroke="var(--line)" stroke-width="2"/>
     <path d="M14 30 L26 22 L36 27 L48 17 L58 21" fill="none" stroke="var(--p-soft)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="58" cy="21" r="3" fill="var(--p-soft)"/>
-  </svg><p class="eh">${esc(h)}</p><p class="el">${esc(line)}</p></div>`;
+  </svg><p class="eh">${esc(h)}</p><p class="el">${esc(line)}</p>${extraHtml||''}</div>`;
 }
 // weekly line — inline SVG, aria-hidden; the visible numbers live in the caption
 function lineChart(series,color,noun){
@@ -416,9 +419,16 @@ function websiteBand(d){
   // `notConnectedLine` keeps each card's own not-connected wording (the KPI card
   // talks about numbers, the terms table about searches); the three states before
   // it are the same sentence wherever they appear, because they are the same fact.
+  // A draft HERE doesn't always mean nothing is live ANYWHERE: a rebuild's
+  // business may already be live at its own domain on another platform. The
+  // draft state names that door (record_href → presence.html#monitor, where the
+  // address is recorded) so "Publish the site" stops being the only exit —
+  // that dead end is exactly what Eric hit for his external clients.
+  const recordAlt=gDraft&&g&&g.record_href
+    ?`<p class="el" style="margin-top:6px">Already live on another platform? <a href="${esc(withScope(g.record_href))}">Record that website’s address</a> — its search numbers can start now, whoever hosts it.</p>`:'';
   const searchEmpty=(notConnectedLine)=>gDown?emptyState('Search data is catching its breath','Check back shortly.')
     :gNoDom?emptyState('Where is their website?','You don’t host this one, so there’s nothing to publish — Google reports on a domain whoever hosts it. Record their website address and their existing search numbers start arriving.')
-    :gDraft?emptyState('Publish the site first','Google can’t measure a draft — it has never been able to visit this site. Publish, and the search numbers start from the first full month it’s live.')
+    :gDraft?emptyState('Publish the site first','Google can’t measure a draft — it has never been able to visit this site. Publish, and the search numbers start from the first full month it’s live.',recordAlt)
     :gWait?emptyState('Connected — waiting on Google','Search Console is connected. Google reports on whole past months, so the first numbers land after the site has been live through one. Nothing to do.')
     :emptyState('Not measured yet',notConnectedLine);
   let h=`<h2 class="band">Your website</h2>`;

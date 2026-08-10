@@ -50,10 +50,20 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
     searchReadinessState({ ...OURS_DRAFT, lastPublishedAt: '2026-05-01T00:00:00Z' }) === 'connect');
   ok('our own published+connected site gets the lag note, not a connect nag',
     searchReadinessState({ ...OURS_DRAFT, lastPublishedAt: '2026-05-01T00:00:00Z', gscConnected: true }) === 'waiting');
-  // the exact shape of the bug being fixed: hosted is the ONLY differing input.
-  ok('the fix is precisely the hosting question: same row, hosted flips draft → connect',
-    searchReadinessState({ ...OURS_DRAFT, externalDomain: 'acmebakery.com' }) === 'draft'
-    && searchReadinessState({ ...OURS_DRAFT, externalDomain: 'acmebakery.com', hosted: false }) === 'connect');
+  // the exact shape of the bug being fixed: with NO recorded address, hosting is
+  // the only differing input and it decides which ask is honest — publish (ours)
+  // vs tell-us-the-address (theirs).
+  ok('the fix is precisely the hosting question: same address-less row, hosted flips no_domain → draft',
+    searchReadinessState(OURS_DRAFT) === 'draft'
+    && searchReadinessState({ ...OURS_DRAFT, hosted: false }) === 'no_domain');
+  // …and a RECORDED address opens the same door for a hosted rebuild-in-progress:
+  // the client is already live at their own domain on another platform, so their
+  // established search numbers do not wait for OUR publish date (the door Eric
+  // was missing for an existing hosted-edition client).
+  ok('a hosted draft with a recorded external address is no longer trapped at "publish first"',
+    searchReadinessState({ ...OURS_DRAFT, externalDomain: 'acmebakery.com' }) === 'connect');
+  ok('a hosted draft with a recorded address + GSC connected shows the honest lag',
+    searchReadinessState({ ...OURS_DRAFT, externalDomain: 'acmebakery.com', gscConnected: true }) === 'waiting');
 }
 
 // ═══ 2. the honest surface: what we can and cannot show, WITH the reason ═════
@@ -174,11 +184,12 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
     const h = page(p);
     ok(`${p}: the dialog asks where their existing website lives`,
       /id="cu-website"/.test(h) && /Their existing website address/.test(h));
-    ok(`${p}: the field appears only when the site is NOT hosted here`,
+    ok(`${p}: the field appears exactly when a site exists somewhere we don't host (build-elsewhere, monitor)`,
       /function cuHostedHere\(\)\{return \$\('cu-edition'\)\.value==='presence';\}/.test(h)
-      && /cu-website-wrap'\);if\(w\)w\.style\.display=cuHostedHere\(\)\?'none':''/.test(h));
+      && /function cuAsksWebsite\(\)\{const v=\$\('cu-edition'\)\.value;return v==='business_os_only'\|\|v==='presence_monitor';\}/.test(h)
+      && /cu-website-wrap'\);if\(w\)w\.style\.display=cuAsksWebsite\(\)\?'':'none'/.test(h));
     ok(`${p}: the address is actually submitted to /sales/customers`,
-      /website_url:\(!cuHostedHere\(\)/.test(h));
+      /website_url:\(cuAsksWebsite\(\)/.test(h));
     ok(`${p}: the hint is honest about which numbers this unlocks and which it doesn’t`,
       /whoever hosts it/.test(h) && /Visitor counts still can’t come from here/.test(h));
   }
