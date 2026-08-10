@@ -18,6 +18,7 @@
 --   • failure retry — hourly (drains presence_scheduled_runs failures under max_attempts)
 --   • coach sweep — weekly (Mondays 15:00 UTC)
 --   • GSC sync — daily 07:00 UTC (owner-gated on Google OAuth secrets)
+--   • GA4 sync — daily 07:30 UTC (owner-gated on the same Google OAuth app)
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
@@ -26,7 +27,7 @@ create extension if not exists pg_net;
 do $$
 declare j record;
 begin
-  for j in select jobname from cron.job where jobname in ('presence_ops_cycle','presence_ops_retry','presence_ops_coach','presence_gsc_sync') loop
+  for j in select jobname from cron.job where jobname in ('presence_ops_cycle','presence_ops_retry','presence_ops_coach','presence_gsc_sync','presence_ga4_sync') loop
     perform cron.unschedule(j.jobname);
   end loop;
 end $$;
@@ -70,6 +71,20 @@ $$);
 -- OWNER-GATED: this job does nothing until the Google OAuth app + CONNECTED_GOOGLE_
 -- SEARCH_CONSOLE_CLIENT_ID/_SECRET + CONNECTION_ENC_KEY are set and at least one
 -- customer has connected Search Console (each unconnected site is skipped).
+
+-- GA4 sync — daily 07:30 UTC (monthly signal totals; offset from the GSC job so
+-- the two Google reads never contend for the same invocation window)
+select cron.schedule('presence_ga4_sync', '30 7 * * *', $$
+  select net.http_post(
+    url    := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+    headers:= '{"Content-Type":"application/json"}'::jsonb,
+    body   := jsonb_build_object('secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scheduler_secret'), 'task', 'ga4_sync')
+  );
+$$);
+-- OWNER-GATED the same way: CONNECTED_GOOGLE_ANALYTICS_CLIENT_ID/_SECRET +
+-- CONNECTION_ENC_KEY set, the Analytics Data + Admin APIs enabled on the Google
+-- Cloud project, and at least one customer connected (each unconnected site is
+-- skipped; a connection with several GA4 properties waits for the choice).
 
 -- ── SPLIT MODE (apply when the fleet outgrows the single tick, ~30-50 sites) ──
 -- The single 15-min tick runs observation + revenue + hygiene in ONE invocation;

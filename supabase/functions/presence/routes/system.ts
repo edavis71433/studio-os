@@ -10,6 +10,7 @@ import { svc, svcAll, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns, runWindowExpiries } from '../ops/scheduler.ts';
 import { runUptimeHeartbeat } from '../monitor/heartbeat.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
+import { runGa4Sync } from '../ops/ga4_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
@@ -290,6 +291,18 @@ export async function handleSystem(req: Request, route: string, method: string, 
         }).then((r) => r.json?.[0]?.id || null).catch(() => null);
         const res = await runGscSync(limit);
         const issues = sweepIssues({ gsc_sync: res });
+        if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: res }) }).catch(() => {});
+        return json({ data: res }, 200, cors);
+      }
+      if (task === 'ga4_sync') {
+        // Ledgered exactly like gsc_sync (the daily pg_cron response is discarded
+        // by pg_net — without a ledger row a persistently failing sync is invisible).
+        const row = await svc('presence_scheduled_runs', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ run_type: 'ga4_sync', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
+        }).then((r) => r.json?.[0]?.id || null).catch(() => null);
+        const res = await runGa4Sync(limit);
+        const issues = sweepIssues({ ga4_sync: res });
         if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: res }) }).catch(() => {});
         return json({ data: res }, 200, cors);
       }
