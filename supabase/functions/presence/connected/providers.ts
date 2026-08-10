@@ -42,7 +42,7 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
   // ── Local listings ────────────────────────────────────────────────────────
   { key: 'google_business_profile', name: 'Google Business Profile', customerLabel: 'your Google listing',
     category: 'local_listing', purpose: 'Keep your Google listing — hours, phone, photos, reviews — correct and current.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['business.manage'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/business.manage'],   // full URL — Google rejects the short form (the AN-3.1 fix, applied to the siblings)
     reads: ['your listing details and hours', 'reviews and their replies', 'how many people called or asked directions'],
     futureWrites: ['update hours and details', 'reply to a review', 'publish a post'], minEdition: 'presence_monitor',
     rateNote: 'per-minute limits; batched, backed-off', status: 'planned' },
@@ -55,12 +55,12 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
   // ── Analytics ─────────────────────────────────────────────────────────────
   { key: 'google_analytics', name: 'Google Analytics', customerLabel: 'your visitor numbers',
     category: 'analytics', purpose: 'Understand how many people visit and what they look at — in plain numbers.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['analytics.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
     reads: ['visitors and page views', 'your busiest pages', 'where visitors come from'], futureWrites: [],
     minEdition: 'presence_monitor', rateNote: 'token-bucket quota; cached reads', status: 'planned' },
   { key: 'google_tag_manager', name: 'Google Tag Manager', customerLabel: 'your website tags',
     category: 'analytics', purpose: 'See what measurement tags are on your site, and keep them tidy.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['tagmanager.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/tagmanager.readonly'],
     reads: ['which tags and trackers are installed'], futureWrites: ['add or remove a measurement tag'],
     minEdition: 'presence', rateNote: 'low-frequency config reads', status: 'planned' },
 
@@ -87,7 +87,7 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
     rateNote: 'daily throttles; low-frequency', status: 'planned' },
   { key: 'youtube', name: 'YouTube', customerLabel: 'your YouTube channel',
     category: 'social', purpose: 'See how your videos are doing.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['youtube.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
     reads: ['videos and their view counts', 'channel subscribers'], futureWrites: [], minEdition: 'presence',
     rateNote: 'daily quota units; cached', status: 'planned' },
 
@@ -106,7 +106,7 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
   // ── Scheduling ────────────────────────────────────────────────────────────
   { key: 'google_calendar', name: 'Google Calendar', customerLabel: 'your appointments',
     category: 'scheduling', purpose: 'So your website can show real availability and, later, take bookings.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['calendar.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     reads: ['your free/busy availability', 'upcoming appointments'], futureWrites: ['create a booking'],
     minEdition: 'presence', rateNote: 'per-minute limits; incremental sync', status: 'planned' },
   { key: 'calendly', name: 'Calendly', customerLabel: 'your booking page',

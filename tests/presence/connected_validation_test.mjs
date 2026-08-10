@@ -88,7 +88,15 @@ const urlsafe = (s) => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, 
   ok('security: approval is enforced in the executor — an unapproved write cannot run',
     (await executeWrite(SITE, { id: 'p', provider_key: 'google_business_profile', workflow: 'gbp_post', kind: 'write', status: 'proposed', payload: {} }, 'x')).reason === 'not_approved');
   // permission isolation: least-privilege scopes are declared, read scopes only
-  ok('security: least-privilege — every provider declares scopes, all read-oriented', CONNECTED_PROVIDERS.every((p) => Array.isArray(p.scopes) && p.scopes.every((s) => !/write|manage\b/i.test(s) || s === 'business.manage')));
+  // `business.manage` is Google's ONE read+write-shaped scope for Business
+  // Profile — there is no read-only variant — so it stays the single documented
+  // exception. It is now declared as the full URL Google actually accepts
+  // (short-form scopes are rejected at consent; AN-3.1 learned this the hard
+  // way for Search Console, and the Google siblings carried the same defect).
+  const GBP_MANAGE = 'https://www.googleapis.com/auth/business.manage';
+  ok('security: least-privilege — every provider declares scopes, all read-oriented', CONNECTED_PROVIDERS.every((p) => Array.isArray(p.scopes) && p.scopes.every((s) => !/write|manage\b/i.test(s) || s === GBP_MANAGE)));
+  ok('security: every Google scope is the FULL URL Google accepts (a short form is rejected at consent)',
+    CONNECTED_PROVIDERS.filter((p) => /^(google_|youtube)/.test(p.key)).every((p) => p.scopes.every((s) => s.startsWith('https://www.googleapis.com/auth/'))));
 }
 
 // ═══ 4. OWNERSHIP — identical for every provider, never lock-in ═══
