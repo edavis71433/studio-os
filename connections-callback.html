@@ -41,10 +41,20 @@ const $ = (id) => document.getElementById(id);
 // localStorage is untrusted input — escape anything we render from it (or anywhere).
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
+// Which client this connection was started for. The connect leg signed the OAuth
+// state against THAT site; this return leg arrives on a bare redirect URI with
+// no ?client=, so without replaying the scope the server resolves a different
+// site from the JWT and the legs can never agree — no_site 404 for an operator
+// who owns no site, or bad_state 400 on mismatch. And the way back out has to
+// carry it too, or "Back to your connections" lands on the same 404 the operator
+// just escaped: a literal loop.
+const PENDING_SCOPE = localStorage.getItem('dds-pending-scope') || '';
+const backHref = PENDING_SCOPE ? '/connections.html?client=' + encodeURIComponent(PENDING_SCOPE) : '/connections.html';
+
 function show(icon, title, msg, showBtn){
   $('card').innerHTML = (icon === 'ok' ? '<div class="ok">✓</div>' : '<div class="spin" role="status"></div>')
     + `<h1 style="margin-top:18px" role="status">${esc(title)}</h1><p>${esc(msg)}</p>`
-    + (showBtn ? '<a class="btn" href="/connections.html">Back to your connections</a>' : '');
+    + (showBtn ? `<a class="btn" href="${esc(backHref)}">Back to your connections</a>` : '');
   const h = $('card').querySelector('h1'); if (h) h.focus && h.setAttribute('tabindex','-1'), h.focus();
 }
 
@@ -64,18 +74,28 @@ function show(icon, title, msg, showBtn){
     const { data } = await sb.auth.getSession();
     const token = (data && data.session && data.session.access_token) || '';
     if(!token){ show('', 'Please sign in and try again.', 'Your connection couldn’t be confirmed because your session ended. Nothing changed.', true); return; }
+    const headers = { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':token };
+    // replay the scope the connect leg signed against (see PENDING_SCOPE above)
+    if(PENDING_SCOPE) headers['x-dds-scope-site'] = PENDING_SCOPE;
     const r = await fetch(SUPABASE_URL + '/functions/v1/presence/connections/' + encodeURIComponent(key) + '/callback', {
-      method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':token },
-      body: JSON.stringify({ code, state }),
+      method:'POST', headers, body: JSON.stringify({ code, state }),
     });
-    localStorage.removeItem('dds-pending-connection'); localStorage.removeItem('dds-pending-label');
+    const body = await r.json().catch(()=>({}));
+    localStorage.removeItem('dds-pending-connection'); localStorage.removeItem('dds-pending-label'); localStorage.removeItem('dds-pending-scope');
     if(r.ok){
       show('ok', 'Connected.', 'We’re now reading from ' + label + ' — read-only, always with your approval, and yours to disconnect any time.', true);
     } else {
-      show('', 'That connection didn’t complete.', 'Nothing changed. Please try connecting again from your presence.', true);
+      // The server sends DISTINCT, actionable messages here — the state window
+      // lapsed, the code didn't come back, storage isn't configured, the exchange
+      // failed. Collapsing all four into "that didn't complete" was the difference
+      // between knowing what to do next and going round again.
+      const msg = (body && typeof body.message === 'string' && body.message.trim())
+        ? body.message.trim()
+        : 'Nothing changed. Please try connecting again from your Connections page.';
+      show('', 'That connection didn’t complete.', msg, true);
     }
   }catch(_){
-    show('', 'That connection didn’t complete.', 'Nothing changed on your site. Please try again in a moment.', true);
+    show('', 'That connection didn’t complete.', 'We couldn’t reach Studio OS to confirm it. Nothing changed on your site — please try again in a moment.', true);
   }
 })();
 </script>

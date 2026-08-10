@@ -50,6 +50,12 @@
   .keybox{margin-top:12px;display:none;gap:9px;flex-wrap:wrap}
   .keybox input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
   .note{font-size:13px;color:var(--soft);margin-top:8px}
+  /* the reason under a badge, and the persistent problem panel — a failure the
+     owner must act on never expires on a 2.6s timer */
+  .why{font-size:13.5px;color:var(--warn);margin:8px 0 0}
+  .prob{display:none;margin-top:12px;padding:12px 14px;border-radius:11px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--ink);font-size:13.5px;line-height:1.5}
+  .prob code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:5px;word-break:break-all}
+  .prob ul{margin:4px 0 0}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
   a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
@@ -91,11 +97,32 @@ const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':
 let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
-const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') });
+const SCOPE = (new URLSearchParams(location.search).get('client')||'');
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':SCOPE });
 async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
 
 function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+
+// A failure that needs the OWNER to do something must not evaporate in 2.6
+// seconds. `problem()` writes the server's own message into the card, where it
+// stays until the next successful attempt — the operator can read it twice,
+// copy a secret name out of it, or walk away and come back. Toasts stay for
+// things that are merely *news* ("Up to date."), never for things that need
+// action. `extra` carries the activation detail (missing secrets, redirect URI)
+// the 503 now names.
+function problem(key, msg, extra){
+  const box = $('prob-'+key); if(!box) return void toast(msg);
+  let h = `<b>${esc(msg)}</b>`;
+  if(extra && Array.isArray(extra.missing) && extra.missing.length){
+    h += `<p style="margin:6px 0 0">Set these as Supabase Edge Function secrets:</p><ul style="margin:4px 0 0;padding-left:18px">${extra.missing.map(m=>`<li><code>${esc(m)}</code></li>`).join('')}</ul>`;
+  }
+  if(extra && extra.redirect_uri){ h += `<p style="margin:6px 0 0">Redirect URI to register: <code>${esc(extra.redirect_uri)}</code></p>`; }
+  box.innerHTML = h; box.style.display='block';
+}
+function clearProblem(key){ const box=$('prob-'+key); if(box){ box.innerHTML=''; box.style.display='none'; } }
+// The server's own words, when it sent any. Never swallow a message we were given.
+const serverMsg = (r, fallback) => (r && r.body && typeof r.body.message === 'string' && r.body.message.trim()) ? r.body.message.trim() : fallback;
 
 // Small styled confirm — replaces native confirm(), matching the app's surfaces
 // (same pattern as presence.html's askText). Resolves true/false.
@@ -168,13 +195,20 @@ function card(e){
   } else {
     actions = `<button class="primary" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">${s.reconnect?'Reconnect':'Connect'}</button>`;
   }
+  // The reason UNDER the badge. An "attention" badge with nothing beside it is
+  // the dead end this page shipped with: something is wrong, and the only move
+  // left is to press Connect again and hope.
+  const reason = (e.connection && e.connection.reason) ? String(e.connection.reason) : '';
+  const why = (reason && (s.cls==='attn'||s.cls==='off') && !s.unavailable) ? `<p class="why">${esc(reason)}</p>` : '';
   return `<article class="svc" id="svc-${esc(e.key)}">
     <div class="svc-top">
       <div><h3>${esc(e.label)}</h3><p class="purpose">${esc(e.purpose)}</p></div>
       <span class="badge ${s.cls}">${esc(s.label)}</span>
     </div>
+    ${why}
     ${s.connected ? dataLine(e.data) : ''}
     <div class="row">${actions}</div>
+    <div class="prob" id="prob-${esc(e.key)}" role="alert"></div>
     <div class="keybox" id="key-${esc(e.key)}">
       <input type="password" placeholder="Paste your read-only key" aria-label="Read-only key" id="keyin-${esc(e.key)}">
       <button class="primary" data-keygo="${esc(e.key)}" data-label="${esc(e.label)}">Connect</button>
@@ -232,47 +266,83 @@ async function askConcierge(){
 }
 
 async function connect(key, label, btn){
-  btn.disabled = true; btn.textContent = 'One moment…';
+  btn.disabled = true; btn.textContent = 'One moment…'; clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/connect', {});
   if(r.ok && r.body && r.body.data && r.body.data.mode === 'oauth' && r.body.data.authorize_url){
     // remember which service, then hand off to the service's own approval screen
     localStorage.setItem('dds-pending-connection', key);
     localStorage.setItem('dds-pending-label', label);
+    // …and WHICH CLIENT this is being connected for. The connect leg signed the
+    // state against THIS scoped site (routes/connections.ts → connected/auth.ts
+    // signState). The callback returns on a bare URL with no ?client=, so
+    // without this the callback would resolve a different site from the JWT and
+    // the two legs could never agree: no_site 404 for an agency member, or
+    // bad_state 400 on mismatch. Remembering the scope is what lets the operator
+    // connect a service ON BEHALF OF a client at all.
+    if(SCOPE) localStorage.setItem('dds-pending-scope', SCOPE); else localStorage.removeItem('dds-pending-scope');
     location.href = r.body.data.authorize_url; return;
   }
   if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
+  btn.disabled=false; btn.textContent='Connect';
   // needs a pasted read-only key
-  if(r.status === 422 || (r.body && /key/i.test(r.body.message||''))){ $('key-'+key).style.display = 'flex'; btn.disabled=false; btn.textContent='Connect'; $('keyin-'+key).focus(); return; }
-  // honestly unavailable on this environment yet
-  if(r.status === 503){ toast('This one isn’t available yet.'); btn.disabled=false; btn.textContent='Connect'; return; }
-  toast('That didn’t start — nothing changed. Try again in a moment.'); btn.disabled=false; btn.textContent='Connect';
+  if(r.status === 422 || (r.body && /key/i.test(r.body.message||''))){ $('key-'+key).style.display = 'flex'; $('keyin-'+key).focus(); return; }
+  if(r.offline){ problem(key, 'Your connection dropped before anything started — nothing changed. Try again when you’re back online.'); return; }
+  // Not available yet: the server now NAMES what's missing (the secrets, the
+  // redirect URI). Eric is the owner — he is the only person who can act on
+  // this, so it is shown in full and it stays on screen.
+  if(r.status === 503){ problem(key, serverMsg(r, 'This one isn’t switched on yet.'), r.body); return; }
+  problem(key, serverMsg(r, 'That didn’t start, and nothing changed. Try again in a moment.'), r.body);
 }
 async function connectKey(key, label){
   const val = ($('keyin-'+key).value||'').trim(); if(!val) return;
+  clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/connect', { api_key: val });
   if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
-  toast('That key didn’t connect — nothing changed. Please check it and try again.');
+  problem(key, serverMsg(r, 'That key didn’t connect, and nothing changed. Please check it and try again.'), r.body);
 }
 async function disconnect(key, label, btn){
   if(!(await askConfirm('Disconnect ' + label + '?', 'Studio OS stops reading it from here on. Your ' + label + ' account and everything in it stay exactly as they are — you can reconnect any time.', 'Disconnect'))) return;
   btn.disabled = true; btn.textContent = 'Disconnecting…';
+  clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/disconnect', {});
   if(r.ok){ toast('Disconnected ' + label + '. Your account is untouched.'); return reload(); }
-  toast('That didn’t go through — try again in a moment.'); btn.disabled=false; btn.textContent='Disconnect';
+  btn.disabled=false; btn.textContent='Disconnect';
+  problem(key, serverMsg(r, 'That didn’t go through — nothing changed. Try again in a moment.'), r.body);
 }
 async function refresh(key, btn){
-  btn.disabled = true; const old = btn.textContent; btn.textContent = 'Refreshing…';
+  btn.disabled = true; const old = btn.textContent; btn.textContent = 'Refreshing…'; clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/refresh', {});
   if(r.ok){ toast('Up to date.'); return reload(); }
-  toast('Couldn’t refresh just now — it may need a quick reconnect.'); btn.disabled=false; btn.textContent=old;
+  btn.disabled=false; btn.textContent=old;
+  // The server says WHY it couldn't read (read 401 / 403 / no verified property).
+  // "Couldn't refresh just now" hid all of them behind the same shrug.
+  problem(key, serverMsg(r, 'Couldn’t read from it just now — it may need a quick reconnect.'), r.body);
 }
 
 function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub" style="margin:8px auto 0">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
-function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`; }
+// A 404 here is `no_site` — the caller owns no site of their own (an agency
+// operator, which is exactly Eric). That is PERMANENT: "please refresh in a
+// moment" sent him round the loop forever, because refreshing can never fix it.
+// The fix is a client scope, so say that, and hand him the door.
+function trouble(status){
+  if(status === 404){
+    $('main').innerHTML = `<div class="center"><h2>Open a client first.</h2>
+      <p class="sub" style="margin:8px auto 0">Connections belong to a particular business, and your studio account doesn’t have a website of its own. Pick a client and you’ll see everything they can connect — refreshing this page won’t change it.</p>
+      <p style="margin-top:22px"><a class="link" href="/agency.html">Pick a client from Studio →</a></p></div>`;
+    return;
+  }
+  if(status === 403){
+    $('main').innerHTML = `<div class="center"><h2>You don’t have access to that client.</h2>
+      <p class="sub" style="margin:8px auto 0">Nothing changed. If this is one of your clients, open them from Studio and try again from there.</p>
+      <p style="margin-top:22px"><a class="link" href="/agency.html">Back to Studio →</a></p></div>`;
+    return;
+  }
+  $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`;
+}
 
 async function reload(){
   try{ const s = await apiGet('/connections'); render(s && s.data); }
-  catch(_){ trouble(); }
+  catch(status){ trouble(typeof status === 'number' ? status : 0); }
 }
 (async function init(){
   try{
@@ -280,7 +350,7 @@ async function reload(){
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
     await reload();
-  }catch(_){ trouble(); }
+  }catch(_){ trouble(0); }
 })();
 </script>
 </body>

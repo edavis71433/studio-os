@@ -17,6 +17,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { loadPlan } from '../commerce/enforce.ts';
 import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
+import { connectionReason } from '../connected/contract.ts';
 import type { EditionKey } from '../connected/contract.ts';
 import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState } from '../connected/auth.ts';
 import { saveTokens, loadTokens, disconnect as storeDisconnect } from '../connected/store.ts';
@@ -28,6 +29,25 @@ import { saveWritePlan, listWritePlans, getWritePlan, decideWritePlan, markWrite
 import { executeWrite } from '../connected/execute.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 
+// ── Owner-facing activation copy ─────────────────────────────────────────────
+// "Isn't available on this environment yet" is true and useless. The person
+// reading it on a solo studio IS the owner — the only person who can fix it —
+// so the 503 names the exact secrets and the exact redirect URI instead of
+// hiding the setup from the one human who can do it. Secret names are derived
+// the same way connected/auth.ts derives them (CONNECTED_<KEY>_CLIENT_ID /
+// _SECRET), so this can never drift from what the code actually reads.
+// Authoritative list: docs/presence/ENV-AND-SECRETS.md.
+const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+function activationHelp(key: string, providerName: string): { message: string; missing: string[]; redirect_uri: string; docs: string } {
+  const K = key.toUpperCase();
+  const missing = [`CONNECTED_${K}_CLIENT_ID`, `CONNECTED_${K}_CLIENT_SECRET`, 'CONNECTION_ENC_KEY'];
+  return {
+    message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${SITE_URL}/connections-callback.html. Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
+    missing, redirect_uri: `${SITE_URL}/connections-callback.html`,
+    docs: 'docs/presence/ENV-AND-SECRETS.md',
+  };
+}
+
 const CATEGORY_LABEL: Record<string, string> = {
   search: 'Being found', local_listing: 'Your listings', analytics: 'Your numbers',
   social: 'Your social', reviews: 'Your reviews', scheduling: 'Your bookings',
@@ -38,7 +58,7 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
   const plan = (await loadPlan(site.client_id)) as EditionKey;
   const items = connectableFor(plan);
   const [connQ, dataQ] = await Promise.all([
-    svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health,last_sync_at,connected_at`),
+    svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health,last_sync_at,connected_at,last_error`),
     svc(`presence_connected_data?site_id=eq.${site.id}&select=provider_key,data,fetched_at`),
   ]);
   const states = new Map((connQ.ok && Array.isArray(connQ.json) ? connQ.json : []).map((c: any) => [c.provider_key, c]));
@@ -49,7 +69,13 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
     const s = states.get(it.key); const d = dataMap.get(it.key);
     const entry = {
       key: it.key, label: it.label, purpose: it.purpose, reads: it.reads, approval: it.approval, availability: it.status,
-      connection: s ? { status: s.status, health: s.health, last_sync_at: s.last_sync_at, connected_at: s.connected_at } : { status: 'disconnected', health: 'unknown', last_sync_at: null, connected_at: null },
+      // `reason`: the plain-English WHY behind an attention/down badge. Without
+      // it the badge is a dead end — the customer can see something is wrong and
+      // has only "press Connect again" left. Translated from the internal
+      // last_error (connectionReason), never the raw provider text.
+      connection: s
+        ? { status: s.status, health: s.health, last_sync_at: s.last_sync_at, connected_at: s.connected_at, reason: connectionReason(s.last_error, it.label) }
+        : { status: 'disconnected', health: 'unknown', last_sync_at: null, connected_at: null, reason: '' },
       data: d ? { ...d.data, as_of: d.fetched_at } : null, // the customer's own numbers, plain
     };
     const g = CATEGORY_LABEL[it.category] || it.category;
@@ -71,10 +97,15 @@ export async function handleConnectionProfile(site: SiteRow, key: string, cors: 
 export async function handleConnectionConnect(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
   const p = providerByKey(key);
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
-  if (!encryptionConfigured()) return json({ error: 'not_available', message: `Secure connection storage isn’t set up on this environment yet.` }, 503, cors);
+  if (!encryptionConfigured()) {
+    return json({ error: 'not_available', message: 'Secure connection storage isn’t switched on yet — set the CONNECTION_ENC_KEY Supabase Edge Function secret (a 44-character base64 key). Until it exists, connections fail closed rather than store anything in the clear.', missing: ['CONNECTION_ENC_KEY'], docs: 'docs/presence/ENV-AND-SECRETS.md' }, 503, cors);
+  }
 
   if (isOAuth(key)) {
-    if (!oauthConfigured(key)) return json({ error: 'not_available', message: `Connecting ${p.customerLabel} isn’t available on this environment yet.` }, 503, cors);
+    if (!oauthConfigured(key)) {
+      const help = activationHelp(key, p.name);
+      return json({ error: 'not_available', ...help }, 503, cors);
+    }
     const state = await signState(site.id, key);
     const url = authorizeUrl(key, state);
     return json({ data: { mode: 'oauth', authorize_url: url, state, message: `You’ll approve access to ${p.customerLabel} on ${p.name}’s own screen — read-only, and you can disconnect any time.` } }, 200, cors);
@@ -95,7 +126,7 @@ export async function handleConnectionConnect(req: Request, site: SiteRow, key: 
 export async function handleConnectionCallback(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
   const p = providerByKey(key);
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
-  if (!oauthConfigured(key)) return json({ error: 'not_available', message: 'That connection isn’t available on this environment yet.' }, 503, cors);
+  if (!oauthConfigured(key)) return json({ error: 'not_available', ...activationHelp(key, p.name) }, 503, cors);
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const code = String(body?.code || '');
   if (!code) return json({ error: 'bad_request', message: 'The connection didn’t return a code — please try again.' }, 422, cors);
@@ -103,7 +134,12 @@ export async function handleConnectionCallback(req: Request, site: SiteRow, key:
   // Refuses replayed, cross-site, or forged callbacks before any code is exchanged.
   const state = String(body?.state || '');
   if (!(await verifyState(state, site.id, key))) {
-    return json({ error: 'bad_state', message: 'That connection couldn’t be verified — please start connecting again. Nothing changed.' }, 400, cors);
+    // Two honest causes, and the customer can act on either: the consent screen
+    // sat open longer than the 10-minute state window, or the connect leg was
+    // started for a DIFFERENT client than the one this callback resolved to
+    // (the operator-connects-for-a-client case — connections-callback.html sends
+    // x-dds-scope-site so the two legs agree).
+    return json({ error: 'bad_state', message: 'That connection couldn’t be verified, so nothing was connected. Usually the approval screen was left open too long (there’s a 10-minute window) — start again from the same client’s Connections page and it will go through.' }, 400, cors);
   }
   try {
     const tokens = await exchangeCode(key, code);

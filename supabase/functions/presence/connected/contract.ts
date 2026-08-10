@@ -86,6 +86,38 @@ export const ERROR_PHILOSOPHY = {
   network_failure: 'transient; last-sync time tells the truth; retried on the next natural pass, never a background storm',
 } as const;
 
+// ── The reason under the badge ───────────────────────────────────────────────
+// A "Needs attention" badge with no reason is a dead end: the customer can see
+// that something is wrong and has no idea what, so the only move left is to
+// press Connect again and hope. `presence_connections.last_error` already holds
+// the answer — but it is an INTERNAL marker (the law above: never raw provider
+// errors to the customer), so it is translated here rather than leaked.
+//
+// PURE, so every marker the store can write has a pinned sentence. Anything
+// unrecognized degrades to a calm, honest line instead of shipping raw text to
+// a screen — a fallback, never a fabrication.
+export function connectionReason(lastError: unknown, label = 'this service'): string {
+  const raw = String(lastError ?? '').trim();
+  if (!raw) return '';
+  const http = raw.match(/^read (\d{3})$/);
+  if (http) {
+    switch (http[1]) {
+      case '401': return 'The permission lapsed on the service’s side. Reconnecting takes one tap and fixes it.';
+      case '403': return `The sign-in worked, but that account isn’t allowed to see ${label}. Connect with the account that owns it.`;
+      case '404': return `${label} answered, but couldn’t find anything to read for this website yet.`;
+      case '429': return 'The service asked us to slow down. Nothing is broken — we’ll read again shortly.';
+      default: return http[1].startsWith('5')
+        ? 'The service is having trouble at its end right now. We’ll keep the last numbers and try again.'
+        : `The service refused that read (${http[1]}). Reconnecting usually clears it.`;
+    }
+  }
+  // Sentences WE author (store.ts / the syncs) are already plain English and are
+  // the most useful thing we can possibly say — pass those through verbatim.
+  if (/^[A-Z]/.test(raw) && /\s/.test(raw) && !/^Error\b|^TypeError\b/.test(raw)) return raw.slice(0, 200);
+  if (/needs a quick reconnect/i.test(raw)) return 'The permission lapsed. Reconnecting takes one tap.';
+  return 'The last read didn’t go through. Reconnecting usually clears it — nothing on your account changed.';
+}
+
 export const EDITIONS: readonly EditionKey[] = ['presence_monitor', 'presence', 'presence_managed', 'agency', 'enterprise'] as const;
 export function editionRank(e: EditionKey): number { return EDITIONS.indexOf(e); }
 // Technical capability only (the milestone forbids finalizing pricing here): an
