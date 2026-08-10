@@ -80,7 +80,7 @@ import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
-import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
+import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
 import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
 import { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } from './routes/enterprise.ts';
 
@@ -1015,6 +1015,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       if (seg && seg !== 'prepare' && action === 'decide' && method === 'POST') return handleWriteDecide(req, site, key, seg, principal, cors);
       if (seg && seg !== 'prepare' && action === 'execute' && method === 'POST') return handleWriteExecute(site, key, seg, principal, cors);
       if (seg && seg !== 'prepare' && action === 'rollback' && method === 'POST') return handleWriteRollback(site, key, seg, principal, cors);
+    }
+  }
+  // GA4 property selection: list what the connected account can read; record the pick
+  {
+    const m = route.match(/^\/connections\/([a-z0-9_]+)\/(properties|property)$/);
+    if (m) {
+      if (m[2] === 'properties' && method === 'GET') return handleConnectionProperties(site, m[1], cors);
+      if (m[2] === 'property' && method === 'POST') return handleConnectionPropertySelect(req, site, m[1], principal, cors);
     }
   }
   {

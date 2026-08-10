@@ -184,6 +184,20 @@ function dataLine(d){
   return `<div class="data">${bits.join(' · ')}${asof}</div>`;
 }
 
+// GA4 only: which Analytics property this connection reads. A Google account
+// usually holds several; the numbers are meaningless until exactly one is
+// chosen. Connected with a choice → say which (and how it was chosen).
+// Connected without one → ask, with the account's real list (loaded after
+// render; see loadGaProperties). Failure states are inline and honest.
+function propertyBlock(e, s){
+  if(e.key!=='google_analytics' || !s.connected) return '';
+  if(e.property && e.property.id){
+    const how = e.property.auto_selected ? ' — the only one on that account, picked automatically' : '';
+    return `<p class="note" id="pick-note">Reading the <b>${esc(e.property.name||('property '+e.property.id))}</b> property${how}.</p>`;
+  }
+  return `<div class="pickbox" id="pick-google_analytics"><p class="note">Checking which Analytics properties that account can see…</p></div>`;
+}
+
 function card(e){
   const s = statusOf(e);
   const reads = (e.reads||[]).map(r=>`<li>${esc(r)}</li>`).join('');
@@ -207,6 +221,7 @@ function card(e){
     </div>
     ${why}
     ${s.connected ? dataLine(e.data) : ''}
+    ${propertyBlock(e, s)}
     <div class="row">${actions}</div>
     <div class="prob" id="prob-${esc(e.key)}" role="alert"></div>
     <div class="keybox" id="key-${esc(e.key)}">
@@ -255,6 +270,39 @@ function wire(){
   document.querySelectorAll('[data-refresh]').forEach(b=>b.addEventListener('click', ()=>refresh(b.getAttribute('data-refresh'), b)));
   const cask=$('cask'), cq=$('cq');
   if(cask){ cask.addEventListener('click', askConcierge); cq.addEventListener('keydown', e=>{ if(e.key==='Enter') askConcierge(); }); }
+  if($('pick-google_analytics')) loadGaProperties();
+}
+
+// ── the GA4 property choice (connected, nothing chosen yet) ──────────────────
+// Four honest states: loading (placeholder above), none (the account has no
+// property — say so, nothing to press), one-or-many (the question with real
+// buttons; one property normally auto-selects on the first read, so reaching
+// the list with one is rare but still answerable), error (inline, stays put).
+async function loadGaProperties(){
+  const box=$('pick-google_analytics'); if(!box) return;
+  try{
+    const s=await apiGet('/connections/google_analytics/properties');
+    const d=(s&&s.data)||{};
+    if(d.selected&&d.selected.id) return reload();          // chosen elsewhere (or auto) since render
+    const props=d.properties||[];
+    if(!props.length){
+      box.innerHTML=`<p class="why">${esc(d.note||'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics.')}</p>`;
+      return;
+    }
+    box.innerHTML=`<p class="note" style="color:var(--ink);font-weight:600;margin-top:12px">Which property is this website?</p>
+      <div class="row" style="margin-top:8px">${props.map(p=>`<button data-gaprop="${esc(p.id)}">${esc(p.name)}${p.account?` · ${esc(p.account)}`:''}</button>`).join('')}</div>
+      <p class="note">Pick the one that measures this website — read-only either way, and changeable any time by reconnecting.</p>`;
+    box.querySelectorAll('[data-gaprop]').forEach(b=>b.addEventListener('click',()=>pickGaProperty(b.getAttribute('data-gaprop'),b)));
+  }catch(_status){
+    box.innerHTML=`<p class="why">We couldn’t list that account’s Analytics properties just now. Nothing changed — refresh in a moment.</p>`;
+  }
+}
+async function pickGaProperty(id,btn){
+  const old=btn.textContent; btn.disabled=true; btn.textContent='Choosing…'; clearProblem('google_analytics');
+  const r=await apiPost('/connections/google_analytics/property',{ property_id:id });
+  if(r.ok){ toast('Reading that property from here on.'); return reload(); }
+  btn.disabled=false; btn.textContent=old;
+  problem('google_analytics', serverMsg(r,'That choice didn’t save — nothing changed. Try again in a moment.'), r.body);
 }
 async function askConcierge(){
   const cq=$('cq'), box=$('cans'), btn=$('cask');
@@ -284,8 +332,11 @@ async function connect(key, label, btn){
   }
   if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
   btn.disabled=false; btn.textContent='Connect';
-  // needs a pasted read-only key
-  if(r.status === 422 || (r.body && /key/i.test(r.body.message||''))){ $('key-'+key).style.display = 'flex'; $('keyin-'+key).focus(); return; }
+  // Needs a pasted read-only key — the server answers 422 for api-key providers.
+  // Status ONLY, never a /key/i sniff of the message: the real 503 activation
+  // text names CONNECTION_ENC_KEY, and the sniff showed an OAuth provider a
+  // paste-a-key box instead of the owner's setup instructions.
+  if(r.status === 422){ $('key-'+key).style.display = 'flex'; $('keyin-'+key).focus(); return; }
   if(r.offline){ problem(key, 'Your connection dropped before anything started — nothing changed. Try again when you’re back online.'); return; }
   // Not available yet: the server now NAMES what's missing (the secrets, the
   // redirect URI). Eric is the owner — he is the only person who can act on

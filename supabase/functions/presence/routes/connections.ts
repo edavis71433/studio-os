@@ -19,9 +19,10 @@ import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
 import { connectionReason } from '../connected/contract.ts';
 import type { EditionKey } from '../connected/contract.ts';
-import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState } from '../connected/auth.ts';
-import { saveTokens, loadTokens, disconnect as storeDisconnect } from '../connected/store.ts';
-import { readProvider } from '../connected/adapters.ts';
+import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens } from '../connected/auth.ts';
+import { saveTokens, loadTokens, disconnect as storeDisconnect, getConnectionConfig, setConnectionConfig, markStatus } from '../connected/store.ts';
+import { readProvider, discoverGa4Properties } from '../connected/adapters.ts';
+import { ga4PropertyPath } from '../lib/ga4.ts';
 import { encryptionConfigured } from '../connected/crypto.ts';
 import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connected/writes.ts';
 import type { WriteWorkflow } from '../connected/writes.ts';
@@ -38,11 +39,17 @@ import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 // _SECRET), so this can never drift from what the code actually reads.
 // Authoritative list: docs/presence/ENV-AND-SECRETS.md.
 const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+// Per-provider extra steps beyond the secrets — spoken HERE because the person
+// reading the 503 is the one human who can do them.
+const ACTIVATION_EXTRA: Record<string, string> = {
+  google_analytics: 'The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/analytics.readonly scope to its consent screen, and enable the Google Analytics Data API and Google Analytics Admin API on the project.',
+};
 function activationHelp(key: string, providerName: string): { message: string; missing: string[]; redirect_uri: string; docs: string } {
   const K = key.toUpperCase();
   const missing = [`CONNECTED_${K}_CLIENT_ID`, `CONNECTED_${K}_CLIENT_SECRET`, 'CONNECTION_ENC_KEY'];
+  const extra = ACTIVATION_EXTRA[key] ? ` ${ACTIVATION_EXTRA[key]}` : '';
   return {
-    message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${SITE_URL}/connections-callback.html. Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
+    message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${SITE_URL}/connections-callback.html.${extra} Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
     missing, redirect_uri: `${SITE_URL}/connections-callback.html`,
     docs: 'docs/presence/ENV-AND-SECRETS.md',
   };
@@ -58,7 +65,7 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
   const plan = (await loadPlan(site.client_id)) as EditionKey;
   const items = connectableFor(plan);
   const [connQ, dataQ] = await Promise.all([
-    svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health,last_sync_at,connected_at,last_error`),
+    svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health,last_sync_at,connected_at,last_error,config`),
     svc(`presence_connected_data?site_id=eq.${site.id}&select=provider_key,data,fetched_at`),
   ]);
   const states = new Map((connQ.ok && Array.isArray(connQ.json) ? connQ.json : []).map((c: any) => [c.provider_key, c]));
@@ -76,6 +83,11 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
       connection: s
         ? { status: s.status, health: s.health, last_sync_at: s.last_sync_at, connected_at: s.connected_at, reason: connectionReason(s.last_error, it.label) }
         : { status: 'disconnected', health: 'unknown', last_sync_at: null, connected_at: null, reason: '' },
+      // GA4 only: which property this connection reads (0128 config). The page
+      // shows the choice — or, when connected with none chosen, asks for it.
+      ...(it.key === 'google_analytics' ? { property: (s?.config?.property_id)
+        ? { id: String(s.config.property_id), name: String(s.config.property_name || ''), auto_selected: !!s.config.auto_selected }
+        : null } : {}),
       data: d ? { ...d.data, as_of: d.fetched_at } : null, // the customer's own numbers, plain
     };
     const g = CATEGORY_LABEL[it.category] || it.category;
@@ -151,6 +163,74 @@ export async function handleConnectionCallback(req: Request, site: SiteRow, key:
   } catch (_e) {
     return json({ error: 'connect_failed', message: 'That connection didn’t complete. Nothing changed — please try again.' }, 502, cors);
   }
+}
+
+// ── GA4 property selection ───────────────────────────────────────────────────
+// One Google account usually holds several GA4 properties; reporting is always
+// against exactly one. These two endpoints are the human half of that choice:
+// list what the connected account can read (Admin API accountSummaries — shape
+// in lib/ga4.ts), and record the pick on the connection (0128 config). Only
+// Google Analytics has this shape today; other providers 404 honestly.
+
+/** A live access token for this site's connection, silently refreshed when
+ *  expired — the same dance readProvider does, extracted for the two GA4
+ *  property endpoints. Null = not connected (or refresh failed). */
+async function liveToken(siteId: string, key: string): Promise<string | null> {
+  let tokens = await loadTokens(siteId, key);
+  if (!tokens?.access_token) return null;
+  if (tokens.expires_at && new Date(tokens.expires_at) <= new Date() && tokens.refresh_token && isOAuth(key) && oauthConfigured(key)) {
+    try { tokens = await refreshTokens(key, tokens.refresh_token); await saveTokens(siteId, key, tokens, []); }
+    catch { return null; }
+  }
+  return tokens.access_token || null;
+}
+
+export async function handleConnectionProperties(site: SiteRow, key: string, cors: Record<string, string>) {
+  const p = providerByKey(key);
+  if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  if (key !== 'google_analytics') return json({ error: 'not_found', message: `${p.customerLabel} doesn’t choose a property — there’s nothing to pick here.` }, 404, cors);
+  const token = await liveToken(site.id, key);
+  if (!token) return json({ error: 'not_connected', message: 'Connect Google Analytics first — then pick which property is this website.' }, 409, cors);
+  const found = await discoverGa4Properties(token).catch(() => null);
+  if (!found || !found.ok) {
+    const status = found && !found.ok ? found.status : 0;
+    const msg = status === 403
+      ? 'Google answered, but that account isn’t allowed to list Analytics properties — the Analytics Admin API may not be enabled on the app’s Google Cloud project yet.'
+      : 'We couldn’t list the properties just now. Nothing changed — try again in a moment.';
+    return json({ error: 'read_failed', message: msg }, 502, cors);
+  }
+  const cfg = await getConnectionConfig(site.id, key);
+  const selected = cfg.property_id ? { id: String(cfg.property_id), name: String(cfg.property_name || ''), auto_selected: !!cfg.auto_selected } : null;
+  return json({ data: {
+    properties: found.properties,
+    selected,
+    note: found.properties.length === 0
+      ? 'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics, or create the property first.'
+      : 'Pick the property that measures this website. Read-only either way.',
+  } }, 200, cors);
+}
+
+export async function handleConnectionPropertySelect(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
+  const p = providerByKey(key);
+  if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  if (key !== 'google_analytics') return json({ error: 'not_found', message: `${p.customerLabel} doesn’t choose a property — there’s nothing to pick here.` }, 404, cors);
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const picked = ga4PropertyPath(body?.property_id);
+  if (!picked) return json({ error: 'bad_request', message: 'Pick a property from the list — that didn’t look like one.' }, 422, cors);
+  const id = picked.replace(/^properties\//, '');
+  const token = await liveToken(site.id, key);
+  if (!token) return json({ error: 'not_connected', message: 'Connect Google Analytics first — then pick which property is this website.' }, 409, cors);
+  // Verify the pick against what the account can actually read — a typo'd or
+  // stale id must fail HERE, not as a silent 404 on every future sync.
+  const found = await discoverGa4Properties(token).catch(() => null);
+  if (!found || !found.ok) return json({ error: 'read_failed', message: 'We couldn’t confirm that property with Google just now. Nothing changed — try again in a moment.' }, 502, cors);
+  const match = found.properties.find((x) => x.id === id);
+  if (!match) return json({ error: 'bad_request', message: 'That property isn’t on the connected Google account. Pick one from the list — or reconnect with the account that owns it.' }, 422, cors);
+  await setConnectionConfig(site.id, key, { property_id: match.id, property_name: match.name, auto_selected: false });
+  await markStatus(site.id, key, 'connected', 'ok', '').catch(() => {});   // clears the "choose a property" attention
+  await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'configure', detail: `property selected: ${match.name} (${match.id})`, actor_kind: principal.kind === 'staff' ? 'operator' : 'customer' }) }).catch(() => {});
+  readProvider(site.id, key, p.customerLabel).catch(() => {});   // first read against the chosen property, on-demand
+  return json({ data: { selected: { id: match.id, name: match.name }, message: `Reading ${match.name} from here on.` } }, 200, cors);
 }
 
 export async function handleConnectionRefresh(site: SiteRow, key: string, cors: Record<string, string>) {

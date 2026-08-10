@@ -108,6 +108,119 @@ test.describe('Connections — failures say what went wrong, and stay said', () 
   });
 });
 
+// ── GA4: the property choice ─────────────────────────────────────────────────
+// A Google account usually holds SEVERAL GA4 properties; the numbers are
+// meaningless until exactly one is chosen. Connected-with-a-choice says which;
+// connected-without-one asks, from the account's real list; every failure state
+// is inline and honest (the page's problem-panel idiom, never a 2.6s toast).
+test.describe('Connections — Google Analytics chooses its property', () => {
+  const GA_SURFACE = (over: Record<string, unknown> = {}) => ({ data: {
+    edition: 'presence_monitor',
+    note: 'Connect the services you already use.',
+    groups: { 'Your numbers': [{
+      key: 'google_analytics', label: 'your visitor numbers',
+      purpose: 'Understand how many people visit and what they look at — in plain numbers.',
+      reads: ['visitors and page views'], approval: 'You approve access on the provider’s sign-in screen.',
+      availability: 'Read-only',
+      connection: { status: 'connected', health: 'ok', last_sync_at: null, connected_at: '2026-08-01T00:00:00Z', reason: '' },
+      property: null, data: null,
+      ...over,
+    }] },
+  } });
+  const PROPS = (list: Array<{ id: string; name: string; account?: string }>) =>
+    ({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { properties: list, selected: null, note: list.length ? 'Pick the property that measures this website.' : 'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics, or create the property first.' } }) });
+
+  test('the registry flip: Google Analytics renders a Connect button at all', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE({ connection: { status: 'disconnected', health: 'unknown', last_sync_at: null, connected_at: null, reason: '' } }) } });
+    await page.goto('/connections.html');
+    const connect = page.locator('#svc-google_analytics button[data-connect]');
+    await expect(connect).toBeVisible();
+    await expect(connect).toHaveText('Connect');
+    await expect(page.locator('#svc-google_analytics')).not.toContainText('This one’s coming soon.');
+  });
+
+  test('MANY properties → "Which property is this website?" with the real list; picking one records it', async ({ page }) => {
+    let picked = '';
+    await installApp(page, { api: { '/connections': GA_SURFACE() } });
+    await page.route('**/functions/v1/presence/connections/google_analytics/properties', (route) =>
+      route.fulfill(PROPS([{ id: '313646501', name: 'Bacchus Kitchen', account: 'Davis Digital Studio' }, { id: '313646502', name: 'davisdigitalstudio.com', account: 'Davis Digital Studio' }])));
+    await page.route('**/functions/v1/presence/connections/google_analytics/property', async (route) => {
+      picked = JSON.parse(route.request().postData() || '{}').property_id || '';
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { selected: { id: '313646501', name: 'Bacchus Kitchen' }, message: 'Reading Bacchus Kitchen from here on.' } }) });
+    });
+    await page.goto('/connections.html');
+    await expect(page.getByText('Which property is this website?')).toBeVisible();
+    const btn = page.locator('#pick-google_analytics button[data-gaprop="313646501"]');
+    await expect(btn).toContainText('Bacchus Kitchen');
+    await btn.click();
+    await expect.poll(() => picked).toBe('313646501');
+  });
+
+  test('ONE property (auto-selected server-side) → the card says which, and that it was automatic', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE({ property: { id: '313646501', name: 'Bacchus Kitchen', auto_selected: true }, data: { visitors: 512, pageviews: 2100, as_of: '2026-08-09T07:30:00Z' } }) } });
+    await page.goto('/connections.html');
+    const card = page.locator('#svc-google_analytics');
+    await expect(card).toContainText('Reading the Bacchus Kitchen property');
+    await expect(card).toContainText('picked automatically');
+    // no picker when the choice is made
+    await expect(page.locator('#pick-google_analytics')).toHaveCount(0);
+    // and the numbers flow, plainly
+    await expect(card).toContainText('512 recent visitors');
+  });
+
+  test('ZERO properties → an honest dead-end sentence, nothing to press', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE() } });
+    await page.route('**/functions/v1/presence/connections/google_analytics/properties', (route) => route.fulfill(PROPS([])));
+    await page.goto('/connections.html');
+    await expect(page.locator('#pick-google_analytics'))
+      .toContainText('That Google account has no Google Analytics property yet');
+    await expect(page.locator('#pick-google_analytics button')).toHaveCount(0);
+  });
+
+  test('a failed property list → inline failure that stays put, not a toast', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE() } });
+    await page.route('**/functions/v1/presence/connections/google_analytics/properties', (route) =>
+      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'read_failed', message: 'We couldn’t list the properties just now.' }) }));
+    await page.goto('/connections.html');
+    const box = page.locator('#pick-google_analytics');
+    await expect(box).toContainText('We couldn’t list that account’s Analytics properties just now');
+    await page.waitForTimeout(3200);   // a toast would be gone; this must not be
+    await expect(box).toContainText('Nothing changed');
+  });
+
+  test('a rejected pick → the server’s reason lands in the problem panel; the button recovers', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE() } });
+    await page.route('**/functions/v1/presence/connections/google_analytics/properties', (route) =>
+      route.fulfill(PROPS([{ id: '1', name: 'A' }, { id: '2', name: 'B' }])));
+    await page.route('**/functions/v1/presence/connections/google_analytics/property', (route) =>
+      route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'bad_request', message: 'That property isn’t on the connected Google account. Pick one from the list — or reconnect with the account that owns it.' }) }));
+    await page.goto('/connections.html');
+    const btn = page.locator('#pick-google_analytics button[data-gaprop="1"]');
+    await btn.click();
+    await expect(page.locator('#prob-google_analytics')).toContainText('isn’t on the connected Google account');
+    await expect(btn).toBeEnabled();
+    await expect(btn).toContainText('A');
+  });
+
+  test('the 503 names the GA-specific Google Cloud steps (scope + the two APIs)', async ({ page }) => {
+    await installApp(page, { api: { '/connections': GA_SURFACE({ connection: { status: 'disconnected', health: 'unknown', last_sync_at: null, connected_at: null, reason: '' } }) } });
+    await page.route('**/functions/v1/presence/connections/google_analytics/connect', (route) =>
+      route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
+        error: 'not_available',
+        message: 'Google Analytics isn’t switched on yet — it needs its Google Analytics app registered and three Supabase Edge Function secrets set: CONNECTED_GOOGLE_ANALYTICS_CLIENT_ID, CONNECTED_GOOGLE_ANALYTICS_CLIENT_SECRET, CONNECTION_ENC_KEY. The app’s redirect URI must be https://davisdigitalstudio.com/connections-callback.html. The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/analytics.readonly scope to its consent screen, and enable the Google Analytics Data API and Google Analytics Admin API on the project. Nothing is wrong with your account; this is a one-time setup on the Studio side.',
+        missing: ['CONNECTED_GOOGLE_ANALYTICS_CLIENT_ID', 'CONNECTED_GOOGLE_ANALYTICS_CLIENT_SECRET', 'CONNECTION_ENC_KEY'],
+        redirect_uri: 'https://davisdigitalstudio.com/connections-callback.html',
+      }) }));
+    await page.goto('/connections.html');
+    await page.locator('#svc-google_analytics button[data-connect]').click();
+    const prob = page.locator('#prob-google_analytics');
+    await expect(prob).toContainText('CONNECTED_GOOGLE_ANALYTICS_CLIENT_ID');
+    await expect(prob).toContainText('analytics.readonly');
+    await expect(prob).toContainText('Google Analytics Data API');
+    await expect(prob).toContainText('Google Analytics Admin API');
+  });
+});
+
 test.describe('Connections — the operator connects FOR a client', () => {
   const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 
