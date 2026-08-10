@@ -16,7 +16,12 @@ const mig = read('supabase/migrations/0085_form_submission_converted.sql');
 ok('dedupe: an existing deal for the submission is returned, not duplicated', /source_submission_id=eq\.\$\{srcSub\}&deleted_at=is\.null[\s\S]*?if \(existing\) return json\(\{ data: existing, already_converted: true \}/.test(sales));
 ok('dedupe: the lookup is tenant-scoped (site_id)', /presence_deals\?site_id=eq\.\$\{site\.id\}&source_submission_id=eq\.\$\{srcSub\}/.test(sales));
 ok('convert: the originating enquiry is marked converted (system status)', /presence_form_submissions\?id=eq\.\$\{srcSub\}&site_id=eq\.\$\{site\.id\}`, \{ method: 'PATCH', body: JSON\.stringify\(\{ status: 'converted' \}\)/.test(sales));
-ok('convert: the created event carries the source submission (deep-link provenance)', /dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: 'lead', source_submission_id: srcSub \}\)/.test(sales));
+// The submission link rides `detail` (a real jsonb column) — it used to be a
+// TOP-LEVEL source_submission_id key, which presence_deal_events doesn't have,
+// so PostgREST 400'd the insert and the best-effort catch swallowed it: the
+// 'created' event never actually wrote. The enquiry text rides along too
+// (sales_price_flow_test.mjs pins that half).
+ok('convert: the created event carries the source submission (deep-link provenance)', /dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: 'lead', detail: \{ source_submission_id: srcSub/.test(sales));
 
 // inbox: link each enquiry to its deal, tenant-scoped, bounded
 ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /deal_id: dealMap\.get\(String\(s\.id\)\) \|\| null, converted: s\.status === 'converted' \|\| dealMap\.has/.test(commercial));

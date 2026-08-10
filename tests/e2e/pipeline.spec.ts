@@ -1343,6 +1343,108 @@ test.describe('agreement — the unfilled-blanks warning', () => {
   });
 });
 
+// ── The price flows to the end (operator audit 1, 2, 8) ─────────────────────
+// Stage 'contract' conflates sent and signed, so the drawer used to render
+// "Signed ✓" beside "Do next: Get it signed"; the renewal reminder armed only
+// off a field nothing prompted for; and the signed agreement promised a deposit
+// nobody minted. These pin the drawer half of each fix.
+const DEAL7 = '77777777-7777-4777-8777-777777777777';
+const contractDeal = (contract: Record<string, unknown>, dealExtras: Record<string, unknown> = {}) => ({ data: {
+  deal: { id: DEAL7, title: 'Marlow rebuild', stage: 'contract', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null, ...dealExtras },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [contract], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} });
+const conApi = (contract: Record<string, unknown>, dealExtras: Record<string, unknown> = {}) =>
+  ({ ...API, [`/sales/deals/${DEAL7}`]: contractDeal(contract, dealExtras), [`/sales/deals/${DEAL7}/tasks`]: { data: [] } });
+const SIGNED_NO_TERM = { id: 'k-sg', title: 'Service agreement', status: 'signed', signer_name: 'Sam Rivera', signed_at: '2026-07-15T10:00:00.000Z', version: 1, terms_snapshot: null, body: 'A non-refundable deposit of 50% of the total project fee is due before work begins.' };
+
+test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
+  test('a SIGNED deal’s guidance says convert — never "Get it signed" — and deep-links the button', async ({ page }) => {
+    await installApp(page, { api: conApi(SIGNED_NO_TERM) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    const guide = page.locator('#pathHost .path-guide');
+    await expect(guide).toContainText('They’ve signed — convert them to open their portal and start the project.');
+    await expect(guide).toContainText('Convert them to a customer');
+    await expect(guide).not.toContainText('Get it signed');                      // the contradiction is dead
+    // the "Do next" is a live deep-link straight to the convert button
+    await page.locator('#guideConvert').click();
+    await expect(page.locator('#convert')).toBeFocused();
+    // …and the stage to-do presets follow the fact too
+    await expect(page.locator('#dt-preset option', { hasText: 'Convert them to a customer' })).toHaveCount(1);
+  });
+
+  test('an UNSIGNED sent agreement keeps the current copy', async ({ page }) => {
+    await installApp(page, { api: conApi({ ...SIGNED_NO_TERM, id: 'k-un', status: 'sent', signer_name: null, signed_at: null }) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await expect(page.locator('#pathHost .path-guide')).toContainText('Get it signed');
+  });
+
+  test('a signed agreement missing its renewal date says the reminder can’t arm (no invented default)', async ({ page }) => {
+    await installApp(page, { api: conApi(SIGNED_NO_TERM) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    // the body states no operative term, so: hint yes, prefilled date NO
+    await expect(page.locator('#detailInner')).toContainText('No renewal date — the renewal reminder can’t arm.');
+    await expect(page.locator('#con-term-k-sg')).toHaveValue('');
+  });
+
+  test('an agreement that STATES a term prefills signed_at + N months — set only by pressing Save', async ({ page }) => {
+    const termed = { ...SIGNED_NO_TERM, body: 'This engagement is a 12-month term beginning at signing. A 50% deposit is due.' };
+    let saved = '';
+    await installApp(page, { api: conApi(termed) });
+    await page.route('**/functions/v1/presence/sales/contracts/k-sg/term', async (route) => {
+      saved = route.request().postData() || '';
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { term_end: '2027-07-15' } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await expect(page.locator('#detailInner')).toContainText('reads as a 12-month term');
+    await expect(page.locator('#con-term-k-sg')).toHaveValue('2027-07-15');      // signed 2026-07-15 + 12 months
+    expect(saved).toBe('');                                                      // NOTHING was written yet — the default is only a prefill
+    await page.locator('[data-set-term="k-sg"]').click();
+    await expect(page.locator('.dds-toast')).toContainText('Renewal reminder set');
+    expect(JSON.parse(saved)).toEqual({ term_end: '2027-07-15' });               // one tap of Save confirms it
+  });
+
+  test('once a renewal date is set, the hint goes away', async ({ page }) => {
+    await installApp(page, { api: conApi({ ...SIGNED_NO_TERM, terms_snapshot: { term_end: '2027-01-01' } }) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await expect(page.locator('#detailInner')).not.toContainText('No renewal date');
+    await expect(page.locator('#con-term-k-sg')).toHaveValue('2027-01-01');
+  });
+
+  test('sending the agreement reports the deposit the server minted alongside it', async ({ page }) => {
+    const draft = { ...SIGNED_NO_TERM, id: 'k-dr', status: 'draft', signer_name: null, signed_at: null };
+    let dialogs = 0;
+    await installApp(page, { api: conApi(draft) });
+    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await page.route('**/functions/v1/presence/sales/contracts/k-dr/send', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-dr', status: 'sent' }, url: 'https://example.test/sign/x', emailed: true, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.locator('[data-send-contract="k-dr"]').first().click();
+    await expect(page.locator('.dds-toast')).toContainText('deposit request is ready — they can pay the moment they sign');
+    expect(dialogs).toBe(0);                                                     // a valued deal warns about nothing
+  });
+
+  test('a VALUELESS agreement warns before send — the doc prints "[50% deposit]" nobody computed', async ({ page }) => {
+    const blank = { ...SIGNED_NO_TERM, id: 'k-bl', status: 'draft', signer_name: null, signed_at: null,
+      body: 'Project fee: [project fee]. A deposit of [50% deposit] is due at signing.' };
+    const calls: string[] = [];
+    await installApp(page, { api: conApi(blank, { expected_value_cents: 0 }) });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      if (route.request().method() === 'GET') return route.fallback();
+      calls.push(new URL(route.request().url()).pathname);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await page.locator('[data-send-contract="k-bl"]').first().click();
+    await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
+    expect(msg).toContain('the deal has no value set');
+    expect(msg).toContain('the deposit request will make itself when you send');
+    expect(calls).toHaveLength(0);                                               // declining sends nothing at all
+  });
+});
+
 // ── Voiding an invoice raised in error ───────────────────────────────────────
 // `presence_invoices.status` has allowed 'void' since migration 0086 and this
 // page has always rendered a "Voided" row — but nothing in the platform ever

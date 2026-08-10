@@ -13,7 +13,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { applyPlaceholders, buildPlaceholderValues } from '../lib/doc_placeholders.ts';
+import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
@@ -516,7 +516,21 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       if (!rows(c)[0]) return json({ error: 'bad_contact', message: 'That contact isn’t in this workspace.' }, 422, cors);
     }
     let srcSub: string | null = UUID_RE.test(b.source_submission_id || '') ? b.source_submission_id : null;
-    if (srcSub) { const s = await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}&select=id&limit=1`); if (!rows(s)[0]) srcSub = null; }
+    // The enquiry TEXT travels with the deal. The one-tap "→ Deal" (leads.html)
+    // only ever carried name/email, so the message that started the whole
+    // relationship — "we need a site before our March opening" — was lost the
+    // moment the enquiry became a deal, and the drawer showed a bare "No notes".
+    // The same tenant-guard read that validates the submission also fetches its
+    // message; it lands in the deal's notes (visible + editable in Details) and
+    // rides the immutable 'created' event so the record keeps it even after the
+    // notes are rewritten. Server-side on purpose: EVERY creator that links a
+    // submission gets this, not just the leads page.
+    let enquiry = '';
+    if (srcSub) {
+      const s = await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}&select=id,message&limit=1`);
+      const sub = rows(s)[0];
+      if (!sub) srcSub = null; else enquiry = clean(sub.message, 2000);
+    }
     // P2-F G1 — DEDUPE conversion: a website enquiry becomes at most ONE deal.
     // A second "add to pipeline" click (or a retry) returns the existing deal
     // instead of creating a duplicate.
@@ -530,13 +544,18 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: 'lead',
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
         expected_value_cents: Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0)), // R6: bounded like line items
-        expected_close: closeDate || null, notes: clean(b.notes, 2000) }) });
+        expected_close: closeDate || null, notes: clean(b.notes, 2000) || (enquiry ? clean(`Website enquiry: ${enquiry}`, 2000) : '') }) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
     const deal = rows(ins)[0];
     // Mark the originating website enquiry converted (system status) so the leads
     // inbox reflects it and it can't be converted again.
     if (srcSub) await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }).catch(() => {});
-    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', source_submission_id: srcSub });
+    // detail (a real jsonb column) carries the submission link + the enquiry
+    // text. It used to ride source_submission_id as a TOP-LEVEL key — a column
+    // presence_deal_events does not have — so PostgREST 400'd the insert and
+    // dealEvent's best-effort catch swallowed it: the 'created' event was never
+    // written at all. The link now lives where the schema can keep it.
+    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { source_submission_id: srcSub, ...(enquiry ? { enquiry: enquiry.slice(0, 500) } : {}) } });
     return json({ data: deal }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -1368,7 +1387,29 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'proposal-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'proposal-decide' } as Principal;
-  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision } });
+  // ── The price flows forward: ACCEPTING a proposal backfills the deal value ──
+  // expected_value_cents is what the contract placeholders print (a 0 value
+  // degrades to "[project fee]"/"[50% deposit]" — lib/doc_placeholders.ts) and
+  // what summarizePipeline rolls into "Won this month" — so a proposal-priced
+  // deal left at 0 made Eric retype the number into the agreement and then won
+  // as $0. Backfill from the accepted proposal's FINAL total (post discount +
+  // tax, the same proposalTotals the invoice default uses). The eq.0 guard
+  // rides in the PATCH's WHERE, so a nonzero HAND-SET value is never
+  // overwritten — the operator's own number always wins. Best-effort: the
+  // accept itself already stands. The change rides the proposal_decided
+  // event's detail (value_backfilled_cents) so it's on the deal's record.
+  let backfilledCents = 0;
+  if (decision === 'accepted') {
+    try {
+      const total = Math.min(1_000_000_00, proposalTotals(p.line_items).total_cents);   // bounded like every value write
+      if (total > 0) {
+        const bf = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&expected_value_cents=eq.0&select=id`,
+          { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ expected_value_cents: total }) });
+        if (rows(bf)[0]) backfilledCents = total;
+      }
+    } catch { /* best-effort — the summary and placeholders just keep reading the stored value */ }
+  }
+  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision, ...(backfilledCents ? { value_backfilled_cents: backfilledCents } : {}) } });
   if (decision === 'accepted') {
     await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
     await raiseDealReady(tok.site_id, dealId, 'accepted', id);   // W1: tell the studio (and clear the proposal's reminder row)
@@ -1438,6 +1479,65 @@ export async function handleSalesContractCreate(req: Request, site: SiteRow, pri
   return json({ data: { ...rows(ins)[0], content_hash: hash } }, 201, cors);
 }
 
+/** The signed agreement promises a deposit — SOMEBODY has to mint it.
+ *
+ *  doc_placeholders prints "50% deposit ($X)" into the agreement, and the sign
+ *  page's sign→pay handoff (handleSalesContractSign) can only land on pay if an
+ *  OPEN deposit invoice already exists on the deal — which used to require Eric
+ *  to remember "Request a deposit" before every send, while the drawer tip
+ *  promised "once they sign, they can pay right away". So contract SEND mints
+ *  it: purpose='deposit' (the same shape "Request a deposit" writes), amount
+ *  from the SAME depositSplit the placeholder renderer printed — one source of
+ *  truth, so the invoice can never disagree with the signed page.
+ *
+ *  Every reason NOT to mint is deliberate:
+ *    • the agreement text never says "deposit" → the document made no promise,
+ *      so no invoice is invented for it
+ *    • the deal has no value → the doc printed "[50% deposit]" (an honest
+ *      blank, not a number) → nothing to mint; `warning:'no_value'` rides back
+ *      so the drawer can say "set the deal value" (its pre-send confirm warns
+ *      too — same shape as the unfilledBlanks guard)
+ *    • ANY deposit invoice already exists on the deal — open (pre-created, or a
+ *      prior send minted it), paid (money already moved), or void (Eric
+ *      deliberately withdrew one; re-minting would overrule him). This is the
+ *      idempotency: send → resend → resend mints AT MOST ONCE, ever.
+ *    • Stripe isn't configured → a linkless invoice can't land anyone on pay
+ *    • the split is under Stripe's ~$0.50 floor → NEVER a $0 invoice
+ *
+ *  Deliberately NOT emailed: the client just received the agreement email, and
+ *  the pay link is handed to them ON the sign page the moment they sign
+ *  (sales.ts sign→pay). The drawer's Send/Resend chases it if needed, and the
+ *  unpaid-reminder sweep picks it up like any open invoice. Best-effort: a mint
+ *  failure never blocks the send; a link failure leaves the row for the
+ *  drawer's Send button to repair (handleSalesInvoiceSend). */
+async function ensureDepositForContractSend(site: SiteRow, principal: Principal, contract: any): Promise<{ minted: boolean; amount_cents?: number; invoice_id?: string; warning?: string }> {
+  try {
+    const dealId = contract?.deal_id;
+    if (!dealId) return { minted: false };
+    if (!/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
+    const deal = await loadDeal(site.id, dealId);
+    if (!deal) return { minted: false };
+    const { deposit_cents } = depositSplit(deal.expected_value_cents);
+    if (deposit_cents < 50) return { minted: false, warning: 'no_value' };         // the doc printed "[50% deposit]" — the deal needs a value
+    if (!stripeConfigured()) return { minted: false };
+    // AT MOST ONCE, EVER — any prior deposit row (open, paid, OR void) means the
+    // deal's deposit story is already being told; never a second automatic one.
+    const prior = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.deposit&deleted_at=is.null&select=id,status&limit=1`));
+    if (prior[0]) return { minted: false };
+    const description = `Deposit — ${deal.title || 'project'}`;
+    const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title: 'Deposit', description, amount_cents: deposit_cents, currency: 'usd', purpose: 'deposit', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
+    const inv = rows(ins)[0];
+    if (!inv) return { minted: false };
+    try {
+      const link = await createServicePaymentLink({ amountCents: deposit_cents, currency: 'usd', description, invoiceId: inv.id });
+      await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+    } catch { /* the row stands; the drawer's Send repairs the link under the same idempotency key */ }
+    await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: deposit_cents, purpose: 'deposit', auto: 'contract_send' } });
+    return { minted: true, amount_cents: deposit_cents, invoice_id: inv.id };
+  } catch { return { minted: false }; }
+}
+
 export async function handleSalesContractSend(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const r = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`);
@@ -1446,13 +1546,22 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
   const secret = linkSecret();
   const mkLink = async () => secret ? `${siteUrl()}/sign.html?t=${await signSalesToken({ t: 'contract', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
   if (c.status === 'signed') return json({ error: 'already_signed' }, 409, cors);
-  if (c.status === 'sent') return json({ data: c, url: await mkLink(), content_hash: c.content_hash, already_sent: true }, 200, cors);
+  if (c.status === 'sent') {
+    // A RESEND still ensures the deposit exists (the helper's at-most-once guard
+    // makes it idempotent — a resend can never mint a second one), so an
+    // agreement sent before this existed still lands its signer on pay.
+    const dep = await ensureDepositForContractSend(site, principal, c);
+    return json({ data: c, url: await mkLink(), content_hash: c.content_hash, already_sent: true, deposit: dep }, 200, cors);
+  }
   const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   const link = await mkLink();
   await dealEvent(site.id, c.deal_id, 'contract_sent', principal, { detail: { contract_id: id } });
   const emailed = await emailSalesDoc(site.id, c.deal_id, 'contract', link);   // auto-send to the contact
-  return json({ data: rows(up)[0], url: link, content_hash: c.content_hash, emailed }, 200, cors);
+  // The agreement just promised a 50% deposit — make sure the sign page can
+  // collect it (see ensureDepositForContractSend; at most once, never $0).
+  const deposit = await ensureDepositForContractSend(site, principal, rows(up)[0]);
+  return json({ data: rows(up)[0], url: link, content_hash: c.content_hash, emailed, deposit }, 200, cors);
 }
 
 /** Remove an agreement that was never sent for signature.

@@ -54,8 +54,29 @@ export const PIPELINE_GUIDANCE: Record<Stage, StageGuidance> = {
   },
 };
 
-/** The guidance for a stage (falls back to the lead guidance for a stray value). Pure. */
-export function guidanceFor(stage: string): StageGuidance {
+// ── The signed-agreement branch of the contract stage ────────────────────────
+// Stage 'contract' CONFLATES sent and signed (the ladder has no signed step;
+// won is convert-only), so the stage-keyed table above can only say "get it
+// signed" — which the drawer rendered right beside its own "SIGNED ✓" chip.
+// The guidance must branch on the signed FACT (lib/sales_lifecycle.ts
+// agreementSigned), three ways:
+//   unsigned            → PIPELINE_GUIDANCE.contract (the copy above)
+//   signed, unconverted → THIS copy: the one thing left to do is convert
+//   converted           → the deal reads as won; the won guidance applies
+export const CONTRACT_SIGNED_GUIDANCE: StageGuidance = {
+  tip: 'They’ve signed — convert them to open their portal and start the project.',
+  suggested_action: 'Convert them to a customer',
+  todos: ['Convert them to a customer', 'Request the deposit', 'Book the kickoff call'],
+};
+
+/** The facts the stage ladder can't carry — see guidanceFor. */
+export interface GuidanceFacts { agreement_signed?: boolean; converted?: boolean }
+
+/** The guidance for a stage (falls back to the lead guidance for a stray value).
+ *  Pass the signed/converted FACTS to get the honest contract-stage branch — a
+ *  signed-but-unconverted deal is told to convert, never "get it signed". Pure. */
+export function guidanceFor(stage: string, facts?: GuidanceFacts): StageGuidance {
+  if (stage === 'contract' && facts?.agreement_signed && !facts?.converted) return CONTRACT_SIGNED_GUIDANCE;
   return PIPELINE_GUIDANCE[stage as Stage] || PIPELINE_GUIDANCE.lead;
 }
 

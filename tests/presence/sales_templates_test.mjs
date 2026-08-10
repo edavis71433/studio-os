@@ -22,7 +22,7 @@ ok('use: contract create accepts template_id + fills placeholders from the deal'
 // of the regex literals.
 {
   const ph = read('supabase/functions/presence/lib/doc_placeholders.ts');
-  ok('placeholders: substitution delegates to the pure lib (one implementation)', /import \{ applyPlaceholders, buildPlaceholderValues \} from '\.\.\/lib\/doc_placeholders\.ts'/.test(sales) && /applyPlaceholders\(text, buildPlaceholderValues\(/.test(sales));
+  ok('placeholders: substitution delegates to the pure lib (one implementation)', /import \{ applyPlaceholders, buildPlaceholderValues, depositSplit \} from '\.\.\/lib\/doc_placeholders\.ts'/.test(sales) && /applyPlaceholders\(text, buildPlaceholderValues\(/.test(sales));
   ok('placeholders: the studio’s real agreement tokens are all filled', ['client_name', 'client_company', 'deal_title', 'deal_value', 'deposit_amount', 'balance_amount', 'today', 'studio_name'].every((t) => new RegExp(`^\\s*${t}:`, 'm').test(ph)));
   ok('placeholders: the contact read carries company as well as name (site-scoped)', /presence_contacts\?id=eq\.\$\{deal\.contact_id\}&site_id=eq\.\$\{siteId\}&select=name,company/.test(sales));
   ok('placeholders: {{studio_name}} comes from the site’s own presence_identity', /presence_identity\?site_id=eq\.\$\{siteId\}&select=business_name/.test(sales));

@@ -30,6 +30,18 @@ export const PLACEHOLDER_TOKENS = [
  *  carries no business_name for the site. */
 export const STUDIO_NAME_FALLBACK = 'Davis Digital Studio';
 
+/** THE deposit split — §2 of the agreement: 50% to begin, 50% before launch.
+ *  deposit = round(total/2); balance = the remainder, so the split never loses
+ *  a cent. ONE source of truth, deliberately: this module prints these figures
+ *  into the document a client signs, and routes/sales.ts mints the deposit
+ *  invoice from the SAME helper at contract send — the invoice the sign page
+ *  lands on can never disagree with the number the agreement printed. Pure. */
+export function depositSplit(totalCents: unknown): { deposit_cents: number; balance_cents: number } {
+  const cents = Math.max(0, Math.trunc(Number(totalCents)) || 0);
+  const deposit = Math.round(cents / 2);
+  return { deposit_cents: deposit, balance_cents: cents - deposit };
+}
+
 /** Money exactly as the app's money0() renders it: no cents when the amount is
  *  whole, two decimals when it isn't. `forceCents` pins the two-decimal form so
  *  a set of related figures agrees with itself. Pure. */
@@ -55,8 +67,10 @@ export function buildPlaceholderValues(input: PlaceholderInput): Record<string, 
   // A 0/absent value must NOT print as "$0" in something a client signs — say
   // plainly that the number still has to be filled in.
   const hasValue = cents > 0;
-  const deposit = Math.round(cents / 2);          // §2: 50% to begin, 50% before launch
-  const balance = cents - deposit;                // the split never loses a cent
+  // §2: 50% to begin, 50% before launch — via the ONE shared split (the same
+  // helper the contract-send deposit mint uses), so the document and the invoice
+  // can never print two different deposits.
+  const { deposit_cents: deposit, balance_cents: balance } = depositSplit(cents);
   // The three figures appear in ONE sentence of the agreement, so they must agree
   // with each other: an odd total ($1,000.01) would otherwise read
   // "$500.01 + $500", which looks like a typo in a document someone signs.

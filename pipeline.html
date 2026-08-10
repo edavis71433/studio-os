@@ -342,7 +342,36 @@ const PIPELINE_GUIDANCE={
   lost:{tip:'Not every deal fits — the door stays open for later.',action:'Keep the relationship warm; reopen if things change',
     todos:['Note why it didn’t fit','Set a reminder to check back']},
 };
-const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
+// The signed-agreement branch of the contract stage — mirrors
+// CONTRACT_SIGNED_GUIDANCE in lib/pipeline_guidance.ts (kept in sync by hand,
+// like the table above). Stage 'contract' conflates sent and signed, so the
+// drawer used to render "Signed ✓" right beside "Do next: Get it signed" —
+// guidance must branch on the signed FACT: unsigned → the contract copy above;
+// signed-unconverted → convert them; converted → the deal reads as won.
+const CONTRACT_SIGNED_GUIDANCE={tip:'They’ve signed — convert them to open their portal and start the project.',action:'Convert them to a customer',
+  todos:['Convert them to a customer','Request the deposit','Book the kickoff call']};
+const guidanceFor=(s,facts)=>{
+  if(s==='contract'&&facts&&facts.signed&&!facts.converted)return CONTRACT_SIGNED_GUIDANCE;
+  return PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
+};
+// ── Renewal-term detection — the client mirror of impliedTermMonths in
+// lib/sales_lifecycle.ts (kept in sync by hand, same contract as the guidance
+// mirror above). Only OPERATIVE term language counts ("12-month term", "a term
+// of twelve (12) months", "for a term of 12 months") — NEVER §10's liability
+// lookback ("in the twelve (12) months immediately preceding"), which is a
+// damages window, not an engagement term. No date is ever invented: a detected
+// term only PREFILLS the renewal input; nothing is set until Save is pressed.
+function impliedTermMonths(body){
+  const text=String(body==null?'':body);
+  const pats=[/\b(\d{1,2})[-\s]month\s+(?:term|engagement)\b/i,
+    /\b(?:term|period)\s+of\s+(?:this\s+agreement\s+)?(?:is\s+|shall\s+be\s+)?(?:[a-z]+\s+)?\((\d{1,2})\)\s*months?\b/i,
+    /\bfor\s+a\s+(?:term|period)\s+of\s+(?:[a-z]+\s+)?\(?(\d{1,2})\)?\s*months?\b/i];
+  for(const re of pats){const m=text.match(re);if(m){const n=parseInt(m[1],10);if(isFinite(n)&&n>=1&&n<=60)return n;}}
+  return null;
+}
+// signed_at + N months → 'YYYY-MM-DD' (UTC arithmetic; JS Date normalizes an
+// overflowing day-of-month, e.g. Jan 31 + 1mo).
+const addMonthsISO=(iso,months)=>{const p=String(iso||'').slice(0,10).split('-').map(Number);if(p.length<3||!isFinite(p[0])||!isFinite(p[1])||!isFinite(p[2]))return '';const d=new Date(Date.UTC(p[0],p[1]-1+months,p[2]));const z=(n)=>String(n).padStart(2,'0');return d.getUTCFullYear()+'-'+z(d.getUTCMonth()+1)+'-'+z(d.getUTCDate());};
 // ── Starter services ────────────────────────────────────────────────────────
 // The proposal line-item dropdown already exists; it's simply hidden while the
 // services catalog is empty, so a brand-new studio never discovers it. When the
@@ -379,7 +408,9 @@ const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note ad
 function evtLabel(e){
   const d=(e&&e.detail)||{};
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
-  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?'Proposal accepted':'Proposal declined';
+  // An accept that backfilled the deal value says so — the price change is part
+  // of the record (value_backfilled_cents rides the proposal_decided detail).
+  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined';
   if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
   if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer charge paid':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
@@ -858,6 +889,20 @@ function confirmBlanks(text){
   if(!b.length)return true;
   const shown=b.slice(0,3).map(x=>x.length>46?x.slice(0,44)+'…]':x).join(', ');
   return confirm('This agreement still has '+b.length+' fill-in '+(b.length===1?'blank':'blanks')+' — '+shown+(b.length>3?', and '+(b.length-3)+' more':'')+'.\n\nThe client will see them exactly as written. Send it anyway?');
+}
+
+// The money half of the same guard. When the deal has no value, the agreement's
+// fee/deposit placeholders print as the filler's honest lowercase brackets
+// ([project fee] / [50% deposit] / [50% balance] — lib/doc_placeholders.ts),
+// which confirmBlanks deliberately ignores (they're ALL-CAPS-only). But SENDING
+// one of those means the signed page promises a deposit nobody computed — and
+// the server skips the automatic deposit request (no value → nothing honest to
+// mint), so the sign page won't land on pay. Same confirm idiom: warn, name the
+// fix, let him decide. Returns true when it's fine to send.
+const MONEY_BLANK_RE=/\[(?:project fee|50% deposit|50% balance)\]/;
+function confirmMoneyBlanks(text){
+  if(!MONEY_BLANK_RE.test(String(text==null?'':text)))return true;
+  return confirm('This agreement prints the project fee and deposit as unfilled brackets — the deal has no value set.\n\nSet the deal value in Details first (then re-draft or edit the amounts in), and the deposit request will make itself when you send. Send it with the blanks as written?');
 }
 
 function renderFilters(){
@@ -1466,7 +1511,19 @@ async function openDeal(id){
       // holds a signing link, and a signature is permanent. Draft only.
       const del=k.status==='draft'?`<button class="btn ghost" data-del-con="${k.id}" title="Remove this draft — it was never sent for signature" aria-label="Delete draft agreement ${esc(k.title||'Agreement')}">Delete</button>`:'';
       const termEnd=(k.terms_snapshot&&k.terms_snapshot.term_end)||'';
-      const renewRow=signed?`<div class="row2" style="margin-top:6px;align-items:center"><label class="mut" for="con-term-${k.id}" style="margin:0">Renewal date (optional)</label><input type="date" id="con-term-${k.id}" value="${esc(termEnd)}" style="max-width:170px"><button class="btn ghost" data-set-term="${k.id}">Save</button></div><div class="mut" style="font-size:12px;margin-top:2px">We’ll remind you ~30 and ~7 days before it ends — nothing auto-renews.</div>`:'';
+      // The renewal reminder (runAgreementRenewalReminders) arms ONLY off
+      // terms_snapshot.term_end — a field nothing used to prompt for, so the
+      // machinery sat dark. A signed agreement without a date says so plainly;
+      // and when the agreement TEXT states a term ("12-month term"), signed_at
+      // + N months is PREFILLED as a visible default — one tap of Save
+      // confirms it. Never a silent write: nothing is stored until Save.
+      let termMonths=null,termDefault='';
+      if(signed&&!termEnd){
+        termMonths=impliedTermMonths(k.body);
+        if(termMonths&&k.signed_at)termDefault=addMonthsISO(k.signed_at,termMonths);
+      }
+      const termHint=(signed&&!termEnd)?`<div class="mut" style="font-size:12px;margin-top:6px;color:var(--warn,#775d31)">⏰ No renewal date — the renewal reminder can’t arm.${termDefault?` This agreement reads as a ${termMonths}-month term, so ${esc(termDefault)} is filled in below — press Save to confirm it (nothing is set until you do).`:' Add one below and we’ll nudge you before it ends.'}</div>`:'';
+      const renewRow=signed?`${termHint}<div class="row2" style="margin-top:6px;align-items:center"><label class="mut" for="con-term-${k.id}" style="margin:0">Renewal date (optional)</label><input type="date" id="con-term-${k.id}" value="${esc(termEnd||termDefault)}" style="max-width:170px"><button class="btn ghost" data-set-term="${k.id}">Save</button></div><div class="mut" style="font-size:12px;margin-top:2px">We’ll remind you ~30 and ~7 days before it ends — nothing auto-renews.</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
@@ -1539,7 +1596,7 @@ async function openDeal(id){
                FILLS the input (same pattern as the proposal line-item picker) —
                still fully editable before Add, and "Something else…" keeps the
                free-text path first-class. The POST is unchanged. -->
-          <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
+          <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
           <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
@@ -1591,7 +1648,7 @@ async function openDeal(id){
         const hint=canBack?'. Activate to move the deal back here.':current?'. Activate to show or hide the stage guidance.':'';
         return `<button type="button" class="pstep ${cls}" data-pstep="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${done?'✓ ':''}${esc(stageLabel(s))}</button>`;
       }).join('');
-      const g=guidanceFor(stage);
+      const g=guidanceFor(stage,{signed:signedNow,converted:!!d.converted_client_id});
       const fwd=(BOARD_NEXT[stage]||[])[0];
       const fwdOk=fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>curIdx;
       let side='';
@@ -1602,10 +1659,13 @@ async function openDeal(id){
       else side=`<span class="mut" style="font-size:13px">Get the agreement signed to convert</span>`;
       host.innerHTML=`<div class="pathrow"><div class="path" role="group" aria-label="Deal stages">${steps}</div><div class="path-side">${side}</div></div>
         ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button type="button" class="btn" id="backGo">Move back</button><button type="button" class="btn ghost" id="backNo">Cancel</button></div>`:''}
-        ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${esc(g.action)}</div>`:''}`;
+        ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${(stage==='contract'&&signedNow)?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(g.action)} ↓</a>`:esc(g.action)}</div>`:''}`;
       const mc=$('markComplete'); if(mc)mc.onclick=()=>pathMove(fwd,mc);
-      // the Convert flow stays exactly where it is — this just points at it
-      const pc=$('pathConvert'); if(pc)pc.onclick=()=>{const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
+      // the Convert flow stays exactly where it is — these just point at it
+      // (the side button AND the signed-guidance "Do next" deep-link).
+      const goConvert=()=>{const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
+      const pc=$('pathConvert'); if(pc)pc.onclick=goConvert;
+      const gc=$('guideConvert'); if(gc)gc.onclick=(e)=>{e.preventDefault();goConvert();};
       host.querySelectorAll('.pstep.canback').forEach(b=>b.onclick=()=>{PENDING_BACK=b.getAttribute('data-pstep');renderDrawerPath();});   // only the honest one-back move renders interactive
       const cur=host.querySelector('.pstep.current'); if(cur)cur.onclick=()=>{GUIDE_OPEN=!GUIDE_OPEN;renderDrawerPath();};
       const bg=$('backGo'); if(bg)bg.onclick=()=>{const to=PENDING_BACK;PENDING_BACK='';pathMove(to,bg);};
@@ -1670,7 +1730,7 @@ async function openDeal(id){
     // The stage's preset to-dos FILL the input — they never post on their own, so
     // every one is still editable (or datable) before Add. Same contract as the
     // proposal line-item picker: '' clears, '__custom__' hands over to free text.
-    const dtp=$('dt-preset'); if(dtp){ const stageTodos=guidanceFor(d.stage).todos||[];
+    const dtp=$('dt-preset'); if(dtp){ const stageTodos=guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[];
       dtp.onchange=()=>{const v=dtp.value;const ti=$('dt-title');if(!ti)return;
         if(v===''||v==='__custom__'){ti.value='';}
         else {const t=stageTodos[+v];if(t)ti.value=t;}
@@ -1696,8 +1756,13 @@ async function openDeal(id){
     const sendProposalById=async(pid)=>{const r=await api('/sales/proposals/'+pid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[pid]=r.url;toast(r.emailed?('Proposal sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):(NO_EMAIL?noEmailWhy('Proposal','link'):'Proposal prepared — it wasn’t emailed, so copy the link and send it yourself.'));copyToClip(r.url);openDeal(id);};
     const sendContractById=async(cid)=>{const r=await api('/sales/contracts/'+cid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[cid]=r.url;
       // The sign→pay moment only works if a deposit is WAITING when they sign.
-      const hasOpenDeposit=(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
-      toast(r.emailed?('Agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.')):(NO_EMAIL?noEmailWhy('Agreement','signing link'):'Agreement prepared — it wasn’t emailed, so copy the signing link and send it yourself.'));
+      // The send now mints it server-side (r.deposit) when the agreement prints
+      // one and none exists — say so; only fall back to the "request it" tip
+      // when nothing is waiting and nothing was minted.
+      const dep=r.deposit||{};
+      const hasOpenDeposit=dep.minted||(data.invoices||[]).some(v=>v.purpose==='deposit'&&v.status==='open');
+      const depNote=dep.minted?'. A '+money(dep.amount_cents)+' deposit request is ready — they can pay the moment they sign.':(hasOpenDeposit?'':'. Tip: request the deposit now — they can pay right after signing.');
+      toast(r.emailed?('Agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+depNote):(NO_EMAIL?noEmailWhy('Agreement','signing link'):'Agreement prepared — it wasn’t emailed, so copy the signing link and send it yourself.'));
       copyToClip(r.url);openDeal(id);};
     // Copy an already-sent doc's link (send is idempotent → re-fetches the link).
     const copyDocLink=async(kind,docId)=>{try{let url=LINKS[docId];if(!url){const r=await api('/sales/'+(kind==='contract'?'contracts':'proposals')+'/'+docId+'/send','POST',{});url=r.url;if(url)LINKS[docId]=url;}if(!url){toast('No signing link is available — check your email settings.',true);return;}copyToClip(url);toast(kind==='contract'?'Signing link copied':'Link copied');}catch(e){toast(nice(e),true);}};
@@ -1718,6 +1783,7 @@ async function openDeal(id){
       const k=(data.contracts||[]).find(x=>x.id===b.dataset.sendContract);
       if(k&&typeof k.body==='string'){
         if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+        if(!confirmMoneyBlanks(k.body)){toast('Not sent — set the deal value in Details first.');return;}
       }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
         toast('Not sent — open it with View / print to check it first.');return;
       }
@@ -1819,6 +1885,7 @@ async function openDeal(id){
         // toasts it and re-enables the buttons) — nothing is saved, nothing sent.
         {saveLabel:'Save draft',alt:{label:'Save & send for signature →',run:async(v)=>{
           if(!confirmBlanks(v.body))throw new Error('Not sent — fill in the blanks, then send it.');
+          if(!confirmMoneyBlanks(v.body))throw new Error('Not sent — set the deal value in Details first.');
           const cid=await saveCon(v);await sendContractById(cid);}}});
       // An agreement form should never open as a blank page. PRECEDENCE:
       //   1. a restored draft — his own unsaved words always win (ddsDraftRestore

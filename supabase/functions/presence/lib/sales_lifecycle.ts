@@ -173,6 +173,50 @@ export function canSignContract(current: ContractStatus, storedHash: string, pre
   return { ok: true };
 }
 
+/** The SIGNED fact for a deal, derived from its contract rows. Stage 'contract'
+ *  CONFLATES "agreement out" and "agreement signed" — the stage ladder has no
+ *  signed step (won is convert-only), so anything that words itself off the
+ *  stage alone will call a signed deal "waiting to be signed". This is the ONE
+ *  place that decides the fact: the drawer guidance (lib/pipeline_guidance.ts)
+ *  and the follow-up sweep (commerce/lifecycle.ts) both read it, so the copy on
+ *  screen and the copy in a nudge email can never disagree. A soft-deleted
+ *  contract row doesn't count. Pure. */
+export function agreementSigned(contracts: unknown): boolean {
+  return Array.isArray(contracts) && contracts.some((c) =>
+    !!c && typeof c === 'object'
+    && (c as { status?: unknown }).status === 'signed'
+    && !(c as { deleted_at?: unknown }).deleted_at);
+}
+
+/** Does the agreement TEXT state an operative engagement term? Returns the term
+ *  in months, or null when the document doesn't say. Feeds the renewal-date
+ *  default on a signed agreement (the reminder in commerce/lifecycle.ts only
+ *  arms off terms_snapshot.term_end): a detected term lets the drawer PREFILL
+ *  signed_at + N months for a one-tap confirm — never a silent write.
+ *
+ *  HONESTY GUARD: only operative term language counts — "12-month term",
+ *  "a term of twelve (12) months", "for a term/period of N months". The shipped
+ *  agreements' ONLY twelve-month wording is §10's liability lookback ("fees
+ *  paid … in the twelve (12) months immediately preceding"), which is a damages
+ *  window, not an engagement term — none of these patterns match it, so no date
+ *  is ever invented from it. Pure; pipeline.html mirrors this by hand. */
+export function impliedTermMonths(body: unknown): number | null {
+  const text = String(body ?? '');
+  const pats = [
+    /\b(\d{1,2})[-\s]month\s+(?:term|engagement)\b/i,                                                    // "12-month term"
+    /\b(?:term|period)\s+of\s+(?:this\s+agreement\s+)?(?:is\s+|shall\s+be\s+)?(?:[a-z]+\s+)?\((\d{1,2})\)\s*months?\b/i, // "term of twelve (12) months"
+    /\bfor\s+a\s+(?:term|period)\s+of\s+(?:[a-z]+\s+)?\(?(\d{1,2})\)?\s*months?\b/i,                     // "for a term of 12 months"
+  ];
+  for (const re of pats) {
+    const m = text.match(re);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 60) return n;
+    }
+  }
+  return null;
+}
+
 // ── convert-to-customer (idempotent decision) ──
 export interface ConvertibleDeal { stage: Stage; converted_client_id?: string | null; }
 export type ConvertOutcome = 'ready' | 'already_converted' | 'blocked_stage' | 'blocked_lost';
