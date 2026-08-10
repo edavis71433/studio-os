@@ -55,9 +55,15 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
   // ── Analytics ─────────────────────────────────────────────────────────────
   { key: 'google_analytics', name: 'Google Analytics', customerLabel: 'your visitor numbers',
     category: 'analytics', purpose: 'Understand how many people visit and what they look at — in plain numbers.',
-    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+    auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/analytics.readonly'],   // full URL (e42ecb7); ONE scope covers both the Data API runReport and Admin accountSummaries (verified in both discovery documents)
     reads: ['visitors and page views', 'your busiest pages', 'where visitors come from'], futureWrites: [],
-    minEdition: 'presence_monitor', rateNote: 'token-bucket quota; cached reads', status: 'planned' },
+    // GA4 shipped the same way AN-3.1 shipped Search Console: a real read
+    // (connected/adapters.ts readGa4 — property discovery + POST runReport, the
+    // call shape GET-a-URL could never express — plus ops/ga4_sync.ts writing
+    // the shared `signals` store, source='ga4'), request/response contracts
+    // transcribed from the official Data/Admin API discovery documents (cited
+    // in lib/ga4.ts). This flip is what makes the Connect button render.
+    minEdition: 'presence_monitor', rateNote: 'token-bucket quota; cached reads', status: 'read_only' },
   { key: 'google_tag_manager', name: 'Google Tag Manager', customerLabel: 'your website tags',
     category: 'analytics', purpose: 'See what measurement tags are on your site, and keep them tidy.',
     auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/tagmanager.readonly'],

@@ -34,6 +34,13 @@ const readEndpointBlock = adaptersSrc.slice(
   adaptersSrc.indexOf('// Per-provider request shaping'),
 );
 const hasReadEndpoint = (key) => new RegExp(`^\\s*${key}:\\s*'https?://`, 'm').test(readEndpointBlock);
+// A provider whose call shape the shared GET cannot express reads through a
+// per-provider strategy instead (READ_STRATEGIES) — GA4's POST runReport is the
+// first. Either one satisfies "a read exists"; a strategy is MORE evidence, not
+// less, because it had to be written deliberately.
+const strategiesBlock = adaptersSrc.slice(adaptersSrc.indexOf('export const READ_STRATEGIES'));
+const hasReadStrategy = (key) => new RegExp(`^\\s*${key}:`, 'm').test(strategiesBlock);
+const hasRead = (key) => hasReadEndpoint(key) || hasReadStrategy(key);
 
 // A normalizer counts as REAL only if it maps something. The kitchen-sink probe
 // mirrors connected/maturity.ts: a defensive `{ label }` fallback produces no
@@ -66,8 +73,17 @@ const DEFERRED = {
   // ── Google family: the endpoint is a placeholder or the wrong resource ──
   google_business_profile:
     'READ_ENDPOINT lists ACCOUNTS (mybusinessbusinessinformation/v1/accounts); the normalizer reads rating/reviewCount, which live on a location’s reviews resource. No location is ever resolved, so a connected customer would see a blank card.',
-  google_analytics:
-    'READ_ENDPOINT is the GA4 Data API BASE (analyticsdata.googleapis.com/v1beta) with no property id. GA4 reporting is a POST runReport against a specific property; the shared bearer GET can only 404.',
+  // google_analytics's entry is DELETED — its documented defect ("READ_ENDPOINT
+  // is the GA4 Data API BASE with no property id; GA4 reporting is a POST
+  // runReport against a specific property; the shared bearer GET can only 404")
+  // was fixed the honest way: the adapter layer grew a per-provider read
+  // STRATEGY (connected/adapters.ts readGa4 — Admin-API property discovery +
+  // POST properties/{id}:runReport), the chosen property lives on the
+  // connection (0128 config), and ops/ga4_sync.ts writes the shared `signals`
+  // store (source='ga4'). Evidence bar met AN-3.1-style: request/response
+  // shapes transcribed from the official Data/Admin API discovery documents,
+  // pinned in tests/presence/ga4_test.mjs (doc URLs cited there and in
+  // lib/ga4.ts). The flip's own audit is section 1b below.
   google_tag_manager:
     'The endpoint returns GTM ACCOUNTS; the normalizer publishes that count as "tags installed". Accounts are not tags — connecting it would print a confidently wrong number.',
   google_calendar:
@@ -125,10 +141,39 @@ const DEFERRED = {
     /const PROVIDER = 'google_search_console'/.test(src('ops/gsc_sync.ts')));
 }
 
+// ═══ 1b. the GA4 flip — live requires the strategy AND the property id ═══
+// GA4's read is only real if all three legs exist: a per-provider strategy (the
+// POST call shape the shared GET could never express), a property selection
+// (discovery + stored choice — a report without a property id is a 404), and
+// the scheduled sync into `signals`. Words in the registry are not evidence;
+// these greps hold the flip to the code that actually shipped.
+{
+  const ga = providerByKey('google_analytics');
+  ok('GA4: google_analytics is read_only — the read shipped, so the Connect button must render',
+    ga.status === 'read_only', ga.status);
+  ok('GA4: asks for the FULL analytics.readonly scope URL (covers both the Data and Admin APIs)',
+    ga.scopes.length === 1 && ga.scopes[0] === 'https://www.googleapis.com/auth/analytics.readonly');
+  ok('GA4: reads through a per-provider STRATEGY, not a GET-a-URL endpoint',
+    hasReadStrategy('google_analytics') && !hasReadEndpoint('google_analytics'));
+  ok('GA4: the strategy is the real call shape — POST properties/{id}:runReport on the Data API',
+    /analyticsdata\.googleapis\.com\/v1beta\/\$\{prop\}:runReport/.test(adaptersSrc) && /method: 'POST'/.test(adaptersSrc));
+  ok('GA4: the strategy resolves a PROPERTY ID (stored 0128 config, else Admin-API discovery)',
+    /getConnectionConfig\(siteId, 'google_analytics'\)/.test(adaptersSrc) &&
+    /ga4PropertyPath\(cfg\.property_id\)/.test(adaptersSrc) &&
+    /analyticsadmin\.googleapis\.com\/v1beta\/accountSummaries/.test(adaptersSrc));
+  ok('GA4: several properties never guess — the human is asked to choose',
+    /Choose which Google Analytics property/.test(adaptersSrc));
+  const ga4Sync = src('ops/ga4_sync.ts');
+  ok('GA4: the shipped sync exists and targets this exact provider key',
+    /const PROVIDER = 'google_analytics'/.test(ga4Sync));
+  ok('GA4: the sync labels its signals with the external source (ga4), never the first-party one',
+    /source: 'ga4'/.test(src('lib/ga4.ts')));
+}
+
 // ═══ 2. no shipped read adapter is left 'planned' (the defect that started this) ═══
 {
   const stranded = CONNECTED_PROVIDERS.filter((p) =>
-    p.status === 'planned' && !DEFERRED[p.key] && mapsSomething(p.key, p.customerLabel) && hasReadEndpoint(p.key) && hasConnectPath(p));
+    p.status === 'planned' && !DEFERRED[p.key] && mapsSomething(p.key, p.customerLabel) && hasRead(p.key) && hasConnectPath(p));
   ok('audit: every provider with a live read adapter and no deferral reason is OFF “planned”',
     stranded.length === 0,
     stranded.length ? `still planned with nothing explaining it: ${stranded.map((p) => p.key).join(', ')}` : '');
@@ -137,8 +182,8 @@ const DEFERRED = {
 // ═══ 3. nothing is flipped without an adapter behind it (the opposite mistake) ═══
 {
   const hollow = CONNECTED_PROVIDERS.filter((p) => p.status !== 'planned' &&
-    !(NORMALIZERS[p.key] && mapsSomething(p.key, p.customerLabel) && hasReadEndpoint(p.key) && hasConnectPath(p)));
-  ok('audit: no provider is connectable without a normalizer, a read endpoint and a connect path',
+    !(NORMALIZERS[p.key] && mapsSomething(p.key, p.customerLabel) && hasRead(p.key) && hasConnectPath(p)));
+  ok('audit: no provider is connectable without a normalizer, a read (endpoint or strategy) and a connect path',
     hollow.length === 0, hollow.map((p) => p.key).join(', '));
 }
 
@@ -166,8 +211,9 @@ const DEFERRED = {
   ok('audit: deferred + live accounts for every provider exactly once',
     Object.keys(DEFERRED).length + live.length === CONNECTED_PROVIDERS.length,
     `${Object.keys(DEFERRED).length} deferred + ${live.length} live = ${CONNECTED_PROVIDERS.length}`);
-  ok('audit: exactly one provider is live today, and it is Search Console',
-    live.length === 1 && live[0].key === 'google_search_console', live.map((p) => p.key).join(', '));
+  const liveKeys = live.map((p) => p.key).sort().join(',');
+  ok('audit: exactly two providers are live today — Search Console (AN-3.1) and Google Analytics (the GA4 build)',
+    liveKeys === 'google_analytics,google_search_console', liveKeys);
 }
 
 const failed = results.filter((r) => !r.p);

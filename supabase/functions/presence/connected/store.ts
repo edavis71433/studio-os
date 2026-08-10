@@ -50,6 +50,23 @@ export async function getConnection(siteId: string, providerKey: string): Promis
   return r.json?.[0] || null;
 }
 
+// ── 0128: per-connection provider settings (e.g. the selected GA4 property) ──
+// Non-secret facts about HOW to read a provider. Merge-patch semantics: the
+// caller sends only the keys it is changing. Falls back to {} on any trouble —
+// a missing config is a normal state (nothing chosen yet), never an error.
+export async function getConnectionConfig(siteId: string, providerKey: string): Promise<Record<string, unknown>> {
+  const r = await svc(`presence_connections?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}&select=config&limit=1`).catch(() => null);
+  const cfg = (r as any)?.json?.[0]?.config;
+  return (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) ? cfg as Record<string, unknown> : {};
+}
+
+export async function setConnectionConfig(siteId: string, providerKey: string, patch: Record<string, unknown>): Promise<void> {
+  const current = await getConnectionConfig(siteId, providerKey);
+  await svc(`presence_connections?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, {
+    method: 'PATCH', body: JSON.stringify({ config: { ...current, ...patch } }),
+  });
+}
+
 export async function setConnection(siteId: string, providerKey: string, patch: Record<string, unknown>): Promise<void> {
   await svc('presence_connections?on_conflict=site_id,provider_key', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -125,7 +142,9 @@ export async function loadAllConnectedData(siteId: string): Promise<Array<{ prov
 export async function disconnect(siteId: string, providerKey: string, actorKind = 'customer'): Promise<void> {
   await svc(`presence_connection_secrets?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, { method: 'DELETE' });
   await svc(`presence_connected_data?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, { method: 'DELETE' });
-  await setConnection(siteId, providerKey, { status: 'disconnected', health: 'unknown', scopes_granted: [], secret_ref: null, connected_at: null, last_error: '' });
+  // config cleared too (0128): a later reconnect may be a DIFFERENT Google
+  // account, and a stale property selection would read the wrong business.
+  await setConnection(siteId, providerKey, { status: 'disconnected', health: 'unknown', scopes_granted: [], secret_ref: null, connected_at: null, last_error: '', config: {} });
   await svc('presence_connection_events', {
     method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ site_id: siteId, provider_key: providerKey, action: 'disconnect', detail: 'disconnected; token destroyed, cache cleared', actor_kind: actorKind }),
