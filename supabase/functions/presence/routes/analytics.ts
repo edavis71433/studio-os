@@ -72,6 +72,25 @@ export async function readGsc(clientId: string | null | undefined): Promise<GscR
   };
 }
 
+/** The Google Analytics numbers from the shared `signals` table (source='ga4',
+ *  written monthly by ops/ga4_sync.ts — same period bucketing as GSC). These are
+ *  GOOGLE'S numbers about pages we may not host: a different methodology from
+ *  the first-party presence_visits beacon, so they surface as their own labeled
+ *  block ("via Google Analytics") and are NEVER merged into first-party counts.
+ *  ok:false marks a failed read — distinct from "genuinely no data yet". */
+export type Ga4SignalsRead = { visitors: number | null; sessions: number | null; pageviews: number | null; period: string; hasData: boolean; ok: boolean };
+export async function readGa4Signals(clientId: string | null | undefined): Promise<Ga4SignalsRead> {
+  const empty: Ga4SignalsRead = { visitors: null, sessions: null, pageviews: null, period: '', hasData: false, ok: true };
+  if (!clientId) return empty;
+  const r = await svc(`signals?client_id=eq.${encodeURIComponent(clientId)}&source=eq.ga4&select=metric,value,period&order=period.desc&limit=12`);
+  if (!(r as any).ok) return { ...empty, ok: false };
+  const rows = Array.isArray((r as any).json) ? (r as any).json : [];
+  if (!rows.length) return empty;
+  const period = String(rows[0].period);
+  const val = (metric: string): number | null => { const m = rows.find((x: any) => x.period === period && x.metric === metric); return m ? Number(m.value) : null; };
+  return { visitors: val('visitors'), sessions: val('sessions'), pageviews: val('pageviews'), period, hasData: true, ok: true };
+}
+
 const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
 /** Load recent visit rows for a site over the current + prior window (for trend).
  *  TRUTHFULNESS (AN-4): the 5000-row cap, ordered ts.desc, truncates the PRIOR
@@ -90,8 +109,9 @@ export async function loadVisits(siteId: string, period: Period, nowMs: number):
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
 const periodOf = (req: Request): Period => (new URL(req.url).searchParams.get('period') === 'month' ? 'month' : 'week');
 
-/** Are the traffic/search providers actually connected? (They are 'planned' today,
- *  so this is honestly false — Analytics then says so rather than faking a number.) */
+/** Are the traffic/search providers actually connected? (Both are live now —
+ *  GSC since AN-3.1, GA4 since the visitor-numbers build; when nothing is
+ *  connected this is honestly false and Analytics says so, never a fake number.) */
 async function connectionState(siteId: string): Promise<{ ga: boolean; gsc: boolean }> {
   const r = await svc(`presence_connections?site_id=eq.${siteId}&select=provider_key,status`);
   const live = new Set(arr(r).filter((c) => ['connected', 'verified', 'active'].includes(String(c.status))).map((c) => c.provider_key));
@@ -589,7 +609,8 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   //   null             — ready to connect: either published-and-hosted, or an
   //                      external site whose domain we know.
   //   { clicks, … }    — real numbers.
-  const gscConnected = !!(await safe(connectionState(site.id)))?.gsc;
+  const connState = await safe(connectionState(site.id));
+  const gscConnected = !!connState?.gsc;
   const readiness = searchReadinessState({
     hosted, lastPublishedAt: site.last_published_at || null, externalDomain,
     gscConnected, hasData: !!gsc?.hasData,
@@ -635,6 +656,19 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     // not "not measured yet" — they are structurally unavailable (our beacon is
     // only on pages we render), while search works perfectly. The page prints
     // the reason instead of a silent zero.
-    website: { traffic, search, hosting: hostingSurface({ hosted, externalDomain, domainVerified: extConn?.status === 'verified' }) },
+    //
+    // `ga` — the connected-Google-Analytics numbers, present only when GA4 is
+    // actually connected. has_data:true carries the latest synced month; the
+    // page shows those with a "via Google Analytics" provenance label. NEVER
+    // merged into `traffic`: the first-party beacon and Google's tag measure
+    // differently, and a blended count would be a number nobody could trust.
+    website: { traffic, search, ga: await (async () => {
+      if (!connState?.ga) return null;
+      const g4 = await safe(readGa4Signals(site.client_id));
+      if (!g4 || !g4.ok) return { connected: true, has_data: false, unavailable: true };
+      return g4.hasData
+        ? { connected: true, has_data: true, visitors: g4.visitors, sessions: g4.sessions, pageviews: g4.pageviews, period: g4.period, source: 'google_analytics' }
+        : { connected: true, has_data: false };
+    })(), hosting: hostingSurface({ hosted, externalDomain, domainVerified: extConn?.status === 'verified' }) },
   } }, 200, cors);
 }

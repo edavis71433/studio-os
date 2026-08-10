@@ -406,6 +406,12 @@ function websiteBand(d){
   // hosting: whose website this is, and therefore which numbers can exist at all.
   const host=(w&&w.hosting)||null;
   const external=!!(host&&host.external);
+  // ga: the connected-Google-Analytics numbers (source-labeled, monthly). Only
+  // ever shown WITH their provenance — never blended into first-party counts:
+  // our beacon and Google's tag measure differently, and a merged number would
+  // be one nobody could trust.
+  const ga=(w&&w.ga)||null;
+  const gaOk=!!(ga&&ga.has_data);
   // D1: every business-insights drill carries the active period (it understands
   // windows — SS11 consumes it); the connections CTA never does.
   const BI=withPeriod('/business-insights.html');
@@ -438,15 +444,24 @@ function websiteBand(d){
   // pages we render and deploy), while search works perfectly. Stating the reason
   // once, up front, is the difference between an empty state and a lie.
   if(external){
+    // Once a connected Google Analytics is reporting, "visitor numbers can't"
+    // stops being the truth — they arrive via that connection, and the note
+    // says so (with the provenance) instead of contradicting the card below.
+    const visitorsBit=gaOk
+      ?`<strong>Visitor numbers:</strong> via their connected Google Analytics — Google’s own measurement of their pages, not the studio counter.`
+      :`<strong>Visitor numbers can’t:</strong> ${esc(host.visitors_reason||'')}`;
     h+=`<p class="bandnote">${esc(host.domain?`${host.domain} isn’t hosted by the studio.`:'This website isn’t hosted by the studio.')} `
       +`<strong>Search numbers work:</strong> ${esc(host.search_reason||'')} `
-      +`<strong>Visitor numbers can’t:</strong> ${esc(host.visitors_reason||'')}</p>`;
+      +visitorsBit+`</p>`;
   }
   // the ONE reason a non-hosted site shows no visitor numbers — same sentence on
   // every card that would otherwise say "not measured yet" and mean "never".
   const offSite=(what)=>emptyState('Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${host&&host.domain?host.domain:'this website'}, so none of its pages carry our counter. Their own analytics (or a connected Google Analytics) holds these numbers.`);
-  h+=card('c3','Visitors',based(periodLabel(),tTrunc),
+  h+=card('c3','Visitors',external&&gaOk?'':based(periodLabel(),tTrunc),
     measuring?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
+      // the external-site state 4d2e866 promised: when a connected Google
+      // Analytics holds the numbers, show them — labeled with their source.
+      :external&&gaOk?kpi(num(ga.visitors),`${num(ga.pageviews)} page view${ga.pageviews===1?'':'s'} · via Google Analytics${gscQual(ga.period)}`)
       :external?offSite('Visitors')
       :t?emptyState('Not measured yet','Visitor counts appear once your site is collecting them.')
       :emptyState('Visitor counts hit a hiccup','Refresh in a moment.'),

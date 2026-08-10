@@ -530,6 +530,62 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('Once people start visiting, the trend shows here')).toHaveCount(0);
   });
 
+  // ── the state 4d2e866 promised: "a connected Google Analytics holds these
+  // numbers" — now, when GA4 is connected and reporting, the numbers ARRIVE,
+  // always with their provenance. Never blended with first-party counts.
+  test('an EXTERNAL client with GA4 reporting sees the numbers — labeled "via Google Analytics"', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;                      // no beacon on their pages, ever
+    D.data.website.search = { clicks: 38, impressions: 4100, period: '2026-07', top_terms: [] };
+    D.data.website.ga = { connected: true, has_data: true, visitors: 512, sessions: 683, pageviews: 2100, period: '2026-07', source: 'google_analytics' };
+    D.data.website.hosting = {
+      hosted: false, external: true, domain: 'bacchuskitchen.com', domain_verified: true,
+      visitors_measurable: false, visitors_reason: 'Visitor counts can’t come from here — bacchuskitchen.com isn’t hosted by the studio, so there’s no counter on its pages. Their own analytics (or a connected Google Analytics) is where those numbers live.',
+      search_measurable: true, search_reason: 'Search numbers work fine: Google reports on the domain bacchuskitchen.com, whoever hosts it.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    // the numbers, with their source on them
+    await expect(page.getByText('512').first()).toBeVisible();
+    await expect(page.getByText('via Google Analytics').first()).toBeVisible();
+    // the visitors card stopped claiming the numbers can't exist
+    const visitorsCard = page.locator('.card', { hasText: 'via Google Analytics' }).first();
+    await expect(visitorsCard).not.toContainText('Not measured here');
+    // the band note now explains the provenance instead of contradicting the card
+    const note = page.locator('.bandnote');
+    await expect(note).toContainText('via their connected Google Analytics');
+    await expect(note).not.toContainText('Visitor numbers can’t:');
+  });
+
+  test('an EXTERNAL client with GA4 connected but NOT reporting keeps the honest explanation', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic = null;
+    D.data.website.search = null;
+    D.data.website.ga = { connected: true, has_data: false };   // connected; first month hasn't landed
+    D.data.website.hosting = {
+      hosted: false, external: true, domain: 'bacchuskitchen.com', domain_verified: true,
+      visitors_measurable: false, visitors_reason: 'Visitor counts can’t come from here — bacchuskitchen.com isn’t hosted by the studio, so there’s no counter on its pages. Their own analytics (or a connected Google Analytics) is where those numbers live.',
+      search_measurable: true, search_reason: 'Search numbers work fine: Google reports on the domain bacchuskitchen.com, whoever hosts it.',
+    };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    // no fabricated numbers, no provenance label with nothing behind it
+    await expect(page.getByText('via Google Analytics')).toHaveCount(0);
+    await expect(page.getByText('Not measured here').first()).toBeVisible();
+    await expect(page.getByText('none of its pages carry our counter').first()).toBeVisible();
+  });
+
+  test('a HOSTED site never blends GA4 into its first-party counts', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    // first-party measuring AND a ga block present: first-party wins, unlabeled
+    D.data.website.ga = { connected: true, has_data: true, visitors: 99999, sessions: 1, pageviews: 1, period: '2026-07', source: 'google_analytics' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('214').first()).toBeVisible();          // the first-party count
+    await expect(page.getByText('99,999')).toHaveCount(0);              // GA's number never leaks in
+    await expect(page.getByText('via Google Analytics')).toHaveCount(0);
+  });
+
   test('a site WE host keeps the ordinary empty states — no external wording leaks', async ({ page }) => {
     const D = JSON.parse(JSON.stringify(DASH));
     D.data.website.traffic = null;
