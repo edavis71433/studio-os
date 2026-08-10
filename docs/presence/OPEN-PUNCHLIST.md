@@ -561,6 +561,109 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## 💸 THE SILENT STUDIO — BUILT, NEEDS 0120 + DEPLOY (2026-08-07)
+
+Eric, from his phone: no email when Claud Beltran signed OR paid his deposit;
+Bacchus project stuck at "0% · 0/0 tasks"; "connect search console just takes
+me in a circle"; business dashboard empty; then Projects + Pipeline + Contacts
+ALL empty; messages unfilterable outside a profile.
+
+FIVE ROOT CAUSES, none of them what the symptom suggested:
+
+1. THE EMAILS NEVER EXISTED. Not misconfigured — absent. handleSalesContractSign
+   (sales.ts:1354) emailed only the SIGNER; stripe-webhook had grep -c sendEmail
+   = 0. Meanwhile lifecycle.ts happily emailed "your proposal went quiet 3 days
+   ago". The nagging worked; the good news didn't. FIXED: raiseDealReady now
+   RETURNS the raiseNotice created-flag (it was discarding it at :1179, so there
+   was nothing to gate send-once on); webhook forwards to a new secret-gated
+   POST /commerce/invoice-paid carrying invoice_id ONLY (re-read server-side, so
+   a leaked secret can't forge an amount) — chosen over inlining Resend because
+   the route gets brand + push + studioRecipient + checklist tick for free.
+   Degrades to today's behaviour if the function isn't deployed yet.
+2. THE BLANK BUSINESS EMAIL WAS LOAD-BEARING. lifecycle.ts:403,437,489,581,616
+   all did `if (owner)` with NO fallback and NO log against a column that
+   defaults to '' — so lead-followup, deal-followup, support-aging, renewal and
+   agreement-renewal were ALL silently dying for Eric right now. All five now go
+   through emailOperator → studioRecipient's 3-rung chain, and warn on nobody.
+3. PROJECTS COULDN'T MOVE OFF 0%. ensureProjectForDeal made an empty shell.
+   FIXED: Eric's 10 steps (his choice), source='checklist:<key>' so each is one
+   addressable row — no schema change. Progress is COMPUTED (presence_projects
+   has no progress column; the one at baseline:1524 is the legacy table).
+   Auto-tick: agreement_signed, deposit_paid, site_live. Idempotent via one
+   WHERE (source=eq + status=neq.done), so a re-fired webhook matches 0 rows.
+   ⚠ site_live needed BOTH doors — publish.ts:183 AND deploy_reconcile.ts:52 —
+   a slow deploy would silently have cost 10%. Seed is EVIDENCE-aware not
+   event-driven, because the real order is sign → pay → convert: both facts are
+   already true before a project exists.
+4. THE SEARCH CONSOLE "CIRCLE" WAS THREE BUGS STACKED. (a) providers.ts had ALL
+   21 providers status:'planned', and connections.html:132 renders "coming soon"
+   instead of a Connect button for anything not read_only — so NO provider had a
+   button, for anyone, despite AN-3.1 shipping the real GSC read. (b) the card's
+   CTA pointed at /agency.html, which has ZERO connect affordances. (c) the
+   callback dropped the client scope, so operator-connects-for-client could
+   never complete — the bug that would have looked identical the moment secrets
+   were set. All fixed. Only GSC flipped live; the other 20 each have a recorded
+   defect (Tag Manager publishes ACCOUNT count as "tags installed"; GA4 points
+   at the bare API base; HubSpot reads results.length from limit=1 = always 1;
+   Stripe/Square read a `total` their responses lack; Apple's OAuth endpoints
+   are invented). Half would print a confidently wrong number.
+   ⚠ WORST FIND: /system/health derived connected_platform from GOOGLE_CLIENT_ID
+   /_SECRET — names NO code reads (auth.ts uses CONNECTED_<KEY>_CLIENT_ID). Wrong
+   in BOTH directions, and PHASE-J-OWNER-ACTIVATION.md told the owner to verify
+   activation with that flag. Following the checklist could not have worked.
+5. THE SCOPE WAS STICKY AND INVISIBLE. carryScopeGlobally (shell.js:817) rewrites
+   every APP_PAGES anchor to carry ?client=, so one drill-in silently scoped
+   Projects/Pipeline/Contacts/Analytics — all studio-level — to a client site
+   where that data cannot live. Empty states then LIED ("No projects yet · Create
+   a project") while Bacchus sat won+converted. FIXED: window.ddsStudioLevel()
+   on all three, exit link carries data-noscope (or carryScopeGlobally re-scopes
+   the escape hatch straight back), scope read from URL not CTX (the page's own
+   fetch beats the context fetch).
+   ⚠ AND IT WAS A DATA TRAP, not just bad copy: POST /projects and /sales/deals
+   write site_id = caller's site, so creating from a scoped page FILED THE RECORD
+   ON THE CLIENT'S SITE where nothing else can see it. Create actions now hidden
+   while scoped.
+   Truth table recorded: studio-level = projects/pipeline/contacts; mixed =
+   analytics/leads/inbox; per-client = the other 17.
+
+ALSO: scoped Business dashboard now does REAL per-client sales (converted_client_id
+UNIQUE 0074 + customer_client_id indexed 0086:37 — both populated for Bacchus),
+not the cheap suppression. "Won this month" names wins OUTSIDE the window
+("most recent win Jul 22 ($4,800)") because $0 read identically for three
+different truths. Inbox gains client + project lenses (URL-round-tripping,
+filtered-empty names every narrowing) — support rows previously carried only a
+project NAME so they couldn't join their own project's lens; +1 field fixes it.
+#181's grouping and 0115's client link both preserved; a test asserts no lens
+can surface a row absent from the unfiltered list.
+
+WHY IT ALL REACHED HIM — THE TESTS ASSERTED UNREACHABLE HAPPY PATHS:
+analytics.spec.ts:282 navigated to ?client= but served the UNSCOPED rich fixture
+and asserted $12,400 — green while the real scoped board could only ever return
+zeros. analytics_dashboard_test.mjs:121 fixtures stage:'won' which the sign path
+never produces. operator_notify_test.mjs scopes itself to the 4 portal actions,
+so signing/payment were outside its charter by construction.
+
+⚠ NEEDS ERIC: run 0120_project_checklist_backfill.sql (tested twice against a
+scratch PG16: Bacchus → 10 tasks, 3 done, 30%; a project with existing tasks
+untouched; a soft-deleted checklist NOT resurrected). Then function deploy.
+⚠ SEARCH CONSOLE ACTIVATION (Supabase → Edge Functions → Secrets):
+CONNECTION_ENC_KEY (44-char base64), CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID,
+_SECRET, SITE_URL. Google Cloud: enable the API, consent screen with
+webmasters.readonly, register ${SITE_URL}/connections-callback.html.
+Do NOT set GOOGLE_CLIENT_ID/_SECRET/STATE_SIGNING_SECRET for this.
+REALISTIC: ~6-10 weeks to a trustworthy number. Sensitive scope = Google review
+(days-weeks); sites must be PUBLISHED; Google needs days-weeks to crawl; gsc.ts
+queries the PREVIOUS FULL CALENDAR MONTH. Publishing is the long pole, not OAuth.
+OPEN CALL FOR ERIC: the client can currently tick "Send your content and photos"
+(matches existing template-task behaviour) which moves Eric's bar. Offer to make
+the 3 client-facing steps visible-but-not-tickable.
+DEFERRED w/ reasons: stage==='converted' dead branch (spans 2 files w/ a binding
+comment); UTC month boundaries (needs an operator-timezone source of truth that
+doesn't exist yet); APP_PAGES narrowing (trades a teachable message for a silent
+scope drop).
+Gates: pure 224/0/4, chrome 28, shell 5, e2e desktop 768/1 (known
+broadcasts.spec.ts:172), mobile+tablet 95/0.
+
 ## 📱 MOBILE MENU DEAD ON REAL iOS — FIXED, AWAITING DEPLOY (2026-08-07)
 
 Eric, from his phone: "I was looking at studio in Mobile view and none of the
