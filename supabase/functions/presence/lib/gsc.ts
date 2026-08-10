@@ -13,6 +13,45 @@ export function propertyCandidates(domain: string): string[] {
   return [`sc-domain:${d}`, `https://${d}/`, `https://www.${d}/`];
 }
 
+/** Which domain should Search Console be asked about for this site?
+ *
+ *  Search Console reports on a VERIFIED DOMAIN PROPERTY. It does not care who
+ *  hosts the site — so the answer is "wherever this client's website actually
+ *  lives", which for a large part of Eric's book is a domain he does not host.
+ *
+ *    monitor edition — the site row is a workspace ABOUT someone else's website
+ *                      (0031: "observing the customer's EXISTING external
+ *                      website (no hosting, no publishing)"). Its real address
+ *                      is the verified/pending external one in
+ *                      presence_monitor_connections.domain. It is NEVER a
+ *                      *.netlify.app: we deploy nothing for it, so a stale
+ *                      netlify_site_id would point Google at the wrong property.
+ *    presence edition — we host it. custom_domain is the address people type;
+ *                      the netlify subdomain is the fallback while a custom
+ *                      domain is still being pointed. An external domain may
+ *                      still be recorded (a client whose old site is live
+ *                      elsewhere while we build the new one) and is preferred
+ *                      over the netlify subdomain, because that is where the
+ *                      established search presence actually is.
+ *
+ *  Pure; returns null when we simply don't know where the website is — which is
+ *  a different, honestly-reportable situation from "no numbers yet". */
+export type GscDomainSource = 'external' | 'custom_domain' | 'netlify';
+export function gscDomainFor(
+  site: { edition?: string | null; custom_domain?: string | null; netlify_site_id?: string | null },
+  externalDomain?: string | null,
+): { domain: string; source: GscDomainSource } | null {
+  const host = (v: unknown) => String(v ?? '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./i, '').toLowerCase();
+  const ext = host(externalDomain);
+  const custom = host(site?.custom_domain);
+  const netlify = site?.netlify_site_id ? `${site.netlify_site_id}.netlify.app` : '';
+  const order: Array<[GscDomainSource, string]> = site?.edition === 'monitor'
+    ? [['external', ext], ['custom_domain', custom]]
+    : [['custom_domain', custom], ['external', ext], ['netlify', netlify]];
+  for (const [source, domain] of order) if (domain) return { domain, source };
+  return null;
+}
+
 /** The searchAnalytics/query request body. dimensions=[] → site totals; else a
  *  breakdown. Bounded rowLimit keeps us well inside API quotas. */
 export function gscQueryBody(startDate: string, endDate: string, dimensions: string[] = [], rowLimit = 1) {

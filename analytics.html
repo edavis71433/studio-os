@@ -49,6 +49,11 @@
   /* ── the 12-column grid + Lightning card chrome ── */
   .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
   .band{grid-column:1/-1;font-family:var(--sans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:10px 2px -4px}
+  /* the honest header for a website the studio does NOT host: what these numbers
+     can and cannot say, stated once before the cards rather than implied by four
+     empty ones. Same full-width slot as .band. */
+  .bandnote{grid-column:1/-1;font-size:13px;line-height:1.55;color:var(--soft);background:var(--p-soft);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:2px 0 -2px}
+  .bandnote strong{color:var(--ink);font-weight:700}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
   .ch{padding:13px 16px 0}
   .ch .t{font-family:var(--sans);font-size:14px;font-weight:700}
@@ -376,24 +381,35 @@ function websiteBand(d){
   const tTrunc=!!(t&&t.truncated);
   // search, in the order things actually happen:
   //   gDown  — the read hiccuped. NOT the connect CTA (they may well be connected).
-  //   gDraft — the site has never been published. Google cannot measure a page it
-  //            has never been able to visit, and the sync asks for the previous
-  //            full calendar month, so connecting a draft today fetches a month in
-  //            which nothing was live. Asking for Search Console here is the wrong
-  //            step, and asking every week is nagging about the wrong step.
+  //   gNoDom — the studio does NOT host this website and no address is on file.
+  //            This used to be read as "still a draft" and answered with "publish
+  //            the site first" — nonsense for a client whose site has been live at
+  //            their own domain for years. Search Console reports on a verified
+  //            DOMAIN property whoever hosts it; the only blocker is the address.
+  //   gDraft — a site WE host that has never been published. Google cannot measure
+  //            a page it has never been able to visit, and the sync asks for the
+  //            previous full calendar month, so connecting a draft today fetches a
+  //            month in which nothing was live. Still the right ask — but only for
+  //            the sites we actually publish.
   //   gWait  — genuinely connected; no month has landed yet. Honest lag.
-  //   g null — published, nothing connected: the connect CTA is finally right.
+  //   g null — ready to connect (published-and-hosted, or external with a known
+  //            domain): the connect CTA is finally right.
   //   gOk    — real numbers.
   const gDown=!!(g&&g.unavailable);
+  const gNoDom=!!(g&&g.no_domain);
   const gDraft=!!(g&&g.draft);
   const gWait=!!(g&&g.waiting);
-  const gOk=!!(g&&!g.unavailable&&!g.draft&&!g.waiting);
+  const gOk=!!(g&&!g.unavailable&&!g.no_domain&&!g.draft&&!g.waiting);
+  // hosting: whose website this is, and therefore which numbers can exist at all.
+  const host=(w&&w.hosting)||null;
+  const external=!!(host&&host.external);
   // D1: every business-insights drill carries the active period (it understands
   // windows — SS11 consumes it); the connections CTA never does.
   const BI=withPeriod('/business-insights.html');
   // the one place the "what now?" for a non-measuring search card is decided.
   // card() layers withScope() on every footer href, so these stay unscoped here.
   const searchCta=gOk||gDown?[BI,'View search insights']
+    :gNoDom?[(g&&g.record_href)||'/presence.html#monitor','Add their website address']
     :gDraft?[(g&&g.publish_href)||'/presence.html#publish','Publish the site']
     :gWait?null
     :['/connections.html','Connect Search Console'];
@@ -401,19 +417,35 @@ function websiteBand(d){
   // talks about numbers, the terms table about searches); the three states before
   // it are the same sentence wherever they appear, because they are the same fact.
   const searchEmpty=(notConnectedLine)=>gDown?emptyState('Search data is catching its breath','Check back shortly.')
+    :gNoDom?emptyState('Where is their website?','You don’t host this one, so there’s nothing to publish — Google reports on a domain whoever hosts it. Record their website address and their existing search numbers start arriving.')
     :gDraft?emptyState('Publish the site first','Google can’t measure a draft — it has never been able to visit this site. Publish, and the search numbers start from the first full month it’s live.')
     :gWait?emptyState('Connected — waiting on Google','Search Console is connected. Google reports on whole past months, so the first numbers land after the site has been live through one. Nothing to do.')
     :emptyState('Not measured yet',notConnectedLine);
   let h=`<h2 class="band">Your website</h2>`;
+  // Say plainly whose website this is BEFORE showing a grid of empty cards. For a
+  // client we don't host, first-party visitor numbers are not "not measured yet" —
+  // they are structurally unavailable (the counter we inject only ever lands on
+  // pages we render and deploy), while search works perfectly. Stating the reason
+  // once, up front, is the difference between an empty state and a lie.
+  if(external){
+    h+=`<p class="bandnote">${esc(host.domain?`${host.domain} isn’t hosted by the studio.`:'This website isn’t hosted by the studio.')} `
+      +`<strong>Search numbers work:</strong> ${esc(host.search_reason||'')} `
+      +`<strong>Visitor numbers can’t:</strong> ${esc(host.visitors_reason||'')}</p>`;
+  }
+  // the ONE reason a non-hosted site shows no visitor numbers — same sentence on
+  // every card that would otherwise say "not measured yet" and mean "never".
+  const offSite=(what)=>emptyState('Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${host&&host.domain?host.domain:'this website'}, so none of its pages carry our counter. Their own analytics (or a connected Google Analytics) holds these numbers.`);
   h+=card('c3','Visitors',based(periodLabel(),tTrunc),
     measuring?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
+      :external?offSite('Visitors')
       :t?emptyState('Not measured yet','Visitor counts appear once your site is collecting them.')
       :emptyState('Visitor counts hit a hiccup','Refresh in a moment.'),
-    [BI,'View website insights']);
+    external?null:[BI,'View website insights']);
   h+=card('c3','Actions taken',based(periodLabel(),tTrunc),
     measuring?kpi(num(t.actions),'calls, emails & booking taps')
+      :external?offSite('Calls, emails and booking taps')
       :emptyState('Not measured yet','Calls, emails and booking taps will count up here.'),
-    [BI,'View website insights']);
+    external?null:[BI,'View website insights']);
   h+=card('c3','Google clicks','',
     gOk?kpi(num(g.clicks),`${num(g.impressions)} times seen in search${gscQual(g.period)}`):searchEmpty('Connect Search Console to see your Google numbers.'),
     searchCta);
@@ -421,12 +453,14 @@ function websiteBand(d){
     const top=measuring&&(t.top_sources||[])[0];
     h+=card('c3','Top source',based('',tTrunc),
       top?kpi(esc(top.source),`${num(top.share)}% of visits`,'small')
+        :external?offSite('Where visitors come from')
         :emptyState('Not measured yet','Where visitors come from shows up here.'),
-      [BI,'View website insights']);
+      external?null:[BI,'View website insights']);
   }
   h+=card('c6','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
-    (measuring&&lineChart(t.weekly,'var(--c2)','visitors'))||emptyState('No visits yet','Once people start visiting, the trend shows here.'),
-    [BI,'View website insights']);
+    (measuring&&lineChart(t.weekly,'var(--c2)','visitors'))
+      ||(external?offSite('Visits over time'):emptyState('No visits yet','Once people start visiting, the trend shows here.')),
+    external?null:[BI,'View website insights']);
   {
     let body=null;
     if(measuring&&(t.top_sources||[]).length){

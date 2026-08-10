@@ -167,6 +167,11 @@
 // view-name dropdown with FIXED views (D3: no saved views/bulk), "N customers ·
 // Updated just now" meta, sortable columns, refresh, and a Table ⇄ Cards display
 // toggle (cards = the original look, kept). Fed by /studio/customers (studio-side,
+        <div id="cu-website-wrap" style="display:none">
+          <label for="cu-website">Their existing website address</label>
+          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
+        </div>
 // tenant-scoped to the operator's own site via the Agency–Client Bridge). "Open"
 // routes to that customer's record; "Manage their website" stays the clearly-
 // secondary website action.
@@ -382,7 +387,14 @@ function wireList(){
 // sync by hand: set up an existing customer with their own workspace + a
 // sign-in invitation, or just connect them by email. POST /sales/customers
 // (handleSalesAddCustomer) reads mode/name/business_name/email/edition. ──
-function syncCuSignup(){const s=$('cu-signup');if(s)s.style.display=($('cu-edition').value==='presence')?'':'none';}
+// `presence` is the only option where the site lives HERE. Every other answer
+// means we don't host it — so ask where it actually is, because that domain is
+// the one thing Search Console needs and the one thing we currently never learn.
+function cuHostedHere(){return $('cu-edition').value==='presence';}
+function syncCuSignup(){
+  const s=$('cu-signup');if(s)s.style.display=cuHostedHere()?'':'none';
+  const w=$('cu-website-wrap');if(w)w.style.display=cuHostedHere()?'none':'';
+}
 function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
 function syncCuMode(){
   const connect=cuMode()==='connect';
@@ -409,10 +421,12 @@ $('custForm').onsubmit=async(e)=>{
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
   if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
   const label=mode==='connect'?'Save':'Set up + invite';
+  const wf=$('cu-website');if(wf)wf.value='';
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
   const body=mode==='connect'
     ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value};
+    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value,
+       website_url:(!cuHostedHere()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){

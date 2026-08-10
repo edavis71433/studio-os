@@ -17,7 +17,8 @@ import { gather } from '../agency/routes.ts';
 import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
   inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights, websiteRows,
-  trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP, type Period,
+  trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
+  searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDetailInsights, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
@@ -164,7 +165,13 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
 
   // AN-2: real first-party traffic; AN-3: real search performance. Only surfaces
   // that genuinely have no data stay in "not measured".
-  const trafficCards = trafficInsights(traffic, period);
+  // Whose website is this? A monitor-edition workspace watches a site the client
+  // already had — no beacon of ours is on it, so the visitor empty state must say
+  // that rather than promise numbers "once your site is published".
+  const homeHosted = site.edition !== 'monitor';
+  const homeExternalDomain = homeHosted ? null
+    : (arr(await svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain&limit=1`).catch(() => ({})))[0]?.domain || null);
+  const trafficCards = trafficInsights(traffic, period, { hosted: homeHosted, domain: homeExternalDomain });
   const searchCards = searchInsights(gsc);
   const notice = trafficNotice(traffic);
   const sNotice = searchNotice(gsc);
@@ -180,6 +187,8 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
     health: { sentence: health.headline, status: health.status, suggestions: (health.suggestions || []).slice(0, 3) },
     watching,
     not_measured: gscConnected ? [] : notMeasured(true, false),   // traffic is first-party; search real when connected
+    // Named plainly so the page never has to guess whose website this is.
+    hosting: hostingSurface({ hosted: homeHosted, externalDomain: homeExternalDomain }),
   } }, 200, cors);
 }
 
@@ -288,7 +297,7 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // AN-3 (§Agency): per-client search state from the shared `signals` table — who's
   // growing/falling on Google, and who hasn't connected Search Console. Reuses the
   // portfolio; one site→client map + one signals query (no duplicate dashboard).
-  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at`));
+  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at,edition`));
   const clientIds = sites.map((s) => s.client_id).filter(Boolean);
   const gscRows = clientIds.length ? arr(await svc(`signals?client_id=in.(${clientIds.join(',')})&source=eq.gsc&metric=eq.search_impressions&select=client_id,value,period&order=period.desc&limit=2000`)) : [];
   const byClient = new Map<string, any[]>();
@@ -306,32 +315,53 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // `signals` rows: "connected" or "connect Search Console". Both of the states
   // in between were being nagged with the wrong step.
   //
-  //   DRAFT     — the site has never been published. Search Console cannot
-  //               report on a page Google has never been able to crawl, and
-  //               lib/gsc.ts queries the PREVIOUS FULL CALENDAR MONTH, so
+  //   NO_DOMAIN — we DON'T host this client's website (monitor edition) and no
+  //               address has been recorded. This band used to read the absent
+  //               last_published_at as "still a draft" and tell Eric to publish
+  //               — but an established site at the client's own domain has
+  //               nothing to publish, and Search Console reports on a verified
+  //               DOMAIN property regardless of who hosts it. The only real
+  //               blocker is that we don't know the domain yet.
+  //   DRAFT     — a site WE host that has never been published. Search Console
+  //               cannot report on a page Google has never been able to crawl,
+  //               and lib/gsc.ts queries the PREVIOUS FULL CALENDAR MONTH, so
   //               connecting a draft today fetches a month in which nothing was
-  //               live. Publishing comes first; asking for Search Console here
-  //               is asking for the wrong thing.
+  //               live. Publishing comes first — for the sites we publish.
   //   WAITING   — genuinely connected (presence_connections says so — the old
   //               code never read that table at all), but no month has landed
   //               yet. A real connection was being nagged to "connect Search
   //               Console" for weeks.
-  //   NOT_CONN. — published, and nothing is connected. The one case where the
-  //               ask is right.
+  //   NOT_CONN. — ready to connect (published-and-hosted, or external with a
+  //               known domain), and nothing is connected. The ask is right.
   const gscConnected = new Set(
     arr(await svc(`presence_connections?site_id=in.(${siteIds.join(',')})&provider_key=eq.google_search_console&select=site_id,status`))
       .filter((c: any) => ['connected', 'verified', 'active'].includes(String(c.status)))
       .map((c: any) => String(c.site_id)),
   );
+  // The external addresses, in one batched read — a monitor-edition site's real
+  // website lives here, not in custom_domain/netlify_site_id.
+  const externalDomains = new Map<string, string>(
+    arr(await svc(`presence_monitor_connections?site_id=in.(${siteIds.join(',')})&select=site_id,domain`))
+      .filter((c: any) => c && c.domain)
+      .map((c: any) => [String(c.site_id), String(c.domain)] as [string, string]),
+  );
   const nameOf = (siteId: string) => String((portfolio || []).find((c: any) => String(c.site_id) === String(siteId))?.name || 'this client');
-  const counts = { draft: 0, waiting: 0, not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
-  const draftSites: any[] = [], waitingSites: any[] = [], notConnectedSites: any[] = [];
+  const counts = { no_domain: 0, draft: 0, waiting: 0, not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
+  const noDomainSites: any[] = [], draftSites: any[] = [], waitingSites: any[] = [], notConnectedSites: any[] = [];
   for (const s of sites) {
     const st = stateFor(s.client_id);
     if (st === 'not_connected') {
-      // no numbers yet — but WHY there are none is three different situations
-      if (!s.last_published_at) { counts.draft++; draftSites.push(s); continue; }
-      if (gscConnected.has(String(s.id))) { counts.waiting++; waitingSites.push(s); continue; }
+      // no numbers yet — but WHY there are none is four different situations
+      const readiness = searchReadinessState({
+        hosted: s.edition !== 'monitor',
+        lastPublishedAt: s.last_published_at || null,
+        externalDomain: externalDomains.get(String(s.id)) || null,
+        gscConnected: gscConnected.has(String(s.id)),
+        hasData: false,
+      });
+      if (readiness === 'no_domain') { counts.no_domain++; noDomainSites.push(s); continue; }
+      if (readiness === 'draft') { counts.draft++; draftSites.push(s); continue; }
+      if (readiness === 'waiting') { counts.waiting++; waitingSites.push(s); continue; }
       counts.not_connected++; notConnectedSites.push(s); continue;
     }
     counts[st]++;
@@ -346,6 +376,15 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const searchInsightsAgency: any[] = [];
   if (counts.growing) searchInsightsAgency.push({ key: 'search_growing', title: 'Rising on Google', sentence: `${counts.growing} ${counts.growing === 1 ? 'client is' : 'clients are'} getting seen more on Google lately.`, number: counts.growing, tone: 'good' });
   if (counts.falling) searchInsightsAgency.push({ key: 'search_falling', title: 'Losing visibility', sentence: `${counts.falling} ${counts.falling === 1 ? 'client is' : 'clients are'} being seen less on Google — worth a fresh update.`, number: counts.falling, tone: 'attention' });
+  if (counts.no_domain) {
+    const links = linksFor(noDomainSites, (id) => `/presence.html?client=${encodeURIComponent(id)}#monitor`, 'Add the website for');
+    searchInsightsAgency.push({
+      key: 'search_no_domain', title: 'Tell us where their website is',
+      sentence: `${counts.no_domain} of ${siteIds.length} ${counts.no_domain === 1 ? 'client has a website you don’t host' : 'clients have websites you don’t host'}, and no address on file. Google reports on a domain whoever hosts it — record the address and their search numbers start arriving. Nothing needs publishing.`,
+      number: counts.no_domain, tone: 'neutral',
+      sites: links, href: links[0]?.href, cta: links.length === 1 ? links[0].cta : 'Add the first address',
+    });
+  }
   if (counts.draft) {
     const links = linksFor(draftSites, (id) => `/presence.html?client=${encodeURIComponent(id)}#publish`, 'Publish');
     searchInsightsAgency.push({
@@ -473,6 +512,12 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
     safe(readGsc(site.client_id)),
   ]);
+  // Do WE serve this website? A monitor-edition workspace watches a website the
+  // client already had (0031); everything about what we can measure follows from
+  // this one fact, so it is read, never assumed.
+  const hosted = site.edition !== 'monitor';
+  const extConn = hosted ? null : arr(await safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) || {})[0] || null;
+  const externalDomain = extConn?.domain ? String(extConn.domain) : null;
   const okRows = (r: unknown): any[] | null => (r && (r as { ok?: boolean }).ok ? arr(r as { json?: unknown }) : null);
 
   // ── Sales band ──
@@ -517,22 +562,38 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   }
   // search states, in the order they actually happen:
   //   { unavailable }  — the signals read failed. NOT a connect prompt (AN-4).
-  //   { draft }        — the site has never been published. Search Console
-  //                      cannot report on a page Google has never crawled, and
-  //                      lib/gsc.ts asks for the PREVIOUS FULL CALENDAR MONTH,
-  //                      so connecting a draft today fetches a month in which
-  //                      nothing was live. The ask is simply the wrong one.
+  //   { no_domain }    — we DON'T host this website and nobody has told us where
+  //                      it is. The previous gate read the absent
+  //                      last_published_at as "still a draft" and told Eric to
+  //                      publish — for a client with an established site at
+  //                      their own domain there is nothing to publish, and
+  //                      Search Console never cared who hosts it. The one real
+  //                      blocker is that we don't know the domain.
+  //   { draft }        — a site WE host that has never been published. Search
+  //                      Console cannot report on a page Google has never
+  //                      crawled, and lib/gsc.ts asks for the PREVIOUS FULL
+  //                      CALENDAR MONTH, so connecting a draft today fetches a
+  //                      month in which nothing was live. Still the right ask —
+  //                      but only for a site we actually publish.
   //   { waiting }      — connected (presence_connections, which this handler
   //                      never read), no month landed yet. Honest lag, not a
   //                      missing connection.
-  //   null             — published, nothing connected: the connect prompt is right.
+  //   null             — ready to connect: either published-and-hosted, or an
+  //                      external site whose domain we know.
   //   { clicks, … }    — real numbers.
+  const gscConnected = !!(await safe(connectionState(site.id)))?.gsc;
+  const readiness = searchReadinessState({
+    hosted, lastPublishedAt: site.last_published_at || null, externalDomain,
+    gscConnected, hasData: !!gsc?.hasData,
+  });
   let search: unknown = null;
   if (!gsc || !gsc.ok) search = { unavailable: true };
-  else if (!gsc.hasData && !site.last_published_at) {
+  else if (readiness === 'no_domain') {
+    search = { no_domain: true, external: true, record_href: '/presence.html#monitor' };
+  } else if (readiness === 'draft') {
     search = { draft: true, publish_href: '/presence.html#publish' };
-  } else if (!gsc.hasData && (await safe(connectionState(site.id)))?.gsc) {
-    search = { waiting: true };
+  } else if (readiness === 'waiting') {
+    search = { waiting: true, external: !hosted, domain: externalDomain };
   } else if (gsc.hasData) {
     const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
     search = {
@@ -557,6 +618,11 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       truncated_invoices: !!invs && invs.length >= 1000,
       truncated_enquiries: !!subs && subs.length >= 1000,
     },
-    website: { traffic, search },
+    // `hosting` says plainly which of these numbers can exist at all, and why.
+    // For a client whose website we don't serve, first-party visitor counts are
+    // not "not measured yet" — they are structurally unavailable (our beacon is
+    // only on pages we render), while search works perfectly. The page prints
+    // the reason instead of a silent zero.
+    website: { traffic, search, hosting: hostingSurface({ hosted, externalDomain, domainVerified: extConn?.status === 'verified' }) },
   } }, 200, cors);
 }

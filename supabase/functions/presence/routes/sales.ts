@@ -17,6 +17,7 @@ import { applyPlaceholders, buildPlaceholderValues } from '../lib/doc_placeholde
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
+import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { signDocToken, verifyDocToken, renderDocument, type DocKind } from '../lib/documents.ts';
@@ -1846,6 +1847,51 @@ async function provisionCustomerAccount(opts: {
   return { ok: true, clientId, siteId: prov.siteId, hosted: prov.hosted, isNewLogin, alreadyExisted, createdClient, createdAuthId };
 }
 
+/** Record the customer's OWN website address on a workspace we don't host.
+ *
+ *  Reuses presence_monitor_connections wholesale — the table 0031 already
+ *  created for exactly this ("A Monitor site's link to the customer's existing
+ *  website. Read-only forever"), with the same token/method shape
+ *  handleMonitorConnect writes, so /monitor/connection, /monitor/verify, the
+ *  readiness report and the evidence collector all pick it up unchanged and
+ *  Eric can edit or disconnect it later from presence.html's Monitor card.
+ *  No new column, no new table, no second source of truth for "their domain".
+ *
+ *  status stays 'pending': OUR ownership proof (meta tag / DNS TXT) is what
+ *  gates observation of their pages. It deliberately does NOT gate Search
+ *  Console, which does its own verification — Google answers 403/404 for a
+ *  property the connected account doesn't own, so an unverified row can only
+ *  ever fail closed.
+ *
+ *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
+ *  still successfully added if this write fails. Returns the stored host. */
+async function recordExistingWebsite(
+  siteId: string, plan: PlanKey, websiteUrl: string, agencySiteId: string, principal: Principal, label: string,
+): Promise<string | null> {
+  try {
+    if (!websiteUrl) return null;
+    if (editionFor(plan) !== 'monitor') return null;   // we host it — there is no external site to record
+    let url: URL;
+    try {
+      url = new URL(/^https?:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`);
+      if (!/^https?:$/.test(url.protocol) || !url.hostname.includes('.')) return null;
+    } catch { return null; }
+    const clean1 = `${url.protocol}//${url.host}/`;
+    const token = 'dds-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+    // create-only on the token/status: never re-issue a proof for a connection
+    // that already exists (merge-duplicates would otherwise reset a verified one).
+    const have = rows(await svc(`presence_monitor_connections?site_id=eq.${siteId}&select=site_id,domain&limit=1`))[0];
+    if (have) return have.domain ? String(have.domain) : null;
+    const w = await svc('presence_monitor_connections', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: siteId, url: clean1, domain: url.hostname, platform: 'custom', method: 'meta', token, status: 'pending', last_check_note: '' }),
+    });
+    if (!w.ok) return null;
+    await writeChangeEvent({ siteId: agencySiteId, entityType: 'client', entityId: siteId, action: 'update', summary: `Recorded ${label}’s existing website ${url.hostname} (hosted elsewhere)`, principal, provenance: 'human', fields: ['monitor_connection'] }).catch(() => {});
+    return url.hostname;
+  } catch { return null; }
+}
+
 /** Seam 1: if the operator runs an AGENCY, add the customer to their managed
  *  portfolio (presence_agency_clients) so the Studio App can service them via
  *  scope-switching. Idempotent (site_id PK). Best-effort; solo owners skip it. */
@@ -1982,6 +2028,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
 
   // ── A) SET THEM UP NOW (existing behavior) ──────────────────────────────────
   const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
+  const existingWebsite = clean(b.website_url, 200);   // their OWN site, when we don't host it
 
   const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
   if (!acct.ok || !acct.clientId) return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t set up the customer’s account — please try again.' }, acct.httpStatus || 502, cors);
@@ -1989,6 +2036,16 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
 
   // managed portfolio (Seam 1) + agency bridge (one primary agency per customer).
   const managed = await linkAgencyPortfolio(principal, acct.siteId, email);
+
+  // Not every customer is a greenfield build. When the plan says we DON'T host
+  // their website (a monitor-edition workspace — 0031: "observing the customer's
+  // EXISTING external website"), record where that website actually is. This is
+  // the one fact everything downstream needs: Search Console reports on a
+  // verified DOMAIN property regardless of who serves the pages, so with the
+  // address on file their established search presence syncs immediately — and
+  // without it the analytics board can only say "we don't know where their site
+  // is", which is what it now says instead of "publish it first".
+  const externalDomain = acct.siteId ? await recordExistingWebsite(acct.siteId, plan, existingWebsite, site.id, principal, businessName) : null;
 
   // Agency–Client Bridge via the shared helper (ensureBridge — one primary agency
   // per customer; idempotent; reuses an existing link; refuses a customer owned by
@@ -2002,9 +2059,9 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   // Already had a workspace → friendly "they're already set up" (with a link), no
   // duplicate, no fresh invite (they already have access).
   if (acct.alreadyExisted) {
-    return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
+    return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, external_domain: externalDomain, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
   }
   const invited = await sendCustomerInvite(email, acct.isNewLogin);
   await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'create', summary: `Added ${businessName} as a customer`, principal, provenance: 'human' }).catch(() => {});
-  return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, portal_url: portalUrl } }, 201, cors);
+  return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, external_domain: externalDomain, portal_url: portalUrl } }, 201, cors);
 }

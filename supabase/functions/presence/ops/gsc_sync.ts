@@ -6,13 +6,19 @@
 // the one boundary that can't be live-tested here (Google's API) uses a known-good
 // contract. Fail-safe: a site that errors is skipped, never blocks the others.
 //
+// HOSTING-AGNOSTIC: Search Console reports on a VERIFIED DOMAIN PROPERTY and has
+// no opinion about who serves the pages. This sync used to derive the property
+// from custom_domain-or-netlify-subdomain, which quietly assumed we host every
+// client. gscDomainFor now resolves the domain per SITE EDITION, so a client
+// whose established website lives at their own domain syncs exactly as happily.
+//
 // OWNER-GATED: nothing flows until the Google OAuth app + `webmasters.readonly`
 // consent + the CONNECTED_GOOGLE_SEARCH_CONSOLE_* / CONNECTION_ENC_KEY secrets are
 // set; without a real token, loadTokens returns null and each site is skipped.
 import { svc } from '../lib/db.ts';
 import { loadTokens, saveTokens, markStatus } from '../connected/store.ts';
 import { refreshTokens } from '../connected/auth.ts';
-import { propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor } from '../lib/gsc.ts';
+import { propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor, gscDomainFor } from '../lib/gsc.ts';
 
 const PROVIDER = 'google_search_console';
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
@@ -35,13 +41,36 @@ async function query(siteId: string, siteUrl: string, body: unknown, tokenState:
   return { ok: r.ok, status: r.status, json };
 }
 
+/** The client's own website address, when we are not the ones hosting it. Read
+ *  per-site (never assumed): a monitor-edition workspace watches an EXTERNAL
+ *  site, and that domain — not a netlify subdomain we never deployed — is the
+ *  Search Console property. `status` is deliberately NOT filtered to 'verified':
+ *  Search Console does its own ownership check (an unverified property answers
+ *  403/404 and propertyCandidates simply moves on), so requiring OUR meta-tag
+ *  verification first would block a client whose domain Google already trusts. */
+async function externalDomainFor(siteId: string): Promise<string | null> {
+  const r = await svc(`presence_monitor_connections?site_id=eq.${siteId}&select=domain&limit=1`).catch(() => null);
+  return (r && arr(r)[0]?.domain) ? String(arr(r)[0].domain) : null;
+}
+
 /** Sync one site's GSC data → signals (aggregate) + presence_search_terms (detail). */
-export async function syncGscForSite(site: { id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null }, now: Date): Promise<{ ok: boolean; note: string }> {
+export async function syncGscForSite(site: { id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition?: string | null }, now: Date, externalDomain?: string | null): Promise<{ ok: boolean; note: string }> {
   const bundle = await loadTokens(site.id, PROVIDER);
   if (!bundle?.access_token) return { ok: false, note: 'not_connected' };
   const tokenState = { access: bundle.access_token, refresh: bundle.refresh_token || null };
-  const domain = site.custom_domain || (site.netlify_site_id ? `${site.netlify_site_id}.netlify.app` : '');
-  if (!domain) return { ok: false, note: 'no_domain' };
+  const ext = externalDomain !== undefined ? externalDomain : await externalDomainFor(site.id);
+  const picked = gscDomainFor(site, ext);
+  if (!picked) {
+    // Two different silences: we host it and no domain is attached yet, vs. we
+    // don't host it and nobody has told us where their website is. The second is
+    // fixable by Eric in a sentence, so it says so where he'll see it.
+    if (site.edition === 'monitor') {
+      await markStatus(site.id, PROVIDER, 'connected', 'attention', 'Add this client’s website address — Search Console needs to know which domain to report on').catch(() => {});
+      return { ok: false, note: 'no_external_domain' };
+    }
+    return { ok: false, note: 'no_domain' };
+  }
+  const domain = picked.domain;
   const { startDate, endDate, period } = gscMonthWindow(now);
 
   // find the verified property (Domain vs URL-prefix), reusing the proven candidates
@@ -75,7 +104,7 @@ export async function runGscSync(limit = 100, now: Date = new Date()): Promise<{
   const conns = arr(await svc(`presence_connections?provider_key=eq.${PROVIDER}&status=eq.connected&select=site_id&limit=${limit}`));
   let synced = 0, failed = 0, skipped = 0;
   for (const c of conns) {
-    const site = arr(await svc(`presence_sites?id=eq.${c.site_id}&select=id,client_id,custom_domain,netlify_site_id&limit=1`))[0];
+    const site = arr(await svc(`presence_sites?id=eq.${c.site_id}&select=id,client_id,custom_domain,netlify_site_id,edition&limit=1`))[0];
     if (!site) { skipped++; continue; }
     try { const r = await syncGscForSite(site, now); r.ok ? synced++ : (r.note === 'not_connected' ? skipped++ : failed++); }
     catch { failed++; }

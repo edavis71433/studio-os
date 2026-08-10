@@ -89,6 +89,83 @@ export function notMeasured(gaConnected: boolean, gscConnected: boolean): Insigh
   return out;
 }
 
+// ── Whose website is this, and what can we honestly measure about it? ────────
+// Not every client is a greenfield build. A large part of the book already has a
+// website at their own domain and an established search presence; Studio OS is
+// the workspace ABOUT that site, not its host (presence_sites.edition='monitor',
+// migration 0031: "observing the customer's EXISTING external website (no
+// hosting, no publishing)").
+//
+// That distinction decides two different things, and conflating them is what
+// produced the wrong advice:
+//
+//   SEARCH is hosting-agnostic. Search Console reports on a verified DOMAIN
+//   property; it does not care who serves the bytes. An external client has
+//   nothing to publish, so "publish the site first" is both useless and untrue
+//   for them — what they need is for us to know their domain.
+//
+//   FIRST-PARTY VISITORS are not. presence_visits is fed by one beacon that
+//   lib/render.ts injects into pages WE render and deploy. On a site we don't
+//   host that beacon is not on any page, so the count is not "0 visitors" and
+//   not "not measured yet" — it is structurally unavailable, forever, until
+//   either the site moves here or a visitor-analytics provider is connected.
+//   Showing a silent zero there is a lie; so is a "connect it" nudge that
+//   points at a thing which would not help.
+
+/** The search state, in the order things actually happen. `hosted` is the one
+ *  input that used to be assumed: it is FALSE for a client whose website we do
+ *  not serve, and it is what stops an external client being told to publish.
+ *  Pure. */
+export type SearchReadiness = 'measuring' | 'no_domain' | 'draft' | 'waiting' | 'connect';
+export function searchReadinessState(x: {
+  hosted: boolean;                     // do WE serve this website? (edition !== 'monitor')
+  lastPublishedAt?: string | null;     // only meaningful when hosted
+  externalDomain?: string | null;      // the client's own address, when we don't host
+  gscConnected: boolean;
+  hasData: boolean;
+}): SearchReadiness {
+  if (x.hasData) return 'measuring';
+  // We don't host it and nobody has told us where it lives — nothing downstream
+  // (connect, sync, verify) can even be attempted. Checked BEFORE the draft rule:
+  // an external site has no last_published_at either, and reading that absence as
+  // "still a draft" is exactly the bug this replaces.
+  if (!x.hosted && !x.externalDomain) return 'no_domain';
+  // A site WE host that has never gone live: Google has never been able to visit
+  // it, and the sync asks for the previous full calendar month, so connecting
+  // today fetches a month in which nothing existed. Publishing genuinely is first.
+  if (x.hosted && !x.lastPublishedAt) return 'draft';
+  if (x.gscConnected) return 'waiting';
+  return 'connect';
+}
+
+/** What this website's numbers can and cannot say, and WHY — the honest header
+ *  for a client whose site we don't host. Pure. */
+export function hostingSurface(x: { hosted: boolean; externalDomain?: string | null; domainVerified?: boolean }): {
+  hosted: boolean; external: boolean; domain: string | null; domain_verified: boolean;
+  visitors_measurable: boolean; visitors_reason: string;
+  search_measurable: boolean; search_reason: string;
+} {
+  const domain = x.externalDomain ? String(x.externalDomain) : null;
+  if (x.hosted) {
+    return {
+      hosted: true, external: false, domain, domain_verified: !!x.domainVerified,
+      visitors_measurable: true, visitors_reason: 'Visitor numbers come from this website itself — every page we publish carries the counter.',
+      search_measurable: true, search_reason: 'Search numbers come from Google Search Console once this website is live and connected.',
+    };
+  }
+  return {
+    hosted: false, external: true, domain, domain_verified: !!x.domainVerified,
+    visitors_measurable: false,
+    visitors_reason: domain
+      ? `Visitor counts can’t come from here — ${domain} isn’t hosted by the studio, so there’s no counter on its pages. Their own analytics (or a connected Google Analytics) is where those numbers live.`
+      : 'Visitor counts can’t come from here — this website isn’t hosted by the studio, so there’s no counter on its pages.',
+    search_measurable: true,
+    search_reason: domain
+      ? `Search numbers work fine: Google reports on the domain ${domain}, whoever hosts it.`
+      : 'Search numbers will work as soon as we know their website address — Google reports on a domain, whoever hosts it.',
+  };
+}
+
 /** SEO readiness — REAL booleans from search-health (no fake impressions). AN-4. */
 export function searchReadinessInsight(x: { verified: boolean; titleSet: boolean; descriptionSet: boolean; sitemap: boolean; brokenLinks: number }): Insight {
   const gaps: string[] = [];
@@ -121,8 +198,18 @@ const prettyPath = (p: string) => {
 
 /** Visitor + page + source + engagement sentences. Empty when there's no data yet
  *  (honest — never a fabricated number). AN-2.3/2.5. */
-export function trafficInsights(agg: TrafficAgg, period: Period): Insight[] {
+export function trafficInsights(agg: TrafficAgg, period: Period, hosting?: { hosted: boolean; domain?: string | null }): Insight[] {
   const w = periodWord(period);
+  // The empty state depends on WHOSE website this is. "Once your site is
+  // published, visitor numbers show up here" is true for a site we host and
+  // false forever for one we don't: presence_visits is fed by a beacon
+  // lib/render.ts injects into pages WE render, so on an external site there is
+  // no counter to wait for. `number: null` (not 0) because there is no zero to
+  // report — the measurement doesn't exist.
+  if (!agg.hasData && hosting && !hosting.hosted) {
+    const at = hosting.domain ? ` on ${hosting.domain}` : '';
+    return [{ key: 'traffic', title: 'Website visitors', sentence: `Visitor numbers can’t come from here — the studio doesn’t host this website, so there’s no counter${at}. Search numbers are unaffected: Google reports on the domain whoever hosts it.`, number: null, href: '/connections.html', tone: 'neutral' }];
+  }
   if (!agg.hasData) return [{ key: 'traffic', title: 'Website visitors', sentence: `No visits recorded yet this ${w} — once your site is published and shared, visitor numbers show up here.`, number: 0, href: '/presence.html#publish', tone: 'neutral' }];
   const out: Insight[] = [];
   // truncated = the prior window is undercounted; stating a trend would

@@ -226,6 +226,11 @@
       <label for="e-email">Email</label>
       <input id="e-email" type="email" maxlength="160" placeholder="jane@business.com" autocomplete="off">
       <label for="e-phone">Phone</label>
+        <div id="cu-website-wrap" style="display:none">
+          <label for="cu-website">Their existing website address</label>
+          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
+        </div>
       <input id="e-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
       <label for="e-company">Company</label>
       <input id="e-company" maxlength="120" placeholder="Acme Co." autocomplete="off">
@@ -495,7 +500,14 @@ function showDupe(payload,matches){
 // provisioning path server-side; here we just collect + show the outcome. ──
 // The signup note + copyable link only apply when their site will live with us
 // (self-serve plan). Hidden otherwise. Paying for software is never picked here.
-function syncCuSignup(){const s=$('cu-signup');if(s)s.style.display=($('cu-edition').value==='presence')?'':'none';}
+// `presence` is the only option where the site lives HERE. Every other answer
+// means we don't host it — so ask where it actually is, because that domain is
+// the one thing Search Console needs and the one thing we currently never learn.
+function cuHostedHere(){return $('cu-edition').value==='presence';}
+function syncCuSignup(){
+  const s=$('cu-signup');if(s)s.style.display=cuHostedHere()?'':'none';
+  const w=$('cu-website-wrap');if(w)w.style.display=cuHostedHere()?'none':'';
+}
 // TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
 // themselves — connect by email" (connect). The mode governs which fields show and
 // what the server does; connect provisions nothing.
@@ -528,7 +540,8 @@ $('custForm').onsubmit=async(e)=>{
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
   const body=mode==='connect'
     ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value};
+    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:$('cu-edition').value,
+       website_url:(!cuHostedHere()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
@@ -545,6 +558,7 @@ $('custForm').onsubmit=async(e)=>{
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
     }else if(d.invited===false){
+  const wf=$('cu-website');if(wf)wf.value='';
       // honest outcome: the account exists but the invitation email failed —
       // never claim "Invitation sent" (SS6; server: handleSalesAddCustomer)
       heading='Account created — the invitation email couldn’t be sent';
