@@ -5161,7 +5161,11 @@ async function mountSearchCard() {
   };
   line(true, "Google can read your site — sitemap, page details, and your " + (h.schema && h.schema.type ? h.schema.type : "business") + " listing info are built in automatically.");
   line(h.seo_fields.title && h.seo_fields.description, "Your search headline and description are set.", "Add a search headline and description above — until then Google shows your name and description.");
-  line(h.verification.google, "Google Search Console is connected.", "Add your free Google Search Console code above to see how people find you.");
+  // This reads presence_settings.google_site_verification (routes/search.ts:41) —
+  // the HTML meta ownership tag, which is a DIFFERENT thing from a Search Console
+  // connection. Saying "connected" here claimed something untrue and contradicted
+  // the Connections page, which correctly showed it as not connected.
+  line(h.verification.google, "Your Google verification code is saved.", "Add your free Google Search Console code above to see how people find you.");
   if (h.verification.bing) line(true, "Bing is connected too (that powers Copilot search).");
   (h.links || []).forEach((l) => { if (l.ok === false) line(false, "", "Your " + l.kind.replace("social:", "") + " link isn’t answering — check " + l.url.slice(0, 40) + "…"); });
   if ((h.links || []).length && (h.links || []).every((l) => l.ok !== false)) line(true, "All your outside links (booking, social, redirects) are answering.");

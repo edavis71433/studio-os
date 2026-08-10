@@ -36,7 +36,7 @@ Guard-tested: **no SEO jargon** (CTR/impressions/query/SERP) ever reaches the cu
 The **entire Google side is owner/Google-console work**, not code:
 1. Create a **Google Cloud project**, enable the **Search Console API**, configure the **OAuth consent screen** — the `webmasters.readonly` scope is **sensitive**, so Google likely requires **app verification/review** (can take days–weeks).
 2. Register the redirect URI **`${SITE_URL}/connections-callback.html`**.
-3. Set edge-function secrets: **`CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID`**, **`CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET`**, **`CONNECTION_ENC_KEY`**, **`STATE_SIGNING_SECRET`**, **`SITE_URL`**.
+3. Set edge-function secrets: **`CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID`**, **`CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET`**, **`CONNECTION_ENC_KEY`**, **`SITE_URL`**. (`STATE_SIGNING_SECRET` was listed here in error and has been removed: **no connected-platform code reads it**. The OAuth state is SEALED with `CONNECTION_ENC_KEY` — `connected/auth.ts` `signState`/`verifyState` — not HMAC-signed. Setting it does nothing for this flow.)
 4. A customer must then connect their own verified property.
 
 Until then, `/connections/google_search_console/connect` honestly returns `not_available` (503), the daily cron finds no connected sites, and Analytics keeps showing the honest "connect Google Search Console" card. **I could not live-test the Google API boundary** — but the request/response contract is copied verbatim from the shipping clever-api collector, and the parsing, storage, sync iteration, and surfacing are all tested (17/17 unit + 7/7 live against the real stores).

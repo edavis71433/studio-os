@@ -21,7 +21,7 @@ All secrets the `presence` function reads, grouped by what they activate (full d
 | **Email** | `RESEND_KEY`, `EMAIL_FROM`, `OPS_ALERT_EMAIL` | **Owner-required** — verify via `capabilities.email`. |
 | **Hosting** | `NETLIFY_AUTH_TOKEN` | **Owner-required** — verify via `capabilities.publishing`. |
 | **Approvals** | `APPROVAL_SECRET` (→ `SCHEDULER_SECRET` fallback) | **Owner-required** — verify via `capabilities.one_tap_approvals`. |
-| **Connected** | `GOOGLE_CLIENT_ID/SECRET`, `STATE_SIGNING_SECRET`, `CONNECTION_ENC_KEY` | **Owner-required** (fail-closed) — verify via `capabilities.connected_platform`. |
+| **Connected** | `CONNECTION_ENC_KEY`, plus a provider pair `CONNECTED_<PROVIDER_KEY>_CLIENT_ID`/`_SECRET` (today: `CONNECTED_GOOGLE_SEARCH_CONSOLE_*`), and `SITE_URL` for the redirect URI | **Owner-required** (fail-closed) — verify via `capabilities.connected_platform`. `GOOGLE_CLIENT_ID/SECRET` and `STATE_SIGNING_SECRET` were listed here in error: no connected-platform code reads them, and the health check used to report activation from them (fixed). |
 | **AI** | `ANTHROPIC_KEY`, `VISUAL_MODEL_KEY/URL/NAME` | **Owner-required** — verify via `capabilities.ai` / `visual_studio`. |
 | **Cron** | (a scheduler calling `/system/run`) | **Owner-required** — verify via `data.last_cycle` advancing. |
 | **Backups** | Supabase PITR + restore drill | **Owner-required** (dashboard setting). |
@@ -55,7 +55,7 @@ Each capability's readiness is **verifiable the moment the owner sets its secret
 | **Hosting (NETLIFY_AUTH_TOKEN)** | publish fails with a config error; live site untouched | "We hit a snag — nothing changed on your live site." |
 | **One-tap (APPROVAL_SECRET)** | `/approve/send` returns 503 "not configured" | Clear message; approvals still work in-app. |
 | **Connected token encryption (CONNECTION_ENC_KEY)** | **fail-closed** — token storage refused | Connection can't be saved insecurely — safe by default. |
-| **OAuth state (STATE_SIGNING_SECRET)** | state verification fails with a clear message | "State failed verification" — no silent bypass. |
+| **OAuth state (sealed with `CONNECTION_ENC_KEY`)** | state verification fails with a clear message | "That connection couldn't be verified" — no silent bypass. |
 | **AI (ANTHROPIC_KEY)** | honest `ai_unavailable` (200), never filler | "AI unavailable right now" — deterministic fallbacks where they exist. |
 | **Cron stops** | scheduled publishes simply don't fire; recorded as still-pending | Nothing lost; fires when cron resumes. |
 | **Provider disconnects / API limits** | connected reads return honest "unavailable"; writes stay approval-gated | Calm "couldn't refresh just now." |

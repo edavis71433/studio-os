@@ -19,6 +19,7 @@ import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
+import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -69,11 +70,18 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
     { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
   ],
+  // These are the names connected/auth.ts ACTUALLY reads. The three it used to
+  // list — GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_SECRET — are
+  // read by NO connected-platform code: credentials come from
+  // CONNECTED_<PROVIDER_KEY>_CLIENT_ID/_SECRET (auth.ts creds()), and the OAuth
+  // state is SEALED with CONNECTION_ENC_KEY (auth.ts signState), not HMAC'd. So
+  // the old list was wrong in both directions: setting them lit up
+  // capabilities.connected_platform while every connect call still 503'd, and
+  // setting the real ones left it reading false.
   connected: [
-    { name: 'GOOGLE_CLIENT_ID', required: false, enables: 'Google OAuth (Connected Platform)' },
-    { name: 'GOOGLE_CLIENT_SECRET', required: false, enables: 'Google OAuth token exchange' },
-    { name: 'STATE_SIGNING_SECRET', required: false, enables: 'signed OAuth state (CSRF-safe connect flow)' },
-    { name: 'CONNECTION_ENC_KEY', required: false, enables: 'encrypting connected tokens at rest (FAIL-CLOSED: without it, token storage is refused, not faked)' },
+    { name: 'CONNECTION_ENC_KEY', required: false, enables: 'encrypting connected tokens at rest AND sealing the OAuth state (FAIL-CLOSED: without it, token storage is refused, not faked)' },
+    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID', required: false, enables: 'connecting Google Search Console (the one live provider) — paired with _CLIENT_SECRET' },
+    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET', required: false, enables: 'the Search Console token exchange + silent refresh. The provider app must also register ${SITE_URL}/connections-callback.html as its redirect URI (SITE_URL is listed under `site`)' },
   ],
   site: [
     { name: 'SITE_URL', required: false, enables: 'absolute links in emails (defaults to the production host)' },
@@ -105,7 +113,12 @@ export function validateSecrets() {
     operator_management: has('OPERATOR_SECRET'), // marketplace/enterprise via x-operator-secret
     ai: has('ANTHROPIC_KEY'),
     visual_studio: has('VISUAL_MODEL_KEY'),
-    connected_platform: has('GOOGLE_CLIENT_ID') && has('GOOGLE_CLIENT_SECRET') && has('CONNECTION_ENC_KEY'),
+    // true only when a customer could actually complete a connection today: the
+    // encryption key (storage + state sealing) plus a real provider credential
+    // PAIR under the name connected/auth.ts reads. Derived from the registry, so
+    // flipping a second provider live needs no edit here.
+    connected_platform: has('CONNECTION_ENC_KEY') && CONNECTED_PROVIDERS.some((p) =>
+      p.status !== 'planned' && has(`CONNECTED_${p.key.toUpperCase()}_CLIENT_ID`) && has(`CONNECTED_${p.key.toUpperCase()}_CLIENT_SECRET`)),
   };
   return {
     ok: missingRequired.length === 0,           // backward-compatible

@@ -71,7 +71,7 @@ Core is already set (the function runs). Then, in priority order:
 | Secret | Enables | Where |
 |---|---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (GBP, Search Console, Analytics…) | Google Cloud Console → OAuth credentials |
-| `STATE_SIGNING_SECRET` | CSRF-safe signed OAuth state | you generate |
+| `CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID` / `_SECRET` | connecting Google Search Console (the redirect URI to register is `${SITE_URL}/connections-callback.html`) | Google Cloud console |
 | `CONNECTION_ENC_KEY` | **encrypts connected tokens at rest** | you generate (32+ bytes) |
 *Verify:* `capabilities.connected_platform = true`. *Security note — fail-closed:* without `CONNECTION_ENC_KEY`, token storage is **refused**, never faked. Set it before enabling connections.
 
@@ -102,7 +102,7 @@ Scheduled publishes, the operations cycle, and retries fire only when something 
 - [ ] **Resend** key + verified `EMAIL_FROM` domain → `email = true`.
 - [ ] **Netlify** token → `publishing = true`.
 - [ ] **`APPROVAL_SECRET`** → `one_tap_approvals = true`.
-- [ ] **Google OAuth** + `STATE_SIGNING_SECRET` + `CONNECTION_ENC_KEY` → `connected_platform = true` (optional at launch).
+- [ ] **Google OAuth app** + `CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID`/`_SECRET` + `CONNECTION_ENC_KEY` → `connected_platform = true` (optional at launch). Not `GOOGLE_CLIENT_ID`/`STATE_SIGNING_SECRET` — no connected-platform code reads those.
 - [ ] **`ANTHROPIC_KEY`** (+ visual keys if using Visual Studio) → `ai = true`.
 - [ ] **Cron** hitting `/system/run` on a schedule (e.g., every 10 min).
 - [ ] **PITR** enabled on both Supabase projects + one recorded restore drill (see DR).
