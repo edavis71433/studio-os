@@ -27,7 +27,7 @@
   :root[data-theme="dark"] .btn:not(.ghost),:root[data-theme="dark"] .c .acts a.reply{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
         inbox.html's list-pane header + customers.html by hand ── */
@@ -49,7 +49,13 @@
   .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
   /* ── the table view: sortable columns; scrolls in its OWN container ── */
-  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  /* position:relative is load-bearing, not decoration. The Actions <th> holds a
+     .sr-only label, which is position:absolute with NO positioned ancestor — so
+     its containing block was the initial one and overflow:auto could not clip
+     it. At 390px that 1px span sat at document x=540 and gave the BODY a 91px
+     sideways scroll (pre-existing; the table itself was always contained).
+     Making .tscroll the containing block puts it back inside the scroller. */
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
   thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -62,6 +68,36 @@
   tbody tr:last-child td{border-bottom:none}
   tbody td .nm{font-weight:600}
   tbody td a{color:var(--p);text-decoration:none}
+  /* ── the action column must never be the part that's off-screen ───────────
+     Eric's report: the Delete button clipped to "Del". The actions are the LAST
+     column and .rowact is white-space:nowrap, so whatever pushes this table
+     past its container pushes Delete out first. Three things, in order:
+       1. the roster sits in the --dds-w-data tier now, so at 1280 there is room
+          for all six columns with nothing to scroll;
+       2. free text can no longer set the floor — one 40-character email address
+          was a ~300px min-content column all by itself. `anywhere` only breaks
+          a token that would otherwise overflow, so short values are untouched;
+       3. and when the table genuinely cannot fit (a phone, or a roster with
+          many custom columns) it still scrolls inside .tscroll — but the action
+          cell is PINNED to the right edge, so Edit / New deal / Delete stay
+          reachable at every scroll position instead of being what's lost.
+     The pinned cell needs its own opaque fill (a transparent sticky cell lets
+     the scrolled columns slide visibly under it) and must follow the row hover. */
+  td.c-email{overflow-wrap:anywhere}
+  th.acts,td.acts{width:1%;white-space:nowrap}
+  /* …and the buttons may stack rather than set a ~250px floor for the column. */
+  .rowacts{flex-wrap:wrap}
+  /* The PIN is tablet-and-up only. Pinned on a 390px phone the action cell is
+     250px of a 350px container — it sits ON TOP of Company and Email and the
+     row is unreadable (measured, not guessed). Phones default to the Cards
+     view for exactly this reason, and a phone that does choose Table gets an
+     ordinary scrolling table where nothing is covered. */
+  @media (min-width:768px){
+    th.acts,td.acts{position:sticky;right:0;background:var(--card);box-shadow:-10px 0 9px -10px rgba(27,21,37,.20)}
+    tbody tr:hover td.acts{background:var(--p-soft)}
+  }
+  @media (min-width:768px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) th.acts,:root:not([data-theme="light"]) td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
+  @media (min-width:768px){:root[data-theme="dark"] th.acts,:root[data-theme="dark"] td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
   .bar{display:flex;gap:8px;margin:0 0 6px;align-items:center;flex-wrap:wrap}
@@ -190,6 +226,11 @@
           <option value="business_os_only">Just their client workspace / business tools — no site work</option>
           <option value="presence_monitor">Just monitoring a site they already have</option>
         </select>
+        <div id="cu-website-wrap" style="display:none">
+          <label for="cu-website">Their existing website address</label>
+          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
+        </div>
         <p class="note">Adding them creates their client workspace and emails them a link to set their password and sign in. You bill them for your work the usual way — they never pay for software here.</p>
         <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
       </div>
@@ -226,11 +267,6 @@
       <label for="e-email">Email</label>
       <input id="e-email" type="email" maxlength="160" placeholder="jane@business.com" autocomplete="off">
       <label for="e-phone">Phone</label>
-        <div id="cu-website-wrap" style="display:none">
-          <label for="cu-website">Their existing website address</label>
-          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
-          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
-        </div>
       <input id="e-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
       <label for="e-company">Company</label>
       <input id="e-company" maxlength="120" placeholder="Acme Co." autocomplete="off">
@@ -340,17 +376,17 @@ function tableHtml(list){
   const ths=COLS.map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
-  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
     return `<tr data-open="${esc(c.id)}" tabindex="0" aria-label="Open ${who}">
       <td><span class="nm">${who}</span>${dupFlag(c)}</td>
       <td>${esc(c.company||'—')}</td>
-      <td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
+      <td class="c-email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
       <td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>
       <td>${esc(relWhen(c.updated_at)||'—')}</td>
-      <td><div class="rowacts">
+      <td class="acts"><div class="rowacts">
         <button class="rowact" data-edit="${esc(c.id)}" title="Edit this contact" aria-label="Edit ${who}">Edit</button>
         <button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
         <button class="rowact danger" data-del="${esc(c.id)}" title="Remove this contact from your list" aria-label="Delete ${who}">Delete</button>
@@ -521,6 +557,7 @@ function syncCuMode(){
 }
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
+  const wf=$('cu-website');if(wf)wf.value='';
   const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
   const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
@@ -558,7 +595,6 @@ $('custForm').onsubmit=async(e)=>{
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
     }else if(d.invited===false){
-  const wf=$('cu-website');if(wf)wf.value='';
       // honest outcome: the account exists but the invitation email failed —
       // never claim "Invitation sent" (SS6; server: handleSalesAddCustomer)
       heading='Account created — the invitation email couldn’t be sent';

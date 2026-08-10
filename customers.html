@@ -24,7 +24,7 @@
   }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
@@ -83,7 +83,10 @@
   .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
 
   /* ── the table view: sortable columns; the table scrolls in its OWN container ── */
-  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  /* position:relative is load-bearing — see contacts.html: the Actions <th>'s
+     .sr-only label is position:absolute, so without a positioned ancestor it
+     escaped overflow:auto and gave the body a sideways scroll at 390px. */
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
   thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -96,6 +99,19 @@
   tbody tr:last-child td{border-bottom:none}
   td .n{font-weight:600}
   td.num{font-variant-numeric:tabular-nums}
+  /* Same pinned action column as contacts.html — "Manage their website" is the
+     last cell and cannot wrap, so it is what a too-narrow table loses first.
+     Kept in sync with contacts.html by hand (as .tscroll already is). */
+  td.c-email{overflow-wrap:anywhere}
+  th.acts,td.acts{width:1%;white-space:nowrap}
+  /* Tablet-and-up only — see contacts.html: pinned on a phone the action cell
+     covers the columns it sits beside. Phones default to Cards. */
+  @media (min-width:768px){
+    th.acts,td.acts{position:sticky;right:0;background:var(--card);box-shadow:-10px 0 9px -10px rgba(27,21,37,.20)}
+    tbody tr:hover td.acts{background:var(--p-soft)}
+  }
+  @media (min-width:768px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) th.acts,:root:not([data-theme="light"]) td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
+  @media (min-width:768px){:root[data-theme="dark"] th.acts,:root[data-theme="dark"] td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
 
@@ -151,6 +167,11 @@
           <option value="business_os_only">Just their client workspace / business tools — no site work</option>
           <option value="presence_monitor">Just monitoring a site they already have</option>
         </select>
+        <div id="cu-website-wrap" style="display:none">
+          <label for="cu-website">Their existing website address</label>
+          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
+        </div>
         <p class="note">Adding them creates their client workspace and emails them a link to set their password and sign in. You bill them for your work the usual way — they never pay for software here.</p>
         <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
       </div>
@@ -167,11 +188,6 @@
 // view-name dropdown with FIXED views (D3: no saved views/bulk), "N customers ·
 // Updated just now" meta, sortable columns, refresh, and a Table ⇄ Cards display
 // toggle (cards = the original look, kept). Fed by /studio/customers (studio-side,
-        <div id="cu-website-wrap" style="display:none">
-          <label for="cu-website">Their existing website address</label>
-          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
-          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
-        </div>
 // tenant-scoped to the operator's own site via the Agency–Client Bridge). "Open"
 // routes to that customer's record; "Manage their website" stays the clearly-
 // secondary website action.
@@ -280,17 +296,17 @@ function tableHtml(list){
   const ths=COLS.map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
-  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
     return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Open ${esc(c.name||'Customer')}">
       <td><span class="n">${esc(c.name||'Customer')}</span></td>
-      <td>${esc(c.email||'—')}</td>
+      <td class="c-email">${esc(c.email||'—')}</td>
       <td class="num">${Number(c.project_count||0)}</td>
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>
-      <td>${c.customer_site_id?`<button class="rowact" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</td>
+      <td class="acts">${c.customer_site_id?`<button class="rowact" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Customers"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -405,6 +421,7 @@ function syncCuMode(){
 }
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
+  const wf=$('cu-website');if(wf)wf.value='';
   const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
   const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
@@ -421,7 +438,6 @@ $('custForm').onsubmit=async(e)=>{
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
   if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
   const label=mode==='connect'?'Save':'Set up + invite';
-  const wf=$('cu-website');if(wf)wf.value='';
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
   const body=mode==='connect'
     ?{mode:'connect',name:name||undefined,email}

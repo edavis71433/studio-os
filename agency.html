@@ -22,7 +22,7 @@
   }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:980px;margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
   .brand{font-family:var(--serif);font-size:22px;font-weight:500}
@@ -53,7 +53,11 @@
 
   /* ── the table view (customers.html .tscroll anatomy): sortable columns; the
         table scrolls in its OWN container — the page never overflows sideways ── */
-  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  /* position:relative is load-bearing — the Actions <th> holds a .sr-only label
+     (position:absolute). With no positioned ancestor its containing block was
+     the initial one, so overflow:auto could not clip it and the 1px span gave
+     the BODY a sideways scroll at phone widths. Same fix as contacts.html. */
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:680px}
   .tscroll thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   .tscroll thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -69,6 +73,17 @@
   .bits{font-size:12px;color:var(--warn);margin-top:2px}
   .domln{white-space:nowrap;font-size:13px}
   .domln .exp{color:var(--warn);font-weight:600}
+  /* Pinned action column — same anatomy as contacts.html / customers.html:
+     "Manage their website" is the last cell and cannot wrap, so it is what a
+     too-narrow table loses first. Tablet-and-up only; on a phone a pinned cell
+     covers the columns beside it, and phones get the Cards view. */
+  .tscroll th.acts,.tscroll td.acts{width:1%;white-space:nowrap}
+  @media (min-width:768px){
+    .tscroll th.acts,.tscroll td.acts{position:sticky;right:0;background:var(--card);box-shadow:-10px 0 9px -10px rgba(27,21,37,.20)}
+    .tscroll tbody tr:hover td.acts{background:var(--p-soft)}
+  }
+  @media (min-width:768px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tscroll th.acts,:root:not([data-theme="light"]) .tscroll td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
+  @media (min-width:768px){:root[data-theme="dark"] .tscroll th.acts,:root[data-theme="dark"] .tscroll td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
   .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
@@ -243,7 +258,7 @@ function tableHtml(list){
   const ths=COLS.map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
-  }).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const att=Number(c.attention||0);
     const bits=statusBits(c,true);   // leads/domain have their own columns here
@@ -254,7 +269,7 @@ function tableHtml(list){
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td class="num">${Number(c.leads_waiting||0)}</td>
       <td>${domainCell(c)}</td>
-      <td>${PROJECT_BY_SITE[c.site_id]?`<button class="rowact" data-web="${esc(c.site_id)}">Manage their website</button>`:''}</td>
+      <td class="acts">${PROJECT_BY_SITE[c.site_id]?`<button class="rowact" data-web="${esc(c.site_id)}">Manage their website</button>`:''}</td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
