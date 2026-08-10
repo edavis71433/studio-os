@@ -620,20 +620,29 @@ Date: ____________                                         Date: ____________`;
 // must read the label) and, where the package has one, the scope of work that
 // goes between the cover and the legal terms. `body` is ASSEMBLED below.
 //
-// growth's scope is Eric's standard skeleton: general prose verbatim, with the
-// industry-specific parts left as [BRACKETED] fill-in points he completes per
-// client. That is deliberate and load-bearing — a salon must never receive a
-// contract promising Tock reservations and a wine club. unfilledBlanks() below
-// counts what's still unfilled, and the deal page warns before sending.
+// Every scope is Eric's standard skeleton: general prose verbatim from his own
+// documents, with the industry-specific parts left as [BRACKETED] fill-in
+// points he completes per client. That is deliberate and load-bearing — a salon
+// must never receive a contract promising Tock reservations and a wine club.
+// unfilledBlanks() below counts what's still unfilled, and the deal page warns
+// before sending. Every money figure prints through {{deal_value}} /
+// {{deposit_amount}} / {{balance_amount}} (depositSplit is the one source of
+// the 50/50 split) — never a typed-in number.
+//
+// Provenance — every promise traces to a document Eric published:
+//   growth ............ his Bacchus Growth scope of work, generalized
+//   custom_photography  his Custom + Photography agreement docx (cover lists +
+//                       §1 copywriting), plus the tier as published on
+//                       pricing-estimator.html (shot list, GA4, keyword research)
+//   template_build .... the published tier: pricing.html (web design card) and
+//                       pricing-estimator.html's Template/starter tier. The SEO
+//                       Strategy add-on is still an OPEN decision with Eric, so
+//                       the scope carries it only as a bracketed optional block
+//                       — never a baked-in promise.
 //
 // EXTENSION POINT — adding a package is adding one entry here: a label, a cover
 // page whose "Package:" line matches it, and (optionally) a scope. Nothing else
 // changes: the chooser, the seeding and the tests all read this map.
-// OWED: Eric has published a "Template build" tier but has given no scope
-// content for it, so it is deliberately NOT invented here — a made-up scope in
-// a signed document is worse than no package at all. When he writes that scope,
-// add a third entry (key template_build, label "Template build", its own cover
-// and scope) and it appears in the chooser automatically.
 const DDS_AGREEMENT_PACKAGES={
   growth:{label:'Growth',cover:`{{studio_name_upper}}
 Project Agreement & Scope of Work
@@ -658,7 +667,7 @@ Please read it before signing. If anything here does not match what you expected
 
 1. THE PACKAGE
 
-Growth package.
+Growth package, as presented in the [MONTH YEAR] proposal.
 
 Growth package, one time project fee                    {{deal_value}}
 Deposit due at signing, 50 percent                      {{deposit_amount}}
@@ -759,16 +768,23 @@ The project cannot move without these. They are listed in full in the checklist 
 - Logo files and any existing brand guidelines, colors, or fonts.
 - An active [PLATFORM] account in your name, with me added as a contributor.
 - [ANY OTHER ACCOUNT NEEDED FOR AN INTEGRATION — e.g. an active booking or reservation account]
+- Access to your Google Business Profile, or authorization for me to claim it on your behalf.
+- Timely review and feedback at each revision round.
+- A single named person authorized to approve work and give final sign off.
+
+Content delivery is the single most common cause of delay on projects like this. If content is more than fourteen days late, the launch date moves accordingly. This is not a penalty. It is simply what happens when there is nothing to build with.
 
 6. REVISIONS AND CHANGES
 
 REVISION ROUNDS
 
-Two rounds of consolidated feedback are included before launch. A round means one collected set of changes, sent together, not a stream of individual requests over several days.
+Two revision rounds are included. A round is one consolidated set of feedback delivered after reviewing the full site, not a series of individual messages sent over several days. Please gather your notes, and any notes from anyone else whose opinion matters, and send them together.
+
+Feedback sent piecemeal after a round has closed counts toward the next round. Additional rounds beyond the two included are billable and will be quoted and approved in writing before any work begins.
 
 CHANGES TO SCOPE
 
-Anything not described in this document is handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
+Anything not described in this document is out of scope. If you decide you want it, it does not simply get absorbed into the project. It gets handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
 
 This is not me being rigid. It is how the fixed fee stays fixed and the launch date stays real.
 
@@ -827,7 +843,7 @@ Actually climbing in search results is not immediate. Realistically it takes abo
 11. SCOPE ACKNOWLEDGMENT
 
 By signing this agreement, both parties confirm they have read this scope of work and agree that it accurately describes the project, the fee, and the responsibilities of each side. The legal terms that govern the work follow below.`},
-  custom_photo:{label:'Custom + Photography',cover:`{{studio_name_upper}}
+  custom_photography:{label:'Custom + Photography',cover:`{{studio_name_upper}}
 Project Agreement & Scope of Work
 
 PROJECT SUMMARY
@@ -858,7 +874,340 @@ NOT INCLUDED (QUOTED SEPARATELY IF NEEDED)
 Ongoing website support / maintenance (available as a monthly plan)
 Paid advertising management (Google Ads, social ads)
 Custom photography shoot costs (photographer fees, location, talent)
-Copywriting beyond standard page content, e-commerce, or custom integrations`,scope:''},
+Copywriting beyond standard page content, e-commerce, or custom integrations
+
+This is one document and one signature. The scope of work below says exactly what is being built; the Project Agreement that follows it sets the terms that govern the work.`,scope:`SCOPE OF WORK — CUSTOM + PHOTOGRAPHY PACKAGE
+
+This document defines exactly what is being built, what it costs, what each of us is responsible for, and how the project runs from start to finish. It replaces the proposal for the purpose of describing the work, and it is the reference we both come back to if a question comes up later.
+
+Please read it before signing. If anything here does not match what you expected, tell me now rather than after we start. Changing scope on paper is easy. Changing it mid build is not.
+
+1. THE PACKAGE
+
+Custom + Photography package, as presented in the [MONTH YEAR] proposal.
+
+Custom + Photography package, one time project fee      {{deal_value}}
+Deposit due at signing, 50 percent                      {{deposit_amount}}
+Balance due at launch, 50 percent                       {{balance_amount}}
+
+The project fee is fixed. It does not change based on how many hours the work takes. It changes only if you and I agree in writing to add something that is not described in this document.
+
+2. WHAT GETS BUILT
+
+Everything below is included in the Custom + Photography package fee.
+
+THE DESIGN AND BUILD
+
+Bespoke custom website design — Designed for your brand from scratch, not a template, and art-directed so the site looks like the business you actually run.
+
+Website copy for your core pages — Clear, SEO-aware copy for the core pages stated in the proposal, typically up to seven pages, such as Home, About, Services, Contact, and related core pages. Written from your intake questionnaire, your existing materials, and our discovery conversation. See Agreement §1 for what counts as standard page content.
+
+Mobile-first, fast-loading build — Built for phones first, with on-page SEO foundations in place from day one.
+
+Private client portal — Progress tracking, approvals, files, messages, and invoices, all in one place from kickoff to launch.
+
+[ANY INDUSTRY-SPECIFIC PAGE OR FEATURE FROM THE PROPOSAL] — [WHAT IT MEANS]
+
+Two rounds of revisions per major deliverable — The major deliverables are the initial design concept, the built-out pages before launch, and the final pre-launch site. See section 6.
+
+30-day post-launch check-in — See section 9.
+
+PHOTOGRAPHY DIRECTION
+
+Art-directed photography direction — Art direction and a shot list for a distinctive, professional look, so the photography matches the design instead of fighting it.
+
+Important clarification on photography. This scope covers photography direction: the art direction and the shot list. It does not include the shoot itself. Photographer fees, location, and talent are not part of the project fee — they are quoted separately if needed.
+
+SEO AND VISIBILITY
+
+On-page SEO — Title tags, meta descriptions, headings, XML sitemap, and indexing setup, written for every page and targeted to real keywords, not filled with placeholder text.
+
+Keyword research — Research into what [CITY OR MARKET] customers actually search for, such as [EXAMPLE SEARCH TERM] or [EXAMPLE SEARCH TERM] , and the site built around those terms.
+
+Google Business Profile setup and optimization — The listing that appears in Maps for searches like [CATEGORY] near me. Set up or optimized, with local SEO basics, and made consistent with the site.
+
+Google Analytics 4 with conversion events — Installed and configured so you can see who visits, where they come from, what they look at, and which forms they complete.
+
+3. SITE MAP
+
+The site launches with [NUMBER] pages.
+
+[LIST EVERY PAGE, NUMBERED]
+
+Included copywriting covers the core pages stated in the proposal, typically up to seven. Additional pages beyond these are not included. If you want more, they can be added by written change order as described in section 6.
+
+4. WHAT IS NOT INCLUDED
+
+Being specific here protects both of us. If something you assumed was included appears on this list, raise it now.
+
+- Photography shoot costs of any kind: photographer fees, location, and talent. Direction and the shot list are included; the shoot itself is not.
+- Ongoing website support or maintenance after launch. Available as a separate monthly plan.
+- Paid advertising management of any kind, including Google Ads and social ads.
+- Copywriting beyond standard page content: blog posts or article programs, long-form sales pages, product descriptions for e-commerce catalogs, email or advertising campaigns, scripts, customer-interview-based case studies, and substantial rewrites of copy you supply beyond light editing.
+- E-commerce and custom integrations. These are quoted separately.
+- Third party subscription costs. See section 8.
+[ADD ANY EXCLUSION SPECIFIC TO THIS CLIENT]
+
+Anything on this list can be added to the project, or handled later under a separate arrangement. It simply is not covered by the fee in section 1.
+
+5. WHAT YOU PROVIDE
+
+The project cannot move without these.
+
+- All required content, assets, brand materials, and login credentials.
+- Your intake questionnaire, completed — the copy is written from it, your existing materials, and our discovery conversation.
+- Logo files and any existing brand guidelines, colors, or fonts.
+- Access to your Google Business Profile, or authorization for me to claim it on your behalf.
+- [ANY OTHER ACCOUNT OR ACCESS NEEDED — e.g. hosting, the domain registrar, or a booking system]
+- Timely review and feedback at each revision round.
+- A single named person authorized to approve work and give final sign off.
+
+Content delivery is the single most common cause of delay on projects like this. If content is more than fourteen days late, the launch date moves accordingly. This is not a penalty. It is simply what happens when there is nothing to build with.
+
+6. REVISIONS AND CHANGES
+
+REVISION ROUNDS
+
+Two rounds of revisions per major deliverable are included. The major deliverables are the initial design concept, the built-out pages before launch, and the final pre-launch site — each may be revised up to two times. A round is one consolidated set of feedback, not a series of individual messages sent over several days. Please gather your notes, and any notes from anyone else whose opinion matters, and send them together.
+
+Feedback sent piecemeal after a round has closed counts toward the next round. Additional rounds beyond those included are billable and will be quoted and approved in writing before any work begins.
+
+CHANGES TO SCOPE
+
+Anything not described in this document is out of scope. If you decide you want it, it does not simply get absorbed into the project. It gets handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
+
+This is not me being rigid. It is how the fixed fee stays fixed and the launch date stays real.
+
+7. PROCESS AND TIMELINE
+
+The estimate below assumes content arrives on schedule. It is a plan, not a guarantee.
+
+Kickoff — Agreement signed, deposit received, questionnaire returned. [WEEK]
+
+Content and discovery — You send content and brand materials. I review them, flag gaps, and we set the creative direction. [WEEKS]
+
+Design concept — The initial design concept delivered for review; concept revision rounds applied. [WEEKS]
+
+Photography direction — Art direction and the shot list delivered, so any shoot can be scheduled. [WEEKS]
+
+Build — Pages built out on a private preview link. Your current site stays live and untouched. [WEEKS]
+
+Review and revisions — You review the built-out pages and the final pre-launch site; revision rounds applied. [WEEKS]
+
+Launch — Final approval, balance paid, domain pointed to the new site, everything verified. [WEEK]
+
+Check-in — 30-day post-launch check-in. Month 1 after launch.
+
+8. PAYMENT AND THIRD PARTY COSTS
+
+PROJECT FEE
+
+The project fee of {{deal_value}} is paid in two parts. Fifty percent, or {{deposit_amount}} , is due at signing and before work begins. The remaining fifty percent, or {{balance_amount}} , is due at launch. The site goes live once the balance is received.
+
+COSTS YOU PAY DIRECTLY
+
+These are not part of the project fee. They are billed to you by the providers, in your name, on your own payment method.
+
+[HOSTING OR PLATFORM SUBSCRIPTION] — [APPROXIMATE COST] . [NOTE]
+
+Domain registration — Annual, varies. Billed by the registrar.
+
+Photography shoot costs — Photographer fees, location, and talent, if a shoot is wanted. Quoted separately and approved by you before anything is booked.
+
+[ANY OTHER THIRD PARTY SERVICE] — [APPROXIMATE COST] . [NOTE]
+
+Every account is created in your name and remains under your control. I am added as a collaborator so I can do the work, and you can remove my access at any time.
+
+9. LAUNCH, ACCEPTANCE, AND SUPPORT
+
+The site is considered accepted when it goes live with your approval. A 30-day post-launch check-in is included.
+
+Ongoing website support and maintenance after launch is not included in the project fee. It is available as a separate monthly plan, and we can talk about it whenever you are ready.
+
+10. ABOUT SEARCH RESULTS
+
+Worth stating plainly, in writing, before we start.
+
+The site will be significantly better than the current one on day one. It will be faster, readable by Google, correctly structured, and built around real keywords. That part is immediate.
+
+Actually climbing in search results is not immediate. Realistically it takes about six months before you see a meaningful change in how much traffic search brings you, and that assumes the site stays current and your Google Business Profile stays accurate. Anyone who promises you faster than that is not being straight with you.
+
+11. SCOPE ACKNOWLEDGMENT
+
+By signing this agreement, both parties confirm they have read this scope of work and agree that it accurately describes the project, the fee, and the responsibilities of each side. The legal terms that govern the work follow below.`},
+  template_build:{label:'Template build',cover:`{{studio_name_upper}}
+Project Agreement & Scope of Work
+
+PROJECT SUMMARY
+
+Studio:         {{studio_name}}
+Client:         {{client_company}}
+Project:        {{deal_title}}
+Package:        Template build
+Project fee:    {{deal_value}} (flat)
+Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch
+Revisions:      1 round included — see Scope of Work §6 and Agreement §3
+Timeline:       Typically 2 to 4 weeks; confirmed at discovery and depends on timely client input
+Effective date: {{today}}
+
+This is one document and one signature. The scope of work below says exactly what is being built; the Project Agreement that follows it sets the terms that govern the work.`,scope:`SCOPE OF WORK — TEMPLATE BUILD PACKAGE
+
+This document defines exactly what is being built, what it costs, what each of us is responsible for, and how the project runs from start to finish. It replaces the proposal for the purpose of describing the work, and it is the reference we both come back to if a question comes up later.
+
+Please read it before signing. If anything here does not match what you expected, tell me now rather than after we start. Changing scope on paper is easy. Changing it mid build is not.
+
+1. THE PACKAGE
+
+Template build package, as presented in the [MONTH YEAR] proposal.
+
+Template build package, one time project fee            {{deal_value}}
+Deposit due at signing, 50 percent                      {{deposit_amount}}
+Balance due at launch, 50 percent                       {{balance_amount}}
+
+The project fee is fixed. It does not change based on how many hours the work takes. It changes only if you and I agree in writing to add something that is not described in this document.
+
+2. WHAT GETS BUILT
+
+Everything below is included in the Template build package fee.
+
+THE SITE BUILD
+
+New website — A template build on [PLATFORM — the platform that fits your business] . Set up and configured by me. You can update it yourself afterward without touching code.
+
+Your branding applied — Your colors, fonts, and logo applied across every page so the site does not look like the stock template.
+
+Up to five pages — [LIST THE PAGES — up to five] . Mobile-optimized.
+
+[WHO WRITES THE PAGE COPY — the proposal states whether copywriting is included or the text is supplied by you]
+
+Contact form — A form block, configured and tested so inquiries reach the inbox you specify.
+
+One revision round — One round of consolidated feedback before launch. See section 6.
+
+Launch walkthrough video — A recorded video showing you how to update your own content after launch.
+
+Included automatically through the platform, with no setup required: mobile responsiveness, SSL padlock, XML sitemap and robots file, and fast load speed through a global content delivery network.
+
+SEO AND VISIBILITY
+
+Basic on-page SEO — Page titles and meta descriptions set up on every page.
+
+Google Analytics setup — Installed so you can see who visits and where they come from.
+
+Google Search Console setup — Tells Google the site exists, submits the sitemap, and sets up monitoring for crawl errors going forward.
+
+[OPTIONAL SEO STRATEGY ADD-ON — only if the proposal includes it: keyword research, competitor analysis, and a content roadmap. Delete this line if it was not part of the proposal.]
+
+3. SITE MAP
+
+The site launches with [NUMBER] pages.
+
+[LIST EVERY PAGE, NUMBERED]
+
+Additional pages beyond these are not included. If you want more, they can be added by written change order as described in section 6.
+
+4. WHAT IS NOT INCLUDED
+
+Being specific here protects both of us. If something you assumed was included appears on this list, raise it now.
+
+- Photography and videography of any kind.
+- Logo design, rebranding, or creation of new brand assets. I apply your existing branding. I do not create it.
+- Custom design or custom code of any kind. This is a template build; bespoke design is its own package and is quoted separately.
+- Keyword research, competitor analysis, or an SEO content roadmap, unless the proposal includes the SEO strategy add-on named in section 2.
+- Online store, e-commerce checkout, product sales, or gift card sales through the website.
+- Recurring billing, subscription payment processing, or member account management.
+- Event ticketing or ticket sales through the website.
+- Business email setup or migration of existing email accounts.
+- Ongoing SEO work, content updates, blog writing, or link building after launch.
+- Social media management or paid advertising of any kind.
+- Ongoing site maintenance, content changes, or calendar updates after launch and handoff.
+- Copywriting beyond the pages listed in section 3.
+- Third party subscription costs. See section 8.
+[ADD ANY EXCLUSION SPECIFIC TO THIS CLIENT]
+
+Anything on this list can be added to the project, or handled later under a separate arrangement. It simply is not covered by the fee in section 1.
+
+5. WHAT YOU PROVIDE
+
+The project cannot move without these.
+
+- All written content and business information: hours, address, phone, service details, and the story behind the business.
+- All photography and imagery you want on the site.
+- Logo files and any existing brand guidelines, colors, or fonts.
+- An active [PLATFORM] account in your name, with me added as a contributor.
+- [ANY OTHER ACCOUNT NEEDED FOR AN INTEGRATION — e.g. a booking or scheduling account]
+- Timely review and feedback at the revision round.
+- A single named person authorized to approve work and give final sign off.
+
+Content delivery is the single most common cause of delay on projects like this. If content is more than fourteen days late, the launch date moves accordingly. This is not a penalty. It is simply what happens when there is nothing to build with.
+
+6. REVISIONS AND CHANGES
+
+REVISION ROUNDS
+
+One revision round is included. A round is one consolidated set of feedback delivered after reviewing the full site, not a series of individual messages sent over several days. Please gather your notes, and any notes from anyone else whose opinion matters, and send them together.
+
+Feedback sent piecemeal after the round has closed counts toward an additional round. Additional rounds beyond the one included are billable and will be quoted and approved in writing before any work begins.
+
+CHANGES TO SCOPE
+
+Anything not described in this document is out of scope. If you decide you want it, it does not simply get absorbed into the project. It gets handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
+
+This is not me being rigid. It is how the fixed fee stays fixed and the launch date stays real.
+
+7. PROCESS AND TIMELINE
+
+The estimate below assumes content arrives on schedule. It is a plan, not a guarantee. A template build typically runs two to four weeks end to end.
+
+Kickoff — Agreement signed, deposit received, questionnaire and checklist returned. [WEEK]
+
+Content — You send content and photography. I review it and flag gaps. [WEEKS]
+
+Build — Site built on a private preview link. Your current site stays live and untouched. [WEEKS]
+
+Review — You review the preview and send one consolidated round of feedback. [WEEK]
+
+Revisions — The included round applied. [WEEK]
+
+Launch — Final approval, balance paid, domain pointed to the new site, everything verified. [WEEK]
+
+Handoff — Walkthrough video delivered, old site cancelled once stable. [WEEK]
+
+8. PAYMENT AND THIRD PARTY COSTS
+
+PROJECT FEE
+
+The project fee of {{deal_value}} is paid in two parts. Fifty percent, or {{deposit_amount}} , is due at signing and before work begins. The remaining fifty percent, or {{balance_amount}} , is due at launch. The site goes live once the balance is received.
+
+COSTS YOU PAY DIRECTLY
+
+These are not part of the project fee. They are billed to you by the providers, in your name, on your own payment method.
+
+[PLATFORM] subscription — [APPROXIMATE COST] . Covers hosting, SSL, sitemap, mobile responsiveness, and all platform features marked as included above.
+
+Domain registration — Annual, varies. Billed by the registrar.
+
+[ANY OTHER THIRD PARTY SERVICE] — [APPROXIMATE COST] . [NOTE]
+
+Every account is created in your name and remains under your control. I am added as a collaborator so I can do the work, and you can remove my access at any time.
+
+9. LAUNCH, ACCEPTANCE, AND SUPPORT
+
+The site is considered accepted when it goes live with your approval. [POST-LAUNCH FIX WINDOW — state it here if offered, e.g. for fourteen days after launch anything broken or not working as described in this document is fixed at no charge. Broken means broken, not new requests or changes of mind, which are handled as change orders.]
+
+After launch, the site is yours to run. The walkthrough video shows you how to update your own content — no code needed. If you would rather I handle ongoing updates, that is a separate monthly arrangement and we can talk about it whenever you are ready.
+
+10. ABOUT SEARCH RESULTS
+
+Worth stating plainly, in writing, before we start.
+
+The site will be significantly better than the current one on day one. It will be faster, readable by Google, and correctly structured. That part is immediate.
+
+Actually climbing in search results is not immediate. Realistically it takes about six months before you see a meaningful change in how much traffic search brings you, and that assumes the site stays current and your Google Business Profile stays accurate. Anyone who promises you faster than that is not being straight with you.
+
+11. SCOPE ACKNOWLEDGMENT
+
+By signing this agreement, both parties confirm they have read this scope of work and agree that it accurately describes the project, the fee, and the responsibilities of each side. The legal terms that govern the work follow below.`},
 };
 // ONE assembly, so the legal terms cannot drift between packages: cover, then
 // the scope if the package has one, then the shared §1-19 — always last, so the

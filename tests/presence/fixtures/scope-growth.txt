@@ -6,7 +6,7 @@ Please read it before signing. If anything here does not match what you expected
 
 1. THE PACKAGE
 
-Growth package.
+Growth package, as presented in the [MONTH YEAR] proposal.
 
 Growth package, one time project fee                    {{deal_value}}
 Deposit due at signing, 50 percent                      {{deposit_amount}}
@@ -107,16 +107,23 @@ The project cannot move without these. They are listed in full in the checklist 
 - Logo files and any existing brand guidelines, colors, or fonts.
 - An active [PLATFORM] account in your name, with me added as a contributor.
 - [ANY OTHER ACCOUNT NEEDED FOR AN INTEGRATION — e.g. an active booking or reservation account]
+- Access to your Google Business Profile, or authorization for me to claim it on your behalf.
+- Timely review and feedback at each revision round.
+- A single named person authorized to approve work and give final sign off.
+
+Content delivery is the single most common cause of delay on projects like this. If content is more than fourteen days late, the launch date moves accordingly. This is not a penalty. It is simply what happens when there is nothing to build with.
 
 6. REVISIONS AND CHANGES
 
 REVISION ROUNDS
 
-Two rounds of consolidated feedback are included before launch. A round means one collected set of changes, sent together, not a stream of individual requests over several days.
+Two revision rounds are included. A round is one consolidated set of feedback delivered after reviewing the full site, not a series of individual messages sent over several days. Please gather your notes, and any notes from anyone else whose opinion matters, and send them together.
+
+Feedback sent piecemeal after a round has closed counts toward the next round. Additional rounds beyond the two included are billable and will be quoted and approved in writing before any work begins.
 
 CHANGES TO SCOPE
 
-Anything not described in this document is handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
+Anything not described in this document is out of scope. If you decide you want it, it does not simply get absorbed into the project. It gets handled through a written change order that states what is being added, what it costs, and how it affects the timeline. Nothing gets built and nothing gets billed until you approve that in writing.
 
 This is not me being rigid. It is how the fixed fee stays fixed and the launch date stays real.
 

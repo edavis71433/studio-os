@@ -1188,7 +1188,7 @@ test.describe('agreement — one per package', () => {
     // the chooser offers every shipped package, in order, and defaults sensibly
     const pick = page.locator('#conPkg');
     await expect(pick).toBeVisible();
-    await expect(pick.locator('option')).toHaveText(['Growth', 'Custom + Photography']);
+    await expect(pick.locator('option')).toHaveText(['Growth', 'Custom + Photography', 'Template build']);
     await expect(pick).toHaveValue('growth');
 
     const text = await seeded(page);
@@ -1217,15 +1217,38 @@ test.describe('agreement — one per package', () => {
     await page.goto(`/pipeline.html?deal=${DEAL5}`);
     await page.locator('#addCon').click();
     await seeded(page);
-    await page.locator('#conPkg').selectOption('custom_photo');
+    await page.locator('#conPkg').selectOption('custom_photography');
     await expect(page.locator('.dds-toast')).toContainText('Custom + Photography agreement loaded');
     const text = await conBody(page).inputValue();
     expect(text).toContain('Package:        Custom + Photography');
     expect(text).toContain('Art-directed photography direction');                // its own what's-included list
+    expect(text).toContain('SCOPE OF WORK — CUSTOM + PHOTOGRAPHY PACKAGE');      // its own scope now, same 11-section skeleton
+    // the docx's crisp line: photography DIRECTION is bought — the SHOOT is not
+    expect(text).toContain('This scope covers photography direction: the art direction and the shot list. It does not include the shoot itself.');
     expect(text).not.toContain('SCOPE OF WORK — GROWTH PACKAGE');                // …and none of Growth's scope
     expect(text).not.toContain('[LIST THE FIVE CORE PAGES]');
     expect(text).not.toMatch(/\{\{/);
     expect(text).toContain('$6,400');
+    expect(text).toContain('Custom + Photography package, one time project fee      $6,400');   // money flows through the tokens
+  });
+
+  test('choosing Template build seeds the published tier — SEO stays a bracketed option, never a promise', async ({ page }) => {
+    await installApp(page, { api: PKG_API });
+    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.locator('#addCon').click();
+    await seeded(page);
+    await page.locator('#conPkg').selectOption('template_build');
+    await expect(page.locator('.dds-toast')).toContainText('Template build agreement loaded');
+    const text = await conBody(page).inputValue();
+    expect(text).toContain('Package:        Template build');
+    expect(text).toContain('SCOPE OF WORK — TEMPLATE BUILD PACKAGE');
+    expect(text).toContain('One revision round');                                // the published tier: 1 round, not Growth's 2
+    // the $800 SEO add-on decision is still open with Eric — only the bracketed block may mention strategy work
+    expect(text).toContain('[OPTIONAL SEO STRATEGY ADD-ON');
+    expect(text).not.toContain('SEMrush');                                       // Growth-only research never leaks in
+    expect(text).not.toContain('Art-directed photography');                      // nor Custom + Photography's promise
+    expect(text).not.toMatch(/\{\{/);
+    expect(text).toContain('Template build package, one time project fee            $6,400');
   });
 
   test('the legal terms are byte-identical whichever package is chosen', async ({ page }) => {
@@ -1233,7 +1256,7 @@ test.describe('agreement — one per package', () => {
     await page.goto(`/pipeline.html?deal=${DEAL5}`);
     await page.locator('#addCon').click();
     const growth = await seeded(page);
-    await page.locator('#conPkg').selectOption('custom_photo');
+    await page.locator('#conPkg').selectOption('custom_photography');
     const custom = await conBody(page).inputValue();
     const legalOf = (t: string) => t.slice(t.indexOf('\nPROJECT AGREEMENT\n\n'));
     expect(legalOf(growth).length).toBeGreaterThan(10000);
@@ -1247,14 +1270,14 @@ test.describe('agreement — one per package', () => {
     await seeded(page);
     await conBody(page).fill('MY OWN WORDING, typed by hand.');
     page.once('dialog', (d) => { expect(d.message()).toContain('Custom + Photography'); d.dismiss(); });
-    await page.locator('#conPkg').selectOption('custom_photo');
+    await page.locator('#conPkg').selectOption('custom_photography');
     await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
     await expect(page.locator('#conPkg')).toHaveValue('growth');                 // …and the select snapped back
   });
 });
 
 // ── The unfilled-blanks guard ───────────────────────────────────────────────
-// The Growth skeleton ships 25 [BRACKETED] fill-in points. A client must never
+// The Growth skeleton ships 26 [BRACKETED] fill-in points. A client must never
 // receive "[LIST THE FIVE CORE PAGES]" — but a half-filled draft sent to himself
 // is legitimate, so this warns and lets him through, never blocks.
 test.describe('agreement — the unfilled-blanks warning', () => {
@@ -1277,7 +1300,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();               // Save & send for signature →
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
-    expect(msg).toContain('25 fill-in blanks');
+    expect(msg).toContain('26 fill-in blanks');
     expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
     expect(msg).toContain('Send it anyway?');
     expect(calls).toHaveLength(0);                                              // not even saved as a draft

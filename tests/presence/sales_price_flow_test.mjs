@@ -144,7 +144,7 @@ const pipe = read('pipeline.html');
   let depth = 0, end = -1;
   for (let j = pipe.indexOf('{', start); j < pipe.length; j++) { if (pipe[j] === '{') depth++; else if (pipe[j] === '}' && --depth === 0) { end = j + 1; break; } }
   const mirror = new Function(`${pipe.slice(start, end)}\nreturn impliedTermMonths;`)();
-  const CASES = ['a 12-month term', 'The term of this Agreement is twelve (12) months.', 'for a term of 6 months', LOOKBACK, PKGS.growth.body, PKGS.custom_photo.body, '', 'no term at all', 'a 99-month term'];
+  const CASES = ['a 12-month term', 'The term of this Agreement is twelve (12) months.', 'for a term of 6 months', LOOKBACK, PKGS.growth.body, PKGS.custom_photography.body, PKGS.template_build.body, '', 'no term at all', 'a 99-month term'];
   ok('the pipeline.html mirror ≡ the server helper on every case', CASES.every((c) => mirror(c) === impliedTermMonths(c)),
     CASES.filter((c) => mirror(c) !== impliedTermMonths(c)).map((c) => c.slice(0, 40)).join(' · '));
 
