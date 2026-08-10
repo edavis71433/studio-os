@@ -28,7 +28,7 @@ import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
-import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
+import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
@@ -735,6 +735,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleProjectStatus(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/tasks$/);
     if (m && method === 'POST') return handleTasksCreate(req, jwt, site, principal, m[1], cors);
+    // the studio's standard-step picker: add chosen steps of the ten-step
+    // delivery checklist (lib/project_checklist.ts) to this project
+    m = route.match(/^\/projects\/([0-9a-f-]{36})\/checklist$/);
+    if (m && method === 'POST') return handleProjectChecklist(req, jwt, site, principal, m[1], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/tasks\/([0-9a-f-]{36})$/);
     if (m && method === 'PATCH') return handleTask(req, jwt, site, principal, m[1], m[2], cors);
     m = route.match(/^\/projects\/([0-9a-f-]{36})\/milestones$/);
