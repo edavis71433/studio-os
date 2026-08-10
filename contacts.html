@@ -17,7 +17,7 @@
   :root{
     --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
     --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--bad:var(--dds-bad,#9a4242);
     --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -130,6 +130,20 @@
   .dupe-match{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
   .dupe-match .dm-name{font-weight:600;font-size:14px}
   .dupe-match .dm-why{font-size:12px;color:var(--faint)}
+  /* ── row actions (edit · new deal · delete) ──
+     The table's action cell holds three controls, so they need to stay one
+     compact group; the CARD's .acts already wraps, and cards are what a phone
+     gets by default (matchMedia 759px), which is where the 390px reach comes
+     from. Delete is worded, not an icon — an unlabeled ✕ on a contact row is
+     exactly the control you hit by accident. */
+  .rowacts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+  .rowact.danger,.c .acts button.danger{color:var(--bad,#a3423a)}
+  .rowact.danger:hover,.c .acts button.danger:hover{border-color:var(--bad,#a3423a);color:var(--bad,#a3423a)}
+  /* the quiet possible-duplicate hint — a note, never an alarm */
+  .dupflag{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;white-space:nowrap;vertical-align:middle}
+  .delfacts{list-style:none;padding:0;margin:10px 0 0}
+  .delfacts li{font-size:14px;padding:6px 0 6px 18px;position:relative;color:var(--ink)}
+  .delfacts li::before{content:'•';position:absolute;left:4px;color:var(--p)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -195,6 +209,35 @@
   </form>
 </dialog>
 <dialog id="dupeDlg" aria-label="Possible duplicate"><div class="dbody" id="dupeBody"></div></dialog>
+<!-- Edit a contact in place, from the row. Same four facts the record page's
+     inline Edit carries (crm.html loadDetails → editContact), PLUS the owner's
+     own custom fields — this page is where Manage fields defines them, so this
+     is where they have to be fillable. `notes` is deliberately NOT here: that
+     column doubles as the machine marker for connect-on-signup
+     (CONNECT_INTENT_TAG, routes/sales.ts), and a free-text box over it would let
+     a stray edit silently break a pending customer connection. -->
+<dialog id="editDlg" aria-label="Edit contact">
+  <form id="editForm" class="dbody">
+    <h3 id="edit-h">Edit contact</h3>
+    <div id="edit-load"><div class="spin" role="status" aria-label="Loading"></div></div>
+    <div id="edit-fields" hidden>
+      <label for="e-name">Name</label>
+      <input id="e-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+      <label for="e-email">Email</label>
+      <input id="e-email" type="email" maxlength="160" placeholder="jane@business.com" autocomplete="off">
+      <label for="e-phone">Phone</label>
+      <input id="e-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
+      <label for="e-company">Company</label>
+      <input id="e-company" maxlength="120" placeholder="Acme Co." autocomplete="off">
+      <div id="e-custom"></div>
+      <div class="row2"><button type="button" class="btn ghost" id="e-cancel">Cancel</button><button type="submit" class="btn" id="e-save">Save changes</button></div>
+    </div>
+  </form>
+</dialog>
+<!-- Delete: the confirm NAMES what is attached. The body is built from the
+     server's dry-run answer (DELETE without ?confirm=1 never writes), so the
+     facts are the database's, not the roster's. -->
+<dialog id="delDlg" aria-label="Remove contact"><div class="dbody" id="delBody"></div></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -277,6 +320,17 @@ function headerHtml(count){
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
   </div>`;
 }
+// The quiet "possible duplicate" note. The server annotates the roster read
+// (?dupes=1) with the SAME matcher the new-contact prompt already uses — phone
+// numbers compared as digits, so "6262346081" and "(626) 234-6081" are one
+// number, and near-identical names ("Claud" / "Claude") count. It says who and
+// why on hover/focus; it never hides, reorders or merges anything.
+function dupFlag(c){
+  const d=c&&c.possible_duplicate_of;
+  if(!d||!d.name)return '';
+  const why=d.why?' — '+d.why:'';
+  return `<span class="dupflag" title="Looks like ${esc(d.name)}${esc(why)}">possible duplicate</span>`;
+}
 function tableHtml(list){
   const ths=COLS.map(([k,label])=>{
     const on=SORT.key===k;
@@ -286,12 +340,16 @@ function tableHtml(list){
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
     return `<tr data-open="${esc(c.id)}" tabindex="0" aria-label="Open ${who}">
-      <td><span class="nm">${who}</span></td>
+      <td><span class="nm">${who}</span>${dupFlag(c)}</td>
       <td>${esc(c.company||'—')}</td>
       <td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
       <td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>
       <td>${esc(relWhen(c.updated_at)||'—')}</td>
-      <td><button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button></td>
+      <td><div class="rowacts">
+        <button class="rowact" data-edit="${esc(c.id)}" title="Edit this contact" aria-label="Edit ${who}">Edit</button>
+        <button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
+        <button class="rowact danger" data-del="${esc(c.id)}" title="Remove this contact from your list" aria-label="Delete ${who}">Delete</button>
+      </div></td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Contacts"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -302,11 +360,13 @@ function cardsHtml(list){
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
     h+=`<div class="c" role="button" tabindex="0" data-open="${esc(c.id)}" aria-label="Open ${who}">
-      <div class="top"><span class="who">${who}</span>${c.company?`<span class="co">${esc(c.company)}</span>`:''}</div>
+      <div class="top"><span class="who">${who}${dupFlag(c)}</span>${c.company?`<span class="co">${esc(c.company)}</span>`:''}</div>
       <div class="contact">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}${c.email&&c.phone?' · ':''}${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:''}</div>
       <div class="acts">
         ${c.email?`<a class="reply" href="mailto:${esc(c.email)}">Email</a>`:(c.phone?`<a class="reply" href="tel:${esc(tel)}">Call</a>`:'')}
+        <button data-edit="${esc(c.id)}" aria-label="Edit ${who}">Edit</button>
         <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
+        <button class="danger" data-del="${esc(c.id)}" aria-label="Delete ${who}">Delete</button>
       </div></div>`;
   }
   return h;
@@ -385,6 +445,8 @@ function wireList(){
     const nbtn=document.querySelector('[data-sort="'+k+'"]'); if(nbtn)nbtn.focus();
   }));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();newDeal(b.getAttribute('data-deal'));}));
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openEdit(b.getAttribute('data-edit'));}));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();askDelete(b.getAttribute('data-del'));}));
   // Tap a contact card / table row → the unified Client Record (Details tab).
   // Clicks on action buttons/links inside don't open it.
   document.querySelectorAll('.c[data-open]').forEach(card=>{
@@ -592,6 +654,132 @@ function openDetail(id){
   const sc=scope();
   location.href='/crm.html?contact='+encodeURIComponent(id)+'&tab=details'+(sc?'&client='+sc:'');
 }
+
+// ── EDIT a contact from the row ─────────────────────────────────────────────
+// The same shape as the record page's inline Edit (crm.html editContact →
+// PATCH /sales/contacts/:id), brought to the roster so a fix doesn't cost a
+// page load. It also carries the owner's CUSTOM FIELDS, because Manage fields
+// (this page's own toolbar) is what defines them and a definition you can't
+// fill in anywhere is a dead end.
+let EDIT_ID='',EDIT_DEFS=[];
+function customInput(f,v){
+  const id='ecf-'+f.key, lab=`<label for="${id}">${esc(f.label||f.key)}</label>`;
+  if(f.type==='select'){
+    const opts=['<option value="">—</option>'].concat((f.choices||[]).map(o=>`<option value="${esc(o)}"${String(v==null?'':v)===String(o)?' selected':''}>${esc(o)}</option>`)).join('');
+    return lab+`<select id="${id}" data-cf="${esc(f.key)}">${opts}</select>`;
+  }
+  const t=f.type==='number'?'number':(f.type==='date'?'date':'text');
+  return lab+`<input id="${id}" data-cf="${esc(f.key)}" type="${t}" value="${esc(v==null?'':v)}">`;
+}
+// Why a status code appears in the copy: this codebase has a standing defect of
+// silent catches and interchangeable toasts. A failure here says which step
+// failed and what the server answered, so a real fault is diagnosable from
+// Eric's phone instead of vanishing into "something went wrong".
+function readFailNote(r){
+  if(r.status===403)return 'Your plan’s business tools don’t include contacts, so we can’t open this record.';
+  if(r.status===404)return 'That contact is no longer in your list — refresh to see the current roster.';
+  if(!r.status)return 'We couldn’t reach the server (you may be offline).';
+  return (r.body&&r.body.message)||('The server answered '+r.status+'.');
+}
+async function openEdit(id){
+  EDIT_ID=id;
+  const row=ALL.find(x=>x.id===id)||{};
+  $('edit-h').textContent='Edit '+(row.name||row.email||row.phone||'contact');
+  $('edit-fields').hidden=true;$('edit-load').hidden=false;
+  $('edit-load').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  if(!$('editDlg').open)$('editDlg').showModal();
+  let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id));}catch(_){r={ok:false,status:0,body:{}};}
+  if(EDIT_ID!==id)return;                       // a newer Edit opened while this was in flight
+  // The roster row already holds name/email/phone/company. If the detail read
+  // fails we still open the form on THOSE values rather than stranding the
+  // operator — and we say plainly which part is missing and why.
+  const d=(r.ok&&r.body&&r.body.data)||null;
+  const c=(d&&d.contact)||row;
+  EDIT_DEFS=(d&&d.custom_fields)||[];
+  const cv=(d&&d.contact&&d.contact.custom)||{};
+  $('e-name').value=c.name||'';$('e-email').value=c.email||'';$('e-phone').value=c.phone||'';$('e-company').value=c.company||'';
+  $('e-custom').innerHTML=EDIT_DEFS.length?EDIT_DEFS.map(f=>customInput(f,cv[f.key])).join(''):'';
+  if(!d)$('e-custom').innerHTML=`<p class="note" style="color:var(--bad)">Your own custom fields couldn’t be loaded — ${esc(readFailNote(r))} Name, email, phone and company below are the values from your list and will still save.</p>`;
+  $('edit-load').hidden=true;$('edit-fields').hidden=false;
+  const sv=$('e-save');if(sv)sv.disabled=false;
+  setTimeout(()=>$('e-name').focus(),20);
+}
+$('e-cancel').onclick=()=>{EDIT_ID='';$('editDlg').close();};
+$('editForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const id=EDIT_ID;if(!id)return;
+  const name=$('e-name').value.trim(),email=$('e-email').value.trim();
+  if(!name&&!email){toast('A contact needs a name or an email.');$('e-name').focus();return;}
+  const body={name,email,phone:$('e-phone').value.trim(),company:$('e-company').value.trim()};
+  if(EDIT_DEFS.length){
+    const custom={};
+    document.querySelectorAll('#e-custom [data-cf]').forEach(el=>{custom[el.getAttribute('data-cf')]=el.value;});
+    body.custom=custom;
+  }
+  const btn=$('e-save');if(btn)btn.disabled=true;
+  let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id),'PATCH',body);}catch(_){r={ok:false,status:0,body:{}};}
+  if(!r.ok){
+    // Every failure names itself. 409 is the one an operator can actually act
+    // on (two contacts, one address), so it keeps the server's own wording.
+    toast(r.status===409?((r.body&&r.body.message)||'Another contact already uses that email.')
+      :r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.'
+      :r.status===404?'That contact is no longer in your list — refresh to see the current roster.'
+      :!r.status?'That didn’t save — we couldn’t reach the server.'
+      :((r.body&&r.body.message)||('That didn’t save — the server answered '+r.status+'.')));
+    if(btn)btn.disabled=false;return;
+  }
+  EDIT_ID='';$('editDlg').close();
+  // The save SUCCEEDED. A refresh failure afterwards is its own, softer story —
+  // it must never repaint a real save as a failure.
+  toast(r.body&&r.body.warning==='custom_unavailable'?((r.body.message)||'Saved.'):'Contact updated.');
+  load().catch(()=>toast('Saved — but we couldn’t refresh the list. Refresh will catch it up.'));
+};
+
+// ── DELETE a contact ────────────────────────────────────────────────────────
+// Two steps, always. The first DELETE carries no ?confirm=1 and the server
+// treats it as a DRY RUN: it writes nothing and answers 409 with the inventory
+// of everything attached to this person. That inventory is what the confirm
+// shows — "Claud has 1 deal, 1 signed agreement, 1 paid invoice and 1 project"
+// — so Eric decides with the facts, not a shrug. Only the second call, with
+// ?confirm=1, removes them, and it removes ONLY the contact row (a soft delete):
+// the deals, agreements, invoices and projects stay exactly where they are.
+async function askDelete(id){
+  const row=ALL.find(x=>x.id===id)||{};
+  const who=row.name||row.email||row.phone||'this contact';
+  let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id),'DELETE');}catch(_){r={ok:false,status:0,body:{}};}
+  if(r.ok&&r.body&&r.body.data&&r.body.data.already){toast(who+' was already removed.');await load();return;}
+  if(r.status!==409){
+    toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.'
+      :r.status===404?'That contact is no longer in your list — refresh to see the current roster.'
+      :!r.status?'We couldn’t check what’s attached to '+who+' — the server didn’t answer. Nothing was deleted.'
+      :((r.body&&r.body.message)||('We couldn’t check what’s attached to '+who+' — the server answered '+r.status+'. Nothing was deleted.')));
+    return;
+  }
+  const b=r.body||{};
+  const items=Array.isArray(b.items)?b.items:[];
+  let h=`<h3>Remove ${esc(b.name||who)}?</h3>`;
+  if(items.length)h+=`<ul class="delfacts">${items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
+  h+=`<p class="note">${esc(b.message||'')}</p>`;
+  h+=`<div class="row2"><button type="button" class="btn ghost" id="del-cancel">Keep them</button><button type="button" class="btn" id="del-go" style="background:var(--bad);border-color:var(--bad);color:#fff">Remove ${esc(b.name||who)}</button></div>`;
+  $('delBody').innerHTML=h;
+  if(!$('delDlg').open)$('delDlg').showModal();
+  $('del-cancel').onclick=()=>$('delDlg').close();
+  $('del-go').onclick=async()=>{
+    const go=$('del-go');go.disabled=true;go.textContent='Removing…';
+    let d;try{d=await api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE');}catch(_){d={ok:false,status:0,body:{}};}
+    if(!d.ok){
+      // Name the reason, in the dialog, and leave the dialog open so the
+      // failure can't be mistaken for a removal that happened.
+      const why=!d.status?'we couldn’t reach the server':((d.body&&d.body.message)||('the server answered '+d.status));
+      $('delBody').insertAdjacentHTML('afterbegin',`<p class="note" role="alert" style="color:var(--bad);margin:0 0 8px">${esc(b.name||who)} was NOT removed — ${esc(why)}.</p>`);
+      go.disabled=false;go.textContent='Try again';return;
+    }
+    $('delDlg').close();
+    const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
+    toast(kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.'));
+    await load();
+  };
+}
 // ── CUSTOM FIELD DEFINITIONS editor (≤5 labeled fields, site-wide) ──
 function fieldTypeSel(t){const opts=[['text','Text'],['number','Number'],['date','Date'],['select','Choice']];let o='';for(const p of opts)o+='<option value="'+p[0]+'"'+(p[0]===t?' selected':'')+'>'+p[1]+'</option>';return '<select class="fr-type">'+o+'</select>';}
 function fieldRow(f){f=f||{label:'',type:'text',choices:[]};const showCh=f.type==='select';return '<div class="field-row"><input class="fr-label" placeholder="Field name" maxlength="60" value="'+esc(f.label||'')+'">'+fieldTypeSel(f.type)+'<input class="fr-choices" placeholder="Options, comma-separated" value="'+esc((f.choices||[]).join(', '))+'"'+(showCh?'':' style="display:none"')+'><button type="button" class="fr-del" aria-label="Remove field">✕</button></div>';}
@@ -615,7 +803,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 let REQ_SEQ=0;
 async function load(){
   const seq=++REQ_SEQ;
-  const r=await api('/sales/contacts?limit=500');
+  const r=await api('/sales/contacts?limit=500&dupes=1');
   if(seq!==REQ_SEQ)return;
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}

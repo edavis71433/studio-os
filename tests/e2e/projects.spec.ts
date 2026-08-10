@@ -105,6 +105,25 @@ const API = {
   '/support': { data: [] },
 };
 
+// ── The studio's ten standard delivery steps ────────────────────────────────
+// Mirrors supabase/functions/presence/lib/project_checklist.ts — [key, title,
+// client_action, auto]. The REAL list is pinned by the pure suite
+// (tests/presence/project_checklist_picker_test.mjs, which also fails if any of
+// these titles is ever pasted into projects.html); this is the fixture the page
+// is served, exactly as the server would send it.
+const CHECKLIST_STEPS = [
+  ['agreement_signed', 'Agreement signed', false, 'contract_signed'],
+  ['deposit_paid', 'Deposit paid', false, 'deposit_paid'],
+  ['questionnaire_returned', 'Send back your project questionnaire', true, null],
+  ['content_received', 'Send your content and photos', true, null],
+  ['draft_shared', 'Design draft shared', false, null],
+  ['client_review', 'Review the design draft', true, null],
+  ['revisions', 'Revisions', false, null],
+  ['domain_connected', 'Domain connected', false, null],
+  ['site_live', 'Site live', false, 'site_live'],
+  ['handover', 'Handover', false, null],
+] as Array<[string, string, boolean, string | null]>;
+
 // register AFTER installApp (later routes match first): serve a genuine 404 for
 // p3's report so the degradation path under test is the real error path
 const routeP3Report404 = (page: import('@playwright/test').Page) =>
@@ -433,15 +452,7 @@ test.describe('Project record page', () => {
   // ten from here, including the three he now owns, or the rule would have taken
   // away the only tick that remained.
   test('the studio can tick every one of the ten checklist steps — including the three the client can’t', async ({ page }) => {
-    const STEPS = [
-      ['agreement_signed', 'Agreement signed', false], ['deposit_paid', 'Deposit paid', false],
-      ['questionnaire_returned', 'Send back your project questionnaire', true],
-      ['content_received', 'Send your content and photos', true],
-      ['draft_shared', 'Design draft shared', false],
-      ['client_review', 'Review the design draft', true],
-      ['revisions', 'Revisions', false], ['domain_connected', 'Domain connected', false],
-      ['site_live', 'Site live', false], ['handover', 'Handover', false],
-    ] as Array<[string, string, boolean]>;
+    const STEPS = CHECKLIST_STEPS;
     const detail = { data: { ...P1_DETAIL.data, tasks: STEPS.map(([key, title, act], i) => ({
       id: `ck${i}`, title, status: 'todo', client_visible: act, client_action_required: act,
       source: `checklist:${key}`, sort_order: i * 10, derived: { overdue: false },
@@ -722,5 +733,245 @@ test.describe('Projects — the New-project dialog on phones (SS6 pin)', () => {
     expect((await post).postDataJSON()).toEqual({ name: 'Zeta rebuild', description: 'Scope: a full site refresh with a new booking flow.' });
     await expect(page.locator('#newDlg')).toBeHidden();
     await expect(page.locator('#dtitle')).toContainText('Bare project');   // openProject(created id)
+  });
+});
+
+// ── The standard-step picker (P2-D · Eric's ask) ─────────────────────────────
+// "there also should be a drop down for tasks that we know need to be completed
+// that we add and once completed the percentage goes up."
+//
+// The ten steps already were the studio's spine, but only the deal→project
+// handoff could put them on a project. A project that missed that door — every
+// project made before the checklist, Bacchus among them — reads "0% · 0/0 tasks"
+// and has no way out except a SQL backfill. These tests drive the way out from
+// the page: pick known steps (several at once), or take the whole spine in one
+// press, and watch the COMPUTED percentage move.
+//
+// The mock is a small STATE MACHINE, not a fixture: the writes actually apply,
+// so the percentage each assertion reads is one the server computed from rows —
+// the way the real /report route computes it (progressOf: done ÷ total).
+type Held = Map<string, 'todo' | 'done'>;
+function installChecklistProject(page: import('@playwright/test').Page, opts: { held?: string[]; signedAndPaid?: boolean } = {}) {
+  const held: Held = new Map();
+  for (const k of opts.held || []) held.set(k, 'todo');
+  const step = (key: string) => CHECKLIST_STEPS.find((s) => s[0] === key)!;
+  const idxOf = (key: string) => CHECKLIST_STEPS.findIndex((s) => s[0] === key);
+  const tasks = () => [...held.entries()]
+    .sort((a, b) => idxOf(a[0]) - idxOf(b[0]))
+    .map(([key, status]) => ({
+      id: 'ck-' + key, title: step(key)[1], status, detail: '', priority: 'normal',
+      client_visible: step(key)[2], client_action_required: step(key)[2],
+      source: 'checklist:' + key, sort_order: idxOf(key) * 10, derived: { overdue: false },
+    }));
+  // exactly what routes/projects.ts checklistState() returns
+  const checklist = () => CHECKLIST_STEPS.map(([key, title, act, auto]) => ({
+    key, title, client_action: act, auto, present: held.has(key), status: held.get(key) ?? null,
+  }));
+  const progress = () => {
+    const total = held.size, done = [...held.values()].filter((s) => s === 'done').length;
+    return { pct: total ? Math.round((done / total) * 100) : 0, done, total };
+  };
+  const posts: Array<Record<string, unknown>> = [];
+  const jsonOf = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+  page.route(/\/functions\/v1\/presence\/projects\/p7/, (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace(/^.*\/presence\/projects\/p7/, '') || '';
+    const method = route.request().method();
+    if (path === '/checklist' && method === 'POST') {
+      const b = route.request().postDataJSON() || {};
+      posts.push(b);
+      const asked: string[] = b.all === true ? CHECKLIST_STEPS.map((s) => s[0]) : (b.keys || []);
+      const missing = asked.filter((k) => !held.has(k));
+      for (const k of missing) held.set(k, 'todo');
+      // reconcileChecklistFacts: the two evidence steps are ticked from facts the
+      // system already owns, so a signed + paid project never lands on 0%
+      let reconciled = false;
+      if (opts.signedAndPaid && missing.some((k) => k === 'agreement_signed' || k === 'deposit_paid')) {
+        reconciled = true;
+        for (const k of ['agreement_signed', 'deposit_paid']) if (held.has(k)) held.set(k, 'done');
+      }
+      return route.fulfill(jsonOf({ data: { added: missing.length, added_keys: missing, skipped_keys: asked.filter((k) => !missing.includes(k)), reconciled, checklist: checklist() } }, missing.length ? 201 : 200));
+    }
+    if (/^\/tasks\/ck-/.test(path) && method === 'PATCH') {
+      const key = path.replace('/tasks/ck-', '');
+      held.set(key, (route.request().postDataJSON() || {}).status);
+      return route.fulfill(jsonOf({ data: { ok: true } }));
+    }
+    if (path === '/tasks' && method === 'POST') { posts.push(route.request().postDataJSON() || {}); return route.fulfill(jsonOf({ data: { id: 'free1' } }, 201)); }
+    if (path === '/report') return route.fulfill(jsonOf({ data: { summary: { progress: progress(), milestones: { complete: 0, total: 0 }, open_client_actions: 0, pending_approvals: 0, shared_files: 0 } } }));
+    if (path === '/messages' || path === '/surveys') return route.fulfill(jsonOf({ data: [] }));
+    if (path === '/client-messages') return route.fulfill(jsonOf({ data: [], customer: null }));
+    if (path === '') return route.fulfill(jsonOf({ data: {
+      project: { id: 'p7', name: 'Bacchus website', status: 'active', client_visible: true, client_id: null, target_date: null },
+      milestones: [], tasks: tasks(), deliverables: [], approvals: [],
+      progress: progress(), checklist: checklist(), is_studio_view: true,
+    } }));
+    return route.fulfill(jsonOf({ data: {} }));
+  });
+  return { posts, held };
+}
+
+test.describe('Project record — the standard-step picker', () => {
+  test('Bacchus before the backfill: 0/0 with one press to the whole spine, and the evidence already ticked', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { signedAndPaid: true });   // registered AFTER installApp, so it wins
+    await page.goto('/projects.html?project=p7');
+    await expect(page.locator('#dtitle')).toContainText('Bacchus');
+    // the honest, useless number this whole feature exists to move
+    await expect(page.locator('.hl-panel')).toContainText('0%');
+    await expect(page.locator('#tsList')).toContainText('No tasks yet');
+    // the affordance is unmissable, and only offered because NONE are present
+    const nudge = page.locator('.stepnudge');
+    await expect(nudge).toBeVisible();
+    await expect(nudge).toContainText('None of the 10 standard delivery steps');
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p7/checklist')),
+      page.locator('#addAllSteps').click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ all: true });
+    // the record repaints from the server — no manual reload
+    await expect(page.locator('#tsList .titem')).toHaveCount(10);
+    // 2 of 10 done, because the signed contract and the paid deposit were ALREADY
+    // true: 20%, not a fresh zero
+    await expect(page.locator('.hl-panel')).toContainText('20%');
+    await expect(page.locator('.hl-panel')).toContainText('2/10 tasks');
+    await expect(page.locator('#tsList [data-tdone]:checked')).toHaveCount(2);
+    // …and now there is nothing left to add: no nudge, no picker button
+    await expect(page.locator('.stepnudge')).toHaveCount(0);
+    await expect(page.locator('#addStep')).toHaveCount(0);
+  });
+
+  test('the picker lists all ten, disables the ones already here, and adds several at once', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { held: ['deposit_paid'] });
+    await page.goto('/projects.html?project=p7');
+    await expect(page.locator('#dtitle')).toContainText('Bacchus');
+    // one step present → no "add all" nudge, but the picker is offered
+    await expect(page.locator('.stepnudge')).toHaveCount(0);
+    await page.locator('#addStep').click();
+    const rows = page.locator('.steppick .sp-row');
+    await expect(rows).toHaveCount(10);
+    // the step the project already holds is SHOWN, disabled, with the reason —
+    // never silently missing, and never submittable
+    const has = page.locator('.steppick .sp-row.has');
+    await expect(has).toHaveCount(1);
+    await expect(has).toContainText('Deposit paid');
+    await expect(has).toContainText('already on this project');
+    await expect(has.locator('input')).toBeDisabled();
+    await expect(page.locator('.steppick input[data-step]:not([disabled])')).toHaveCount(9);
+    // the three the client sees are marked, quietly; the self-ticking ones too
+    await expect(page.locator('.steppick .tag.client')).toHaveCount(3);
+    await expect(page.locator('.steppick .sp-row', { hasText: 'Site live' }).locator('.tag')).toContainText('ticks itself');
+    // several at once — the reason this is a checkbox list and not a dropdown
+    await page.locator('.steppick input[data-step="draft_shared"]').check();
+    await page.locator('.steppick input[data-step="site_live"]').check();
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p7/checklist')),
+      page.locator('#spAdd').click(),
+    ]);
+    // KEYS, never titles: the server builds the row from lib/project_checklist.ts
+    expect(req.postDataJSON()).toEqual({ keys: ['draft_shared', 'site_live'] });
+    await expect(page.locator('#tsList .titem')).toHaveCount(3);
+    await expect(page.locator('.hl-panel')).toContainText('0/3 tasks');
+    // re-opening the picker no longer offers what we just added
+    await page.locator('#addStep').click();
+    await expect(page.locator('.steppick .sp-row.has')).toHaveCount(3);
+    await expect(page.locator('.steppick input[data-step="site_live"]')).toBeDisabled();
+    // select-all-remaining takes the rest in one go
+    await page.locator('#spAll').click();
+    await expect(page.locator('.steppick input[data-step]:checked')).toHaveCount(7);
+    const [req2] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p7/checklist')),
+      page.locator('#spAdd').click(),
+    ]);
+    expect((req2.postDataJSON() as { keys: string[] }).keys).toHaveLength(7);
+    await expect(page.locator('#tsList .titem')).toHaveCount(10);
+    await expect(page.locator('#addStep')).toHaveCount(0);   // nothing left to offer
+  });
+
+  test('ticking a picked step moves the computed percentage — no reload', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { held: ['draft_shared', 'revisions', 'handover', 'client_review'] });
+    await page.goto('/projects.html?project=p7');
+    await expect(page.locator('.hl-panel')).toContainText('0%');
+    await expect(page.locator('.hl-panel')).toContainText('0/4 tasks');
+    await page.locator('[data-tdone="ck-draft_shared"]').check();
+    await expect(page.locator('.hl-panel')).toContainText('25%');
+    await expect(page.locator('.hl-panel')).toContainText('1/4 tasks');
+    // the Tasks card's own counter moves with it
+    await expect(page.locator('.rsec h3', { hasText: 'Tasks' }).locator('.n')).toHaveText('1/4');
+    // a CLIENT-facing step is Eric's to tick too (operator-verified, never theirs)
+    await page.locator('[data-tdone="ck-client_review"]').check();
+    await expect(page.locator('.hl-panel')).toContainText('50%');
+    // and it reopens: untick returns the number honestly
+    await page.locator('[data-tdone="ck-client_review"]').uncheck();
+    await expect(page.locator('.hl-panel')).toContainText('25%');
+  });
+
+  test('free-text tasks are untouched — no source, no keys, still the plain form', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { held: ['handover'] });
+    await page.goto('/projects.html?project=p7');
+    await page.locator('#addTask').click();
+    await page.locator('#mf-title').fill('Call the printer');
+    await page.locator('#mf-client_action_required').check();
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p7/tasks')),
+      page.locator('#tsForm form button[type="submit"]').click(),
+    ]);
+    // the EXACT free-text shape — no `source`, no keys, nothing checklist-shaped
+    expect(req.postDataJSON()).toEqual({ title: 'Call the printer', client_action_required: true });
+    // the picker and the free-text form share ONE host, so only one is ever open
+    await page.locator('#addStep').click();
+    await expect(page.locator('#tsForm form.steppick')).toHaveCount(1);
+    await expect(page.locator('#tsForm #mf-title')).toHaveCount(0);
+    await page.locator('#addTask').click();
+    await expect(page.locator('#tsForm form.steppick')).toHaveCount(0);
+    await expect(page.locator('#tsForm #mf-title')).toHaveCount(1);
+  });
+
+  test('a race is answered honestly: a 409 refreshes the card instead of claiming a save', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, {});
+    // the other tab won: the unique index refuses, and the step is already there
+    await page.route(/\/functions\/v1\/presence\/projects\/p7\/checklist/, (route) => route.fulfill({
+      status: 409, contentType: 'application/json',
+      body: JSON.stringify({ error: 'conflict', message: 'Those steps were just added somewhere else — refresh to see where the project stands.' }),
+    }));
+    await page.goto('/projects.html?project=p7');
+    await page.locator('#addAllSteps').click();
+    await expect(page.locator('.dds-toast, #toast, [role="status"]').filter({ hasText: 'just added somewhere else' }).first()).toBeVisible();
+    // and the card is re-read rather than left showing an invented success
+    await expect(page.locator('#tsList')).toContainText('No tasks yet');
+  });
+
+  test('the picker fits a phone and stays keyboard-reachable (no horizontal overflow)', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { held: ['deposit_paid'] });
+    await page.goto('/projects.html?project=p7');
+    await page.locator('#addStep').click();
+    await expect(page.locator('.steppick')).toBeVisible();
+    // the page must never scroll sideways because of the picker
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    const vp = page.viewportSize()!;
+    const box = (await page.locator('.steppick').boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(vp.width + 1);
+    // focus lands on the first pickable step, so a keyboard can drive it
+    await expect(page.locator('.steppick input[data-step="agreement_signed"]')).toBeFocused();
+    await expect(page.locator('#spAdd')).toBeVisible();
+  });
+
+  test('no serious/critical axe violations with the picker open', async ({ page }) => {
+    await installApp(page, { api: API });
+    installChecklistProject(page, { held: ['deposit_paid'] });
+    await page.goto('/projects.html?project=p7');
+    await page.locator('#addStep').click();
+    await expect(page.locator('.steppick')).toBeVisible();
+    const r = await new AxeBuilder({ page }).analyze();
+    const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(bad.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
   });
 });

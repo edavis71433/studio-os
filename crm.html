@@ -520,7 +520,7 @@ async function loadDetails(host){
   let html='';
   if(d){
     const c=d.contact||{}; const cf=d.custom_fields||[]; const cv=c.custom||{};
-    DETAIL={cid,c};
+    DETAIL={cid,c,cf};
     const rows=[['Name',c.name],['Company',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
     html+=`<section><h2>Contact <button class="link" id="editContact" style="border:none;background:none;font-size:13px;color:var(--p);cursor:pointer;padding:0;text-transform:none;letter-spacing:0">Edit</button></h2><div class="card"><div class="kv">`+(rows.length?rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join(''):'<div class="muted">No details yet — tap Edit to add them.</div>')+`</div></div></section>`;
     if(cf.length){
@@ -557,18 +557,58 @@ async function loadDetails(host){
   const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
 }
 // Edit the contact inline (PATCH /sales/contacts/:id — the existing path, kept).
+// The owner's CUSTOM FIELDS edit here too: the Details tab has always DISPLAYED
+// them (loadDetails renders d.custom_fields), so an Edit that couldn't touch
+// them left the only fillable path on contacts.html. Same PATCH, `custom` bag.
+// `notes` stays off the form deliberately — that column doubles as the
+// connect-on-signup machine marker (CONNECT_INTENT_TAG, routes/sales.ts).
 function editContact(host){
   const c=(DETAIL&&DETAIL.c)||{}; const cid=DETAIL&&DETAIL.cid;
-  const field=(id,label,val,type)=>`<label class="mut" for="${id}" style="font-size:12.5px;color:var(--faint);display:block;margin-top:10px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px">`;
+  const defs=(DETAIL&&DETAIL.cf)||[]; const cv=c.custom||{};
+  const inp=(id,val,type,extra)=>`<input id="${id}" type="${type||'text'}" value="${esc(val==null?'':val)}"${extra||''} style="width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px">`;
+  const lab=(id,label)=>`<label class="mut" for="${id}" style="font-size:12.5px;color:var(--faint);display:block;margin-top:10px">${label}</label>`;
+  const field=(id,label,val,type)=>lab(id,label)+inp(id,val,type);
+  const cfField=(f)=>{
+    const id='eccf-'+f.key, v=cv[f.key];
+    if(f.type==='select'){
+      const opts=['<option value="">—</option>'].concat((f.choices||[]).map(o=>`<option value="${esc(o)}"${String(v==null?'':v)===String(o)?' selected':''}>${esc(o)}</option>`)).join('');
+      return lab(id,esc(f.label||f.key))+`<select id="${id}" data-cf="${esc(f.key)}" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px">${opts}</select>`;
+    }
+    return lab(id,esc(f.label||f.key))+inp(id,v,f.type==='number'?'number':(f.type==='date'?'date':'text'),` data-cf="${esc(f.key)}"`);
+  };
   host.innerHTML=`<section><h2>Edit contact</h2><div class="card">
     ${field('ec-name','Name',c.name)}${field('ec-company','Company',c.company)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}
-    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>`;
+    ${defs.map(cfField).join('')}
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>
+    <section><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">Removing a contact takes them off your contact list. Their deals, agreements, invoices and projects are never deleted with them.</p>
+    <button id="ec-del" style="border-color:transparent;color:var(--bad)">Delete this contact</button></div></section>`;
   $('ec-cancel').onclick=()=>loadDetails(host);
   $('ec-save').onclick=async()=>{
     const body={name:$('ec-name').value.trim(),company:$('ec-company').value.trim(),email:$('ec-email').value.trim(),phone:$('ec-phone').value.trim()};
+    if(defs.length){const custom={};host.querySelectorAll('[data-cf]').forEach(el=>{custom[el.getAttribute('data-cf')]=el.value;});body.custom=custom;}
     const btn=$('ec-save'); btn.disabled=true;
     const r=await apiAg('/sales/contacts/'+cid,'PATCH',body);
-    if(r.ok){CONTACT_CACHE=null;toast('Saved.');loadDetails(host);}else{toast((r.body&&r.body.message)||'Couldn’t save.');btn.disabled=false;}
+    // Every failure names itself — a 409 (two contacts, one address) is the one
+    // an operator can act on, so it keeps the server's own wording.
+    if(r.ok){CONTACT_CACHE=null;toast(r.body&&r.body.warning==='custom_unavailable'?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);}
+    else{toast((r.body&&r.body.message)||(r.status?('Couldn’t save — the server answered '+r.status+'.'):'Couldn’t save — we couldn’t reach the server.'));btn.disabled=false;}
+  };
+  // Two-step delete, same contract as contacts.html: the unconfirmed DELETE is a
+  // dry run that writes nothing and returns what's attached; the confirm names it.
+  $('ec-del').onclick=async()=>{
+    const who=c.name||c.email||c.phone||'this contact';
+    const btn=$('ec-del'); btn.disabled=true;
+    const pre=await apiAg('/sales/contacts/'+cid,'DELETE');
+    btn.disabled=false;
+    if(pre.ok&&pre.body&&pre.body.data&&pre.body.data.already){toast(who+' was already removed.');location.href='/contacts.html';return;}
+    if(pre.status!==409){toast((pre.body&&pre.body.message)||(pre.status?('We couldn’t check what’s attached to '+who+' — the server answered '+pre.status+'. Nothing was deleted.'):'We couldn’t reach the server. Nothing was deleted.'));return;}
+    if(!confirm('Remove '+(pre.body.name||who)+'?\n\n'+(pre.body.message||'')))return;
+    btn.disabled=true;
+    const d=await apiAg('/sales/contacts/'+cid+'?confirm=1','DELETE');
+    if(!d.ok){toast((d.body&&d.body.message)||((pre.body.name||who)+' was NOT removed — the server answered '+(d.status||'nothing')+'.'));btn.disabled=false;return;}
+    const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
+    toast(kept.length?((pre.body.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((pre.body.name||who)+' removed.'));
+    setTimeout(()=>{location.href='/contacts.html';},900);
   };
 }
 

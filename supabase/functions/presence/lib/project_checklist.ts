@@ -115,23 +115,97 @@ export const DELIVERY_CHECKLIST: ChecklistStep[] = [
 export const checklistStep = (key: string): ChecklistStep | null =>
   DELIVERY_CHECKLIST.find((s) => s.key === key) || null;
 
+/** The key a `checklist:<key>` source addresses — null for anything else
+ *  (`manual`, `template`, empty). The inverse of checklistSource, and the one
+ *  place a source string is turned back into a step. */
+export function checklistKeyOf(source: unknown): string | null {
+  const s = String(source ?? '');
+  if (!s.startsWith(CHECKLIST_SOURCE_PREFIX)) return null;
+  const key = s.slice(CHECKLIST_SOURCE_PREFIX.length);
+  return checklistStep(key) ? key : null;   // an unknown key is not one of OUR ten
+}
+
+/** ONE row builder — every insert of a checklist step, whether it comes from the
+ *  handoff seeder (all ten) or from the studio's picker (a subset), goes through
+ *  here, so a picked step is byte-for-byte what the seeder would have written.
+ *  `i` is the step's CANONICAL index, not its position in the subset: sort_order
+ *  is a property of the step, so a step added late still lands in delivery order
+ *  among its siblings. */
+const checklistRow = (siteId: string, projectId: string, s: ChecklistStep, i: number): Record<string, unknown> => ({
+  site_id: siteId,
+  project_id: projectId,
+  title: s.title,
+  detail: '',
+  status: 'todo',
+  priority: 'normal',
+  // Both stay true for the client's three: they SEE it, and it IS their ask.
+  // What they cannot do is tick it — that is read off `source` below, not off
+  // either of these flags (clientMayTick).
+  client_visible: s.clientAction === true,
+  client_action_required: s.clientAction === true,
+  sort_order: i * 10,
+  source: checklistSource(s.key),
+});
+
 /** The rows to insert for a project, in order. Pure — the caller supplies ids.
  *  sort_order strides by 10 so a studio can hand-insert between steps later
  *  (the same stride nextSortOrder/applyTemplate use). */
 export function checklistRows(siteId: string, projectId: string): Array<Record<string, unknown>> {
-  return DELIVERY_CHECKLIST.map((s, i) => ({
-    site_id: siteId,
-    project_id: projectId,
+  return DELIVERY_CHECKLIST.map((s, i) => checklistRow(siteId, projectId, s, i));
+}
+
+/** The rows to insert for SOME of the steps — the studio picking known steps off
+ *  the Tasks card. Always in canonical delivery order, whatever order the caller
+ *  asked in; unknown keys are dropped (the caller validates and reports them).
+ *  Identical row shape to checklistRows, by construction. */
+export function checklistRowsFor(siteId: string, projectId: string, keys: Iterable<string>): Array<Record<string, unknown>> {
+  const want = new Set<string>();
+  for (const k of keys) want.add(String(k ?? ''));
+  const out: Array<Record<string, unknown>> = [];
+  DELIVERY_CHECKLIST.forEach((s, i) => { if (want.has(s.key)) out.push(checklistRow(siteId, projectId, s, i)); });
+  return out;
+}
+
+/** One step of the checklist AS IT STANDS ON A PROJECT — the catalog entry plus
+ *  whether this project already holds it. This is what the studio's picker
+ *  renders, so the ten steps are described in exactly ONE place and the page
+ *  never carries its own copy of the list. */
+export interface ChecklistSlot {
+  key: string;
+  title: string;
+  /** the client sees this step and it is THEIR ask (still operator-ticked) */
+  client_action: boolean;
+  /** the fact that ticks this step by itself, or null for a hand-ticked step */
+  auto: string | null;
+  /** this project already holds a LIVE row for the step → never offer it again */
+  present: boolean;
+  /** the present row's status ('todo' … 'done'), null when absent */
+  status: string | null;
+}
+
+/** Merge the canonical ten with a project's task rows (which must carry `source`
+ *  and `status`). Pure: no reads, no order surprises — always ten slots, in
+ *  delivery order. Soft-deleted rows must be filtered out by the CALLER, because
+ *  the uniqueness rule they mirror (presence_tasks_project_checklist_uq) is
+ *  itself partial on `deleted_at is null`: a step the studio deleted is genuinely
+ *  absent and may be added again. */
+export function checklistState(tasks: Array<{ source?: unknown; status?: unknown }>): ChecklistSlot[] {
+  const held = new Map<string, string>();
+  for (const t of tasks || []) {
+    const key = checklistKeyOf(t?.source);
+    if (key && !held.has(key)) held.set(key, String(t?.status ?? 'todo'));
+  }
+  return DELIVERY_CHECKLIST.map((s) => ({
+    key: s.key,
     title: s.title,
-    detail: '',
-    status: 'todo',
-    priority: 'normal',
-    // Both stay true for the client's three: they SEE it, and it IS their ask.
-    // What they cannot do is tick it — that is read off `source` below, not off
-    // either of these flags (clientMayTick).
-    client_visible: s.clientAction === true,
-    client_action_required: s.clientAction === true,
-    sort_order: i * 10,
-    source: checklistSource(s.key),
+    client_action: s.clientAction === true,
+    auto: s.auto || null,
+    present: held.has(s.key),
+    status: held.get(s.key) ?? null,
   }));
 }
+
+/** The steps a project does NOT yet hold, in delivery order — what "add all the
+ *  standard steps" adds, and what makes that button idempotent. */
+export const missingChecklistKeys = (tasks: Array<{ source?: unknown; status?: unknown }>): string[] =>
+  checklistState(tasks).filter((s) => !s.present).map((s) => s.key);

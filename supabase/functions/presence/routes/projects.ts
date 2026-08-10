@@ -7,9 +7,13 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
-import { ensureProjectForDeal, ensureBridge } from '../lib/service_bridge.ts';
+import { ensureProjectForDeal, ensureBridge, reconcileChecklistFacts } from '../lib/service_bridge.ts';
 import { offerCsat, csatRatingsForProject } from '../lib/csat.ts';
 import { templateByKey, type ProjectTemplate } from '../lib/project_templates.ts';
+import {
+  checklistState, checklistRowsFor, checklistStep, checklistKeyOf, isChecklistSource,
+  DELIVERY_CHECKLIST,
+} from '../lib/project_checklist.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
   deriveTaskState, compareOrder, nextSortOrder, forViewer, clampLimit, clampOffset, progressOf,
@@ -163,7 +167,10 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
   if (req.method === 'GET') {
     const [ms, ts, ev, dl, ap] = await Promise.all([
       svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,status,due_date,sort_order,client_visible,completed_at&order=sort_order.asc`),
-      svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,detail,status,priority,client_visible,client_action_required,assigned_to,milestone_id,due_date,sort_order,completed_at&order=sort_order.asc&limit=500`),
+      // `source` rides along so the studio's Tasks card can tell which of the ten
+      // standard delivery steps this project already holds (checklistState) —
+      // the picker must never offer a step that is already here.
+      svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,detail,status,priority,client_visible,client_action_required,assigned_to,milestone_id,due_date,sort_order,completed_at,source&order=sort_order.asc&limit=500`),
       svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${site.id}&select=kind,detail,actor,client_visible,created_at&order=created_at.desc&limit=50`),
       svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,note,status,client_visible,media_id,created_at&order=created_at.desc&limit=200`),
       svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,subject_type,subject_id,title,summary,content_hash,status,client_visible,requested_at,decided_at,decision_note&order=created_at.desc&limit=100`),
@@ -195,7 +202,13 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
         };
       }
     }
-    return json({ data: { project, milestones, tasks, events, deliverables, approvals, progress, is_studio_view: studio, customer_saas } }, 200, cors);
+    // The studio's step picker: the canonical ten (lib/project_checklist.ts) each
+    // marked with whether THIS project already holds it. Server-side on purpose —
+    // the page must not carry a second copy of the list, and "already present" is
+    // a fact about rows, not about the browser. Studio-only: the client never
+    // picks steps, and the catalog is not theirs to see.
+    const checklist = studio ? checklistState(tasksAll) : null;
+    return json({ data: { project, milestones, tasks, events, deliverables, approvals, progress, checklist, is_studio_view: studio, customer_saas } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     if (!studio) return studioDenied(cors);
@@ -274,6 +287,14 @@ export async function handleTasksCreate(req: Request, jwt: string, site: SiteRow
   if (milestoneId) { const m = rows(await svc(`presence_milestones?id=eq.${milestoneId}&project_id=eq.${projectId}&site_id=eq.${site.id}&select=id&limit=1`))[0]; if (!m) milestoneId = null; }
   const dd = dateOrNull(b.due_date);
   if (!dd.ok) return json({ error: 'validation', message: 'Due date must be YYYY-MM-DD.' }, 422, cors);
+  // ONE door for the ten standard steps. `source` is otherwise free text, so this
+  // route could mint a second `checklist:<key>` row for a project — the exact
+  // duplicate the auto-tick's single-row PATCH and the partial unique index both
+  // depend on never existing. A standard step is added through /checklist, which
+  // builds the row from lib/project_checklist.ts and skips what's already there.
+  if (isChecklistSource(b.source)) {
+    return json({ error: 'validation', message: 'Add a standard delivery step from the checklist picker, not as a free-text task.' }, 422, cors);
+  }
   const existing = rows(await svc(`presence_tasks?project_id=eq.${projectId}&site_id=eq.${site.id}&deleted_at=is.null&select=sort_order&order=sort_order.desc&limit=1`)); // D2: only the current max, not the whole list
   const clientVisible = b.client_visible === true || b.client_action_required === true;
   const ins = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' },
@@ -327,6 +348,104 @@ export async function handleTask(req: Request, jwt: string, site: SiteRow, princ
     await projectEvent(site.id, projectId, 'client_action', principal, true, { task_id: taskId, title: rows(up)[0].title });
   }
   return json({ data: rows(up)[0] }, 200, cors);
+}
+
+// ═══ THE STANDARD DELIVERY CHECKLIST (the studio's step picker) ═══════════════
+// Eric asked for "a drop down for tasks that we know need to be completed that we
+// add and once completed the percentage goes up". The ten steps are already the
+// studio's spine (lib/project_checklist.ts) — this route is the door that puts a
+// CHOSEN subset of them onto a project, producing rows identical to the ones the
+// handoff seeder writes: same title, same source key, same client flags.
+//
+// WHY A ROUTE AND NOT `POST /tasks` WITH A TITLE. Three reasons, all of them the
+// reason the checklist exists at all: the row must carry `source=checklist:<key>`
+// or the auto-tick can never find it; the flags must match the step, not the
+// operator's memory; and a step must never be added TWICE (the auto-tick PATCHes
+// one addressable row, and presence_tasks_project_checklist_uq enforces it in the
+// database once 0120/0123 is applied). So the caller sends KEYS, never a title.
+
+/** The live (non-deleted) checklist rows a project holds. `source like 'checklist:%'`
+ *  is the same predicate the partial unique index is built on — deliberately, so
+ *  "what the picker refuses to offer" and "what the database refuses to store"
+ *  can never disagree. A soft-deleted step is genuinely absent under both. */
+async function heldChecklist(siteId: string, projectId: string) {
+  const r = await svc(`presence_tasks?project_id=eq.${projectId}&site_id=eq.${siteId}&deleted_at=is.null&source=like.${encodeURIComponent('checklist:')}*&select=source,status&limit=100`);
+  return rows(r);
+}
+
+export async function handleProjectChecklist(req: Request, jwt: string, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  if (!(await isStudioSide(jwt, site, principal))) return studioDenied(cors);
+  const project = await loadProject(site.id, projectId);
+  if (!project) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+
+  // `all: true` = "add all the standard steps" — the affordance for a project
+  // that has none (a pre-0120 handoff, showing an honest but useless 0/0). It is
+  // NOT a separate code path: it just means "every key", and the same
+  // already-present filter below makes it idempotent and additive.
+  const asked: string[] = b.all === true
+    ? DELIVERY_CHECKLIST.map((s) => s.key)
+    : (Array.isArray(b.keys) ? b.keys : []).map((k: unknown) => clean(k, 60));
+  if (!asked.length) return json({ error: 'validation', message: 'Pick at least one standard step to add.' }, 422, cors);
+  const unknown = asked.filter((k) => !checklistStep(k));
+  // no key echo in the message — the page's error filter (nice()) drops a string
+  // that looks like machinery, and a step key does. The list is the contract.
+  if (unknown.length) return json({ error: 'validation', message: 'That isn’t one of the standard delivery steps.', unknown }, 422, cors);
+
+  const held = await heldChecklist(site.id, projectId);
+  const present = new Set(held.map((t) => checklistKeyOf(t.source)).filter(Boolean) as string[]);
+  const missing = [...new Set(asked)].filter((k) => !present.has(k));
+  const skipped = [...new Set(asked)].filter((k) => present.has(k));
+
+  let added: any[] = [];
+  if (missing.length) {
+    const ins = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(checklistRowsFor(site.id, projectId, missing)) });
+    if (!ins.ok) {
+      // 409 = the partial unique index refused a duplicate, i.e. another tab (or
+      // the 0120 backfill) added one of these between our read and our write. Say
+      // so and hand back the TRUTH rather than pretending: one honest retry with
+      // the recomputed gap, then a plain conflict the page refreshes on.
+      if (ins.status === 409) {
+        const held2 = await heldChecklist(site.id, projectId);
+        const present2 = new Set(held2.map((t) => checklistKeyOf(t.source)).filter(Boolean) as string[]);
+        const still = missing.filter((k) => !present2.has(k));
+        const retry = still.length
+          ? await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(checklistRowsFor(site.id, projectId, still)) })
+          : null;
+        if (retry && !retry.ok) {
+          return json({ error: 'conflict', message: 'Those steps were just added somewhere else — refresh to see where the project stands.', checklist: checklistState(await heldChecklist(site.id, projectId)) }, 409, cors);
+        }
+        added = retry ? rows(retry) : [];
+      } else {
+        return json({ error: 'write_failed', message: 'Those steps didn’t save — please try again.' }, 502, cors);
+      }
+    } else {
+      added = rows(ins);
+    }
+  }
+  const addedKeys = added.map((t) => checklistKeyOf(t.source)).filter(Boolean) as string[];
+
+  // EVIDENCE, NOT A FRESH ZERO. Two of the ten are facts the system already owns
+  // (a signed contract, a paid deposit) and their live tick call sites fired long
+  // before these rows existed. Adding the steps without reading that evidence
+  // back would put Eric at "0%" on a project that is demonstrably 20% done — the
+  // same lie the seeder's own reconcile exists to prevent. Same function, same
+  // rule, and idempotent, so it is safe on every add. Only meaningful for a
+  // project handed off from a deal; a manual project has no contract to read.
+  const reconcilable = addedKeys.some((k) => { const s = checklistStep(k); return s?.auto === 'contract_signed' || s?.auto === 'deposit_paid'; });
+  let reconciled = false;
+  if (reconcilable && project.deal_id) { await reconcileChecklistFacts(site.id, String(project.deal_id), projectId); reconciled = true; }
+
+  // ONE event, not ten. This is the scaffold going in (the same call
+  // seedProjectChecklist and applyTemplate make), not a stream of "a task was
+  // added" notifications — and it stays internal: the client's three steps show
+  // up on their to-do card as tasks, which is the notification that matters.
+  if (addedKeys.length) await projectEvent(site.id, projectId, 'checklist_steps_added', principal, false, { keys: addedKeys, count: addedKeys.length });
+
+  const state = checklistState(await heldChecklist(site.id, projectId));
+  return json({ data: { added: addedKeys.length, added_keys: addedKeys, skipped_keys: skipped, reconciled, checklist: state } }, addedKeys.length ? 201 : 200, cors);
 }
 
 // ═══ MILESTONES ═══

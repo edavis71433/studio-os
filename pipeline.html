@@ -979,7 +979,12 @@ function ensureContactNames(){
   // updated — older contacts' deals read "—" in the Table and match by title only
   // in search. Lifting that needs paged fetches or a server-side join, not a
   // bigger number here.
-  CONTACT_LOADING=api('/sales/contacts?limit=100')
+  // include_deleted=1: this join only ever LABELS deals that already exist. A
+  // contact removed from the roster must not turn their own historical deals
+  // into "—" (and unfindable by the person's name in search) — the deal is
+  // still real, and it still belongs to whoever it belonged to. Same site
+  // scope; the roster read is unchanged and still hides them.
+  CONTACT_LOADING=api('/sales/contacts?limit=100&include_deleted=1')
     .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;for(const c of (r.data||[])){CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}})
     .catch(()=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
     .finally(()=>{CONTACT_LOADING=null;});

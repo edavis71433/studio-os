@@ -628,9 +628,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/contacts/fields' && (method === 'GET' || method === 'PUT')) return handleSalesContactFields(req, site, principal, cors);
   {
     // Contact DETAIL: tap a contact → their deals + recent activity + last-spoke
-    // + custom-field values (GET); edit info + field values (PATCH). Site-scoped.
+    // + custom-field values (GET); edit info + field values (PATCH); remove them
+    // from the roster (DELETE — a SOFT delete that cascades to nothing, and that
+    // answers 409 with the attached history until ?confirm=1). Site-scoped.
     const m = route.match(/^\/sales\/contacts\/([0-9a-f-]{36})$/);
-    if (m && (method === 'GET' || method === 'PATCH')) return handleSalesContact(req, site, principal, m[1], cors);
+    if (m && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) return handleSalesContact(req, site, principal, m[1], cors);
   }
   // Add an EXISTING customer directly — no deal/sign/convert ceremony. Studio-gated
   // like every /sales/* route (relationship feature + the reviewer boundary above).

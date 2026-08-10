@@ -195,6 +195,17 @@ html.dds-embed #detailWrap{padding-top:0}
   textarea{min-height:70px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
+  /* the standard-step picker: the ten delivery steps we already know about,
+     ticked in a list (several at once), with the ones this project already
+     holds shown but disabled so the absence is explained, never mysterious */
+  .sp-h{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--soft)}
+  .sp-row{align-items:flex-start;gap:8px;padding:2px 0;cursor:pointer}
+  .sp-row input{margin-top:2px;flex:0 0 auto;accent-color:var(--p)}
+  .sp-row .sp-t{min-width:0}
+  .sp-row.has{opacity:.62;cursor:default}
+  .sp-has{display:block;font-size:11.5px;color:var(--soft);margin-top:1px}
+  .stepnudge{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:2px 0 8px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:13.5px;color:var(--soft)}
+  .stepnudge .sn-t{flex:1 1 190px;min-width:0}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
   /* Centering, mobile-safe (SS6 review; same doctrine as customers/contacts).
@@ -559,6 +570,66 @@ function miniForm(host, fields, onSubmit){
   setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
 }
 
+// ── the standard-step picker ────────────────────────────────────────────────
+// Eric's ten delivery steps live in ONE place — supabase/functions/presence/lib/
+// project_checklist.ts — and arrive with the project as data.checklist, already
+// marked with what THIS project holds (routes/projects.ts checklistState). This
+// page therefore never carries its own copy of the list: it renders whatever the
+// server says the ten are, in the server's order.
+//
+// A CHECKBOX LIST, not a <select>. The real moment is "this project is missing
+// most of them" (a pre-backfill handoff sits at 0/0), so one-at-a-time through a
+// dropdown would be ten round trips and ten re-renders; ticking several and
+// saving once matches how the card already behaves (tasks ARE a checkbox list
+// here). Steps the project already holds stay VISIBLE but disabled with the
+// reason, so "where did that one go?" answers itself instead of looking like a
+// bug — and a disabled input can't be submitted, so the UI cannot ask the server
+// for a duplicate the unique index would refuse.
+//
+// NOT ONE OF THE TEN IS NAMED IN THIS FILE, deliberately: the titles and keys
+// are the server's, and a pure test (project_checklist_picker_test.mjs) fails if
+// any of them is ever pasted in here.
+function stepPicker(host,id,steps){
+  host.innerHTML='';
+  const missing=steps.filter(s=>!s.present);
+  const f=document.createElement('form'); f.className='mini steppick'; f.setAttribute('aria-label','Add standard delivery steps');
+  const rows=steps.map(s=>{
+    // quietly marked: the client SEES their three (and is asked for them) — Eric
+    // still ticks those himself; and three tick themselves from evidence.
+    const tags=(s.client_action?'<span class="tag client">shared</span>':'')+(s.auto?'<span class="tag">ticks itself</span>':'');
+    const note=s.present?`<span class="sp-has">${s.status==='done'?'already on this project · done':'already on this project'}</span>`:'';
+    return `<label class="chk sp-row${s.present?' has':''}"><input type="checkbox" data-step="${esc(s.key)}"${s.present?' disabled':''}><span class="sp-t">${esc(s.title)}${tags}${note}</span></label>`;
+  }).join('');
+  f.innerHTML=`<div class="sp-h">Standard delivery steps</div><p class="mut" style="margin:-4px 0 2px">Tick the ones to add — each is worth 10% of the project.</p>${rows}`;
+  const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
+  if(missing.length>1){
+    const all=document.createElement('button'); all.type='button'; all.className='btn ghost sm'; all.id='spAll'; all.textContent='Select all '+missing.length+' remaining';
+    all.onclick=()=>{f.querySelectorAll('input[data-step]:not([disabled])').forEach(cb=>{cb.checked=true;});};
+    row.appendChild(all);
+  }
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='btn ghost sm'; cancel.textContent='Cancel'; cancel.onclick=()=>{host.innerHTML='';};
+  const save=document.createElement('button'); save.type='submit'; save.className='btn sm'; save.id='spAdd'; save.textContent='Add selected';
+  row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
+  f.onsubmit=async(e)=>{
+    e.preventDefault();
+    const keys=[...f.querySelectorAll('input[data-step]:not([disabled])')].filter(cb=>cb.checked).map(cb=>cb.dataset.step);
+    if(!keys.length){toast('Tick at least one step to add.');return;}
+    save.disabled=true;
+    // A 409 means someone (another tab, or the SQL backfill) added one of these
+    // between the page's read and this write. Say what happened and re-open the
+    // record so the card shows where the project ACTUALLY stands.
+    try{const r=await api('/projects/'+id+'/checklist','POST',{keys});toast(addedMsg(r));openProject(id);}
+    catch(err){toast(nice(err),true);openProject(id);}
+  };
+  setTimeout(()=>{const first=f.querySelector('input[data-step]:not([disabled])')||f.querySelector('button');if(first)first.focus();},20);
+}
+// what the server actually did — never "added 10" when it skipped nine
+function addedMsg(r){
+  const d=(r&&r.data)||{}; const n=Number(d.added||0);
+  if(!n)return 'Those steps were already on this project.';
+  return n===1?'Step added':'Added '+n+' standard steps';
+}
+
 // show/hide the full-screen record view (in-page, same tab) — the list and the
 // record are two panels of the ONE page; only one is visible at a time.
 function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
@@ -644,6 +715,16 @@ async function openProject(id){
       const others=STUDIO?(T_NEXT[t.status]||[]).filter(s=>s!=='done'&&!(done&&s==='todo')).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(statusLabel(s))}</button>`).join(''):'';
       return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
     }).join('')||'<div class="empty">No tasks yet — add the first one.</div>';
+    // the ten standard delivery steps, as the SERVER sees them for this project
+    // (absent on the client side, and on any response that predates the field)
+    const CHK=(STUDIO&&Array.isArray(data.checklist))?data.checklist:[];
+    const chkMissing=CHK.filter(s=>!s.present).length;
+    // A project holding NONE of them is the pre-backfill case (a handoff that
+    // predates the checklist, reading an honest but useless 0/0). One button
+    // gives Eric the whole spine — and the server reads the evidence it already
+    // has, so a signed + paid project lands on 20%, not on a fresh zero.
+    const chkNudge=(STUDIO&&CHK.length&&chkMissing===CHK.length)
+      ? `<div class="stepnudge"><span class="sn-t">None of the ${CHK.length} standard delivery steps are on this project yet — there is nothing for progress to count.</span><button class="btn sm" id="addAllSteps">Add all ${CHK.length} standard steps</button></div>` : '';
     // Origin honesty (the portal's "You shared" treatment, mirrored): a client
     // upload is marked by the server-stamped note ('Uploaded by the client.' —
     // client_delivery.ts handleClientUploadCreate; PREFIX match so a studio
@@ -670,7 +751,7 @@ async function openProject(id){
       ${pathHtml(data.milestones||[])}
       <div class="dbody"><div class="dgrid">
         <div class="dmain">
-          <div class="rsec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?'<button class="btn ghost sm" id="addTask">+ Add</button>':''}</h3><div id="tsList">${ts}</div><div id="tsForm"></div></div>
+          <div class="rsec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?`${chkMissing?'<button class="btn ghost sm" id="addStep">+ Standard step</button>':''}<button class="btn ghost sm" id="addTask">+ Add</button>`:''}</h3>${chkNudge}<div id="tsList">${ts}</div><div id="tsForm"></div></div>
           <div class="rsec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
           ${STUDIO?`<div class="rsec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>`:''}
           <div class="rsec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
@@ -722,6 +803,15 @@ async function openProject(id){
     const taskForm=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
     if($('addTask'))$('addTask').onclick=taskForm;
     if($('quickTask'))$('quickTask').onclick=()=>{taskForm();const f=$('tsForm');if(f)f.scrollIntoView({block:'center'});};
+    // + Standard step → the picker, in the SAME host as the free-text form, so
+    // only one of the two ways to add a task is ever open. Free-text tasks are
+    // untouched: they stay source='manual' and Eric's own to tick.
+    if($('addStep'))$('addStep').onclick=()=>{stepPicker($('tsForm'),id,CHK);const f=$('tsForm');if(f)f.scrollIntoView({block:'nearest'});};
+    if($('addAllSteps'))$('addAllSteps').onclick=async()=>{
+      const b=$('addAllSteps'); b.disabled=true;
+      try{const r=await api('/projects/'+id+'/checklist','POST',{all:true});toast(addedMsg(r));openProject(id);}
+      catch(e){toast(nice(e),true);openProject(id);}   // a race → show the truth
+    };
     // milestones
     if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});openProject(id);});
     const mdone=async(mid)=>{try{await api('/projects/'+id+'/milestones/'+mid,'PATCH',{status:'complete'});toast('Milestone complete');openProject(id);}catch(e){toast(nice(e),true);}};

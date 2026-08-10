@@ -19,6 +19,9 @@ import {
   isPossibleDuplicate, findPossibleDuplicates,
 } from '../../supabase/functions/presence/crm/dedupe.ts';
 import { composeContactDetail, lastSpokeLabel } from '../../supabase/functions/presence/crm/contact_detail.ts';
+import {
+  plural, listSentence, summarizeAttachments, attachmentWarning, duplicateHints,
+} from '../../supabase/functions/presence/crm/contact_links.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -163,6 +166,56 @@ const NUL = String.fromCharCode(0), DEL = String.fromCharCode(127);
 
   ok('lastSpokeLabel is calm + relative', lastSpokeLabel('2026-07-12T12:00:00.000Z', NOW) === 'Last spoke yesterday');
   ok('lastSpokeLabel empty when never', lastSpokeLabel(null, NOW) === '');
+}
+
+// ═══ 6b. DELETE pre-flight: what a contact is attached to ═══
+// Eric's real roster: Claud Beltran is a converted customer (won deal, signed
+// agreement, paid deposit, a project); "Claude Beltran" is the empty duplicate.
+// The confirm has to be able to tell those two apart out loud.
+{
+  ok('plural picks the label’s own plural', plural(1, 'deal', 'deals') === '1 deal' && plural(3, 'deal', 'deals') === '3 deals');
+  ok('listSentence writes like a person', listSentence(['a']) === 'a' && listSentence(['a', 'b']) === 'a and b' && listSentence(['a', 'b', 'c']) === 'a, b and c');
+  ok('listSentence of nothing is empty', listSentence([]) === '' && listSentence(undefined) === '');
+
+  const claud = summarizeAttachments({ deals: 1, won_deals: 1, signed_contracts: 1, paid_invoices: 1, projects: 1 });
+  ok('the converted customer totals his real records', claud.total === 4, String(claud.total));
+  ok('a won deal marks him converted', claud.converted === true);
+  ok('the sentence names every attachment', claud.sentence === '1 deal, 1 signed agreement, 1 paid invoice and 1 project', claud.sentence);
+  ok('won_deals never becomes its own line (no double-report)', claud.items.length === 4 && !claud.items.some((i) => /won/.test(i)));
+  const warn = attachmentWarning('Claud Beltran', claud);
+  ok('the warning leads with the name and the facts', warn.startsWith('Claud Beltran has 1 deal, 1 signed agreement, 1 paid invoice and 1 project.'), warn);
+  ok('the warning promises nothing cascades', /nothing is deleted with them/.test(warn) && /became a customer/.test(warn));
+
+  const empty = summarizeAttachments({});
+  ok('the empty duplicate has nothing attached', empty.total === 0 && empty.items.length === 0 && empty.sentence === '');
+  ok('nothing attached earns no warning at all', attachmentWarning('Claude Beltran', empty) === '');
+  ok('summarizeAttachments tolerates junk', summarizeAttachments(null).total === 0 && summarizeAttachments({ deals: -4, reviews: 'x' }).total === 0);
+
+  const unpaid = summarizeAttachments({ deals: 2, open_invoices: 1, appointments: 1, reviews: 2 });
+  ok('unpaid money and incidentals are named too', unpaid.sentence === '2 deals, 1 unpaid invoice, 1 booking and 2 reviews', unpaid.sentence);
+  ok('no won deal means not converted', unpaid.converted === false);
+  ok('an unnamed contact still reads as a sentence', attachmentWarning('', unpaid).startsWith('This contact has 2 deals'));
+}
+
+// ═══ 6c. roster duplicate hints (the two Clauds) ═══
+{
+  const roster = [
+    { id: 'c1', name: 'Claud Beltran', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081' },
+    { id: 'c2', name: 'Claude Beltran', email: '', phone: '6262346081' },
+    { id: 'c3', name: 'Eric Test', email: 'edavis7143@yahoo.com', phone: '' },
+    { id: 'c4', name: 'Hettie Smith', email: 'hettie@example.com', phone: '(310) 555-0134' },
+    { id: 'c5', name: 'Maurice Tobin', email: 'maurice@example.com', phone: '' },
+  ];
+  const hints = duplicateHints(roster);
+  ok('the two Clauds find each other', hints.c1 && hints.c1.id === 'c2' && hints.c2 && hints.c2.id === 'c1');
+  ok('the hint says WHY, in plain words', /same phone number/.test(hints.c1.why), hints.c1 && hints.c1.why);
+  ok('the hint names the other person', hints.c1.name === 'Claude Beltran');
+  ok('the three distinct people are left alone', !hints.c3 && !hints.c4 && !hints.c5, JSON.stringify(Object.keys(hints)));
+  // the exact defect Eric hit: one number typed two ways
+  ok('phone formatting is not identity', phoneKey('(626) 234-6081') === phoneKey('6262346081'));
+  ok('a lone contact has no duplicate', Object.keys(duplicateHints([roster[0]])).length === 0);
+  ok('duplicateHints tolerates junk', Object.keys(duplicateHints(null)).length === 0 && Object.keys(duplicateHints([null, {}])).length === 0);
+  ok('above the cap it says nothing rather than stalling', Object.keys(duplicateHints(roster, 2)).length === 0);
 }
 
 // ═══ 7. empty / defensive ═══

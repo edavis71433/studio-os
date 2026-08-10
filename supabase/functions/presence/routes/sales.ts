@@ -5,7 +5,7 @@
 //   sign/convert are idempotent. Convert bridges to the existing, idempotent
 //   provisionForSignup — no second provisioning path, no legacy data.
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
@@ -34,6 +34,7 @@ import {
 import { composeContactDetail } from '../crm/contact_detail.ts';
 import { normalizeFieldDefs, normalizeFieldValues, applyFieldValues, type CustomFieldDef } from '../crm/custom_fields.ts';
 import { findPossibleDuplicates } from '../crm/dedupe.ts';
+import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence } from '../crm/contact_links.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -125,11 +126,23 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     const q = clean(u.searchParams.get('q'), 80).replace(/[(),*"\\]/g, ' ').trim();   // L2: neutralize PostgREST filter grammar
     const limit = clampLimit(u.searchParams.get('limit'));
     const offset = Math.max(0, Math.trunc(Number(u.searchParams.get('offset'))) || 0);
-    let path = `presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,email,phone,company,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
+    // include_deleted=1 is for LABELLING ONLY — pipeline.html joins contact names
+    // onto deals it already has, and a soft-deleted contact's historical deals
+    // must still say whose they are rather than degrade to "—". It never widens
+    // tenant scope (site_id is still pinned) and the roster never asks for it.
+    const withDeleted = u.searchParams.get('include_deleted') === '1';
+    let path = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=id,name,email,phone,company,updated_at${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
     if (q) path += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
     const r = await svc(path);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
-    return json({ data: rows(r), limit, offset }, 200, cors);
+    const list = rows(r);
+    // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
+    // the CREATE-time prompt uses (phoneKey → "6262346081" === "(626) 234-6081";
+    // nameSimilarity → "Claud" ≈ "Claude"), just run across the page instead of
+    // against one new arrival. Opt-in so no other caller pays for the scan.
+    const hints = u.searchParams.get('dupes') === '1' ? duplicateHints(list) : null;
+    if (hints) for (const c of list) { const h = hints[String(c.id)]; if (h) c.possible_duplicate_of = h; }
+    return json({ data: list, limit, offset }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -207,10 +220,71 @@ async function loadContact(siteId: string, id: string) {
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at&limit=1`);
   return rows(r)[0] || null;
 }
+
+// ── What would deleting this contact leave behind? ───────────────────────────
+// presence_contacts is referenced by exactly THREE foreign keys — presence_deals
+// .contact_id (0074), presence_appointments.contact_id (0099) and
+// presence_reviews.contact_id (0101) — all `on delete set null`. Everything
+// else (proposals, agreements, invoices, projects) hangs off the DEAL, so it is
+// reached through those deals, not through the contact.
+//
+// (The legacy `contacts` table at 0000_baseline.sql:648 — clients/projects/
+// prospects/audit_leads/events/partnerships hang off THAT one — is a different
+// table entirely. This page and every /sales/* route read presence_contacts.)
+//
+// Each count is independent and each may FAIL. A failed count is reported as
+// unknown, never as zero — a silent zero here would be the difference between
+// "nothing attached, delete freely" and destroying the shape of a real customer
+// relationship. `unknown` names every count we could not take.
+async function contactAttachments(siteId: string, contactId: string) {
+  const counts: Record<string, number> = {};
+  const unknown: string[] = [];
+  const take = async (label: string, path: string) => {
+    const c = await svcCount(path).catch(() => null);
+    if (c === null) { unknown.push(label); return 0; }
+    return c;
+  };
+  const dealRows = await svc(`presence_deals?contact_id=eq.${contactId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,stage,converted_client_id,converted_at&limit=200`);
+  if (!dealRows.ok) unknown.push('deals');
+  const deals = rows(dealRows);
+  counts.deals = deals.length;
+  counts.won_deals = deals.filter((d: any) => d.stage === 'won' || d.converted_client_id || d.converted_at).length;
+  const ids = deals.map((d: any) => d.id).filter(Boolean);
+  if (ids.length) {
+    const inList = `in.(${ids.join(',')})`;
+    const [sc, pi, oi, pr] = await Promise.all([
+      take('agreements', `presence_contracts?site_id=eq.${siteId}&deal_id=${inList}&status=eq.signed&deleted_at=is.null`),
+      take('invoices', `presence_invoices?site_id=eq.${siteId}&deal_id=${inList}&status=eq.paid&deleted_at=is.null`),
+      take('invoices', `presence_invoices?site_id=eq.${siteId}&deal_id=${inList}&status=eq.open&deleted_at=is.null`),
+      take('projects', `presence_projects?site_id=eq.${siteId}&deal_id=${inList}&deleted_at=is.null`),
+    ]);
+    counts.signed_contracts = sc; counts.paid_invoices = pi; counts.open_invoices = oi; counts.projects = pr;
+  }
+  // Bookings (0099) and reviews (0101) point at the contact directly. Both
+  // tables post-date the contacts table, so a workspace deployed ahead of those
+  // migrations simply reports them unknown rather than 502-ing the whole delete.
+  const [ap, rv] = await Promise.all([
+    take('bookings', `presence_appointments?site_id=eq.${siteId}&contact_id=eq.${contactId}&deleted_at=is.null`),
+    take('reviews', `presence_reviews?site_id=eq.${siteId}&contact_id=eq.${contactId}&deleted_at=is.null`),
+  ]);
+  counts.appointments = ap; counts.reviews = rv;
+  return { summary: summarizeAttachments(counts), unknown: [...new Set(unknown)] };
+}
+
 export async function handleSalesContact(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const contact = await loadContact(site.id, id);
-  if (!contact) return json({ error: 'not_found', message: 'That contact is no longer here.' }, 404, cors);
+  if (!contact) {
+    // A DELETE of a contact that is ALREADY gone is a success, not an error —
+    // Eric tapping Delete twice (or on a stale roster) must not be told the
+    // operation failed when the end state is exactly what he asked for. Any
+    // other method still 404s.
+    if (req.method === 'DELETE') {
+      const gone = rows(await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id&limit=1`))[0];
+      if (gone) return json({ data: { ok: true, deleted: true, already: true } }, 200, cors);
+    }
+    return json({ error: 'not_found', message: 'That contact is no longer here.' }, 404, cors);
+  }
 
   if (req.method === 'GET') {
     const defs = await loadContactFieldDefs(site.id);
@@ -266,6 +340,46 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     }
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
     return json({ data: rows(up)[0] }, 200, cors);
+  }
+
+  if (req.method === 'DELETE') {
+    // SOFT delete — `deleted_at`, the pattern every other removable entity in
+    // this schema uses (0074 partial indexes; the deal DELETE above; the draft
+    // proposal/agreement deletes). ONE row is written. Nothing cascades: the
+    // deals, agreements, invoices, projects, bookings and reviews that reference
+    // this contact are untouched, and their FKs still point at the row.
+    //
+    // ALWAYS TWO-STEP. A DELETE without ?confirm=1 writes NOTHING — it is a dry
+    // run that answers 409 with the INVENTORY, so the browser can put the facts
+    // in front of Eric ("Claud has 1 deal, 1 signed agreement, 1 paid invoice
+    // and 1 project") instead of a generic "Are you sure?". He decides; the
+    // second DELETE carries ?confirm=1 and performs it. The dry run runs even
+    // when nothing is attached, so no unconfirmed request can ever remove a
+    // contact — the confirm is built from what the database actually says, not
+    // from what the roster happened to be showing.
+    const u = new URL(req.url);
+    const confirmed = u.searchParams.get('confirm') === '1';
+    const who = String(contact.name || contact.email || contact.phone || 'This contact');
+    const { summary, unknown } = await contactAttachments(site.id, id);
+    if (!confirmed) {
+      // A count we could NOT take is reported as such. Claiming "nothing
+      // attached" off a failed query is exactly the silent-catch defect this
+      // codebase keeps paying for.
+      const blind = unknown.length
+        ? ` We couldn’t check ${listSentence(unknown)} just now, so there may be more attached than this shows.`
+        : '';
+      return json({
+        error: summary.total > 0 ? 'has_history' : 'confirm_required',
+        message: (attachmentWarning(who, summary)
+          || `Nothing else in your workspace is attached to ${who} — no deals, invoices, projects or bookings.`) + blind,
+        attachments: summary.counts, items: summary.items, converted: summary.converted,
+        unknown, name: who, has_history: summary.total > 0,
+      }, 409, cors);
+    }
+    const del = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
+    if (!del.ok) return json({ error: 'write_failed', message: `We couldn’t remove ${who} — the change didn’t reach the database (${del.status}). Nothing was deleted; please try again.` }, 502, cors);
+    if (!rows(del)[0]) return json({ error: 'write_failed', message: `We couldn’t remove ${who} — no matching contact was updated. Refresh and try again.` }, 502, cors);
+    return json({ data: { ok: true, deleted: true, name: who, kept: summary.counts, kept_items: summary.items } }, 200, cors);
   }
 
   return json({ error: 'method_not_allowed' }, 405, cors);

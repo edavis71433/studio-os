@@ -353,3 +353,95 @@ test.describe('Relationship view', () => {
     await expect(page.locator('.dds-toast')).toContainText('update that to-do');
   });
 });
+
+// ── The record page's own Edit / Delete for a contact ────────────────────────
+// contacts.html hands a contact off to /crm.html?contact=…&tab=details, so the
+// two actions Eric asked for have to exist here as well as on the row. The
+// Details tab already DISPLAYED the owner's custom fields; the inline Edit now
+// writes them too. Delete is the same two-step contract as the roster's: an
+// unconfirmed DELETE writes nothing and returns what's attached.
+test.describe('Client record — editing and removing the contact', () => {
+  const CID = 'ffffffff-6666-4666-8666-ffffffffffff';
+  const SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
+  const CONTACT_RECORD = { data: {
+    identity: { contact_id: CID, deal_id: null, client_id: null, customer_site_id: null, project_id: null },
+    header: { name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', status: 'customer' },
+    highlights: {},
+    sections: { overview: false, details: true, deal: false, delivery: false },
+    default_tab: 'details',
+    canonical: { key: 'contact', value: CID },
+  } };
+  const DETAIL = { data: {
+    contact: { id: CID, name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', custom: { referred_by: 'Walk-in' } },
+    custom_fields: [{ key: 'referred_by', label: 'Referred by', type: 'text' }],
+    deals: [], timeline: [], last_contacted_at: null,
+  } };
+
+  test('the inline Edit saves the four facts AND the owner’s custom fields', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': CONTACT_RECORD, ['/sales/contacts/' + CID]: DETAIL } });
+    let patched: Record<string, unknown> | null = null;
+    await page.route(new RegExp('/functions/v1/presence/sales/contacts/' + CID), (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      patched = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: CID } }) });
+    });
+    await page.goto(`/crm.html?contact=${CID}&tab=details`);
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.locator('#ec-name')).toHaveValue('Claud Beltran');
+    // the custom field the Details card already displayed is now editable here
+    await expect(page.locator('#eccf-referred_by')).toHaveValue('Walk-in');
+    await page.locator('#ec-phone').fill('(626) 234-6081 ext 2');
+    await page.locator('#eccf-referred_by').fill('Referred by Hettie');
+    await page.locator('#ec-save').click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
+    expect(patched).toEqual({
+      name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com',
+      phone: '(626) 234-6081 ext 2', custom: { referred_by: 'Referred by Hettie' },
+    });
+  });
+
+  test('Delete warns with the attached history by name, and only removes the contact', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': CONTACT_RECORD, ['/sales/contacts/' + CID]: DETAIL } });
+    const writes: string[] = [];
+    page.on('request', (r) => { if (r.method() !== 'GET' && r.url().includes('/functions/v1/presence')) writes.push(`${r.method()} ${new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')}${new URL(r.url()).search}`); });
+    await page.route(new RegExp('/functions/v1/presence/sales/contacts/' + CID), (route) => {
+      if (route.request().method() !== 'DELETE') return route.fallback();
+      const confirmed = new URL(route.request().url()).searchParams.get('confirm') === '1';
+      return confirmed
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, deleted: true, name: 'Claud Beltran', kept_items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'] } }) })
+        : route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({
+            error: 'has_history', name: 'Claud Beltran', has_history: true, converted: true,
+            items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'],
+            message: 'Claud Beltran has 1 deal, 1 signed agreement, 1 paid invoice and 1 project. They became a customer. Removing them takes them off your contact list only — the deal, the agreement, the invoices and the project all stay exactly where they are, and nothing is deleted with them.',
+          }) });
+    });
+    await page.goto(`/crm.html?contact=${CID}&tab=details`);
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.locator('#ec-del')).toBeVisible();
+
+    // ONE dialog listener for the whole test — a per-click `once` races with
+    // Playwright's auto-dismiss and the second dialog arrives already handled.
+    const seen: string[] = [];
+    let answer: 'dismiss' | 'accept' = 'dismiss';
+    page.on('dialog', (d) => { seen.push(d.message()); answer === 'accept' ? d.accept() : d.dismiss(); });
+
+    // FIRST: back out. The dry run has already happened; nothing else may write.
+    await page.locator('#ec-del').click();
+    await expect.poll(() => seen.length).toBe(1);   // the confirm follows the dry run, so wait on the dialog
+    expect(writes).toEqual([`DELETE /sales/contacts/${CID}`]);
+    // the confirm NAMED what is attached — not a generic "Are you sure?"
+    expect(seen[0]).toContain('1 deal, 1 signed agreement, 1 paid invoice and 1 project');
+    expect(seen[0]).toContain('nothing is deleted with them');
+
+    // THEN: accept. Exactly one more write — the confirmed delete. Nothing cascades.
+    answer = 'accept';
+    await page.locator('#ec-del').click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'their 1 deal, 1 signed agreement, 1 paid invoice, 1 project stayed' }).first()).toBeVisible();
+    expect(writes).toEqual([
+      `DELETE /sales/contacts/${CID}`,
+      `DELETE /sales/contacts/${CID}`,
+      `DELETE /sales/contacts/${CID}?confirm=1`,
+    ]);
+  });
+});
