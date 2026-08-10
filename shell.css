@@ -28,6 +28,39 @@
 :root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-line-strong:#ddd6ea;--dds-p:#5b3fa0;--dds-p-deep:#2a1b4a;--dds-p-soft:#efeafa;--dds-bad:#9a4242;--dds-good:#33664b;--dds-good-soft:#e7f1ea;--dds-warn:#775d31;--dds-warn-soft:#f3ead9;--dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09)}
 :root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-line-strong:#3a3150;--dds-p:#b79ceb;--dds-p-deep:#cdb6f2;--dds-p-soft:#241d38;--dds-bad:#e08b83;--dds-good:#8bbf9f;--dds-good-soft:#1f2a24;--dds-warn:#d3ac6e;--dds-warn-soft:#2a2316;--dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35)}
 
+/* ── PAGE WIDTH TIERS — the one place a page's `.wrap` cap is decided ────────
+   Before this there were 17 different `.wrap{max-width}` values between 600px
+   and 1200px, invented one page at a time. The number is not the design; what
+   the page is FOR is the design. Four tiers, picked by content shape:
+
+     --dds-w-form  640px  ONE column of form fields or a short focused flow.
+                          A text input much past ~640px is harder to aim at and
+                          to scan, and a Cancel/Save pair 1600px apart is two
+                          separate decisions. Widening a form is a regression.
+     --dds-w-focus 760px  ONE column of items you work down one at a time — a
+                          card feed, a message list, a doc. ~72 characters at
+                          the shell's 16px body, the top of the comfortable
+                          45–75ch measure, with room for a card's action row.
+     --dds-w-app  1280px  Working surfaces: dashboards and record pages, main
+                          column plus a rail. 1280 fills a laptop edge to edge
+                          and then STOPS: a 3fr/2fr split stretched to 1900px
+                          puts the rail a head-turn from the column it annotates.
+     --dds-w-data 1600px  Tables and rosters. Many columns, each wanting its own
+                          room — this is the tier Eric's "these pages should
+                          take up the whole screen" is about. 1600 leaves ~160px
+                          of margin on a 1920 monitor (reads as a page margin,
+                          not as dead space) and still caps growth, so a 2560px
+                          display doesn't stretch a six-column row until a
+                          person's name and their Delete button are a foot apart.
+
+   Pages reference these from their own `.wrap` rule, with the literal as the
+   var() fallback so a page that ever loads without shell.css still has a cap.
+   They do NOT vary by theme — no four-block contract needed here.
+   Add a page? Pick a tier. Do not invent an 18th number. */
+:root{
+  --dds-w-form:640px; --dds-w-focus:760px; --dds-w-app:1280px; --dds-w-data:1600px;
+}
+
 /* pages get top-room for the fixed shell once it mounts */
 html.dds-has-shell body{padding-top:var(--dds-shell-h)}
 
