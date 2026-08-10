@@ -4,7 +4,7 @@
 import { svc } from '../lib/db.ts';
 import { seal, open } from './crypto.ts';
 import type { ConnectionStatus } from './contract.ts';
-import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { raiseNotice, clearNotice, clearNoticePrefix, connExpiredPeriod, connExpiredPeriodPrefix, connExpiredLegacyPeriod } from '../lib/notice.ts';
 import { CONNECTED_PROVIDERS } from './providers.ts';
 
 // friendly label per provider for the notice copy (the customer never sees a key)
@@ -62,24 +62,33 @@ export async function markStatus(siteId: string, providerKey: string, status: Co
     method: 'PATCH', body: JSON.stringify({ status, health, last_error: error.slice(0, 300) }),
   });
   // FIX 2: a degraded connection must reach the ONE notice model (bell + Inbox),
-  // not only connections.html — mirroring publish.ts's raise/clear pattern. Keyed
-  // per provider (`conn:<provider>`) and idempotent: raiseNotice no-ops after the
-  // first, and recovery clears it exactly once. Best-effort; never blocks a read.
+  // not only connections.html — mirroring publish.ts's raise/clear pattern.
+  //
+  // The period is WEEKLY-BUCKETED per provider (connExpiredPeriod — the
+  // supportAgingPeriod idiom), not the bare `conn:<provider>`. The static key
+  // was a once-per-lifetime trap: recovery only PATCHes the row dismissed, the
+  // row keeps the unique key, so after ONE reconnect every later expiry of the
+  // same provider was silent forever — and providers DO expire again (Google
+  // revokes refresh tokens routinely). The bucket keeps it calm (send-once
+  // within a week, even though markStatus fires on every sync attempt) while a
+  // still- or newly-degraded connection speaks up again in a later week.
+  // Recovery clears every bucket at once (prefix) plus the legacy exact key.
+  // Best-effort; never blocks a read.
   try {
     const degraded = ['expired', 'error', 'revoked'].includes(status) || ['attention', 'down'].includes(health);
     const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`);
     const clientId = s.json?.[0]?.client_id;
     if (!clientId) return;
-    const period = `conn:${providerKey}`;
     if (degraded) {
       const label = CONN_LABEL[providerKey] || 'A connected service';
       await raiseNotice({
-        siteId, clientId, kind: 'connection_expired', period,
+        siteId, clientId, kind: 'connection_expired', period: connExpiredPeriod(providerKey, Date.now()),
         headline: `${label} needs a quick reconnect`,
         body: 'It stopped updating — reconnecting keeps your numbers current. Nothing on your website changed.',
       });
     } else if (status === 'connected' && health === 'ok') {
-      await clearNotice(clientId, 'connection_expired', period);
+      await clearNoticePrefix(clientId, 'connection_expired', connExpiredPeriodPrefix(providerKey));
+      await clearNotice(clientId, 'connection_expired', connExpiredLegacyPeriod(providerKey));
     }
   } catch { /* the notice is best-effort — a connection status write must never fail on it */ }
 }

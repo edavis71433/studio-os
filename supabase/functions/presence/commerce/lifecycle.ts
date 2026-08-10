@@ -31,7 +31,7 @@ import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { emailOperator } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
 import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
@@ -407,7 +407,10 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
     if (!clientId) continue;
     const who = lead.name || lead.email || 'Someone';
     const copy = leadFollowupCopy(lead.form_kind, who);
-    const fresh = await raiseNotice({ siteId: lead.site_id, clientId, kind: 'lead_followup', period: `lead:${lead.id}`, headline: copy.headline, body: copy.body });
+    // Weekly-bucketed (leadFollowupPeriod), not once-ever: a lead that is STILL
+    // sitting 'new' when the 7-day bucket rolls over gets one more tap before it
+    // ages out of the window, instead of exactly one ping in its whole life.
+    const fresh = await raiseNotice({ siteId: lead.site_id, clientId, kind: 'lead_followup', period: leadFollowupPeriod(lead.id, Date.now()), headline: copy.headline, body: copy.body });
     if (fresh) {
       nudged++;
       // emailOperator, not `presence_identity.email || silence` — see the note at
@@ -422,8 +425,17 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
 // ── CRM: nudge stale DEALS (leads had this; deals didn't) ────────────────────
 // A deal parked in qualified/proposal/contract with no movement for a few days
 // would otherwise sit forever — Pipedrive/Dubsado's whole promise is "no deal
-// falls through." Same 15-min sweep, same notices rail, send-once per deal.
-export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> {
+// falls through." Same 15-min sweep, same notices rail. WEEKLY, not once-ever:
+// the static `deal:<id>` period was the once-per-lifetime trap — activity on
+// the deal clears the notice (routes/sales.ts), the dismissed row keeps the
+// unique key, and a stalled→nudged→woke→stalled-again deal went silent forever.
+// dealFollowupPeriod carries the 7-day bucket (the supportAgingPeriod idiom):
+// send-once inside a week, speaks up again the next; the sales.ts teardowns
+// clear every bucket at once via dealFollowupPeriodPrefix (+ the legacy key).
+export async function runDealFollowups(limit = 20): Promise<{ nudged: number; task_nudges: number }> {
+  // #8 rides this registered step (see runDealTaskReminders below) so the
+  // sweep needs no new /system/run wiring — same cadence, same revenue group.
+  const task_nudges = (await runDealTaskReminders(limit).catch(() => ({ nudged: 0 }))).nudged;
   const from = new Date(Date.now() - 30 * 86400_000).toISOString();   // not ancient (<30d)
   const to = new Date(Date.now() - 3 * 86400_000).toISOString();      // quiet at least 3 days
   const q = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(qualified,proposal,contract)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,title,stage&order=updated_at.asc&limit=${limit}`);
@@ -436,7 +448,7 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
     const body = deal.stage === 'proposal' ? 'A proposal has been out for a few days with no reply — a quick nudge often closes it.'
       : deal.stage === 'contract' ? 'The agreement is sent but not signed yet — a gentle reminder helps it over the line.'
       : 'This deal has gone quiet for a few days — a quick follow-up keeps it moving.';
-    const fresh = await raiseNotice({ siteId: deal.site_id, clientId, kind: 'deal_followup', period: `deal:${deal.id}`, headline: `Follow up on ${title}`, body });
+    const fresh = await raiseNotice({ siteId: deal.site_id, clientId, kind: 'deal_followup', period: dealFollowupPeriod(deal.id, Date.now()), headline: `Follow up on ${title}`, body });
     if (fresh) {
       nudged++;
       // Parity with lead follow-ups: a quiet $5k proposal deserves at least the
@@ -447,6 +459,104 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
         const safeBody = body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
         emailOperator(deal.site_id, `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, 'deal_followup').catch(() => {});
       } catch { /* the notice already carries it */ }
+    }
+  }
+  return { nudged, task_nudges };
+}
+
+// ── DEAL TO-DOS & NEXT-STEP DATES: the dates the owner set, finally kept (#8) ─
+// presence_deal_tasks rows carry due_date and presence_deals carries
+// next_step_at — and NOTHING ever read either: a to-do could sail past its due
+// date, a "next step by Friday" could pass, and the studio stayed silent. This
+// sweep (same shape as the five above; it rides the registered deal_nudges
+// step) raises one calm owner notice + email per overdue item, weekly-bucketed
+// so a still-overdue item speaks again next week rather than once ever.
+// Deploy-order-tolerant: pre-0108 the table read fails (clean no-op); pre-0127
+// the 'deal_task_due' kind fails the CHECK, raiseNotice returns false, no email
+// — dormant until Eric applies the SQL, exactly the 0094–0119 posture.
+
+/** Is a deal to-do due for a nudge? Due today counts — "due" and "overdue" both
+ *  deserve the tap; done/deleted rows never do. Pure. */
+export function dealTaskDue(t: { status?: string; due_date?: string | null }, todayIso: string): boolean {
+  if (t.status !== 'open' || !t.due_date) return false;
+  return String(t.due_date).slice(0, 10) <= todayIso.slice(0, 10);
+}
+
+/** Has a deal's next-step date passed without the deal moving? Only open
+ *  pipeline stages — a won/lost/converted deal's old date is history. Pure. */
+export function nextStepOverdue(d: { stage?: string; next_step_at?: string | null; converted_client_id?: string | null }, todayIso: string): boolean {
+  if (!d.next_step_at || d.converted_client_id) return false;
+  if (!['new', 'qualified', 'proposal', 'contract'].includes(String(d.stage || ''))) return false;
+  return String(d.next_step_at).slice(0, 10) < todayIso.slice(0, 10);
+}
+
+/** Weekly-bucketed dedupe keys — one nudge per item per week while it stays
+ *  overdue. No teardown path exists (the sweep simply stops once the to-do is
+ *  done / the date moves), so the rows are ordinary dismissible asks. Pure. */
+export function dealTaskPeriod(taskId: string, nowMs: number): string {
+  return `dealtask:${taskId}:${noticeWeekBucket(nowMs)}`;
+}
+export function nextStepPeriod(dealId: string, nowMs: number): string {
+  return `nextstep:${dealId}:${noticeWeekBucket(nowMs)}`;
+}
+
+export async function runDealTaskReminders(limit = 20): Promise<{ nudged: number }> {
+  const nowIso = new Date().toISOString();
+  const today = nowIso.slice(0, 10);
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  let nudged = 0;
+  const siteClient = new Map<string, string>();
+  const clientFor = async (siteId: string): Promise<string> => {
+    if (!siteClient.has(siteId)) {
+      const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }));
+      siteClient.set(siteId, String(s.json?.[0]?.client_id || ''));
+    }
+    return siteClient.get(siteId) || '';
+  };
+
+  // ── overdue deal to-dos (presence_deal_tasks, 0108) ──
+  const tq = await svc(`presence_deal_tasks?status=eq.open&deleted_at=is.null&due_date=not.is.null&due_date=lte.${today}&select=id,site_id,deal_id,title,due_date&order=due_date.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
+  for (const t of (tq.ok && Array.isArray(tq.json) ? tq.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string; due_date: string; status?: string }>) {
+    if (!dealTaskDue({ status: 'open', due_date: t.due_date }, nowIso)) continue;   // pure guard defends the SQL window
+    const deal = (await svc(`presence_deals?id=eq.${encodeURIComponent(t.deal_id)}&site_id=eq.${encodeURIComponent(t.site_id)}&deleted_at=is.null&select=id,title,stage,converted_client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+    if (!deal || deal.stage === 'lost' || deal.converted_client_id) continue;       // the deal left the pipeline — its to-dos go quiet with it
+    const clientId = await clientFor(t.site_id);
+    if (!clientId) continue;
+    const title = String(t.title || 'a to-do').slice(0, 80);
+    const dealTitle = String(deal.title || 'a deal').slice(0, 80);
+    const overdue = String(t.due_date).slice(0, 10) < today;
+    const fresh = await raiseNotice({
+      siteId: t.site_id, clientId, kind: 'deal_task_due', period: dealTaskPeriod(t.id, Date.now()),
+      headline: `${overdue ? 'Overdue' : 'Due today'} — ${title} (${dealTitle})`,
+      body: `You set this to-do ${overdue ? `for ${String(t.due_date).slice(0, 10)} and it hasn’t been marked done` : 'for today'}. Tick it off or move the date so the deal keeps its momentum.`,
+    });
+    if (fresh) {
+      nudged++;
+      emailOperator(t.site_id, `A deal to-do is ${overdue ? 'overdue' : 'due today'} — ${title}`,
+        `<p>On <b>${esc(dealTitle)}</b>: “${esc(title)}” was due ${esc(String(t.due_date).slice(0, 10))}. A quick tick — or a new date — keeps the deal honest.</p>`,
+        'deal_task_due', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${deal.id}` }).catch(() => {});
+    }
+  }
+
+  // ── passed next-step dates (presence_deals.next_step_at, 0089) ──
+  const dq = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(new,qualified,proposal,contract)&next_step_at=not.is.null&next_step_at=lt.${today}&select=id,site_id,title,stage,next_step_at,next_step&order=next_step_at.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
+  for (const d of (dq.ok && Array.isArray(dq.json) ? dq.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string; next_step_at: string; next_step?: string }>) {
+    if (!nextStepOverdue({ stage: d.stage, next_step_at: d.next_step_at, converted_client_id: null }, nowIso)) continue;
+    const clientId = await clientFor(d.site_id);
+    if (!clientId) continue;
+    const dealTitle = String(d.title || 'a deal').slice(0, 80);
+    const step = String(d.next_step || '').slice(0, 100);
+    const fresh = await raiseNotice({
+      siteId: d.site_id, clientId, kind: 'deal_task_due', period: nextStepPeriod(d.id, Date.now()),
+      headline: `The next step date passed — ${dealTitle}`,
+      body: `${step ? `“${step}” was` : 'The next step you set was'} planned for ${String(d.next_step_at).slice(0, 10)} and the deal hasn’t moved since. Do it now, or set a new date so nothing drifts.`,
+    });
+    if (fresh) {
+      nudged++;
+      emailOperator(d.site_id, `The next step on ${dealTitle} slipped past its date`,
+        `<p>${step ? `“${esc(step)}”` : 'The next step you set'} on <b>${esc(dealTitle)}</b> was planned for ${esc(String(d.next_step_at).slice(0, 10))}. Two minutes now keeps it from going cold.</p>`,
+        'deal_task_due', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${d.id}` }).catch(() => {});
     }
   }
   return { nudged };

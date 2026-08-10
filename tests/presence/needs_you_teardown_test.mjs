@@ -359,10 +359,15 @@ ok('D4: raiseDealReady also clears the document reminder for the doc that just l
 ok('D4: contract-sign passes the signed document to the teardown', /raiseDealReady\(tok\.site_id, dealId, 'signed', id\)/.test(sales));
 ok('D4: proposal-accept passes the accepted document to the teardown', /raiseDealReady\(tok\.site_id, dealId, 'accepted', id\)/.test(sales));
 {
-  const clears = sales.match(/clearNotice\(site\.client_id, 'deal_followup', `deal:\$\{(?:dealId|id)\}`\)/g) || [];
-  ok('D4: convert (both idempotent + fresh paths) and delete clear the deal follow-up row', clears.length >= 3, `${clears.length} sites`);
+  // (recurrence fix) the stall nudge is weekly-bucketed (`deal:<id>:w<n>`), so
+  // every teardown must clear by PREFIX (all buckets at once) AND the pre-bucket
+  // legacy exact key — an exact-match clear would strand this week's row.
+  const prefixClears = sales.match(/clearNoticePrefix\(site\.client_id, 'deal_followup', dealFollowupPeriodPrefix\((?:dealId|id)\)\)/g) || [];
+  const legacyClears = sales.match(/clearNotice\(site\.client_id, 'deal_followup', dealFollowupLegacyPeriod\((?:dealId|id)\)\)/g) || [];
+  ok('D4: convert (both idempotent + fresh paths) and delete clear the deal follow-up row', prefixClears.length >= 3, `${prefixClears.length} sites`);
+  ok('D4: …every one of them also clears the pre-bucket legacy key', legacyClears.length === prefixClears.length, `${legacyClears.length} legacy vs ${prefixClears.length} prefix`);
 }
-ok('D4: the deal DELETE path clears too', /deleted_at[\s\S]{0,600}?clearNotice\([^)]*'deal_followup', `deal:/.test(sales));
+ok('D4: the deal DELETE path clears too', /deleted_at[\s\S]{0,900}?clearNoticePrefix\([^)]*'deal_followup', dealFollowupPeriodPrefix\(/.test(sales));
 
 // D5 — the four client_* kinds become the silent throttle key they were documented to be
 ok('D5: notifyStudioOfClientAction raises the client_* kinds pre-dismissed (rows and badge finally agree)',

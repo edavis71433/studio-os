@@ -94,20 +94,29 @@ async function forwardBillingSync(type: string, object: unknown): Promise<boolea
  *  body is an ID ONLY: the route re-reads the invoice from the database, so this
  *  hop can never assert an amount, a payee, or a paid state.
  *
- *  Returns whether the echo was accepted, so the caller can fall back to writing
- *  the in-app notice itself. Never throws — a payment must never fail because
- *  its echo did. */
-async function forwardInvoicePaid(invoiceId: string): Promise<boolean> {
-  if (!BILLING_SYNC_SECRET) { console.warn(`[stripe-webhook] BILLING_SYNC_SECRET unset — cannot send the operator's paid echo for ${invoiceId}; set it on this function`); return false; }
+ *  `delivered` is NOT "the route answered 2xx". The route answers 200 with
+ *  {ignored} on a transient invoice re-read failure, and 200 with notice:false
+ *  when its own insert failed inside — a HOLLOW 200 either way: payment
+ *  recorded, operator never told, nothing retries (this idempotent event never
+ *  re-runs). So the body's own flags decide: the operator has been told exactly
+ *  when `notice` (told just now) or `already` (told on a previous delivery) is
+ *  true, and ONLY that skips the caller's in-app floor. Never throws — a
+ *  payment must never fail because its echo did. */
+async function forwardInvoicePaid(invoiceId: string): Promise<{ delivered: boolean }> {
+  if (!BILLING_SYNC_SECRET) { console.warn(`[stripe-webhook] BILLING_SYNC_SECRET unset — cannot send the operator's paid echo for ${invoiceId}; set it on this function`); return { delivered: false }; }
   try {
     const r = await fetch(`${SB_URL}/functions/v1/presence/commerce/invoice-paid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-commerce-secret': BILLING_SYNC_SECRET, apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
       body: JSON.stringify({ invoice_id: invoiceId }),
     });
-    if (!r.ok) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} returned ${r.status}`); return false; }
-    return true;
-  } catch (e) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} threw: ${String(e)}`); return false; }
+    if (!r.ok) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} returned ${r.status}`); return { delivered: false }; }
+    const out = await r.json().catch(() => null);
+    const d = out && typeof out === 'object' ? (out as { data?: { notice?: unknown; already?: unknown; ignored?: unknown } }).data : null;
+    const delivered = !!d && (d.notice === true || d.already === true);
+    if (!delivered) console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} answered 200 but did NOT record the operator notice (${JSON.stringify(d || out)}) — falling back to the in-app floor`);
+    return { delivered };
+  } catch (e) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} threw: ${String(e)}`); return { delivered: false }; }
 }
 
 const enc = new TextEncoder();
@@ -471,19 +480,23 @@ Deno.serve(async (req: Request) => {
       // stays the thin single source of payment truth. The route re-reads the
       // invoice from the database — this call passes an id, never an amount.
       const echoed = await forwardInvoicePaid(String(inv.id));
-      if (!echoed && clientId) {
-        // THE FLOOR. If the presence function is unreachable or not yet
-        // deployed, the operator still gets the in-app row the old code wrote —
-        // just without the push, the mail, or the checklist tick. Never silent:
-        // a warn says exactly what was lost, because "the payment worked but the
-        // studio was never told" is the failure this whole change exists to end.
+      if (!echoed.delivered && clientId) {
+        // THE FLOOR. If the presence function is unreachable, not yet deployed,
+        // OR answered a hollow 200 (its re-read hiccuped / its own insert
+        // failed — the body's notice/already flags say so), the operator still
+        // gets the in-app row the old code wrote — just without the push, the
+        // mail, or the checklist tick. Never silent: a warn says exactly what
+        // was lost, because "the payment worked but the studio was never told"
+        // is the failure this whole change exists to end. ignore-duplicates on
+        // the unique (client_id, kind, period) key, so a floor written after a
+        // half-successful echo (or a retry) never errors and never doubles.
         console.warn(`[stripe-webhook] invoice-paid echo hop FAILED for ${invoiceId} — falling back to the in-app notice only (no push, no operator email)`);
-        await db('presence_plan_notices', 'POST', {
+        await dbInsertReturning('presence_plan_notices?on_conflict=client_id,kind,period', {
           site_id: inv.site_id, client_id: clientId, kind: 'invoice_paid',
           period: `paid:${inv.id}`, status: 'active',
           headline: `Paid — ${inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice')} (${amount})`,
           body: inv.purpose === 'deposit' ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
-        });
+        }, 'return=minimal,resolution=ignore-duplicates');
       }
       // A failure past here must be VISIBLE but never fatal — warn, never a bare
       // catch{}. The payment is already recorded; only its echo can be lost.

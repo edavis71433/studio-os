@@ -21,7 +21,7 @@
 // decision is a PURE state machine (nextUptimeState) tested without a network.
 
 import { svc } from '../lib/db.ts';
-import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { raiseNotice, clearNotice, clearNoticePrefix, siteDownPeriod, siteDownPeriodPrefix, siteDownLegacyPeriod } from '../lib/notice.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 
@@ -145,10 +145,10 @@ export async function runUptimeHeartbeat(limit = 25): Promise<HeartbeatResult> {
 
         if (nextStep.transition === 'confirmed_down') {
           confirmed_down++;
-          await onConfirmedDown(site, url).catch(() => {});
+          await notifyConfirmedDown(site, url).catch(() => {});
         } else if (nextStep.transition === 'recovered') {
           recovered++;
-          await onRecovered(site).catch(() => {});
+          await notifySiteRecovered(site).catch(() => {});
         }
       } catch { /* best-effort — one site never stops the sweep */ }
     }
@@ -159,10 +159,21 @@ export async function runUptimeHeartbeat(limit = 25): Promise<HeartbeatResult> {
 
 // Confirmed outage → the ONE notice model (bell + push, both idempotent via the
 // unique client/kind/period key) + a calm branded email, sent exactly once per
-// outage (raiseNotice returns fresh only on first insert).
-async function onConfirmedDown(site: HeartbeatSite & { client_id: string }, url: string): Promise<void> {
-  const period = `site:${site.id}`;
-  const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'site_down', period, headline: DOWN_HEADLINE, body: DOWN_BODY });
+// outage.
+//
+// The period is OUTAGE-SCOPED (site + the UTC day it was confirmed —
+// siteDownPeriod), not the bare site id. The static `site:<id>` key made this
+// alert ONCE PER SITE, EVER: recovery only PATCHed the row dismissed, the row
+// kept the unique key, and outage #2 of the same site was silent forever — the
+// most dangerous possible failure for the one alert whose whole job is "the
+// thing you sell is broken right now". The day bucket means a NEW outage on a
+// later day alerts again, while a site flapping within one day pages at most
+// once (the confirmed-down state machine already keeps a CONTINUING outage from
+// re-raising at all — this only dedupes distinct outages inside one day).
+// Exported (with an injectable clock) so the second-outage behaviour is
+// testable without a network.
+export async function notifyConfirmedDown(site: HeartbeatSite & { client_id: string }, url: string, nowMs: number = Date.now()): Promise<void> {
+  const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'site_down', period: siteDownPeriod(site.id, nowMs), headline: DOWN_HEADLINE, body: DOWN_BODY });
   if (!fresh) return;   // already raised for this outage — don't re-email/re-push
   // customer email, on their brand (reuses the ONE branded send path)
   const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`).catch(() => ({ json: null as any }));
@@ -181,8 +192,14 @@ async function onConfirmedDown(site: HeartbeatSite & { client_id: string }, url:
 }
 
 // Recovery → clear the down notice (idempotent) + one calm "back online" email.
-async function onRecovered(site: HeartbeatSite & { client_id: string }): Promise<void> {
-  await clearNotice(site.client_id, 'site_down', `site:${site.id}`);
+// Prefix clear, because the period now carries the outage's day bucket and the
+// recovery can't know (and must not care) which day the outage was confirmed —
+// every `site:<id>:*` row goes at once. The legacy exact key (`site:<id>`,
+// pre-bucket rows) is cleared too: the LIKE's trailing colon deliberately can't
+// reach it (same both-shapes teardown as supportAgingLegacyPeriod).
+export async function notifySiteRecovered(site: HeartbeatSite & { client_id: string }): Promise<void> {
+  await clearNoticePrefix(site.client_id, 'site_down', siteDownPeriodPrefix(site.id));
+  await clearNotice(site.client_id, 'site_down', siteDownLegacyPeriod(site.id));
   const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`).catch(() => ({ json: null as any }));
   const email = cl.json?.[0]?.email;
   if (email) {

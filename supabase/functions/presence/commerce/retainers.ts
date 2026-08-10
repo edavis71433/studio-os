@@ -81,6 +81,57 @@ export function retainerStatusFromStripe(stripeStatus: string): RetainerStatus {
   }
 }
 
+// ── DUNNING (operator audit #3): a care-plan payment failure must be SEEN ────
+// applyRetainerSync used to flip retainer.status to past_due/canceled and tell
+// NOBODY — no notice, no email, no dashboard consumer outside the deal drawer.
+// Recurring service money quietly stopping is exactly the class of silence this
+// platform exists to end, so a status TRANSITION now raises one calm owner
+// notice (+ the send-once email, gated on the notice's created flag). Pure
+// decision + copy here; the impure raise lives inside applyRetainerSync below.
+
+/** Which transitions deserve the owner's attention. Only a CHANGE counts — a
+ *  webhook retry that lands on the same status is silence. Pure. */
+export function retainerTransition(priorStatus: string | undefined, nextStatus: string | undefined): 'past_due' | 'canceled' | 'recovered' | null {
+  const prior = String(priorStatus || '');
+  const next = String(nextStatus || '');
+  if (!next || prior === next) return null;
+  if (next === 'past_due') return 'past_due';
+  if (next === 'canceled') return 'canceled';
+  if (next === 'active' && prior === 'past_due') return 'recovered';
+  return null;
+}
+
+/** Weekly-bucketed dedupe keys, one namespace per deal — the recovery teardown
+ *  clears every bucket at once via the prefix (the supportAgingPeriod idiom).
+ *  Send-once inside a week even if Stripe delivers several failed-invoice
+ *  events; a retainer STILL past due next week may speak again. Pure. */
+export function retainerNoticePeriodPrefix(dealId: string): string { return `retainer:${dealId}:`; }
+export function retainerNoticePeriod(dealId: string, transition: 'past_due' | 'canceled', nowMs: number): string {
+  const w = Number.isFinite(nowMs) ? Math.floor(nowMs / (7 * 86400_000)) : 0;
+  return `${retainerNoticePeriodPrefix(dealId)}${transition}:w${w}`;
+}
+
+/** The studio's plain voice: what happened, which client/deal, what to do. Pure. */
+export function retainerNoticeCopy(transition: 'past_due' | 'canceled', dealTitle: string, amountCents: number, interval: string): { headline: string; body: string; subject: string; html: string } {
+  const name = (dealTitle || '').trim() || 'a retainer client';
+  const amt = '$' + ((Number(amountCents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const per = interval === 'year' ? 'year' : 'month';
+  if (transition === 'past_due') {
+    return {
+      headline: `A retainer payment didn’t go through — ${name}`,
+      body: `The ${amt}/${per} retainer didn’t collect this cycle. Stripe retries automatically — if it keeps failing, the client’s card likely needs updating. The work agreement itself hasn’t changed.`,
+      subject: `A retainer payment didn’t go through — ${name}`,
+      html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> didn’t collect this cycle.</p><p>Stripe retries automatically over the next few days. If it keeps failing, the client’s card needs updating — open the subscription in Stripe to see the attempts, or send the client a fresh authorization link from the deal.</p>`,
+    };
+  }
+  return {
+    headline: `A retainer ended — ${name}`,
+    body: `The ${amt}/${per} retainer has been canceled in Stripe and won’t bill again. If that’s expected, nothing to do. If not, a fresh authorization link from the deal restarts it.`,
+    subject: `A retainer ended — ${name}`,
+    html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> has been canceled in Stripe and won’t bill again.</p><p>If you and the client agreed to wrap up, nothing to do. If this is a surprise, open the deal and send a fresh authorization link to restart it.</p>`,
+  };
+}
+
 /** Merge a webhook/API patch onto the deal's stored retainer, stamping updated_at.
  *  Load-bearing guard: a CANCELED retainer is never resurrected by a late,
  *  out-of-order webhook (a subscription.updated arriving after cancel) — canceling
@@ -157,7 +208,7 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
   }
   if (!dealId || !siteId) return { synced: false, reason: 'no_deal' };
 
-  const dr = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}&deleted_at=is.null&select=id,retainer&limit=1`).catch(() => ({ json: [] as any[] }));
+  const dr = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}&deleted_at=is.null&select=id,title,retainer&limit=1`).catch(() => ({ json: [] as any[] }));
   const deal = Array.isArray(dr.json) ? dr.json[0] : null;
   const prior: Partial<RetainerState> | null = (deal && deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
   if (!prior) return { synced: false, reason: 'no_retainer' };   // never invent a retainer from a webhook
@@ -184,6 +235,48 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
   const up = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}`, {
     method: 'PATCH', body: JSON.stringify({ retainer: next }),
   }).catch(() => ({ ok: false }));
+
+  // ── DUNNING (operator audit #3) — the transition, made audible ─────────────
+  // Deliberately INSIDE applyRetainerSync (the SERVICE rail), never the SaaS
+  // billing branch: the purpose-metadata separation above is load-bearing, and
+  // this touches only the deal's own notice rail. Best-effort and gated on the
+  // stored PATCH landing (a transition we failed to record is retried by
+  // Stripe, and must not burn its send-once key on a state we don't hold).
+  // Pre-0127 the 'retainer_status' kind fails the notices CHECK → raiseNotice
+  // returns false → no email, no throw: dormant until Eric applies the SQL
+  // (the 0094–0119 deploy-order posture — SQL lands before or with the deploy).
+  if ((up as { ok?: boolean }).ok === true) {
+    try {
+      const change = retainerTransition(prior.status, next.status);
+      if (change) {
+        const { raiseNotice, clearNoticePrefix } = await import('../lib/notice.ts');
+        const siteRow = (await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+        const clientId = String(siteRow?.client_id || '');
+        if (clientId) {
+          if (change === 'recovered') {
+            // the money is flowing again — the bell must stop saying otherwise
+            await clearNoticePrefix(clientId, 'retainer_status', retainerNoticePeriodPrefix(dealId));
+          } else {
+            const title = String((deal as { title?: string }).title || '').slice(0, 80);
+            const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'));
+            const fresh = await raiseNotice({
+              siteId, clientId, kind: 'retainer_status',
+              period: retainerNoticePeriod(dealId, change, Date.now()),
+              headline: copy.headline, body: copy.body,
+            });
+            if (fresh) {
+              const { emailOperator } = await import('../lib/service_bridge.ts');
+              const href = next.stripe_subscription_id
+                ? `https://dashboard.stripe.com/subscriptions/${next.stripe_subscription_id}`
+                : `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}`;
+              emailOperator(siteId, copy.subject, copy.html, 'retainer_status',
+                { label: change === 'past_due' ? 'Open it in Stripe' : 'Open the deal', href }).catch(() => {});
+            }
+          }
+        }
+      }
+    } catch { /* the dunning echo is best-effort — retainer truth is already stored */ }
+  }
 
   // Settlement echo (best-effort): a recurring charge landed → a calm history line
   // on the deal, exactly like a paid service invoice. Reuses the allowed

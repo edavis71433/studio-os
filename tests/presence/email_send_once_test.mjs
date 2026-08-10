@@ -12,7 +12,7 @@ const notice = read('supabase/functions/presence/lib/notice.ts');
 // welcome-back email rides the notice insert (send-once), not fired blindly.
 // The insert now flows through the ONE writer (raiseNotice), whose created
 // boolean comes from the idempotent representation-returning insert.
-ok('welcome-back: freshness detected via raiseNotice (idempotent insert, return=representation)', /freshNotice = await raiseNotice\(\{[\s\S]*?kind: 'welcome_back'/.test(sync) && /resolution=ignore-duplicates,return=representation/.test(notice) && /const created = ins\.ok && Array\.isArray\(ins\.json\) && ins\.json\.length > 0/.test(notice));
+ok('welcome-back: freshness detected via raiseNotice (idempotent insert, return=representation)', /freshNotice = await raiseNotice\(\{[\s\S]*?kind: 'welcome_back'/.test(sync) && /resolution=ignore-duplicates,return=representation/.test(notice) && /const created = ins\.json\.length > 0/.test(notice) && /=== 'created'/.test(notice));
 ok('welcome-back: emails ONLY when the notice is newly created', /freshNotice = await raiseNotice\(/.test(sync) && /if \(freshNotice && clQ\.json\?\.\[0\]\?\.email\) sendEmail/.test(sync));
 ok('welcome-back: the old unconditional email send is gone', !/\n      if \(clQ\.json\?\.\[0\]\?\.email\) sendEmail\(clQ\.json\[0\]\.email, copy\.subject/.test(sync));
 

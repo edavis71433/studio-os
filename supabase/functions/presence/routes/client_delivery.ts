@@ -36,12 +36,26 @@ const readerKey = (p: Principal) => String(p.userId || p.email || 'anon');
 const customerOf = (site: SiteRow): string | null => (site.client_id ? String(site.client_id) : null);
 const noCustomer = (cors: Record<string, string>) => json({ data: [], message: 'No service delivery is linked to your account yet.' }, 200, cors);
 
-async function clientEvent(agencySiteId: string, projectId: string, kind: string, principal: Principal, detail: Record<string, unknown> = {}) {
+// This write is NOT an echo — presence_project_events rows stamped
+// detail.from='client' ARE the Inbox/bell feed's source of truth
+// (lib/inbox_feed.ts counts them and shapes the conversation rows from them).
+// It used to be `.catch(() => {})` with no .ok check: a transient PostgREST
+// hiccup silently dropped the client's message/upload from the studio's Inbox
+// forever, with nothing logged and nothing to retry. Now: check .ok, retry
+// exactly once, and if BOTH attempts fail, warn LOUDLY with what was lost so
+// the log is at least honest. It still never throws — the client's own request
+// must never fail because the studio's feed write did (exported for tests).
+export async function clientEvent(agencySiteId: string, projectId: string, kind: string, principal: Principal, detail: Record<string, unknown> = {}) {
   // detail.from='client' marks events from the CLIENT DOOR (this file is the only
   // one) — principal.kind can't tell a customer from the studio owner (both are
   // 'client'), and the studio's bell must never ring for its own actions.
-  await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ project_id: projectId, site_id: agencySiteId, kind, actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', ...detail } }) }).catch(() => {});
+  const post = () => svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ project_id: projectId, site_id: agencySiteId, kind, actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', ...detail } }) });
+  try {
+    let r = await post().catch(() => ({ ok: false, status: 0 }));
+    if (!r.ok) r = await post().catch(() => ({ ok: false, status: 0 }));
+    if (!r.ok) console.warn(`[client-event] LOST an Inbox feed row (kind=${kind}, project=${projectId}, site=${agencySiteId}, status=${(r as { status?: number }).status ?? '?'}) after a retry — the client's action succeeded but the studio's Inbox/bell will not show it`);
+  } catch { /* never fail the client's request over the studio's feed */ }
 }
 
 // ═══ SERVICE BILLING (the customer's invoices FROM the agency) ═══
@@ -103,7 +117,7 @@ export async function handleClientTaskDone(_req: Request, site: SiteRow, princip
   if (t.status === 'done') return json({ data: { ok: true } }, 200, cors);
   const up = await svc(`presence_tasks?id=eq.${taskId}&site_id=eq.${s}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'done', completed_at: nowIso() }) });
   if (!up.ok) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
-  await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'task_done', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title: String(t.title || 'A to-do') } }) }).catch(() => {});
+  await clientEvent(s, projectId, 'task_done', principal, { title: String(t.title || 'A to-do') });   // checked + retried — this row IS the Inbox feed
   return json({ data: { ok: true } }, 200, cors);
 }
 
@@ -225,8 +239,7 @@ export async function handleClientUploadCreate(req: Request, site: SiteRow, prin
   const ins = await svc('presence_deliverables', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: s, project_id: projectId, media_id: mediaId, title, note: 'Uploaded by the client.', status: 'shared', client_visible: true }) });
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
-  await svc('presence_project_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ project_id: projectId, site_id: s, kind: 'client_upload', actor: readerKey(principal), actor_kind: principal.kind, client_visible: true, detail: { from: 'client', title } }) }).catch(() => {});
+  await clientEvent(s, projectId, 'client_upload', principal, { title });   // checked + retried — this row IS the Inbox feed (the notify below is the email half)
   // Tell the studio (email + bell + push). Throttled per project per 15 minutes,
   // so a client dropping six files sends ONE email. Awaited but never fails this request (see notifyStudioOfClientAction).
   await notifyStudioOfClientAction({

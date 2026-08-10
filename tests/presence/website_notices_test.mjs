@@ -13,7 +13,7 @@ const presence = read('presence.html');
 
 // one model, idempotent, best-effort
 ok('helper: raiseNotice writes the ONE model (plan_notices, unique client/kind/period)', /presence_plan_notices\?on_conflict=client_id,kind,period/.test(notice) && /resolution=ignore-duplicates,return=representation/.test(notice));
-ok('helper: returns true only on a fresh insert (no double-fire) + never throws', /const created = ins\.ok && Array\.isArray\(ins\.json\) && ins\.json\.length > 0/.test(notice) && /return created/.test(notice) && /catch \(e\)/.test(notice));
+ok('helper: returns true only on a fresh insert (no double-fire) + never throws', /const created = ins\.json\.length > 0/.test(notice) && /return created \? 'created' : 'exists'/.test(notice) && /=== 'created'/.test(notice) && /catch \(e\)/.test(notice));
 ok('helper: clearNotice can drop a resolved attention item', /export async function clearNotice/.test(notice));
 
 // publish failure → notice, idempotent per publish, cleared on success

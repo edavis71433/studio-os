@@ -437,9 +437,11 @@ try {
   // Part 1b: the same silent skip, five more times.
   ok('lifecycle: the silent `const owner = ident.json?.[0]?.email` idiom is GONE from every sweep',
     !/const owner = ident\.json\?\.\[0\]\?\.email/.test(lc) && !/presence_identity\?site_id=eq\.[^&]*&select=email/.test(lc));
-  const kinds = ['lead_followup', 'deal_followup', 'support_aging', 'renewal_reminder', 'agreement_renewal'];
-  for (const k of kinds) ok(`lifecycle: the ${k} email now routes through emailOperator (it was dying silently)`, new RegExp(`emailOperator\\([\\s\\S]*?'${k}'\\)`).test(lc));
-  ok('lifecycle: all five operator sends go through the ONE door', (lc.match(/emailOperator\(/g) || []).length === 5);
+  const kinds = ['lead_followup', 'deal_followup', 'support_aging', 'renewal_reminder', 'agreement_renewal', 'deal_task_due'];
+  for (const k of kinds) ok(`lifecycle: the ${k} email now routes through emailOperator (it was dying silently)`, new RegExp(`emailOperator\\([\\s\\S]*?'${k}'`).test(lc));
+  // seven call sites: the five originals + the two deal_task_due sends (overdue
+  // to-dos and passed next-step dates — runDealTaskReminders).
+  ok('lifecycle: every operator send goes through the ONE door', (lc.match(/emailOperator\(/g) || []).length === 7);
 }
 {
   const sb = read('supabase/functions/presence/lib/service_bridge.ts');
@@ -470,8 +472,14 @@ try {
     iTry > 0 && iEcho > iTry && iCatch > iEcho, `try@${iTry} echo@${iEcho} catch@${iCatch}`);
   ok('webhook: …and a failure is VISIBLE — console.warn, never a bare catch {}',
     /catch \(e\) \{ console\.warn\(`\[stripe-webhook\] paid-echo/.test(fn) && !/catch \{\s*\}/.test(fn));
-  ok('webhook: a failed hop still writes the in-app notice, so the operator is never left with nothing',
-    /if \(!echoed && clientId\) \{[\s\S]{0,600}presence_plan_notices/.test(fn));
+  // (hollow-200 fix) `echoed` is now the parsed body's own notice/already flags,
+  // not "the route answered 2xx" — a 200 {ignored} or notice:false must fall
+  // through to the floor, and the floor insert is conflict-safe (a retry or a
+  // half-successful echo never errors and never doubles).
+  ok('webhook: a failed OR hollow echo still writes the in-app notice, so the operator is never left with nothing',
+    /if \(!echoed\.delivered && clientId\) \{[\s\S]{0,1600}?presence_plan_notices\?on_conflict=client_id,kind,period/.test(fn));
+  ok('webhook: the echo is accepted ONLY on the body’s own flags (notice/already), never a bare 2xx',
+    /d\.notice === true \|\| d\.already === true/.test(hook));
   ok('webhook: …and says exactly what was lost', /invoice-paid echo hop FAILED[\s\S]{0,80}no push, no operator email/.test(fn));
 }
 {

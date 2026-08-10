@@ -38,6 +38,20 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   await prune('ops_errors', `ops_errors?created_at=lt.${daysAgo(OPS_ERRORS_DAYS)}`);
   await prune('rate_limit_state', `rate_limit_state?window_start=lt.${daysAgo(RATE_LIMIT_DAYS)}`);
 
+  // Dismissed notices: nothing ever DELETEd from presence_plan_notices, and a
+  // dismissed row is both invisible AND the permanent holder of its unique
+  // (client_id, kind, period) key — which is exactly the send-once ledger, so
+  // pruning must be conservative. 400 days is deliberately longer than every
+  // send-once window that matters (invoices remind on a 7-day floor, docs on a
+  // 21-day window, wind-down completes at 60 days, booking slots are in the
+  // past): deleting a dismissed row this old can re-enable at most a once-ever
+  // nudge whose condition has genuinely persisted for 13+ months — which may
+  // honestly speak again. With the recurrence fix, weekly-bucketed kinds
+  // (support/deal/conn/site/retainer/task) now accrete one dismissed row per
+  // active week; this is what keeps that table bounded. ACTIVE rows are never
+  // touched — an unhandled ask has no expiry date.
+  await prune('plan_notices', `presence_plan_notices?status=eq.dismissed&created_at=lt.${daysAgo(400)}`);
+
   // Free-tool submissions: the privacy policy promises inquiry/tool data is
   // "cleared out periodically" — this is the mechanism behind that sentence.
   // A lead that hasn't turned into a conversation in a year has no basis left.

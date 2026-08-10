@@ -15,7 +15,7 @@
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
-import { raiseNotice } from '../lib/notice.ts';
+import { raiseNotice, raiseNoticeDetailed } from '../lib/notice.ts';
 import { noticeDismissible } from '../lib/inbox_feed.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveSite } from '../lib/site.ts';
@@ -444,35 +444,56 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   const what = String(inv.title || (isDeposit ? 'Deposit' : 'Invoice'));
   // WHO paid — the deal's contact, so the subject line names a person. Purely
   // decorative: every line below degrades to a correct, less specific sentence.
+  // The same read also carries the two facts the sends below need: whether the
+  // deal has been CONVERTED yet (audit #10 — a paid, unconverted deal means
+  // "convert them now"), and the payer's EMAIL (the client receipt).
   let who = '';
+  let payerEmail = '';
+  let unconverted = false;   // true only when a deal exists and is NOT yet a customer
   try {
     if (inv.deal_id) {
-      const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=title,contact_id&limit=1`)).json?.[0];
+      const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=title,contact_id,converted_client_id&limit=1`)).json?.[0];
+      if (deal) unconverted = !deal.converted_client_id;
       if (deal?.contact_id) {
-        const contact = (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=name&limit=1`)).json?.[0];
+        const contact = (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=name,email&limit=1`)).json?.[0];
         who = String(contact?.name || '').slice(0, 80);
+        payerEmail = String(contact?.email || '').trim();
       }
       if (!who) who = String(deal?.title || '').slice(0, 80);
     }
   } catch { /* the money landed either way */ }
 
   const headline = `${isDeposit ? 'Deposit' : 'Paid'} — ${what} (${amount})${who ? ` from ${who}` : ''}`;
-  // raiseNotice, not a raw insert: same unique (client_id, kind, period) row the
-  // webhook wrote before, PLUS the Web Push it was silently skipping, PLUS the
-  // created-flag that is the send-once gate for the email below. period is the
-  // invoice id, so a Stripe retry re-raises nothing and re-sends nothing.
-  const fresh = await raiseNotice({
+  // raiseNoticeDetailed, not a raw insert: same unique (client_id, kind, period)
+  // row the webhook wrote before, PLUS the Web Push it was silently skipping,
+  // PLUS the created-flag that is the send-once gate for the email below.
+  // period is the invoice id, so a Stripe retry re-raises nothing and re-sends
+  // nothing. The THREE-WAY outcome matters to the caller: 'created' and
+  // 'exists' both mean the operator has been (or already was) told, but
+  // 'failed' means they have NOT — and the webhook must be able to tell the
+  // difference, because it skips its own in-app floor whenever this route
+  // answers 2xx. A hollow 200 ("notice":false, nobody told, nothing retries)
+  // was exactly how a recorded payment stayed invisible.
+  const outcome = await raiseNoticeDetailed({
     siteId: String(inv.site_id), clientId: String(clientId), kind: 'invoice_paid', period: `paid:${inv.id}`,
     headline,
     body: isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
   });
+  const fresh = outcome === 'created';
 
   let emailed = false;
+  let receipted = false;
   if (fresh) {
     const { emailOperator } = await import('../lib/service_bridge.ts');
     const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
     const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
     const link = inv.deal_id ? `${base}/pipeline.html?deal=${inv.deal_id}` : `${base}/today.html`;
+    // Audit #10 — convert-aware: a deal that has SIGNED AND PAID but was never
+    // converted has no portal, no project, no checklist. The money email is the
+    // exact moment the operator is already looking, so it says so.
+    const convertLine = unconverted
+      ? `<p><b>They’ve signed and paid — convert them now to open their portal.</b> Converting creates their customer workspace and starts the delivery checklist.</p>`
+      : '';
     emailed = await emailOperator(String(inv.site_id),
       `${isDeposit ? 'Deposit' : 'Payment'} received — ${amount}${who ? ` from ${who}` : ''}`,
       `<p><b>${esc(amount)}</b> just landed${who ? ` from <b>${esc(who)}</b>` : ''}.</p>` +
@@ -481,8 +502,37 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
       `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
       (who ? `<tr><td style="padding:2px 12px 2px 0;color:#666">From</td><td>${esc(who)}</td></tr>` : '') +
       `</table>` +
+      convertLine +
       `<p>${isDeposit ? 'The deposit is in — the work can start.' : 'Nothing else to do; the invoice is marked paid.'}</p>`,
-      isDeposit ? 'deposit_paid' : 'invoice_paid', { label: 'Open it in your workspace', href: link });
+      isDeposit ? 'deposit_paid' : 'invoice_paid', { label: unconverted ? 'Convert them in your workspace' : 'Open it in your workspace', href: link });
+
+    // ── THE CLIENT'S RECEIPT (audit long-tail) ────────────────────────────────
+    // payment-success.html promises "a receipt is on its way to your email" —
+    // and until now only Eric got mail. This is the biggest trust moment in the
+    // client's whole engagement; it must not be silence. Branded on the studio's
+    // own brand, transactional (their own payment → critical), send-once on the
+    // SAME fresh gate as the operator email, and honest when it can't send:
+    // no resolvable client email → a loud warn, never a quiet skip.
+    try {
+      if (payerEmail) {
+        const [{ sendEmail }, { loadEmailBrand }] = await Promise.all([
+          import('../commerce/account.ts'),
+          import('../lib/email_brand.ts'),
+        ]);
+        const brand = await loadEmailBrand(String(inv.site_id)).catch(() => undefined);
+        receipted = await sendEmail(payerEmail, `Payment received — thank you`,
+          `<p>Your payment went through securely.</p>` +
+          `<table style="margin:8px 0;border-collapse:collapse">` +
+          `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}</b></td></tr>` +
+          `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
+          `</table>` +
+          `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} Your studio has been notified, and everything updates automatically on their side.</p>` +
+          `<p style="color:#666;font-size:.9rem">Keep this email for your records.</p>`,
+          brand, { critical: true });
+      } else {
+        console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
+      }
+    } catch (e) { console.warn(`[invoice-paid] client receipt failed for ${inv.id}: ${String((e as Error)?.message || e)} (non-fatal)`); }
   }
 
   // A paid DEPOSIT is checklist step 2, and it ticks itself. Idempotent (the
@@ -494,7 +544,10 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
     const { tickChecklistForDeal } = await import('../lib/service_bridge.ts');
     ticked = await tickChecklistForDeal(String(inv.site_id), String(inv.deal_id), 'deposit_paid', 'stripe', 'system');
   }
-  return json({ data: { notice: fresh, emailed, ticked } }, 200, cors);
+  // `notice` = told just now; `already` = a retry, the operator was told before.
+  // notice:false + already:false means the operator has NOT been told — the
+  // webhook reads exactly these flags and writes its own in-app floor then.
+  return json({ data: { notice: fresh, already: outcome === 'exists', emailed, receipted, ticked } }, 200, cors);
 }
 
 async function handleBillingSync(req: Request, cors: Record<string, string>): Promise<Response> {

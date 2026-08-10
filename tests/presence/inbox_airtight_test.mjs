@@ -36,14 +36,17 @@ ok('FIX1: inbox.html filters the aggregate row so it is not double-listed with /
   /feed\.notices\|\|\[\]\)\.filter\(n=>n\.kind!=='website_enquiry'\)/.test(inbox));
 
 // ── FIX 2: degraded connections reach the bell + Inbox ───────────────────────
-ok('FIX2: markStatus raises a connection_expired notice on degrade (per-provider period)',
-  /kind: 'connection_expired', period,/.test(store) && /const period = `conn:\$\{providerKey\}`/.test(store));
+// (recurrence fix) the period is now WEEKLY-BUCKETED per provider
+// (connExpiredPeriod, lib/notice.ts) — the static `conn:<provider>` key was
+// once-per-lifetime: after one reconnect every later expiry was silent forever.
+ok('FIX2: markStatus raises a connection_expired notice on degrade (per-provider, week-bucketed period)',
+  /kind: 'connection_expired', period: connExpiredPeriod\(providerKey, Date\.now\(\)\)/.test(store));
 ok('FIX2: degrade covers expired/error/revoked + attention/down health',
   /\['expired', 'error', 'revoked'\]\.includes\(status\) \|\| \['attention', 'down'\]\.includes\(health\)/.test(store));
-ok('FIX2: recovery clears the notice exactly (idempotent, same period key)',
-  /status === 'connected' && health === 'ok'[\s\S]*?clearNotice\(clientId, 'connection_expired', period\)/.test(store));
+ok('FIX2: recovery clears EVERY bucket at once (prefix) plus the pre-bucket legacy key',
+  /status === 'connected' && health === 'ok'[\s\S]*?clearNoticePrefix\(clientId, 'connection_expired', connExpiredPeriodPrefix\(providerKey\)\)[\s\S]*?clearNotice\(clientId, 'connection_expired', connExpiredLegacyPeriod\(providerKey\)\)/.test(store));
 ok('FIX2: it rides the ONE notice model (reuses raiseNotice/clearNotice, no new store)',
-  /import \{ raiseNotice, clearNotice \} from '\.\.\/lib\/notice\.ts'/.test(store));
+  /import \{ raiseNotice, clearNotice, clearNoticePrefix, connExpiredPeriod, connExpiredPeriodPrefix, connExpiredLegacyPeriod \} from '\.\.\/lib\/notice\.ts'/.test(store));
 ok('FIX2: connection_expired has a NOTICE_HREF so its CTA lands on connections.html',
   /connection_expired: '\/connections\.html'/.test(workspace));
 ok('FIX1: website_enquiry has a NOTICE_HREF (leads.html)', /website_enquiry: '\/leads\.html'/.test(workspace));

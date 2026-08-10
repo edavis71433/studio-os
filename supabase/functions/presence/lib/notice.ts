@@ -39,10 +39,17 @@ export interface NoticeInput {
   push?: boolean;
 }
 
+/** The three honest outcomes of a raise. Most callers only need the boolean
+ *  (`raiseNotice` below) — but the invoice-paid echo has to tell its caller the
+ *  difference between "the operator was told just now" ('created'), "the
+ *  operator was already told" ('exists' — a retry, nothing more to do) and "the
+ *  operator was NOT told" ('failed' — the insert broke, so the caller must fall
+ *  back to its own floor rather than treat a hollow 200 as delivery). */
+export type RaiseOutcome = 'created' | 'exists' | 'failed';
+
 /** Raise (or no-op if already present for this client/kind/period) a notice.
- *  Returns true only when a NEW row was inserted — so callers can send an email
- *  or bump a counter exactly once. */
-export async function raiseNotice(n: NoticeInput): Promise<boolean> {
+ *  'created' only when a NEW row was inserted — the exact send-once gate. */
+export async function raiseNoticeDetailed(n: NoticeInput): Promise<RaiseOutcome> {
   try {
     const status = n.status === 'dismissed' ? 'dismissed' : 'active';
     const ins = await svc('presence_plan_notices?on_conflict=client_id,kind,period', {
@@ -52,7 +59,13 @@ export async function raiseNotice(n: NoticeInput): Promise<boolean> {
         headline: n.headline.slice(0, 200), body: n.body.slice(0, 1000), status,
       }),
     });
-    const created = ins.ok && Array.isArray(ins.json) && ins.json.length > 0;
+    if (!ins.ok || !Array.isArray(ins.json)) {
+      // a 4xx/5xx (e.g. a kind the CHECK doesn't know yet — migration pending) is
+      // a FAILURE, not a duplicate: the operator was not told.
+      console.error(`[notice] failed to raise ${n.kind} for ${n.clientId}: status ${ins.status} (non-fatal)`);
+      return 'failed';
+    }
+    const created = ins.json.length > 0;
     // A NEW notice also pushes to the owner's device (best-effort, gated on VAPID
     // keys). Only on first creation so a re-raise never re-pushes. WHETHER to
     // push is its own explicit decision — `status` only defaults it (see the
@@ -66,11 +79,19 @@ export async function raiseNotice(n: NoticeInput): Promise<boolean> {
         pushToSite(n.siteId, { title: n.headline.slice(0, 80), body: n.body.slice(0, 140), url: href, tag: `notice:${n.kind}` }).catch(() => {});
       } catch { /* push is best-effort */ }
     }
-    return created;
+    return created ? 'created' : 'exists';
   } catch (e) {
     console.error(`[notice] failed to raise ${n.kind} for ${n.clientId}: ${String((e as Error)?.message || e)} (non-fatal)`);
-    return false;
+    return 'failed';
   }
+}
+
+/** Boolean view of raiseNoticeDetailed — true only for a NEW row, so callers
+ *  can send an email or bump a counter exactly once. (The codebase leans on
+ *  this boolean everywhere; only callers that must distinguish a retry from a
+ *  failure use the detailed form.) */
+export async function raiseNotice(n: NoticeInput): Promise<boolean> {
+  return (await raiseNoticeDetailed(n)) === 'created';
 }
 
 /** Clear an active notice of a kind for a client (e.g. once a publish recovers).
@@ -114,6 +135,75 @@ export async function clearNoticePrefix(clientId: string, kind: string, prefix: 
   }
   const scope = `client_id=eq.${encodeURIComponent(clientId)}&kind=eq.${encodeURIComponent(kind)}&status=eq.active&period=like.${encodeURIComponent(likeLiteral(safe))}*`;
   await svc(`presence_plan_notices?${scope}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+}
+
+// ═══ RECURRENCE-SAFE PERIODS (the once-per-lifetime trap, closed) ════════════
+// clearNotice only ever PATCHes status='dismissed' — the row SURVIVES and keeps
+// holding the unique (client_id, kind, period) key forever. So any notice whose
+// period is a static per-entity constant AND which has a clear/teardown path is
+// ONCE-PER-LIFETIME: the second outage, the second token expiry, the second
+// stall of the same deal were all permanently silent. The fix is the idiom
+// supportAgingPeriod (lib/intake.ts) established: the period carries a TIME
+// BUCKET after a stable `<scope>:<id>:` prefix, so a recurring condition can
+// speak again in a later bucket, while the teardown clears every bucket at once
+// with clearNoticePrefix — plus the pre-bucket legacy exact key, which the
+// trailing colon deliberately excludes from the LIKE (see
+// supportAgingLegacyPeriod for why that colon is load-bearing).
+//
+// These helpers are PURE (no I/O, no clock of their own) and are the ONE place
+// each period's shape lives — the raise site and the clear site both import
+// them, so the two can never drift apart again. The invariant test
+// (tests/presence/notice_recurrence_test.mjs) walks every raiseNotice call site
+// and fails any cleared kind whose period is neither bucketed nor an explicitly
+// justified per-event id.
+
+/** 7-day bucket — floor(now / 7d), the exact arithmetic supportAgingPeriod
+ *  uses: deterministic, clock-free in tests, timezone-independent, and exactly
+ *  7 days wide. A non-finite clock degrades to bucket 0 (never NaN in a key). */
+export const NOTICE_WEEK_MS = 7 * 86400_000;
+export function noticeWeekBucket(nowMs: number): string {
+  return `w${Number.isFinite(nowMs) ? Math.floor(nowMs / NOTICE_WEEK_MS) : 0}`;
+}
+
+/** UTC-day bucket — for conditions where "again the next day" must re-alert
+ *  (an outage) but flapping within a day must not storm. */
+export function noticeDayBucket(nowMs: number): string {
+  return Number.isFinite(nowMs) ? new Date(nowMs).toISOString().slice(0, 10) : 'd0';
+}
+
+// ── site_down (monitor/heartbeat.ts) — outage-scoped, at most one page/day ───
+export function siteDownPeriodPrefix(siteId: string): string { return `site:${siteId}:`; }
+export function siteDownPeriod(siteId: string, nowMs: number): string {
+  return `${siteDownPeriodPrefix(siteId)}${noticeDayBucket(nowMs)}`;
+}
+/** The pre-bucket shape (`site:<id>`, no trailing colon) — rows raised before
+ *  the bucket deployed. Recovery clears BOTH shapes, or an old outage's row
+ *  stays "Your website didn't respond" forever. */
+export function siteDownLegacyPeriod(siteId: string): string { return `site:${siteId}`; }
+
+// ── connection_expired (connected/store.ts) — weekly while degraded ──────────
+export function connExpiredPeriodPrefix(providerKey: string): string { return `conn:${providerKey}:`; }
+export function connExpiredPeriod(providerKey: string, nowMs: number): string {
+  return `${connExpiredPeriodPrefix(providerKey)}${noticeWeekBucket(nowMs)}`;
+}
+export function connExpiredLegacyPeriod(providerKey: string): string { return `conn:${providerKey}`; }
+
+// ── deal_followup stall nudge (commerce/lifecycle.runDealFollowups) ──────────
+// The clear sites live in routes/sales.ts (delete / convert) — they import
+// these same helpers, which is the whole point.
+export function dealFollowupPeriodPrefix(dealId: string): string { return `deal:${dealId}:`; }
+export function dealFollowupPeriod(dealId: string, nowMs: number): string {
+  return `${dealFollowupPeriodPrefix(dealId)}${noticeWeekBucket(nowMs)}`;
+}
+export function dealFollowupLegacyPeriod(dealId: string): string { return `deal:${dealId}`; }
+
+// ── lead_followup (commerce/lifecycle.runLeadFollowups) — weekly bucket too ──
+// No teardown exists for this kind (a replied lead leaves the SQL window by
+// status), but the bucket keeps the shape consistent and means a lead that is
+// STILL sitting 'new' when the week rolls over gets one more tap before it goes
+// cold, instead of exactly one ping ever.
+export function leadFollowupPeriod(leadId: string, nowMs: number): string {
+  return `lead:${leadId}:${noticeWeekBucket(nowMs)}`;
 }
 
 /** When a CLIENT REVIEWER decides something (a plan, a connected write, a file,
