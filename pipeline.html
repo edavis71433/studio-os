@@ -36,7 +36,7 @@ html.dds-embed #detailWrap{padding-top:0}
   :root[data-theme="dark"] .btn:not(.ghost),:root[data-theme="dark"] .path button.pstep.current{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
-  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 80px}
+  .wrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:26px 20px 80px}
   h1{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:4px}
   .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
   /* ── roster header (.lhead) — the same list-view anatomy as customers.html /
@@ -189,7 +189,7 @@ html.dds-embed #detailWrap{padding-top:0}
      the page scrolls naturally. Everything below is SCOPED to #detailWrap /
      #detailInner so the pipeline list, board, and the other dialogs are untouched.
      ───────────────────────────────────────────────────────────────────────── */
-  #detailWrap{max-width:1000px}
+  #detailWrap{max-width:var(--dds-w-app,1280px)}
   #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
   .backbar{padding:16px 20px 0}
   .backbar .btn{padding:8px 14px}

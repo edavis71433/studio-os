@@ -42,7 +42,7 @@ html.dds-embed #detailWrap{padding-top:0}
   :root[data-theme="dark"] .pstep.current{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1020px;margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 
@@ -109,7 +109,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
 
   /* ── the RECORD PAGE (Lightning anatomy, dds skin — crm.html's patterns) ── */
-  #detailWrap{max-width:1200px;margin:0 auto;padding:20px 20px 90px}
+  #detailWrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:20px 20px 90px}
   .crumbs{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--soft);margin-bottom:12px;flex-wrap:wrap}
   .crumbs .crumb{font:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:2px 4px;border-radius:6px}
   .crumbs .crumb:hover{background:var(--p-soft)}
