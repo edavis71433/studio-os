@@ -561,6 +561,99 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## 🔍 THE DEEP DIVE + FIX WAVES — LIVE (deploys #36-40, 2026-08-07)
+
+Eric: "do a deep dive... gaps, opportunities, refinements... be thorough."
+Three parallel audits (operator journey / client experience / code health),
+then five build waves. Also from his screenshots: receivables void buttons,
+the external-site CTA dead end, and his real contract content.
+
+AUDIT HEADLINES (full reports in the three audit transcripts):
+- Operator: the price was retyped 4x (proposal→contract→deposit→rollup);
+  signed deals got a FACTUALLY WRONG nudge then went silent forever; retainer
+  payment failures were invisible; the questionnaire the contracts reference
+  DID NOT EXIST; handover has no ceremony; discovery calls bypass the CRM
+  (Calendly); deposit-paid didn't prompt convert.
+- Client: welcome email said "welcome to Studio OS" (platform-name leak at the
+  exact trust moment); paying produced SILENCE (receipt promised on the
+  success page, never sent); site-live never announced; enquiry ack was dead
+  code; support replies never emailed portal clients; client bar read 0% the
+  day after signing+paying.
+- Code health: site_down could fire ONCE PER SITE EVER (period tombstone —
+  the class from deletion_requested, surviving in 3 more places);
+  the e2e harness CANNOT REJECT any request (method-blind prefix fixtures,
+  200-everything catch-all) — the machine behind every green-while-broken
+  incident; migrations 0116-0123 queue order-sensitively with only text pins.
+
+SHIPPED (each wave gated + merged + deployed separately):
+#36 3216a24 receivables rows carry Send/Copy/Void (shared wireInvoiceActions).
+#37 2778a56 external clients reachable: record-their-domain door for existing
+  clients (edition NOT flipped — provision re-syncs it from plan, M11 blocks
+  authoring, heartbeat drops it: verdict DO NOT FLIP, address is orthogonal);
+  dialog values deduped (one silently mapped to the HOSTED plan server-side);
+  scoped-operator monitor read fixed (asUser null → "Connect" over a VERIFIED
+  row; one tap would merge-duplicate a fresh token over it).
+#38 3f98ef7 money chain: accept backfills expected_value_cents (guard rides
+  the PATCH WHERE); contract send auto-mints the 50% deposit through ONE
+  depositSplit helper (doc and invoice cannot disagree; at-most-once-ever,
+  void never overruled); signed deals get convert guidance (agreementSigned
+  helper exported for the sweep); impliedTermMonths prefill (⚠ FINDING: the
+  templates state NO operative term — the audit's 12-month premise was the
+  §10 liability lookback); enquiry text lands on the deal.
+  ⚠ ADJACENT: the `created` deal event WAS NEVER WRITTEN (source_submission_id
+  posted as a nonexistent column, 400 swallowed by dealEvent's catch).
+#39 4b158ff never-silent: outage-day periods + prefix clears (site_down,
+  connection_expired, deal/lead followups) + INVARIANT TEST walking every
+  raiseNotice call site (cleared kind must bucket its period — closes the
+  class); raiseNoticeDetailed created|exists|failed; webhook floor unless
+  notice||already (hollow-200 fixed); clientEvent retry+warn (was the Inbox
+  feed's source of truth, fire-and-forgotten); retainer dunning INSIDE
+  applyRetainerSync (past_due/canceled → notice+email, weekly buckets);
+  deal to-do/next-step sweep riding deal_nudges; client RECEIPT email;
+  convert-aware paid copy; 400-day dismissed-notice retention.
+  ⚠ NEEDS ERIC: 0127 (retainer_status + deal_task_due kinds) — dormant until.
+#40(Netlify) 1ac1e8c agreements: Growth completed from the Bacchus PDF
+  (GBP access, single approver, content-14-days, PIECEMEAL FEEDBACK rule,
+  out-of-scope absorption); custom_photography (direction-NOT-shoot kept
+  crisp in 4 places) + template_build (SEO only as bracketed optional; $800
+  decision still open) — every clause traces to Bacchus PDF / docx / site,
+  unsourceable = bracketed. Legal terms: zero drift vs his docx (dup §16
+  resolved, signature tokenized). Signed docs byte-frozen by content_hash.
+  Blanks 26/24/23 pinned.
+#40 2a759e5 client-lifecycle emails, studio-voiced: welcome ("Your client
+  portal is ready — <studio>", never the platform name), site-live via BOTH
+  publish doors send-once on the checklist tick's fresh signal, enquiry ack
+  wired into lead_intake (Formspree fallback sends none → thanks panel
+  stops promising it), support replies now reach auth-uid portal clients
+  via emailCustomerByClient + the 15-min throttle.
+  ⚠ CALENDLY STAYS (deliberate): no agency-site id exists client-side, and
+  booking-enabled state couldn't be verified from the sandbox; half-switching
+  risked losing bookings. Path: hardcode the id once booking is confirmed on.
+
+DECISIONS WAITING ON ERIC:
+1. Template build: site says ONE revision round; legal §3 grants TWO per
+   deliverable. Reconcile.
+2. No agreement states a term — want a 12-month term clause so renewal
+   reminders can arm?
+3. The $800 SEO add-on (estimator) — still open.
+4. SQL: 0120 (or press "Add all standard steps"), 0127.
+
+QUEUED NEXT (specced, not built): questionnaire-as-survey (auto-offer at
+convert, submission = evidence, auto-tick step 3) + ONE progress number
+(client sees the 10-step bar, his 3 highlighted) + per-step to-do affordances
+in the portal (content→share card, review→approvals) + handover ceremony
+(10/10 → CSAT + review ask + retainer offer); e2e harness that can say NO
+(route manifest, 418 catch-all); migration replay harness; tenant-form
+visitor ack (same class as the enquiry ack, tenant surface); monthly care
+report; GBP (accounts→locations→reviews + picker) + GA4 runReport adapters;
+contact merge RPC; per-proposal declined period; deal-task-done teardown;
+NOTICE_HREF entries for the two new kinds.
+
+MULTI-AGENT OPS: 10 builds + 3 audits across the day on ONE shared checkout.
+After the morning's cross-staging incidents: explicit-path commits only,
+pull-rebase before push, checkout-index to gate a tree mid-flight — zero
+further incidents, zero lost bytes.
+
 ## 🖼️ THE AFTERNOON BATCH — LIVE (deploys #34-35, 2026-08-07)
 
 Eric's second round from the roster screens: contacts uneditable (+ a live
