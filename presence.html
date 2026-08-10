@@ -2546,6 +2546,13 @@ async function renderMonitorCard() {
     card.appendChild(el("div", "dol", c.status === "verified" ? "watching over it" : "waiting on verification"));
     card.appendChild(el("div", "dop", c.url));
     if (c.status !== "verified") {
+      // What verification does and doesn't gate, in plain words — the address
+      // alone already feeds the search numbers (gsc_sync deliberately doesn't
+      // wait on 'verified'); the tag only unlocks the active watching. Without
+      // this line the card reads as a blocker on everything, which it isn't.
+      const why = el("p", "aihint", "This proves you're authorized to watch this site (it may well be your client's — placing the tag is something you do with their access, or as part of a rebuild). It unlocks the up/down checks only. The search numbers don't wait on it: they come from Google once Search Console is connected. If the site is being replaced soon, it's fine to leave this until the new one goes live with the tag already on it.");
+      why.style.marginTop = "6px";
+      card.appendChild(why);
       const how = el("p", "aihint", c.instructions);
       how.style.marginTop = "6px";
       card.appendChild(how);
