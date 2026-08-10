@@ -312,7 +312,12 @@ function cardsHtml(list){
   return h;
 }
 function listHtml(rows){
-  if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html${scope()?'?client='+scope():''}">Open Pipeline →</a></p></div>`;
+  // Scoped into a client, this reads presence_contacts?site_id=<client's site> —
+  // but contacts live on the STUDIO's site, so the list can only ever be empty
+  // and "Add someone" would file them against the wrong tenant. data-noscope on
+  // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
+  if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
+  if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
   if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;
   return DISPLAY==='table'?tableHtml(rows):cardsHtml(rows);
 }

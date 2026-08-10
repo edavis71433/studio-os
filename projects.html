@@ -419,6 +419,11 @@ function renderRoster(){
   $('lhead').innerHTML=headerHtml(list);
   if(!list.length){
     if(Q.trim())$('list').innerHTML='<p class="mut">No projects match “'+esc(Q)+'”.</p>';
+    // Scoped into a client, this list reads site_id = <the client's site> — and
+    // projects are created on the AGENCY site (service_bridge ensureProjectForDeal
+    // takes agencySiteId). So it is not "no projects yet", it is "projects don't
+    // live here", and "New project" would be a trap. Say the true thing instead.
+    else if(!Q.trim()&&!FILTER&&window.ddsStudioLevel&&window.ddsStudioLevel($('list'),{noun:'Projects',lower:'projects'})){/* painted */}
     else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
     else $('list').innerHTML='<p class="mut">No projects yet.</p>';
   }else{
@@ -470,7 +475,11 @@ async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
     const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
-    STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO;
+    // Scoped into a client, POST /projects would file the project on the CLIENT's
+    // site — projects live on the agency site (service_bridge ensureProjectForDeal
+    // takes agencySiteId), so it would land where nothing else can see it. Hide
+    // the action rather than offer a button that does the wrong thing quietly.
+    STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO||!!scope();
     ITEMS=res.data||[]; LOADED_AT=Date.now();
     renderRoster();
     // enrichment (existing routes only): customer names once + per-project report

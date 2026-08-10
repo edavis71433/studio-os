@@ -1037,6 +1037,11 @@ function renderMeta(){
 // Roster-empty honesty: a stage-filtered empty says WHICH stage is empty (the
 // won landing gets its own line); only a truly empty pipeline gets the starter.
 function renderRosterEmpty(host){
+  // Scoped into a client, this reads presence_deals?site_id=<client's site> —
+  // but deals only ever live on the STUDIO's site (sales.ts says so, 0074 keys
+  // them that way). So it can only ever be empty, and "New deal" would file the
+  // deal against the client's own site where nothing else can see it.
+  if(window.ddsStudioLevel&&window.ddsStudioLevel(host,{noun:'Deals',lower:'deals and invoices'}))return;
   if(FILTER==='won'){host.innerHTML='<div class="dds-empty"><div class="ico">🏆</div><h3>No won deals yet</h3><p>Deals you win show up here with their values.</p></div>';return;}
   if(FILTER){host.innerHTML='<div class="dds-empty"><h3>Nothing in “'+esc(stageLabel(FILTER))+'” right now.</h3><p>Deals in this stage will show up here.</p></div>';return;}
   if(window.ddsEmpty) window.ddsEmpty(host,{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal});
@@ -1225,7 +1230,10 @@ function wireBoard(){
 
 // ── new deal: an accessible in-dialog form (no prompt) ──
 function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
-$('newDeal').onclick=openNewDeal;
+// Scoped into a client, POST /sales/deals writes site_id = the CLIENT's site —
+// but deals only ever live on the studio's own site, so the deal would vanish
+// from the pipeline the moment you left the client. Hide the action.
+if(scope())$('newDeal').hidden=true; else $('newDeal').onclick=openNewDeal;
 // the toolbar's copy of "Manage services" (openManageServices is defined below —
 // this handler only runs on click, long after the whole script has evaluated)
 {const mst=$('mngServicesTop'); if(mst) mst.onclick=()=>openManageServices();}

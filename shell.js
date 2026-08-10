@@ -1069,6 +1069,50 @@
       (opts.body ? '<p>' + sEsc(opts.body) + '</p>' : '') + act + '</div>';
     if (opts.onAction) { var b = host.querySelector('[data-dds-act]'); if (b) b.addEventListener('click', opts.onAction); }
   };
+  // ── The studio-level empty state ─────────────────────────────────────────────
+  // Some records — projects, deals, contacts, invoices — live ONLY on the
+  // studio's own site. Scope is sticky across navigation (carryScopeGlobally),
+  // so once an operator drills into a client, those pages read `site_id = <the
+  // client's site>` and can only ever come back empty. "No projects yet · Create
+  // a project" is then false twice over: the studio HAS projects, and creating
+  // one from a client scope is a trap.
+  //
+  // A state that can never be non-empty must not borrow the wording of one that
+  // can. This says whose records these are, and hands over the way back —
+  // never a create CTA that would do the wrong thing.
+  //   window.ddsStudioLevel({ noun:'Projects', lower:'projects' })  → false when
+  //   unscoped (the page renders its normal empty state), true when it painted.
+  // The URL fallback matters: a page renders its own data as soon as ITS fetch
+  // lands, which can be before the shell's context fetch. Keying only on CTX
+  // would make the notice appear or not depending on which request won — so the
+  // SCOPE comes from the URL (always present, never racy) and the NAME from CTX
+  // when it has arrived. Unknown name degrades the copy, never the correctness.
+  window.ddsScopeInfo = function () {
+    var s = CTX && CTX.scope, id = scopeId();
+    if (s && s.site_id) return { id: s.site_id, name: s.name || '' };
+    return id ? { id: id, name: '' } : null;
+  };
+  window.ddsStudioLevel = function (host, opts) {
+    var sc = window.ddsScopeInfo(); if (!sc) return false;
+    host = hostOf(host); if (!host) return false;
+    opts = opts || {};
+    var noun = opts.noun || 'These records', lower = opts.lower || 'they';
+    var who = sc.name || 'one client';
+    // data-noscope is LOAD-BEARING: carryScopeGlobally rewrites every same-origin
+    // APP_PAGES anchor to carry ?client=, so without it the escape hatch would be
+    // re-scoped straight back into the client it is trying to leave.
+    var href = opts.href || (location.pathname || '/agency.html');
+    host.innerHTML = '<div class="dds-empty"><div class="ico">🏛️</div>' +
+      '<h3>' + sEsc(noun + ' live at the studio level') + '</h3>' +
+      '<p>' + sEsc('You’re looking at ' + who + '. Your ' + lower + ' belong to your studio, not to one client, so there’s nothing here to show — and nothing you could usefully add from inside a client.') + '</p>' +
+      '<div class="act"><a class="primary" data-noscope href="' + sEsc(href) + '" style="display:inline-block;text-decoration:none">' + sEsc(opts.cta || ('Leave ' + who + ' and open ' + noun)) + '</a></div></div>';
+    // The page's own fetch usually beats the shell's context fetch, so the first
+    // paint often knows the scope but not the client's NAME. When context lands,
+    // repaint once so the notice says who you are actually looking at. Guarded by
+    // `!sc.name` so this can never loop.
+    if (!sc.name) document.addEventListener('dds:context', function () { window.ddsStudioLevel(host, opts); }, { once: true });
+    return true;
+  };
   window.ddsSkeleton = function (host, rows) {
     host = hostOf(host); if (!host) return;
     var n = rows || 3, out = '';
