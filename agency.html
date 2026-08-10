@@ -116,7 +116,13 @@
   #queues{margin-bottom:22px}
 
   /* ── starter kits (CP-1) — class-based card, no inline style soup ── */
+  /* Starter kits is a FORM sitting on a data-tier page. The page is 1600 wide
+     because the client TABLE wants it; a "Kit name" field 700px wide and a
+     paragraph running 1560px are just the roster's width leaking into content
+     that gains nothing from it. The card still spans the page (it lines up with
+     the table above), but its prose and controls hold the focused measure. */
   .kitcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);margin-top:18px}
+  .kitcard p,.kitcard .kitrow{max-width:var(--dds-w-focus,760px)}
   .kitcard h2{font-size:15px;font-weight:600;font-family:var(--sans);margin:0 0 6px}
   .kitcard .muted{margin-bottom:10px}
   .kitrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
