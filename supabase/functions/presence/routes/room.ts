@@ -271,9 +271,12 @@ export async function handleMediaList(site: SiteRow, cors: Record<string, string
     let thumb: string | null = null;
     try {
       const objectPath = m.storage_path.replace(/^presence-media\//, '');
-      const r = await fetch(`${SB_URL}/storage/v1/object/sign/presence-media/${objectPath}?expiresIn=3600`, {
+      // expiresIn belongs in the BODY (a query-string expiresIn 400s), and `format`
+      // is not the output-format selector — both as documented in lib/media.ts
+      // signThumb. Between them this grid signed nothing that could ever load.
+      const r = await fetch(`${SB_URL}/storage/v1/object/sign/presence-media/${objectPath}`, {
         method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transform: { width: 320, format: 'webp', quality: 70 } }),
+        body: JSON.stringify({ expiresIn: 3600, transform: { width: 320, quality: 70 } }),
       });
       const jj = await r.json().catch(() => null);
       if (jj?.signedURL) thumb = `${SB_URL}/storage/v1${jj.signedURL}`;

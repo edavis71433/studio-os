@@ -22,7 +22,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, copyObject, isImageMime, signSocialCrop } from '../lib/media.ts';
+import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop } from '../lib/media.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
@@ -368,11 +368,17 @@ export async function handleAssetSocial(site: SiteRow, id: string, cors: Record<
   }
   const focal = { x: Number((asset as any).focal_x), y: Number((asset as any).focal_y) };
   const list = socialCropList(focal, { width: asset.width, height: asset.height });
-  // Sign each crop from the private bucket, in parallel (bounded: 4 ratios).
-  const urls = await Promise.all(list.map((c) => signSocialCrop(asset.storage_path, asset.mime || '', { width: c.width, height: c.height })));
+  // Sign each crop from the private bucket, in parallel (bounded: 4 ratios) — plus
+  // ONE untransformed URL for the same object. All four crops share it: a transform
+  // that can't be served fails the same way for every ratio, and the original is the
+  // one thing that still shows the owner their photo. A fifth sign, not four more.
+  const [urls, fallback] = await Promise.all([
+    Promise.all(list.map((c) => signSocialCrop(asset.storage_path, asset.mime || '', { width: c.width, height: c.height }))),
+    signOriginalImage(asset.storage_path, asset.mime || ''),
+  ]);
   const crops = list.map((c, i) => ({ ...c, url: urls[i] }));
   const isShareImage = await isCurrentOg(site, id);
-  return json({ data: { crops, focal: list[0]?.object_position || '50% 50%', is_share_image: isShareImage } }, 200, cors);
+  return json({ data: { crops, fallback_url: fallback, focal: list[0]?.object_position || '50% 50%', is_share_image: isShareImage } }, 200, cors);
 }
 async function isCurrentOg(site: SiteRow, id: string): Promise<boolean> {
   try { const s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id&limit=1`); return arr(s)[0]?.og_media_id === id; } catch { return false; }
@@ -441,9 +447,12 @@ export async function handleAssetCards(req: Request, site: SiteRow, id: string, 
 export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<string, string>) {
   const asset = await loadAsset(site.id, id);
   if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
-  const [refMap, live, thumb, download] = await Promise.all([
+  const [refMap, live, thumb, thumbFallback, download] = await Promise.all([
     referencedRefs(site), liveMediaIds(site),
     signThumb(asset.storage_path, asset.mime || ''),
+    // the untransformed original, so the panel's big preview has somewhere honest
+    // to go when the transformed one won't load (see lib/media.ts signOriginal)
+    signOriginalImage(asset.storage_path, asset.mime || ''),
     signDownload(asset.storage_path, `${fileName(asset)}`),
   ]);
   const usage = (refMap.get(id) || []).map((r) => ({ ...r, live: live.has(id) }));
@@ -459,6 +468,7 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
     asset: present(asset, { in_use: usage.length > 0, thumb }),
     usage, summary: usageSummary(usage),
     versions: { prior, superseded_by: supersededBy, has_history: !!prior },
+    thumb_fallback: thumbFallback,
     download_url: download,
     policy: await policyFor(site),
   } }, 200, cors);

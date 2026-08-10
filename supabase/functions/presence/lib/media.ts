@@ -172,6 +172,20 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
   return { files, failed };
 }
 
+// ── The transform contract ───────────────────────────────────────────────────
+// Storage's image transformer takes width / height / resize / quality — and a
+// `format` whose ONLY accepted value is 'origin' ("keep the source format").
+// It is NOT the output-format selector it reads like: leaving format out is what
+// asks for a modern format, and the transformer negotiates WebP from the request
+// itself. Passing format:'webp' therefore hands the transformer a value outside
+// its enum. The SIGN call still succeeds — the transform options only ride the
+// token, they aren't executed until the URL is fetched — so the server happily
+// returned a URL that could never resolve, and Files rendered an <img> around it.
+// That is the bug behind "the photos are broken in the preview image": a
+// well-formed src, a 4xx on GET, and the browser's broken-image glyph.
+// Signed at DISPLAY time everywhere (never persisted), so expiry is not in play.
+const THUMB_TTL = 3600;
+
 /** DAM-1 (Files): a short-lived signed THUMBNAIL for one image (private bucket).
  *  Reused by the Files grid + detail. Documents have no image thumbnail → null. */
 export async function signThumb(storagePath: string, mime: string, width = 320): Promise<string | null> {
@@ -181,11 +195,36 @@ export async function signThumb(storagePath: string, mime: string, width = 320):
     // expiresIn MUST be in the body (the sign endpoint 400s on a query-string expiresIn)
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 3600, transform: { width, format: 'webp', quality: 72 } }),
+      body: JSON.stringify({ expiresIn: THUMB_TTL, transform: { width, quality: 72 } }),
     });
     const j = await r.json().catch(() => null);
     return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
   } catch { return null; }
+}
+
+/** The honest fallback behind every transformed preview: the ORIGINAL object,
+ *  signed with NO transform at all. A transform has failure modes the plain
+ *  object does not (the store may not perform transforms, and a source past the
+ *  transformer's limits is refused), and an owner would far rather see their
+ *  full-size photo than a broken image. Same bucket, same private object, same
+ *  short life — only the transform is dropped. */
+export async function signOriginal(storagePath: string, expiresIn = THUMB_TTL): Promise<string | null> {
+  try {
+    const objectPath = storagePath.replace(`${BUCKET}/`, '');
+    // expiresIn MUST be in the body (the sign endpoint 400s on a query-string expiresIn)
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
+      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn }),
+    });
+    const j = await r.json().catch(() => null);
+    return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+  } catch { return null; }
+}
+
+/** The same fallback, but only for images — a document has no image preview to
+ *  fall back TO, and handing one to an <img> would just fail differently. */
+export async function signOriginalImage(storagePath: string, mime: string): Promise<string | null> {
+  return isImageMime(mime) ? await signOriginal(storagePath) : null;
 }
 
 /** DAM (social crops): a short-lived signed URL for one focal/social ratio via the
@@ -200,7 +239,7 @@ export async function signSocialCrop(storagePath: string, mime: string, t: { wid
     const objectPath = storagePath.replace(`${BUCKET}/`, '');
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 3600, transform: { width: t.width, height: t.height, resize: 'cover', format: 'webp', quality: t.quality ?? 80 } }),
+      body: JSON.stringify({ expiresIn: THUMB_TTL, transform: { width: t.width, height: t.height, resize: 'cover', quality: t.quality ?? 80 } }),
     });
     const j = await r.json().catch(() => null);
     return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
@@ -211,19 +250,11 @@ export async function signSocialCrop(storagePath: string, mime: string, t: { wid
  *  transform) — used for "Download" and for previewing documents. Optionally sets
  *  a friendly download filename. */
 export async function signDownload(storagePath: string, filename?: string): Promise<string | null> {
-  try {
-    const objectPath = storagePath.replace(`${BUCKET}/`, '');
-    // expiresIn MUST be in the body; the friendly download filename rides the signed URL.
-    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
-      method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 600 }),
-    });
-    const j = await r.json().catch(() => null);
-    if (!j?.signedURL) return null;
-    let url = `${SB_URL}/storage/v1${j.signedURL}`;
-    if (filename) url += (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(filename);
-    return url;
-  } catch { return null; }
+  // the SAME untransformed signer as signOriginal — a download is that URL plus
+  // the friendly filename. One signer, so the two can never drift apart.
+  const url = await signOriginal(storagePath, 600);
+  if (!url) return null;
+  return filename ? url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(filename) : url;
 }
 
 /** DAM-1 (Files): server-side COPY of a storage object (for "Duplicate"). Returns
@@ -250,11 +281,14 @@ export async function previewUrlMap(manifest: MediaManifestEntry[]): Promise<Rec
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
     // DL-FILES: a NON-image original (a PDF Download) is signed WITHOUT a transform,
     // so the preview's Download link resolves to the real file — matching how it will
-    // serve once published. Images are signed with their width/format transform as before.
-    const body = v.format === 'original' ? {} : { transform: { width: v.width, format: v.format, quality: 80 } };
-    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}?expiresIn=600`, {
+    // serve once published. Images are signed with their width transform as before.
+    // Two fixes here, both the same fixes signThumb carries: expiresIn belongs in the
+    // BODY (a query-string expiresIn 400s, so every preview URL came back null), and
+    // `format` is not the output selector — see THUMB_TTL's note above.
+    const transform = v.format === 'original' ? {} : { transform: { width: v.width, quality: 80 } };
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ expiresIn: 600, ...transform }),
     });
     const j = await r.json().catch(() => null);
     if (j?.signedURL) map[v.output_path] = `${SB_URL}/storage/v1${j.signedURL}`;

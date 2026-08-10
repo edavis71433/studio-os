@@ -652,3 +652,145 @@ test.describe('Files (the DAM, customer-facing)', () => {
     expect(caret).toEqual({ s: 2, e: 2 });
   });
 });
+
+// ── Previews: a private object behind a short-lived signed URL ───────────────
+// "The photos in Files that Hettie uploaded are broken in the preview image."
+// The detail panel's big preview and the four social crops each rode a signed
+// TRANSFORM URL. When that URL can't be served — a transform the store won't
+// perform, a source past the transformer's limits, an aged-out token — the
+// browser drew its own broken-image glyph beside the alt text, over files that
+// were perfectly intact and downloadable. Two things had to change: the preview
+// falls back to the SAME object untransformed, and a preview that still can't
+// load says so in words. A broken-image glyph is not a state this page can reach.
+test.describe('Files — previews of a private object', () => {
+  // a real 1×1 PNG: the fallback must actually DECODE, so naturalWidth proves it
+  const PNG_1PX = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const TRANSFORM = 'https://sb.e2e.test/storage/v1/object/sign/presence-media/s/a.png?token=T&width=320';
+  const ORIGINAL = 'https://sb.e2e.test/storage/v1/object/sign/presence-media/s/a.png?token=T';
+
+  // Hettie's file, in the shape /assets emits for it: a client upload (no
+  // width/height — the portal door doesn't measure the image), thumb signed as a
+  // transform, thumb_fallback the same object untransformed.
+  const HETTIE = {
+    id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'HODLLC Logo', kind: 'image', mime: 'image/png',
+    in_use: false, favorite: false, alt_text: '', tags: [], collection: '', asset_status: 'approved',
+    state: 'approved', bytes: 17000, created_at: '2026-08-10T00:00:00Z',
+    client_upload: true, metadata: { client_upload: true, note: 'Uploaded by the client.' },
+    client_id: 'c1111111-1111-4111-8111-c11111111111', client_name: 'Hettie Orange Design',
+    project_id: 'p1111111-1111-4111-8111-p11111111111',
+    thumb: TRANSFORM,
+  };
+  const crop = (label: string, w: number, h: number, aspect: string) => ({
+    key: label.toLowerCase(), label, purpose: '', aspect, width: w, height: h,
+    object_position: '50% 50%', url: `${TRANSFORM}&h=${h}`,
+  });
+  const previewApi = {
+    '/assets/collections': { data: [] },
+    '/assets/health': { data: { findings: [] } },
+    '/assets': { data: { assets: [HETTIE], total: 1, shown: 1, live_count: 0, policy: 'immediate' } },
+    ['/assets/' + HETTIE.id]: { data: {
+      asset: HETTIE, usage: [], versions: { has_history: false },
+      summary: { headline: '' }, thumb_fallback: ORIGINAL, download_url: ORIGINAL + '&download=logo.png',
+    } },
+    ['/assets/' + HETTIE.id + '/social']: { data: {
+      crops: [crop('Square', 1080, 1080, '1:1'), crop('Portrait', 1080, 1350, '4:5'),
+              crop('Story', 1080, 1920, '9:16'), crop('Link preview', 1200, 628, '1.91:1')],
+      fallback_url: ORIGINAL, focal: '50% 50%', is_share_image: false,
+    } },
+    ['/assets/' + HETTIE.id + '/cards']: { data: { cards: [] } },
+  };
+  const png = (route: import('@playwright/test').Route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1PX });
+  // exactly how a signed transform URL fails when the store can't serve it
+  const refuse = (route: import('@playwright/test').Route) => route.fulfill({
+    status: 400, contentType: 'application/json',
+    body: JSON.stringify({ statusCode: '400', error: 'InvalidRequest', message: 'transform not available' }),
+  });
+  // every <img> on the page that actually decoded pixels
+  const decoded = (page: Page, sel: string) => page.$$eval(sel, (els) =>
+    els.map((e) => (e as HTMLImageElement).naturalWidth).filter((w) => w > 0).length);
+
+  test('a client-uploaded photo whose TRANSFORM fails still shows the photo — the fallback resolves', async ({ page }) => {
+    const asked: string[] = [];
+    await installApp(page, { api: previewApi });
+    await page.route('**/storage/v1/**', (route) => {
+      const u = route.request().url();
+      asked.push(u);
+      return u.includes('width=') ? refuse(route) : png(route);   // transform refused, original served
+    });
+    await page.goto('/files.html');
+    await page.getByText('HODLLC Logo').first().click();
+    // the big preview ends up on the untransformed original, and it DECODES
+    const pv = page.locator('.pv img');
+    await expect(pv).toHaveAttribute('src', ORIGINAL);
+    await expect.poll(() => decoded(page, '.pv img')).toBe(1);
+    await expect(page.locator('.pv .pvfail')).toHaveCount(0);   // no need for the sentence — it recovered
+    // the transform WAS tried first: both URLs were requested, in that order
+    expect(asked.some((u) => u.includes('width=320'))).toBe(true);
+    expect(asked).toContain(ORIGINAL);
+  });
+
+  test('the four social sizes render — each falls back to the original rather than a broken glyph', async ({ page }) => {
+    await installApp(page, { api: previewApi });
+    await page.route('**/storage/v1/**', (route) =>
+      route.request().url().includes('&h=') ? refuse(route) : png(route));
+    await page.goto('/files.html');
+    await page.getByText('HODLLC Logo').first().click();
+    await expect(page.locator('#social-slot figure')).toHaveCount(4);
+    await expect(page.locator('#social-slot')).toContainText('Square');
+    await expect(page.locator('#social-slot')).toContainText('Link preview');
+    // all four show real pixels…
+    await expect.poll(() => decoded(page, '#social-slot img')).toBe(4);
+    // …so none of them fell through to the sentence
+    await expect(page.locator('#social-slot .pvfail')).toHaveCount(0);
+  });
+
+  test('a genuinely missing object reads as a SENTENCE — never a broken-image glyph', async ({ page }) => {
+    await installApp(page, { api: previewApi });
+    await page.route('**/storage/v1/**', (route) => route.fulfill({
+      status: 404, contentType: 'application/json',
+      body: JSON.stringify({ statusCode: '404', error: 'NotFound', message: 'Object not found' }),
+    }));
+    await page.goto('/files.html');
+    await page.getByText('HODLLC Logo').first().click();
+    // the big preview says what happened, and says the FILE is still fine
+    await expect(page.locator('.pv .pvfail')).toContainText('Preview unavailable');
+    await expect(page.locator('.pv .pvfail')).toContainText('Download');
+    // each social size says it too — four sentences, not four broken glyphs
+    await expect(page.locator('#social-slot .pvfail')).toHaveCount(4);
+    await expect(page.locator('#social-slot .pvfail').first()).toHaveText('Preview unavailable');
+    // and NOT ONE <img> is left on the page holding a src that failed. This is
+    // the assertion that reddens against the old code: it left five of them.
+    expect(await page.locator('.pv img, #social-slot img').count()).toBe(0);
+  });
+
+  test('a roster thumbnail that cannot load falls back to its icon, not a blank cell', async ({ page }) => {
+    await pinGrid(page);
+    await installApp(page, { api: previewApi });
+    await page.route('**/storage/v1/**', refuse);
+    await page.goto('/files.html');
+    const thumb = page.locator('.tile .thumb').first();
+    await expect(thumb).toBeVisible();
+    await expect(thumb.locator('svg')).toHaveCount(1);                    // the placeholder icon took over…
+    await expect.poll(() => thumb.evaluate((el) => el.style.backgroundImage)).toBe('');   // …and the dead background is gone
+  });
+
+  test('a crop the server could not sign at all is a sentence too — never a silent empty box', async ({ page }) => {
+    await installApp(page, {
+      api: {
+        ...previewApi,
+        ['/assets/' + HETTIE.id + '/social']: { data: {
+          crops: [{ ...crop('Square', 1080, 1080, '1:1'), url: null }],
+          fallback_url: null, focal: '50% 50%', is_share_image: false,
+        } },
+      },
+    });
+    await page.route('**/storage/v1/**', png);
+    await page.goto('/files.html');
+    await page.getByText('HODLLC Logo').first().click();
+    await expect(page.locator('#social-slot .pvfail')).toHaveText('Preview unavailable');
+  });
+});

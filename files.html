@@ -174,6 +174,11 @@
   .pv{border-radius:12px;overflow:hidden;background:var(--p-soft);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin:14px 0 16px}
   .pv img{width:100%;height:100%;object-fit:contain}
   .pv svg{width:48px;height:48px;color:var(--faint)}
+  /* A preview that can't load says so IN WORDS. The browser's own broken-image
+     glyph reads as "your file is damaged" — which is a lie: the file is fine and
+     downloadable, it's the preview that didn't come through. */
+  .pvfail{display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:12.5px;line-height:1.4;color:var(--faint)}
+  .box .pvfail{position:absolute;inset:0;padding:6px;font-size:11px}
   .field{margin:14px 0}
   .field label{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:5px}
   .field input,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:14px;font-family:inherit}
@@ -674,8 +679,11 @@ function tableHtml(rows){
     return `<th scope="col"${k==='client'?' class="cli"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('');
   const trs=rows.map(a=>{
-    const t=a.thumb?` style="background-image:url('${esc(a.thumb)}')"`:'';
-    const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
+    const ic=svg(a.kind==='document'?IC.doc:IC.photo);
+    // data-thumb/data-ic: wireThumbs falls the cell back to the icon if the
+    // thumbnail can't load — a CSS background has no onerror of its own
+    const t=a.thumb?` data-thumb="${esc(a.thumb)}" data-ic="${esc(ic)}" style="background-image:url('${esc(a.thumb)}')"`:'';
+    const inner=a.thumb?'':ic;
     const st=a.state||'approved';
     const stateLbl={live:'Live',pending:'Pending',approved:'Approved',draft:'Draft',archived:'Archived'}[st]||st;
     const ckTd=S.canEdit?`<td class="ck"><input type="checkbox" data-pick="${esc(a.id)}" aria-label="Select ${esc(a.name)}"${S.selected.has(a.id)?' checked':''}></td>`:'';
@@ -724,8 +732,9 @@ function renderNudge(){
   return `<div class="nudge">A few files could use attention: ${parts.join(' · ')}.<button id="tidy">Review</button></div>`;
 }
 function tile(a){
-  const t=a.thumb?`style="background-image:url('${esc(a.thumb)}')"`:'';
-  const inner=a.thumb?'':svg(a.kind==='document'?IC.doc:IC.photo);
+  const ic=svg(a.kind==='document'?IC.doc:IC.photo);
+  const t=a.thumb?`data-thumb="${esc(a.thumb)}" data-ic="${esc(ic)}" style="background-image:url('${esc(a.thumb)}')"`:'';
+  const inner=a.thumb?'':ic;
   const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not on your site';
   // the Pending badge obeys the SAME honesty rule as the table's Status column
   // (stateShown) — otherwise Grid and Table would contradict each other about
@@ -747,6 +756,7 @@ function tile(a){
 }
 function wire(){
   wireRail();
+  wireThumbs($('root'));   // a thumbnail that can't load falls back to its icon, never a blank cell
   // grid tiles open on click/Enter/Space; table rows do too, but never from a
   // click on the row's own controls (checkbox / future buttons)
   document.querySelectorAll('.tile[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
@@ -816,6 +826,48 @@ async function bulkDownload(ids){
   toast(fail?(ok?`Downloaded ${ok} · ${fail} failed`:'Downloads failed — try again in a moment'):`Downloaded ${ok} file${ok===1?'':'s'}`);
 }
 
+/* ── honest previews ─────────────────────────────────────────────────────────
+   Every preview here rides a short-lived signed URL for a PRIVATE object, and a
+   signed URL can fail to resolve for reasons that have nothing to do with the
+   file: a transform the store won't perform, a source past the transformer's
+   limits, a token that has aged out. When it does, the browser draws its own
+   broken-image glyph next to the alt text — which is how "the photos in Files
+   are broken" looked to Eric, over files that were perfectly intact.
+   So: a preview img declares a FALLBACK (the same object, untransformed) and a
+   SENTENCE. It tries the fallback once, and if that fails too it replaces itself
+   with the sentence. A broken-image glyph is never a state this page can reach.
+   Wired in JS, not an inline onerror, so a URL can't break out of an attribute —
+   and re-checked immediately, because an <img> that has ALREADY failed by the
+   time we get here (cached failure, data: URL, offline) never fires onerror. */
+const PV_FAIL='Preview unavailable — the file itself is fine. Use Download to open it.';
+function wirePreviews(root){
+  (root||document).querySelectorAll('img[data-pv]').forEach(im=>{
+    if(im.dataset.pvWired)return;im.dataset.pvWired='1';
+    const fail=()=>{
+      const fb=im.getAttribute('data-fallback');
+      if(fb&&im.src!==fb){im.removeAttribute('data-fallback');im.src=fb;return;}   // one try at the original
+      const host=im.closest('[data-pvhost]')||im.parentElement;
+      if(host)host.innerHTML=`<span class="pvfail">${esc(im.getAttribute('data-fail')||PV_FAIL)}</span>`;
+    };
+    im.onerror=fail;
+    if(im.complete&&!im.naturalWidth)fail();   // already failed before we got here
+  });
+}
+/* The roster's tiles paint their thumbnail as a CSS background — no <img>, so no
+   onerror, and a thumbnail that 404s left a silent empty box. Probe the same URL
+   (the browser serves the second request from cache) and, if it can't load, drop
+   back to the placeholder icon a file with no thumbnail already shows. A 34px
+   cell has no room for a sentence; the icon IS the honest state here. */
+function wireThumbs(root){
+  (root||document).querySelectorAll('[data-thumb]').forEach(el=>{
+    if(el.dataset.thWired)return;el.dataset.thWired='1';
+    const u=el.getAttribute('data-thumb');if(!u)return;
+    const probe=new Image();
+    probe.onerror=()=>{el.style.backgroundImage='';el.innerHTML=el.getAttribute('data-ic')||'';};
+    probe.src=u;
+  });
+}
+
 /* ── detail panel ── */
 let detailOpener=null;   // a11y: where focus returns when the slide-over closes
 function focusPanel(){const x=$('panel').querySelector('.x');if(x)x.focus();}
@@ -842,7 +894,11 @@ function closeDetail(){
 }
 function renderDetail(){
   const d=S.current,a=d.asset;const ed=S.canEdit;
-  const pv=a.thumb?`<img src="${esc(a.thumb)}" alt="${esc(a.alt_text||'')}">`:svg(a.kind==='document'?IC.doc:IC.photo);
+  // the big preview: the transformed thumbnail, falling back to the untransformed
+  // original (d.thumb_fallback), falling back to a sentence — never a broken glyph
+  const pv=a.thumb
+    ?`<img src="${esc(a.thumb)}" alt="${esc(a.alt_text||'')}" data-pv data-fallback="${esc(d.thumb_fallback||'')}" data-fail="${esc(PV_FAIL)}">`
+    :svg(a.kind==='document'?IC.doc:IC.photo);
   // EC-1 cohesion: each "where used" entry clicks through to the Website editor —
   // the file's home and where it's edited/removed. Scope-aware for agency drill-in.
   const siteHref=(hash)=>{const c=scope();return '/presence.html'+(hash||'')+(c?(hash&&hash.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c):'');};
@@ -858,7 +914,7 @@ function renderDetail(){
   const approveCtrls=(st==='pending'&&ed)?`<div class="vrow" style="background:var(--warn-soft);color:var(--warn)">This replacement is waiting to go live.<span style="margin-left:auto;display:flex;gap:8px"><button class="btn" onclick="decideFile('${a.id}','approve')">Approve</button><button class="btn warn" onclick="decideFile('${a.id}','reject')">Ask for changes</button></span></div>`:'';
   $('panel').innerHTML=`
     <button class="x" onclick="closeDetail()" aria-label="Close file details">×</button>
-    <div class="pv">${pv}</div>
+    <div class="pv" data-pvhost>${pv}</div>
     <div>${stateBadge}</div>${approvedLine}${approveCtrls}
     <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>
     <div class="field"><label for="f-name">Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
@@ -880,6 +936,7 @@ function renderDetail(){
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
       <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
+  wirePreviews($('panel'));
   if(a.kind==='image'){loadSocial(a.id);loadCards(a.id,'');}
 }
 // Focal-aware social crops (square / portrait / story / link-preview). The sizes are
@@ -891,16 +948,24 @@ async function loadSocial(id){
   if(!$('social-slot')||!S.current||S.current.asset.id!==id)return;   // panel changed while loading
   if(!r.ok||!r.body.data){slot.innerHTML=`<div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Not available for this file.</div>`;return;}
   const crops=r.body.data.crops||[];
+  // One untransformed URL stands behind all four ratios — a transform that can't be
+  // served fails identically for every one of them, and the uncropped original still
+  // shows the owner their photo. A crop we couldn't sign AT ALL, and one whose URL
+  // won't load, land in the same honest place: the sentence, never a broken glyph.
+  const fb=r.body.data.fallback_url||'';
   const cells=crops.map(c=>{
     const ratio=c.height?(c.width/c.height):1;
     const box=`padding-bottom:${(100/(ratio||1)).toFixed(1)}%;position:relative`;
-    const img=c.url?`<img src="${esc(c.url)}" alt="${esc(c.label)} preview" loading="lazy" style="position:absolute;inset:0;object-position:${esc(c.object_position||'50% 50%')}">`:'';
-    return `<figure><div class="box" style="${box}">${img}</div><figcaption>${esc(c.label)}<br>${esc(c.aspect||'')}</figcaption></figure>`;
+    const img=c.url
+      ?`<img src="${esc(c.url)}" alt="${esc(c.label)} preview" loading="lazy" data-pv data-fallback="${esc(fb)}" data-fail="Preview unavailable" style="position:absolute;inset:0;object-position:${esc(c.object_position||'50% 50%')}">`
+      :'<span class="pvfail">Preview unavailable</span>';
+    return `<figure><div class="box" data-pvhost style="${box}">${img}</div><figcaption>${esc(c.label)}<br>${esc(c.aspect||'')}</figcaption></figure>`;
   }).join('');
   const isOg=r.body.data.is_share_image;const ed=S.canEdit;
   const ogBtn=ed?`<button class="btn ogbtn" onclick="setShareImage('${id}',${isOg?'true':'false'})">${isOg?'✓ This is your share image':'Use as share image'}</button>`:'';
   slot.innerHTML=`<div class="hl">Social sizes</div><div class="row">${cells}</div>
     <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}`;
+  wirePreviews(slot);
 }
 // ── G31: branded cards — the photo re-laid-out per platform (Instagram / story /
 // Facebook / X / Pinterest) with the owner's brand: accent bar, logo, business

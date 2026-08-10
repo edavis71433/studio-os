@@ -114,6 +114,57 @@ ok('short: truncated JPEG (2 bytes) declared image/jpeg → REJECTED', magicMatc
   // ONE store / no second pipeline: variants still come from the render transform (EXIF-safe output path)
   const lib = read('supabase/functions/presence/lib/media.ts');
   ok('invariant: publish variants still ride the render transform (orientation-safe, EXIF-free output)', /render\/image\/authenticated/.test(lib));
+
+  // ── The SIGNING contract ("the photos are broken in the preview image") ────
+  // A signed transform URL that can't resolve is worse than no URL at all: the
+  // page renders an <img> around it and the browser draws a broken-image glyph
+  // over a file that is perfectly intact. Two ways we produced exactly that, both
+  // pinned here because neither fails at sign time — only when the URL is FETCHED.
+  const room = read('supabase/functions/presence/routes/room.ts');
+  // These are CODE assertions — the comments in both files necessarily name the
+  // bad value in order to explain it, so strip comments before matching.
+  const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const libCode = code(lib), roomCode = code(room);
+  // 1. `format` is not the output-format selector. Storage accepts one value,
+  //    'origin' (keep the source format); leaving it out is what asks for a
+  //    modern format, and WebP is negotiated from the request. Naming 'webp'
+  //    hands the transformer a value outside its enum.
+  ok('sign: no transform asks for format:\'webp\' — not a value storage accepts',
+    !/format:\s*'webp'/.test(libCode) && !/format:\s*'webp'/.test(roomCode));
+  ok('sign: thumbnails/crops still transform (width + quality), they just don\'t name a format',
+    /transform: \{ width, quality: 72 \}/.test(lib) && /resize: 'cover', quality/.test(lib));
+  // 2. expiresIn belongs in the BODY. media.ts has said so in a comment since
+  //    signThumb was written — while previewUrlMap and room.ts passed it in the
+  //    query string, so every URL they signed came back null.
+  ok('sign: expiresIn is ALWAYS in the body — never a query string (the sign endpoint 400s on it)',
+    !/object\/sign\/[^`]*\?expiresIn=/.test(libCode) && !/object\/sign\/[^`]*\?expiresIn=/.test(roomCode));
+  ok('sign: every signer names expiresIn in its JSON body', (lib.match(/expiresIn/g) || []).length >= 4);
+  // 3. The fallback: the same private object, untransformed, so a transform that
+  //    cannot be served still leaves the owner looking at their photo.
+  ok('fallback: signOriginal signs the object with NO transform at all',
+    /export async function signOriginal\(/.test(lib) && !/signOriginal[\s\S]{0,400}transform:/.test(lib));
+  ok('fallback: signDownload is signOriginal + the friendly filename (one signer, no drift)',
+    /const url = await signOriginal\(storagePath, 600\)/.test(lib));
+  ok('fallback: signOriginalImage refuses a document (nothing for an <img> to fall back TO)',
+    /signOriginalImage[\s\S]{0,200}isImageMime\(mime\)/.test(lib));
+
+  const assets = read('supabase/functions/presence/routes/assets.ts');
+  ok('wiring: the detail panel ships thumb_fallback beside the transformed thumb',
+    /signOriginalImage\(asset\.storage_path/.test(assets) && /thumb_fallback: thumbFallback/.test(assets));
+  ok('wiring: the social crops ship ONE fallback_url for all four ratios (a fifth sign, not four more)',
+    /fallback_url: fallback/.test(assets) && (assets.match(/signOriginalImage\(/g) || []).length === 2);
+
+  // The page must never leave a broken-image glyph on screen — a preview that
+  // cannot load falls back once, then says so in words.
+  const files = read('files.html');
+  ok('honesty: files.html wires an error path onto every preview img (data-pv), not an inline onerror',
+    /function wirePreviews\(/.test(files) && /data-pv\b/.test(files) && !/onerror="/.test(files));
+  ok('honesty: a preview tries data-fallback ONCE, then replaces itself with a sentence',
+    /data-fallback/.test(files) && /class="pvfail"/.test(files) && /Preview unavailable/.test(files));
+  ok('honesty: an <img> that already failed before wiring is caught (complete && !naturalWidth)',
+    /im\.complete&&!im\.naturalWidth/.test(files));
+  ok('honesty: roster thumbnails (a CSS background — no onerror) fall back to their icon',
+    /function wireThumbs\(/.test(files) && /data-thumb=/.test(files) && /data-ic=/.test(files));
 }
 
 const passed = results.filter((r) => r.p).length;
