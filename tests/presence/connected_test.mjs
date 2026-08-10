@@ -33,7 +33,11 @@ const CATS = ['search', 'local_listing', 'analytics', 'social', 'reviews', 'sche
 
 // ═══ 2. read-only first — nothing writes at L4.0 ═══
 {
-  ok('read-only first: NO provider is read_write yet (every one is planned)', CONNECTED_PROVIDERS.every((p) => p.status === 'planned'));
+  // Read-only first is about WRITES, not about staying dark. A provider whose
+  // read adapter has actually shipped is 'read_only' (google_search_console,
+  // AN-3.1) — that is the law being kept, not broken. Which providers may leave
+  // 'planned', and why the rest may not, is audited in connected_registry_test.mjs.
+  ok('read-only first: NO provider is read_write yet', CONNECTED_PROVIDERS.every((p) => p.status === 'planned' || p.status === 'read_only'));
   ok('read-only first: every observation provider declares real read capabilities', CONNECTED_PROVIDERS.every((p) => Array.isArray(p.reads)));
   ok('future writes are DECLARED (so the write architecture is supportable) but built by no adapter',
     CONNECTED_PROVIDERS.some((p) => p.futureWrites.length > 0) && CONNECTED_PROVIDERS.every((p) => p.status !== 'read_write'));
@@ -86,7 +90,8 @@ const CATS = ['search', 'local_listing', 'analytics', 'social', 'reviews', 'sche
     Array.isArray(x.read_capabilities) && Array.isArray(x.future_write_capabilities) && x.customer_approval &&
     Array.isArray(x.supported_editions) && ['Planned', 'Read-only', 'Read/Write'].includes(x.status)));
   const s = inventorySummary();
-  ok('inventory: summary covers category/status/edition', s.total === CONNECTED_PROVIDERS.length && s.byStatus.planned === CONNECTED_PROVIDERS.length && Object.keys(s.byCategory).length >= 8);
+  ok('inventory: summary covers category/status/edition', s.total === CONNECTED_PROVIDERS.length &&
+    Object.values(s.byStatus).reduce((a, b) => a + b, 0) === CONNECTED_PROVIDERS.length && Object.keys(s.byCategory).length >= 8);
 }
 
 // ═══ 7. extensibility — a new provider is a registry ENTRY, not a redesign ═══

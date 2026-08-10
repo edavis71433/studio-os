@@ -3,7 +3,20 @@
 // one contract. Adding a provider is appending here — never a new architecture.
 // Read-only first: `reads` is what a shipped adapter observes; `futureWrites` is
 // declared (so the write architecture is provably supportable) but built by NO
-// adapter at L4.0 — every `status` is 'planned'.
+// adapter at L4.0 — every `status` began as 'planned'.
+//
+// `status` IS THE SWITCH THE CUSTOMER FEELS. connections.html renders the Connect
+// button only for 'read_only'/'read_write'; a 'planned' provider renders "coming
+// soon" and cannot be connected AT ALL. So a provider is flipped off 'planned'
+// only when its read is verified end-to-end — endpoint, scope and normalizer
+// proven against the real API, not merely written down. Phase AN-3.1 did that for
+// google_search_console (the request/response contract is copied verbatim from
+// the shipping clever-api collector, the scope is the full URL Google demands,
+// and ops/gsc_sync.ts is tested against the real stores) — and then forgot to
+// flip this field, which is why the Connect button never appeared. The other 20
+// are audited, with the concrete reason each is still 'planned', in
+// tests/presence/connected_registry_test.mjs; that test fails if a shipped
+// adapter is left on 'planned' or a 'planned' one is flipped without evidence.
 //
 // Scopes are the least-privilege permissions we would request — the smallest set
 // that satisfies `reads`. They are declared here so consent is honest before a
@@ -17,7 +30,9 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
     auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],   // AN-3.1: full scope URL (Google rejects the short form)
     reads: ['the searches that lead to you', 'how often you appear and get clicked', 'pages Google has trouble reading'],
     futureWrites: ['submit a sitemap', 'ask Google to re-check a page'], minEdition: 'presence_monitor',
-    rateNote: 'generous daily quota; observed on a gentle schedule', status: 'planned' },
+    // AN-3.1 shipped the real read (ops/gsc_sync.ts + lib/gsc.ts, proven call
+    // shape, full-URL scope). This is the flip that phase missed.
+    rateNote: 'generous daily quota; observed on a gentle schedule', status: 'read_only' },
   { key: 'bing_webmaster', name: 'Bing Webmaster Tools', customerLabel: 'how you show up in Bing',
     category: 'search', purpose: 'The same visibility picture for Bing and the assistants that use it.',
     auth: 'api_key', approval: 'api_key_entry', scopes: ['webmaster.read'],
