@@ -288,7 +288,7 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // AN-3 (§Agency): per-client search state from the shared `signals` table — who's
   // growing/falling on Google, and who hasn't connected Search Console. Reuses the
   // portfolio; one site→client map + one signals query (no duplicate dashboard).
-  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id`));
+  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at`));
   const clientIds = sites.map((s) => s.client_id).filter(Boolean);
   const gscRows = clientIds.length ? arr(await svc(`signals?client_id=in.(${clientIds.join(',')})&source=eq.gsc&metric=eq.search_impressions&select=client_id,value,period&order=period.desc&limit=2000`)) : [];
   const byClient = new Map<string, any[]>();
@@ -301,23 +301,80 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
     const prior = periods[1] ? Number(rows.find((x) => x.period === periods[1])?.value || 0) : null;
     return agencySearchState({ impressions: cur, clicks: 0, priorImpressions: prior, priorClicks: null, ctr: null, position: null, period: periods[0], hasData: true, totalImpressions: cur, totalClicks: 0, firstImpressionAt: null, firstSearchClickAt: null });
   };
-  const counts = { not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
-  const notConnectedSites: any[] = [];
-  for (const s of sites) { const st = stateFor(s.client_id); counts[st]++; if (st === 'not_connected') notConnectedSites.push(s); }
+  // ── The order of operations, told honestly (AN-3.1 follow-up) ───────────────
+  // The old band inferred exactly two states from the presence/absence of
+  // `signals` rows: "connected" or "connect Search Console". Both of the states
+  // in between were being nagged with the wrong step.
+  //
+  //   DRAFT     — the site has never been published. Search Console cannot
+  //               report on a page Google has never been able to crawl, and
+  //               lib/gsc.ts queries the PREVIOUS FULL CALENDAR MONTH, so
+  //               connecting a draft today fetches a month in which nothing was
+  //               live. Publishing comes first; asking for Search Console here
+  //               is asking for the wrong thing.
+  //   WAITING   — genuinely connected (presence_connections says so — the old
+  //               code never read that table at all), but no month has landed
+  //               yet. A real connection was being nagged to "connect Search
+  //               Console" for weeks.
+  //   NOT_CONN. — published, and nothing is connected. The one case where the
+  //               ask is right.
+  const gscConnected = new Set(
+    arr(await svc(`presence_connections?site_id=in.(${siteIds.join(',')})&provider_key=eq.google_search_console&select=site_id,status`))
+      .filter((c: any) => ['connected', 'verified', 'active'].includes(String(c.status)))
+      .map((c: any) => String(c.site_id)),
+  );
+  const nameOf = (siteId: string) => String((portfolio || []).find((c: any) => String(c.site_id) === String(siteId))?.name || 'this client');
+  const counts = { draft: 0, waiting: 0, not_connected: 0, growing: 0, falling: 0, steady: 0 } as Record<string, number>;
+  const draftSites: any[] = [], waitingSites: any[] = [], notConnectedSites: any[] = [];
+  for (const s of sites) {
+    const st = stateFor(s.client_id);
+    if (st === 'not_connected') {
+      // no numbers yet — but WHY there are none is three different situations
+      if (!s.last_published_at) { counts.draft++; draftSites.push(s); continue; }
+      if (gscConnected.has(String(s.id))) { counts.waiting++; waitingSites.push(s); continue; }
+      counts.not_connected++; notConnectedSites.push(s); continue;
+    }
+    counts[st]++;
+  }
+  // One link per client — never a CTA that points nowhere. `href`/`cta` stay set
+  // to the FIRST client so an older page (which knows nothing of `sites`) still
+  // lands somewhere that can act; the shipped '/agency.html' fallback could not,
+  // since Studio has no Search Console affordance at all.
+  const linksFor = (rows: any[], path: (id: string) => string, verb: string) => rows.slice(0, 8).map((s: any) => ({
+    id: String(s.id), name: nameOf(s.id), href: path(String(s.id)), cta: `${verb} ${nameOf(s.id)}`,
+  }));
   const searchInsightsAgency: any[] = [];
   if (counts.growing) searchInsightsAgency.push({ key: 'search_growing', title: 'Rising on Google', sentence: `${counts.growing} ${counts.growing === 1 ? 'client is' : 'clients are'} getting seen more on Google lately.`, number: counts.growing, tone: 'good' });
   if (counts.falling) searchInsightsAgency.push({ key: 'search_falling', title: 'Losing visibility', sentence: `${counts.falling} ${counts.falling === 1 ? 'client is' : 'clients are'} being seen less on Google — worth a fresh update.`, number: counts.falling, tone: 'attention' });
+  if (counts.draft) {
+    const links = linksFor(draftSites, (id) => `/presence.html?client=${encodeURIComponent(id)}#publish`, 'Publish');
+    searchInsightsAgency.push({
+      key: 'search_draft', title: 'Publish the site first',
+      sentence: `${counts.draft} of ${siteIds.length} ${counts.draft === 1 ? 'site is' : 'sites are'} still a draft. Google can’t measure a site it has never been able to visit — publishing comes before Search Console, not after.`,
+      number: counts.draft, tone: 'neutral',
+      sites: links, href: links[0]?.href, cta: links.length === 1 ? links[0].cta : 'Publish the first one',
+    });
+  }
+  if (counts.waiting) {
+    const links = linksFor(waitingSites, (id) => `/connections.html?client=${encodeURIComponent(id)}`, 'Check');
+    searchInsightsAgency.push({
+      key: 'search_waiting', title: 'Connected — waiting on Google',
+      sentence: `${counts.waiting} ${counts.waiting === 1 ? 'client is' : 'clients are'} connected to Search Console with no numbers yet. That’s normal: Google reports on whole past months, so the first figures land after the site has been live through one — expect a few weeks, not days. Nothing to do.`,
+      number: counts.waiting, tone: 'neutral',
+      sites: links, href: links[0]?.href, cta: links.length === 1 ? links[0].cta : 'Check the connections',
+    });
+  }
   if (counts.not_connected) {
-    // Connecting Search Console is the STUDIO's setup job — a client never touches it.
-    // Frame it as the operator's action and link straight to that client's connections
-    // (scoped) when there's exactly one; otherwise to the portfolio to pick the client.
-    const one = notConnectedSites.length === 1 ? notConnectedSites[0] : null;
+    // Connecting Search Console is the STUDIO's setup job — a client never touches
+    // it. Frame it as the operator's action and link straight to each client's
+    // connections page, scoped. Never '/agency.html': `grep -c connections
+    // agency.html` is 0, so that CTA landed somewhere that could not act.
+    const links = linksFor(notConnectedSites, (id) => `/connections.html?client=${encodeURIComponent(id)}`, 'Connect');
     searchInsightsAgency.push({
       key: 'search_not_connected', title: 'Connect Search Console',
-      sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'client needs' : 'clients need'} Google Search Console connected — connect it for them (it’s your setup, not theirs) to unlock their search numbers.`,
+      sentence: `${counts.not_connected} of ${siteIds.length} ${counts.not_connected === 1 ? 'published client needs' : 'published clients need'} Google Search Console connected — connect it for them (it’s your setup, not theirs) to unlock their search numbers.`,
       number: counts.not_connected, tone: 'neutral',
-      href: one ? `/connections.html?client=${encodeURIComponent(String(one.id))}` : '/agency.html',
-      cta: one ? 'Connect it for them' : 'Choose a client',
+      sites: links, href: links[0]?.href, cta: links.length === 1 ? links[0].cta : 'Connect the first one',
     });
   }
 
@@ -367,15 +424,52 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+
+  // ── Whose sales are these? ───────────────────────────────────────────────────
+  // Deals and invoices only ever live on the OPERATOR's agency site — sales.ts
+  // says so in a comment ("Deals only ever live on agency sites"), the inserts
+  // put them there, and 0086 calls site_id "the agency site that issued it". So
+  // reading them as site_id = <the drilled client's site> can only ever return
+  // nothing: every client drill-in showed "Open pipeline $0 · 0 open deals · No
+  // invoices yet · No wins yet", forever, for structural reasons. A guaranteed
+  // $0 is not an empty state, it is a false statement — Eric's Bacchus deal is
+  // won AND converted, and the board said he had none.
+  //
+  // The join key already exists and is indexed: presence_deals.converted_client_id
+  // (0074, UNIQUE) and presence_invoices.customer_client_id (0086:37) both point
+  // at the CLIENT. So when scoped we read by client instead of by site, and the
+  // band becomes what Eric expected it to be — the business dashboard FOR
+  // Bacchus, showing the studio's actual sales relationship with Bacchus.
+  //
+  // Only when SCOPED. `x-dds-scope-site` reaching this handler means index.ts
+  // already ran resolveScopedSite and it passed (agency membership + role +
+  // authorized-client, fail-closed), so the caller is an authorized operator.
+  // Unscoped, the site_id read stands: a client owner must never be handed the
+  // studio's deal record about them, and an operator on their own site gets
+  // their whole pipeline exactly as before.
+  const scopedTo = String(req.headers.get('x-dds-scope-site') || '');
+  const isScoped = !!scopedTo && scopedTo === String(site.id);
+  const clientId = String(site.client_id || '');
+  // converted_*_id is the conversion link; customer_*_id is the billing link.
+  // Both site variants are included because an upsell invoice may be addressed
+  // to the workspace rather than the client record — a superset of the truth,
+  // never a guess.
+  const dealsQuery = isScoped && clientId
+    ? `presence_deals?or=(converted_client_id.eq.${clientId},converted_site_id.eq.${site.id})&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`
+    : `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`;
+  const invoicesQuery = isScoped && clientId
+    ? `presence_invoices?or=(customer_client_id.eq.${clientId},customer_site_id.eq.${site.id})&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`
+    : `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`;
+
   // TRUTHFULNESS (AN-4, like loadVisits above): every capped read is ORDERED
   // newest-first, so hitting a cap means "the most recent N" — a deterministic,
   // honest subset — and the per-section truncated_* flags below let the page
   // say so instead of presenting a silent undercount as the whole story.
   const [dealsR, subsR, supR, invR, visitsR, gsc] = await Promise.all([
-    safe(svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`)),
+    safe(svc(dealsQuery)),
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
-    safe(svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`)),
+    safe(svc(invoicesQuery)),
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
     safe(readGsc(site.client_id)),
   ]);
@@ -421,11 +515,25 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       truncated: visits.length >= 5000,
     };
   }
-  // search: null = genuinely not connected; { unavailable: true } = the signals
-  // read failed (the page must NOT show the connect CTA for a hiccup — AN-4).
+  // search states, in the order they actually happen:
+  //   { unavailable }  — the signals read failed. NOT a connect prompt (AN-4).
+  //   { draft }        — the site has never been published. Search Console
+  //                      cannot report on a page Google has never crawled, and
+  //                      lib/gsc.ts asks for the PREVIOUS FULL CALENDAR MONTH,
+  //                      so connecting a draft today fetches a month in which
+  //                      nothing was live. The ask is simply the wrong one.
+  //   { waiting }      — connected (presence_connections, which this handler
+  //                      never read), no month landed yet. Honest lag, not a
+  //                      missing connection.
+  //   null             — published, nothing connected: the connect prompt is right.
+  //   { clicks, … }    — real numbers.
   let search: unknown = null;
   if (!gsc || !gsc.ok) search = { unavailable: true };
-  else if (gsc.hasData) {
+  else if (!gsc.hasData && !site.last_published_at) {
+    search = { draft: true, publish_href: '/presence.html#publish' };
+  } else if (!gsc.hasData && (await safe(connectionState(site.id)))?.gsc) {
+    search = { waiting: true };
+  } else if (gsc.hasData) {
     const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
     search = {
       clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,
@@ -437,6 +545,13 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     period,
     generated_at: nowIso,
     sales: {
+      // `scope`: 'client' means the deals/invoices above are the ones ATTACHED to
+      // this client (converted / billed), not the studio's whole pipeline. The
+      // page says so, because "Open pipeline" means a different thing here and a
+      // number whose meaning is ambiguous is barely better than a wrong one.
+      // Enquiries and support stay site-scoped either way — those genuinely are
+      // the client's own.
+      scope: isScoped && clientId ? 'client' : 'studio',
       pipeline, won, enquiries, support, invoices, recent_wins,
       truncated_deals: !!deals && deals.length >= 2000,
       truncated_invoices: !!invs && invs.length >= 1000,

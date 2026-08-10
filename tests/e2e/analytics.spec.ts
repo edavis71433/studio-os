@@ -279,16 +279,38 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
   });
 
+  // The scoped board is a DIFFERENT payload from the unscoped one: deals and
+  // invoices live on the operator's agency site, so a client drill-in reads them
+  // by converted_client_id / customer_client_id and the band is labelled
+  // scope:'client'. Serving the rich UNSCOPED fixture here — as this test used to
+  // — asserted $12,400 on a board that could only ever have returned zeros, which
+  // is precisely why the empty Sales band shipped. The fixture is now scoped.
+  const DASH_SCOPED = (() => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.sales.scope = 'client';
+    // one converted deal — Bacchus-shaped: won, so nothing is open
+    D.data.sales.pipeline = { open: { count: 0, value_cents: 0 }, stages: [
+      { stage: 'lead', label: 'New lead', count: 0, value_cents: 0 },
+      { stage: 'qualified', label: 'Qualified', count: 0, value_cents: 0 },
+      { stage: 'proposal', label: 'Proposal sent', count: 0, value_cents: 0 },
+      { stage: 'contract', label: 'Agreement out', count: 0, value_cents: 0 },
+    ] };
+    D.data.sales.won = { this_month: { count: 0, value_cents: 0 }, last_month: { count: 1, value_cents: 480000 } };
+    D.data.sales.recent_wins = [{ title: 'Bacchus Kitchen + Wine Bar', value_cents: 480000, closed_at: '2026-07-22T00:00:00Z' }];
+    D.data.sales.invoices = { paid_cents: 240000, sent_cents: 240000, overdue_cents: 0, outstanding_cents: 240000, paid_count: 1, sent_count: 1, overdue_count: 0 };
+    return D;
+  })();
+
   test('forwards the scope header (SC-1) on its dashboard call', async ({ page }) => {
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
     let sentScope = '';
-    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await installApp(page, { api: { '/analytics/dashboard': DASH_SCOPED } });
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
       sentScope = route.request().headers()['x-dds-scope-site'] || '';
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DASH) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DASH_SCOPED) });
     });
     await page.goto(`/analytics.html?client=${CLIENT}`);
-    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sales' })).toBeVisible();
     expect(sentScope).toBe(CLIENT);
     // drill links carry the scope through to the report surfaces
     await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
@@ -374,6 +396,77 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.locator('.st').first()).toBeVisible();     // slow fetch → stencil blocks
     await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
     await expect(page.locator('.st')).toHaveCount(0);            // replaced by the real board
+  });
+
+  // ── the scoped Sales band: real per-client sales, honestly labelled ──────────
+  test('scoped, the Sales band says whose sales these are and shows the client’s real win', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/analytics/dashboard': DASH_SCOPED } });
+    await page.goto(`/analytics.html?client=${CLIENT}`);
+    await expect(page.getByRole('heading', { name: 'Sales' })).toBeVisible();
+    // the band is the studio's sales relationship WITH this client — same
+    // numbers, different meaning, so it is stated rather than guessed at
+    await expect(page.getByText('Your deal and invoices with this client.')).toBeVisible();
+    // and the client's actual invoices are there — not "No invoices yet"
+    await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
+    await expect(page.getByText('No wins yet')).toHaveCount(0);
+  });
+
+  test('“Won this month” with a win LAST month says so — never a bare $0', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/analytics/dashboard': DASH_SCOPED } });
+    await page.goto(`/analytics.html?client=${CLIENT}`);
+    const wonCard = page.locator('section.card', { has: page.getByRole('heading', { name: 'Won this month' }) });
+    // "$0 · none won yet" reads the same for "no wins", "wins last month" and
+    // "this band cannot see your wins" — three very different situations
+    await expect(wonCard).toContainText('none won yet this month');
+    await expect(wonCard).toContainText('most recent win');
+    await expect(wonCard).toContainText('$4,800');
+  });
+
+  // ── the draft gate: publishing comes before Search Console ───────────────────
+  test('a DRAFT site is asked to publish, not to connect Search Console', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('Publish the site first').first()).toBeVisible();
+    await expect(page.getByText('Google can’t measure a draft').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+      .toHaveAttribute('href', '/presence.html#publish');
+    // the wrong step, asked every week, is what nagging is
+    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
+  });
+
+  test('the draft publish link carries the scope BEFORE the fragment, not inside it', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.search = { draft: true, publish_href: '/presence.html#publish' };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto(`/analytics.html?client=${CLIENT}`);
+    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+      .toHaveAttribute('href', `/presence.html?client=${CLIENT}#publish`);
+  });
+
+  test('CONNECTED but with no month yet → the honest lag, and nothing to do', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.search = { waiting: true };
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByText('Connected — waiting on Google').first()).toBeVisible();
+    await expect(page.getByText('Google reports on whole past months').first()).toBeVisible();
+    // a real connection must stop being nagged to connect
+    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
+    await expect(page.getByText('Not measured yet')).toHaveCount(0);
+  });
+
+  test('published and genuinely not connected → the connect CTA is finally right', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.search = null;
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('link', { name: 'Connect Search Console →' }).first())
+      .toHaveAttribute('href', '/connections.html');
   });
 
   test('no serious/critical axe violations on the dashboard', async ({ page }, testInfo) => {
@@ -608,6 +701,52 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByText('Add your first client from your Studio tools')).toBeVisible();
     // the rollup keeps its own no-clients empty state
     await expect(page.getByText('No clients yet', { exact: false }).first()).toBeVisible();
+  });
+
+  // ── the Search Console band: every CTA lands somewhere that can act ──────────
+  test('with several clients needing it, the card links EACH one — never /agency.html', async ({ page }) => {
+    const PF = JSON.parse(JSON.stringify(PORTFOLIO));
+    PF.data.insights = [{
+      key: 'search_not_connected', title: 'Connect Search Console',
+      sentence: '2 of 3 published clients need Google Search Console connected.',
+      number: 2, tone: 'neutral',
+      sites: [
+        { id: 's1', name: 'Marlow’s Kitchen', href: '/connections.html?client=s1', cta: 'Connect Marlow’s Kitchen' },
+        { id: 's2', name: 'Beacon Plumbing', href: '/connections.html?client=s2', cta: 'Connect Beacon Plumbing' },
+      ],
+      href: '/connections.html?client=s1', cta: 'Connect the first one',
+    }];
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': PF } });
+    await page.goto('/analytics.html');
+    // the shipped card fell back to /agency.html whenever >1 client needed it —
+    // and `grep -c connections agency.html` is 0, so it landed nowhere that could act
+    await expect(page.getByRole('link', { name: 'Connect Marlow’s Kitchen →' })).toHaveAttribute('href', '/connections.html?client=s1');
+    await expect(page.getByRole('link', { name: 'Connect Beacon Plumbing →' })).toHaveAttribute('href', '/connections.html?client=s2');
+    await expect(page.getByRole('link', { name: 'Choose a client →' })).toHaveCount(0);
+  });
+
+  test('draft clients are asked to publish, not to connect Search Console', async ({ page }) => {
+    const PF = JSON.parse(JSON.stringify(PORTFOLIO));
+    PF.data.insights = [{
+      key: 'search_draft', title: 'Publish the site first',
+      sentence: '1 of 3 sites is still a draft. Google can’t measure a site it has never been able to visit.',
+      number: 1, tone: 'neutral',
+      sites: [{ id: 's3', name: 'Cedar Studio', href: '/presence.html?client=s3#publish', cta: 'Publish Cedar Studio' }],
+      href: '/presence.html?client=s3#publish', cta: 'Publish Cedar Studio',
+    }];
+    await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': PF } });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('heading', { name: 'Publish the site first' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Publish Cedar Studio →' }))
+      .toHaveAttribute('href', '/presence.html?client=s3#publish');
+  });
+
+  test('an older function build (href only, no sites[]) still renders its single link', async ({ page }) => {
+    // additive both ways — the page must never depend on the new field
+    await installApp(page, { api: AGENCY_API });
+    await page.goto('/analytics.html');
+    await expect(page.getByRole('link', { name: 'Connect it for them →' }))
+      .toHaveAttribute('href', '/connections.html?client=s3');
   });
 
   test('no serious/critical axe violations on the portfolio lens', async ({ page }, testInfo) => {
