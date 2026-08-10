@@ -84,9 +84,14 @@
      The pinned cell needs its own opaque fill (a transparent sticky cell lets
      the scrolled columns slide visibly under it) and must follow the row hover. */
   td.c-email{overflow-wrap:anywhere}
+  /* width:1% asks the auto table algorithm for this column's MINIMUM. With the
+     buttons on one line that minimum is the button row itself, so the column
+     takes exactly what it needs and gives every other pixel to the data. */
   th.acts,td.acts{width:1%;white-space:nowrap}
-  /* …and the buttons may stack rather than set a ~250px floor for the column. */
-  .rowacts{flex-wrap:wrap}
+  /* On a phone, and ONLY on a phone, the buttons may stack instead — otherwise
+     the column's minimum is ~250px of a 350px table. Left unscoped this wrapped
+     the buttons at every width and made desktop rows three lines tall. */
+  @media (max-width:767.98px){.rowacts{flex-wrap:wrap}}
   /* The PIN is tablet-and-up only. Pinned on a 390px phone the action cell is
      250px of a 350px container — it sits ON TOP of Company and Email and the
      row is unreadable (measured, not guessed). Phones default to the Cards
