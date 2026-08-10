@@ -398,6 +398,105 @@ async function businessNameFor(clientId: string): Promise<string> {
   return String(r.json?.[0]?.name || '').slice(0, 120);
 }
 
+// ── SYSTEM: invoice-paid echo (called by the stripe-webhook, secret-gated) ──
+// WHY A ROUTE AND NOT A RESEND CALL IN THE WEBHOOK. When a service invoice or
+// deposit is paid, three things must happen for the operator, and the webhook
+// function can do NONE of them properly:
+//
+//   1. the notice must go through raiseNotice — the webhook wrote it with a raw
+//      db() POST, which skips the Web Push at lib/notice.ts, so the one event
+//      most worth buzzing a phone for was the only notice that never did;
+//   2. the operator must be EMAILED (`grep -c sendEmail` in stripe-webhook: 0);
+//   3. the recipient must come from studioRecipient's fallback chain, because
+//      presence_identity.email is blank on the studio's own site.
+//
+// The webhook is a deliberately thin, single-purpose function: no lib/ imports,
+// no Resend key, no VAPID keys, no brand loader. Inlining a "minimal Resend
+// call" there would buy an UNBRANDED email that still has no push, still has no
+// fallback recipient, and would put the platform's mail credentials into a
+// second function's secret set. Everything needed already lives here, and the
+// webhook already has a paved path for exactly this delegation
+// (forwardBillingSync → /commerce/billing-sync, same secret, same shape). So the
+// echo is a route, and the webhook stays the source of PAYMENT truth only.
+//
+// The body carries an id, never facts: the invoice is re-read from the database,
+// so a leaked secret cannot forge an amount or a payee.
+async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>): Promise<Response> {
+  if (!BILLING_SYNC_SECRET || req.headers.get('x-commerce-secret') !== BILLING_SYNC_SECRET) {
+    return json({ error: 'forbidden' }, 403, cors);
+  }
+  let body: any = null;
+  try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const invoiceId = String(body?.invoice_id || '');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceId)) {
+    return json({ error: 'bad_request' }, 400, cors);
+  }
+  const inv = (await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose&limit=1`)).json?.[0];
+  if (!inv) return json({ data: { ignored: true, reason: 'not_paid_or_unknown' } }, 200, cors);
+  const clientId = (await svc(`presence_sites?id=eq.${encodeURIComponent(String(inv.site_id))}&select=client_id&limit=1`)).json?.[0]?.client_id;
+  if (!clientId) return json({ data: { ignored: true, reason: 'no_owner_client' } }, 200, cors);
+
+  // A DEPOSIT IS NOT A SEPARATE FLOW — it is presence_invoices.purpose='deposit'
+  // (0086). It is, however, a different SENTENCE: "Deposit — $500 from Claud
+  // Beltran" is the thing Eric actually wants to read, and "Invoice paid" is not.
+  const isDeposit = inv.purpose === 'deposit';
+  const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const what = String(inv.title || (isDeposit ? 'Deposit' : 'Invoice'));
+  // WHO paid — the deal's contact, so the subject line names a person. Purely
+  // decorative: every line below degrades to a correct, less specific sentence.
+  let who = '';
+  try {
+    if (inv.deal_id) {
+      const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=title,contact_id&limit=1`)).json?.[0];
+      if (deal?.contact_id) {
+        const contact = (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=name&limit=1`)).json?.[0];
+        who = String(contact?.name || '').slice(0, 80);
+      }
+      if (!who) who = String(deal?.title || '').slice(0, 80);
+    }
+  } catch { /* the money landed either way */ }
+
+  const headline = `${isDeposit ? 'Deposit' : 'Paid'} — ${what} (${amount})${who ? ` from ${who}` : ''}`;
+  // raiseNotice, not a raw insert: same unique (client_id, kind, period) row the
+  // webhook wrote before, PLUS the Web Push it was silently skipping, PLUS the
+  // created-flag that is the send-once gate for the email below. period is the
+  // invoice id, so a Stripe retry re-raises nothing and re-sends nothing.
+  const fresh = await raiseNotice({
+    siteId: String(inv.site_id), clientId: String(clientId), kind: 'invoice_paid', period: `paid:${inv.id}`,
+    headline,
+    body: isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
+  });
+
+  let emailed = false;
+  if (fresh) {
+    const { emailOperator } = await import('../lib/service_bridge.ts');
+    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+    const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+    const link = inv.deal_id ? `${base}/pipeline.html?deal=${inv.deal_id}` : `${base}/today.html`;
+    emailed = await emailOperator(String(inv.site_id),
+      `${isDeposit ? 'Deposit' : 'Payment'} received — ${amount}${who ? ` from ${who}` : ''}`,
+      `<p><b>${esc(amount)}</b> just landed${who ? ` from <b>${esc(who)}</b>` : ''}.</p>` +
+      `<table style="margin:8px 0;border-collapse:collapse">` +
+      `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}</b></td></tr>` +
+      `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
+      (who ? `<tr><td style="padding:2px 12px 2px 0;color:#666">From</td><td>${esc(who)}</td></tr>` : '') +
+      `</table>` +
+      `<p>${isDeposit ? 'The deposit is in — the work can start.' : 'Nothing else to do; the invoice is marked paid.'}</p>`,
+      isDeposit ? 'deposit_paid' : 'invoice_paid', { label: 'Open it in your workspace', href: link });
+  }
+
+  // A paid DEPOSIT is checklist step 2, and it ticks itself. Idempotent (the
+  // PATCH matches only a not-yet-done row) and independent of `fresh`, so a
+  // retry that arrives after the notice already exists still repairs a tick that
+  // was missed the first time.
+  let ticked = false;
+  if (isDeposit && inv.deal_id) {
+    const { tickChecklistForDeal } = await import('../lib/service_bridge.ts');
+    ticked = await tickChecklistForDeal(String(inv.site_id), String(inv.deal_id), 'deposit_paid', 'stripe', 'system');
+  }
+  return json({ data: { notice: fresh, emailed, ticked } }, 200, cors);
+}
+
 async function handleBillingSync(req: Request, cors: Record<string, string>): Promise<Response> {
   if (!BILLING_SYNC_SECRET || req.headers.get('x-commerce-secret') !== BILLING_SYNC_SECRET) {
     return json({ error: 'forbidden' }, 403, cors);
@@ -575,6 +674,7 @@ export async function handleCommerce(req: Request, route: string, method: string
   if (route === '/commerce/verify' && method === 'POST') return handleVerify(req, cors);
   if (route === '/commerce/checkout-status' && method === 'GET') return handleCheckoutStatus(req, cors);
   if (route === '/commerce/billing-sync' && method === 'POST') return handleBillingSync(req, cors);
+  if (route === '/commerce/invoice-paid' && method === 'POST') return handleInvoicePaidEcho(req, cors);
 
   // authed
   const authed = principal.kind === 'client' || principal.kind === 'staff';

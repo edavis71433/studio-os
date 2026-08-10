@@ -168,8 +168,13 @@ function teardownFor(kind) {
     iClear > 0 && iEvent > 0 && iClear < iEvent, `clear@${iClear} event@${iEvent}`);
   ok('F2: …and outside the echo’s try{} — the try is what used to swallow its turn',
     iClear > 0 && iClear < echo.indexOf('    try {'), `clear@${iClear} try@${echo.indexOf('    try {')}`);
-  ok('F2: the invoice_paid notice reuses the client the clear resolved (one site read, one truth)',
-    /const clientId = await clearInvoiceReminder\(inv\);/.test(echo) && /if \(clientId\) \{/.test(echo));
+  // The notice is now DELEGATED to presence /commerce/invoice-paid (so it goes
+  // through raiseNotice and gets the Web Push + the operator email the raw insert
+  // never had). The raw insert survives as the FALLBACK for when that hop fails —
+  // and that fallback must still reuse the client the clear already resolved,
+  // which is what this has always been about: one site read, one truth.
+  ok('F2: the invoice_paid notice fallback reuses the client the clear resolved (one site read, one truth)',
+    /const clientId = await clearInvoiceReminder\(inv\);/.test(echo) && /if \(!echoed && clientId\) \{/.test(echo));
 
   // the healing path: a retry of an already-paid invoice must still clear.
   ok('F2: the ALREADY-PAID short-circuit clears too, so a Stripe retry heals a stranded row',

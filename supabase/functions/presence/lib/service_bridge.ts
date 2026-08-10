@@ -64,6 +64,19 @@ export async function ensureProjectForDeal(opts: {
   }
 
   await ensureBridge(agencySiteId, project.id, clientId, customerSiteId, deal.id);
+  // A handed-off project is NOT an empty shell. Before this, a converted deal
+  // produced a project with zero tasks, so the record page read "PROGRESS 0% ·
+  // 0/0 tasks" forever — progress is COMPUTED from tasks (progressOf), so with
+  // none there was no number to move. It starts as the studio's ten-step
+  // delivery checklist instead; two of those steps then tick themselves off the
+  // facts the system already owns (signing, the deposit). Best-effort and
+  // self-guarding — the handoff is complete with or without it.
+  await seedProjectChecklist(agencySiteId, project.id);
+  // …and the two self-ticking steps are ALREADY TRUE by the time a project
+  // exists: the normal order is sign → pay the deposit → convert, so a freshly
+  // seeded checklist that started every step at 'todo' would be lying about two
+  // facts nobody would ever go back and tick. Reconcile them from the evidence.
+  await reconcileChecklistFacts(agencySiteId, deal.id, project.id);
   await projectEventRow(agencySiteId, project.id, 'project_created', actor, actorKind, true, { name: project.name, from_deal: deal.id });
   return { ok: true, project, idempotent: false };
 }
@@ -244,7 +257,7 @@ export const noticePeriodFor = (threadKey: string, bucket = true): string =>
  *  wave — this helper sits on the front of a chain that must finish before an
  *  edge response resolves, so every avoidable serial hop is latency the email
  *  might not survive. */
-async function studioRecipient(agencySiteId: string): Promise<{ to: string; ownerClientId: string }> {
+export async function studioRecipient(agencySiteId: string): Promise<{ to: string; ownerClientId: string }> {
   const [siteR, identR] = await Promise.all([
     svc(`presence_sites?id=eq.${agencySiteId}&select=client_id&limit=1`),
     svc(`presence_identity?site_id=eq.${agencySiteId}&select=business_name,email&limit=1`),
@@ -434,4 +447,175 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
     console.warn(`[operator-notify] ${n?.kind} failed for site ${n?.agencySiteId}: ${String((e as Error)?.message || e)} (non-fatal)`);
     return false;
   }
+}
+
+/** Email the site's OPERATOR about something the system just learned — the one
+ *  door every operator-facing email goes through.
+ *
+ *  WHY IT EXISTS. Five lifecycle sweeps and both money moments used to do this
+ *  by hand, and every one of them did it the same broken way:
+ *
+ *      const owner = ident.json?.[0]?.email;   // presence_identity.email
+ *      if (owner) { … }                        // …and silence if it's blank
+ *
+ *  presence_identity.email is `default ''` (0015_presence_phase1.sql:82). Eric's
+ *  is blank, so `if (owner)` was false on every sweep and his deal-followup,
+ *  lead-followup, support-aging, renewal and agreement-renewal mail had ALL been
+ *  dying silently — no send, no log, nothing to notice. studioRecipient is the
+ *  only resolver with a fallback chain (identity → the owner's own clients row →
+ *  OPS_ALERT_EMAIL, that last rung gated on AGENCY_SITE_ID), and a dead end here
+ *  WARNS instead of vanishing.
+ *
+ *  Two properties are load-bearing and must not be "simplified":
+ *    • NO opts.siteId — that would set reply_to to the site's INBOUND WEBHOOK
+ *      address, so the operator hitting Reply would post his text into
+ *      /email/inbound. Operator mail keeps the human PLATFORM_REPLY_TO.
+ *    • critical:true — maySend silently suppresses non-critical mail for an
+ *      opted-out address; operational mail to the studio must survive that
+ *      (a bounce/complaint still suppresses, which is correct).
+ *
+ *  `what` is a short tag for the log line only. `cta` renders the button HERE
+ *  rather than at the call site, because only this function has the loaded brand
+ *  — a caller building its own button has to hardcode an accent colour, and a
+ *  hardcoded accent is wrong for every studio but one. Never throws; returns
+ *  whether a send was actually accepted. */
+export async function emailOperator(agencySiteId: string, subject: string, html: string, what: string, cta?: { label: string; href: string }): Promise<boolean> {
+  try {
+    if (!agencySiteId) return false;
+    const [{ to }, { sendEmail }, { loadEmailBrand }] = await Promise.all([
+      studioRecipient(agencySiteId),
+      import('../commerce/account.ts'),
+      import('./email_brand.ts'),
+    ]);
+    if (!to) {
+      console.warn(`[operator-mail] no operator recipient for site ${agencySiteId} (presence_identity.email and the owner's client email are both empty) — skipping ${what} (non-fatal)`);
+      return false;
+    }
+    const brand = await loadEmailBrand(agencySiteId);
+    // class="cta" is what the branded shell keys its white link text off
+    // (lib/email_brand.ts); the background has to be inline for email clients.
+    const body = cta
+      ? `${html}<p class="cta"><a href="${cta.href}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${cta.label} →</a></p>`
+      : html;
+    return await sendEmail(to, subject.slice(0, 180), body, brand, { critical: true });
+  } catch (e) {
+    console.warn(`[operator-mail] ${what} failed for site ${agencySiteId}: ${String((e as Error)?.message || e)} (non-fatal)`);
+    return false;
+  }
+}
+
+// ── The standard delivery checklist (see lib/project_checklist.ts) ───────────
+
+/** Seed the studio's ten-step checklist onto a project. SELF-GUARDING: it only
+ *  ever fills an EMPTY project, so it can be called from the handoff, from a
+ *  backfill, or twice in a row, and never duplicates or overwrites a studio's
+ *  own tasks. Returns how many steps were written (0 = already had tasks, or the
+ *  insert failed). Best-effort — a project must never fail to exist because its
+ *  scaffold didn't. */
+export async function seedProjectChecklist(siteId: string, projectId: string): Promise<number> {
+  try {
+    if (!siteId || !projectId) return 0;
+    // ANY task row blocks the seed, INCLUDING a soft-deleted one — deliberately
+    // stricter than `deleted_at is null`, and the same rule the 0120 backfill
+    // uses. A studio that deleted these steps meant it; re-seeding them on the
+    // next call (or the next time the backfill is pasted) would resurrect work
+    // they threw away.
+    const existing = rows(await svc(`presence_tasks?project_id=eq.${projectId}&site_id=eq.${siteId}&select=id&limit=1`));
+    if (existing.length) return 0;   // never merge into a project that already has work on it
+    const { checklistRows } = await import('./project_checklist.ts');
+    const body = checklistRows(siteId, projectId);
+    // ONE insert, not ten round trips — and no per-task activity event: this is
+    // the scaffold, not a stream of "a task was added" notifications (the same
+    // call applyTemplate makes).
+    const ins = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
+    if (!ins.ok) { console.warn(`[checklist] seed failed for project ${projectId}: ${ins.status} (non-fatal)`); return 0; }
+    return rows(ins).length;
+  } catch (e) {
+    console.warn(`[checklist] seed threw for project ${projectId}: ${String((e as Error)?.message || e)} (non-fatal)`);
+    return 0;
+  }
+}
+
+/** Tick one checklist step done. THE IDEMPOTENCY GUARANTEE lives in this one
+ *  query: the PATCH is filtered on `source=eq.checklist:<key>` AND
+ *  `status=neq.done`, with return=representation, so
+ *
+ *    • a re-fired Stripe webhook, a second sign POST, or a re-publish matches
+ *      ZERO rows — nothing is written and `false` comes back, so the caller's
+ *      "we just ticked it" side effects (the activity event) don't fire twice;
+ *    • a step the studio already ticked by hand is left exactly as it was,
+ *      including its completed_at;
+ *    • a project with no checklist (pre-backfill, or a studio that deleted the
+ *      step) is a clean no-op.
+ *
+ *  Never throws — it hangs off signing, payment and publishing, and none of
+ *  those may fail because their bookkeeping did. */
+export async function tickChecklistStep(siteId: string, projectId: string, key: string, actor = 'system', actorKind = 'system'): Promise<boolean> {
+  try {
+    if (!siteId || !projectId || !key) return false;
+    const { checklistSource } = await import('./project_checklist.ts');
+    const src = encodeURIComponent(checklistSource(key));
+    const done = nowIso();
+    const up = await svc(
+      `presence_tasks?project_id=eq.${projectId}&site_id=eq.${siteId}&source=eq.${src}&status=neq.done&deleted_at=is.null&select=id,title,client_visible`,
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'done', completed_at: done, updated_at: done }) },
+    );
+    const row = rows(up)[0];
+    if (!row) return false;   // already done, or no such step — either way, nothing happened
+    await projectEventRow(siteId, projectId, 'task_status_change', actor, actorKind, row.client_visible === true, { task_id: row.id, title: row.title, status: 'done', auto: key });
+    return true;
+  } catch (e) {
+    console.warn(`[checklist] tick ${key} failed for project ${projectId}: ${String((e as Error)?.message || e)} (non-fatal)`);
+    return false;
+  }
+}
+
+/** Tick a step on the project a DEAL was handed off to (deal.created_project_id).
+ *  The sign + deposit paths know a deal, not a project. No project yet (the deal
+ *  hasn't been converted) → a clean false. */
+export async function tickChecklistForDeal(agencySiteId: string, dealId: string, key: string, actor = 'system', actorKind = 'system'): Promise<boolean> {
+  try {
+    if (!agencySiteId || !dealId) return false;
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${agencySiteId}&select=created_project_id&limit=1`))[0];
+    if (!deal?.created_project_id) return false;
+    return await tickChecklistStep(agencySiteId, String(deal.created_project_id), key, actor, actorKind);
+  } catch { return false; }
+}
+
+/** Tick a step on whatever delivery project is bridged to a CUSTOMER's site —
+ *  the seam publishing needs, since a publish knows only the site it just put
+ *  live. Scoped through the ACTIVE service link, so the tick lands on the
+ *  agency's project and can never cross tenants. */
+export async function tickChecklistForCustomerSite(customerSiteId: string, key: string, actor = 'system', actorKind = 'system'): Promise<boolean> {
+  try {
+    if (!customerSiteId) return false;
+    const link = rows(await svc(`presence_service_links?customer_site_id=eq.${customerSiteId}&status=eq.active&select=project_id,agency_site_id&order=created_at.desc&limit=1`))[0];
+    if (!link?.project_id || !link?.agency_site_id) return false;
+    return await tickChecklistStep(String(link.agency_site_id), String(link.project_id), key, actor, actorKind);
+  } catch { return false; }
+}
+
+/** Tick the self-ticking steps from evidence already in the database, rather
+ *  than from an event we happened to be present for.
+ *
+ *  The handoff order is sign → pay the deposit → CONVERT, so by the time a
+ *  project exists both of those facts are usually already true and their live
+ *  tick call sites (the sign route, the paid webhook) fired long before there
+ *  was a checklist to tick. A freshly seeded checklist would therefore start
+ *  with two steps at 'todo' that are simply false — and nothing would ever
+ *  correct them. This reads the evidence instead: a SIGNED contract on the deal,
+ *  and a PAID deposit invoice on the deal.
+ *
+ *  Same idempotency as every other tick (the PATCH matches only non-done rows),
+ *  so calling it on an already-reconciled project writes nothing. Best-effort. */
+export async function reconcileChecklistFacts(agencySiteId: string, dealId: string, projectId: string): Promise<void> {
+  try {
+    if (!agencySiteId || !dealId || !projectId) return;
+    const [signedQ, depQ] = await Promise.all([
+      svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${agencySiteId}&status=eq.signed&deleted_at=is.null&select=id&limit=1`),
+      svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${agencySiteId}&purpose=eq.deposit&status=eq.paid&deleted_at=is.null&select=id&limit=1`),
+    ]);
+    if (rows(signedQ).length) await tickChecklistStep(agencySiteId, projectId, 'agreement_signed', 'system', 'system');
+    if (rows(depQ).length) await tickChecklistStep(agencySiteId, projectId, 'deposit_paid', 'system', 'system');
+  } catch { /* the checklist is still usable un-reconciled */ }
 }

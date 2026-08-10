@@ -130,7 +130,7 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('add-customer: dispatched in the authed block (after checkEntitlement gate)', idx.indexOf("route === '/sales/customers'") > idx.indexOf('checkEntitlement(principal'));
   // reuses the frozen bridge + one-primary-agency (ensureBridge), never a parallel
   // bridge — the bridge is now formed in the ONE shared bridgeCustomerToStudio helper.
-  ok('add-customer: reuses ensureBridge via the shared bridgeCustomerToStudio (one primary agency)', /ensureBridge\(agencySiteId, project\.id, clientId/.test(sales) && /import \{ ensureProjectForDeal, ensureBridge, linksForCustomer \}/.test(sales) && /export async function bridgeCustomerToStudio/.test(sales));
+  ok('add-customer: reuses ensureBridge via the shared bridgeCustomerToStudio (one primary agency)', /ensureBridge\(agencySiteId, project\.id, clientId/.test(sales) && /import \{ ensureProjectForDeal, ensureBridge, linksForCustomer[^}]*\} from '\.\.\/lib\/service_bridge\.ts'/.test(sales) && /export async function bridgeCustomerToStudio/.test(sales));
   // SERVICE customer: entitlement without a Stripe subscription (active access, no checkout)
   ok('add-customer: SERVICE billing boundary — provisions active access, no Stripe subscription created', !/createServicePaymentLink|createCheckout|stripe/i.test(sales.slice(sales.indexOf('handleSalesAddCustomer'))));
   // IDEMPOTENT existing-email: returns a friendly already_exists (with a link), never a duplicate

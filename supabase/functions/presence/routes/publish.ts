@@ -19,6 +19,7 @@ import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/pub
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { tickChecklistForCustomerSite } from '../lib/service_bridge.ts';
 import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
@@ -187,6 +188,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
   // G3 — a successful publish clears any lingering publish-failed attention notice.
   if (live && site.client_id) await clearNotice(site.client_id, 'publish_failed');
+  // "Site live" is step 9 of the studio's delivery checklist, and a live deploy
+  // of the customer's site IS that step — so it ticks itself rather than waiting
+  // for someone to remember. Resolved through the ACTIVE service link
+  // (customer_site_id → the agency's project), so it can never cross tenants,
+  // and idempotent: the PATCH matches only a not-yet-done row, so the tenth
+  // re-publish writes nothing. A site with no delivery bridge — every ordinary
+  // self-serve customer — resolves to no link and this is one cheap read.
+  if (live) await tickChecklistForCustomerSite(site.id, 'site_live', 'publish', 'system').catch(() => false);
 
   await writeChangeEvent({ siteId: site.id, entityType: kind, entityId: null, action: kind, summary, principal, provenance: 'human' });
   logStages(live ? 'live' : 'deploying');   // M5: terminal telemetry (deploying = handed to reconcile)

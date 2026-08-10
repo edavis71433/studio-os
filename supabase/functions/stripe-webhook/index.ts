@@ -85,6 +85,31 @@ async function forwardBillingSync(type: string, object: unknown): Promise<boolea
   } catch (e) { console.error(`[stripe-webhook] billing-sync ${type} threw: ${String(e)}`); return false; }
 }
 
+/** Hand a just-paid presence invoice to the presence function so the OPERATOR is
+ *  actually told: raiseNotice (bell/Today/Inbox + the Web Push this file could
+ *  never fire), the operator email (this file has no Resend key and no recipient
+ *  fallback chain), and the delivery-checklist tick for a paid deposit.
+ *
+ *  Same shape and same secret as forwardBillingSync — no new trust boundary. The
+ *  body is an ID ONLY: the route re-reads the invoice from the database, so this
+ *  hop can never assert an amount, a payee, or a paid state.
+ *
+ *  Returns whether the echo was accepted, so the caller can fall back to writing
+ *  the in-app notice itself. Never throws — a payment must never fail because
+ *  its echo did. */
+async function forwardInvoicePaid(invoiceId: string): Promise<boolean> {
+  if (!BILLING_SYNC_SECRET) { console.warn(`[stripe-webhook] BILLING_SYNC_SECRET unset — cannot send the operator's paid echo for ${invoiceId}; set it on this function`); return false; }
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/presence/commerce/invoice-paid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-commerce-secret': BILLING_SYNC_SECRET, apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
+    if (!r.ok) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} returned ${r.status}`); return false; }
+    return true;
+  } catch (e) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} threw: ${String(e)}`); return false; }
+}
+
 const enc = new TextEncoder();
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -431,7 +456,28 @@ Deno.serve(async (req: Request) => {
           detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents) || 0, purpose: inv.purpose },
         });
       }
-      if (clientId) {
+      // ── THE OPERATOR ECHO ────────────────────────────────────────────────
+      // Eric's client paid a deposit and Eric got NO EMAIL. This raw notice
+      // INSERT was the whole of it, and it was two things short of the rest of
+      // the product: it bypassed raiseNotice, so it never fired the Web Push
+      // every other notice fires; and this function has never contained the
+      // string `sendEmail` at all.
+      //
+      // Both live in the presence function (Resend key, VAPID keys, the brand
+      // loader, and studioRecipient's fallback chain — presence_identity.email
+      // is blank on the studio's own site, so the naive lookup finds nobody).
+      // So the echo is DELEGATED over the same secret-gated hop this file
+      // already uses for subscriptions (forwardBillingSync), and this function
+      // stays the thin single source of payment truth. The route re-reads the
+      // invoice from the database — this call passes an id, never an amount.
+      const echoed = await forwardInvoicePaid(String(inv.id));
+      if (!echoed && clientId) {
+        // THE FLOOR. If the presence function is unreachable or not yet
+        // deployed, the operator still gets the in-app row the old code wrote —
+        // just without the push, the mail, or the checklist tick. Never silent:
+        // a warn says exactly what was lost, because "the payment worked but the
+        // studio was never told" is the failure this whole change exists to end.
+        console.warn(`[stripe-webhook] invoice-paid echo hop FAILED for ${invoiceId} — falling back to the in-app notice only (no push, no operator email)`);
         await db('presence_plan_notices', 'POST', {
           site_id: inv.site_id, client_id: clientId, kind: 'invoice_paid',
           period: `paid:${inv.id}`, status: 'active',
@@ -439,7 +485,9 @@ Deno.serve(async (req: Request) => {
           body: inv.purpose === 'deposit' ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
         });
       }
-    } catch (e) { console.error(`[stripe-webhook] paid-echo best-effort failed for ${invoiceId}:`, e); }
+      // A failure past here must be VISIBLE but never fatal — warn, never a bare
+      // catch{}. The payment is already recorded; only its echo can be lost.
+    } catch (e) { console.warn(`[stripe-webhook] paid-echo best-effort failed for ${invoiceId}: ${String((e as Error)?.message || e)} (payment stands)`); }
     console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} paid (via ${via})`);
     return new Response('ok', { status: 200 });
   };

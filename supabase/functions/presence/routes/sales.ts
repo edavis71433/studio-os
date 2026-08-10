@@ -11,7 +11,7 @@ import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, d
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
-import { ensureProjectForDeal, ensureBridge, linksForCustomer } from '../lib/service_bridge.ts';
+import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
@@ -1167,16 +1167,16 @@ export async function handleSalesContractTerm(req: Request, site: SiteRow, princ
  *  runSalesDocReminders was nudging about, so the `remind:<doc>` follow-up row
  *  goes here. It rides this helper because this is the one place that has
  *  already resolved the site's client_id — the clear costs no extra read. */
-async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' | 'signed', docId?: string): Promise<void> {
+async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' | 'signed', docId?: string): Promise<boolean> {
   try {
     const site = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
-    if (!site?.client_id) return; // no owning client → nowhere calm to surface it
+    if (!site?.client_id) return false; // no owning client → nowhere calm to surface it
     const title = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=title&limit=1`))[0]?.title || 'a deal';
     const headline = event === 'signed' ? `Agreement signed — ready to convert ${title}` : `Proposal accepted — ${title}`;
     const body = event === 'signed'
       ? 'The client signed. Convert them to a customer to provision their workspace whenever you’re ready.'
       : 'The client accepted your proposal. Prepare the agreement to sign when you’re ready.';
-    await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
+    const fresh = await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
     // the document is decided — it is no longer waiting on anyone.
     // BELT-AND-BRACES ONLY: runDocumentReminders now raises `remind:<doc>` as a
     // silent ledger row (status 'dismissed'), so for anything raised after that
@@ -1184,7 +1184,16 @@ async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' 
     // stays for the rows raised BEFORE it — those are still active, and this is
     // the only thing that takes them down. Delete it once none can be left.
     if (docId) await clearNotice(site.client_id, 'deal_followup', `remind:${docId}`);
+    // THE SEND-ONCE GATE, handed back to the caller. raiseNotice returns true only
+    // when a NEW row was inserted (lib/notice.ts) — the whole codebase's
+    // "do the out-of-band thing exactly once" primitive. This helper used to
+    // DISCARD it and return void, which is why the operator's signed-agreement
+    // email had nothing to hang off. Returning it costs nothing and is the only
+    // safe gate: the period is `signed:<deal>`, so a replayed sign, a retry, or a
+    // second call can never produce a second email.
+    return fresh;
   } catch { /* non-fatal — the deal event + Pipeline still record it */ }
+  return false;
 }
 
 export async function handleSalesProposalSend(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -1378,7 +1387,43 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
-  await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
+  const signedIsNews = await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
+
+  // ── TELL THE OPERATOR. A client signed a contract and the studio got NO email:
+  // the notice above lands on Today/Attention/bell, which only helps someone who
+  // is already looking at the app. A signature is the single most important
+  // thing that happens in this product, so it gets mail too — the same shape
+  // commerce/lifecycle.ts uses everywhere (raiseNotice → `if (fresh) sendEmail`),
+  // so `signedIsNews` is BOTH the dedupe and the send-once throttle: a replayed
+  // sign POST re-raises nothing and therefore re-sends nothing.
+  // Recipient is studioRecipient's fallback chain (identity email → the owner's
+  // own clients row → OPS_ALERT_EMAIL), never the bare presence_identity.email
+  // that is blank on this very site.
+  if (signedIsNews) {
+    try {
+      const dealTitle = String(rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal');
+      const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+      const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      await emailOperator(tok.site_id,
+        `Signed — ${dealTitle}`,
+        `<p><b>${esc(signerName)}</b> signed <b>${esc(String(c.title || 'the service agreement'))}</b>.</p>` +
+        `<table style="margin:8px 0;border-collapse:collapse">` +
+        `<tr><td style="padding:2px 12px 2px 0;color:#666">Deal</td><td><b>${esc(dealTitle)}</b></td></tr>` +
+        `<tr><td style="padding:2px 12px 2px 0;color:#666">Signed by</td><td>${esc(signerName)}${signerEmail ? ` · ${esc(signerEmail)}` : ''}</td></tr>` +
+        `<tr><td style="padding:2px 12px 2px 0;color:#666">Signed at</td><td>${signedAt.slice(0, 19).replace('T', ' ')} UTC</td></tr>` +
+        `</table>` +
+        `<p>Their signed copy is already on its way to them. Convert them to a customer when you're ready — that provisions their workspace and starts the delivery checklist.</p>`,
+        'contract_signed', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}` });
+    } catch { /* the signature stands; its echo is best-effort */ }
+  }
+
+  // The delivery checklist's step 1 is a FACT the system just established, so it
+  // ticks itself rather than waiting for the studio to remember. A no-op when
+  // the deal hasn't been converted yet — the usual order is sign THEN convert,
+  // and the handoff's own reconcileChecklistFacts reads the signed contract back
+  // out and ticks it there, so the step is right either way. Idempotent by
+  // construction (the PATCH matches only a not-yet-done row).
+  await tickChecklistForDeal(tok.site_id, dealId, 'agreement_signed', 'contract-sign', 'system').catch(() => false);
 
   // EXECUTED COPY: the email is the durable record ("you'll always be able to ask
   // for a copy" — now they don't have to ask). Full agreement text + signature

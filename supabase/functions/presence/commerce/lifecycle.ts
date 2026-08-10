@@ -6,7 +6,17 @@
 // existing /system/run cycle and reuses every rail we have:
 //   • notices  → presence_plan_notices (one per client/kind/month, dismissible,
 //                already rendered by the workspace card)
-//   • emails   → sendEmail (graceful no-op without RESEND_KEY)
+//   • emails   → sendEmail (graceful no-op without RESEND_KEY); everything aimed
+//                at the OPERATOR goes through emailOperator (lib/service_bridge.ts).
+//                ⚠ NEVER go back to `const owner = ident.json?.[0]?.email; if (owner)`.
+//                presence_identity.email is `default ''` (0015_presence_phase1.sql),
+//                and on the studio's own site it IS blank — so that idiom was a
+//                silent skip, with no fallback and no log, and it had been quietly
+//                killing the lead-followup, deal-followup, support-aging, renewal
+//                and agreement-renewal mail in this file for their whole life.
+//                emailOperator has the fallback chain (identity → the owner's own
+//                clients row → OPS_ALERT_EMAIL) and WARNS when it resolves to
+//                nobody, so this can never fail silently again.
 //   • send-once → the notices table's unique(client,kind,period) IS the dedupe:
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
@@ -19,6 +29,7 @@ import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNotice
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
+import { emailOperator } from '../lib/service_bridge.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
@@ -399,12 +410,10 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
     const fresh = await raiseNotice({ siteId: lead.site_id, clientId, kind: 'lead_followup', period: `lead:${lead.id}`, headline: copy.headline, body: copy.body });
     if (fresh) {
       nudged++;
-      const ident = await svc(`presence_identity?site_id=eq.${lead.site_id}&select=email&limit=1`);
-      const owner = ident.json?.[0]?.email;
-      if (owner) {
-        const brand = await loadEmailBrand(lead.site_id);   // BR-1: on the owner's brand
-        sendEmail(String(owner), copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/leads.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, brand).catch(() => {});
-      }
+      // emailOperator, not `presence_identity.email || silence` — see the note at
+      // the top of this file's operator-mail section (and lib/service_bridge.ts).
+      const brand = await loadEmailBrand(lead.site_id);   // BR-1: on the owner's brand
+      emailOperator(lead.site_id, copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/leads.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, 'lead_followup').catch(() => {});
     }
   }
   return { nudged };
@@ -433,14 +442,10 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number }> 
       // Parity with lead follow-ups: a quiet $5k proposal deserves at least the
       // email a fresh $0 lead gets. Send-once (gated on the notice insert above).
       try {
-        const ident = await svc(`presence_identity?site_id=eq.${deal.site_id}&select=email&limit=1`);
-        const owner = ident.json?.[0]?.email;
-        if (owner) {
-          const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
-          const brand = await loadEmailBrand(deal.site_id);
-          const safeBody = body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-          sendEmail(String(owner), `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, brand).catch(() => {});
-        }
+        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const brand = await loadEmailBrand(deal.site_id);
+        const safeBody = body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+        emailOperator(deal.site_id, `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, 'deal_followup').catch(() => {});
       } catch { /* the notice already carries it */ }
     }
   }
@@ -485,13 +490,9 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
       // Parity with lead/deal nudges: the owner also gets the email once (send-once
       // gated on the notice insert above), on their own brand.
       try {
-        const ident = await svc(`presence_identity?site_id=eq.${r.site_id}&select=email&limit=1`);
-        const owner = ident.json?.[0]?.email;
-        if (owner) {
-          const brand = await loadEmailBrand(r.site_id);
-          sendEmail(String(owner), `A support request is waiting — ${subject}`,
-            `<p>${esc(body)}</p><p class="cta"><a href="${base}/projects.html?support=${r.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the request →</a></p>`, brand).catch(() => {});
-        }
+        const brand = await loadEmailBrand(r.site_id);
+        emailOperator(r.site_id, `A support request is waiting — ${subject}`,
+          `<p>${esc(body)}</p><p class="cta"><a href="${base}/projects.html?support=${r.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the request →</a></p>`, 'support_aging').catch(() => {});
       } catch { /* the owner notice already carries it */ }
     }
   }
@@ -577,9 +578,7 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
     const fresh = await raiseNotice({ siteId, clientId: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body });
     if (fresh) {
       reminded++;
-      const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`);
-      const owner = ident.json?.[0]?.email;
-      if (owner) sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${base}/portal.html">Review or manage your plan →</a></p>`).catch(() => {});
+      emailOperator(siteId, copy.subject, `<p>${copy.body}</p><p><a href="${base}/portal.html">Review or manage your plan →</a></p>`, 'renewal_reminder').catch(() => {});
     }
   }
   return { reminded };
@@ -612,12 +611,8 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
     const fresh = await raiseNotice({ siteId: c.site_id, clientId, kind: 'agreement_renewal', period: agreementRenewalPeriod(String(termEnd), win), headline: copy.headline, body: copy.body });
     if (fresh) {
       reminded++;
-      const ident = await svc(`presence_identity?site_id=eq.${c.site_id}&select=email&limit=1`);
-      const owner = ident.json?.[0]?.email;
-      if (owner) {
-        const link = c.deal_id ? `${base}/pipeline.html?deal=${c.deal_id}` : `${base}/pipeline.html`;
-        sendEmail(String(owner), copy.subject, `<p>${copy.body}</p><p><a href="${link}">Open the deal →</a></p>`).catch(() => {});
-      }
+      const link = c.deal_id ? `${base}/pipeline.html?deal=${c.deal_id}` : `${base}/pipeline.html`;
+      emailOperator(c.site_id, copy.subject, `<p>${copy.body}</p><p><a href="${link}">Open the deal →</a></p>`, 'agreement_renewal').catch(() => {});
     }
   }
   return { reminded };
