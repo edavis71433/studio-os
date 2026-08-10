@@ -426,6 +426,49 @@ test.describe('Project record page', () => {
     await expect(page.locator('#tsList .titem').filter({ hasText: 'Collect content' }).locator('.t')).toHaveClass(/donetext/);
   });
 
+  // ── the operator's side of "the client can't tick their own steps" ──────────
+  // The client lost the Mark done button on the three checklist steps addressed
+  // to them (client.html) and a crafted POST is refused at the client door
+  // (routes/client_delivery.ts). NONE of that reaches this door: Eric ticks all
+  // ten from here, including the three he now owns, or the rule would have taken
+  // away the only tick that remained.
+  test('the studio can tick every one of the ten checklist steps — including the three the client can’t', async ({ page }) => {
+    const STEPS = [
+      ['agreement_signed', 'Agreement signed', false], ['deposit_paid', 'Deposit paid', false],
+      ['questionnaire_returned', 'Send back your project questionnaire', true],
+      ['content_received', 'Send your content and photos', true],
+      ['draft_shared', 'Design draft shared', false],
+      ['client_review', 'Review the design draft', true],
+      ['revisions', 'Revisions', false], ['domain_connected', 'Domain connected', false],
+      ['site_live', 'Site live', false], ['handover', 'Handover', false],
+    ] as Array<[string, string, boolean]>;
+    const detail = { data: { ...P1_DETAIL.data, tasks: STEPS.map(([key, title, act], i) => ({
+      id: `ck${i}`, title, status: 'todo', client_visible: act, client_action_required: act,
+      source: `checklist:${key}`, sort_order: i * 10, derived: { overdue: false },
+    })) } };
+    await installApp(page, { api: { ...API, '/projects/p1': detail } });
+    await page.goto('/projects.html?project=p1');
+    await expect(page.locator('#tsList .titem')).toHaveCount(10);
+    // every step is tickable from here — no source ever gates the studio's own door
+    await expect(page.locator('#tsList [data-tdone]')).toHaveCount(10);
+    for (const box of await page.locator('#tsList [data-tdone]').all()) {
+      await expect(box).toBeEnabled();
+      await expect(box).not.toBeChecked();
+    }
+    // and the tick on a CLIENT-facing step (ck3 = "Send your content and photos")
+    // is the ordinary studio PATCH, unchanged
+    await page.route('**/functions/v1/presence/projects/p1/tasks/ck3', (route) => {
+      detail.data.tasks[3].status = JSON.parse(route.request().postData() || '{}').status;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/projects/p1/tasks/ck3')),
+      page.locator('[data-tdone="ck3"]').check(),
+    ]);
+    expect(req.postData()).toContain('"status":"done"');
+    await expect(page.locator('[data-tdone="ck3"]')).toBeChecked();
+  });
+
   test('the Status ▾ popup honors the slice-2 contract (aria-expanded, Escape→focus, outside click, ladder-only items)', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/projects.html?project=p1');

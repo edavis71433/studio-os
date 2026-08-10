@@ -455,6 +455,14 @@ function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon
 // "N things need your OK" line both use it, so Home can never show two
 // contradictory counts on the same render.
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
+// ── who ticks a to-do off ────────────────────────────────────────────────────
+// Three of the studio's ten delivery-checklist steps are addressed to YOU
+// ("Send your content and photos"), so they show here as your to-dos — but the
+// studio marks them off, because only they can see the thing actually arrived
+// (and their progress bar is computed from these same rows). Mirrors
+// clientMayTick in supabase/functions/presence/lib/project_checklist.ts; the
+// server refuses a checklist tick regardless of what this draws.
+function clientMayTick(t){return String((t&&t.source)||'').indexOf('checklist:')!==0;}
 // PS2: the ONE portal money formatter — the glance tile, the Needs-you invoice
 // row, the Invoices rows and the tab's unpaid-total line all render the same
 // cents the same way ($1,200, $1,234.50 — never a bare $1200 drifting from the
@@ -2133,7 +2141,9 @@ async function openProject(id,focusSection){
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
   // your tasks
-  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`}</div>`;}html+=`</section>`;}
+  // A to-do the studio settles gets NO Mark done button — and says so, so the
+  // card reads as "we're watching for it", never as a broken/inert control.
+  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';const mine=clientMayTick(t);html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':(mine?`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`:`<p class="muted tdnote">Your studio marks this one off once it arrives.</p>`)}</div>`;}html+=`</section>`;}
   // files — the Files tab's exact list anatomy (fileRowHtml .frow rows with
   // You-shared chips and honest meta — never the raw server note as body copy),
   // then the slice-12 share card preselected to THIS project (preflight,

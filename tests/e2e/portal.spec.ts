@@ -3076,6 +3076,69 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     })).toBe('Your to-dos');
   });
 
+  // ── the delivery checklist's three client steps: seen, asked for, not theirs to tick ──
+  // Eric's rule. "Send your content and photos" IS the client's homework and has
+  // to keep showing as their to-do — but HE marks it off, when the thing actually
+  // arrives, because his progress bar is computed from these very rows and only
+  // he can see that it landed. So the card stays and says who settles it; the
+  // Mark done button goes. Ordinary manual/template to-dos are untouched.
+  const CHECKLIST_TODOS = [
+    { id: 'ck1', title: 'Send back your project questionnaire', status: 'todo', client_action_required: true, source: 'checklist:questionnaire_returned', derived: { overdue: false } },
+    { id: 'ck2', title: 'Send your content and photos', status: 'todo', client_action_required: true, source: 'checklist:content_received', derived: { overdue: false } },
+    { id: 'ck3', title: 'Review the design draft', status: 'todo', client_action_required: true, source: 'checklist:client_review', derived: { overdue: false } },
+  ];
+  const withTodos = (tasks: unknown[]) => ({ ...CLIENT_API,
+    [`/client/projects/${PID}`]: { data: { ...(CLIENT_API as any)[`/client/projects/${PID}`].data, tasks } } });
+
+  test('the three checklist steps are LISTED as the client’s to-dos — worded as the ask', async ({ page }) => {
+    await installApp(page, { api: withTodos(CHECKLIST_TODOS) });
+    await page.goto(`/client.html?project=${PID}`);
+    const todos = page.locator('#sec-todos');
+    await expect(todos.getByRole('heading', { name: 'Your to-dos' })).toBeVisible();
+    await expect(todos.locator('.card')).toHaveCount(3);
+    await expect(todos.getByRole('heading', { name: 'Send back your project questionnaire' })).toBeVisible();
+    await expect(todos.getByRole('heading', { name: 'Send your content and photos' })).toBeVisible();
+    await expect(todos.getByRole('heading', { name: 'Review the design draft' })).toBeVisible();
+  });
+
+  test('…and carry NO mark-done control — the studio ticks them, and the card says so', async ({ page }) => {
+    await installApp(page, { api: withTodos(CHECKLIST_TODOS) });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-todos .card')).toHaveCount(3);
+    // no button, no handler hook — not merely a disabled or hidden one
+    await expect(page.getByRole('button', { name: 'Mark done' })).toHaveCount(0);
+    await expect(page.locator('[data-taskdone]')).toHaveCount(0);
+    // and never a dead card: each one says who marks it off
+    await expect(page.locator('#sec-todos .tdnote')).toHaveCount(3);
+    await expect(page.locator('#sec-todos .tdnote').first()).toHaveText('Your studio marks this one off once it arrives.');
+    // they still count as waiting on the client — the ask has not gone away
+    await expect(page.locator('.hl', { hasText: 'Waiting on you' }).locator('.hl-v')).toHaveText('4');   // 3 to-dos + 1 pending approval
+  });
+
+  test('an ordinary to-do keeps its Mark done button right beside a checklist step (no regression)', async ({ page }) => {
+    const TEMPLATE_TODO = { id: 't1', title: 'Send your logo', status: 'open', client_action_required: true, source: 'template', derived: { overdue: false } };
+    await installApp(page, { api: withTodos([TEMPLATE_TODO, CHECKLIST_TODOS[1]]) });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}/tasks/t1/done`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) }));
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-todos .card')).toHaveCount(2);
+    // exactly ONE button, and it belongs to the template task's card
+    await expect(page.locator('[data-taskdone]')).toHaveCount(1);
+    await expect(page.locator('[data-taskdone="t1"]')).toBeVisible();
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/tasks/t1/done`));
+    await page.getByRole('button', { name: 'Mark done' }).click();
+    await post;
+    await expect(page.locator('#toast')).toContainText('Marked done — your studio will see it.');
+  });
+
+  test('Home still queues the checklist steps as things waiting on the client', async ({ page }) => {
+    await installApp(page, { api: withTodos(CHECKLIST_TODOS) });
+    await page.goto('/client.html');
+    const body = page.locator('#needs-body');
+    await expect(body.locator('.kchip', { hasText: 'To-do' })).toBeVisible();
+    await expect(body.getByText('3 things for you')).toBeVisible();
+  });
+
   test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/client/projects', fail500);

@@ -10,6 +10,7 @@ import { svc } from '../lib/db.ts';
 import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
 import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient, notifyStudioOfClientAction } from '../lib/service_bridge.ts';
 import { csatRatingsForProject } from '../lib/csat.ts';
+import { clientMayTick } from '../lib/project_checklist.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
@@ -77,6 +78,16 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
 // Client to-dos were read-only (a client saw "N things for you" but couldn't act).
 // Only a client_action_required, client_visible task on their OWN linked project can
 // be marked done here; a client_visible event lets the studio see they acted.
+//
+// …EXCEPT A DELIVERY-CHECKLIST STEP (lib/project_checklist.ts). Three of the ten
+// steps ARE addressed to the client ("Send your content and photos") and stay
+// visible to them as their asks — but the studio owns the tick, because the
+// studio's progress bar is computed from these same rows and only the studio can
+// see that the content actually arrived. THIS IS THE RULE, not the hidden button
+// in client.html: a crafted POST for a checklist task is refused here, on
+// `source`, which is exactly the column that makes a checklist step addressable
+// in the first place. Ordinary manual/template tasks carry no `checklist:`
+// source and are completely unaffected.
 export async function handleClientTaskDone(_req: Request, site: SiteRow, principal: Principal, projectId: string, taskId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(projectId) || !UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
   const me = customerOf(site);
@@ -84,8 +95,11 @@ export async function handleClientTaskDone(_req: Request, site: SiteRow, princip
   const link = await linkForCustomerProject(me, projectId);
   if (!link) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
   const s = link.agency_site_id;
-  const t = rows(await svc(`presence_tasks?id=eq.${taskId}&project_id=eq.${projectId}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&client_action_required=is.true&select=id,title,status&limit=1`))[0];
+  const t = rows(await svc(`presence_tasks?id=eq.${taskId}&project_id=eq.${projectId}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&client_action_required=is.true&select=id,title,status,source&limit=1`))[0];
   if (!t) return json({ error: 'not_found', message: 'That to-do isn’t here.' }, 404, cors);
+  // 403, not 404: the client CAN see this step, so pretending it doesn't exist
+  // would be a lie. Say who ticks it instead.
+  if (!clientMayTick(t.source)) return json({ error: 'operator_verified', message: 'Your studio marks this one off once it arrives — no need to do anything here.' }, 403, cors);
   if (t.status === 'done') return json({ data: { ok: true } }, 200, cors);
   const up = await svc(`presence_tasks?id=eq.${taskId}&site_id=eq.${s}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'done', completed_at: nowIso() }) });
   if (!up.ok) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
@@ -277,7 +291,11 @@ export async function handleClientProject(_req: Request, site: SiteRow, _princip
   const s = ctx.siteId; const now = nowIso();
   const [ms, ts, ev, dl, ap, sv] = await Promise.all([
     svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,status,due_date,sort_order,completed_at&order=sort_order.asc`),
-    svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,detail,status,priority,client_action_required,due_date,sort_order,completed_at&order=sort_order.asc&limit=500`),
+    // `source` rides along so the portal knows which to-dos are ITS OWN to tick
+    // and which the studio settles (clientMayTick) — the button is drawn from
+    // this, the refusal is enforced in handleClientTaskDone. Nothing else about
+    // the payload changed; source is free text the studio never types by hand.
+    svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,detail,status,priority,client_action_required,source,due_date,sort_order,completed_at&order=sort_order.asc&limit=500`),
     svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${s}&client_visible=is.true&select=kind,detail,created_at&order=created_at.desc&limit=50`),
     svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.shared&select=id,title,note,created_at&order=created_at.desc&limit=200`),
     svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,subject_type,title,summary,content_hash,status,decided_at&order=created_at.desc&limit=100`),

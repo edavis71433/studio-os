@@ -25,6 +25,10 @@
 //     double-tick a checklist step, and must never fail the parent operation.
 //   • NO PORTAL LEAK — seeding ten steps must not put the studio's internal
 //     work in front of the customer.
+//   • SEEING AN ASK ≠ SETTLING IT — the three client-facing steps must STAY in
+//     the customer's portal (they are their homework) while the tick stays the
+//     studio's, because the studio's progress bar is computed from these very
+//     rows. Enforced on the ROUTE, not by a hidden button.
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
@@ -50,7 +54,8 @@ Deno.env.set('SITE_URL', 'https://davisdigitalstudio.com');
 
 const { handleCommerce } = await import('../../supabase/functions/presence/routes/commerce.ts');
 const bridge = await import('../../supabase/functions/presence/lib/service_bridge.ts');
-const { DELIVERY_CHECKLIST, checklistSource, checklistRows } = await import('../../supabase/functions/presence/lib/project_checklist.ts');
+const { DELIVERY_CHECKLIST, checklistSource, checklistRows, clientMayTick, isChecklistSource } = await import('../../supabase/functions/presence/lib/project_checklist.ts');
+const { handleClientTaskDone } = await import('../../supabase/functions/presence/routes/client_delivery.ts');
 
 const realFetch = globalThis.fetch;
 const jr = (data, status = 200) => new Response(data === null ? '' : JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -239,6 +244,88 @@ try {
     ok('checklist: sort_order strides by 10 so the studio can insert between steps', rows.map((r) => r.sort_order).join(',') === '0,10,20,30,40,50,60,70,80,90');
     ok('checklist: every seeded row starts as todo and carries the project’s own site_id (tenant-safe)',
       rows.every((r) => r.status === 'todo' && r.site_id === AGENCY && r.project_id === PROJECT));
+  }
+
+  // ═══════════════ PART D2 · SEEING an ask is not SETTLING it ═══════════════
+  // Eric's rule. The client still sees "Send your content and photos" as their
+  // to-do — it IS their homework — but he ticks it, when the thing actually
+  // arrives. His progress bar is computed from these very rows, so a client
+  // self-tick would move HIS number on evidence he does not have. The third
+  // question ("may they tick it?") is answered by `source`, not by a third
+  // column: a checklist step has always been settled by EVIDENCE (the three
+  // auto-ticks) or by the operator — never by a claim.
+  ok('tick: not one delivery-checklist step is client-tickable — not even the three addressed to the client',
+    DELIVERY_CHECKLIST.every((s) => clientMayTick(checklistSource(s.key)) === false));
+  ok('tick: …while ordinary work is untouched — manual and starter-template tasks keep the button they’ve had since P2-D',
+    clientMayTick('manual') === true && clientMayTick('template') === true &&
+    clientMayTick('') === true && clientMayTick(null) === true && clientMayTick(undefined) === true);
+  ok('tick: the test is the checklist PREFIX, so a source that merely contains the word is not caught',
+    isChecklistSource('checklist:content_received') === true && isChecklistSource('checklist') === false &&
+    isChecklistSource('my checklist:x') === false && isChecklistSource('template') === false);
+  {
+    const rows = checklistRows(AGENCY, PROJECT);
+    ok('tick: the three client steps STAY shared and still read as the client’s ask (the portal must keep listing them)',
+      rows.filter((r) => r.client_visible).length === 3 &&
+      rows.filter((r) => r.client_visible).every((r) => r.client_action_required === true));
+    ok('tick: …and none of the ten seeded rows is tickable by the client',
+      rows.every((r) => clientMayTick(r.source) === false));
+  }
+
+  // THE ROUTE IS THE RULE — a crafted POST must be refused even though the
+  // portal draws no button. Same door, two tasks, two answers.
+  {
+    const CUSTOMER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const CUST_SITE = { id: '77777777-7777-4777-8777-777777777777', client_id: CUSTOMER };
+    const CHK_TASK = '99999999-9999-4999-8999-999999999999';
+    const TPL_TASK = '88888888-8888-4888-8888-888888888888';
+    const installTaskFetch = (task) => {
+      const calls = [];
+      globalThis.fetch = async (input, init = {}) => {
+        const url = typeof input === 'string' ? input : input.url;
+        const method = (init.method || 'GET').toUpperCase();
+        calls.push({ url, method });
+        if (url.includes('presence_service_links')) return jr([{ project_id: PROJECT, agency_site_id: AGENCY, customer_client_id: CUSTOMER }]);
+        if (url.includes('presence_tasks') && method === 'PATCH') return jr(null, 200);
+        if (url.includes('presence_tasks')) return jr(task ? [task] : []);
+        if (url.includes('presence_project_events')) return jr(null, 201);
+        return jr([]);
+      };
+      return calls;
+    };
+    const post = (taskId) => handleClientTaskDone(new Request('https://x/done', { method: 'POST' }), CUST_SITE, PRINCIPAL, PROJECT, taskId, {});
+    {
+      const calls = installTaskFetch({ id: CHK_TASK, title: 'Send your content and photos', status: 'todo', source: 'checklist:content_received' });
+      const r = await post(CHK_TASK);
+      const out = await r.json();
+      ok('route: a crafted POST for a CHECKLIST step is refused (403), even though the client can see it',
+        r.status === 403 && out.error === 'operator_verified', `${r.status} ${JSON.stringify(out)}`);
+      ok('route: …and NOTHING is written — no status flip, no "the client acted" event on Eric’s timeline',
+        !calls.some((c) => c.method === 'PATCH') && !calls.some((c) => c.url.includes('presence_project_events')));
+      ok('route: …and the refusal is honest — 403 with who ticks it, not a 404 pretending their own to-do isn’t there',
+        r.status !== 404 && /Your studio marks this one off once it arrives/.test(String(out.message || '')), String(out.message));
+      restore();
+    }
+    {
+      // NO REGRESSION: the starter template's client task still ticks, exactly as before.
+      const calls = installTaskFetch({ id: TPL_TASK, title: 'Send your logo', status: 'todo', source: 'template' });
+      const r = await post(TPL_TASK);
+      const out = await r.json();
+      ok('route: a starter-TEMPLATE client task still ticks — the long-standing behaviour is unchanged',
+        r.status === 200 && out.data?.ok === true, `${r.status} ${JSON.stringify(out)}`);
+      const patch = calls.find((c) => c.method === 'PATCH');
+      ok('route: …with the same site-scoped PATCH and the same client-visible event it always wrote',
+        /presence_tasks\?id=eq\./.test(String(patch?.url || '')) && calls.some((c) => c.url.includes('presence_project_events') && c.method === 'POST'), String(patch?.url));
+      restore();
+    }
+    {
+      // The gate reads `source`, so the lookup must actually ASK for it.
+      const calls = installTaskFetch({ id: TPL_TASK, title: 'Send your logo', status: 'todo', source: 'manual' });
+      await post(TPL_TASK);
+      const look = calls.find((c) => c.url.includes('presence_tasks') && c.method === 'GET');
+      ok('route: the task lookup selects `source` — the gate can never read undefined and wave a step through',
+        /select=[^&]*\bsource\b/.test(String(look?.url || '')), String(look?.url));
+      restore();
+    }
   }
 
   // SEEDING — a new project gets ten tasks, so progress can move off 0%.
@@ -430,6 +517,16 @@ try {
   const cd = read('supabase/functions/presence/routes/client_delivery.ts');
   ok('portal: and the server never sends an internal task over the wire at all (client_visible=is.true)',
     (cd.match(/presence_tasks\?project_id=eq\.\$\{id\}[^`]*client_visible=is\.true/g) || []).length === 2);
+  // …and the OTHER half of the same contract: the three client steps must keep
+  // APPEARING (they are the client's homework) while losing only the button.
+  ok('portal: the bundle ships `source`, so the portal can tell its own to-dos from the ones the studio settles',
+    /presence_tasks\?project_id=eq\.\$\{id\}[^`]*select=[^&]*client_action_required,source,/.test(cd));
+  ok('portal: the to-do card draws Mark done ONLY for a task the client may tick',
+    /const mine=clientMayTick\(t\);/.test(portal) && /mine\?`<div class="row"><button class="approve" data-taskdone=/.test(portal));
+  ok('portal: …and a studio-settled to-do still renders, saying who marks it off (never a dead card)',
+    /Your studio marks this one off once it arrives\./.test(portal));
+  ok('portal: the portal’s mirror uses the SAME checklist prefix as the server predicate',
+    /function clientMayTick\(t\)\{return String\(\(t&&t\.source\)\|\|''\)\.indexOf\('checklist:'\)!==0;\}/.test(portal));
 }
 
 const failed = results.filter((r) => !r).length;

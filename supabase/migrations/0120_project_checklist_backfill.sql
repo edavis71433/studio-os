@@ -48,6 +48,18 @@
 -- and stay internal; the three that are genuinely the client's homework are
 -- shared, and are worded as the ASK because the portal prints the raw title on
 -- their to-do card.
+--
+-- WHO TICKS IT, THOUGH, IS A THIRD QUESTION — and it is NOT a third column.
+-- Those three steps are shown to the customer and ARE their ask, but the studio
+-- marks them off: only the studio can see that the questionnaire really came
+-- back, and the studio's progress bar is computed from these very rows, so a
+-- customer's self-tick would move the studio's number on evidence it does not
+-- have. That rule is read off `source` (every checklist step carries
+-- 'checklist:<key>', below) rather than off either boolean — see clientMayTick
+-- in lib/project_checklist.ts, enforced in routes/client_delivery.ts. So THESE
+-- INSERTS ARE UNCHANGED by that decision: both flags still ride the same
+-- client_action value, exactly as they always did. Ordinary manual/template
+-- tasks carry no 'checklist:' source and keep their client Mark-done button.
 
 -- ── STEP 1 · seed the ten steps onto every task-less project ────────────────
 with steps(key, title, client_action, sort_order) as (

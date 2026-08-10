@@ -31,6 +31,27 @@
 // genuinely the client's homework are shared, and are therefore titled in the
 // client's voice, because the portal renders the raw title on their to-do card.
 //
+// …BUT SEEING AN ASK IS NOT THE SAME AS SETTLING IT. Those two booleans answer
+// two different questions and the checklist needs different answers:
+//
+//   client_visible          → may the customer SEE this row?          yes ×3
+//   client_action_required  → is the customer the one being ASKED?    yes ×3
+//   may the customer TICK IT DONE themselves?                          NO ×10
+//
+// The third question is NOT a third column. It is already answered by `source`,
+// because "who gets to assert this step is finished" is the checklist's whole
+// point: three of the ten tick themselves from facts the system owns (above),
+// and NONE of the ten was ever meant to move on a claim. Only the studio knows
+// whether the questionnaire really came back — and the studio's progress bar is
+// computed from these very rows (progressOf), so a customer ticking "Send your
+// content and photos" would move THE STUDIO'S number on evidence the studio
+// does not have. So: a `checklist:` row is OPERATOR-VERIFIED. See clientMayTick
+// below — the one predicate, read by routes/client_delivery.ts (the server-side
+// refusal) and mirrored by client.html (which simply omits the Mark done
+// button). Ordinary manual/template tasks are untouched: they carry no
+// `checklist:` source, so they keep the client Mark-done button they have had
+// since P2-D.
+//
 // Pure data + pure helpers. Every insert/update lives in lib/service_bridge.ts.
 
 export interface ChecklistStep {
@@ -38,7 +59,8 @@ export interface ChecklistStep {
   key: string;
   title: string;
   /** true → the CUSTOMER has to do this, so it is shared with them and appears
-   *  in the portal's "Your to-dos" with a Mark done button. */
+   *  in the portal's "Your to-dos" as their ask. READ-ONLY there: the studio
+   *  ticks it when the thing actually arrives (see clientMayTick). */
   clientAction?: boolean;
   /** documents that the system ticks this step itself (see the tick call sites). */
   auto?: 'contract_signed' | 'deposit_paid' | 'site_live';
@@ -47,6 +69,29 @@ export interface ChecklistStep {
 export const CHECKLIST_SOURCE_PREFIX = 'checklist:';
 /** The presence_tasks.source value that addresses one step of one project. */
 export const checklistSource = (key: string): string => `${CHECKLIST_SOURCE_PREFIX}${key}`;
+
+/** Is this presence_tasks row one of the delivery checklist's steps? */
+export const isChecklistSource = (source: unknown): boolean =>
+  String(source ?? '').startsWith(CHECKLIST_SOURCE_PREFIX);
+
+/** May the CLIENT mark this task done themselves?
+ *
+ *  NO for every checklist step, including the three that are addressed to them.
+ *  They still SEE those three and are still asked for them — client_visible and
+ *  client_action_required both stay true — but the tick is the studio's, because
+ *  the studio's progress bar is computed from these rows and only the studio can
+ *  see that the questionnaire actually arrived. A checklist step is settled by
+ *  EVIDENCE (a signed contract, a paid deposit, a live site) or by the operator
+ *  looking at the thing; never by a claim.
+ *
+ *  YES for everything else — a manual task or a starter-template task
+ *  (lib/project_templates.ts) flagged client_action_required keeps the Mark done
+ *  button it has had since P2-D. Nothing about those rows changes.
+ *
+ *  Enforced server-side in routes/client_delivery.ts (handleClientTaskDone) and
+ *  mirrored in client.html, which omits the button. The UI is the courtesy; the
+ *  route is the rule. */
+export const clientMayTick = (source: unknown): boolean => !isChecklistSource(source);
 
 /** The ten steps, in delivery order. Ten steps = 10% each, by construction —
  *  nothing stores that number, progressOf just counts done/total. */
@@ -81,6 +126,9 @@ export function checklistRows(siteId: string, projectId: string): Array<Record<s
     detail: '',
     status: 'todo',
     priority: 'normal',
+    // Both stay true for the client's three: they SEE it, and it IS their ask.
+    // What they cannot do is tick it — that is read off `source` below, not off
+    // either of these flags (clientMayTick).
     client_visible: s.clientAction === true,
     client_action_required: s.clientAction === true,
     sort_order: i * 10,
