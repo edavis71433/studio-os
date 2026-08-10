@@ -561,6 +561,79 @@ Investigate too: WHY the "open a few days without a reply" rows persist —
 if replying doesn't clear them, that's a bug, not a missing button.
 SEQUENCED: after the CRM deal-page four; alongside or before Files-by-client.
 
+## 🖼️ THE AFTERNOON BATCH — LIVE (deploys #34-35, 2026-08-07)
+
+Eric's second round from the roster screens: contacts uneditable (+ a live
+Claud/Claude duplicate), no task dropdown, pages half-width, analytics
+platform-only, Hettie's previews broken.
+
+SHIPPED:
+1. CONTACTS EDIT/DELETE. Delete is a dry-run first: DELETE w/o ?confirm=1
+   writes NOTHING, answers 409 with the attachment inventory ("1 deal, 1
+   signed agreement, 1 paid invoice, 1 project"). Soft-delete, one row, no
+   cascade; failed counts report as UNKNOWN never zero. FKs are all
+   on-delete-set-null (deals 0074, appointments 0099, reviews 0101).
+   ⚠ pipeline.html:982 would have blanked a deleted contact's name off his
+   own WON deals — fixed w/ include_deleted=1 (labelling only).
+   notes column deliberately NOT on the form — it doubles as the
+   CONNECT_INTENT_TAG machine marker. MERGE deliberately not built:
+   needs a plpgsql RPC (atomicity across 3 tables) that NO test in this
+   repo can exercise; ~45 SQL + 35 route + 40 UI when wanted.
+   Duplicate hints via existing findPossibleDuplicates (?dupes=1, opt-in).
+2. CHECKLIST PICKER. Checkbox list of the ten (disabled-with-reason when
+   present), "Add all N standard steps" nudge when a project has none —
+   reconciles evidence via reconcileChecklistFacts, so Bacchus = ONE PRESS
+   → 20% (not 30: site_live can't tick a draft). 0123 adds the unique
+   index standalone (0120 unrun); POST /tasks now 422s a checklist: source
+   — one door. ⚠ picker catalog ships as data.checklist; a pure test fails
+   if any of the ten titles is ever pasted into projects.html.
+3. WIDTH TIERS. 17 ad-hoc caps → four named tokens in shell.css:61:
+   form 640 / focus 760 / app 1280 / data 1600. 19 pages retiered
+   (client.html untouched — customer-facing). Roster action column:
+   width:1% + sticky right ≥768px w/ opaque fill; email cells
+   overflow-wrap:anywhere. ⚠ FOUND: contacts/customers/agency had a
+   PRE-EXISTING 91px horizontal body scroll at 390px — a .sr-only label
+   in an absolutely-positioned span with no positioned ancestor escaping
+   .tscroll's clip; .tscroll{position:relative} fixes all three.
+   tests/e2e/responsive.spec.ts pins scrollWidth<=clientWidth for all 19
+   pages × 3 viewports.
+4. EXTERNAL CLIENTS (the "analytics is platform-only" complaint). NO new
+   storage: presence_sites.edition='monitor' (0031!) + monitor_connections
+   already held the domain — analytics/gsc_sync just never read them.
+   searchReadinessState (compose.ts) now: hasData→measuring; external
+   w/o domain→"Where is their website?"; hosted draft→publish nudge
+   (9d955c6 preserved); connected→waiting. Visitor numbers for external
+   sites are null-with-reason (beacon can't exist there), never 0.
+   GBP NOT flipped: adapter queries the ACCOUNTS list but normalizes
+   review fields that live on a LOCATION — needs accounts→locations→
+   reviews + a location picker. GA same class. Both specced follow-ups.
+5. HETTIE'S PREVIEWS. NOT the morning Files commits (predates them).
+   Two signing bugs breaking EVERY transformed image everywhere:
+   format:'webp' (storage accepts only 'origin' — omitting IS the webp
+   ask; confirmed against the vendored SDK type) and expiresIn in the
+   query string (sign endpoint 400s; previewUrlMap + room.ts signed
+   NOTHING — the room grid rendered blank and nobody noticed). Untouched
+   surfaces (signDownload, portal) were fine, which is why files worked
+   while previews didn't. Now: original-image fallback, then "Preview
+   unavailable — the file itself is fine. Use Download to open it."
+   ⚠ residual: handleAssetCards swallows inlineCardImages failure →
+   silently blank exported card. Follow-up.
+   ⚠ portal uploads pass no width/height → no crop_rect, no "W×H" line.
+   Follow-up.
+
+MULTI-AGENT OPS LESSON (twice today): agents sharing one checkout swept
+each other's staged files into wrong-attribution commits (802d11c carries
+the contacts work; 01df36b carries the checklist wiring restore). Nothing
+lost, verified both times — but stage by explicit path, never -A, and
+verify route wiring at HEAD before merging.
+
+Gates at merge: pure 226/0/4, chrome 28, shell 5, e2e 224 desktop + 77
+mobile on touched surfaces; full 3-project sweep 2171 passed / 7 known.
+OPEN FOR ERIC: run 0120 OR press "Add all standard steps" on Bacchus;
+publish the three sites; business name/email; the two GSC secrets
+(CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID/_SECRET — values likely
+copyable from the old GOOGLE_CLIENT_ID/_SECRET) + Google Cloud checks.
+
 ## 💸 THE SILENT STUDIO — BUILT, NEEDS 0120 + DEPLOY (2026-08-07)
 
 Eric, from his phone: no email when Claud Beltran signed OR paid his deposit;
