@@ -211,6 +211,12 @@ html.dds-embed #detailWrap{padding-top:0}
   /* related-list rows: each document row separated like crm.html's .rrow */
   #detailInner .lrows .lr{border-top:1px solid var(--line);padding-top:9px;margin-top:9px}
   #detailInner .lrows .lr:first-child{border-top:none;padding-top:0;margin-top:0}
+  /* "Who owes you" rows — invoice facts left, the per-invoice actions right.
+     Same separator idiom as .lrows .lr; the actions wrap under the facts on
+     narrow screens instead of squeezing them. */
+  #detailInner .rcv-row{display:flex;justify-content:space-between;gap:8px 12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:9px;margin-top:9px}
+  #detailInner .rcv-row:first-child{border-top:none;padding-top:0;margin-top:0}
+  #detailInner .rcv-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   /* the inline mini-forms + quick-log sit on the card surface for contrast */
   #detailInner form.mini{background:var(--card)}
   @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
@@ -898,18 +904,57 @@ async function loadDealTasks(id){
   host.querySelectorAll('[data-tk]').forEach(c=>c.onchange=async()=>{try{await api('/sales/deal-tasks/'+c.getAttribute('data-tk'),'PATCH',{status:c.checked?'done':'open'});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
   host.querySelectorAll('[data-tkdel]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deal-tasks/'+b.getAttribute('data-tkdel'),'PATCH',{delete:true});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
 }
+// ── Shared per-invoice actions: Send/Resend · Copy link · Void ───────────────
+// ONE wiring for every surface that renders invoice rows with these controls —
+// the deal drawer's "Invoice & deposit" list AND the "Who owes you" receivables
+// list. The two must never drift: same routes, same toasts, same confirm copy.
+// `root` is the container that was just rendered; `refresh()` re-reads and
+// re-renders that surface after a successful action (the drawer re-opens the
+// deal; the receivables list re-fetches, so a voided row leaves and the
+// Outstanding total moves).
+function wireInvoiceActions(root,refresh){
+  // Copy a payment (or authorization) link — clipboard with an execCommand fallback.
+  root.querySelectorAll('[data-copy-pay]').forEach(b=>b.onclick=()=>{
+    const url=b.dataset.copyPay;
+    const fallback=()=>{const i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();try{document.execCommand('copy');toast('Payment link copied');}catch(_){toast('Couldn’t copy on this device — use the Copy link button in the invoice list, or the email has the same link.',true);}i.remove();};
+    if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Payment link copied')).catch(fallback);else fallback();
+  });
+  // Send/resend ONE invoice (e.g. the balance now the milestone is reached).
+  // Reuses /sales/invoices/:id/send (the single-invoice primitives).
+  root.querySelectorAll('[data-send-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.sendInv+'/send','POST',{});toast((r.resent?'Re-sent':'Sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
+  // Void an invoice raised in error — the only exit an unpaid invoice has other
+  // than being paid. The button is only rendered on a NOT-paid row, and the
+  // server refuses a paid one anyway (409): the UI mirrors the rule, it doesn't
+  // hold it. Destructive → confirm first, same idiom as data-del-prop.
+  // The server switches the Stripe payment link off as part of the void, but it
+  // is best-effort by design — the invoice row is the authority, so a Stripe
+  // hiccup can never leave a void that didn't happen. `link_deactivated:false`
+  // is that hiccup, and it is the one outcome the operator must not be told is
+  // a clean success: the link they emailed the client may still take money.
+  root.querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!confirm('Void this invoice? It stops being payable — we switch its payment link off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});const linkLive=!r.already&&!!r.data&&r.data.link_deactivated===false;toast(linkLive?'Invoice voided — but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.already?'Already voided':'Invoice voided',linkLive);refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
+}
 // "Who owes you" — the receivables list behind the AR strip (open invoices across
-// all deals). Opens in the same full-screen detail panel; each row jumps to its deal.
+// all deals). Opens in the same full-screen detail panel; each row jumps to its
+// deal AND carries the same per-invoice actions as the drawer (Send/Resend ·
+// Copy link · Void) — chasing payment is this list's whole purpose, and
+// withdrawing a mistaken invoice shouldn't require the detour through the deal.
 async function openReceivables(){
   showDetail();
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:50%"></div></div>';
   let d=null;try{const r=await api('/sales/receivables');d=r&&r.data;}catch(e){/* */}
   if(!d){$('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dbody mut">Couldn’t load receivables just now.</div>';const b=$('rcBack');if(b)b.onclick=closeDealDetail;return;}
   const items=d.items||[];
-  const list=items.length?items.map(i=>`<div class="item"><div><div class="t">${esc(i.title)}${i.overdue?' <span class="pill" style="color:var(--bad,#a3423a)">overdue</span>':''}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}</div></div>${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</div>`).join(''):'<div class="mut">Nothing outstanding — you’re all paid up. 🎉</div>';
+  // Every row here is an OPEN invoice by definition (the endpoint filters), so
+  // Void always applies; Send reads Resend once a payment link exists, and Copy
+  // link only renders when there's a link to copy — the drawer's exact rules.
+  const list=items.length?items.map(i=>`<div class="item rcv-row"><div><div class="t">${esc(i.title)}${i.overdue?' <span class="pill" style="color:var(--bad,#a3423a)">overdue</span>':''}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}</div></div><span class="rcv-acts"><button class="btn ghost sm" data-send-inv="${esc(i.id)}">${i.stripe_url?'Resend':'Send'}</button>${i.stripe_url?`<button class="btn ghost sm" data-copy-pay="${esc(i.stripe_url)}">Copy link</button>`:''}<button class="btn ghost sm" data-void-inv="${esc(i.id)}" title="${i.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${esc(i.title)}">Void</button>${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</span></div>`).join(''):'<div class="mut">Nobody owes you anything — you’re all paid up. 🎉</div>';
   $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}</div></div></div><div class="dbody">${list}</div>`;
   const b=$('rcBack');if(b)b.onclick=closeDealDetail;
   $('detailInner').querySelectorAll('[data-rcdeal]').forEach(x=>x.onclick=()=>openDeal(x.dataset.rcdeal));
+  // After a send/void the list re-reads itself (the row leaves, the Outstanding
+  // total updates, an emptied list says so) and the AR strip behind the panel
+  // re-totals so it can't contradict what the operator just did.
+  wireInvoiceActions($('detailInner'),()=>{openReceivables();renderSummary();});
 }
 // List · Board · Table — a 3-way segmented display control. List (cards) and
 // Board (kanban) are unchanged; Table is the sortable-columns list view. The
@@ -1879,25 +1924,12 @@ async function openDeal(id){
     // Renewal/expiry date on a SIGNED agreement → the owner gets one calm reminder
     // ~30 and ~7 days before it ends (never an auto-renew).
     $('detailInner').querySelectorAll('[data-set-term]').forEach(b=>b.onclick=async()=>{const cid=b.dataset.setTerm;const inp=$('con-term-'+cid);const val=(inp&&inp.value)||'';b.disabled=true;try{await api('/sales/contracts/'+cid+'/term','POST',{term_end:val||null});toast(val?'Renewal reminder set':'Renewal date cleared');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
-    $('detailInner').querySelectorAll('[data-copy-pay]').forEach(b=>b.onclick=()=>{
-      const url=b.dataset.copyPay;
-      const fallback=()=>{const i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();try{document.execCommand('copy');toast('Payment link copied');}catch(_){toast('Couldn’t copy on this device — use the Copy link button in the invoice list, or the email has the same link.',true);}i.remove();};
-      if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Payment link copied')).catch(fallback);else fallback();
-    });
+    // Per-invoice actions (Copy link · Send/Resend · Void) — the ONE shared
+    // wiring (wireInvoiceActions, up by openReceivables) that the "Who owes you"
+    // list uses too; a success re-opens the deal so the row re-renders from
+    // fresh server state. [data-copy-pay] also covers the retainer links above.
+    wireInvoiceActions($('detailInner'),()=>openDeal(id));
     const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});});
-    // Per-stage send/resend — bill ONE invoice (e.g. the balance now the milestone
-    // is reached). Reuses /sales/invoices/:id/send (the single-invoice primitives).
-    $('detailInner').querySelectorAll('[data-send-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.sendInv+'/send','POST',{});toast((r.resent?'Re-sent':'Sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
-    // Void an invoice raised in error — the only exit an unpaid invoice has other
-    // than being paid. The button is only rendered on a NOT-paid row, and the
-    // server refuses a paid one anyway (409): the UI mirrors the rule, it doesn't
-    // hold it. Destructive → confirm first, same idiom as data-del-prop above.
-    // The server switches the Stripe payment link off as part of the void, but it
-    // is best-effort by design — the invoice row is the authority, so a Stripe
-    // hiccup can never leave a void that didn't happen. `link_deactivated:false`
-    // is that hiccup, and it is the one outcome the operator must not be told is
-    // a clean success: the link they emailed the client may still take money.
-    $('detailInner').querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!confirm('Void this invoice? It stops being payable — we switch its payment link off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});const linkLive=!r.already&&!!r.data&&r.data.link_deactivated===false;toast(linkLive?'Invoice voided — but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.already?'Already voided':'Invoice voided',linkLive);openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // Payment schedule builder: deposit + balance, or N installments. Previews the
     // staged invoices (labels · due dates · amounts · running total = deal total),
     // then mints them via /sales/deals/:id/schedule. The client math mirrors the

@@ -310,7 +310,13 @@ const notice = (id) => world.notices.find((r) => r.id === id);
   ok('deal page: the void control is inside the not-paid branch', /v\.status==='paid'\?/.test(paidBranch) && /v\.status==='void'\?/.test(paidBranch));
   ok('deal page: the existing Voided render is still there for a row that reaches that state', /v\.status==='void'\?`<span class="mut">Voided<\/span>`/.test(invRow));
   ok('deal page: voiding confirms first (same idiom as the draft deletes)', /\[data-void-inv\][\s\S]{0,320}confirm\(/.test(pipeline));
-  ok('deal page: it POSTs the right route and re-renders the deal', /api\('\/sales\/invoices\/'\+b\.dataset\.voidInv\+'\/void','POST'/.test(pipeline) && /\[data-void-inv\][\s\S]{0,600}openDeal\(id\)/.test(pipeline));
+  // The handler is the ONE shared wiring (wireInvoiceActions) now — the drawer
+  // and the "Who owes you" receivables list both call it, each with its own
+  // refresh: the drawer re-opens the deal, the list re-fetches itself (so a
+  // voided row leaves and the Outstanding total moves) + re-totals the AR strip.
+  ok('deal page: it POSTs the right route and re-renders the surface it was tapped on', /api\('\/sales\/invoices\/'\+b\.dataset\.voidInv\+'\/void','POST'/.test(pipeline) && /\[data-void-inv\][\s\S]{0,700}refresh\(\)/.test(pipeline));
+  ok('deal page: the drawer wires the shared handler with a deal re-open', /wireInvoiceActions\(\$\('detailInner'\),\(\)=>openDeal\(id\)\)/.test(pipeline));
+  ok('receivables list: the SAME shared handler is wired with a list re-read + AR re-total', /wireInvoiceActions\(\$\('detailInner'\),\(\)=>\{openReceivables\(\);renderSummary\(\);\}\)/.test(pipeline));
   ok('deal page: it toasts on success and on failure (page idiom)', /\[data-void-inv\][\s\S]{0,600}toast\([\s\S]{0,120}nice\(e\),true\)/.test(pipeline));
 }
 

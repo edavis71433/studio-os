@@ -1461,3 +1461,150 @@ test.describe('invoice — the Void control', () => {
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeEnabled();
   });
 });
+
+// ── "Who owes you" — per-invoice actions on the receivables list ─────────────
+// The list behind the AR strip used to offer only "Open deal": withdrawing a
+// mistaken invoice (or resending its link) meant a detour through the deal
+// drawer. The rows now carry the drawer's per-invoice actions — Send/Resend,
+// Copy link (only when a payment link exists), Void — via the ONE shared wiring
+// (wireInvoiceActions), and after a void the list re-reads itself honestly:
+// the row leaves, the Outstanding total updates, an emptied list says so.
+const RINV1 = 'ccccccc1-1111-4111-8111-cccccccccccc';   // sent — has a payment link
+const RINV2 = 'ccccccc2-2222-4222-8222-cccccccccccc';   // minted, never sent
+const RCV_ITEM1 = { id: RINV1, title: 'Deposit', amount_cents: 40000, due_date: null, overdue: false, deal_id: DEAL, deal: 'Foreign Code', stripe_url: 'https://pay.example/fc' };
+const RCV_ITEM2 = { id: RINV2, title: 'Deposit', amount_cents: 160000, due_date: null, overdue: false, deal_id: DEAL2, deal: 'Bacchus Kitchen + Wine Bar', stripe_url: null };
+const summaryWithAr = (outstanding: number, count: number) => ({ data: {
+  total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
+  by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
+  ar: { outstanding_cents: outstanding, count, overdue_cents: 0, overdue_count: 0 },
+} });
+
+test.describe('receivables — the "Who owes you" list carries the invoice actions', () => {
+  const rcvApi = (items: unknown[], total: number) => ({
+    ...API,
+    '/sales/summary': summaryWithAr(total, items.length),
+    '/sales/receivables': { data: { items, total_cents: total, overdue_cents: 0 } },
+  });
+  const openList = async (page: import('@playwright/test').Page) => {
+    await page.goto('/pipeline.html');
+    await page.locator('#arOpen').click();
+    await expect(page.locator('#detailInner')).toContainText('Who owes you');
+  };
+
+  test('each row offers Send/Resend · Copy link (only with a link) · Void · Open deal', async ({ page }) => {
+    await installApp(page, { api: rcvApi([RCV_ITEM1, RCV_ITEM2], 200000) });
+    await openList(page);
+    await expect(page.locator('#detailInner')).toContainText('Outstanding: $2,000');
+    const sent = page.locator('.rcv-row').filter({ hasText: 'Foreign Code' });
+    const unsent = page.locator('.rcv-row').filter({ hasText: 'Bacchus Kitchen + Wine Bar' });
+    // The already-emailed invoice: Resend + Copy link + Void + Open deal.
+    await expect(sent.locator(`[data-send-inv="${RINV1}"]`)).toHaveText('Resend');
+    await expect(sent.locator('[data-copy-pay]')).toHaveAttribute('data-copy-pay', 'https://pay.example/fc');
+    await expect(sent.locator(`[data-void-inv="${RINV1}"]`)).toBeVisible();
+    await expect(sent.locator(`[data-rcdeal="${DEAL}"]`)).toBeVisible();
+    // Never sent: Send (first send), no link to copy, and still voidable.
+    await expect(unsent.locator(`[data-send-inv="${RINV2}"]`)).toHaveText('Send');
+    await expect(unsent.locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(unsent.locator(`[data-void-inv="${RINV2}"]`)).toBeVisible();
+    // The verb stayed Void — the drawer already taught it; nothing says "Delete".
+    await expect(page.locator('#detailInner')).not.toContainText('Delete');
+  });
+
+  test('voiding from the list removes the row, updates the Outstanding total, and re-totals the AR strip', async ({ page }) => {
+    const calls: string[] = [];
+    let voided = false;
+    await installApp(page, { api: rcvApi([RCV_ITEM1, RCV_ITEM2], 200000) });
+    // Dynamic server: after the void, the re-read returns only the survivor —
+    // the assertions are on what the page draws from fresh state, not optimism.
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      const method = route.request().method();
+      if (method === 'POST' && path === `/sales/invoices/${RINV1}/void`) {
+        calls.push(path); voided = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, id: RINV1, status: 'void', link_deactivated: true } }) });
+      }
+      if (method === 'GET' && path === '/sales/receivables' && voided) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [RCV_ITEM2], total_cents: 160000, overdue_cents: 0 } }) });
+      }
+      if (method === 'GET' && path === '/sales/summary' && voided) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(summaryWithAr(160000, 1)) });
+      }
+      return route.fallback();
+    });
+    await openList(page);
+
+    // Declining the confirm sends nothing and the row stays.
+    page.once('dialog', (d) => d.dismiss());
+    await page.locator(`[data-void-inv="${RINV1}"]`).click();
+    await expect.poll(() => calls.length).toBe(0);
+    await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toBeVisible();
+
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await page.locator(`[data-void-inv="${RINV1}"]`).click();
+    await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
+    expect(msg).toContain('Void this invoice?');   // the drawer's exact confirm — shared wiring, not a copy
+    await expect.poll(() => calls).toContain(`/sales/invoices/${RINV1}/void`);
+    // The row leaves and the header total moves — the survivor stays put.
+    await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toHaveCount(0);
+    await expect(page.locator('#detailInner')).toContainText('Outstanding: $1,600');
+    await expect(page.locator('.rcv-row').filter({ hasText: 'Bacchus Kitchen + Wine Bar' })).toBeVisible();
+  });
+
+  test('voiding the last invoice leaves an honest empty state', async ({ page }) => {
+    let voided = false;
+    await installApp(page, { api: rcvApi([RCV_ITEM2], 160000) });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      const method = route.request().method();
+      if (method === 'POST' && path === `/sales/invoices/${RINV2}/void`) {
+        voided = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, id: RINV2, status: 'void', link_deactivated: null } }) });
+      }
+      if (method === 'GET' && path === '/sales/receivables' && voided) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [], total_cents: 0, overdue_cents: 0 } }) });
+      }
+      return route.fallback();
+    });
+    await openList(page);
+    page.once('dialog', (d) => d.accept());
+    await page.locator(`[data-void-inv="${RINV2}"]`).click();
+    await expect(page.locator('#detailInner')).toContainText('Nobody owes you anything');
+    await expect(page.locator('.rcv-row')).toHaveCount(0);
+  });
+
+  test('a refused void (the payment landed meanwhile) surfaces the server’s reason and the row stays', async ({ page }) => {
+    await installApp(page, { api: rcvApi([RCV_ITEM1, RCV_ITEM2], 200000) });
+    await page.route('**/functions/v1/presence/sales/invoices/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
+    });
+    await openList(page);
+    page.once('dialog', (d) => d.accept());
+    await page.locator(`[data-void-inv="${RINV1}"]`).click();
+    await expect(page.locator('.dds-toast')).toContainText('financial record');
+    // Nothing was hidden on a refusal — both rows and the total are untouched.
+    await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toBeVisible();
+    await expect(page.locator('#detailInner')).toContainText('Outstanding: $2,000');
+    await expect(page.locator(`[data-void-inv="${RINV1}"]`)).toBeEnabled();
+  });
+
+  test('Resend from the list POSTs the shared send route and the list re-reads', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: rcvApi([RCV_ITEM1, RCV_ITEM2], 200000) });
+    await page.route('**/functions/v1/presence/sales/invoices/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (route.request().method() === 'POST' && path === `/sales/invoices/${RINV1}/send`) {
+        calls.push(path);
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: RINV1 }, resent: true, emailed: true, url: 'https://pay.example/fc' }) });
+      }
+      return route.fallback();
+    });
+    await openList(page);
+    await page.locator(`[data-send-inv="${RINV1}"]`).click();
+    await expect(page.locator('.dds-toast')).toContainText('Re-sent — emailed to the client');
+    await expect.poll(() => calls).toContain(`/sales/invoices/${RINV1}/send`);
+    // The re-read leaves both rows — a resend changes nothing to hide.
+    await expect(page.locator('.rcv-row')).toHaveCount(2);
+  });
+});

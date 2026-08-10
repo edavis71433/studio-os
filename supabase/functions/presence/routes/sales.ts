@@ -415,12 +415,16 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  const invs = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,due_date,deal_id,created_at&order=due_date.asc.nullslast,created_at.asc&limit=300`));
+  // stripe_url rides along so the list rows can offer the SAME per-invoice
+  // actions the deal drawer has (Send vs Resend label, Copy link) — chasing
+  // payment is this list's whole point, and voiding a mistake shouldn't
+  // require a detour through the deal.
+  const invs = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,due_date,deal_id,created_at,stripe_url&order=due_date.asc.nullslast,created_at.asc&limit=300`));
   const dealIds = [...new Set(invs.map((i: any) => i.deal_id).filter(Boolean))];
   const dealById: Record<string, string> = {};
   if (dealIds.length) for (const d of rows(await svc(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&select=id,title`))) dealById[String(d.id)] = String(d.title || '');
   const today = nowIso().slice(0, 10);
-  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, overdue: !!(i.due_date && String(i.due_date) < today), deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
+  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, overdue: !!(i.due_date && String(i.due_date) < today), deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null }));
   const total = items.reduce((a, i) => a + i.amount_cents, 0);
   const overdue = items.filter((i) => i.overdue).reduce((a, i) => a + i.amount_cents, 0);
   return json({ data: { items, total_cents: total, overdue_cents: overdue } }, 200, cors);
