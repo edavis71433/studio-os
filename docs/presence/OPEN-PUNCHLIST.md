@@ -636,6 +636,14 @@ DECISIONS WAITING ON ERIC:
 2. No agreement states a term — want a 12-month term clause so renewal
    reminders can arm?
 3. The $800 SEO add-on (estimator) — still open.
+4. PRICING ON THE SITE — Eric: "i think i need to take the pricing off my site";
+   after weighing it ("Leave it for now", 2026-08-07). Options laid out were:
+   strip numbers keep page / remove entirely (+redirects) / RAISE the anchors
+   (site says "starts around $1,500" while Bacchus closed at $3,200 — the
+   anchor may be low, not wrong). Revisit deliberately, not tonight. NOTE the
+   page's whole voice is "An honest number, not a guessing game" — removing
+   pricing is a REPOSITIONING, not a deletion; template_build's agreement scope
+   was sourced from this page's card, so a rewrite should re-check that scope.
 4. SQL: 0120 (or press "Add all standard steps"), 0127.
 
 QUEUED NEXT (specced, not built): questionnaire-as-survey (auto-offer at
