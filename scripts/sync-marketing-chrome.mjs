@@ -58,6 +58,12 @@ export const PAGES = [
   ['retail-web-design.html', '/retail-web-design', 'industries'],
   ['home-services-web-design.html', '/home-services-web-design', 'industries'],
   ['health-wellness-web-design.html', '/health-wellness-web-design', 'industries'],
+  // Local landers (hybrid geo strategy): national service pages keep their
+  // framing, these carry the city terms. Not in the nav — no link matches
+  // their clean URL, so they take the chrome unstamped.
+  ['burbank-web-design.html', '/burbank-web-design'],
+  ['glendale-web-design.html', '/glendale-web-design'],
+  ['pasadena-web-design.html', '/pasadena-web-design'],
   ['tools.html', '/tools'],
   ['audit.html', '/audit', 'tools'],
   ['ai-critique.html', '/ai-critique', 'tools'],
