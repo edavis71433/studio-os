@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
-<title>Web Design Pricing Estimator | Davis Digital Studio</title>
-<meta name="description" content="Answer 5 questions for a real ballpark price on your web design project. No signup, no sales call. Honest estimates from Davis Digital Studio.">
+<title>Web Design Scope Builder | Davis Digital Studio</title>
+<meta name="description" content="Answer 5 questions and see which web design build actually fits your business, and what it includes. No signup. Your real number comes on a free call.">
 <link rel="canonical" href="https://davisdigitalstudio.com/pricing-estimator">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_US">
@@ -14,11 +14,11 @@
 <meta name="twitter:site" content="@davisdigitalstudio">
 <meta property="og:url" content="https://davisdigitalstudio.com/pricing-estimator">
 <meta property="og:title" content="Web Design Pricing Estimator — Davis Digital Studio">
-<meta property="og:description" content="What will your web design project actually cost? Answer 5 questions and get a real price range in under a minute. No signup required.">
+<meta property="og:description" content="What does your web design project actually need? Answer 5 questions and see which build fits, in under a minute. No signup required.">
 <meta property="og:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Web Design Pricing Estimator — Davis Digital Studio">
-<meta name="twitter:description" content="What will your web design project actually cost? Answer 5 questions and get a real price range in under a minute. No signup required.">
+<meta name="twitter:description" content="What does your web design project actually need? Answer 5 questions and see which build fits, in under a minute. No signup required.">
 <meta name="twitter:image" content="https://davisdigitalstudio.com/og-image.jpg">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#5b3fa0">
@@ -36,10 +36,11 @@
    skin, no pill buttons, no gradient bands, no emoji icons —
    the option icons are stroked SVG (pinned by
    tests/e2e/marketing-tools.spec.ts). The quiz logic, scoring,
-   and lead intake are unchanged; tier AMOUNTS are the ones MS2
-   verified ($1,500 / $3,800 / $6,500 · Growth Partnership starts
-   around $400 a month). The "Package" catalog FRAMING is flagged
-   for Eric in the slice report, not silently rewritten.
+   and lead intake are unchanged. This page NO LONGER PUBLISHES
+   AMOUNTS: it is a scope builder that recommends a build and
+   routes to the free call for the number (MESSAGING-GUIDE §11).
+   Tier objects keep a `range` field, now a plain-language scope
+   label, not a price — do not reintroduce figures here.
    ============================================================ */
 
 /* Progress */
@@ -191,8 +192,8 @@
   <div class="tool-hero-grid">
     <div>
       <span class="eyebrow">Free tool &middot; Pricing estimator</span>
-      <h1 class="mt-s">What will your project <em>actually cost?</em></h1>
-      <p class="lede">Not knowing what a website should cost is what keeps a lot of good businesses stuck &mdash; guessing, over-paying, or putting it off for another year. Answer five quick questions for an honest range in under a minute. No signup, no sales call unless you want one.</p>
+      <h1 class="mt-s">What does your project <em>actually need?</em></h1>
+      <p class="lede">Guessing at scope is what keeps a lot of good businesses stuck &mdash; over-buying, under-buying, or putting it off for another year. Answer five quick questions and I&rsquo;ll show you which build fits and what&rsquo;s in it. The number comes on a free call, once I actually understand your business.</p>
     </div>
     <div class="tool-specimen" aria-hidden="true">
       <div class="spec-label">Example &middot; 5 quick questions</div>
@@ -211,8 +212,8 @@
         </div>
       </div>
       <div class="spec-callout">
-        <div class="k">Estimated range</div>
-        <div class="v">$1,500 &ndash; $3,800</div>
+        <div class="k">Recommended build</div>
+        <div class="v">Custom + Photography</div>
       </div>
     </div>
   </div>
@@ -318,22 +319,18 @@
       <div class="opt" onclick="toggleMulti(4,'seo')" id="q4_seo">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
         <div class="opt-text"><h3>SEO setup</h3><p>Keyword research, on-page optimization, Google Search Console</p></div>
-        <span class="opt-price">+$800</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'copy')" id="q4_copy">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></div>
         <div class="opt-text"><h3>Copywriting</h3><p>I need help writing the actual words on the site</p></div>
-        <span class="opt-price">+$400/pg</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'brand')" id="q4_brand">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l10 6.5L12 15 2 8.5z"/><path d="M2 15.5L12 22l10-6.5"/></svg></div>
         <div class="opt-text"><h3>Brand identity</h3><p>Logo, colors, fonts, visual identity package</p></div>
-        <span class="opt-price">+$500</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'booking')" id="q4_booking">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
         <div class="opt-text"><h3>Booking or reservations</h3><p>Online scheduling, reservations, or appointment booking</p></div>
-        <span class="opt-price">+$300</span>
       </div>
       <div class="opt" onclick="toggleMulti(4,'none')" id="q4_none">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
@@ -362,7 +359,7 @@
       </div>
       <div class="opt" onclick="pick(5,'1month')" id="q5_1month">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-        <div class="opt-text"><h3>Within 1 month</h3><p>May include a 25% rush surcharge</p></div>
+        <div class="opt-text"><h3>Within 1 month</h3><p>May include a rush surcharge</p></div>
       </div>
       <div class="opt" onclick="pick(5,'asap')" id="q5_asap">
         <div class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
@@ -386,7 +383,7 @@
     </div>
 
     <div class="disclaimer">
-      This is a ballpark range based on your answers, not a quote. Final price depends on design complexity, content, and scope confirmed in a free discovery call. Every paid audit fee ($99+) is credited toward your project.
+      This is a starting point based on your answers, not a quote. What it costs depends on design complexity, content, and the scope we confirm together on a free call — and every paid audit fee is credited toward your project.
     </div>
 
     <!-- Trust + education (consultative, not salesy): explain what actually moves
@@ -613,12 +610,12 @@ function showResults() {
     studio: 'What you described, ' + typeLabel + ' with ' + pageLabel + ' on ' + platformLabel + ', is a Studio-level project. This scope needs a full custom design system, and depending on the complexity of your e-commerce or feature requirements, it will take 6-10 weeks to do right.'
   }[tier];
 
-  var rushNote = rush ? ' Because your timeline is tight (' + timelineLabel + '), a 25% rush surcharge applies, this prioritizes your project and compresses the timeline.' : '';
+  var rushNote = rush ? ' Because your timeline is tight (' + timelineLabel + '), a rush surcharge applies — it prioritizes your project and compresses the timeline. I'll cover exactly what that means on the call.' : '';
 
   var tiers = {
     starter: {
       name: 'Template',
-      range: rush ? '$1,875' : '$1,500',
+      range: 'Template build',
       cadence: '50% upfront · 50% at launch · 2-4 week timeline',
       cls: 'starter',
       items: [
@@ -636,7 +633,7 @@ function showResults() {
     },
     growth: {
       name: 'Custom + Photography',
-      range: rush ? '$4,750' : '$3,800',
+      range: 'Custom design with photography',
       cadence: '50% upfront · 50% at launch · 4-6 week timeline',
       cls: 'growth',
       items: [
@@ -654,7 +651,7 @@ function showResults() {
     },
     studio: {
       name: 'Custom HTML',
-      range: rush ? '$8,125' : '$6,500',
+      range: 'Fully custom build',
       cadence: '50% upfront · 25% at midpoint · 25% at launch',
       cls: 'studio',
       items: [
@@ -664,7 +661,7 @@ function showResults() {
         'Custom animations, interactions, and widgets',
         'Performance optimization and Core Web Vitals audit',
         '30-day post-launch support included',
-        'Optional Growth Partnership (starts around $400 a month) to keep your site working after launch'
+        'Optional Growth Partnership to keep your site working after launch'
       ],
       cta: "Book a free call about your project",
       ctaUrl: '/contact',
@@ -673,16 +670,16 @@ function showResults() {
   };
 
   var t = tiers[tier];
-  var rushHtml = rush ? '<span class="tier-rush">Rush pricing applied, ' + timelineLabel + '</span>' : '';
+  var rushHtml = rush ? '<span class="tier-rush">Rush timeline, ' + timelineLabel + '</span>' : '';
 
   // Conversational reasoning block
   var reasoningHtml = '<div class="tier-reason">' + reasoning + rushNote + '</div>';
 
   document.getElementById('tierCard').innerHTML =
     '<div class="tier-result ' + t.cls + '">' +
-    '<div class="tier-badge">' + t.name + ' Package</div>' + rushHtml +
+    '<div class="tier-badge">Recommended for you</div>' + rushHtml +
     '<div class="tier-name">' + t.name + '</div>' +
-    '<div class="tier-range">' + t.range + '</div>' +
+    '<div class="tier-range">' + t.name + '</div>' +
     '<div class="tier-cadence">' + t.cadence + '</div>' +
     reasoningHtml +
     '<ul class="tier-includes">' + t.items.map(function(i) { return '<li>' + i + '</li>'; }).join('') + '</ul>' +
@@ -703,13 +700,13 @@ function showResults() {
   document.getElementById('tierCard').innerHTML += nextHtml;
 
   // Add-ons
-  var addonDetails = { seo:{label:'SEO Strategy',price:'$800',desc:'Keyword research, competitor analysis, and a 6-month content roadmap.'}, copy:{label:'Copywriting',price:'$400/page',desc:'Professional website copy written for clarity, SEO, and conversion.'}, brand:{label:'Brand Identity',price:'$500',desc:'Logo, color palette, typography system, and usage guidelines.'}, booking:{label:'Booking Integration',price:'$300',desc:'Online scheduling, reservations, or appointment booking setup.'} };
+  var addonDetails = { seo:{label:'SEO Strategy',desc:'Keyword research, competitor analysis, and a 6-month content roadmap.'}, copy:{label:'Copywriting',desc:'Professional website copy written for clarity, SEO, and conversion.'}, brand:{label:'Brand Identity',desc:'Logo, color palette, typography system, and usage guidelines.'}, booking:{label:'Booking Integration',desc:'Online scheduling, reservations, or appointment booking setup.'} };
   if (addons.length > 0) {
     var addonsHtml = '<div class="k">Add-ons included in your estimate</div>' +
       '<div class="addons-grid">' +
       addons.map(function(k) {
         var a = addonDetails[k];
-        return a ? '<div class="addon-pill"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;color:var(--ink);">' + a.label + '</span><span class="addon-price">' + a.price + '</span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
+        return a ? '<div class="addon-pill"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;color:var(--ink);">' + a.label + '</span><span class="addon-price"></span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
       }).join('') +
       '</div>';
     document.getElementById('addonsNote').innerHTML = addonsHtml;
@@ -724,7 +721,7 @@ function showResults() {
   window.__peSummary = 'Pricing Estimator — Project: ' + typeLabel + '; Pages: ' + pageLabel +
     '; Platform: ' + platformLabel + '; Timeline: ' + timelineLabel +
     (addons.length ? ('; Add-ons: ' + addons.join(', ')) : '; Add-ons: none') +
-    '. Recommended: ' + t.name + ' (' + t.range + ')' + (rush ? ' [rush pricing applied]' : '') + '.';
+    '. Recommended: ' + t.name + ' (' + t.range + ')' + (rush ? ' [rush timeline]' : '') + '.';
 
   // Move focus to the results heading so SR/keyboard users land on the outcome.
   var ph = document.getElementById('peResultsHeading'); if (ph) { try { ph.focus(); } catch(e) {} }

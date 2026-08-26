@@ -292,18 +292,19 @@ test.describe('tools family (static pins)', () => {
     expect(html, 'lead intake preserved').toContain('lead_intake');
   });
 
-  test('pricing-estimator: published numbers only, one taxonomy, results CTA → /contact', () => {
+  test('pricing-estimator: no published numbers, one taxonomy, results CTA → /contact', () => {
     const html = read('pricing-estimator.html');
-    // MS2's corrected numbers hold
-    for (const amt of ['$1,500', '$3,800', '$6,500']) expect(html, amt).toContain(amt);
-    expect(html).toContain('around $400 a month');
-    expect(html).not.toContain('$850');
+    // the page is a SCOPE builder now: it recommends a build and sends the
+    // visitor to the free call for the number. Any dollar figure is a
+    // regression (MESSAGING-GUIDE §11).
+    expect(html.match(/\$\d/g), 'estimator publishes no amounts').toBeNull();
     // the second, internal taxonomy no longer leaks into Q2's option badges
-    // (Q4's add-on price badges are real published add-on numbers and stay)
     expect(html).not.toContain('>Studio+<');
     const q2 = html.match(/<div class="q-card" id="q2">[\s\S]*?<div class="q-card" id="q3">/)?.[0] ?? '';
     expect(q2, 'Q2 exists').toContain('How many pages');
     expect(q2.match(/class="opt-price"/g), 'Q2 taxonomy badges removed').toBeNull();
+    // Q4's add-on price chips went with the pricing removal
+    expect(html.match(/class="opt-price"/g), 'no add-on price chips anywhere').toBeNull();
     // results CTAs point at the one booking front door
     expect(html).toContain("ctaUrl: '/contact'");
     expect(html).not.toContain('ctaUrl: \'https://');
@@ -467,7 +468,7 @@ test.describe('tools family (live)', () => {
     await expect(page.locator('.results a[href="/contact"]')).toBeVisible();
   });
 
-  test('estimator: growth flow reaches its result on published numbers', async ({ page }) => {
+  test('estimator: growth flow reaches its recommended build', async ({ page }) => {
     await page.goto('/pricing-estimator.html');
     await page.click('#q1_new');
     await page.click('#q1next');
@@ -480,12 +481,13 @@ test.describe('tools family (live)', () => {
     await page.click('#q5_flexible');
     await page.click('#q5next');
     await expect(page.locator('#peResults')).toBeVisible();
-    await expect(page.locator('#tierCard')).toContainText('$3,800');
+    await expect(page.locator('#tierCard')).toContainText('Custom + Photography');
+    await expect(page.locator('#tierCard')).toContainText('Recommended for you');
     // the result books through the front door, not a Calendly deep link
     await expect(page.locator('#tierCard a[href="/contact"]')).toBeVisible();
   });
 
-  test('estimator: studio flow carries the corrected retainer line, include-list legible', async ({ page }) => {
+  test('estimator: studio flow carries the retainer line, include-list legible', async ({ page }) => {
     await page.goto('/pricing-estimator.html');
     await page.click('#q1_ecommerce');
     await page.click('#q1next');
@@ -499,13 +501,13 @@ test.describe('tools family (live)', () => {
     await page.click('#q5next');
     await expect(page.locator('#peResults')).toBeVisible();
     const card = page.locator('.tier-result');
-    await expect(card).toContainText('$6,500');
+    await expect(card).toContainText('Custom HTML');
     // the previously-dim open item: the Studio include-list on its dark gradient.
     // First: no gradient surface at all (a gradient defeats any bg-color walk) —
     // then the text must clear WCAG AA against its actual background.
     const bgImage = await card.evaluate((el) => getComputedStyle(el).backgroundImage);
     expect(bgImage, 'tier card is a flat tokenized surface').toBe('none');
-    const li = card.locator('.tier-includes li').filter({ hasText: '$400 a month' });
+    const li = card.locator('.tier-includes li').filter({ hasText: 'Growth Partnership' });
     await expect(li).toBeVisible();
     const [fg, bg] = await li.evaluate((el) => {
       const color = getComputedStyle(el).color;

@@ -41,6 +41,8 @@ const PAGES = [
   'industries.html', 'restaurant-web-design.html',
   'salon-web-design.html', 'retail-web-design.html',
   'home-services-web-design.html', 'health-wellness-web-design.html',
+  'burbank-web-design.html', 'glendale-web-design.html',
+  'pasadena-web-design.html',
   'tools.html', 'audit.html', 'ai-critique.html', 'report-card.html',
   'roi-calculator.html', 'pricing-estimator.html', 'local-visibility.html',
   'about.html', 'work.html', 'contact.html', 'privacy.html', 'terms.html',
@@ -365,17 +367,17 @@ test.describe('marketing nav (live, desktop)', () => {
 // ============================================================
 // MS2 — the money path (docs/design/MARKETING-SITE-OVERHAUL.md §MS2).
 //
-// One price truth, quoted identically at every depth. /pricing is canonical:
-//   web design starts around $1,500 · Growth Partnership starts around $400
-//   a month · paid audits from $99 (audit.html's own published tiers).
-// These pins make the price-drift class regress-proof:
-//   - PUBLISHED NUMBERS ONLY: no money page may carry an amount outside the
-//     published set (the $850-retainer class of bug dies at grep level)
-//   - one phrasing family ("starts around", never "starts at"/"from $400")
+// NO PUBLISHED PRICE. Every number is quoted on the free call; the money
+// path's single job is to reach /contact. This inverts the old "one price
+// truth" pins (which policed $1,500 / $400 / $99-$899) after the pricing
+// removal — see docs/website/MESSAGING-GUIDE.md §11.
+// These pins make the price-REGRESSION class regress-proof:
+//   - ZERO AMOUNTS: no money page may carry a dollar figure at all, so a
+//     reintroduced price fails at grep level instead of shipping
 //   - label honesty: "Full pricing" may only ever land on /pricing
-//   - every money page links /pricing in its own body, not just the chrome
-//   - audit tiers labeled (free review vs paid audits from $99), one
-//     credited-toward-a-full-project story
+//   - every money page links /contact in its own body, not just the chrome
+//   - /pricing explains HOW work is priced and names the audit tiers
+//     without pricing them, keeping one credited-toward-a-full-project story
 //   - ONE timeline (how-we-work's published FAQ ranges), the 45-day fork dies
 //   - the single-closer rule: dark CTA -> footer, nothing interactive between
 // ============================================================
@@ -385,9 +387,9 @@ const MONEY_PAGES = [
   'services.html', 'web-design.html', 'seo-strategy.html',
   'monthly-retainer.html', 'audit.html', 'pricing.html',
 ];
-// Every price published anywhere on the money path. /pricing owns the first
-// two; audit.html's tier table owns the rest. Anything else is an invention.
-const PUBLISHED_AMOUNTS = new Set(['$1,500', '$400', '$99', '$499', '$899']);
+// Nothing is published any more. The set is empty on purpose: any dollar
+// figure on a money page is a regression, not a "new price".
+const PUBLISHED_AMOUNTS = new Set<string>([]);
 
 const mainOf = (html: string, f: string): string => {
   const start = html.indexOf('<main');
@@ -401,32 +403,169 @@ test.describe('MS2 money path (static pins)', () => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
   });
 
-  test('published numbers only: no money page carries an amount outside the published set', () => {
+  test('no published price: no money page carries a dollar amount at all', () => {
     for (const f of MONEY_PAGES) {
       for (const m of read(f).matchAll(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g)) {
-        expect(PUBLISHED_AMOUNTS.has(m[0]), `${f}: "${m[0]}" is not a published price`).toBe(true);
+        expect(
+          PUBLISHED_AMOUNTS.has(m[0]),
+          `${f}: "${m[0]}" — prices are quoted on the call, never published (MESSAGING-GUIDE §11)`
+        ).toBe(true);
       }
     }
   });
 
-  test('one phrasing family: every $1,500 and $400 reads "starts around", never "starts at" / bare "From"', () => {
+  test('every money page routes to the consult in its own body', () => {
     for (const f of MONEY_PAGES) {
-      const html = read(f);
-      // the contradicting families die outright
-      expect(html, `${f}: "starts at" contradicts /pricing's "starts around"`).not.toMatch(/starts? at \$/i);
-      expect(html, `${f}: bare "From $400" contradicts /pricing's "starts around $400"`).not.toMatch(/from \$400/i);
-      for (const m of html.matchAll(/\$(?:1,500|400)/g)) {
-        const ctx = html.slice(Math.max(0, m.index! - 160), m.index! + 160);
+      expect(mainOf(read(f), f).includes('href="/contact"'), `${f}: in-body /contact link`).toBe(true);
+    }
+  });
+
+  test('label honesty: "See what your site needs" always means /audit', () => {
+    // C6: parsed attribute-order-independently, and every occurrence of the
+    // label must resolve to a parseable anchor — a reordered or re-wrapped
+    // link can no longer make the pin pass vacuously.
+    let total = 0;
+    for (const f of PAGES) {
+      total += labelAnchorPin(read(f), f, /See what your site needs/g, '/audit');
+    }
+    expect(total, 'the label exists somewhere (pin is not vacuous)').toBeGreaterThan(0);
+  });
+
+  test('P4: contact.html no longer ships its page-scoped TOKEN flip (chrome stays canonical)', () => {
+    // Honest scope: the sitewide dark remap (styles.css) and the tool bodies'
+    // MS3-owned local skins still exist; 7 tool pages restate chrome dark rules
+    // byte-identical to styles.css's (benign). What MS1 removed is contact's
+    // inline token-flip STYLE BLOCK. contact.css now carries the two dark
+    // SURFACE rules (review F1) so dark-OS visitors keep a legible form —
+    // that file-level media query is expected and correct.
+    expect(read('contact.html')).not.toContain('prefers-color-scheme');
+    expect(read('contact.css')).toContain('prefers-color-scheme: dark');
+    expect(read('contact.css')).toContain('#241d38');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live behavior — desktop
+// ---------------------------------------------------------------------------
+test.describe('marketing nav (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop nav behavior');
+  });
+
+  test('index: 6-slot nav renders, /pricing is one click from home, submenu opens on hover and closes on Escape', async ({ page }) => {
+    await page.goto('/index.html');
+    const nav = page.locator('header.nav');
+    await expect(nav.locator('a[data-nav="pricing"]')).toBeVisible();
+    await expect(nav.locator('a[data-nav="tools"]')).toBeVisible();
+    await expect(nav.locator('.nav-links > a, .nav-links > .nav-has-sub')).toHaveCount(6);
+
+    const toggle = nav.locator('.nav-sub-toggle');
+    await toggle.hover();
+    await expect(nav.locator('.nav-sub')).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(nav.locator('.nav-sub a[data-nav="growth-partnership"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('every nav + footer link on the served page resolves 200 locally', async ({ page }) => {
+    await page.goto('/index.html');
+    const hrefs: string[] = await page.$$eval('header.nav a[href], footer.site a[href]', (as) =>
+      as.map((a) => a.getAttribute('href')!)
+    );
+    const rules = parseRedirects();
+    const targets = new Set<string>();
+    for (const href of hrefs) {
+      if (!href.startsWith('/')) continue; // no external/anchor links expected, asserted below
+      targets.add(targetOf(rules, href) ?? href); // .html hrefs pass through
+    }
+    expect(hrefs.every((h) => h.startsWith('/') || h.startsWith('#'))).toBe(true);
+    for (const t of targets) {
+      const res = await page.request.get(t);
+      expect(res.status(), `${t}`).toBe(200);
+    }
+  });
+
+  test('aria-current is visible where stamped (styles.css active treatment)', async ({ page }) => {
+    await page.goto('/pricing.html');
+    const active = page.locator('.nav-links a[aria-current="page"]');
+    await expect(active).toHaveCount(1);
+    await expect(active).toHaveText('Pricing');
+  });
+
+  for (const path of ['/index.html', '/pricing.html', '/services.html', '/tools.html']) {
+    test(`console-clean boot: ${path}`, async ({ page }) => {
+      const errors: string[] = [];
+      // Third-party CDNs (fonts, consent-gated GA) are unreachable in the CI
+      // sandbox; their load failures carry the URL in location(), not text().
+      // Anything local (127.0.0.1) or script-thrown still fails the test.
+      const external = /fonts\.googleapis|fonts\.gstatic|googletagmanager/;
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('console', (msg) => {
+        if (msg.type() !== 'error') return;
+        if (external.test(msg.text()) || external.test(msg.location()?.url ?? '')) return;
+        errors.push(`${msg.text()} @ ${msg.location()?.url ?? '?'}`);
+      });
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
+// ============================================================
+// MS2 — the money path (docs/design/MARKETING-SITE-OVERHAUL.md §MS2).
+//
+// NO PUBLISHED PRICE. Every number is quoted on the free call; the money
+// path's single job is to reach /contact. This inverts the old "one price
+// truth" pins (which policed $1,500 / $400 / $99-$899) after the pricing
+// removal — see docs/website/MESSAGING-GUIDE.md §11.
+// These pins make the price-REGRESSION class regress-proof:
+//   - ZERO AMOUNTS: no money page may carry a dollar figure at all, so a
+//     reintroduced price fails at grep level instead of shipping
+//   - label honesty: "Full pricing" may only ever land on /pricing
+//   - every money page links /contact in its own body, not just the chrome
+//   - /pricing explains HOW work is priced and names the audit tiers
+//     without pricing them, keeping one credited-toward-a-full-project story
+//   - ONE timeline (how-we-work's published FAQ ranges), the 45-day fork dies
+//   - the single-closer rule: dark CTA -> footer, nothing interactive between
+// ============================================================
+
+// The money pages (MS2's file set — the funnel's price-bearing surfaces).
+const MONEY_PAGES = [
+  'services.html', 'web-design.html', 'seo-strategy.html',
+  'monthly-retainer.html', 'audit.html', 'pricing.html',
+];
+// Nothing is published any more. The set is empty on purpose: any dollar
+// figure on a money page is a regression, not a "new price".
+const PUBLISHED_AMOUNTS = new Set<string>([]);
+
+const mainOf = (html: string, f: string): string => {
+  const start = html.indexOf('<main');
+  const end = html.indexOf('</main>');
+  if (start < 0 || end < 0) throw new Error(`${f}: no <main> region`);
+  return html.slice(start, end);
+};
+
+test.describe('MS2 money path (static pins)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('no published price: no money page carries a dollar amount at all', () => {
+    for (const f of MONEY_PAGES) {
+      for (const m of read(f).matchAll(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g)) {
         expect(
-          /start(?:s|ing)? around/i.test(ctx),
-          `${f} @${m.index}: "${m[0]}" outside the "starts around" family:\n…${ctx}…`
+          PUBLISHED_AMOUNTS.has(m[0]),
+          `${f}: "${m[0]}" — prices are quoted on the call, never published (MESSAGING-GUIDE §11)`
         ).toBe(true);
       }
-      // $400 is always a monthly number, said so in the same breath
-      for (const m of html.matchAll(/\$400/g)) {
-        const ctx = html.slice(m.index!, m.index! + 120);
-        expect(/(a month|\/month)/i.test(ctx), `${f} @${m.index}: $400 without its "/month" cadence`).toBe(true);
-      }
+    }
+  });
+
+  test('every money page routes to the consult in its own body', () => {
+    for (const f of MONEY_PAGES) {
+      expect(mainOf(read(f), f).includes('href="/contact"'), `${f}: in-body /contact link`).toBe(true);
     }
   });
 
@@ -438,18 +577,17 @@ test.describe('MS2 money path (static pins)', () => {
     }
   });
 
-  test('every money page links /pricing in its own body; /pricing cross-quotes the audit tiers', () => {
-    for (const f of MONEY_PAGES.filter((p) => p !== 'pricing.html')) {
-      expect(mainOf(read(f), f).includes('href="/pricing"'), `${f}: in-body /pricing link`).toBe(true);
-    }
+  test('/pricing explains how work is priced and links its sources, without pricing them', () => {
     const pmain = mainOf(read('pricing.html'), 'pricing.html');
-    expect(pmain, 'pricing: audits quoted from their source').toMatch(/audits from \$99/i);
+    // it answers the question the visitor arrived with, in prose not numbers
+    expect(pmain, 'pricing: names what moves the number').toMatch(/what changes the number/i);
+    expect(pmain, 'pricing: audits named, not priced').toMatch(/paid site audits/i);
     expect(pmain, 'pricing: links the audit tiers').toContain('href="/audit#pricing"');
     // the honest standalone-SEO answer: no invented number, a real link instead
     expect(pmain, 'pricing: answers the SEO cost question').toContain('href="/seo-strategy"');
   });
 
-  test('audit tiers labeled: free review vs paid audits from $99, one credited-toward story', () => {
+  test('audit tiers labeled: free review vs three paid levels, one credited-toward story', () => {
     const html = read('audit.html');
     const main = mainOf(html, 'audit.html');
     // the four tiers, named, in the published order
@@ -457,7 +595,9 @@ test.describe('MS2 money path (static pins)', () => {
       expect(main, `audit tier named: ${name}`).toContain(name);
     }
     expect(main, 'free tier labeled Free').toMatch(/tier-badge free">\s*Free/);
-    expect(main, 'the free/paid split is stated, not implied').toMatch(/paid audits from \$99/i);
+    expect(main, 'the free/paid split is stated, not implied').toMatch(/three levels of paid audit/i);
+    // every tier asks for the call rather than a checkout with a hidden price
+    expect(main, 'tiers route to the consult').toMatch(/Ask about this audit/);
     // ONE credit story: "a full project" (the FAQ's own words) — the
     // "full redesign" variant contradicted it on the same page
     expect(html, 'no "credited toward a full redesign" fork').not.toContain('credited toward a full redesign');
@@ -474,20 +614,17 @@ test.describe('MS2 money path (static pins)', () => {
     expect(read('how-we-work.html'), 'the range is how-we-work\'s own published number').toMatch(range);
   });
 
-  test('price-story truth: no absolute "no SEO price anywhere" claim; the $499 upsell sells only $499 content', () => {
-    // C1: the estimator publishes a standalone "SEO Strategy $800" add-on
-    // (its catalog framing is flagged for Eric, not silently rewritten), so
-    // an absolute "you won't find one anywhere on this site" clause on
-    // /pricing is falsified one click away. seo-strategy.html's softer
-    // phrasing ("There's no separate SEO price list") is the defensible form.
+  test('upsell scope truth: the free-score upsell sells the Health Check, not the Competitive tier', () => {
+    // C1: /pricing must not claim there is no SEO price "anywhere on this
+    // site" — seo-strategy.html's softer "no separate SEO price list" is the
+    // defensible form, and survives the pricing removal unchanged.
     expect(read('pricing.html'), 'pricing: absolute SEO-price claim').not.toMatch(/anywhere on this site/i);
-    // C2: competitor analysis is exclusively the $899 Competitive
-    // Intelligence tier (audit.html's tier table, buy-audit's TIERS catalog,
-    // and the schema.org offers all agree). The free-score upsell sells the
-    // $499 Digital Health Check and may not promise competitor work.
+    // C2: competitor analysis is exclusively the Competitive Intelligence
+    // tier. The free-score upsell sells the Digital Health Check and may not
+    // promise competitor work — a scope pin, unaffected by prices going away.
     const upsell = read('audit.html').match(/goes 10x deeper[^']*/)?.[0] ?? '';
     expect(upsell, 'audit: free-score upsell copy found').toBeTruthy();
-    expect(upsell, 'audit: the $499 upsell may not promise the $899 tier\'s competitor work').not.toMatch(/competitor/i);
+    expect(upsell, 'audit: the Health Check upsell may not promise the Competitive tier\'s work').not.toMatch(/competitor/i);
   });
 
   test('monthly-retainer font loading matches index (preload + async swap + noscript)', () => {
@@ -1074,10 +1211,11 @@ test.describe('MS2 money path (live, desktop)', () => {
     });
   }
 
-  test('the services price journey: "See pricing" lands on real pricing', async ({ page }) => {
+  test('the services money journey: the consult is primary, /pricing is the explainer', async ({ page }) => {
     await page.goto('/services.html');
     const main = page.locator('main');
-    // the retargeted button: an in-body pricing link that means what it says
+    // the consult is the conversion goal; /pricing now explains HOW, not how much
+    await expect(main.locator('a[href="/contact"]').first()).toBeVisible();
     const seePricing = main.locator('a[href="/pricing"]').first();
     await expect(seePricing).toBeVisible();
     // no button in the body promises "Full pricing" from a page that lacks it
@@ -1090,8 +1228,8 @@ test.describe('MS2 money path (live, desktop)', () => {
     // clean URL through the parsed _redirects rule, as MS1's tests do)
     const rules = parseRedirects();
     await page.goto(targetOf(rules, '/pricing')!);
-    await expect(page.locator('main')).toContainText('New sites start around $1,500 depending on scope');
-    await expect(page.locator('main')).toContainText('$400');
+    await expect(page.locator('main')).toContainText(/I don.t publish a price list/i);
+    await expect(page.locator('main')).toContainText(/What changes the number/i);
   });
 
   for (const f of ['web-design.html', 'seo-strategy.html']) {
@@ -1128,13 +1266,15 @@ test.describe('MS2 money path (live, mobile)', () => {
     test.skip(testInfo.project.name !== 'mobile', 'mobile behavior');
   });
 
-  test('pricing renders the whole price story on a phone: both offers, audits row, one closer', async ({ page }) => {
+  test('pricing renders the whole story on a phone: both offers, audits row, one closer', async ({ page }) => {
     await page.goto('/pricing.html');
     const main = page.locator('main');
-    await expect(main).toContainText('New sites start around $1,500 depending on scope');
-    await expect(main.getByText('$1,500', { exact: false }).first()).toBeVisible();
-    await expect(main).toContainText(/audits from \$99/i);
+    await expect(main).toContainText(/I don.t publish a price list/i);
+    await expect(main).toContainText(/What changes the number/i);
+    await expect(main).toContainText(/paid site audits/i);
     await expect(main.locator('a[href="/audit#pricing"]')).toBeVisible();
+    // the page's job is the call
+    await expect(main.locator('a[href="/contact"]').first()).toBeVisible();
     const closerCount = await page.evaluate(
       () => document.querySelectorAll('main section.panel-dark, main section.cta-band').length
     );
