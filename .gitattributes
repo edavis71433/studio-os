@@ -1,0 +1,27 @@
+# Line-ending policy.
+#
+# Every text file in this repo is stored with LF endings, and `text=auto` keeps
+# it that way: git normalizes on commit, and compares a working-tree file with
+# its carriage returns stripped. An editor or archive tool that rewrites endings
+# on disk therefore no longer shows up as a thousand phantom modified files, and
+# can no longer sneak CRLF into a commit.
+#
+# That second part matters here. docs/runbooks/BYTE-CHECK.md guarantees repo
+# artifacts are byte-identical to what is deployed; a stray CRLF commit would
+# silently break that guarantee on the next hash comparison.
+* text=auto
+
+# Shell scripts must keep LF or they will not execute.
+*.sh text eol=lf
+
+# Binary assets: never touch the bytes.
+*.woff2 -text
+*.woff  -text
+*.jpg   -text
+*.jpeg  -text
+*.png   -text
+*.webp  -text
+*.ico   -text
+*.pdf   -text
+*.zip   -text
+*.docx  -text
