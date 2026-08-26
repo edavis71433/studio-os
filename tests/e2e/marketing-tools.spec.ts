@@ -816,7 +816,7 @@ test.describe('tools family (dark scheme)', () => {
     expect(await contrastOf(page, '#rcSubmit'), 'report-card submit, hovered').toBeGreaterThanOrEqual(4.5);
   });
 
-  test('estimator: rush chip and add-on prices legible in dark (P4/P8)', async ({ page }) => {
+  test('estimator: rush chip legible in dark (P4/P8)', async ({ page }) => {
     await page.goto('/pricing-estimator.html');
     await page.click('#q1_new'); await page.click('#q1next');
     await page.click('#q2_4-7'); await page.click('#q2next');
@@ -824,8 +824,8 @@ test.describe('tools family (dark scheme)', () => {
     await page.click('#q4_seo'); await page.click('#q4next');
     await page.click('#q5_asap'); await page.click('#q5next');
     await expect(page.locator('#peResults')).toBeVisible();
-    expect(await contrastOf(page, '.tier-rush'), 'rush-pricing disclosure').toBeGreaterThanOrEqual(4.5);
-    expect(await contrastOf(page, '.addon-price'), 'add-on price').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, '.tier-rush'), 'rush-timeline disclosure').toBeGreaterThanOrEqual(4.5);
+    // the add-on price chip went with the pricing removal — nothing to measure
   });
 
   test('local visibility: score band, grade chip, and every signal badge legible in dark (P4)', async ({ page }) => {

@@ -610,7 +610,7 @@ function showResults() {
     studio: 'What you described, ' + typeLabel + ' with ' + pageLabel + ' on ' + platformLabel + ', is a Studio-level project. This scope needs a full custom design system, and depending on the complexity of your e-commerce or feature requirements, it will take 6-10 weeks to do right.'
   }[tier];
 
-  var rushNote = rush ? ' Because your timeline is tight (' + timelineLabel + '), a rush surcharge applies — it prioritizes your project and compresses the timeline. I'll cover exactly what that means on the call.' : '';
+  var rushNote = rush ? ' Because your timeline is tight (' + timelineLabel + '), a rush surcharge applies — it prioritizes your project and compresses the timeline. I’ll cover exactly what that means on the call.' : '';
 
   var tiers = {
     starter: {
@@ -679,7 +679,7 @@ function showResults() {
     '<div class="tier-result ' + t.cls + '">' +
     '<div class="tier-badge">Recommended for you</div>' + rushHtml +
     '<div class="tier-name">' + t.name + '</div>' +
-    '<div class="tier-range">' + t.name + '</div>' +
+    '<div class="tier-range">' + t.range + '</div>' +
     '<div class="tier-cadence">' + t.cadence + '</div>' +
     reasoningHtml +
     '<ul class="tier-includes">' + t.items.map(function(i) { return '<li>' + i + '</li>'; }).join('') + '</ul>' +
@@ -706,7 +706,7 @@ function showResults() {
       '<div class="addons-grid">' +
       addons.map(function(k) {
         var a = addonDetails[k];
-        return a ? '<div class="addon-pill"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;color:var(--ink);">' + a.label + '</span><span class="addon-price"></span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
+        return a ? '<div class="addon-pill"><div style="display:flex;justify-content:space-between;width:100%;"><span style="font-weight:600;color:var(--ink);">' + a.label + '</span></div><div style="font-size:11px;color:var(--muted);">' + a.desc + '</div></div>' : '';
       }).join('') +
       '</div>';
     document.getElementById('addonsNote').innerHTML = addonsHtml;
