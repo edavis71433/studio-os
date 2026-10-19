@@ -31,10 +31,10 @@
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:22px 20px 60px}
   /* ── dashboard header: object icon · serif title · "As of" + Refresh ── */
   .dhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
-  .obj{width:34px;height:34px;border-radius:9px;background:var(--p-soft);display:grid;place-items:center;font-size:17px;flex:none}
+  .obj{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p-soft);display:grid;place-items:center;font-size:17px;flex:none}
   h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.01em;outline-offset:3px}
   .asof{color:var(--faint);font-size:12.5px;margin-left:auto;display:flex;align-items:center;gap:10px}
-  .rbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 13px;font:600 12.5px var(--sans);cursor:pointer}
+  .rbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:6px 13px;font:600 12.5px var(--sans);cursor:pointer}
   .rbtn:hover{border-color:var(--p);color:var(--p)}
   /* ── filter chip (Lightning: filters under the header, open unfiltered) ── */
   .filters{display:flex;gap:8px;margin:12px 0 18px;position:relative}
@@ -42,19 +42,19 @@
   .chip b{color:var(--faint);font-weight:600;margin-right:4px}
   .chip .car{color:var(--faint);font-size:10px}
   .chip:hover{border-color:var(--p)}
-  .chipmenu{position:absolute;left:0;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
+  .chipmenu{position:absolute;left:0;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
   .chipmenu[hidden]{display:none}
   .chipmenu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:8px;cursor:pointer}
   .chipmenu button:hover{background:var(--p-soft)}
   /* ── the 12-column grid + Lightning card chrome ── */
   .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-  .band{grid-column:1/-1;font-family:var(--sans);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:10px 2px -4px}
+  .band{grid-column:1/-1;font-family:var(--sans);font-size:12px;font-weight:500;color:var(--faint);margin:10px 2px -4px}
   /* the honest header for a website the studio does NOT host: what these numbers
      can and cannot say, stated once before the cards rather than implied by four
      empty ones. Same full-width slot as .band. */
-  .bandnote{grid-column:1/-1;font-size:13px;line-height:1.55;color:var(--soft);background:var(--p-soft);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:2px 0 -2px}
+  .bandnote{grid-column:1/-1;font-size:13px;line-height:1.55;color:var(--soft);background:var(--p-soft);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 13px;margin:2px 0 -2px}
   .bandnote strong{color:var(--ink);font-weight:700}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
   .ch{padding:13px 16px 0}
   .ch .t{font-family:var(--sans);font-size:14px;font-weight:700}
   .ch .s{font-size:12px;color:var(--faint);margin-top:2px}
@@ -78,7 +78,7 @@
   /* tables */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-  th{text-align:left;color:var(--faint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 0;border-bottom:1px solid var(--line)}
+  th{text-align:left;color:var(--faint);font-weight:500;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
   td{padding:7px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
   tr:last-child td{border-bottom:none}
   td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -94,24 +94,24 @@
   .eh{font-weight:600;font-size:13.5px}
   .el{font-size:12.5px;color:var(--soft);margin-top:3px}
   /* stencil loading (only shown when the fetch runs >300ms) */
-  .st{background:var(--line);border-radius:12px;opacity:.55}
+  .st{background:var(--line);border-radius:var(--dds-r-lg,10px);opacity:.55}
   @media (prefers-reduced-motion:no-preference){.st{animation:stp 1.1s ease-in-out infinite alternate}}
   @keyframes stp{to{opacity:.3}}
   /* portfolio lens (agency, unscoped — SS7: the same .dhead dashboard anatomy) */
   .cfull{grid-column:1/-1}
   .subline{grid-column:1/-1;color:var(--soft);font-size:14.5px;margin:2px 2px 0}
-  .tchip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 10px}
+  .tchip{display:inline-block;font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;text-transform:capitalize}
   .tchip.good{color:var(--good);background:var(--good-soft)}
   .tchip.attention{color:var(--warn);background:var(--warn-soft)}
   .tchip.neutral{color:var(--p);background:var(--p-soft)}
   .isent{font-size:14px;color:var(--ink);margin-top:4px;line-height:1.45}
   .card .go{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
   .card .go:hover{text-decoration:underline}
-  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:15px 18px;color:var(--soft);font-size:14.5px}
+  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:var(--dds-r-lg,10px);padding:15px 18px;color:var(--soft);font-size:14.5px}
   .quiet b{color:var(--ink);font-weight:600}
   /* per-client rollup — customers.html's .tscroll anatomy (wide content scrolls
      inside its own container; the page never scrolls sideways) */
-  .tscroll{grid-column:1/-1;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll{grid-column:1/-1;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   .tscroll table{min-width:560px}
   .tscroll th{padding:11px 14px}
   .tscroll td{padding:10px 14px}
@@ -125,7 +125,7 @@
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
   .muted{color:var(--soft);font-size:14.5px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
   @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -135,7 +135,7 @@
   /* print (restored from the pre-slice-8 page): the noprint chrome hides, cards
      never break mid-page, and the "Print this summary" button offers the path */
   .print{margin-top:26px;text-align:center}
-  .print button{background:none;border:1px solid var(--line);border-radius:10px;color:var(--soft);font:inherit;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer}
+  .print button{background:none;border:1px solid var(--line);border-radius:var(--dds-r,8px);color:var(--soft);font:inherit;font-size:13px;font-weight:500;padding:8px 16px;cursor:pointer}
   .print button:hover{border-color:var(--p);color:var(--p)}
   @media print{.seg,.print,.filters,.noprint,#dds-shell{display:none!important}.wrap{max-width:100%}.card,.tscroll{box-shadow:none;break-inside:avoid}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}

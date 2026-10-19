@@ -24,27 +24,27 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:48px 22px 96px}
-  header .eyebrow{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600}
+  header .eyebrow{font-size:12.5px;color:var(--soft);font-weight:500}
   header h1{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.12;margin:.35em 0 .1em;text-wrap:balance}
   header .sub{color:var(--soft);font-size:15.5px;margin:0}
   .stack{display:flex;flex-direction:column;gap:16px;margin-top:34px}
-  .moment{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 22px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .moment::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.5}
-  .moment.good::before{background:var(--good)} .moment.attn::before{background:var(--warn)}
-  .moment h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 6px;line-height:1.2;text-wrap:balance}
+  .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:22px 22px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  /* visual refresh: no accent stripe — the row's icon tile carries the tone */
+  .moment::before{display:none}
+  .moment h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0 0 6px;line-height:1.2;text-wrap:balance}
   .moment p{margin:0;color:var(--soft);font-size:15px}
   .row{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
-  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
   button:hover{background:var(--accent-soft);border-color:var(--accent)}
   button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   button.primary:hover{filter:brightness(1.05)}
   button.ghost{border-color:transparent;color:var(--soft);padding-left:6px;padding-right:6px}
   button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .answer{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-radius:12px;font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
+  .answer{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-radius:var(--dds-r-lg,10px);font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
   /* a11y: live regions stay in the accessibility tree from first render (never
      display:none) so the FIRST answer is announced; empty = zero-height/invisible */
   .answer:empty{padding:0;margin:0;background:transparent}
-  .tag{display:inline-block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:8px}
+  .tag{display:inline-block;font-size:12px;color:var(--soft);font-weight:500;margin-bottom:8px;text-transform:capitalize}
   .calm{background:var(--good-soft);border-color:transparent}
   .calm h2{color:var(--good)}
   a.moment.todo{display:block;text-decoration:none;color:inherit}
@@ -65,16 +65,16 @@
   details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
   @media (prefers-reduced-motion:reduce){details.more>summary::before{transition:none}}
   .ask{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
-  .ask h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 4px}
+  .ask h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 4px}
   .ask p{margin:0 0 14px;color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
-  .askbox input{flex:1;font-family:inherit;font-size:15px;padding:12px 15px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .askbox input{flex:1;font-family:inherit;font-size:15px;padding:12px 15px;border-radius:var(--dds-r-lg,10px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
   .askbox input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
   .muted{color:var(--soft);font-size:14px}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
-  a.link{color:var(--accent);text-decoration:none;font-weight:600}
+  a.link{color:var(--accent);text-decoration:none;font-weight:500}
   a.link:hover{text-decoration:underline}
   .appnav{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 26px;padding-bottom:14px;border-bottom:1px solid var(--line)}
   .appnav a{font-size:13.5px;color:var(--soft);text-decoration:none;padding:6px 12px;border-radius:999px;font-weight:500;white-space:nowrap}
@@ -94,7 +94,7 @@
   .cols.norail{grid-template-columns:minmax(0,1fr)}
   .colmain{min-width:0;display:flex;flex-direction:column;gap:18px}
   .colrail{min-width:0;display:flex;flex-direction:column;gap:16px}
-  .seclab{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 9px}
+  .seclab{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 9px}
   section.home-sec{margin:0}
   /* the Needs-you feed: one card, one row per item. Each row KEEPS the
      .moment.todo identity (attention math + responsive pins), restyled from a
@@ -102,22 +102,22 @@
      A notice row is a CONTAINER, not a link: the <a> covers headline+meta and
      the "Done" <button> is its SIBLING — a button may never nest inside an
      anchor (invalid HTML, and assistive tech can't reach the inner control). */
-  .feedcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .feedcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden}
   .feedcard .moment.todo{display:flex;align-items:center;gap:14px;background:transparent;border:0;border-radius:0;box-shadow:none;padding:14px 18px;border-top:1px solid var(--line);overflow:visible}
   .feedcard .moment.todo:first-child{border-top:0}
   .feedcard .moment.todo::before{display:none}
   .feedcard .moment.todo:hover{background:var(--accent-soft)}
   .feedcard .moment.todo:focus-visible,.feedcard .frow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .feedcard .frow{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
-  .fico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
+  .fico{flex:0 0 auto;width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
-  .fcta{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:6px 13px;white-space:nowrap}
+  .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap}
   /* the manual "Done" — quiet by design: the row usually clears itself, this is
      only for the residue. Never shown on money or legal obligations. */
-  .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 13px;white-space:nowrap;cursor:pointer}
+  .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap;cursor:pointer}
   .fdone:hover{color:var(--ink);border-color:var(--soft)}
   .fdone:disabled{opacity:.5;cursor:default}
   @media (max-width:600px){.feedcard .moment.todo{flex-wrap:wrap}.feedcard .frow{flex-wrap:wrap}.fcta{margin-left:50px}}
@@ -125,8 +125,8 @@
   .moment.calm.slim h2{font-size:17px;margin-bottom:2px}
   .moment.calm.slim p{font-size:13.5px}
   /* rail + schedule cards */
-  .rcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px}
-  .rcard .rh{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 12px}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:16px 18px}
+  .rcard .rh{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 12px}
   .mtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
   .mtile .n{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.2}
   .mtile .l{font-size:11.5px;color:var(--faint);line-height:1.35;margin-top:1px}
@@ -145,7 +145,7 @@
   .schedrow .st{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent);font-size:13px;min-width:64px}
   .schedrow .sm{flex:1 1 auto;min-width:0;color:var(--ink)}
   .schedrow .sm .who{color:var(--soft)}
-  .schip{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn)}
+  .schip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn);text-transform:capitalize}
   .schedempty{margin:0;color:var(--soft);font-size:13.5px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>

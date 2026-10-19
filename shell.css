@@ -5,28 +5,44 @@
    notifications, help, and a profile/context menu. Self-contained, theme-aware,
    and the CANONICAL design tokens (this is the one place the shell's palette,
    type, spacing and radii live — pages inherit the frame from here). */
+/* ── Visual refresh (2026-10): the palette moved from warm cream + soft shadows
+   to a cool near-white canvas, hairline borders, 8px corners and sentence-case
+   labels. Brand stays: plum --dds-p, Fraunces for titles, Inter for UI. The
+   token NAMES are unchanged, so every page that aliases --dds-* picks the new
+   look up without edits; the new tokens below (--dds-r*, --dds-info*,
+   --dds-side-w) are additive. */
 :root{
-  --dds-bg:#faf8f5; --dds-card:#fff; --dds-ink:#1b1525; --dds-soft:#6b6478; --dds-faint:#746b8a; --dds-line:#eee9e0;
-  --dds-line-strong:#ddd6ea;
-  --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#efeafa;
-  --dds-good:#33664b; --dds-good-soft:#e7f1ea; --dds-warn:#775d31; --dds-warn-soft:#f3ead9; --dds-bad:#9a4242;
-  --dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09);
-  --dds-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --dds-serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
-  --dds-shell-h:54px;
+  --dds-bg:#f7f7f9; --dds-card:#fff; --dds-ink:#15141a; --dds-soft:#5c5a66; --dds-faint:#6f6d7a; --dds-line:#e6e6ec;
+  --dds-line-strong:#d2d2db;
+  --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#f1edfa;
+  --dds-good:#15713d; --dds-good-soft:#e6f5ec; --dds-warn:#975208; --dds-warn-soft:#fdf2e2; --dds-bad:#c43c3c; --dds-bad-soft:#fdeaea;
+  --dds-info:#2a6fb5; --dds-info-soft:#e8f1fb;
+  --dds-shadow:0 1px 2px rgba(21,20,26,.04);
+  --dds-shadow-pop:0 8px 28px rgba(21,20,26,.12),0 1px 2px rgba(21,20,26,.06);
+  --dds-sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --dds-serif:'Fraunces',"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --dds-mono:'Geist Mono','SF Mono',ui-monospace,monospace;
+  --dds-r-sm:6px; --dds-r:8px; --dds-r-lg:10px; --dds-r-xl:12px;
+  --dds-shell-h:54px; --dds-side-w:232px;
 }
 @media (prefers-color-scheme:dark){:root{
-  --dds-bg:#171320; --dds-card:#1f1a2b; --dds-ink:#efeaf7; --dds-soft:#a79ebc; --dds-faint:#948bad; --dds-line:#2a2338;
-  --dds-line-strong:#3a3150;
-  --dds-p:#b79ceb; --dds-p-deep:#cdb6f2; --dds-p-soft:#241d38; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316; --dds-bad:#e08b83;
-  --dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35);
+  --dds-bg:#141318; --dds-card:#1c1b22; --dds-ink:#ededf0; --dds-soft:#a6a4b0; --dds-faint:#8e8c99; --dds-line:#2a2932;
+  --dds-line-strong:#3a3944;
+  --dds-p:#b79ceb; --dds-p-deep:#cdb6f2; --dds-p-soft:#272136; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316; --dds-bad:#e08b83; --dds-bad-soft:#2e1f1f;
+  --dds-info:#8ab8e8; --dds-info-soft:#1c2633;
+  --dds-shadow:0 1px 2px rgba(0,0,0,.3);
+  --dds-shadow-pop:0 8px 28px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3);
 }}
 /* Four-block contract: every token the @media blocks flip must ALSO appear in
    both explicit-toggle blocks, or a user whose toggle disagrees with the OS
    scheme gets mixed palettes (crm.html aliases --dds-good/--dds-warn for its
    timeline accents, plus --dds-*-soft and --dds-shadow). */
-:root[data-theme="light"]{--dds-bg:#faf8f5;--dds-card:#fff;--dds-ink:#1b1525;--dds-soft:#6b6478;--dds-faint:#746b8a;--dds-line:#eee9e0;--dds-line-strong:#ddd6ea;--dds-p:#5b3fa0;--dds-p-deep:#2a1b4a;--dds-p-soft:#efeafa;--dds-bad:#9a4242;--dds-good:#33664b;--dds-good-soft:#e7f1ea;--dds-warn:#775d31;--dds-warn-soft:#f3ead9;--dds-shadow:0 1px 2px rgba(27,21,37,.05),0 10px 30px rgba(27,21,37,.09)}
-:root[data-theme="dark"]{--dds-bg:#171320;--dds-card:#1f1a2b;--dds-ink:#efeaf7;--dds-soft:#a79ebc;--dds-faint:#948bad;--dds-line:#2a2338;--dds-line-strong:#3a3150;--dds-p:#b79ceb;--dds-p-deep:#cdb6f2;--dds-p-soft:#241d38;--dds-bad:#e08b83;--dds-good:#8bbf9f;--dds-good-soft:#1f2a24;--dds-warn:#d3ac6e;--dds-warn-soft:#2a2316;--dds-shadow:0 1px 2px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35)}
+:root[data-theme="light"]{--dds-bg:#f7f7f9;--dds-card:#fff;--dds-ink:#15141a;--dds-soft:#5c5a66;--dds-faint:#6f6d7a;--dds-line:#e6e6ec;--dds-line-strong:#d2d2db;--dds-p:#5b3fa0;--dds-p-deep:#2a1b4a;--dds-p-soft:#f1edfa;--dds-bad:#c43c3c;--dds-bad-soft:#fdeaea;--dds-good:#15713d;--dds-good-soft:#e6f5ec;--dds-warn:#975208;--dds-warn-soft:#fdf2e2;--dds-info:#2a6fb5;--dds-info-soft:#e8f1fb;--dds-shadow:0 1px 2px rgba(21,20,26,.04);--dds-shadow-pop:0 8px 28px rgba(21,20,26,.12),0 1px 2px rgba(21,20,26,.06)}
+:root[data-theme="dark"]{--dds-bg:#141318;--dds-card:#1c1b22;--dds-ink:#ededf0;--dds-soft:#a6a4b0;--dds-faint:#8e8c99;--dds-line:#2a2932;--dds-line-strong:#3a3944;--dds-p:#b79ceb;--dds-p-deep:#cdb6f2;--dds-p-soft:#272136;--dds-bad:#e08b83;--dds-bad-soft:#2e1f1f;--dds-good:#8bbf9f;--dds-good-soft:#1f2a24;--dds-warn:#d3ac6e;--dds-warn-soft:#2a2316;--dds-info:#8ab8e8;--dds-info-soft:#1c2633;--dds-shadow:0 1px 2px rgba(0,0,0,.3);--dds-shadow-pop:0 8px 28px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3)}
+
+/* One keyboard-focus ring for every shelled page (audit E3: 17 pages had none). */
+html.dds-has-shell :focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+html.dds-has-shell .dds-num{font-variant-numeric:tabular-nums}
 
 /* ── PAGE WIDTH TIERS — the one place a page's `.wrap` cap is decided ────────
    Before this there were 17 different `.wrap{max-width}` values between 600px
@@ -121,7 +137,7 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-ic .dot{position:absolute;top:7px;right:7px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:var(--dds-warn);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;font-family:var(--dds-sans)}
 .dds-search{display:flex;align-items:center;gap:7px;background:var(--dds-bg);border:1px solid var(--dds-line);border-radius:9px;padding:6px 11px;color:var(--dds-faint);font-size:13px;cursor:text;min-width:150px}
 .dds-search kbd{margin-left:auto;font-family:var(--dds-sans);font-size:11px;background:var(--dds-card);border:1px solid var(--dds-line);border-radius:5px;padding:1px 5px;color:var(--dds-faint)}
-@media (max-width:900px){.dds-search span,.dds-search kbd{display:none}.dds-search{min-width:0}}
+@media (max-width:900px){html:not(.dds-side) .dds-search span:not(:first-child),html:not(.dds-side) .dds-search kbd{display:none}html:not(.dds-side) .dds-search{min-width:0}}
 
 /* dropdown panels (notifications / profile) */
 .dds-pop{position:fixed;top:calc(var(--dds-shell-h) + 6px);right:12px;width:320px;max-width:calc(100vw - 24px);background:var(--dds-card);border:1px solid var(--dds-line);border-radius:14px;box-shadow:var(--dds-shadow);padding:8px;z-index:2147483001;max-height:calc(100vh - var(--dds-shell-h) - 16px);max-height:calc(100dvh - var(--dds-shell-h) - 16px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:none}
@@ -378,3 +394,92 @@ html.dds-embed .dds-waffle{display:none!important}
   padding:10px 16px;border-radius:0 0 10px 10px;font:600 14px/1 var(--dds-sans);text-decoration:none;transition:top .12s}
 .dds-skip:focus{top:0;outline:2px solid #fff;outline-offset:-4px}
 @media (prefers-reduced-motion:reduce){.dds-skip{transition:none}}
+
+/* ── Visual refresh: the left sidebar (≥761px, html.dds-side) ──────────────────
+   shell.js stamps html.dds-side on every shelled page except the website
+   builder (presence.html keeps its own rail + the top bar) and embedded frames.
+   The DOM is the same bar the tests pin (#dds-shell · .dds-brand · .dds-nav
+   .sec · #dds-search · .dds-right · #dds-ctxbar); only the layout changes:
+   the bar becomes a 232px column, nav items get an icon + a filled active
+   state, the client context bar becomes a card inside the column, and the
+   account/bell controls sit at the bottom. Phones and tablets keep the top
+   bar, the bottom bar and the drawer exactly as before. */
+@media (min-width:761px){
+  html.dds-side{--dds-shell-h:0px}
+  html.dds-side body{padding-top:0;padding-left:var(--dds-side-w)}
+  html.dds-side.dds-has-ctxbar body{padding-top:0}
+  html.dds-side #dds-shell{top:0;left:0;bottom:0;right:auto;width:var(--dds-side-w);height:auto;
+    flex-direction:column;align-items:stretch;gap:2px;padding:12px 10px 10px;
+    background:var(--dds-bg);backdrop-filter:none;border-bottom:none;border-right:1px solid var(--dds-line);overflow:visible}
+  html.dds-side #dds-shell *{box-sizing:border-box}
+  /* header row: brand + the launcher waffle on the right */
+  html.dds-side .dds-brand{order:0;padding:2px 6px 10px;font-size:14px;gap:8px}
+  html.dds-side .dds-brand .mark{width:24px;height:24px;border-radius:6px;font-size:14px}
+  html.dds-side .dds-brand .ctx{font-size:12.5px}
+  html.dds-side #dds-waffle{order:0;position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:var(--dds-r-sm)}
+  html.dds-side #dds-search{order:1;height:32px;margin:0 0 8px;border-radius:var(--dds-r);padding:0 10px;background:var(--dds-card)}
+  html.dds-side #dds-search span:first-child{display:inline-flex}
+  html.dds-side #dds-search kbd{display:inline-block}
+  html.dds-side .dds-nav{order:2;flex:0 0 auto;flex-direction:column;align-items:stretch;align-self:auto;gap:1px}
+  html.dds-side .dds-nav .sec{display:block}
+  html.dds-side .dds-nav .sec > .it{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 10px;
+    border:none;border-radius:var(--dds-r);font-size:13.5px;font-weight:500;color:var(--dds-soft);text-align:left}
+  html.dds-side .dds-nav .sec > .it:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+  html.dds-side .dds-nav .sec.active > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+  html.dds-side .dds-nav .sec > .it .nic{width:17px;height:17px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  html.dds-side .dds-nav .sec > .it .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html.dds-side .dds-nav .sec > .it .car{font-size:9px;color:var(--dds-faint)}
+  /* multi-item sections (Customers, Files) fly out to the right of the column */
+  html.dds-side .dds-nav .sec .menu{top:0;left:calc(100% + 6px);min-width:220px;border-radius:var(--dds-r-lg);box-shadow:var(--dds-shadow-pop)}
+  /* the client context card, inside the column under the nav */
+  html.dds-side #dds-ctxbar{order:3;position:static;height:auto;margin:10px 0 0;padding:10px;flex-direction:column;align-items:stretch;gap:6px;
+    background:var(--dds-card);color:var(--dds-ink);border:1px solid var(--dds-line);border-radius:var(--dds-r-lg);font-size:13px}
+  html.dds-side #dds-ctxbar .lbl{opacity:1;font-size:11px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--dds-faint)}
+  html.dds-side #dds-ctxbar strong{font-size:13px;line-height:1.25;white-space:normal}
+  html.dds-side #dds-ctxbar .acts{margin:4px 0 0;flex-wrap:wrap;gap:4px;overflow:visible}
+  html.dds-side #dds-ctxbar .acts a{color:var(--dds-soft);font-size:12px;font-weight:500;padding:3px 8px;border-radius:var(--dds-r-sm);border:1px solid var(--dds-line);background:var(--dds-bg)}
+  html.dds-side #dds-ctxbar .acts a:hover{background:var(--dds-card);color:var(--dds-ink);border-color:var(--dds-line-strong)}
+  html.dds-side #dds-ctxbar .acts a.exit{border-color:var(--dds-line)}
+  html.dds-side #dds-ctxbar a:focus-visible{outline-color:var(--dds-p)}
+  /* bell · settings · help · account — the bottom row */
+  html.dds-side .dds-right{order:4;margin-top:auto;padding-top:10px;border-top:1px solid var(--dds-line);justify-content:space-between}
+  html.dds-side .dds-ic{width:32px;height:32px;border-radius:var(--dds-r);font-size:15px}
+  html.dds-side .dds-ic .nic{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  html.dds-side .dds-ic .dot{top:4px;right:4px}
+  /* popovers hang off the column instead of the top-right corner */
+  html.dds-side .dds-pop{top:auto;bottom:12px;left:calc(var(--dds-side-w) + 8px);right:auto;border-radius:var(--dds-r-lg);box-shadow:var(--dds-shadow-pop);max-height:calc(100vh - 24px)}
+  html.dds-side .dds-drawer{top:52px;left:calc(var(--dds-side-w) + 8px);border-radius:var(--dds-r-lg);box-shadow:var(--dds-shadow-pop);max-height:calc(100vh - 64px)}
+  html.dds-side #dds-offline{top:0}
+}
+/* refreshed chrome at every width: corners, borders, the dark-mode flip of the
+   ctx card text happens in the sidebar block above (it is not a plum band there) */
+.dds-nav .sec .menu{border-radius:var(--dds-r-lg,10px)}
+.dds-pop{border-radius:var(--dds-r-lg,10px)}
+.dds-palette .box{border-radius:var(--dds-r-xl,12px);box-shadow:var(--dds-shadow-pop)}
+.dds-palette .res{border-radius:var(--dds-r,8px)}
+.dds-search{border-radius:var(--dds-r,8px)}
+.dds-ic{border-radius:var(--dds-r,8px)}
+.dds-ic .nic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.dds-search .nic{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+.dds-search span:first-child{display:inline-flex}
+.dds-nav .sec > .it .nic{display:none}
+@media (min-width:761px){html.dds-side .dds-nav .sec > .it .nic{display:block}}
+.dds-empty .act button,.dds-empty .act a{border-radius:var(--dds-r,8px);font-weight:500}
+.dds-tour-card button{border-radius:var(--dds-r,8px)}
+.dds-hint .x{border-radius:var(--dds-r,8px)}
+.dds-toast{border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop)}
+.dds-error{border-radius:var(--dds-r-lg,10px)}
+.dds-skeleton{border-radius:var(--dds-r,8px)}
+.dds-tour-card{border-radius:var(--dds-r-xl,12px);box-shadow:var(--dds-shadow-pop)}
+.dds-tour-ring{border-radius:var(--dds-r-lg,10px)}
+
+/* ── Visual refresh: the standard roster header (.lhead, STUDIO-STANDARDS-SWEEP)
+   reads as a plain page title now — no card box, no emoji object tile. Pages
+   keep their own .lhead rules for the phone layout. */
+@media (min-width:761px){
+  html.dds-side .lhead{background:transparent;border:0;box-shadow:none;padding:0 0 4px;margin-bottom:14px}
+  /* the object tile shrinks to a plum dot: still the roster's anchor (and the
+     outside-click target the rosters spec uses), no longer an emoji */
+  html.dds-side .lhead .obj-ic{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--dds-p);font-size:0;color:transparent;box-shadow:none;margin-right:2px}
+  html.dds-side .lhead h1{font-family:var(--dds-serif);font-weight:500;font-size:26px;letter-spacing:-.01em}
+}

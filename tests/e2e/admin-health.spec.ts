@@ -182,14 +182,14 @@ test.describe('Admin Health Center — theme blocks (A11, re-skinned onto --dds-
     await page.goto('/admin-health.html');
     const read = (name: string) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
-    expect(await read('--bg')).toBe('#171320');
+    expect(await read('--bg')).toBe('#141318');
     expect(await read('--ok')).toBe('#8bbf9f');   // = shell --dds-good (dark)
     expect(await read('--attn')).toBe('#d3ac6e'); // = shell --dds-warn (dark)
     expect(await read('--off')).toBe('#9a92a6');  // page-local neutral (kept)
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
-    expect(await read('--bg')).toBe('#faf8f5');
-    expect(await read('--ok')).toBe('#33664b');   // = shell --dds-good (light)
-    expect(await read('--attn')).toBe('#775d31'); // = shell --dds-warn (light)
+    expect(await read('--bg')).toBe('#f7f7f9');
+    expect(await read('--ok')).toBe('#15713d');   // = shell --dds-good (light)
+    expect(await read('--attn')).toBe('#975208'); // = shell --dds-warn (light)
     expect(await read('--off')).toBe('#7a7280');  // page-local neutral (kept)
   });
 });

@@ -306,10 +306,19 @@ test.describe('Context bar (slice 7)', () => {
     await expect(bar.locator('a', { hasText: 'Their website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
     await expect(bar.locator('a', { hasText: 'Exit to Studio' })).toHaveAttribute('href', '/agency.html');
     if (testInfo.project.name !== 'mobile') await expect(page.locator('#dds-settings')).toBeVisible();   // ≤420px: in the account menu, like Help
-    // the page body is pushed down past BOTH bars — nothing hides under them
-    const top = await page.locator('body').evaluate((b) => parseFloat(getComputedStyle(b).paddingTop));
-    const barBottom = await bar.evaluate((e) => e.getBoundingClientRect().bottom);
-    expect(top).toBeGreaterThanOrEqual(barBottom - 1);
+    // nothing hides under the chrome: on the sidebar layouts (≥761px) the body
+    // is pushed RIGHT past the column the bar sits in; on the top-bar layouts
+    // it is pushed DOWN past BOTH bars
+    const side = await page.evaluate(() => document.documentElement.classList.contains('dds-side') && window.innerWidth >= 761);
+    if (side) {
+      const left = await page.locator('body').evaluate((b) => parseFloat(getComputedStyle(b).paddingLeft));
+      const barRight = await bar.evaluate((e) => e.getBoundingClientRect().right);
+      expect(left).toBeGreaterThanOrEqual(barRight - 1);
+    } else {
+      const top = await page.locator('body').evaluate((b) => parseFloat(getComputedStyle(b).paddingTop));
+      const barBottom = await bar.evaluate((e) => e.getBoundingClientRect().bottom);
+      expect(top).toBeGreaterThanOrEqual(barBottom - 1);
+    }
     // studio level (no scope) → no bar
     await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: null } } } });
     await page.goto('/today.html');

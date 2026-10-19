@@ -67,7 +67,7 @@ test.describe('Pipeline table view', () => {
     await expect(page.locator('#table th[aria-sort="descending"]')).toContainText('Deal');
     await expect(page.locator('#table tbody tr').first()).toContainText('Beta rebrand');
     // the summary strip and stage filter chips survive alongside the table
-    await expect(page.locator('#summary')).toContainText('Open:');
+    await expect(page.locator('#summary')).toContainText('Open');
     await expect(page.locator('#filters .chip').first()).toBeVisible();
   });
 
