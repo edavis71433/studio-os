@@ -63,6 +63,22 @@
 
 /* pages get top-room for the fixed shell once it mounts */
 html.dds-has-shell body{padding-top:var(--dds-shell-h)}
+/* …and a little more when the client context bar is up (Phase 1 overhaul) */
+:root{--dds-ctxbar-h:38px}
+html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var(--dds-ctxbar-h))}
+#dds-ctxbar{position:fixed;top:var(--dds-shell-h);left:0;right:0;height:var(--dds-ctxbar-h);z-index:2147482998;
+  display:flex;align-items:center;gap:10px;padding:0 16px;font-family:var(--dds-sans);font-size:13px;
+  background:var(--dds-p);color:#fff;border-bottom:1px solid color-mix(in srgb,var(--dds-p) 70%,#000)}
+#dds-ctxbar .lbl{opacity:.8;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+#dds-ctxbar strong{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dds-ctxbar .acts{margin-left:auto;display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#dds-ctxbar .acts a{color:#fff;text-decoration:none;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+#dds-ctxbar .acts a:hover{background:rgba(255,255,255,.14)}
+#dds-ctxbar .acts a.exit{border-color:rgba(255,255,255,.45)}
+#dds-ctxbar a:focus-visible{outline:2px solid #fff;outline-offset:1px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #dds-ctxbar{color:#171320} :root:not([data-theme="light"]) #dds-ctxbar .acts a{color:#171320} :root:not([data-theme="light"]) #dds-ctxbar .acts a.exit{border-color:rgba(23,19,32,.45)} :root:not([data-theme="light"]) #dds-ctxbar a:focus-visible{outline-color:#171320}}
+:root[data-theme="dark"] #dds-ctxbar{color:#171320} :root[data-theme="dark"] #dds-ctxbar .acts a{color:#171320} :root[data-theme="dark"] #dds-ctxbar .acts a.exit{border-color:rgba(23,19,32,.45)}
+@media (max-width:760px){#dds-ctxbar .lbl{display:none} #dds-ctxbar .acts a:not(.exit):not(:first-child){display:none}}
 
 #dds-shell{position:fixed;top:0;left:0;right:0;height:var(--dds-shell-h);z-index:2147483000;
   background:color-mix(in srgb,var(--dds-card) 92%,transparent);backdrop-filter:saturate(1.4) blur(10px);
@@ -174,7 +190,7 @@ html.dds-embed .dds-waffle{display:none!important}
    overflow a 360px bar. Help moves to the profile menu (it's in UTILS there);
    the brand may truncate rather than push the controls off-screen. */
 @media (max-width:420px){
-  a.dds-ic[href="/help.html"]{display:none}
+  a.dds-ic[href="/help.html"],#dds-settings{display:none}
   .dds-brand{min-width:0;overflow:hidden;white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette,.dds-drawer,.dds-nav .sec .menu{transition:none;animation:none}}

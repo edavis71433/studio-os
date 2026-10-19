@@ -90,7 +90,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // Architecture v1.0 (frozen refinements): Analytics is first-class; utilities overflow.
   ok('nav: Analytics is a first-class outcome (not a utility)', owner.some(s=>s.key==='analytics' && !s.utility && s.items[0].href==='/analytics.html'));
   ok('nav: utilities (Connections/Settings/Help) live in the overflow (utility:true)', ['connections','settings','help'].every(k=>{const s=owner.find(x=>x.key===k);return !!s && s.utility===true;}));
-  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','projects','files','analytics','inbox','studio'].includes(s.key)));
+  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','pipeline','projects','files','analytics','inbox','studio'].includes(s.key)));
   // FIX 6: the primary "Customers" item opens the ROSTER (customers.html), not the
   // single-client CRM detail (which un-scoped showed the owner his OWN profile).
   ok('nav: Customers opens the roster (customers.html), not the single-client detail', owner.find(s=>s.key==='customers').items[0].href==='/customers.html');

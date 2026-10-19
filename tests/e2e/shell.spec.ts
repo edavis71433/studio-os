@@ -290,6 +290,33 @@ test.describe('Context bar (slice 7)', () => {
     await expect(menu.locator('a.rec', { hasText: 'Lea Chan' })).toHaveAttribute('href', '/crm.html?client_id=c-lea');
   });
 
+  // Phase 1 overhaul: drilled into a client, a colored CONTEXT BAR sits under the
+  // top bar (record · their Today · their website · switch · exit). At studio
+  // level there is none. Settings has its own gear in the bar on every page.
+  test('P1 — the client context bar shows when scoped, never at studio level; Settings has a gear', async ({ page }, testInfo) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: {
+      '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } },
+    } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    const bar = page.locator('#dds-ctxbar');
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText('Joe’s Plumbing');
+    await expect(bar.locator('a', { hasText: 'Open record' })).toHaveAttribute('href', `/crm.html?client=${CLIENT}`);
+    await expect(bar.locator('a', { hasText: 'Their website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
+    await expect(bar.locator('a', { hasText: 'Exit to Studio' })).toHaveAttribute('href', '/agency.html');
+    if (testInfo.project.name !== 'mobile') await expect(page.locator('#dds-settings')).toBeVisible();   // ≤420px: in the account menu, like Help
+    // the page body is pushed down past BOTH bars — nothing hides under them
+    const top = await page.locator('body').evaluate((b) => parseFloat(getComputedStyle(b).paddingTop));
+    const barBottom = await bar.evaluate((e) => e.getBoundingClientRect().bottom);
+    expect(top).toBeGreaterThanOrEqual(barBottom - 1);
+    // studio level (no scope) → no bar
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: null } } } });
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-shell .dds-brand')).toBeVisible();
+    await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
+  });
+
   test('a Recent record is exempt from scope-carry — it navigates exactly as stored', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'the caret dropdown is a desktop surface');
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';

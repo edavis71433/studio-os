@@ -93,9 +93,9 @@ test.describe('Agency portfolio', () => {
     const dental = table.locator('tbody tr', { hasText: 'Bright Dental' });
     await expect(dental.locator('.badge')).toContainText('all clear');
     await expect(dental.locator('.bits')).toHaveCount(0);
-    // Marlow has a delivery project → the secondary action rides the row
-    await expect(marlow.locator('.rowact')).toHaveText('Manage their website');
-    await expect(dental.locator('.rowact')).toHaveCount(0);
+    // Phase 1 overhaul: every row carries "Open record" (the hub) + "Their website"
+    await expect(marlow.locator('.rowact')).toHaveText(['Open record', 'Their website']);
+    await expect(dental.locator('.rowact')).toHaveText(['Open record', 'Their website']);
   });
 
   test('cards view keeps the original at-a-glance card (badge + status bits)', async ({ page }) => {
@@ -338,7 +338,7 @@ test.describe('Agency portfolio', () => {
     await page.goto('/agency.html');
     // Marlow has a delivery project → project drill WITH minted client scope
     await page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).click();
-    await page.waitForURL(/crm\.html\?project=p1&tab=delivery&client=a1/);
+    await page.waitForURL(/crm\.html\?project=p1&client=a1/);
     await page.goBack();
     // Dental has no project → client-record drill, scope carried
     await page.locator('tbody tr', { hasText: 'Bright Dental' }).click();

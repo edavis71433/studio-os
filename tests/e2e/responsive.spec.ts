@@ -62,7 +62,7 @@ test.describe('Responsive layout', () => {
 test.describe('Roster action column', () => {
   test.skip(({ viewport }) => !viewport || viewport.width < 1000, 'desktop widths only');
 
-  for (const [path, action] of [['/contacts.html', 'Delete'], ['/customers.html', 'Manage their website']] as const) {
+  for (const [path, action] of [['/contacts.html', 'Delete'], ['/customers.html', 'Their website']] as const) {
     test(`${path} — the table fits and its last action is fully visible`, async ({ page }) => {
       await pinTables(page);
       await installApp(page, { api: { '/sales/contacts': CONTACTS, '/studio/customers': CUSTOMERS } });

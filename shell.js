@@ -49,7 +49,10 @@
     (nav || []).forEach(function (sec) {
       (sec.items || []).forEach(function (it) {
         var href = normalizePath(it.href);
-        if (href === here) best = { key: it.key, len: 999, exact: true };
+        // the FIRST exact match wins (lib/shell.ts returns on it) — the old
+        // "last exact wins" let /presence.html#settings outrank /presence.html,
+        // so the Website page read as "Settings" in the breadcrumb
+        if (href === here) { if (!(best && best.exact)) best = { key: it.key, len: 999, exact: true }; }
         else if (!(best && best.exact) && href !== '/' && (here === href || here.indexOf(href + '/') === 0)) {
           if (!best || href.length > best.len) best = { key: it.key, len: href.length };
         }
@@ -258,6 +261,10 @@
     var brandHtml = scope && scope.name
       ? '<span class="dds-brand"><span class="mark">P</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
       : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
+    // Phase 1 overhaul: Settings gets its own gear in the bar (it was reachable
+    // only through the account menu / launcher). The href is the nav's own.
+    var settingsHref = '';
+    UTILS.forEach(function (sec) { if (sec.key === 'settings' && sec.items.length) settingsHref = sec.items[0].href; });
 
     root.innerHTML =
       // The App Launcher waffle (the burger's successor at EVERY width): CLICK-
@@ -269,12 +276,37 @@
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
+        (settingsHref ? '<a class="dds-ic" href="' + esc(withScope(settingsHref)) + '" id="dds-settings" aria-label="Settings" title="Settings">⚙</a>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">?</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
       '</div>';
 
     wire(nav);
     mountMobileBar(nav, activeKey, att);
+    mountContextBar(scope);
+  }
+
+  // ── client context bar (Phase 1 overhaul) ────────────────────────────────────
+  // Whenever an agency operator is drilled into ONE client, a colored band sits
+  // under the top bar saying so — with the record, the client's own Today, and
+  // the exit back to the studio. The breadcrumb alone ("Studio › name") was too
+  // quiet: the studio-level and client-level pages look identical otherwise.
+  function mountContextBar(scope) {
+    var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
+    if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
+    var sid = scope.site_id || scopeId();
+    var rec = '/crm.html?client=' + encodeURIComponent(sid);
+    var bar = el('<div id="dds-ctxbar" role="region" aria-label="Client context">' +
+      '<span class="lbl">Viewing client</span><strong>' + esc(scope.name) + '</strong>' +
+      '<span class="acts">' +
+        '<a href="' + esc(rec) + '" data-noscope="1">Open record</a>' +
+        '<a href="' + esc(withScope('/today.html')) + '">Their Today</a>' +
+        '<a href="' + esc(withScope('/presence.html')) + '">Their website</a>' +
+        '<a href="/customers.html" class="exit" data-noscope="1">Switch client</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Exit to Studio</a>' +
+      '</span></div>');
+    root.insertAdjacentElement('afterend', bar);
+    document.documentElement.classList.add('dds-has-ctxbar');
   }
 
   // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·

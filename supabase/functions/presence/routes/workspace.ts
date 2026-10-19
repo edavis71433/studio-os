@@ -192,7 +192,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     }
   } catch { /* best-effort */ }
 
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient };
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName };
   return json({ data: {
     site_role: role,
     capabilities: caps,

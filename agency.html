@@ -86,6 +86,8 @@
   @media (min-width:768px){:root[data-theme="dark"] .tscroll th.acts,:root[data-theme="dark"] .tscroll td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
+  .rowact.ghost{color:var(--soft);border-color:transparent}
+  td.acts{white-space:nowrap;text-align:right} td.acts .rowact+.rowact{margin-left:6px}
   .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
 
   /* ── the card view (the page's original look, kept for warmth) ── */
@@ -275,7 +277,7 @@ function tableHtml(list){
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td class="num">${Number(c.leads_waiting||0)}</td>
       <td>${domainCell(c)}</td>
-      <td class="acts">${PROJECT_BY_SITE[c.site_id]?`<button class="rowact" data-web="${esc(c.site_id)}">Manage their website</button>`:''}</td>
+      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button><button class="rowact ghost" data-web="${esc(c.site_id)}">Their website</button></td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -291,7 +293,7 @@ function cardsHtml(list){
       <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
     // FIX 7: opening a client goes to your DELIVERY view; managing their website
     // is the clearly-secondary action.
-    if(PROJECT_BY_SITE[c.site_id])h+=`<div class="managerow"><button data-web="${esc(c.site_id)}">Manage their website →</button></div>`;
+    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button><button data-web="${esc(c.site_id)}">Their website →</button></div>`;
     h+=`</div>`;
   }
   return h;
@@ -368,7 +370,10 @@ function wire(){
     tr.addEventListener('click',open);
     tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();openClient(tr.getAttribute('data-open'));}});
   });
-  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/today.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  // Phase 1 overhaul: "Open record" → the customer hub; "Their website" → the
+  // client's website editor in their scope (was their Today, which reads like the studio's own).
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/presence.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openClient(b.getAttribute('data-rec'));}));
 }
 
 // ── starter kits: data + painting. Events are DELEGATED ONCE below — the old
@@ -434,7 +439,7 @@ function openClient(siteId){
   const pid = PROJECT_BY_SITE[siteId];
   // SC-1: the project drill-in mints the client site scope like its sibling below —
   // without it the record page resolves against the agency's own tenant.
-  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&tab=delivery&client=' + encodeURIComponent(siteId); return; }
+  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&client=' + encodeURIComponent(siteId); return; }
   location.href = '/crm.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}

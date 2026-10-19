@@ -31,7 +31,7 @@ ok('RESOLVER: wired in index.ts', /route === '\/crm\/record' && method === 'GET'
 
 // ═══ The record page ═══
 ok('RECORD: crm.html loads the resolver', /\/crm\/record/.test(crm) && /function loadRecord/.test(crm));
-ok('RECORD: renders the related-card tab bar (Details · Deal · Delivery · Files)', /TAB_ORDER=\['details','deal','delivery','files'\]/.test(crm) && /class="tabs"/.test(crm));
+ok('RECORD: renders the related-card tab bar (Details · Deal · Billing · Delivery · Files)', /TAB_ORDER=\['details','deal','billing','delivery','files'\]/.test(crm) && /class="tabs"/.test(crm));
 ok('RECORD: old deep links keep working (?tab=messages/overview aliases)', /TAB_ALIAS=\{overview:'details',messages:'details'/.test(crm));
 ok('RECORD: with NO identity it shows a picker (never /crm/profile as the landing)', /function picker\(\)/.test(crm) && /if\(!rq\)\{ picker\(\); return; \}/.test(crm));
 ok('RECORD: Deal + Delivery are related-list CARDS linking out — no iframes', /pipeline\.html[\s\S]*?Open in pipeline/.test(crm) && /projects\.html[\s\S]*?Open project/.test(crm) && !/<iframe/.test(crm) && !/embed=1/.test(crm));
