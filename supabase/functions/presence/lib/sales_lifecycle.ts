@@ -480,3 +480,21 @@ export function clampLimit(raw: unknown): number {
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_PAGE;
   return Math.min(MAX_PAGE, n);
 }
+
+// ── Phase 3: honest numbers + stage-aware next steps ─────────────────────────
+/** "Win rate" counts EVERY closed deal, not a rolling 90 days: a studio that
+ *  closes three deals a quarter saw "100% (1 of 1)" beside three won deals.
+ *  10 years is "all time" for a small studio, and keeps the window math intact. */
+export const ALL_TIME_WINDOW_DAYS = 3650;
+/** A deal's free-text next step is STALE once the thing it names has happened —
+ *  "Sign contract, overdue Aug 6" beside an agreement signed Aug 8. Pure: the
+ *  routes clear the field when this says so (contract signed → anything about
+ *  signing; converted/won → that, plus closing or the deposit). */
+export function nextStepStaleAfter(nextStep: unknown, event: 'signed' | 'won'): boolean {
+  const s = String(nextStep ?? '').trim().toLowerCase();
+  if (!s) return false;
+  const signing = /\b(sign|signs|signed|signing|signature|e-?sign|agreement|contract)\b/;
+  if (signing.test(s)) return true;
+  if (event === 'won') return /\b(close|closing|convert|deposit|win)\b/.test(s);
+  return false;
+}

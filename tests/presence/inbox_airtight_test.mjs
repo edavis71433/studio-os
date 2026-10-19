@@ -28,7 +28,9 @@ ok('FIX1: new-enquiry count is deduped against the lead_followup cron notice (no
   /const newEnquiries = freshEnquiries\(i\.newEnquiries \|\| 0, notices\)/.test(bell) &&
   /\+ \(i\.filesPending \|\| 0\) \+ newEnquiries/.test(bell) &&
   /newEnquiries: \(\(eQ\.json as any\[\]\)\?\.length \|\| 0\)/.test(workspace) &&
-  /notices: \(\(nQ\.json as any\[\]\) \|\| \[\]\)/.test(workspace));
+  // Phase 3: the rows the bell counts pass through verifiedNotices first (the
+  // same filter Today renders — one row per real record, stale reminders gone)
+  /notices: await verifiedNotices\(site, \(\(nQ\.json as any\[\]\) \|\| \[\]\)\)/.test(workspace));
 ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for the bell',
   /notices\.unshift\(\{[\s\S]*?kind: 'website_enquiry'/.test(workspace) &&
   /const newEnquiries = freshEnquiries\(\(\(\(enqQ\.ok[\s\S]*?\)\.length, notices\)/.test(workspace));

@@ -229,8 +229,10 @@ test.describe('Relationship view', () => {
     // stage-aware: the won deal's action bar does NOT headline the unsent draft proposal
     await expect(page.locator('#act-proposal')).toHaveCount(0);
     await expect(page.locator('#act-invoice')).toBeVisible();
-    // the draft is still sendable from Billing itself
-    await expect(page.locator('[data-send-prop="p-1"]')).toHaveText('Send to client');
+    // Phase 3 (stage-aware): a won deal never offers to send the unsent draft —
+    // Billing keeps the draft viewable, the Send control is gone
+    await expect(page.locator('[data-send-prop="p-1"]')).toHaveCount(0);
+    await expect(page.locator('[data-doc="proposals:p-1"]')).toBeVisible();
   });
 
   // Comms routing pin (F1/F3): an EMAIL-landed client message is a plain

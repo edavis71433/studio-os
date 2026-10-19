@@ -683,9 +683,17 @@ function renderPortfolio(d,roster){
   // The all-quiet line speaks about "every client" — with ZERO clients that's a
   // contradiction, so the empty portfolio gets its own calm first-step line.
   const clientCount=d.client_count!=null?(Number(d.client_count)||0):(ws?ws.length:0);
+  // Phase 3 (one source for numbers): this lens only sees the CLIENTS. The bell's
+  // own count (support requests, enquiries, client messages on the studio's own
+  // site) is patched in below once the shell context lands, so this line never
+  // says "nothing needs you" on a day Today says four things do.
   if(!ins.length)h+=clientCount>0
-    ?`<div class="quiet cfull"><b>All quiet.</b> Every client is current — nothing needs you right now.</div>`
+    ?`<div class="quiet cfull" id="allQuiet"><b>All quiet.</b> Every client is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
     :`<div class="quiet cfull"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
+  if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>{
+    const n=ctx&&Number(ctx.attention_count)||0; const el=document.getElementById('allQuietStudio'); if(!el||!n)return;
+    el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/today.html">see Today</a>.`;
+  }).catch(()=>{});
   h+=ins.map(insightCard).join('');
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
   h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
