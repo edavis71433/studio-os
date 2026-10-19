@@ -1,5 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// The fixtures are written in UTC (e.g. '2026-07-01T00:00:00Z' is expected to
+// render as "Jul 1"), and the pages format dates in the BROWSER's zone. CI runs
+// in UTC and passed; a laptop west of Greenwich rendered "Jun 30" and failed
+// the same specs. Pin both halves — the Node side (specs that compute "today"
+// with the same Intl calls the pages use) and every browser context — so the
+// suite is the same suite wherever it runs.
+process.env.TZ = 'UTC';
+
 // ── Studio OS browser E2E (Phase PW) ─────────────────────────────────────────
 // The suite is HERMETIC: a local static server serves the real HTML/JS/CSS, and
 // every test stubs the Supabase client + mocks the /functions/v1/presence API
@@ -33,6 +41,7 @@ export default defineConfig({
     // desktop project never saw it. No spec exercises the worker; keep it out
     // of the hermetic harness on every engine.
     serviceWorkers: 'block',
+    timezoneId: 'UTC',   // see process.env.TZ above — fixtures are UTC
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },

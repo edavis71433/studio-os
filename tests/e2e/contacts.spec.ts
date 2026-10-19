@@ -338,6 +338,9 @@ test.describe('Contacts — reachable at 390px', () => {
     // the edit dialog opens and its Save is tappable (the SS6 phone-dialog pin)
     await edit.tap();
     await expect(page.locator('#editDlg')).toBeVisible();
+    // the dialog opens on a spinner and swaps in the fields once the contact
+    // read lands — Save exists only from then on (boundingBox does not wait)
+    await expect(page.locator('#e-save')).toBeVisible();
     const save = (await page.locator('#e-save').boundingBox())!;
     expect(save.y + save.height).toBeLessThanOrEqual(844);
     await page.locator('#e-cancel').tap();
@@ -380,6 +383,9 @@ test.describe('Contacts — Add-a-customer work-type dropdown', () => {
     await page.goto('/contacts.html');
     await page.locator('#addCust').click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    // the dialog moves focus to the name field a beat after it opens; wait for
+    // that to land, or a fill() racing it can be redirected into the wrong field
+    await expect(page.locator('#cu-name')).toBeFocused();
   };
 
   test('every dropdown value is distinct and the four real situations are all offered', async ({ page }) => {

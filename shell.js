@@ -379,12 +379,25 @@
         sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
         if (focusFirst) { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
       }
+      // A pointer press on the trigger or inside the menu must NOT move focus.
+      // Safari (and WebKit on iPad with a trackpad) does not focus a <button> or
+      // <a> on mousedown — it moves focus to the nearest focusable ANCESTOR
+      // (#main on every page) — so the focusout guard below saw focus "leave"
+      // the section and closed the menu before mouseup: a menu link's click
+      // fell through to the page, and a click on the trigger of an OPEN menu
+      // closed-then-reopened it. Focus is placed explicitly instead: the
+      // trigger after a pointer click, the first item after a keyboard one.
+      sec.addEventListener('mousedown', function (e) {
+        if (e.target.closest && e.target.closest('button, a')) e.preventDefault();
+      });
       b.addEventListener('click', function (e) {
         e.stopPropagation();
         var wasOpen = sec.classList.contains('open');
         closeAllLayers();
         // e.detail === 0 → keyboard activation (Enter/Space): move focus into the
-        // menu. A pointer click keeps focus on the trigger (menu-button pattern).
+        // menu. A pointer click keeps focus on the trigger (menu-button pattern)
+        // — placed explicitly, since the mousedown above no longer does it.
+        if (e.detail !== 0) b.focus();
         if (!wasOpen) openSec(e.detail === 0);
       });
       // ArrowDown from the trigger opens the menu (if needed) and enters it

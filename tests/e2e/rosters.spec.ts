@@ -219,6 +219,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await page.goto('/customers.html');
     await page.locator('#addCust').click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-biz').fill('Acme Bakery');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
