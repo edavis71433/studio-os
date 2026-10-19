@@ -16,6 +16,7 @@ import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { linksForCustomer } from '../lib/service_bridge.ts';
 import { siteContentTree } from './room.ts';
 import { noticeHref } from './workspace.ts';
+import { freshEnquiries } from '../lib/inbox_feed.ts';
 import { notifLabel } from '../lib/notifications.ts';
 import { buildAttentionCenter, type AttentionInput } from '../lib/attention_center.ts';
 
@@ -84,7 +85,9 @@ export async function handleAttentionCenter(site: SiteRow, cors: Record<string, 
     missing,
     notices,
     scheduled,
-    new_enquiries: num(enquiryQ),
+    // an AGED lead already has a lead_followup notice card below — counting it
+    // here too rendered the same lead twice (the bell has always deduped it).
+    new_enquiries: freshEnquiries(num(enquiryQ), notices),
     connections_attention,
     approvals_waiting,
     project_approvals_waiting,

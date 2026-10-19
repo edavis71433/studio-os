@@ -4,6 +4,7 @@
 // whole request. Both got a defect that only a behavioural test would have
 // caught, so they live here now: no imports, no I/O, one job each.
 //
+//   freshEnquiries(..)           new enquiries not already spoken for by a lead_followup notice
 //   studioBellCount(..)          what the shell bell badge shows
 //   shapeClientConversations(..) the per-project Inbox conversation rows
 //
@@ -134,16 +135,25 @@ export interface BellInput {
   lastSeenAt: string | null;
 }
 
+/** One lead must never stack two signals. The lead-followup cron raises a
+ *  per-lead notice for AGED 'new' enquiries — that notice IS an enquiry signal,
+ *  so any surface that counts new enquiries alongside active notices reports the
+ *  same lead twice unless it subtracts the ones already spoken for. This is the
+ *  ONE place the rule lives: it used to be inlined in the bell count and the
+ *  portal feed only, so /attention rendered an aged lead as two cards while the
+ *  bell counted it once. Every counter of new enquiries must route through this. */
+export function freshEnquiries(newEnquiries: number, notices: Array<{ kind?: unknown }>): number {
+  const spokenFor = (notices || []).filter((n) => n && n.kind === 'lead_followup').length;
+  return Math.max(0, (newEnquiries || 0) - spokenFor);
+}
+
 /** The ONE "needs you" number behind the shell bell badge (studio surfaces).
  *  Every input is best-effort upstream, so a missing slot arrives as 0/[] and
  *  simply contributes nothing. */
 export function studioBellCount(i: BellInput): number {
   const notices = i.notices || [];
-  // FIX 1 dedupe (unchanged): the lead-followup cron already raises a per-lead
-  // notice for AGED 'new' leads, so count only the fresh enquiries not yet
-  // represented by one — a single lead never stacks two signals.
-  const leadFollowups = notices.filter((n) => n && n.kind === 'lead_followup').length;
-  const newEnquiries = Math.max(0, (i.newEnquiries || 0) - leadFollowups);
+  // FIX 1 dedupe — see freshEnquiries.
+  const newEnquiries = freshEnquiries(i.newEnquiries || 0, notices);
   // F1: the client-portal notices are the email throttle key, not a count.
   const countedNotices = notices.filter((n) => !CLIENT_ACTIVITY_NOTICE_KINDS.has(String(n?.kind ?? ''))).length;
   // detail.from='client' is stamped ONLY by the client door (client_delivery.ts /

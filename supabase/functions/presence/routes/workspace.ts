@@ -23,7 +23,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount, noticeDismissible } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries } from '../lib/inbox_feed.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -359,8 +359,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // so one submission never stacks two rows. (inbox.html renders per-lead detail
   // from /forms/inbox and filters this aggregate kind to avoid a double listing.)
   if (seesFull) {
-    const leadFollowups = notices.filter((n) => n.kind === 'lead_followup').length;
-    const newEnquiries = Math.max(0, (((enqQ.ok && enqQ.json) || []) as any[]).length - leadFollowups);
+    const newEnquiries = freshEnquiries((((enqQ.ok && enqQ.json) || []) as any[]).length, notices);
     if (newEnquiries > 0) notices.unshift({
       id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
