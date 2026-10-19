@@ -22,14 +22,16 @@ ok('FIX1: attention_count counts new form submissions (owner-scoped, status=new)
 // rules below are now behaviourally tested in operator_notify_fixes_test.mjs);
 // the route still owns the reads and must still hand both inputs over.
 ok('FIX1: new-enquiry count is deduped against the lead_followup cron notice (no stacking)',
-  /const leadFollowups = notices\.filter\(\(n\) => n && n\.kind === 'lead_followup'\)\.length/.test(bell) &&
-  /const newEnquiries = Math\.max\(0, \(i\.newEnquiries \|\| 0\) - leadFollowups\)/.test(bell) &&
+  // the rule itself lives in ONE pure helper (freshEnquiries, behaviourally
+  // tested in fresh_enquiries_test.mjs); the bell must route through it
+  /export function freshEnquiries\(/.test(bell) &&
+  /const newEnquiries = freshEnquiries\(i\.newEnquiries \|\| 0, notices\)/.test(bell) &&
   /\+ \(i\.filesPending \|\| 0\) \+ newEnquiries/.test(bell) &&
   /newEnquiries: \(\(eQ\.json as any\[\]\)\?\.length \|\| 0\)/.test(workspace) &&
   /notices: \(\(nQ\.json as any\[\]\) \|\| \[\]\)/.test(workspace));
 ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for the bell',
   /notices\.unshift\(\{[\s\S]*?kind: 'website_enquiry'/.test(workspace) &&
-  /const newEnquiries = Math\.max\(0, \(\(\(enqQ\.ok[\s\S]*?\)\.length - leadFollowups\)/.test(workspace));
+  /const newEnquiries = freshEnquiries\(\(\(\(enqQ\.ok[\s\S]*?\)\.length, notices\)/.test(workspace));
 ok('FIX1: the enquiry feed row is owner-only (reviewers never see leads)',
   /if \(seesFull\) \{[\s\S]*?kind: 'website_enquiry'/.test(workspace));
 ok('FIX1: inbox.html filters the aggregate row so it is not double-listed with /forms/inbox',
