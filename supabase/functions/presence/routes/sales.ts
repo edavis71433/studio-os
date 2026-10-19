@@ -25,7 +25,7 @@ import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
-  summarizePipeline,
+  summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
 } from '../lib/sales_lifecycle.ts';
 import {
@@ -115,6 +115,20 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
 
 /** R1: auto-advance the deal stage AND record the stage_change (pipeline history
  *  no longer jumps silently). Guarded to `from` stages; only emits when a row moved. */
+// Phase 3 (stage-aware): a free-text next step that names a thing that has now
+// happened ("Sign contract" after the signature, "Request the deposit" once the
+// deal is won) is cleared, so the record never shows an overdue step for work
+// that is done. Pure rule in lib/sales_lifecycle.ts; best-effort here — a
+// pre-0089 database without the column simply keeps going.
+async function clearStaleNextStep(siteId: string, dealId: string, event: 'signed' | 'won'): Promise<void> {
+  try {
+    const r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=next_step&limit=1`);
+    const cur = rows(r)[0]?.next_step;
+    if (!nextStepStaleAfter(cur, event)) return;
+    await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ next_step: null, next_step_at: null }) });
+  } catch { /* best-effort */ }
+}
+
 async function advanceStage(siteId: string, dealId: string, to: Stage, from: Stage[], principal: Principal) {
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&stage=in.(${from.join(',')})&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) }).catch(() => ({ json: [] } as any));
   if (rows(up)[0]) await dealEvent(siteId, dealId, 'stage_change', principal, { to_stage: to }); // only when a row actually moved
@@ -410,7 +424,9 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   let outstanding = 0, overdue = 0, overdueCount = 0;
   for (const iv of rows(invR)) { const amt = Number(iv.amount_cents) || 0; outstanding += amt; if (iv.due_date && String(iv.due_date) < today) { overdue += amt; overdueCount++; } }
   const ar = { outstanding_cents: outstanding, count: rows(invR).length, overdue_cents: overdue, overdue_count: overdueCount };
-  return json({ data: { ...summarizePipeline(deals, nowIso()), ar }, truncated: deals.length >= CAP }, 200, cors);
+  // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
+  // days — three won deals read "100% (1 of 1)" under the old window.
+  return json({ data: { ...summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS), ar }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
@@ -1618,6 +1634,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
+  await clearStaleNextStep(tok.site_id, dealId, 'signed');   // Phase 3: "Sign contract" is done now
   const signedIsNews = await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
 
   // ── TELL THE OPERATOR. A client signed a contract and the studio got NO email:
@@ -1845,6 +1862,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
+  await clearStaleNextStep(site.id, dealId, 'won');   // Phase 3: closing/signing/deposit steps are behind us
   if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNoticePrefix(site.client_id, 'deal_followup', dealFollowupPeriodPrefix(dealId)); await clearNotice(site.client_id, 'deal_followup', dealFollowupLegacyPeriod(dealId)); } // the deal is a customer now — clear the "ready to convert" + stale "follow up on this deal" notices (weekly-bucketed → prefix clear + legacy key)
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 

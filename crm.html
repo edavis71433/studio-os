@@ -623,7 +623,10 @@ function renderHighlights(){
     tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
   if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':'',s:owed?esc((openInv.length||1)+(openInv.length===1||!openInv.length?' invoice':' invoices')+' · due now'):'All paid up'});
   const ns=(d.id?d.next_step:hl.next_step)||'';
-  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||'—'),ico:'next',tone:'info',edit:!!d.id,s:d.next_step_at?esc(dueLabel(d.next_step_at)):(ns?'':'Set one')});   // inline-editable when a real deal field backs it
+  // Phase 3 (stage-aware): with no next step set, the tile suggests the stage's
+  // own "do next" (a won deal says "open their project", never a blank dash)
+  const suggested=(d.id&&!ns&&d.stage)?guidanceFor(d.stage).action:'';
+  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:d.next_step_at?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
   if(!d.id&&p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet')),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
@@ -932,7 +935,9 @@ function renderBillingTab(host){
   const props=DEAL.proposals||[];
   html+=props.length?props.map(p=>{
     let acts='';
-    if(p.status==='draft')acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
+    // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft
+    const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+    if(p.status==='draft'&&!closed)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
     else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
     acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
     return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
@@ -1410,9 +1415,20 @@ async function renderNotesView(host){
     else{toast('Couldn’t remove that note.');b.disabled=false;}
   }));
 }
+// Phase 3 (timeline filters): website system events — publish notices, "changes
+// are waiting", connected-service pings — buried the human events (a payment, a
+// signature, a call) under 15+ rows. On the default view they collapse into ONE
+// quiet line; the System chip (or "Show") expands them. Deal events (money,
+// stage moves) are human-relevant and stay inline.
+const isSiteNoise=(it)=>it.type==='system'&&it.kind!=='deal_event';
+const SYS_FOLD_AT=3;   // one or two publish rows read fine inline; it's the pile-up that buries things
+let SYS_OPEN=false;
 function renderMergedTimeline(host){
-  const items=(ACT.items||[]).filter(filterMatch);
-  if(!items.length){host.innerHTML=`<p class="muted" style="margin-top:16px;font-size:13.5px">${(ACT.items||[]).length?'Nothing matches this filter.':'Nothing here yet — messages, calls, and system events will appear as they happen.'}</p>`;return;}
+  const all=(ACT.items||[]).filter(filterMatch);
+  const collapse=FILTER==='all'&&!SYS_OPEN&&all.filter(isSiteNoise).length>=SYS_FOLD_AT;
+  const items=collapse?all.filter(it=>!isSiteNoise(it)):all;
+  const hidden=collapse?all.length-items.length:0;
+  if(!items.length&&!hidden){host.innerHTML=`<p class="muted" style="margin-top:16px;font-size:13.5px">${(ACT.items||[]).length?'Nothing matches this filter.':'Nothing here yet — messages, calls, and system events will appear as they happen.'}</p>`;return;}
   let html=''; let curMonth='';
   for(const it of items){
     const mk=String(it.at).slice(0,7);
@@ -1434,7 +1450,9 @@ function renderMergedTimeline(host){
     }
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
+  if(hidden)html+=`<div class="ti t-system sys-fold"><span class="ti-icon" aria-hidden="true">⚙</span><div class="ti-main"><div class="ti-head"><span class="ti-title" style="font-weight:500;color:var(--faint)">${hidden===1?'1 website update':hidden+' website updates'}</span> <button type="button" class="link-btn" id="sysShow" style="font-size:12.5px">Show</button></div></div></div>`;
   host.innerHTML=html;
+  const ss=$('sysShow'); if(ss)ss.addEventListener('click',()=>{SYS_OPEN=true;renderTimeline();});
   host.querySelectorAll('[data-x]').forEach(b=>b.addEventListener('click',()=>{
     const id=b.getAttribute('data-x');
     if(EXPANDED.has(id))EXPANDED.delete(id);else EXPANDED.add(id);

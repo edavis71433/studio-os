@@ -23,7 +23,30 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries, invoiceReminderIds, renderableNotices } from '../lib/inbox_feed.ts';
+import { clearNotice } from '../lib/notice.ts';
+
+// ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
+// RENDERS are the same rows. Drops the client_* throttle notices (their counted
+// half is a message/support row) and any invoice reminder whose invoice is no
+// longer open — and clears those stale reminders so the badge self-heals. One
+// batched invoices read, only when a reminder exists; a failed read keeps every
+// reminder (never an under-count). Best-effort end to end.
+async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
+  const ids = invoiceReminderIds(rows);
+  let open: ReadonlySet<string> | null = null;
+  if (ids.length) {
+    try {
+      const r = await svc(`presence_invoices?site_id=eq.${site.id}&id=in.(${ids.join(',')})&select=id,status&limit=${ids.length}`);
+      if (r.ok && Array.isArray(r.json)) open = new Set((r.json as any[]).filter((i) => String(i.status) === 'open').map((i) => String(i.id)));
+    } catch { open = null; }
+  }
+  const { keep, stale } = renderableNotices(rows, open);
+  if (stale.length && site.client_id) {
+    for (const n of stale) { try { await clearNotice(String(site.client_id), 'deal_followup', String(n.period)); } catch { /* best-effort */ } }
+  }
+  return keep;
+}
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -160,7 +183,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   let attention_count = 0;
   try {
     attention_count = studioBellCount({
-      notices: ((nQ.json as any[]) || []),
+      notices: await verifiedNotices(site, ((nQ.json as any[]) || [])),
       newEnquiries: ((eQ.json as any[])?.length || 0),
       proposedPlans: (iQ || 0),
       proposedWrites: (wQ || 0),
@@ -349,7 +372,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
   // the server would refuse, and refuses one the client never drew. Synthetic rows
   // below carry no id/period at all; the client's UUID guard is what excludes them.
-  const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHref(n.kind), dismissible: noticeDismissible(n.kind, n.period) }));
+  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHref(n.kind), dismissible: noticeDismissible(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing
