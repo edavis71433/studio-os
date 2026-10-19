@@ -32,7 +32,12 @@ const SEGS = { data: { segments: [
 ] } };
 
 const ROW_DRAFT = { id: D_ID, subject: 'July opening hours', audience: 'contacts', status: 'draft', scheduled_at: null, sent_at: null, recipient_count: null, sent_count: null, skipped_count: null, failed_count: null, created_at: '2026-07-18T09:00:00Z' };
-const ROW_SCHED = { id: S_ID, subject: 'Weekend tasting event', audience: 'enquiries', status: 'scheduled', scheduled_at: '2026-08-01T09:00:00Z', sent_at: null, recipient_count: 8, sent_count: null, skipped_count: null, failed_count: null, created_at: '2026-07-15T09:00:00Z' };
+// A scheduled row must sit in the FUTURE relative to the run: Reschedule
+// prefills this time, and the page refuses to send a prefilled time that has
+// already passed ("Pick a time in the future"). A literal date went stale once
+// the calendar overtook it, so it is computed per run — 30 days out, on the hour.
+const SCHED_AT = new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000 + 30 * 86_400_000).toISOString();
+const ROW_SCHED = { id: S_ID, subject: 'Weekend tasting event', audience: 'enquiries', status: 'scheduled', scheduled_at: SCHED_AT, sent_at: null, recipient_count: 8, sent_count: null, skipped_count: null, failed_count: null, created_at: '2026-07-15T09:00:00Z' };
 const ROW_SENT = { id: T_ID, subject: 'June recap', audience: 'contacts', status: 'sent', scheduled_at: null, sent_at: '2026-06-30T10:00:00Z', recipient_count: 46, sent_count: 42, skipped_count: 3, failed_count: 1, created_at: '2026-06-30T09:00:00Z' };
 const LIST = { data: { broadcasts: [ROW_DRAFT, ROW_SCHED, ROW_SENT] } };
 
