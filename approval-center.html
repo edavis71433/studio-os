@@ -13,23 +13,23 @@
 
   .group{margin-top:32px}
   .group.recently_approved{margin-top:36px;padding-top:26px;border-top:1px solid var(--line)}
-  .glabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 13px}
+  .glabel{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 13px}
 
-  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:17px 19px;box-shadow:var(--shadow);margin-bottom:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:17px 19px;box-shadow:var(--shadow);margin-bottom:12px}
   .top{display:flex;gap:14px;align-items:flex-start}
-  .ic{flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:18px}
+  .ic{flex:none;width:38px;height:38px;border-radius:var(--dds-r,8px);background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:18px}
   .group.recently_approved .ic{background:var(--good-soft)}
   .hd{flex:1;min-width:0}
   .ct{font-size:15.5px;font-weight:600;margin:0;line-height:1.35;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
-  .badge{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--accent);background:var(--accent-soft)}
+  .badge{font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--accent);background:var(--accent-soft);text-transform:capitalize}
   .group.recently_approved .badge{color:var(--good);background:var(--good-soft)}
   .cwhy{margin:4px 0 0;font-size:14px;color:var(--soft);line-height:1.45}
   .outcomes{margin-top:12px;display:flex;flex-direction:column;gap:7px}
   .oc{display:flex;gap:9px;font-size:13.5px;line-height:1.4}
-  .oc .lab{flex:none;font-weight:700;color:var(--faint);min-width:92px;font-size:12px;letter-spacing:.02em;text-transform:uppercase;padding-top:1px}
+  .oc .lab{flex:none;font-weight:500;color:var(--faint);min-width:92px;font-size:12px;padding-top:1px;text-transform:capitalize}
   .oc .val{color:var(--ink)}
   .cact{margin-top:14px}
-  a.act{display:inline-block;font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:8px 17px;text-decoration:none;transition:filter .15s}
+  a.act{display:inline-block;font-size:14px;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:8px 17px;text-decoration:none;transition:filter .15s}
   a.act:hover{filter:brightness(1.06)} a.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .group.scheduled a.act{background:transparent;color:var(--accent)}
   .group.scheduled a.act:hover{background:var(--accent-soft);filter:none}

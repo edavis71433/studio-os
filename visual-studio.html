@@ -27,33 +27,33 @@
   a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
   header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
   header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:56ch}
-  .promise{margin-top:18px;padding:14px 16px;background:var(--accent-soft);border-radius:12px;font-size:13.5px;color:var(--ink)}
+  .promise{margin-top:18px;padding:14px 16px;background:var(--accent-soft);border-radius:var(--dds-r-lg,10px);font-size:13.5px;color:var(--ink)}
   .promise b{font-weight:600}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);margin-top:26px}
-  .label{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 10px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:20px;box-shadow:var(--shadow);margin-top:26px}
+  .label{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 10px}
   .kinds{display:flex;flex-wrap:wrap;gap:8px}
   .kind{font-size:13.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
   .kind[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
   .kind small{display:block;font-size:11px;opacity:.7;font-weight:400}
-  textarea,input{font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:12px 14px;width:100%}
+  textarea,input{font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px 14px;width:100%}
   textarea:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
   .field{margin-top:16px}
-  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 16px;cursor:pointer;transition:background .15s,border-color .15s}
+  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 16px;cursor:pointer;transition:background .15s,border-color .15s}
   button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
   button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
   button.ghost{border-color:transparent;color:var(--soft)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:18px}
-  .variant{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .variant{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;box-shadow:var(--shadow)}
   .variant img{display:block;width:100%;height:auto;background:var(--accent-soft)}
   .variant .body{padding:12px}
   .variant .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .plan{margin-top:26px}
-  .plan h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 4px}
+  .plan h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0 0 4px}
   .plan .meta{font-size:13px;color:var(--soft);margin:0}
-  .tag{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--good);background:var(--good-soft);border-radius:999px;padding:3px 10px;font-weight:600}
+  .tag{display:inline-block;font-size:12px;color:var(--good);background:var(--good-soft);border-radius:999px;padding:3px 10px;font-weight:500;text-transform:capitalize}
   .center{text-align:center;padding:52px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
-  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  a.link{color:var(--accent);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:34px auto}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}

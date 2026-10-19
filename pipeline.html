@@ -41,51 +41,66 @@ html.dds-embed #detailWrap{padding-top:0}
   .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
   /* ── roster header (.lhead) — the same list-view anatomy as customers.html /
         leads.html / contacts.html: object icon · ONE h1 · ↻ · count/money meta ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px}
   .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lhead h1{font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 10px;min-height:34px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
-  .search{width:100%;font-family:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:12px}
+  .search{width:100%;font-family:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);margin-bottom:12px}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   /* the calm "your numbers" strip — plain numbers, tabular, no chart */
   .summary{margin-bottom:18px}
   .summary:empty{display:none}
-  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
+  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:11px 14px;font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
   .sum-line strong{color:var(--ink);font-weight:600}
   .sum-line .dot{color:var(--line);margin:0 5px}
   .sum-line .mut{color:var(--faint);font-size:12.5px}
+  /* visual refresh: the summary is four icon stat tiles in one bordered strip */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
+  .stats .st{display:flex;align-items:center;gap:12px;padding:13px 16px;border-left:1px solid var(--line);min-width:0}
+  .stats .st:first-child{border-left:none}
+  .stats .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .stats .ico.good{background:var(--good-soft);color:var(--good)} .stats .ico.warn{background:var(--warn-soft);color:var(--warn)} .stats .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .stats .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .stats .st-main{min-width:0;flex:1}
+  .stats .k{font-size:12px;color:var(--faint)}
+  .stats .v{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stats .s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sum-stages{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:88px}
-  .sum-stages .sc-l{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);min-width:88px}
+  .sum-stages .sc-l{font-size:12px;color:var(--faint)}
   .sum-stages .sc-n{font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .chip{font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
-  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  /* visual refresh: the display toggle is a segmented control, not chips */
+  .viewtog{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
+  .viewtog .chip{border:none;border-radius:0;background:transparent;padding:5px 11px;font-size:12.5px;font-weight:500}
+  .viewtog .chip.on{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.danger{background:var(--warn)}
   .btn:disabled{opacity:.5;pointer-events:none}
   .spacer{flex:1}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
   .card:hover{border-color:var(--p)}
   .card .t{font-weight:600}
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
-  .stage{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .stage{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .stage.won{background:var(--good-soft);color:var(--good)}
   .stage.lost{background:transparent;border:1px solid var(--line);color:var(--soft)}
   .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
-  dialog{border:none;border-radius:16px;padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
   .dbody{padding:18px 20px;max-height:64vh;overflow:auto}
-  .sec{margin-top:16px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
+  .sec{margin-top:16px}.sec h3{font-size:12px;color:var(--faint);margin-bottom:8px}
   .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
   form.mini .grid{display:flex;gap:8px;flex-wrap:wrap}
-  input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%}
   textarea{min-height:90px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .mut{color:var(--soft);font-size:13px}
@@ -93,10 +108,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .hrow:last-child{border-bottom:none}
   .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
   /* activity quick-log + merged timeline */
-  .qlog{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);margin-bottom:12px}
+  .qlog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:12px;background:var(--bg);margin-bottom:12px}
   .qlog .kinds{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-  .qlog .kb{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
-  .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .qlog .kb{font:inherit;font-size:13px;padding:6px 11px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:500}
   .qlog textarea{min-height:44px}
   .qlog .qrow{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
   .qlog .qrow input[type=date]{width:auto;flex:0 0 auto}
@@ -115,7 +130,7 @@ html.dds-embed #detailWrap{padding-top:0}
         interactivity rules (only the current step + the one legal back-target). ── */
   .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;cursor:default;
+  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:9px 16px;cursor:default;
     background:var(--card);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:0;
     clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
   .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
@@ -136,9 +151,9 @@ html.dds-embed #detailWrap{padding-top:0}
   /* View toggle (List · Board · Table) */
   .viewtog{display:inline-flex;gap:4px}
   /* ── Table view: sortable columns; the table scrolls in its OWN container ── */
-  #table .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  #table .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px)}
   #table table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
-  #table thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  #table thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   #table thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   #table thead th .thb:hover{color:var(--p)}
   #table thead th .arrow{font-size:10px;color:var(--p)}
@@ -155,7 +170,13 @@ html.dds-embed #detailWrap{padding-top:0}
   /* Kanban board — columns = open stages, cards = deals, tap/drag to move */
   .board-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:2px 20px 6px}
   .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;align-items:start}
-  .col{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:220px}
+  .col{background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px;min-width:220px}
+  /* visual refresh: a soft tint per stage (same order as the open STAGES) so the
+     board reads at a glance; the dark palette keeps the plain surface */
+  .col:nth-child(1){background:#f5f2fc} .col:nth-child(2){background:#fdf6ec} .col:nth-child(3){background:#eef4fb} .col:nth-child(4){background:#fbeff5}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .col{background:var(--bg)}}
+  :root[data-theme="dark"] .col{background:var(--bg)}
+  .col-tip{color:var(--soft)}
   .col-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
   .col-t{font-weight:600;font-size:13.5px;flex:1}
   .col-n{font-size:12px;color:var(--faint);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
@@ -165,20 +186,20 @@ html.dds-embed #detailWrap{padding-top:0}
   .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
   .col-body.drop-over{background:var(--p-soft)}
   .bempty{font-size:12px;text-align:center;padding:10px 4px;opacity:.7}
-  .bcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;position:relative}
+  .bcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px;cursor:pointer;position:relative}
   .bcard:hover{border-color:var(--p)}
   .bcard.dragging{opacity:.5}
   .bc-t{font-weight:600;font-size:13.5px;line-height:1.35}
   .bc-v{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;margin-top:3px}
   .bc-m{color:var(--faint);font-size:12px;margin-top:3px}
   .bcard.is-stale{border-left:2px solid var(--warn,#775d31)}
-  .bc-stale{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
+  .bc-stale{display:inline-block;font-size:12px;font-weight:500;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
   .bc-actions{margin-top:8px;position:relative}
   /* popup contract: the Move trigger + every menu option meet the 44px touch floor */
   .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 12px;min-height:44px;cursor:pointer}
   .bc-move:hover{border-color:var(--p)}
-  .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
+  .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
   .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;min-height:44px;display:flex;align-items:center;border-radius:7px;cursor:pointer}
   .bc-menu button:hover{background:var(--p-soft)}
   .board-foot{margin-top:12px;font-size:12.5px}
@@ -190,13 +211,13 @@ html.dds-embed #detailWrap{padding-top:0}
      #detailInner so the pipeline list, board, and the other dialogs are untouched.
      ───────────────────────────────────────────────────────────────────────── */
   #detailWrap{max-width:var(--dds-w-app,1280px)}
-  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden}
   .backbar{padding:16px 20px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .backbar .btn{padding:8px 14px}
   /* compact record header — the record page's header idiom (crm.html .rec-head):
      object icon · serif name · one clean sub-row of chips + facts */
   #detailInner .dhead{padding:16px 22px 18px;justify-content:flex-start;align-items:flex-start;gap:14px}
-  #detailInner .dh-ic{width:44px;height:44px;border-radius:12px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+  #detailInner .dh-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
   #detailInner #dtitle{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;outline-offset:3px}
   #detailInner .dh-sub{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:14px;color:var(--soft);margin-top:5px}
   #detailInner .dh-sub a{color:var(--p);text-decoration:none}
@@ -204,7 +225,7 @@ html.dds-embed #detailWrap{padding-top:0}
   #detailInner .dh-sub .fact strong{color:var(--ink);font-weight:600}
   /* it's a full page now — no inner scroll box; each section breathes as a card */
   #detailInner .dbody{padding:8px 22px 28px;max-height:none;overflow:visible}
-  #detailInner .sec{margin:0 0 16px;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  #detailInner .sec{margin:0 0 16px;background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px}
   #detailInner .sec:last-child{margin-bottom:0}
   /* related-list card headers — same idiom as crm.html's Deal-tab cards (.card-h .t) */
   #detailInner .sec h3{font-family:var(--sans);font-weight:700;font-size:14.5px;text-transform:none;letter-spacing:normal;color:var(--ink);margin-bottom:12px}
@@ -1273,16 +1294,23 @@ async function renderSummary(gen){
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
   const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
-  const openPart=open.count?`Open: <strong>${money(open.value_cents)||'$0'}</strong> across ${plur(open.count,'deal')}`:`Open: <strong>no open deals yet</strong>`;
-  const wonPart=wm.count?`Won this month: <strong>${money(wm.value_cents)||'$0'}</strong> (${wm.count})`:`Won this month: <strong>none yet</strong>`;
-  const winPart=(wr.pct===null||wr.pct===undefined)?`Win rate: <strong>—</strong> <span class="mut">(no closed deals yet)</span>`
-    :`Win rate: <strong>${wr.pct}%</strong> <span class="mut">(${wr.won} of ${wr.won+wr.lost}, last 90 days)</span>`;
+  // visual refresh: four icon tiles (Open · Won this month · Win rate ·
+  // Outstanding) in place of the one-line strip; the per-stage cells follow.
+  const ICO={open:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+    won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+    rate:'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
+    ar:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
+  const tile=(k,v,sub,ico,tone)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s">${sub}</div>`:''}</div></div>`;
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal'),'open',''):tile('Open','$0','no open deals yet','open','');
+  const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
+  const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','no closed deals yet','rate','info')
+    :tile('Win rate',wr.pct+'%',`${wr.won} of ${wr.won+wr.lost}, last 90 days`,'rate','info');
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
-  // AR strip — "who owes me money" across all deals, in one glance (open invoices).
-  const ar=s.ar||{}; let arPart='';
-  if((ar.count||0)>0){ arPart=`<div class="sum-line" style="margin-top:6px">💰 Outstanding: <strong>${money(ar.outstanding_cents)||'$0'}</strong> across ${plur(ar.count,'invoice')}`+((ar.overdue_count||0)>0?` <span class="dot">·</span> <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong> (${ar.overdue_count})`:'')+` <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a></div>`; }
-  host.innerHTML=`<div class="sum-line">${openPart} <span class="dot">·</span> ${wonPart} <span class="dot">·</span> ${winPart}</div>`
-    +(open.count?`<div class="sum-stages">${cells}</div>`:'')+arPart;
+  // AR tile — "who owes me money" across all deals, in one glance (open invoices).
+  const ar=s.ar||{}; let arT='';
+  if((ar.count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',plur(ar.count,'invoice')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+` · <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a>`,'ar','warn'); }
+  host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
+    +(open.count?`<div class="sum-stages">${cells}</div>`:'');
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
 }
 

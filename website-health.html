@@ -27,9 +27,9 @@
   /* ── SS8 shared cms-family chrome: .lhead-lite (icon · count meta · "As of
         {time}" · ↻ soft refresh) — kept in sync by hand with attention.html /
         content-tree.html (the SS9–SS12 primitive). ── */
-  .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
+  .lhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:10px 14px;margin:22px 0 0}
   .lhead[hidden]{display:none}   /* the display rule must never defeat the hidden attribute */
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--accent-soft);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lmeta{flex:1;min-width:0;font-size:13px;color:var(--soft);margin:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--accent);background:var(--accent-soft)}
@@ -43,7 +43,7 @@
   :root[data-theme="dark"] .retry{color:#171320}
   /* >300ms loading stencil — ghost cards, never a flash on fast checks */
   .stencil{margin-top:26px}
-  .stencil .gh{background:var(--card);border:1px solid var(--line);border-radius:15px;height:76px;margin-bottom:12px;position:relative;overflow:hidden}
+  .stencil .gh{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);height:76px;margin-bottom:12px;position:relative;overflow:hidden}
   .stencil .gh::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--line),transparent);animation:shim 1.2s infinite}
   @keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
   @media (prefers-reduced-motion:reduce){.stencil .gh::after{animation:none}}
@@ -56,24 +56,24 @@
   .vtext p{margin:3px 0 0;color:var(--soft);font-size:14px;font-variant-numeric:tabular-nums}
 
   .cat{margin-top:30px}
-  .clabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
-  .chk{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow);margin-bottom:10px}
-  .ci{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+  .clabel{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 12px}
+  .chk{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:15px 17px;box-shadow:var(--shadow);margin-bottom:10px}
+  .ci{flex:none;width:34px;height:34px;border-radius:var(--dds-r,8px);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
   .ci.ok{background:var(--good-soft);color:var(--good)} .ci.attention{background:var(--warn-soft);color:var(--warn)}
   .ci.coming{background:var(--accent-soft);color:var(--accent)} .ci.off{background:var(--line);color:var(--soft)}
   .cb{flex:1;min-width:0}
   .ct{font-size:15px;font-weight:600;margin:0;line-height:1.35;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
-  .cw{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .cw{font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
   .cw.ok{color:var(--good);background:var(--good-soft)} .cw.attention{color:var(--warn);background:var(--warn-soft)}
   .cw.coming{color:var(--accent);background:var(--accent-soft)} .cw.off{color:var(--soft);background:var(--line)}
   .cwhy{margin:5px 0 0;font-size:14px;color:var(--soft);line-height:1.45}
   .cact{margin-top:11px}
-  a.act{display:inline-block;font-size:13.5px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;transition:background .15s,border-color .15s}
+  a.act{display:inline-block;font-size:13.5px;font-weight:500;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 14px;transition:background .15s,border-color .15s}
   a.act:hover{background:var(--accent-soft);border-color:var(--accent)} a.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   /* "What this means" — plain-English suggestions from real visit data */
-  .means{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
-  .means h2{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 4px;display:flex;gap:9px;align-items:center}
+  .means{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:20px 22px;box-shadow:var(--shadow)}
+  .means h2{font-family:var(--sans);font-weight:600;font-size:18px;margin:0 0 4px;display:flex;gap:9px;align-items:center}
   .means .lede{color:var(--soft);font-size:13.5px;margin:0 0 14px}
   .means ul{list-style:none;margin:0;padding:0}
   .means li{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:14.5px;line-height:1.5}

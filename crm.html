@@ -34,19 +34,19 @@
 
   /* ── record header (Lightning anatomy: object icon · name · status) ── */
   .rec-head{margin-top:14px;display:flex;gap:14px;align-items:flex-start}
-  .obj-ic{width:44px;height:44px;border-radius:12px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto;box-shadow:var(--shadow)}
+  .obj-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto;box-shadow:var(--shadow)}
   .obj-ic.customer{background:var(--good)}
   .rec-head h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2}
   .rec-sub{color:var(--soft);font-size:14px;margin-top:4px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
   .rec-sub a{color:var(--p);text-decoration:none} .rec-sub a:hover{text-decoration:underline}
-  .statuschip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p)}
+  .statuschip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p);text-transform:capitalize}
   .statuschip.customer{background:var(--good-soft);color:var(--good)}
 
   /* ── highlights panel: label-over-value tiles ── */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
   .hl{background:var(--card);padding:10px 14px;min-width:0}
-  .hl-k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;display:flex;align-items:center;gap:6px}
-  .hl-v{font-family:var(--serif);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hl-k{font-size:12px;color:var(--faint);font-weight:500;display:flex;align-items:center;gap:6px}
+  .hl-v{font-family:var(--sans);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
   .hl-v .word{text-transform:capitalize}
   .hl-edit{border:none;background:none;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px;border-radius:4px}
   .hl-edit:hover{color:var(--p)}
@@ -55,28 +55,28 @@
   /* ── action bar: the record's verbs, always one click away ── */
   .actbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
   .actbar:empty{display:none}
-  .abtn{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.15s;box-shadow:var(--shadow)}
+  .abtn{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.15s;box-shadow:var(--shadow)}
   .abtn:hover{border-color:var(--p);color:var(--p)}
   .abtn.primary{background:var(--p);color:#fff;border-color:var(--p)} .abtn.primary:hover{background:var(--p-deep);color:#fff}
   /* billing rows: status chip + the row's own buttons */
   .brow{flex-wrap:wrap}
   .racts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .rbtn{font-family:inherit;font-size:12.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center}
+  .rbtn{font-family:inherit;font-size:12.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center}
   .rbtn:hover{border-color:var(--p);color:var(--p)} .rbtn:disabled{opacity:.5;cursor:default}
-  .link-btn{border:none;background:none;color:var(--p);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;padding:0;text-transform:none;letter-spacing:0;border-radius:0}
+  .link-btn{border:none;background:none;color:var(--p);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;padding:0;text-transform:none;letter-spacing:0;border-radius:0}
   .link-btn:hover{text-decoration:underline}
-  .bform{background:var(--card);border:1px solid var(--p);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .bform{background:var(--card);border:1px solid var(--p);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
   .brow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
   .brow2 label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--faint);font-weight:600}
-  .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+  .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;width:100%}
   .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
   .bacts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 
   /* ── Path (Lightning chevrons, dds skin) ── */
-  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px}
   .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;cursor:default;
+  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:9px 16px;cursor:default;
     background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
   .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
@@ -104,13 +104,13 @@
   @media (max-width:1000px){.body{grid-template-columns:minmax(0,1fr)}.rail{order:-1}}
 
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .tabs button{border:none;background:transparent;font-family:inherit;font-size:14.5px;font-weight:600;color:var(--soft);padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap;transition:.15s}
+  .tabs button{border:none;background:transparent;font-family:inherit;font-size:14.5px;font-weight:500;color:var(--soft);padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap;transition:.15s}
   .tabs button:hover{color:var(--ink)}
   .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
   #tabbody{margin-top:18px}
 
   /* related-list cards */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
   .card-h .t{font-weight:700;font-size:14.5px}
   .rrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;border-top:1px solid var(--line);font-size:14px;min-width:0}
@@ -119,50 +119,50 @@
   .rrow .rt .s{color:var(--faint);font-size:12.5px;display:block}
   a.rlink{color:inherit;text-decoration:none;display:block;min-width:0;flex:1}
   a.rlink:hover .rt{color:var(--p)}
-  .schip{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .schip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .schip.good{background:var(--good-soft);color:var(--good)}
   .schip.warn{background:var(--warn-soft);color:var(--warn)}
   .schip.bad{background:transparent;color:var(--bad);border:1px solid var(--bad)}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:14.5px}
   .kv .k{color:var(--faint);font-weight:600}
   .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
-  .fact{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-  .fact .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
-  .fact .v{font-family:var(--serif);font-size:18px;margin-top:2px}
+  .fact{background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px 12px}
+  .fact .k{font-size:12px;color:var(--faint);font-weight:500}
+  .fact .v{font-family:var(--sans);font-size:18px;margin-top:2px;font-weight:600;font-variant-numeric:tabular-nums}
   .fact .v small{font-family:var(--sans);font-size:12px;color:var(--soft);font-weight:400}
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px}
   .chip .d{width:7px;height:7px;border-radius:50%}
   .chip.healthy{background:var(--good-soft);color:var(--good)} .chip.healthy .d{background:var(--good)}
   .chip.attention{background:var(--warn-soft);color:var(--warn)} .chip.attention .d{background:var(--warn)}
   .chip.new,.chip.quiet{background:var(--p-soft);color:var(--p)} .chip.new .d,.chip.quiet .d{background:var(--p)}
-  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between}
+  h2{font-size:12.5px;color:var(--faint);font-weight:500;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between}
   section{margin-top:22px} section:first-child{margin-top:0}
 
   /* ── the activity rail ── */
   .acard{padding:14px 16px}
   .composer-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 -4px}
-  .composer-tabs button{border:none;background:none;font-family:inherit;font-size:13px;font-weight:600;color:var(--soft);padding:8px 10px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap}
+  .composer-tabs button{border:none;background:none;font-family:inherit;font-size:13px;font-weight:500;color:var(--soft);padding:8px 10px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap}
   .composer-tabs button.on{color:var(--p);border-bottom-color:var(--p)}
   .composer-pane{padding:12px 0 4px}
-  .composer-pane textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;min-height:64px}
+  .composer-pane textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;resize:vertical;min-height:64px}
   .composer-pane textarea:focus{outline:none;border-color:var(--p)}
-  .composer-pane input[type=text],.composer-pane input[type=date]{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  .composer-pane input[type=text],.composer-pane input[type=date]{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
   .composer-row{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
   .composer-row .spacer{flex:1}
   .kindchips{display:flex;gap:6px;flex-wrap:wrap}
-  .kindchips button{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:600}
+  .kindchips button{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:500}
   .kindchips button.on{background:var(--p-soft);color:var(--p);border-color:var(--p)}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button.on{background:var(--p-soft);color:var(--p)}
 
   .fchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
-  .fchips button{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-family:inherit}
+  .fchips button{font-size:12px;font-weight:500;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-family:inherit}
   .fchips button.on{background:var(--p-soft);border-color:var(--p);color:var(--p)}
 
   /* Upcoming & overdue band */
-  .upband{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
-  .upband .bt{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:6px}
+  .upband{margin-top:14px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px 12px;background:var(--bg)}
+  .upband .bt{font-size:12px;color:var(--faint);font-weight:500;margin-bottom:6px}
   .uprow{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:13.5px}
   .uprow .due{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
   .uprow.overdue .due{color:var(--bad);font-weight:700}
@@ -172,7 +172,7 @@
   .uprow a:hover{color:var(--p)}
 
   /* the timeline: connector line + white-ring type icons + expandable rows */
-  .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
+  .tl-month{font-size:12px;color:var(--faint);font-weight:500;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
   .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
   .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
   .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
@@ -189,7 +189,7 @@
   button.ti-head{cursor:pointer}
   .ti-title{font-weight:600;min-width:0}
   .ti-car{color:var(--faint);font-size:10px;flex:0 0 auto}
-  .ti-meta{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
+  .ti-meta{font-size:12px;font-weight:500;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
   .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;margin-top:5px;border-left:2px solid var(--line);padding-left:10px}
   .ti-body .note-acts{margin-top:6px}
   .ti-body .note-acts button{font-size:11.5px;padding:3px 9px}
@@ -197,13 +197,13 @@
   .ti a.ti-link{color:var(--p);text-decoration:none;font-size:12px;font-weight:600}
   .ti a.ti-link:hover{text-decoration:underline}
 
-  textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;resize:vertical;min-height:70px}
+  textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:11px 12px;resize:vertical;min-height:70px}
   textarea:focus{outline:none;border-color:var(--p)}
-  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:.15s}
+  button{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
   button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
-  a.link{color:var(--p);text-decoration:none;font-weight:600;font-size:14px} a.link:hover{text-decoration:underline}
-  a.btnlink{display:inline-block;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--p);color:var(--p);padding:7px 14px;text-decoration:none}
+  a.link{color:var(--p);text-decoration:none;font-weight:500;font-size:14px} a.link:hover{text-decoration:underline}
+  a.btnlink{display:inline-block;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);color:var(--p);padding:7px 14px;text-decoration:none}
   a.btnlink:hover{background:var(--p-soft)}
   a.btnlink.primary{background:var(--p);color:#fff} a.btnlink.primary:hover{background:var(--p-deep)}
   .muted{color:var(--soft);font-size:14px}
@@ -215,6 +215,103 @@
   footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none !important}}
+
+  /* ── Visual refresh (2026-10): the hub in the new look. These rules come last
+     on purpose — they restate the pieces above in the refreshed idiom (initials
+     avatar, icon stat tiles, the lifecycle bar, an invoice table, a details card
+     in the rail, dot timeline) without touching the markup contracts the tests
+     pin (#actbar ids, .pstep states, data-* hooks). ── */
+  .rec-head{margin-top:10px;align-items:center}
+  .obj-ic{width:40px;height:40px;border-radius:50%;background:var(--p-soft);color:var(--p);font-family:var(--sans);font-size:14px;font-weight:600;box-shadow:none;letter-spacing:.02em}
+  .obj-ic.customer{background:var(--good-soft);color:var(--good)}
+  .rec-head h1{font-size:28px}
+  .rec-sub{font-size:13px;margin-top:3px;gap:6px 10px}
+  .rec-sub .sep{color:var(--faint)}
+  .statuschip{padding:2px 8px;line-height:18px}
+  .statuschip:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+  /* stat tiles */
+  .hl-panel{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;background:var(--card);box-shadow:none;margin-top:16px}
+  .hl{display:flex;align-items:center;gap:12px;padding:13px 16px;border-left:1px solid var(--line);background:var(--card)}
+  .hl:first-child{border-left:none}
+  .hl .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .hl .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .hl .hl-main{min-width:0;flex:1}
+  .hl-v{font-size:19px;letter-spacing:-.01em;line-height:1.2;margin-top:1px}
+  .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hl-edit{font-size:11.5px}
+  /* the action bar: one filled button, quiet secondaries, the rest under More */
+  .actbar{margin-top:14px;gap:6px;align-items:center}
+  .abtn{box-shadow:none;height:32px;padding:0 12px;font-size:13px}
+  .abtn:hover{border-color:var(--dds-line-strong,#d2d2db);color:var(--ink);background:var(--bg)}
+  .abtn.primary:hover{background:var(--p-deep);color:#fff}
+  .more{position:relative;display:inline-block}
+  .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:4px;display:flex;flex-direction:column}
+  .more-menu[hidden]{display:none}
+  .more-menu .abtn{border:none;background:transparent;justify-content:flex-start;border-radius:var(--dds-r-sm,6px);height:34px;width:100%;box-shadow:none}
+  .more-menu .abtn:hover{background:var(--bg)}
+  /* lifecycle bar: Lead → Qualified → Proposal → Agreement → Won → Project → Growth */
+  .pathcard{box-shadow:none;padding:12px 16px}
+  .path{gap:6px;flex:1 1 520px}
+  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
+  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
+  .path button.pstep.current:hover{filter:none;color:var(--p-deep)}
+  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
+  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
+  .path-guide{margin-top:10px;font-size:13px}
+  .terminal-chip{font-weight:600;padding:3px 10px;font-size:12px}
+  /* tabs + sections */
+  .tabs button{font-size:13.5px;padding:9px 12px;border-bottom-width:2px}
+  .tabs button .n{margin-left:6px;font-size:11.5px;color:var(--faint);font-weight:500}
+  #tabbody{margin-top:16px}
+  #tabbody h2,section h2{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:8px}
+  .card{box-shadow:none;padding:14px 16px}
+  .card.tcard{padding:0;overflow:hidden}
+  .btable{width:100%;border-collapse:collapse;font-size:13.5px}
+  .btable th{font-size:12px;color:var(--faint);font-weight:500;text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
+  .btable td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:middle}
+  .btable tr:first-child td{border-top:none}
+  .btable td.amt,.btable th.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .btable td .rt{display:block;min-width:0} .btable td .rt .s{display:block;color:var(--faint);font-size:12.5px}
+  .btable td.due{color:var(--bad);font-weight:500;white-space:nowrap}
+  .btable td.racts{text-align:right;white-space:nowrap}
+  .btable .racts{justify-content:flex-end;flex-wrap:nowrap;gap:2px}
+  .btable .racts .rbtn{font-size:12px;padding:3px 7px}
+  .btable td .rt{white-space:nowrap}
+  .card.tcard{overflow-x:auto}
+  .btable{min-width:540px}
+  .rbtn{border-color:transparent;color:var(--soft);padding:4px 9px}
+  .rbtn:hover{border-color:var(--line);background:var(--bg);color:var(--ink)}
+  h2 .rbtn,.sec-acts .rbtn{border-color:var(--line);color:var(--ink)}
+  .rbtn.primary,h2 .rbtn.primary{background:var(--p);border-color:var(--p);color:#fff} .rbtn.primary:hover{background:var(--p-deep);color:#fff}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media (max-width:640px){.btable thead{display:none}.btable td{display:block;border-top:none;padding:4px 14px}.btable tr{display:block;border-top:1px solid var(--line);padding:8px 0}.btable tr:first-child{border-top:none}.btable td.racts,.btable td.amt{text-align:left}}
+  /* rail: details card · composer · segmented filter · dot timeline */
+  .rail .card{margin-bottom:14px}
+  .dcard .card-h{margin-bottom:6px}
+  .dkv{display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px 10px;font-size:13px;align-items:center}
+  .dkv svg{width:15px;height:15px;stroke:var(--faint);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .dkv span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dkv .muted{color:var(--faint);font-size:12.5px}
+  .dkv a{color:var(--p);text-decoration:none} .dkv a:hover{text-decoration:underline}
+  /* phones: the seven lifecycle steps scroll sideways instead of truncating */
+  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
+  .composer-tabs button{font-size:12.5px;padding:7px 9px;border-bottom-width:2px}
+  .fchips{display:inline-flex;gap:0;margin-top:14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
+  .fchips button{border:none;border-radius:0;padding:5px 10px;font-size:12.5px;background:transparent;color:var(--soft);font-weight:500}
+  .fchips button.on{background:var(--card);color:var(--ink);border-color:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+  .upband{border-radius:var(--dds-r,8px);background:var(--bg)}
+  .upband .bt{font-size:12px;font-weight:500}
+  .tl-month{font-size:12px;font-weight:500;color:var(--faint);margin:16px 0 2px}
+  .ti{padding:9px 0 9px 22px}
+  .ti:before{left:3px}
+  .ti .ti-icon{left:0;top:13px;width:8px;height:8px;font-size:0;box-shadow:none}
+  .ti .ti-icon *{display:none}
+  .ti-head{font-size:13px}
+  .ti-meta{border-radius:999px;font-weight:500;text-transform:none;letter-spacing:0;font-size:11px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -363,13 +460,15 @@ function renderShell(){
   // a customer-scoped record (sections.overview) resolves its identity from the
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
+  // visual refresh: an initials avatar instead of an emoji object tile
+  const initials=String(nm).split(/\s+/).map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase()||'?';
   $('main').innerHTML=`
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
-      <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${isCust?'🏢':'👤'}</div>
+      <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
       <div style="min-width:0">
         <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
-        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' · ')+'</span>':''}</div>
+        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span class="sep">·</span> <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
       </div>
     </div>
     <div id="hlpanel"></div>
@@ -380,6 +479,7 @@ function renderShell(){
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
+        <div id="dcard"></div>
         <div class="card acard" id="acard"><div class="spin" role="status" aria-label="Loading activity"></div></div>
       </aside>
     </div>`;
@@ -400,6 +500,39 @@ function renderShell(){
   HL_EDIT=false;   // the shell rebuild destroyed any open editor — never leave the flag stale
   renderHighlights();
   renderActions();
+  renderDetailsCard();
+}
+
+// ── Visual refresh: inline stroke icons for the stat tiles + details card ────
+const SVG={
+  value:'<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><path d="M8 7V5h8v2"/>',
+  paid:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+  owed:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  next:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  health:'<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  site:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  company:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+};
+const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
+// The "Customer details" card in the rail: the contact facts always in view,
+// so the operator never leaves Billing to find a phone number. Edit opens the
+// Details tab, where the full form lives.
+function renderDetailsCard(){
+  const host=$('dcard'); if(!host)return;
+  const s=(REC&&REC.sections)||{}; const hd=(REC&&REC.header)||{}; const p=(PROFILE&&PROFILE.profile)||null;
+  if(!(s.overview||s.details)){host.innerHTML='';return;}
+  const rows=[];
+  if(hd.email)rows.push([svg('mail'),`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`]);
+  if(hd.phone)rows.push([svg('phone'),`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`]);
+  if(hd.company)rows.push([svg('company'),esc(hd.company)]);
+  if(p)rows.push([svg('site'),'Website: '+esc(p.live?'live':(p.last_published_at?'offline':'not yet'))]);
+  if(p&&p.health)rows.push([svg('health'),'Health: '+esc(p.health==='attention'?'needs attention':p.health==='new'?'getting set up':p.health)]);
+  if(!rows.length)rows.push(['<span></span>','<span class="muted">No details yet — add them under Edit.</span>']);
+  host.innerHTML=`<div class="card dcard"><div class="card-h"><span class="t">Customer details</span>${s.details?'<button type="button" class="link-btn" data-edit-details>Edit</button>':''}</div><div class="dkv">${rows.map(r=>r[0]+'<span>'+r[1]+'</span>').join('')}</div></div>`;
+  const eb=host.querySelector('[data-edit-details]');
+  if(eb)eb.addEventListener('click',()=>{showTab('details');const f=document.querySelector('#tabbody [data-edit]');if(f)f.click();});
 }
 
 // ── the action bar: every common thing you do for a client, one click from the
@@ -425,11 +558,22 @@ function renderActions(){
   if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
   if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
   if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
-  host.innerHTML=btns.map(b=>b.href
+  // visual refresh: one filled verb, three quiet ones, the rest under "More"
+  // (every button keeps its id and handler — only where it sits changed)
+  const render=(b)=>b.href
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
-    :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`).join('');
-  btns.forEach(b=>{if(b.on){const el=$(b.id);if(el)el.addEventListener('click',b.on);}});
+    :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
+  const FRONT=['act-invoice','act-message','act-log','act-project'];
+  const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
+  const rest=btns.filter(b=>!FRONT.includes(b.id));
+  host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
+  btns.forEach(b=>{if(b.on){const el=$(b.id);if(el)el.addEventListener('click',()=>{closeMore();b.on();});}});
+  const mb=$('act-more');
+  if(mb)mb.addEventListener('click',(e)=>{e.stopPropagation();const m=$('act-menu');const open=m.hidden;m.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=m.querySelector('button,a');if(f)f.focus();}});
 }
+function closeMore(){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}}
+document.addEventListener('click',closeMore);
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore();});
 // Switch to Billing and open one of its inline forms (invoice · deposit ·
 // proposal:<id>). The form opens once the tab has rendered.
 let BILLING_OPEN='';
@@ -453,9 +597,9 @@ let DEAL_READY=Promise.resolve();
 async function loadPanels(){
   const ids=idParams(); const s=(REC&&REC.sections)||{};
   const jobs=[];
-  if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();if(TAB==='details')showTab(TAB,true);}));
+  if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();renderDetailsCard();if(TAB==='details')showTab(TAB,true);}));
   if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
-  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
+  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
 }
@@ -466,16 +610,24 @@ function renderHighlights(){
   const host=$('hlpanel'); if(!host)return;
   if(HL_EDIT)return;   // don't destroy the open editor + typed text; the render after save/cancel catches up
   const hl=REC.highlights||{}; const d=(DEAL&&DEAL.deal)||{}; const p=(PROFILE&&PROFILE.profile)||null;
+  // visual refresh: four icon tiles — money first (value · paid · outstanding),
+  // then the next step. Stage moved into the lifecycle bar; health and website
+  // live in the rail's details card, and only fill in here when there's no deal.
   const tiles=[];
-  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value))});
-  const stage=d.stage||hl.stage; if(stage)tiles.push({k:'Stage',v:`<span class="word">${esc(stageLabel(stage))}</span>`});
-  if(hl.owed_cents)tiles.push({k:'Outstanding',v:esc(fmtC(hl.owed_cents))});
+  const inv=(DEAL&&DEAL.invoices)||[];
+  const paid=inv.filter(v=>v.status==='paid'); const openInv=inv.filter(v=>v.status==='open');
+  const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const owed=DEAL&&DEAL.deal?openInv.reduce((a,b)=>a+(b.amount_cents||0),0):(hl.owed_cents||0);
+  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.title&&d.title!==((REC.header||{}).name||'')?d.title:'')});
+  if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
+    tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
+  if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':'',s:owed?esc((openInv.length||1)+(openInv.length===1||!openInv.length?' invoice':' invoices')+' · due now'):'All paid up'});
   const ns=(d.id?d.next_step:hl.next_step)||'';
-  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||'—'),edit:!!d.id});   // inline-editable when a real deal field backs it
-  if(p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`});
-  if(p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet'))});
+  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||'—'),ico:'next',tone:'info',edit:!!d.id,s:d.next_step_at?esc(dueLabel(d.next_step_at)):(ns?'':'Set one')});   // inline-editable when a real deal field backs it
+  if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
+  if(!d.id&&p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet')),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
-  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,6).map((t,i)=>`<div class="hl"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div></div>`).join('')}</div>`;
+  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,4).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
   const eb=host.querySelector('[data-hledit]');
   if(eb)eb.addEventListener('click',()=>{
     const tile=eb.closest('.hl'); const cur=(DEAL&&DEAL.deal&&DEAL.deal.next_step)||'';
@@ -509,8 +661,19 @@ function renderPath(){
     const state=done?'complete':current?'current stage':'upcoming';
     const attrs=canBack?'':current?` aria-expanded="${GUIDE_OPEN?'true':'false'}"`:' tabindex="-1" aria-disabled="true"';
     const hint=canBack?'. Activate to move the deal back here.':current?'. Activate to show or hide the stage guidance.':'';
-    return `<button class="pstep ${cls}" data-stage="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${done?'✓ ':''}${esc(stageLabel(s))}</button>`;
-  }).join('');
+    return `<button class="pstep ${cls}" data-stage="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${esc(stageLabel(s))}</button>`;
+  }).join('')
+  // visual refresh: the bar is the whole relationship, not just the sale —
+  // Won · Project · Growth follow the four sales stages (read-only markers;
+  // the sales stages keep their interactivity rules above).
+  +(function(){
+    const won=stage==='won'; const proj=(PROJ&&PROJ.project)||null;
+    const projDone=won&&proj&&proj.status==='complete';
+    const projCur=won&&!projDone;
+    const mk=(label,cls)=>`<span class="pstep ${cls}" aria-hidden="true">${label}</span>`;
+    if(stage==='lost')return '';
+    return mk('Won',won?'done':'')+mk('Project',projDone?'done':projCur?'current':'')+mk('Growth',projDone?'current':'');
+  })();
   const g=guidanceFor(stage);
   // the right-side action: forward = "Mark Stage as Complete" (BOARD_NEXT[stage][0]
   // when it's a forward move); at contract+signed it becomes Convert (won is
@@ -518,7 +681,7 @@ function renderPath(){
   const fwd=(BOARD_NEXT[stage]||[])[0];
   const fwdOk=fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>curIdx;
   let side='';
-  if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
+  if(stage==='won')side='';   // the lifecycle bar already shows Won — no second badge
   else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
   else if(stage==='contract'&&signed)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Convert to customer →</a>`;
   else if(fwdOk)side=`<button class="primary" id="markComplete">Mark Stage as Complete</button>`;
@@ -743,29 +906,27 @@ function renderBillingTab(host){
   const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0); const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
   const act=(attrs,label,title)=>`<button type="button" class="rbtn" ${attrs}${title?` title="${esc(title)}"`:''}>${label}</button>`;
   let html='';
-  // headline facts
-  html+=`<section><div class="facts">
-    <div class="fact"><div class="k">Deal value</div><div class="v">${d.expected_value_cents?esc(fmtC(d.expected_value_cents)):'—'}</div></div>
-    <div class="fact"><div class="k">Paid</div><div class="v">${esc(fmtC(got))}</div></div>
-    <div class="fact"><div class="k">Awaiting payment</div><div class="v">${esc(fmtC(owed))}${open.length?`<small> · ${open.length} open</small>`:''}</div></div>
-  </div>${noEmail?`<p class="muted" style="margin-top:10px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`:''}</section>`;
+  // visual refresh: the money facts live in the header tiles now (value · paid ·
+  // outstanding) — the tab opens straight on the invoices.
+  if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
   // invoices + the new-invoice / deposit forms
-  html+=`<section><h2>Invoices <span style="display:flex;gap:6px"><button type="button" class="rbtn" data-bform="invoice">+ Invoice</button><button type="button" class="rbtn" data-bform="deposit">+ Deposit</button><a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule →</a></span></h2>
-    <div id="bform"></div><div class="card">`;
-  html+=inv.length?inv.map(v=>{
+  html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px"><button type="button" class="rbtn" data-bform="deposit">Request deposit</button><a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn primary" data-bform="invoice">+ Invoice</button></span></h2>
+    <div id="bform"></div>`;
+  html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
     const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
-    const sub=esc(fmtC(v.amount_cents))+(v.due_date?' · due '+esc(dueLabel(v.due_date)):(v.status==='open'?' · due now':''));
-    let state, acts='';
-    if(v.status==='paid'){state=`<span class="schip good">Paid${v.paid_at?' '+esc(dueLabel(v.paid_at)):''}</span>`;}
+    const sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
+    let state, acts='', due='', dueCls='';
+    if(v.status==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(dueLabel(v.paid_at)):'';}
     else if(v.status==='void'){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else{state=`<span class="schip warn">${v.stripe_url?'Awaiting payment':'Not sent yet'}</span>`;
+      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls='due';
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
       acts+=act(`data-void-inv="${esc(v.id)}"`,'Void','Withdraw this invoice — the payment link stops working');}
-    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View / print','Open a branded, printable copy (save as PDF)');
-    return `<div class="rrow brow"><span class="rt">${name}<span class="s">${sub}</span></span><span class="racts">${state}${acts}</span></div>`;
-  }).join(''):`<p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p>`;
-  html+=`</div></section>`;
+    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View','Open a branded, printable copy (save as PDF)');
+    return `<tr class="brow"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
+  }).join('')+`</tbody></table></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
+  html+=`</section>`;
   // proposals
   html+=`<section><h2>Proposals <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Proposal (in pipeline)</a></h2><div class="card">`;
   const props=DEAL.proposals||[];

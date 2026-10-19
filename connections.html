@@ -25,10 +25,10 @@
   header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
   header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
   .group{margin-top:38px}
-  .group h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
-  .svc{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
+  .group h2{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 12px}
+  .svc{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
   .svc-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  .svc h3{font-family:var(--serif);font-weight:500;font-size:18px;margin:0}
+  .svc h3{font-family:var(--sans);font-weight:600;font-size:18px;margin:0}
   .svc .purpose{color:var(--soft);font-size:14px;margin:4px 0 0}
   .badge{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
   .badge.ok{color:var(--good);background:var(--good-soft)} .badge.attn{color:var(--warn);background:var(--warn-soft)}
@@ -36,7 +36,7 @@
   .data{margin-top:12px;font-size:15px;color:var(--ink);font-weight:500}
   .data .asof{font-size:12px;color:var(--soft);font-weight:400;margin-left:8px}
   .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;align-items:center}
-  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
   button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
   button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
   button.ghost{border-color:transparent;color:var(--soft)} button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -48,24 +48,24 @@
   .about .body b{color:var(--ink);font-weight:600}
   .about ul{margin:6px 0 10px;padding-left:18px} .about li{margin:2px 0}
   .keybox{margin-top:12px;display:none;gap:9px;flex-wrap:wrap}
-  .keybox input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+  .keybox input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--bg);color:var(--ink)}
   .note{font-size:13px;color:var(--soft);margin-top:8px}
   /* the reason under a badge, and the persistent problem panel — a failure the
      owner must act on never expires on a 2.6s timer */
   .why{font-size:13.5px;color:var(--warn);margin:8px 0 0}
-  .prob{display:none;margin-top:12px;padding:12px 14px;border-radius:11px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--ink);font-size:13.5px;line-height:1.5}
+  .prob{display:none;margin-top:12px;padding:12px 14px;border-radius:var(--dds-r,8px);background:var(--warn-soft);border:1px solid var(--warn);color:var(--ink);font-size:13.5px;line-height:1.5}
   .prob code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:5px;word-break:break-all}
   .prob ul{margin:4px 0 0}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
-  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  a.link{color:var(--accent);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none}
   .toast.show{opacity:1}
   /* a11y: the Concierge answer is a live region — it stays in the accessibility
      tree from first render (never display:none) so the FIRST answer is announced;
      while empty it is zero-height/invisible */
-  .answer{margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap}
+  .answer{margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:var(--dds-r,8px);font-size:14px;white-space:pre-wrap}
   .answer:empty{padding:0;margin:0;background:transparent}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}

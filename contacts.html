@@ -31,22 +31,22 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
         inbox.html's list-pane header + customers.html by hand ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
   .lrow1{display:flex;align-items:center;gap:6px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .viewdd{position:relative;min-width:0;flex:1}
-  #viewBtn{font:inherit;font-family:var(--serif);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;max-width:100%}
+  #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
   #viewBtn .car{font-size:10px;color:var(--faint)}
-  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
   /* ── the table view: sortable columns; scrolls in its OWN container ── */
   /* position:relative is load-bearing, not decoration. The Actions <th> holds a
@@ -55,9 +55,9 @@
      it. At 390px that 1px span sat at document x=540 and gave the BODY a 91px
      sideways scroll (pre-existing; the table itself was always contained).
      Making .tscroll the containing block puts it back inside the scroller. */
-  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
-  thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   thead th .thb:hover{color:var(--p)}
   thead th .arrow{font-size:10px;color:var(--p)}
@@ -108,23 +108,23 @@
   .bar{display:flex;gap:8px;margin:0 0 6px;align-items:center;flex-wrap:wrap}
   .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
   .search:focus{border-color:var(--p)}
-  .btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--p);background:var(--p);color:#fff;border-radius:999px;padding:9px 15px;cursor:pointer;white-space:nowrap}
+  .btn{font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--p);background:var(--p);color:#fff;border-radius:var(--dds-r,8px);padding:9px 15px;cursor:pointer;white-space:nowrap}
   .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
   .btn.ghost:hover{border-color:var(--p);color:var(--p)}
-  .c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 18px;box-shadow:var(--shadow);margin-bottom:11px}
+  .c{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:15px 18px;box-shadow:var(--shadow);margin-bottom:11px}
   .c .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .c .who{font-weight:600;font-size:15.5px}
   .c .co{font-size:13px;color:var(--faint)}
   .c .contact{font-size:13.5px;color:var(--soft);margin-top:3px}
   .c .contact a{color:var(--p);text-decoration:none}
   .c .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:12px 16px;cursor:pointer;text-decoration:none}
+  .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:var(--dds-r,8px);padding:12px 16px;cursor:pointer;text-decoration:none}
   .c .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
   .c .acts button:hover{border-color:var(--p);color:var(--p)}
   .muted{color:var(--soft);font-size:14.5px}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}
   /* Centering, mobile-safe (SS6 review; kept in sync with customers.html).
      NOT margin:auto — mobile browsers resolve the top-layer dialog's
      containing block against the DOCUMENT height, so vertical auto-margins
@@ -134,16 +134,16 @@
      The dialog element itself must NOT be the scroller either — browsers
      won't programmatically scroll the top-layer <dialog> — so the inner
      .dbody scrolls, sized to the 8vh offsets (pipeline's shipped pattern). */
-  dialog{border:none;border-radius:16px;padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dbody{padding:22px;max-height:calc(84vh - 22px);overflow:auto}
-  .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 12px}
+  .dbody h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 12px}
   .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
-  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none}
+  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:9px 12px;outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:12px 0 0;line-height:1.5}
   #cu-mode{display:flex;flex-direction:column;gap:8px;margin:2px 0 4px}
-  .modeopt{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
+  .modeopt{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
   .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
   .modeopt input{width:auto;margin-top:3px;accent-color:var(--p)}
   .modeopt strong{display:block;font-weight:600;font-size:13.5px}
@@ -161,14 +161,14 @@
   /* ── contact open + custom fields ── */
   .c[role=button]{cursor:pointer}
   .c[role=button]:hover{border-color:var(--p)}
-  .dbody textarea{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 12px;outline:none;resize:vertical;min-height:60px}
+  .dbody textarea{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:9px 12px;outline:none;resize:vertical;min-height:60px}
   .dbody textarea:focus{border-color:var(--p)}
   .field-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
   .field-row .fr-label{flex:1;min-width:0}
   .field-row .fr-choices{flex:1;min-width:0}
   .field-row select{width:auto}
   .field-row .fr-del{border:1px solid var(--line);background:transparent;border-radius:8px;cursor:pointer;padding:8px 11px;color:var(--soft);flex:none}
-  .dupe-match{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+  .dupe-match{border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
   .dupe-match .dm-name{font-weight:600;font-size:14px}
   .dupe-match .dm-why{font-size:12px;color:var(--faint)}
   /* ── row actions (edit · new deal · delete) ──

@@ -220,7 +220,29 @@
   // The bell's contents (icon + badge) — factored out of render() so the B4
   // refresh below can repaint JUST the badge without re-rendering the whole bar
   // (a re-render would tear down any open dropdown under the operator's cursor).
-  function bellInner(n) { return '🔔' + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+  // ── Visual refresh: stroke icons for the chrome and the nav (no emoji) ──────
+  // Keyed by nav section key; unknown keys fall back to a plain dot so a new
+  // section never renders without an icon slot (the sidebar aligns labels on it).
+  var ICON = {
+    today: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    inbox: '<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',
+    customers: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+    pipeline: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+    projects: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    files: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
+    analytics: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
+    website: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+    client: '<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
+    account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+    dot: '<circle cx="12" cy="12" r="3"/>'
+  };
+  function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
+  function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
 
   function render() {
     var nav = (CTX && CTX.nav) || [];
@@ -251,16 +273,16 @@
       var hasItem = sec.items.some(function (i) { return i.key === activeKey; });     // item-level: a genuine href match
       if (single) {
         var it = sec.items[0];
-        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + esc(sec.label) + '</a></div>';
+        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span></a></div>';
       }
-      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (hasItem ? ' aria-current="true"' : '') + '>' + esc(sec.label) + ' <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
+      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (hasItem ? ' aria-current="true"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span> <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
     }).join('');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
     var scope = CTX && CTX.scope;
     var brandHtml = scope && scope.name
-      ? '<span class="dds-brand"><span class="mark">P</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
-      : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
+      ? '<span class="dds-brand"><span class="mark">S</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
+      : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">S</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
     // Phase 1 overhaul: Settings gets its own gear in the bar (it was reachable
     // only through the account menu / launcher). The href is the nav's own.
     var settingsHref = '';
@@ -273,12 +295,12 @@
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
-      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
+      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
-        (settingsHref ? '<a class="dds-ic" href="' + esc(withScope(settingsHref)) + '" id="dds-settings" aria-label="Settings" title="Settings">⚙</a>' : '') +
-        '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">?</a>' +
-        '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
+        (settingsHref ? '<a class="dds-ic" href="' + esc(withScope(settingsHref)) + '" id="dds-settings" aria-label="Settings" title="Settings">' + icon('settings') + '</a>' : '') +
+        '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
+        '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
 
     wire(nav);
@@ -305,7 +327,10 @@
         '<a href="/customers.html" class="exit" data-noscope="1">Switch client</a>' +
         '<a href="/agency.html" class="exit" data-noscope="1">Exit to Studio</a>' +
       '</span></div>');
-    root.insertAdjacentElement('afterend', bar);
+    // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
+    // lay it out as a card under the nav; on phones shell.css keeps it fixed
+    // under the top bar (a fixed child escapes the column's flow).
+    root.appendChild(bar);
     document.documentElement.classList.add('dds-has-ctxbar');
   }
 
@@ -893,6 +918,10 @@
     root = document.getElementById('dds-shell');
     if (!root) { root = document.createElement('div'); root.id = 'dds-shell'; document.body.insertBefore(root, document.body.firstChild); }
     document.documentElement.classList.add('dds-has-shell');
+    // Visual refresh: the left sidebar (shell.css ≥761px). The website builder
+    // keeps the top bar — it has its own left rail — and embedded frames have
+    // no chrome at all.
+    if (location.pathname.indexOf('/presence') !== 0 && !document.documentElement.classList.contains('dds-embed')) document.documentElement.classList.add('dds-side');
     // A11y (central): give EVERY shelled page a skip link + a main landmark
     // without editing each one. The page's primary container is #main on most
     // pages; fall back to .wrap or a real <main>. role=main is the ARIA landmark

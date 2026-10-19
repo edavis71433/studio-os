@@ -14,7 +14,7 @@
   /* a date group */
   .group{margin-top:34px}
   .group.upcoming .glabel{color:var(--accent)}
-  .glabel{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 4px}
+  .glabel{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 4px}
 
   /* the timeline itself: a soft rail with icon nodes */
   ol.rail{list-style:none;margin:14px 0 0;padding:0;position:relative}
@@ -31,10 +31,10 @@
   li.event.is-milestone .node{background:var(--accent);border-color:var(--accent);color:#fff;
     box-shadow:0 0 0 5px var(--accent-soft),var(--shadow)}
   li.event.is-milestone .body{background:linear-gradient(180deg,var(--accent-soft),transparent);
-    border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-top:-4px}
-  li.event.is-milestone .etitle{font-family:var(--serif);font-weight:500;font-size:18px}
-  li.event.is-milestone .mtag{display:inline-block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--accent);font-weight:700;margin-bottom:3px}
+    border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:13px 16px;margin-top:-4px}
+  li.event.is-milestone .etitle{font-family:var(--sans);font-weight:600;font-size:18px}
+  li.event.is-milestone .mtag{display:inline-block;font-size:12px;
+    color:var(--accent);font-weight:500;margin-bottom:3px}
   .etitle{font-size:15.5px;font-weight:600;margin:0;line-height:1.35;color:var(--ink);text-wrap:pretty}
   .edesc{margin:3px 0 0;font-size:14px;color:var(--soft);line-height:1.45}
   .meta{margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--faint)}
