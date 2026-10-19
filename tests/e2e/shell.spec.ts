@@ -18,7 +18,7 @@ const CRM_NAV = [
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
   { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
-  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html' }] },
 ];
 const crmCtx = () => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',

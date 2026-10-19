@@ -1477,7 +1477,7 @@ function showGate(title, msg, showBtn) {
 }
 
 /* ── navigation ── */
-function go(view) {
+function go(view, early) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
@@ -1492,6 +1492,7 @@ function go(view) {
   });
   document.querySelectorAll("#dock button").forEach((b) => { const on = b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   window.scrollTo({ top: 0 });
+  if (early) return;   // the pre-data switch: the view is on screen, its loaders run on the real route below
   if (view === "today") loadToday();
   if (view === "history") loadHistory();
   if (view === "media") loadMedia();
@@ -1514,6 +1515,18 @@ function contextHint(view) {
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
 const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
+// Oct 2026 review: the FIRST paint honours the hash. boot() used to await the
+// whole refreshAll() read wave before routeHash(), so a #settings / #business /
+// #design link sat on the Today view's "Setting the table…" loadline for as
+// long as the slowest read took — a stuck-looking page that the second (warm)
+// load merely hid. The early pass only switches the visible view (go(v, true):
+// no loaders, no hint, no URL write); the full routeHash() after the data
+// wave runs the loaders and the data-dependent hashes (#monitor, #publish…).
+function routeHashEarly() {
+  const h = (location.hash || "").replace("#", "").toLowerCase() || String(new URLSearchParams(location.search).get("view") || "").toLowerCase();
+  const v = HASH_VIEWS[h] || (h && $("view-" + h) ? h : "");
+  if (v && v !== "today" && $("view-" + v)) go(v, true);
+}
 function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
@@ -10272,6 +10285,7 @@ async function renderFirstRun() {
       return;
     }
     $("gate").hidden = true; $("app").hidden = false;
+    routeHashEarly();   // the asked-for view is on screen before a single read lands
     await refreshAll();
     renderKnowledgeDocs();
     renderMonitorCard();

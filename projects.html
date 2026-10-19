@@ -131,10 +131,15 @@ html.dds-embed #detailWrap{padding-top:0}
   .rcar{font-size:10px;color:var(--faint)}
 
   /* highlights panel: label-over-value tiles */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
-  .hl{background:var(--card);padding:10px 14px;min-width:0}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:none}
+  .hl{background:var(--card);padding:12px 12px;min-width:0;display:flex;align-items:center;gap:9px;border-left:1px solid var(--line)}
+  .hl:first-child{border-left:none}
+  .hl .ico{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .hl .ico svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .hl .hl-main{min-width:0;flex:1}
   .hl-k{font-size:12px;color:var(--faint);font-weight:500}
-  .hl-v{font-family:var(--sans);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
+  .hl-v{font-family:var(--sans);font-size:15px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
 
   /* ── the Path = milestones in order (Lightning chevrons, dds skin) ── */
   .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px}
@@ -151,6 +156,17 @@ html.dds-embed #detailWrap{padding-top:0}
   .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 12px}
   .terminal-chip.won{background:var(--good-soft);color:var(--good)}
+  /* ── Oct 2026 review: milestones in the record's lifecycle idiom (crm.html's
+     "Visual refresh" .pstep rules, the mock's .ms) — same <li class="pstep">
+     DOM, same done ✓ / current / todo states and aria-current the spec pins. */
+  ol.path{gap:6px;flex:1 1 520px}
+  .pstep,.pstep:first-child,.pstep:last-child,.pstep:only-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;line-height:1.3}
+  .pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .pstep.current{color:var(--p)}
+  .pathcard{box-shadow:none;padding:12px 16px}
+  @media (max-width:640px){.pstep,.pstep:first-child,.pstep:last-child{flex:0 0 auto;min-width:96px}}
 
   /* ── two-column body: related-list cards ── */
   .dbody{margin-top:18px}
@@ -271,7 +287,27 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+// Oct 2026 review: scoped into a client (?client=<their site>), every read on
+// this page used to go to the CLIENT's site — where no project lives (projects
+// are created on the AGENCY site; service_bridge ensureProjectForDeal takes
+// agencySiteId) — so the roster painted "Projects live at the studio level" and
+// a record 404'd. Once the scope resolves to a customer through the bridge
+// (resolveScopedClient below), AG_MODE drops the scope header: the roster, the
+// record, its tasks, files and support all read the studio's own site, and the
+// list is filtered to that customer's projects. A scope that is NOT a bridged
+// customer keeps the old behaviour (the honest studio-level notice).
+let AG_MODE=false,SCOPED_CLIENT=null,OPENED_ONCE=false;
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':AG_MODE?'':scope()});
+async function resolveScopedClient(){
+  const site=scope(); if(!site)return null;
+  try{
+    const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
+    const b=await r.json().catch(()=>({}));
+    const rows=Array.isArray(b&&b.data)?b.data:[];
+    const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
+    return hit?{client_id:String(hit.client_id),name:String(hit.name||'')}:null;
+  }catch(_){return null;}
+}
 // valid next stages mirror lib/service_delivery.ts (project + task ladders)
 const P_NEXT={active:['on_hold','complete','archived'],on_hold:['active','complete','archived'],complete:['active','archived'],archived:['active']};
 const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked','done'],blocked:['todo','in_progress'],done:['todo','in_progress']};
@@ -348,6 +384,7 @@ function headerHtml(list){
   const active=list.filter(p=>p.status==='active').length;
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   const mid=FILTER?` · ${esc(statusLabel(FILTER))}`:` · ${active} active`;
+  const who=SCOPED_CLIENT?`For ${esc(SCOPED_CLIENT.name||'this client')} · `:'';
   return `<div class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">📁</span>
@@ -358,7 +395,7 @@ function headerHtml(list){
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${who}${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </div>`;
 }
 
@@ -434,6 +471,7 @@ function renderRoster(){
     // projects are created on the AGENCY site (service_bridge ensureProjectForDeal
     // takes agencySiteId). So it is not "no projects yet", it is "projects don't
     // live here", and "New project" would be a trap. Say the true thing instead.
+    else if(SCOPED_CLIENT&&!Q.trim()&&window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects for '+(SCOPED_CLIENT.name||'this client')+' yet',body:FILTER?'No '+statusLabel(FILTER)+' projects for them right now — try “All”.':'A project starts when their deal is won — convert the deal in the pipeline and it lands here.'});
     else if(!Q.trim()&&!FILTER&&window.ddsStudioLevel&&window.ddsStudioLevel($('list'),{noun:'Projects',lower:'projects'})){/* painted */}
     else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
     else $('list').innerHTML='<p class="mut">No projects yet.</p>';
@@ -485,14 +523,23 @@ function wireRoster(){
 async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
+    if(scope()&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
     const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
     // Scoped into a client, POST /projects would file the project on the CLIENT's
     // site — projects live on the agency site (service_bridge ensureProjectForDeal
     // takes agencySiteId), so it would land where nothing else can see it. Hide
     // the action rather than offer a button that does the wrong thing quietly.
     STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO||!!scope();
-    ITEMS=res.data||[]; LOADED_AT=Date.now();
+    ITEMS=res.data||[];
+    if(SCOPED_CLIENT)ITEMS=ITEMS.filter(p=>String(p.client_id||'')===SCOPED_CLIENT.client_id);   // this client's work only
+    LOADED_AT=Date.now();
     renderRoster();
+    // one project for this client and nothing else asked for → open it straight away
+    if(SCOPED_CLIENT&&!soft&&!OPENED_ONCE&&ITEMS.length===1){
+      OPENED_ONCE=true;
+      const qp=new URLSearchParams(location.search);
+      if(!qp.get('project')&&!qp.get('support'))openProject(ITEMS[0].id);
+    }
     // enrichment (existing routes only): customer names once + per-project report
     // summaries for Progress / Open approvals — cells fill in as they arrive.
     // These re-renders are async: keep the user's keyboard focus where it was.
@@ -707,7 +754,18 @@ async function openProject(id){
     ];
     if(rp&&Number(rp.open_client_actions||0)>0)hl.push(['Client actions',String(Number(rp.open_client_actions))+' open']);
     if(rp&&rp.csat&&Number(rp.csat.count||0)>0)hl.push(['CSAT',`${esc(String(rp.csat.average))}★ <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">(${Number(rp.csat.count)})</span>`]);
-    const hlHtml=`<div class="hl-panel">${hl.map(t=>`<div class="hl"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div>`).join('')}</div>`;
+    // Oct 2026 review: the mock's stat-tile anatomy — an icon per tile, the
+    // label/value pair unchanged (the spec reads .hl-panel's text, not its shape)
+    const HLI={
+      'Customer':['','<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M4 21a8 8 0 0 1 16 0"/>'],
+      'Target date':['info','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+      'Progress':['','<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>'],
+      'Waiting on client':['warn','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+      'Files':['good','<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>'],
+      'Client actions':['warn','<path d="M20 6L9 17l-5-5"/>'],
+      'CSAT':['good','<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z"/>'],
+    };
+    const hlHtml=`<div class="hl-panel">${hl.map(t=>{const ic=HLI[t[0]]||['','<circle cx="12" cy="12" r="9"/>'];return `<div class="hl"><span class="ico ${ic[0]}" aria-hidden="true"><svg viewBox="0 0 24 24">${ic[1]}</svg></span><div class="hl-main"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div></div>`;}).join('')}</div>`;
 
     // ── related lists ──
     const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(m.due_date)}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';

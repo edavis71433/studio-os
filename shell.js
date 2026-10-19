@@ -563,6 +563,9 @@
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner((CTX && CTX.attention_count) || 0);
   }
+  // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
+  // resolving a support request) can ask for the badge now, past the throttle.
+  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(); };
   function refreshAttention() {
     if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
     if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;

@@ -18,6 +18,7 @@ export interface Asset {
   content_hash?: string | null;
   brand?: boolean | null;
   asset_status?: string | null;   // draft | pending | approved | published | archived
+  client_private?: boolean | null;   // 0131: private to the client it was delivered for (see routes/assets.ts)
   created_at?: string;
 }
 

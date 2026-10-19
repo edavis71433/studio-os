@@ -44,8 +44,14 @@ import { composeSocialCards, HEADLINE_MAX } from '../lib/social_card.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { resolveSiteRole } from '../lib/workspace.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 
-const ASSET_COLS = 'id,storage_path,alt_text,width,height,bytes,mime,tags,collection,metadata,content_hash,brand,asset_status,focal_x,focal_y,created_at';
+const ASSET_COLS_BASE = 'id,storage_path,alt_text,width,height,bytes,mime,tags,collection,metadata,content_hash,brand,asset_status,focal_x,focal_y,created_at';
+// 0131 adds client_private. Deploy-order tolerance (the 0130 idiom): the wide
+// select 400s on a database that has not run the apply pack yet, so the read
+// retries the base column list on that precise missing-column signal only —
+// files keep flowing, nothing is private until the column exists.
+const ASSET_COLS = `${ASSET_COLS_BASE},client_private`;
 const LIST_THUMB_CAP = 160;   // sign at most this many thumbnails per list call (bounded latency)
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
@@ -59,13 +65,20 @@ const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unkn
 // displayName() plain, which is why the flag lives here and not at the default.
 const fileName = (a: Asset, hint?: string | null): string => displayName(a, { hint, fromAltText: true });
 
+/** One presence_media read with the 0131 column, retried on the base list when
+ *  the column is not there yet (never on any other failure). */
+async function readMedia(pathFor: (cols: string) => string) {
+  let r = await svc(pathFor(ASSET_COLS));
+  if (!r.ok && missingColumnSignal(r.json, r.text, 'client_private')) r = await svc(pathFor(ASSET_COLS_BASE));
+  return r;
+}
 async function loadAssets(siteId: string): Promise<Asset[]> {
-  const r = await svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=${ASSET_COLS}&order=created_at.desc&limit=1000`);
+  const r = await readMedia((cols) => `presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=1000`);
   return arr(r) as Asset[];
 }
 async function loadAsset(siteId: string, id: string, includeDeleted = false): Promise<Asset | null> {
   const del = includeDeleted ? '' : '&deleted_at=is.null';
-  const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${siteId}${del}&select=${ASSET_COLS}&limit=1`);
+  const r = await readMedia((cols) => `presence_media?id=eq.${id}&site_id=eq.${siteId}${del}&select=${cols}&limit=1`);
   return (arr(r)[0] as Asset) || null;
 }
 
@@ -236,6 +249,9 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null; clie
     client_id: c?.client_id || undefined,
     client_name: c?.client_name || undefined,
     project_id: c?.project_id || undefined,
+    // 0131: private to that client — out of the shared views and the site picker.
+    // Additive like the two above: omitted when false, absent pre-migration.
+    client_private: a.client_private === true ? true : undefined,
     // DAM-2: approval state + who/when, from reused metadata (no new columns)
     state: fileState(a.asset_status, !!opts.in_use, !!meta.pending_replace),
     approval: { approved_by: meta.approved_by || null, approved_at: meta.approved_at || null, submitted_by: meta.submitted_by || null, submitted_at: meta.submitted_at || null, pending_replace: !!meta.pending_replace },
@@ -618,6 +634,10 @@ export async function handleAssetUpdate(req: Request, site: SiteRow, principal: 
   if (Array.isArray(b.tags)) patch.tags = b.tags.map((t: unknown) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 40);
   if (typeof b.collection === 'string') patch.collection = b.collection.trim().slice(0, 80);
   if (typeof b.brand === 'boolean') patch.brand = b.brand;
+  // 0131: "Private to this client" — only meaningful for a file the delivery graph
+  // ties to a client; the roster shows the switch only there, the server just
+  // stores the flag (it never grants or removes access — present() is operator-only).
+  if (typeof b.client_private === 'boolean') patch.client_private = b.client_private;
   if (typeof b.alt_text === 'string' && b.alt_text.trim().length >= 3) patch.alt_text = b.alt_text.trim().slice(0, 500);
   // rename → metadata.title; favorite → metadata.favorite; caption/description → metadata
   if (typeof b.name === 'string' && b.name.trim()) { meta.title = b.name.trim().slice(0, 200); metaTouched = true; }
@@ -628,8 +648,10 @@ export async function handleAssetUpdate(req: Request, site: SiteRow, principal: 
   if (metaTouched) patch.metadata = meta;
   if (!Object.keys(patch).length) return json({ error: 'bad_request', message: 'Nothing to update.' }, 400, cors);
   const r = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  // pre-0131 database: say so, instead of a generic "isn't here" for a file that is
+  if (!r.ok && 'client_private' in patch && missingColumnSignal(r.json, r.text, 'client_private')) return json({ error: 'needs_migration', message: 'Private files need the 0131 database update first — nothing was changed.' }, 503, cors);
   if (!(r.ok && arr(r)[0])) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: 'Updated file details', principal, provenance: 'human', fields: Object.keys(patch) });
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'update', summary: 'client_private' in patch ? (patch.client_private ? 'Made a file private to its client' : 'Made a file visible in the library again') : 'Updated file details', principal, provenance: 'human', fields: Object.keys(patch) });
   return json({ data: { ok: true, asset: present(arr(r)[0]) } }, 200, cors);
 }
 
