@@ -9,12 +9,12 @@ not measured, so they are not guessed here.
 
 | Workflow | Before | Now (Phase 1 + refresh) | Target (Phases 2–4) | What closes the gap |
 | --- | --- | --- | --- | --- |
-| Send a customer an invoice | 12 clicks, 5 pages | 3: Customers → the record → **Send invoice** → amount → Save (2 on the record itself) | 2 from anywhere: ⌘K "Send invoice to Claud" → amount → Save | Phase 2 global search with actions |
-| Turn a new enquiry into a customer | — | 5+: Today → enquiry → **→ Deal** → new-deal form → Save, then proposal/agreement before Convert | 2: enquiry → **Convert** (creates contact + customer + optional deal) | Phase 2 one customer model; Phase 4 triage so spam never reaches this step |
-| See who owes you and chase it | — | 2: Pipeline → Outstanding tile → "see who"; or the record's Outstanding tile → Resend | 1: Today's Outstanding tile and alert → Resend | Phase 3 one source for numbers (Today, Pipeline, Analytics, the bell agree) |
+| Send a customer an invoice | 12 clicks, 5 pages | 2 from anywhere: ⌘K "Send invoice to Claud" → amount → Save (Phase 2); 3 via Customers → the record → **Send invoice** | done | — |
+| Turn a new enquiry into a customer | — | 2: enquiry → **Make customer** → confirm (contact + customer + optional deal, Phase 2); spam and not-a-fit never reach the queue (Phase 4) | done | — |
+| See who owes you and chase it | — | 2: ⌘K "invoice" → the open invoice (Phase 2); Pipeline → Outstanding tile → "see who". Today, Pipeline, Analytics and the bell now agree (Phase 3) | 1: an Outstanding tile on Today | a Today stat strip (not yet built) |
 | Kick off a won deal's project | — | 2: record → **Open project**; the lifecycle bar names it as the next step | 2, plus the kickoff task and welcome message offered on the record | Phase 3 stage-aware actions |
-| Approve a client's website change | — | 3: Today → **Review & approve** → Approve | 2: the same, with duplicates and test items gone from Needs you | Phase 3 dedupe by record id; Phase 4 onboarding cleanup |
-| Reply to a client message | — | 3: Inbox → the conversation → type → Send; or 2 from the record (Message tab is one click) | 3, with each conversation listed once | Phase 4 enquiry triage; Phase 2 links so the Inbox row opens the right record |
+| Approve a client's website change | — | 3: Today → **Review & approve** → Approve, one row per record (Phase 3) | done | — |
+| Reply to a client message | — | 3: Inbox → the conversation → type → Send, each person listed once (Phase 4); 2 from the record or ⌘K "Message Claud" (Phase 2) | done | — |
 
 ## Rules the phases must keep
 

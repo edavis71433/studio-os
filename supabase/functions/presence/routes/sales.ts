@@ -159,9 +159,16 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // must still say whose they are rather than degrade to "—". It never widens
     // tenant scope (site_id is still pinned) and the roster never asks for it.
     const withDeleted = u.searchParams.get('include_deleted') === '1';
-    let path = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=id,name,email,phone,company,updated_at${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
-    if (q) path += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
-    const r = await svc(path);
+    // Phase 2: client_id (migration 0130) rides the select — the roster links a
+    // person to their customer. A database without the column 400s the widened
+    // select; retry the narrow one so the roster never goes dark pre-apply.
+    const mkPath = (cols: string) => {
+      let p = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
+      if (q) p += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+      return p;
+    };
+    let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
+    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
     const list = rows(r);
     // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
@@ -1860,6 +1867,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   }
   const clientId = acct.clientId;
   const createdClient = acct.createdClient, createdAuthId = acct.createdAuthId, isNewLogin = acct.isNewLogin;
+  await linkContactToCustomer(site.id, deal.contact_id, clientId);   // Phase 2: the contact belongs to the customer now
 
   // 3) stamp the chain onto the deal (we hold the claim; converted_client_id UNIQUE
   //    also blocks a client already converted from ANOTHER deal).
@@ -2132,6 +2140,22 @@ export async function bridgeCustomerToStudio(opts: {
  *  tag (so signup only auto-connects emails the studio explicitly pre-listed, never
  *  a coincidental CRM lead); it's appended, never clobbering the operator's notes.
  *  Reuses the presence_contacts store's (site,email) uniqueness — no new table. */
+// Phase 2 (one customer model): a contact belongs to the customer it became.
+// presence_contacts.client_id (migration 0130) is set here on deal convert and
+// on "Add a customer"; best-effort — a database without the column just keeps
+// the two unlinked (the roster then shows company text, no record link).
+async function linkContactToCustomer(siteId: string, contactId: string | null | undefined, clientId: string | null | undefined): Promise<void> {
+  if (!contactId || !clientId || !UUID_RE.test(String(contactId)) || !UUID_RE.test(String(clientId))) return;
+  try { await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ client_id: clientId }) }); } catch { /* best-effort */ }
+}
+// …and the website enquiry that started it all is marked converted, so it leaves
+// the queue and Today the same way a deal conversion does.
+async function markSubmissionConverted(siteId: string, submissionId: unknown): Promise<void> {
+  const id = String(submissionId || '');
+  if (!UUID_RE.test(id)) return;
+  try { await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }); } catch { /* best-effort */ }
+}
+
 async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
   const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
   if (existing) {
@@ -2179,7 +2203,9 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
       const clientId = existing.id;
       const customerSite = rows(await svc(`presence_sites?client_id=eq.${clientId}&select=id&limit=1`))[0];
       const managed = await linkAgencyPortfolio(principal, customerSite?.id, email);
-      await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      const ct = await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      await linkContactToCustomer(site.id, ct?.id, clientId);
+      await markSubmissionConverted(site.id, b.source_submission_id);
       let projectId: string | null = null, bridged = false, ownedElsewhere = false;
       if (clientId !== site.client_id) {   // self-guard: never bridge the studio to itself
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
@@ -2223,6 +2249,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
     const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: acct.siteId || null, label: businessName });
     projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
   }
+
+  // Phase 2: the person is a contact who belongs to this customer, and the
+  // enquiry that started it (when one did) is converted.
+  { const ct = await ensureConnectContact(site.id, email, name, false); await linkContactToCustomer(site.id, ct?.id, clientId); await markSubmissionConverted(site.id, b.source_submission_id); }
 
   // Already had a workspace → friendly "they're already set up" (with a link), no
   // duplicate, no fresh invite (they already have access).
