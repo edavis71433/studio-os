@@ -335,10 +335,20 @@ function buildItems(feed,leads,notifs){
   // only). An older function build without feed.enquiries degrades to the page's
   // own /forms/inbox read, counting NON-ARCHIVED (C7: the same arithmetic as
   // leads.html's Open — one queue, one count; heuristic dots for 'new' only).
-  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived');
+  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit');
+  // Phase 4 (triage): one row per PERSON. The same visitor submitting four forms
+  // showed as four rows ("Eddie ×4"); they group under the newest, with a count.
+  const byPerson=new Map();
   for(const l of enq){
+    const key=String(l.email||'').trim().toLowerCase()||('id:'+l.id);
+    const cur=byPerson.get(key);
+    if(!cur){byPerson.set(key,{lead:l,count:1});continue;}
+    cur.count++;
+    if(String(l.created_at||'')>String(cur.lead.created_at||''))cur.lead=l;   // the newest fronts the row
+  }
+  for(const {lead:l,count} of byPerson.values()){
     items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
-      name:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      name:(l.name||l.email||'Someone')+(count>1?` · ${count} messages`:''),when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
       chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
   }
   // sorted by newest first; undated items (approvals) stay on top — they're waiting

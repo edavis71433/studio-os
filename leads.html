@@ -57,6 +57,11 @@
   .lead .acts{display:flex;gap:8px;margin-top:14px}
   .lead .acts button{font-family:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:var(--dds-r,8px);padding:6px 13px;cursor:pointer}
   .lead .acts button:hover{border-color:var(--p);color:var(--p)}
+  /* Phase 4 (triage): Spam is a quiet text button; the shelf chip says where a row went */
+  .lead .acts button.quiet{border-color:transparent;color:var(--faint)}
+  .lead .acts button.quiet:hover{border-color:var(--line);color:var(--ink)}
+  .lead .acts .stchip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);margin-left:auto}
+  .lead .acts .stchip.not_a_fit,.lead .acts .stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   .lead .acts a.reply{background:var(--p);color:#fff;border:1px solid var(--p);border-radius:var(--dds-r,8px);padding:6px 14px;text-decoration:none;font-size:12.5px;font-weight:500}
   .muted{color:var(--soft);font-size:14.5px}
   .center{text-align:center;padding:56px 20px}
@@ -105,7 +110,8 @@ const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 // everything a row displays (name · email · phone · message)
 function leadRows(){
   const q=Q.trim().toLowerCase();
-  return ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true)
+  // Open = still in play (new, read, replied, converted); Not a fit / archived only under All
+  return ALL.filter(l=>FILTER==='open'?(l.status!=='archived'&&l.status!=='not_a_fit'):FILTER==='new'?l.status==='new':true)
     .filter(l=>!q||((l.name||'')+' '+(l.email||'')+' '+(l.phone||'')+' '+(l.message||'')).toLowerCase().includes(q));
 }
 function render(){
@@ -152,7 +158,8 @@ function renderLeadList(){
         ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:'')}
         ${l.converted?`<a class="reply" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
-        ${l.converted?'':`<button data-arch="${esc(l.id)}">Archive</button>`}
+        ${l.converted?'':`<button data-arch="${esc(l.id)}" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button><button class="quiet" data-spam="${esc(l.id)}" title="A bot or a vendor pitch — hidden for good">Spam</button>`}
+        ${STATUS_LABEL[l.status]?`<span class="stchip ${esc(l.status)}">${STATUS_LABEL[l.status]}</span>`:''}
       </div></div>`;
   }
   host.innerHTML=h;wireList();
@@ -181,12 +188,22 @@ function wire(){
 // row-level actions live in the list zone (re-wired on every list re-render)
 function wireList(){
   document.querySelectorAll('[data-read]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-read'),'read')));
-  document.querySelectorAll('[data-arch]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-arch'),'archived')));
-  // replying to a lead auto-marks it read — no manual bookkeeping
-  document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&l.status==='new')setStatus(id,'read',true);}));
+  // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
+  document.querySelectorAll('[data-arch]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-arch'),'not_a_fit')));
+  document.querySelectorAll('[data-spam]').forEach(b=>b.addEventListener('click',()=>markSpam(b.getAttribute('data-spam'))));
+  // replying to a lead marks it Replied — no manual bookkeeping
+  document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&(l.status==='new'||l.status==='read'))setStatus(id,'replied',true);}));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
 }
-async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();
+// Phase 4 (triage): the enquiry's shelf, in plain words. `new` and `read` show
+// no chip (the row's own styling says "new"); converted shows the pipeline link.
+const STATUS_LABEL={replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit'};
+async function markSpam(id){
+  const r=await api('/forms/inbox/'+id,'POST',{spam:true});
+  if(!r.ok){toast('That didn’t update.');return;}
+  ALL=ALL.filter(x=>x.id!==id); toast('Marked as spam — it won’t show again.'); render(); const h=$('pagehead'); if(h)h.focus();
+}
+async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='archived'?'Archived.':status==='replied'?'Marked replied.':'Marked read.');render();
   // a11y: render() rebuilt #main and dropped focus — return it to the same lead's
   // remaining control (Archive survives a mark-read), or the page heading if the row left the list.
   const nx=document.querySelector('[data-arch="'+id+'"]')||$('pagehead');if(nx)nx.focus();}}else if(!silent)toast('That didn’t update.');}

@@ -112,7 +112,8 @@ export function leadFollowupCopy(form_kind: string, who: string): { headline: st
  *  (auto-marks read), mark read, or archive — resolves it; a still-'new' lead
  *  does not. Pure. */
 export function leadFollowupResolvesOn(status: string): boolean {
-  return status === 'read' || status === 'archived';
+  // Phase 4 (triage): replied and not-a-fit resolve the nudge too — only `new` waits
+  return status === 'read' || status === 'replied' || status === 'archived' || status === 'not_a_fit';
 }
 
 /** PP-1: the exact notices-rail key for a lead's follow-up nudge. Because the

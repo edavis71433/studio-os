@@ -115,6 +115,19 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
 
 /** R1: auto-advance the deal stage AND record the stage_change (pipeline history
  *  no longer jumps silently). Guarded to `from` stages; only emits when a row moved. */
+// Phase 4 (delete safety): Undo for a removed contact. The DELETE above is a
+// soft delete (deleted_at), so restoring is the same one-column write back —
+// nothing was cascaded, every FK still points at the row. 404 when the id is
+// not a removed contact on this site (already restored, or never here).
+export async function handleSalesContactRestore(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,name,email`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: null }) });
+  if (!r.ok) return json({ error: 'write_failed', message: 'We couldn’t put that contact back just now — please try again.' }, 502, cors);
+  const row = rows(r)[0];
+  if (!row) return json({ error: 'not_found', message: 'That contact isn’t in the removed list — refresh to see the current roster.' }, 404, cors);
+  return json({ data: { ok: true, restored: true, id: row.id, name: String(row.name || row.email || 'Contact') } }, 200, cors);
+}
+
 // Phase 3 (stage-aware): a free-text next step that names a thing that has now
 // happened ("Sign contract" after the signature, "Request the deposit" once the
 // deal is won) is cleared, so the record never shows an overdue step for work

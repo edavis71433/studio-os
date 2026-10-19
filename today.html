@@ -334,7 +334,11 @@ const NOTICE_FYI_KINDS = ['invoice_paid'];
 
 function render(moments, features, feed, ctx, dash, appts, deals){
   $('greeting').textContent = greet();
-  const items = (moments||[]).filter(Boolean);
+  // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
+  // three times (three "Walk me through it" cards about one publish step)
+  // collapses to the first; later duplicates are dropped by headline.
+  const seenHead = new Set();
+  const items = (moments||[]).filter(Boolean).filter((m) => { const k = String(m.headline||'').trim().toLowerCase(); if (!k) return true; if (seenHead.has(k)) return false; seenHead.add(k); return true; });
   // PP-5: the empty-state speaks in the language of what this edition actually is.
   const edFeats = (ctx && ctx.edition_features) || null;
   const hasWebsite = !edFeats || edFeats.indexOf('website') >= 0;

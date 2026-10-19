@@ -842,7 +842,15 @@ async function askDelete(id){
     }
     $('delDlg').close();
     const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
-    toast(kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.'));
+    const msg=kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.');
+    // Phase 4 (delete safety): the removal is a soft delete, so the toast carries
+    // ONE Undo that puts the contact straight back (POST …/restore).
+    if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
+      let u;try{u=await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST');}catch(_){u={ok:false,status:0,body:{}};}
+      if(u.ok){toast((b.name||who)+' is back.');}else toast((u.body&&u.body.message)||'We couldn’t put them back — refresh and check the roster.');
+      await load();
+    }});
+    else toast(msg);
     await load();
   };
 }
