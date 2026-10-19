@@ -23,6 +23,16 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    // The shell registers the real /sw.js, which calls skipWaiting() +
+    // clients.claim() and so controls the page from its FIRST load. In WebKit
+    // (the iPhone project) requests from a worker-controlled page bypass
+    // page.route — even ones the worker's fetch handler declines — so a
+    // cross-origin POST/PATCH reached the real Supabase host (CORS 401) and a
+    // reload fetched the real supabase-js instead of the stub, landing on the
+    // signed-out view. Chromium instruments worker traffic, which is why the
+    // desktop project never saw it. No spec exercises the worker; keep it out
+    // of the hermetic harness on every engine.
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
