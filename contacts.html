@@ -387,7 +387,7 @@ function tableHtml(list){
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
     return `<tr data-open="${esc(c.id)}" tabindex="0" aria-label="Open ${who}">
       <td><span class="nm">${who}</span>${dupFlag(c)}</td>
-      <td>${esc(c.company||'—')}</td>
+      <td>${c.client_id?`<a href="/crm.html?client_id=${esc(c.client_id)}" data-noscope="1" title="This person belongs to a customer — open their record">${esc(c.company||'Customer')} ↗</a>`:esc(c.company||'—')}</td>
       <td class="c-email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
       <td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>
       <td>${esc(relWhen(c.updated_at)||'—')}</td>

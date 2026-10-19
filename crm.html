@@ -446,6 +446,12 @@ async function loadRecord(){
   renderShell();
   if(TAB)showTab(TAB,true);
   loadPanels();
+  // Phase 2 (⌘K actions): ?act=invoice opens the invoice form on Billing once the
+  // deal has loaded; ?act=message brings the composer forward. One hop from
+  // "Send invoice to Claud" in the palette to the amount field.
+  const act=QP().get('act');
+  if(act==='invoice'||act==='deposit')DEAL_READY.then(()=>{if(idParams().deal)openBilling(act);});
+  else if(act==='message'||act==='note'||act==='task')setTimeout(()=>focusComposer(act),300);
 }
 
 // ── the record shell: header + highlights + Path + two-region body ──────────

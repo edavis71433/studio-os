@@ -46,6 +46,11 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  /* Phase 2: the Customers | People tab strip under the header */
+  .seg.tabs2{margin:0 0 12px;background:var(--bg)}
+  .seg.tabs2 button{font-size:13.5px;padding:7px 14px}
+  .seg.tabs2 button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
+  .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:4px}
 
   .bar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
   .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
@@ -338,13 +343,56 @@ function listHtml(list){
   }
   return DISPLAY==='table'?tableHtml(list):cardsHtml(list);
 }
+// ── Phase 2 (one customer model): the People sub-tab ─────────────────────────
+// Customers and the people behind them are ONE list with two tabs. People reads
+// GET /sales/contacts (the same roster contacts.html shows) and links each
+// person to their customer's record when they belong to one (client_id, 0130).
+let TAB=(new URLSearchParams(location.search).get('tab')==='people')?'people':'customers';
+let PEOPLE=null, PEOPLE_FAILED=false;
+async function loadPeople(){
+  const r=await api('/sales/contacts?limit=200');
+  PEOPLE_FAILED=!r.ok; PEOPLE=r.ok&&Array.isArray(r.body.data)?r.body.data:[];
+  if(TAB==='people')render();
+}
+function tabsHtml(){
+  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
+}
+function peopleHtml(){
+  if(PEOPLE===null)return'<div class="spin" role="status" aria-label="Loading people"></div>';
+  if(PEOPLE_FAILED)return'<p class="muted" style="padding:20px 0">We couldn’t load your people just now. <a href="/contacts.html">Open Contacts</a></p>';
+  const q=Q.trim().toLowerCase();
+  const list=PEOPLE.filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q));
+  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?'No one matches “'+esc(Q)+'”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`;
+  const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
+  const trs=list.map(c=>{
+    const cust=c.client_id?byClient[String(c.client_id)]:null;
+    const rec=c.client_id?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(c.client_id)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
+    return `<tr><td><a href="${rec}" data-noscope="1">${esc(c.name||c.email||'Someone')}</a></td><td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td>${esc(c.phone||'—')}</td><td>${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:esc(c.company||'—')}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
+  }).join('');
+  return `<div class="tscroll"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+function wireTabs(){
+  const go=(t)=>{TAB=t;const u=new URL(location.href);if(t==='people')u.searchParams.set('tab','people');else u.searchParams.delete('tab');history.replaceState(null,'',u.toString());if(t==='people'&&PEOPLE===null)loadPeople();render();};
+  const tc=$('tabCustomers'),tp=$('tabPeople');
+  if(tc)tc.addEventListener('click',()=>go('customers'));
+  if(tp)tp.addEventListener('click',()=>go('people'));
+}
 function render(){
   const list=sortedRows();
-  let h=headerHtml(list.length);
+  if(TAB==='people'){
+    let hp=headerHtml(list.length)+tabsHtml();
+    hp+=`<div class="bar"><input class="search" id="search" aria-label="Search people" placeholder="Search people…" value="${esc(Q)}"><a class="btn ghost" href="/contacts.html" style="text-decoration:none">Add or edit people</a></div>`;
+    hp+=`<div id="listZone">${peopleHtml()}</div>`;
+    $('main').innerHTML=hp;
+    const s=$('search'); if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const z=$('listZone');if(z)z.innerHTML=peopleHtml();}));
+    wireTabs(); if(PEOPLE===null)loadPeople();
+    return;
+  }
+  let h=headerHtml(list.length)+tabsHtml();
   h+=`<div class="bar"><input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button></div>`;
   h+=`<div id="listZone">${listHtml(list)}</div>`;
   $('main').innerHTML=h;
-  wire();wireList();
+  wire();wireList();wireTabs();
 }
 // C5: keystrokes re-render ONLY the list zone (+ the meta count) — the search
 // input node is never rebuilt, so caret and focus survive without restoration.
