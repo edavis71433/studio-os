@@ -139,10 +139,11 @@ test.describe('Customers list view', () => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
-    // "Manage their website" is a row action (only with a customer site)
+    // "Their website" is a row action (only with a customer site); "Open record" rides every row
     await expect(page.locator('tbody [data-web]')).toHaveCount(2);
+    await expect(page.locator('tbody [data-rec]')).toHaveCount(await page.locator('tbody tr').count());
     await page.locator('tbody tr').first().locator('td').first().click();
-    await expect(page).toHaveURL(/crm\.html\?client=site-acme&tab=delivery/);
+    await expect(page).toHaveURL(/crm\.html\?client=site-acme$/);
   });
 });
 

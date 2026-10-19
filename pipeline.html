@@ -191,7 +191,7 @@ html.dds-embed #detailWrap{padding-top:0}
      ───────────────────────────────────────────────────────────────────────── */
   #detailWrap{max-width:var(--dds-w-app,1280px)}
   #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-  .backbar{padding:16px 20px 0}
+  .backbar{padding:16px 20px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .backbar .btn{padding:8px 14px}
   /* compact record header — the record page's header idiom (crm.html .rec-head):
      object icon · serif name · one clean sub-row of chips + facts */
@@ -1897,7 +1897,7 @@ async function openDeal(id){
     }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
-      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div>
+      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
       <div class="dhead">
         <div class="dh-ic" aria-hidden="true">🤝</div>
         <div style="min-width:0;flex:1"><div id="dtitle" tabindex="-1">${esc(d.title||'Deal')}</div>

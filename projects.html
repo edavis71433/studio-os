@@ -690,7 +690,10 @@ async function openProject(id){
         <button class="btn ghost sm" id="statusBtn" aria-haspopup="menu" aria-expanded="false">Status <span class="rcar" aria-hidden="true">▾</span></button>
         <div id="statusMenu" role="menu" aria-label="Change status" hidden>${nextP.map(s=>`<button role="menuitem" data-pstatus="${s}">Mark ${esc(statusLabel(s))}</button>`).join('')}</div>
       </div>`:'';
-    const acts=STUDIO?`<div class="rhead-acts">${statusDd}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
+    // Phase 1 overhaul: the project links straight to its customer's record hub
+    // (deal · billing · files · messages) — billing is never more than a click away.
+    const recLink=(STUDIO&&p.client_id)?`<a class="btn ghost sm" href="/crm.html?project=${encodeURIComponent(p.id)}&client_id=${encodeURIComponent(p.client_id)}&tab=billing" data-noscope="1" style="text-decoration:none">Customer record →</a>`:'';
+    const acts=STUDIO?`<div class="rhead-acts">${statusDd}${recLink}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
 
     // ── highlights: Customer · Target date · Progress · Waiting on client · Files
     //    (+ the old overview's remaining stats: open client actions when any

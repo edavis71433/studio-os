@@ -114,6 +114,8 @@
   @media (min-width:768px){:root[data-theme="dark"] th.acts,:root[data-theme="dark"] td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
+  .rowact.ghost{color:var(--soft);border-color:transparent}
+  td.acts{white-space:nowrap;text-align:right} td.acts .rowact+.rowact{margin-left:6px}
 
   /* ── the card view (today's look, kept for warmth) ── */
   .cust{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:11px}
@@ -255,12 +257,14 @@ function openCustomer(c){
   // Opening a customer lands on their unified CLIENT RECORD (Overview · Deal ·
   // Delivery · Details) — the whole relationship in one place. Address by their
   // site when they have one (best scope), else by their client id.
-  if(c.customer_site_id){location.href='/crm.html?client='+encodeURIComponent(c.customer_site_id)+'&tab=delivery';}
+  if(c.customer_site_id){location.href='/crm.html?client='+encodeURIComponent(c.customer_site_id);}
   else if(c.client_id){location.href='/crm.html?client_id='+encodeURIComponent(c.client_id);}
   else if(c.project_id){location.href='/crm.html?project='+encodeURIComponent(c.project_id)+'&tab=delivery';}
 }
-// "Manage their website" stays the secondary action — the website cockpit, not the record.
-function manageSite(c){ if(c.customer_site_id) location.href='/today.html?client='+encodeURIComponent(c.customer_site_id); }
+// Phase 1 overhaul: the record is the primary action ("Open record" → the hub);
+// "Their website" is the secondary one and opens the client's WEBSITE editor
+// (presence.html in their scope) — not their Today, which looked like the studio's.
+function manageSite(c){ if(c.customer_site_id) location.href='/presence.html?client='+encodeURIComponent(c.customer_site_id); }
 
 function sortedRows(){
   const q=Q.trim().toLowerCase();
@@ -306,7 +310,7 @@ function tableHtml(list){
       <td class="num">${Number(c.project_count||0)}</td>
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>
-      <td class="acts">${c.customer_site_id?`<button class="rowact" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</td>
+      <td class="acts"><button class="rowact" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="rowact ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Customers"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -323,7 +327,7 @@ function cardsHtml(list){
       <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
         <span style="flex:1"></span>
         <button class="btn" data-open="${esc(c.client_id)}">Open</button>
-        ${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Manage their website</button>`:''}</div></div>`;
+        <button class="btn" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</div></div>`;
   }
   return h;
 }
@@ -397,6 +401,7 @@ function wireList(){
     tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openCustomer(byId[tr.getAttribute('data-open')]);}});
   });
   document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();manageSite(byId[b.getAttribute('data-web')]);}));
+  document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openCustomer(byId[b.getAttribute('data-rec')]);}));
 }
 
 // ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in

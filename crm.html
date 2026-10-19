@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Client — Studio OS</title>
+<title>Customer — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="One client record — the whole relationship from first enquiry through delivery, in one place.">
 <link rel="stylesheet" href="/fonts/brand.css">
@@ -51,6 +51,26 @@
   .hl-edit{border:none;background:none;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px;border-radius:4px}
   .hl-edit:hover{color:var(--p)}
   .hl input{width:100%;font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin-top:3px}
+
+  /* ── action bar: the record's verbs, always one click away ── */
+  .actbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .actbar:empty{display:none}
+  .abtn{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.15s;box-shadow:var(--shadow)}
+  .abtn:hover{border-color:var(--p);color:var(--p)}
+  .abtn.primary{background:var(--p);color:#fff;border-color:var(--p)} .abtn.primary:hover{background:var(--p-deep);color:#fff}
+  /* billing rows: status chip + the row's own buttons */
+  .brow{flex-wrap:wrap}
+  .racts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .rbtn{font-family:inherit;font-size:12.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center}
+  .rbtn:hover{border-color:var(--p);color:var(--p)} .rbtn:disabled{opacity:.5;cursor:default}
+  .link-btn{border:none;background:none;color:var(--p);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;padding:0;text-transform:none;letter-spacing:0;border-radius:0}
+  .link-btn:hover{text-decoration:underline}
+  .bform{background:var(--card);border:1px solid var(--p);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .brow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .brow2 label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--faint);font-weight:600}
+  .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+  .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
+  .bacts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 
   /* ── Path (Lightning chevrons, dds skin) ── */
   .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
@@ -278,10 +298,13 @@ let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null;
 let ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};
 let FILTER='all', COMPOSER='message', LOGKIND='call', NEWAUD='internal', FOCUS_COMPOSER=false, PENDING_BACK='', GUIDE_OPEN=true;
 const EXPANDED=new Set();
-const TAB_LABEL={details:'Details',deal:'Deal',delivery:'Delivery',files:'Files'};
-const TAB_ORDER=['details','deal','delivery','files'];
+// Phase 1 overhaul: the record is THE hub. Billing (proposals · agreement ·
+// invoices · retainer, with their actions) lives here now; Delivery reads as
+// "Project" because that is what the owner calls it.
+const TAB_LABEL={details:'Details',deal:'Deal',billing:'Billing',delivery:'Project',files:'Files'};
+const TAB_ORDER=['details','deal','billing','delivery','files'];
 // old deep links keep working (inbox.html links ?tab=messages; older links carry overview)
-const TAB_ALIAS={overview:'details',messages:'details',deal:'deal',delivery:'delivery',details:'details',files:'files'};
+const TAB_ALIAS={overview:'details',messages:'details',deal:'deal',billing:'billing',invoices:'billing',money:'billing',delivery:'delivery',project:'delivery',details:'details',files:'files'};
 
 // Build the query for /crm/record from whatever the URL carries.
 function recordQuery(){
@@ -296,6 +319,7 @@ function availTabs(){
   const s=(REC&&REC.sections)||{}; const out=[];
   if(s.details||s.overview)out.push('details');
   if(s.deal)out.push('deal');
+  if(s.deal)out.push('billing');
   if(s.delivery)out.push('delivery');
   if(s.deal||s.delivery)out.push('files');
   return out;
@@ -349,6 +373,7 @@ function renderShell(){
       </div>
     </div>
     <div id="hlpanel"></div>
+    <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
@@ -374,6 +399,51 @@ function renderShell(){
   });
   HL_EDIT=false;   // the shell rebuild destroyed any open editor — never leave the flag stale
   renderHighlights();
+  renderActions();
+}
+
+// ── the action bar: every common thing you do for a client, one click from the
+// record. Salesforce puts these at the top of every record (New Opportunity, Log
+// a Call, Send Email); here they are the studio's verbs. Each button either
+// opens a small inline form on the Billing tab or focuses the composer in the
+// rail. Deal-backed actions render only when the record has a deal. ──
+function renderActions(){
+  const host=$('actbar'); if(!host)return;
+  const ids=idParams(); const d=(DEAL&&DEAL.deal)||null;
+  const btns=[];
+  if(ids.deal){
+    btns.push({id:'act-invoice',label:'Send invoice',primary:true,on:()=>openBilling('invoice')});
+    btns.push({id:'act-deposit',label:'Request deposit',on:()=>openBilling('deposit')});
+    const draft=d&&(DEAL.proposals||[]).find(p=>p.status==='draft');
+    const stage=d&&d.stage;
+    // stage-aware: a won deal never pushes an unsent proposal as the headline act
+    if(draft&&stage!=='won'&&stage!=='lost')btns.push({id:'act-proposal',label:'Send proposal',on:()=>openBilling('proposal:'+draft.id)});
+    btns.push({id:'act-log',label:'Log activity',on:()=>focusComposer('logcall')});
+    btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});
+  }
+  btns.push({id:'act-message',label:'Message',on:()=>focusComposer('message')});
+  if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
+  if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
+  if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
+  host.innerHTML=btns.map(b=>b.href
+    ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
+    :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`).join('');
+  btns.forEach(b=>{if(b.on){const el=$(b.id);if(el)el.addEventListener('click',b.on);}});
+}
+// Switch to Billing and open one of its inline forms (invoice · deposit ·
+// proposal:<id>). The form opens once the tab has rendered.
+let BILLING_OPEN='';
+function openBilling(which){
+  BILLING_OPEN=which||'';
+  if(TAB!=='billing'){showTab('billing');}
+  else renderBillingTab($('tabbody'));
+}
+// Bring the rail composer forward on the requested publisher tab. On narrow
+// screens the rail sits above the tabs, so scrolling to it is the whole move.
+function focusComposer(tab){
+  COMPOSER=tab; renderComposer();
+  const host=$('acard'); if(host)host.scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>{const f=document.querySelector('#composer textarea, #composer input[type=text]');if(f)f.focus({preventScroll:true});},250);
 }
 
 // panels that arrive after the record: profile (health), deal, project, activity.
@@ -384,7 +454,7 @@ async function loadPanels(){
   const ids=idParams(); const s=(REC&&REC.sections)||{};
   const jobs=[];
   if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();if(TAB==='details')showTab(TAB,true);}));
-  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();if(TAB==='deal'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
+  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
   if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
@@ -496,6 +566,7 @@ function showTab(tab,initial){
   host.setAttribute('aria-labelledby','tab-'+tab);
   if(tab==='details')return loadDetails(host);
   if(tab==='deal')return renderDealTab(host);
+  if(tab==='billing')return renderBillingTab(host);
   if(tab==='delivery')return renderDeliveryTab(host);
   if(tab==='files')return renderFilesTab(host);
 }
@@ -630,15 +701,192 @@ function renderDealTab(host){
   if(DEAL.last_contacted_at)rows.push(['Last contacted',when(DEAL.last_contacted_at)]);
   html+=rows.map(r=>`<div class="k">${esc(r[0])}</div><div>${esc(r[1])}</div>`).join('')||'<div class="muted">No details yet.</div>';
   html+=`</div></div></section>`;
-  const list=(title,items,rowFn,empty)=>{
-    let s=`<section><h2>${title}</h2><div class="card">`;
-    s+=items.length?items.map(rowFn).join(''):`<p class="muted" style="font-size:13.5px">${empty}</p>`;
-    return s+`</div></section>`;
-  };
-  html+=list('Proposals',DEAL.proposals||[],(p)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span></a><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span></div>`,'No proposals yet — create one in the pipeline.');
-  html+=list('Agreement',DEAL.contracts||[],(cn)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(cn.title||'Agreement')}${cn.signer_name?`<span class="s">Signed by ${esc(cn.signer_name)}</span>`:''}</span></a><span class="schip ${conChip(cn.status)}">${esc(cn.status||'draft')}</span></div>`,'No agreement yet.');
-  html+=list('Invoices',DEAL.invoices||[],(iv)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(iv.title||'Invoice')}<span class="s">${esc(fmtC(iv.amount_cents))}${iv.due_date?' · due '+esc(dueLabel(iv.due_date)):''}</span></span></a><span class="schip ${invChip(iv.status)}">${esc(iv.status||'open')}</span></div>`,'No invoices yet.');
+  // Stage-aware "what now": one honest line + the one button that matters.
+  // A won deal points at billing and the project, never at an unsent draft.
+  const inv=DEAL.invoices||[]; const open=inv.filter(v=>v.status==='open'); const paid=inv.filter(v=>v.status==='paid');
+  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
+  let now='';
+  if(d.stage==='won'){
+    now=owed?`${fmtC(owed)} is awaiting payment across ${open.length} invoice${open.length===1?'':'s'}.`:(paid.length?`All ${fmtC(paid.reduce((a,b)=>a+(b.amount_cents||0),0))} paid so far. Send the next invoice when a milestone lands.`:'Nothing invoiced yet.');
+    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+  }else if(d.stage==='contract'){
+    now=signed?'Agreement signed. Request the deposit, then convert them to a customer.':'The agreement is out for signature.';
+    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+  }else if(d.stage==='proposal'){ now='Your proposal is with them. <button class="link-btn" data-go="billing">See proposals →</button>'; }
+  else if(d.stage==='lost'){ now='Marked not a fit. The record stays so you can pick it back up.'; }
+  if(now)html+=`<section><h2>What now</h2><div class="card"><p style="font-size:14.5px;margin:0">${now}</p></div></section>`;
+  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Billing →</button></div>`;
+  html+=`<section><h2>Documents</h2><div class="card">`
+    +sum('Proposals',0,(DEAL.proposals||[]).length?(DEAL.proposals||[]).map(p=>esc(p.title||'Proposal')+' · '+esc(p.status||'draft')).join(' · '):'None yet')
+    +sum('Agreement',0,(DEAL.contracts||[]).length?(DEAL.contracts||[]).map(c=>esc(c.title||'Agreement')+' · '+esc(c.status||'draft')).join(' · '):'None yet')
+    +sum('Invoices',0,inv.length?`${inv.length} · ${fmtC(inv.reduce((a,b)=>a+(b.amount_cents||0),0))} total${owed?' · '+fmtC(owed)+' open':''}`:'None yet')
+    +`</div></section>`;
   host.innerHTML=html;
+  host.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-go'))));
+}
+
+// ── Billing tab: the money, with its actions, ON the record ──────────────────
+// Proposals · Agreement · Invoices · Retainer. Every row carries the verb that
+// goes with it (Send / Resend · Copy link · View / print · Void). New invoice,
+// deposit and retainer open as small inline forms. The proposal and agreement
+// EDITORS, payment-schedule builder and templates stay on pipeline.html (linked),
+// so nothing there is rebuilt — the routes below are the same ones it calls.
+function renderBillingTab(host){
+  if(!DEAL){host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';return;}
+  if(DEAL.error||!DEAL.deal){host.innerHTML='<p class="muted">Couldn’t load billing just now.</p>';return;}
+  const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
+  const c=DEAL.contact||REC.header||{}; const noEmail=!(c&&c.email);
+  const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
+  const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
+  const inv=(DEAL.invoices||[]); const open=inv.filter(v=>v.status==='open'); const paid=inv.filter(v=>v.status==='paid');
+  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0); const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const act=(attrs,label,title)=>`<button type="button" class="rbtn" ${attrs}${title?` title="${esc(title)}"`:''}>${label}</button>`;
+  let html='';
+  // headline facts
+  html+=`<section><div class="facts">
+    <div class="fact"><div class="k">Deal value</div><div class="v">${d.expected_value_cents?esc(fmtC(d.expected_value_cents)):'—'}</div></div>
+    <div class="fact"><div class="k">Paid</div><div class="v">${esc(fmtC(got))}</div></div>
+    <div class="fact"><div class="k">Awaiting payment</div><div class="v">${esc(fmtC(owed))}${open.length?`<small> · ${open.length} open</small>`:''}</div></div>
+  </div>${noEmail?`<p class="muted" style="margin-top:10px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`:''}</section>`;
+  // invoices + the new-invoice / deposit forms
+  html+=`<section><h2>Invoices <span style="display:flex;gap:6px"><button type="button" class="rbtn" data-bform="invoice">+ Invoice</button><button type="button" class="rbtn" data-bform="deposit">+ Deposit</button><a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule →</a></span></h2>
+    <div id="bform"></div><div class="card">`;
+  html+=inv.length?inv.map(v=>{
+    const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+    const sub=esc(fmtC(v.amount_cents))+(v.due_date?' · due '+esc(dueLabel(v.due_date)):(v.status==='open'?' · due now':''));
+    let state, acts='';
+    if(v.status==='paid'){state=`<span class="schip good">Paid${v.paid_at?' '+esc(dueLabel(v.paid_at)):''}</span>`;}
+    else if(v.status==='void'){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
+    else{state=`<span class="schip warn">${v.stripe_url?'Awaiting payment':'Not sent yet'}</span>`;
+      acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
+      if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
+      acts+=act(`data-void-inv="${esc(v.id)}"`,'Void','Withdraw this invoice — the payment link stops working');}
+    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View / print','Open a branded, printable copy (save as PDF)');
+    return `<div class="rrow brow"><span class="rt">${name}<span class="s">${sub}</span></span><span class="racts">${state}${acts}</span></div>`;
+  }).join(''):`<p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p>`;
+  html+=`</div></section>`;
+  // proposals
+  html+=`<section><h2>Proposals <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Proposal (in pipeline)</a></h2><div class="card">`;
+  const props=DEAL.proposals||[];
+  html+=props.length?props.map(p=>{
+    let acts='';
+    if(p.status==='draft')acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
+    else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
+    acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
+    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
+  }).join(''):`<p class="muted" style="font-size:13.5px">No proposals yet — draft one in the pipeline.</p>`;
+  html+=`</div></section>`;
+  // agreement
+  html+=`<section><h2>Agreement <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Agreement (in pipeline)</a></h2><div class="card">`;
+  const cons=DEAL.contracts||[];
+  html+=cons.length?cons.map(k=>{
+    let acts='';
+    if(k.status==='draft')acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
+    else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
+    acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
+    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(dueLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
+  }).join(''):`<p class="muted" style="font-size:13.5px">No agreement yet.</p>`;
+  html+=`</div></section>`;
+  // retainer
+  const r=d.retainer;
+  html+=`<section><h2>Retainer</h2><div class="card">`;
+  if(r&&r.status&&r.status!=='canceled'){
+    const st=r.status==='active'?'<span class="schip good">Active</span>':r.status==='past_due'?'<span class="schip bad">Payment overdue</span>':'<span class="schip warn">Awaiting authorization</span>';
+    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1"','Cancel retainer')}</span></div>`;
+  }else{
+    html+=`<p class="muted" style="font-size:13.5px;margin-bottom:10px">Bill this client the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do.</p><button type="button" class="rbtn" data-bform="retainer">Set up a retainer</button><div id="rform"></div>`;
+  }
+  html+=`</div></section>`;
+  host.innerHTML=html;
+  wireBilling(host,d);
+  if(BILLING_OPEN){const w=BILLING_OPEN;BILLING_OPEN='';
+    if(w==='invoice'||w==='deposit')billingForm(w);
+    else if(w==='retainer')billingForm('retainer');
+    else if(w.indexOf('proposal:')===0){const b=host.querySelector(`[data-send-prop="${w.slice(9)}"]`);if(b){b.scrollIntoView({block:'center'});b.focus();}}
+  }
+}
+// one send path per document kind — same routes pipeline.html uses
+async function billingSend(path,okLabel){
+  const r=await apiAg(path,'POST',{});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return null;}
+  const b=r.body||{}; const url=b.url||(b.data&&b.data.url)||'';
+  if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
+  toast(b.emailed?okLabel+' — emailed to the client':(url?okLabel.replace('sent','prepared')+' — link copied, nothing was emailed':okLabel));
+  return b;
+}
+async function reloadDeal(){
+  const ids=idParams(); if(!ids.deal)return;
+  const r=await apiAg('/sales/deals/'+encodeURIComponent(ids.deal)); DEAL=r.ok?(r.body.data||null):{error:true};
+  renderHighlights();renderPath();renderActions();
+  if(TAB==='billing'||TAB==='deal'||TAB==='files')showTab(TAB,true);
+  loadActivity();
+}
+function wireBilling(host,d){
+  host.querySelectorAll('[data-bform]').forEach(b=>b.addEventListener('click',()=>billingForm(b.getAttribute('data-bform'))));
+  host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.'));}));
+  host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.');}));
+  host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
+  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.'))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){toast(r.body.already?'Already voided':'Invoice voided');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.');b.disabled=false;}}));
+  host.querySelectorAll('[data-send-prop]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/proposals/'+b.getAttribute('data-send-prop')+'/send',b.hasAttribute('data-resend')?'Proposal link copied':'Proposal sent');if(r)reloadDeal();else b.disabled=false;}));
+  host.querySelectorAll('[data-send-con]').forEach(b=>b.addEventListener('click',async()=>{
+    const k=(DEAL.contracts||[]).find(x=>x.id===b.getAttribute('data-send-con'));
+    if(k&&k.status==='draft'&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    b.disabled=true;const r=await billingSend('/sales/contracts/'+b.getAttribute('data-send-con')+'/send',b.hasAttribute('data-resend')?'Signing link copied':'Agreement sent');if(r)reloadDeal();else b.disabled=false;}));
+  const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
+}
+// the small inline forms: invoice · deposit · retainer
+function billingForm(kind){
+  const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
+  const today=new Date().toISOString().slice(0,10);
+  if(kind==='retainer'){
+    host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
+  }else{
+    const dep=kind==='deposit';
+    const html=`<div class="bform"><div class="brow2"><label>${dep?'Deposit amount (USD)':'Amount (USD)'}<input type="number" id="bf-amt" step="0.01" min="1" placeholder="${dep?'500':'2500'}"${dep?'':' aria-describedby="bf-hint"'}></label><label>Label<input type="text" id="bf-title" maxlength="80" placeholder="${dep?'Deposit':'e.g. Balance at launch'}"></label><label>Due<input type="date" id="bf-due" min="${today}"></label></div>${dep?'':'<p class="muted" id="bf-hint" style="font-size:12.5px;margin-top:6px">Leave the amount blank to invoice the accepted proposal.</p>'}<div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">${dep?'Request deposit':'Send invoice'}</button></div></div>`;
+    host.innerHTML=html;
+  }
+  host.scrollIntoView({block:'center',behavior:'smooth'});
+  setTimeout(()=>{const a=$('bf-amt');if(a)a.focus({preventScroll:true});},150);
+  $('bf-cancel').addEventListener('click',()=>{host.innerHTML='';});
+  $('bf-go').addEventListener('click',async()=>{
+    const go=$('bf-go'); go.disabled=true;
+    const amt=parseFloat(($('bf-amt').value||'').trim());
+    if(kind==='retainer'){
+      if(!amt||amt<1){toast('Enter a retainer amount of at least $1.');go.disabled=false;return;}
+      const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
+      if(r.ok){const x=r.body.data||{};toast(x.emailed?'Retainer set up — the authorization link was emailed':'Retainer set up — authorization link copied');if(x.url&&!x.emailed&&navigator.clipboard)navigator.clipboard.writeText(x.url).catch(()=>{});reloadDeal();}
+      else{toast((r.body&&r.body.message)||'Couldn’t set that up.');go.disabled=false;}
+      return;
+    }
+    const dep=kind==='deposit';
+    if(dep&&(!amt||amt<1)){toast('Enter a deposit amount.');go.disabled=false;return;}
+    const body={purpose:dep?'deposit':'service'};
+    if(amt)body.amount_cents=Math.round(amt*100);
+    const title=($('bf-title').value||'').trim(); if(title)body.title=title; else if(dep)body.title='Deposit';
+    const due=$('bf-due').value; if(due)body.due_date=due;
+    await sendMoney(body,host);
+  });
+}
+async function sendMoney(body,host){
+  const d=(DEAL&&DEAL.deal)||{}; const label=body.purpose==='deposit'?'Deposit request':'Invoice';
+  const r=await apiAg('/sales/deals/'+d.id+'/invoice','POST',body);
+  if(r.ok){
+    const b=r.body||{}; const url=b.url||'';
+    if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
+    toast(b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
+    if(host)host.innerHTML='';
+    reloadDeal(); return;
+  }
+  if(r.status===409&&r.body&&r.body.error==='amount_mismatch'&&host){
+    const open=r.body.open_invoice||{};
+    host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists at a different amount.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} link</button><button type="button" class="primary" id="bf-force">Send another for the new amount</button></div></div>`;
+    $('bf-resend').addEventListener('click',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
+    $('bf-force').addEventListener('click',()=>sendMoney({...body,force:true},host));
+    return;
+  }
+  toast((r.body&&r.body.message)||'That didn’t go through.');
+  const go=$('bf-go'); if(go)go.disabled=false;
 }
 
 // ── Delivery tab: the project as a related-list card (heavy tools stay on

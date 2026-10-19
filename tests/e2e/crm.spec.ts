@@ -186,6 +186,53 @@ test.describe('Relationship view', () => {
     expect(JSON.parse((await posted).postData() || '{}')).toEqual({ body: 'On it!', audience: 'client' });
   });
 
+  // ── Phase 1 overhaul: the record is the HUB — action bar + Billing tab ─────
+  // Money actions live ON the record now (the same /sales routes pipeline.html
+  // calls). "Send invoice" is two clicks from the customer, not a dozen.
+  const HUB_RECORD = { data: {
+    identity: { contact_id: null, deal_id: DEAL, client_id: 'cl-1', customer_site_id: CLIENT, project_id: PROJECT },
+    header: { name: 'Marlow’s Kitchen', company: 'Marlow’s', email: 'm@example.com', phone: '', status: 'customer' },
+    highlights: { value_cents: 320000, stage: 'won', owed_cents: 160000 },
+    sections: { overview: true, details: true, deal: true, delivery: true },
+    default_tab: 'details',
+    canonical: { key: 'client', value: CLIENT },
+  } };
+  const HUB_DEAL = { data: {
+    deal: { id: DEAL, title: 'Marlow’s Kitchen', stage: 'won', expected_value_cents: 320000, converted_client_id: 'cl-1' },
+    proposals: [{ id: 'p-1', title: 'Proposal', status: 'draft', subtotal_cents: 320000 }],
+    contracts: [{ id: 'k-1', title: 'Service agreement', status: 'signed', signer_name: 'Marlow' }],
+    invoices: [
+      { id: 'i-1', title: 'Deposit', purpose: 'deposit', amount_cents: 160000, status: 'paid', stripe_url: 'https://pay.test/a' },
+      { id: 'i-2', title: 'Invoice', purpose: 'service', amount_cents: 160000, status: 'open', stripe_url: 'https://pay.test/b' },
+    ],
+  } };
+  test('P1 — the action bar sends an invoice from the record in two clicks (POST /sales/deals/:id/invoice)', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await expect(page.getByRole('tab', { name: 'Billing' })).toBeVisible();
+    await page.locator('#act-invoice').click();                         // 1: the action bar
+    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#bf-amt').fill('1600');
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/sales/deals/${DEAL}/invoice`));
+    await page.locator('#bf-go').click();                               // 2: Send invoice
+    expect(JSON.parse((await posted).postData() || '{}')).toEqual({ purpose: 'service', amount_cents: 160000 });
+  });
+  test('P1 — Billing lists invoices with Resend · Copy link · Void · View / print, and a won deal demotes the unsent draft', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
+    await expect(page.locator('.brow .schip.warn', { hasText: 'Awaiting payment' })).toHaveCount(1);
+    await expect(page.locator('[data-send-inv="i-2"]')).toHaveText('Resend');
+    await expect(page.locator('[data-copy="https://pay.test/b"]')).toBeVisible();
+    await expect(page.locator('[data-void-inv="i-2"]')).toBeVisible();
+    await expect(page.locator('[data-void-inv="i-1"]')).toHaveCount(0);   // a paid invoice cannot be voided
+    await expect(page.locator('[data-doc="invoices:i-1"]')).toBeVisible();
+    // stage-aware: the won deal's action bar does NOT headline the unsent draft proposal
+    await expect(page.locator('#act-proposal')).toHaveCount(0);
+    await expect(page.locator('#act-invoice')).toBeVisible();
+    // the draft is still sendable from Billing itself
+    await expect(page.locator('[data-send-prop="p-1"]')).toHaveText('Send to client');
+  });
+
   // Comms routing pin (F1/F3): an EMAIL-landed client message is a plain
   // kind:'message' timeline item on the record — it renders inline with the
   // support ticket chronologically (one conversation), and the composer replies

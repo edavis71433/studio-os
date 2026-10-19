@@ -26,6 +26,7 @@ export interface NavContext {
   isOperator: boolean;          // staff/system (operator)
   editionKey?: EditionKey;      // Phase D: the FEATURE edition; when absent, all features (today's behavior)
   isManagedClient?: boolean;    // the caller is an agency's CLIENT signed into their OWN (bridged) site — client experience, not operator tools
+  scoped?: boolean;             // Phase 1 overhaul: an agency operator drilled INTO a client (x-dds-scope-site set) — the client's Website is primary there
 }
 
 const has = (c: NavContext, cap: SiteCapability) => c.capabilities.includes(cap);
@@ -68,34 +69,47 @@ export function buildNav(c: NavContext): NavSection[] {
   // Today — the calm home
   if (f.hasBusinessOS) single('today', 'Today', '/today.html');
 
-  // Website — one home; its contents are sub-items (internally: the CMS)
-  if (f.hasWebsite) {
+  // Website — one home; its contents are sub-items (internally: the CMS).
+  // Phase 1 overhaul: for an AGENCY operator at studio level the primary bar is
+  // the studio's work (customers, pipeline, projects, inbox); their OWN marketing
+  // site moves to the overflow menu as "Your website". Drilled into a client, or
+  // for any non-agency owner, the Website stays primary — it is their product.
+  const websiteItems = (): NavItem[] => {
     const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
     if (canPublish(c)) website.push({ key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' });
     if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
-    sections.push({ key: 'website', label: 'Website', items: website });
-  }
+    return website;
+  };
+  const studioLevel = !!c.isAgency && !c.scoped;
+  if (f.hasWebsite && !studioLevel) sections.push({ key: 'website', label: 'Website', items: websiteItems() });
 
-  // Customers — the relationship area (internally: the CRM). Leads + the P2-C
-  // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
-  // FIX 6: the primary "Customers" item opens the ROSTER of this studio's customers
-  // (customers.html), not the single-client CRM detail (which un-scoped showed the
-  // owner his OWN profile). Opening a customer from the roster re-scopes into them.
+  // Customers — the relationship area (internally: the CRM): the roster, the
+  // people, the enquiries, broadcasts. FIX 6: the primary "Customers" item opens
+  // the ROSTER (customers.html), not the single-client record. Opening a customer
+  // from the roster lands on the record hub (crm.html).
   if (f.hasRelationship) {
-    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html' }];
-    customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html' });
-    customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
-    customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
+    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
+    customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html', desc: 'The people — one may belong to a customer.' });
+    customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html', desc: 'New messages from your website, waiting to become contacts or deals.' });
     customers.push({ key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
 
+  // Pipeline — the sales deals, as its own top-level outcome (Phase 1 overhaul:
+  // it was a sub-item under Customers, which hid where the money lived).
+  if (f.hasRelationship) single('pipeline', 'Pipeline', '/pipeline.html', 'Deals by stage — proposals, agreements and payments move through here.');
+
   // Projects — the service-delivery area (P2-D): the work you do FOR customers.
   // A first-class outcome; its tasks/files/messages/approvals live on the project.
   if (f.hasRelationship) single('projects', 'Projects', '/projects.html');
+
+  // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
+  // Everything below in "Focused views" is just a narrower cut of this same data —
+  // the label + desc make Inbox read as the primary, the rest as optional lenses.
+  single('inbox', 'Inbox', '/inbox.html', 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.');
 
   // Files — the business library (internally: the DAM). Photos, brand, documents,
   //  downloads — plus AI-generated assets via Visual Studio.
@@ -109,13 +123,13 @@ export function buildNav(c: NavContext): NavSection[] {
   //  (internally: Analytics/reporting). Reserved home; the later phase enriches it.
   if (f.hasReports) single('analytics', 'Analytics', '/analytics.html');
 
-  // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
-  // Everything below in "Focused views" is just a narrower cut of this same data —
-  // the label + desc make Inbox read as the primary, the rest as optional lenses.
-  single('inbox', 'Inbox', '/inbox.html', 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.');
+  // Studio — the agency scope (agency roles only); open a client to re-scope.
+  // Drilled into a client, the shell's context bar carries "Exit to Studio", so
+  // the primary bar does not repeat it (nine items no longer fit beside Search).
+  if (f.hasAgency && c.isAgency && !c.scoped) single('studio', 'Studio', '/agency.html');
 
-  // Studio — the agency scope (agency roles only); open a client to re-scope
-  if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
+  // The agency's OWN website, out of the primary bar (overflow menu + ⌘K).
+  if (f.hasWebsite && studioLevel) sections.push({ key: 'website', label: 'Your website', items: websiteItems(), utility: true });
 
   // ── Deeper views (profile/overflow menu + ⌘K, never the primary bar) ─────────
   // Every capability stays reachable — nothing is retired. The old single long
