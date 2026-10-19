@@ -960,6 +960,7 @@
   }
   // declarative page-level hints (marked in the HTML). One at a time; never intrusive.
   function scanHints() {
+    if (tour) return;   // Phase 4: never stack a hint on top of the first-login tour
     var seen = hintsSeen();
     Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]:not(.dds-live)'), function (node) {
       var key = node.getAttribute('data-hint');
@@ -972,6 +973,7 @@
   window.ddsHint = function (key, html) {
     var seen = hintsSeen();
     if (!key || seen[key]) return false;
+    if (tour) return false;   // Phase 4: the tour is already teaching — one thing at a time
     if (document.querySelector('.dds-hint.show')) return false;   // never stack
     var bar = el('<div class="dds-hint dds-live" role="note"><span class="t"></span></div>');
     bar.querySelector('.t').innerHTML = html;
@@ -1186,12 +1188,21 @@
       (onRetry ? '<button type="button" class="retry" data-dds-retry>Try again</button>' : '') + '</div>';
     if (onRetry) { var b = host.querySelector('[data-dds-retry]'); if (b) b.addEventListener('click', onRetry); }
   };
-  window.ddsToast = function (message, kind) {
+  // Phase 4 (delete safety): an optional third argument {label, onClick} adds ONE
+  // action to the toast — "Undo" after a removal. A toast with an action stays
+  // up longer and is clickable; plain toasts are unchanged.
+  window.ddsToast = function (message, kind, action) {
     var t = el('<div class="dds-toast ' + (kind === 'err' ? 'err' : 'ok') + '" role="status" aria-live="polite"><span class="ico">' + (kind === 'err' ? '!' : '✓') + '</span><span class="t"></span></div>');
     t.querySelector('.t').textContent = String(message == null ? '' : message);
+    var ms = kind === 'err' ? 5200 : 3200;
+    if (action && action.label && typeof action.onClick === 'function') {
+      var a = document.createElement('button'); a.type = 'button'; a.className = 'act'; a.textContent = String(action.label);
+      a.addEventListener('click', function () { try { action.onClick(); } finally { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); } });
+      t.appendChild(a); t.classList.add('has-act'); ms = 8000;
+    }
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.classList.add('show'); });
-    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, kind === 'err' ? 5200 : 3200);
+    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, ms);
     return t;
   };
 

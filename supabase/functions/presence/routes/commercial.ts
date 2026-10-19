@@ -188,15 +188,24 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length } }, 200, cors);
 }
 
+/** The user-settable enquiry statuses (migration 0129). `converted` is system-set. */
+export const ENQUIRY_STATUSES = ['new', 'read', 'replied', 'archived', 'not_a_fit'];
 export async function handleFormStatus(req: Request, site: SiteRow, id: string, cors: Record<string, string>) {
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
-  const status = ['new', 'read', 'archived'].includes(b?.status) ? b.status : 'read';
-  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status }) });
+  // Phase 4 (triage): New · Read · Replied · Not a fit (archived is the old name
+  // for the same shelf) · Spam (the boolean). Only `new` counts as needs-you, so
+  // every other mark takes the enquiry off Today, the bell and the Inbox at once.
+  const spamFlag = typeof b?.spam === 'boolean' ? b.spam : null;
+  const status = ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null ? 'read' : null);
+  const patch: Record<string, unknown> = {};
+  if (status) patch.status = status;
+  if (spamFlag !== null) patch.spam = spamFlag;
+  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!(r.ok && r.json?.[0])) return json({ error: 'not_found' }, 404, cors);
   // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the
   // bell, and the attention badge (all reading active notices) drop it at once.
   // Keyed period=lead:<id>, this touches exactly this lead's notice, nothing else.
-  if (leadFollowupResolvesOn(status)) {
+  if ((status && leadFollowupResolvesOn(status)) || spamFlag === true) {
     const k = leadFollowupNoticeKey(id);
     await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, {
       method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),

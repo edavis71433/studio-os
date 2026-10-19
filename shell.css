@@ -483,3 +483,10 @@ html.dds-embed .dds-waffle{display:none!important}
   html.dds-side .lhead .obj-ic{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--dds-p);font-size:0;color:transparent;box-shadow:none;margin-right:2px}
   html.dds-side .lhead h1{font-family:var(--dds-serif);font-weight:500;font-size:26px;letter-spacing:-.01em}
 }
+
+/* ── Phase 4 (delete safety): a toast that carries ONE action (Undo) ───────── */
+.dds-toast.has-act{pointer-events:auto}
+.dds-toast .act{margin-left:6px;font:inherit;font-size:13px;font-weight:600;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:var(--dds-r-sm,6px);padding:4px 10px;cursor:pointer}
+.dds-toast .act:hover{background:rgba(255,255,255,.26)}
+.dds-toast .act:focus-visible{outline:2px solid #fff;outline-offset:1px}
+@media (max-width:760.98px){.dds-toast.has-act{pointer-events:auto}}
