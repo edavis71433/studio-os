@@ -8,66 +8,131 @@
 <meta name="description" content="Make brand-aware images for your website — you approve every one before it's saved. Your own photos always work too.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically). Visual refresh (2026-10):
+     the page follows the approved "Visual Studio — make images" board — crumb ·
+     serif title + one-line explainer · Upload your own · a "What do you need?"
+     card (pick cards, describe-it, Brand + Size, one filled button) · Your
+     options · Approved before. Same endpoints as before; only the look and the
+     markup changed. */
   :root{
-    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;
-    --accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;
-    --warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);--line-2:color-mix(in srgb,var(--dds-line,#e6e6ec) 60%,var(--dds-card,#fff));
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316}
   /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .kind[aria-pressed="true"]{color:#171320}}
-  :root[data-theme="dark"] .kind[aria-pressed="true"]{color:#171320}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#171320}}
+  :root[data-theme="dark"] .btn.primary{color:#171320}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:44px 22px 96px}
-  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
-  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
-  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:56ch}
-  .promise{margin-top:18px;padding:14px 16px;background:var(--accent-soft);border-radius:var(--dds-r-lg,10px);font-size:13.5px;color:var(--ink)}
-  .promise b{font-weight:600}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:20px;box-shadow:var(--shadow);margin-top:26px}
-  .label{font-size:12.5px;color:var(--soft);font-weight:500;margin:0 0 10px}
-  .kinds{display:flex;flex-wrap:wrap;gap:8px}
-  .kind{font-size:13.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
-  .kind[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .kind small{display:block;font-size:11px;opacity:.7;font-weight:400}
-  textarea,input{font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px 14px;width:100%}
-  textarea:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
-  .field{margin-top:16px}
-  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 16px;cursor:pointer;transition:background .15s,border-color .15s}
-  button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
-  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
-  button.ghost{border-color:transparent;color:var(--soft)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:18px}
-  .variant{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;box-shadow:var(--shadow)}
-  .variant img{display:block;width:100%;height:auto;background:var(--accent-soft)}
-  .variant .body{padding:12px}
-  .variant .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .plan{margin-top:26px}
-  .plan h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0 0 4px}
-  .plan .meta{font-size:13px;color:var(--soft);margin:0}
-  .tag{display:inline-block;font-size:12px;color:var(--good);background:var(--good-soft);border-radius:999px;padding:3px 10px;font-weight:500;text-transform:capitalize}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:20px 28px 90px}
+  svg{display:block}
+  a{color:var(--p)}
+
+  /* ── crumb · title row ── */
+  .crumb{font-size:12.5px;color:var(--faint);display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .crumb a{color:var(--faint);text-decoration:none;border-radius:6px;padding:1px 4px;margin-left:-4px}
+  .crumb a:hover{color:var(--p);background:var(--p-soft)}
+  .crumb [aria-current="page"]{color:var(--ink);font-weight:500}
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
+  .subline{color:var(--soft);font-size:13px;margin:5px 0 0;max-width:64ch}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .hint{font-size:12.5px;color:var(--faint)}
+
+  /* ── buttons (hairline, 8px; ONE filled per screen) ── */
+  .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+  .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .btn.ghost:hover{background:var(--line-2);color:var(--ink)}
+  .btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+  .btn:disabled{opacity:.55;cursor:default}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ── cards · sections · lists ── */
+  .card{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:14px;box-shadow:var(--shadow)}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .card-h h2{margin:0;font-size:14px;font-weight:600}
+  .sec{margin-top:22px}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .sec-h h2{margin:0;font-size:14px;font-weight:600}
+  .sec-h a{font-size:12.5px;text-decoration:none} .sec-h a:hover{text-decoration:underline}
+  .list{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
+  .row{display:flex;align-items:center;gap:14px;padding:11px 14px;border-top:1px solid var(--line-2);min-width:0;flex-wrap:wrap}
+  .row:first-child{border-top:none}
+  .row .thumb{height:30px;border-radius:5px;background:var(--p-soft);flex:0 0 auto;overflow:hidden;display:block;object-fit:cover}
+  .row .t{flex:1 1 200px;min-width:0}
+  .row .t b{font-weight:600;display:block}
+  .row .t span{color:var(--faint);font-size:12.5px}
+  .row .acts{display:flex;gap:6px;align-items:center}
+  .row.quiet{color:var(--soft);background:var(--bg);font-size:12.5px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);line-height:18px}
+  .chip .d{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+  .chip.good{background:var(--good-soft);border-color:transparent;color:var(--good)} .chip.good .d{background:var(--good)}
+
+  /* ── the pick cards: real buttons, aria-pressed carries the choice ── */
+  .setgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+  .setcard{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:14px 16px;display:flex;gap:12px;align-items:flex-start;text-align:left;font:inherit;color:var(--ink);cursor:pointer;transition:.15s;min-width:0}
+  .setcard:hover{border-color:var(--line-strong)}
+  .setcard[aria-pressed="true"]{border-color:var(--p);background:var(--p-soft)}
+  .setcard .ico{width:36px;height:36px;border-radius:9px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .setcard[aria-pressed="true"] .ico{background:var(--card)}
+  .setcard[aria-pressed="true"] .t span{color:var(--soft)}   /* faint ink on the purple tint is 4.4:1 — one step darker clears AA */
+  .setcard .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .setcard .t{flex:1;min-width:0} .setcard .t b{display:block;font-weight:600;margin-bottom:2px;font-size:13.5px} .setcard .t span{color:var(--faint);font-size:12.5px;display:block}
+
+  /* ── describe it · Brand · Size ── */
+  .form2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin-top:16px}
+  .form2 label,.form2 .lbl{display:block;font-size:12.5px;color:var(--faint);margin-bottom:4px}
+  .form2 .full{grid-column:1/-1}
+  .ta{width:100%;min-height:76px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;font:inherit;font-size:13.5px;color:var(--ink);resize:vertical;background:var(--card)}
+  .ta::placeholder{color:var(--faint)}
+  .ta:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .in{min-height:34px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 10px;display:flex;align-items:center;font-size:13.5px;background:var(--bg);color:var(--ink)}
+  .in.quiet{color:var(--faint)}
+  .crow{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap}
+  .note{font-size:12.5px;color:var(--faint);max-width:62ch}
+
+  /* ── the three options ── */
+  .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .opt{padding:10px}
+  .opt img{display:block;width:100%;height:auto;aspect-ratio:8/3;object-fit:cover;border-radius:6px;background:var(--p-soft)}
+  .opt .crow{margin-top:8px}
+  .opt .crow span{font-size:12.5px;color:var(--soft)}
+  .editbox{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .editbox[hidden]{display:none}
+  .editbox input{flex:1 1 240px;height:32px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 10px;font:inherit;font-size:13.5px;color:var(--ink);background:var(--card)}
+  .editbox input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .saved{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .saved .t{flex:1 1 260px} .saved .t b{display:block;font-weight:600;font-size:14.5px} .saved .t p{margin:2px 0 0;color:var(--soft)}
+
+  /* ── states ── */
   .center{text-align:center;padding:52px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
-  a.link{color:var(--accent);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .muted{color:var(--soft);font-size:14px}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:34px auto}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
+  a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:34px auto}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
   .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.opts{grid-template-columns:minmax(0,1fr)}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid,.form2{grid-template-columns:minmax(0,1fr)}h1.title{font-size:24px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Visual Studio</h1>
-    <p class="sub">Make images for your website — a page banner, a social post, a link preview — shaped by your brand. You see a few options and approve the one you want. Nothing is saved until you do.</p>
+  <nav class="crumb" aria-label="Breadcrumb"><a href="/files.html">Files</a><span aria-hidden="true">›</span><span aria-current="page">Visual Studio</span></nav>
+  <header class="toprow">
+    <div>
+      <h1 class="title">Visual Studio</h1>
+      <p class="subline">Make images for your website — a page banner, a social post, a link preview — shaped by your brand. You approve the one you want; nothing is saved until you do.</p>
+    </div>
+    <div class="actions"><a class="btn" href="/files.html" id="uploadOwn">Upload your own</a></div>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
@@ -76,14 +141,15 @@
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Consumes the EXISTING Visual Studio backend only: /visual/kinds, /visual/generate,
-// /visual/plans, /visual/plans/:id/{vary,edit,decide}. No engine logic here.
+// /visual/plans, /visual/plans/:id/{vary,edit,decide} (+ the read-only
+// /brand/profile for the Brand line). No engine logic here.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN = SUPABASE_URL + "/functions/v1/presence";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null, LAST_SUBJECT = "";
+let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null, LAST_SUBJECT = "", BRAND = null;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') });
@@ -96,25 +162,22 @@ function toast(m){ if(window.ddsToast)return void ddsToast(m);const t=$('toast')
 // entered value or null on cancel; askConfirm resolves true/false.
 function dlgShell(){
   const dlg=document.createElement('dialog');
-  dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+  dlg.style.cssText='border:1px solid var(--line,#e6e6ec);border-radius:10px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(21,20,26,.22);background:var(--card,#fff);color:var(--ink,#15141a)';
   return dlg;
 }
 function dlgBtn(label,primary){
-  const b=document.createElement('button'); b.type='button'; b.textContent=label;
-  b.style.cssText=primary
-    ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
-    :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+  const b=document.createElement('button'); b.type='button'; b.textContent=label; b.className='btn'+(primary?' primary':'');
   return b;
 }
 function askText(title, opts){
   opts=opts||{};
   return new Promise((resolve)=>{
     const dlg=dlgShell();
-    const form=document.createElement('form'); form.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; form.appendChild(h);
-    if(opts.hint){ const hh=document.createElement('div'); hh.textContent=opts.hint; hh.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; form.appendChild(hh); }
+    const form=document.createElement('form'); form.style.cssText='padding:18px 20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; form.appendChild(h);
+    if(opts.hint){ const hh=document.createElement('div'); hh.textContent=opts.hint; hh.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; form.appendChild(hh); }
     const inp=document.createElement('input'); inp.type='text'; if(opts.value)inp.value=opts.value; if(opts.placeholder)inp.placeholder=opts.placeholder;
-    inp.style.cssText='width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box'; form.appendChild(inp);
+    inp.style.cssText='width:100%;font:inherit;font-size:15px;padding:8px 11px;border:1px solid var(--line,#e6e6ec);border-radius:8px;outline:none;box-sizing:border-box;background:var(--card,#fff);color:inherit'; form.appendChild(inp);
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(opts.ok||'Save',true); ok.type='submit';
     row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
@@ -122,15 +185,15 @@ function askText(title, opts){
     cancel.addEventListener('click',()=>finish(null));
     form.addEventListener('submit',(e)=>{ e.preventDefault(); finish(inp.value); });
     dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
-    dlg.showModal(); setTimeout(()=>inp.focus(),20);
+    dlg.showModal(); // showModal focuses the first field; no timer (WebKit races a test's next fill())
   });
 }
 function askConfirm(title, body, okLabel){
   return new Promise((resolve)=>{
     const dlg=dlgShell();
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    const box=document.createElement('div'); box.style.cssText='padding:18px 20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; box.appendChild(p); }
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(okLabel||'OK',true);
     row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
@@ -142,79 +205,139 @@ function askConfirm(title, body, okLabel){
   });
 }
 
+// ── the pick cards: one icon per kind the server offers (unknown kinds get the general one) ──
+const ICON = {
+  hero: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15l5-4 4 3 3-2 6 4"/>',
+  social_square: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="12" cy="12" r="3.5"/><path d="M16.5 7.5h.01"/>',
+  social_portrait: '<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M6 15l4-3 3 2 5-4"/>',
+  social_story: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  open_graph: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  general: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+};
+const icon = (kind) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[kind]||ICON.general}</svg>`;
+const kindOf = (k) => KINDS.find(x=>x.kind===k) || null;
+const sizeLine = (k) => k ? `${esc(k.label)} · ${esc(k.width)} × ${esc(k.height)}` : '';
+// Brand: the words from the site's own Brand Profile (read-only). Never invented —
+// when the profile is empty or the read fails, the line says where it comes from.
+function brandLine(){
+  const b=BRAND||{};
+  const bits=[];
+  if(typeof b.personality==='string'&&b.personality.trim())bits.push(b.personality.trim());
+  if(Array.isArray(b.voice_characteristics))bits.push(...b.voice_characteristics.filter(x=>typeof x==='string'&&x.trim()).slice(0,3));
+  if(Array.isArray(b.words_prefer)&&b.words_prefer.length)bits.push(b.words_prefer.slice(0,2).join(', '));
+  return bits.length?bits.join(' · '):'';
+}
+function paintBrand(){
+  const el=$('brandIn'); if(!el)return;
+  const line=brandLine();
+  el.textContent=line||'From your website’s design and words — applied automatically';
+  el.classList.toggle('quiet',!line);
+}
+function paintSize(){
+  const el=$('sizeIn'); if(!el)return;
+  const k=kindOf(CHOSEN);
+  el.innerHTML=k?sizeLine(k):'Pick what you need first';
+  el.classList.toggle('quiet',!k);
+}
+
 function composer(available){
   if(!available){
-    return `<div class="panel"><p class="label">Not switched on yet</p>
-      <p class="muted">Making images isn’t switched on for your studio yet. Your own photos still work exactly as always — <a class="link" href="/files.html">upload to your Files</a> any time.</p></div>`;
+    return `<div class="card" style="margin-top:18px"><div class="card-h"><h2>Not switched on yet</h2></div>
+      <p class="muted" style="margin:8px 0 0">Making images isn’t switched on for your studio yet. Your own photos still work exactly as always — <a class="link" href="/files.html">upload to your Files</a> any time.</p></div>`;
   }
-  return `<div class="panel">
-    <p class="label">What do you need?</p>
-    <div class="kinds" id="kinds">${KINDS.map(k=>`<button class="kind" data-kind="${esc(k.kind)}" aria-pressed="false">${esc(k.label)}<small>${esc(k.aspect)} · ${esc(k.purpose)}</small></button>`).join('')}</div>
-    <div class="field"><textarea id="subject" rows="3" aria-label="Describe the image you need" placeholder="Describe it in your own words — e.g. “our corner table by the window, warm evening light, a couple of coffees”"></textarea></div>
-    <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="primary" id="go">Make a few options</button>
-      <span class="muted">You’ll pick and approve one — nothing saves until then.</span>
+  return `<div class="card" style="margin-top:18px">
+    <div class="card-h"><h2>What do you need?</h2><span class="hint">Pick one, describe it, see three options</span></div>
+    <div class="setgrid" id="kinds" role="group" aria-label="What do you need?">${KINDS.map(k=>`<button type="button" class="setcard kind" data-kind="${esc(k.kind)}" aria-pressed="false"><span class="ico">${icon(k.kind)}</span><span class="t"><b>${esc(k.label)}</b><span>${esc(k.purpose)}</span><span>${esc(k.aspect)} · ${esc(k.width)} × ${esc(k.height)}</span></span></button>`).join('')}</div>
+    <div class="form2">
+      <div class="full"><label for="subject">Describe it in your own words</label><textarea class="ta" id="subject" rows="3" placeholder="e.g. “our corner table by the window, warm evening light, a couple of coffees — for the top of the Home page”"></textarea></div>
+      <div><span class="lbl" id="brandLbl">Brand</span><div class="in quiet" id="brandIn" aria-labelledby="brandLbl">Reading your brand profile…</div></div>
+      <div><span class="lbl" id="sizeLbl">Size</span><div class="in quiet" id="sizeIn" aria-labelledby="sizeLbl">Pick what you need first</div></div>
+    </div>
+    <div class="crow">
+      <span class="note">Every image is AI-made and we say so. Nothing is saved until you approve one. Your own photos always work too — this never replaces them.</span>
+      <div class="actions"><button type="button" class="btn" id="describe">Help me describe it</button><button type="button" class="btn primary" id="go">Make 3 options</button></div>
     </div>
   </div>`;
 }
 
-function variantCard(v){
-  return `<div class="variant">
-    <img src="${esc(v.preview_url||'')}" alt="A generated option" loading="lazy">
-    <div class="body">
-      <div class="row">
-        <button class="primary" data-use="${esc(v.id)}">Use this one</button>
-      </div>
-    </div>
+function variantCard(v,i){
+  return `<div class="card opt">
+    <img src="${esc(v.preview_url||'')}" alt="Option ${i+1}" loading="lazy">
+    <div class="crow"><span>Option ${i+1}</span><div class="actions"><button type="button" class="btn sm" data-use="${esc(v.id)}">Approve</button></div></div>
   </div>`;
 }
 
 function planView(plan){
   CURRENT = plan;
   if(plan.status === 'stored'){
-    return `<div class="plan"><span class="tag">Saved</span>
-      <h2>${esc(plan.title)}</h2>
-      <p class="meta">This image is in Files now — it’s yours to use anywhere. Nothing goes live until you publish.</p>
-      <div style="margin-top:16px"><button class="primary" id="again">Make another</button></div></div>`;
+    return `<section class="sec" id="options"><div class="sec-h"><h2>Your options</h2></div>
+      <div class="card saved"><span class="chip good"><i class="d"></i>Saved</span>
+        <div class="t"><b>${esc(plan.title)}</b><p>This image is in Files now — it’s yours to use anywhere. Nothing goes live until you publish.</p></div>
+        <div class="actions"><button type="button" class="btn" id="again">Make another</button><a class="btn ghost" href="/files.html">Open Files</a></div>
+      </div></section>`;
   }
   const vars = (plan.variations||[]).filter(v=>v.preview_url);
-  return `<div class="plan">
-    <h2>${esc(plan.title)}</h2>
-    <p class="meta">${esc(plan.summary)}</p>
-    <div class="grid">${vars.map(variantCard).join('')}</div>
-    <div style="margin-top:18px;display:flex;gap:9px;flex-wrap:wrap">
-      <button data-vary>Make more like these</button>
-      <button data-editopen>Change something</button>
-      <button class="ghost" data-discard>Discard these</button>
+  return `<section class="sec" id="options">
+    <div class="sec-h"><h2>Your options</h2><span class="hint">${esc(plan.summary||plan.title||'')}</span></div>
+    <div class="opts">${vars.map(variantCard).join('')}</div>
+    <div class="crow">
+      <span class="hint">Approve the one you want — it’s saved to Files only then.</span>
+      <div class="actions">
+        <button type="button" class="btn sm" data-vary>Make more like these</button>
+        <button type="button" class="btn sm" data-editopen aria-expanded="false" aria-controls="editbox">Change something</button>
+        <button type="button" class="btn sm ghost" data-discard>Discard these</button>
+      </div>
     </div>
-    <div id="editbox" style="display:none;margin-top:12px;gap:9px" >
+    <div id="editbox" class="editbox" hidden>
       <input id="editin" aria-label="What should change" placeholder="What should change? e.g. “warmer light”, “less busy”, “more of the food”">
-      <div style="margin-top:9px"><button class="primary" data-editgo>Try that</button></div>
+      <button type="button" class="btn sm" data-editgo>Try that</button>
     </div>
-  </div>`;
+  </section>`;
 }
 
 function render(){
-  let html = `<div class="promise">
-    <b>Yours, and only when you say so.</b> Every image is AI-made (we say so), shaped by your brand, and saved to your library only after you approve it. Your own photos always work too — this never replaces them.
-  </div>`;
-  html += `<div id="composer">${composer(window.__available)}</div>`;
+  let html = `<div id="composer">${composer(window.__available)}</div>`;
   html += `<div id="planhost"></div>`;
   html += `<div id="history"></div>`;
   $('main').innerHTML = html;
   wireComposer();
   loadHistory();
+  loadBrand();
 }
-// Recent generations — the built-but-unused /visual/plans list. Past options + saved
-// images are no longer lost when you leave; tap one to reopen it.
+// the Brand line — read-only, from the site's own profile; silent on failure
+async function loadBrand(){
+  if(!$('brandIn'))return;
+  try{const r=await apiGet('/brand/profile');BRAND=(r&&r.ok&&r.body&&r.body.data)||null;}catch(_){BRAND=null;}
+  paintBrand();
+}
+// Approved before — the built /visual/plans list. Saved images come first with
+// "Use again"; options you made but never approved follow with "Reopen". Both
+// open the plan exactly as before. Nothing here is invented: title, kind and
+// date are the plan's own.
+function planThumb(p){
+  const vars=(p.variations||[]).filter(v=>v&&v.preview_url);
+  const chosen=p.chosen_variation?vars.find(v=>v.id===p.chosen_variation):null;
+  const v=chosen||vars[0]; if(!v)return '';
+  const k=kindOf(p.kind); const ratio=k&&k.width&&k.height?(k.width/k.height):1;
+  const w=Math.max(30,Math.min(56,Math.round(30*ratio)));
+  return `<img class="thumb" src="${esc(v.preview_url)}" alt="" width="${w}" height="30" loading="lazy" style="width:${w}px">`;
+}
+const when=(iso)=>{const d=new Date(iso||'');return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});};
 async function loadHistory(){
   const host=$('history'); if(!host)return;
   let plans=[];try{const r=await apiGet('/visual/plans');plans=(r&&r.ok&&r.body&&r.body.data)||[];}catch(_){}
   const withThumb=plans.filter(p=>p&&(p.variations||[]).some(v=>v&&v.preview_url));
   if(!withThumb.length){host.innerHTML='';return;}
-  let html='<div style="margin-top:34px"><h2 style="font-size:15px;color:var(--soft,#6b6478);margin-bottom:12px">Recent</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">';
-  for(const p of withThumb){const v=(p.variations||[]).find(x=>x&&x.preview_url);const stored=p.status==='stored';html+=`<button data-plan="${esc(p.id)}" title="${esc(p.title||'A past image')}" style="border:1px solid var(--line,#eee);border-radius:12px;overflow:hidden;padding:0;cursor:pointer;background:none;aspect-ratio:1;position:relative">${v?`<img src="${esc(v.preview_url)}" alt="${esc(p.title||'A past image')}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:''}${stored?'<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;border-radius:999px;padding:1px 7px">Saved</span>':''}</button>`;}
-  html+='</div></div>';
+  const stored=withThumb.filter(p=>p.status==='stored'), rest=withThumb.filter(p=>p.status!=='stored');
+  const row=(p)=>{
+    const k=kindOf(p.kind); const saved=p.status==='stored';
+    const meta=[k?k.label:(p.kind||''),when(p.created_at),saved?'':'options kept'].filter(Boolean).join(' · ');
+    return `<div class="row">${planThumb(p)}<div class="t"><b>${esc(p.title||'A past image')}</b><span>${esc(meta)}</span></div>${saved?'<span class="chip good"><i class="d"></i>Saved</span>':''}<div class="acts"><button type="button" class="btn sm ghost" data-plan="${esc(p.id)}">${saved?'Use again':'Reopen'}</button></div></div>`;
+  };
+  let html=`<section class="sec" id="approved"><div class="sec-h"><h2>Approved before</h2><a href="/files.html">In Files</a></div><div class="list">`;
+  html+=stored.map(row).join('');
+  if(rest.length)html+=`<div class="row quiet"><div class="t"><span>Options you made but didn’t approve — nothing was saved.</span></div></div>`+rest.map(row).join('');
+  html+=`<div class="row quiet"><div class="t"><span>Your own photos always work too — this never replaces them.</span></div></div></div></section>`;
   host.innerHTML=html;
   host.querySelectorAll('[data-plan]').forEach(b=>b.addEventListener('click',()=>reopenPlan(b.getAttribute('data-plan'))));
 }
@@ -225,12 +348,33 @@ async function reopenPlan(id){
   $('planhost').innerHTML='';toast('Couldn’t reopen that one.');
 }
 
+// "Help me describe it": a starter sentence for the kind you picked — a prompt
+// to edit, never a claim about your business. No backend call.
+const STARTER = {
+  hero: 'The front of the place on a bright morning, the door open, one or two people arriving — for the top of the Home page.',
+  social_square: 'A close-up of the thing we’re known for, warm natural light, room for a short caption.',
+  social_portrait: 'One of the team at work, natural light, the space behind them.',
+  social_story: 'A quick look inside today — one thing happening right now, nothing staged.',
+  open_graph: 'The place at its best, simple and uncluttered, with calm space on the left for the name.',
+  general: 'A calm image of the space in daylight, nothing staged.',
+};
+function helpDescribe(){
+  const ta=$('subject'); if(!ta)return;
+  if(!CHOSEN){ toast('Pick what you need first — then I’ll suggest a start.'); const f=document.querySelector('[data-kind]'); if(f)f.focus(); return; }
+  if((ta.value||'').trim().length){ ta.focus(); toast('Say what’s in the picture, where it goes, and the mood — change anything that isn’t true of you.'); return; }
+  ta.value = STARTER[CHOSEN] || STARTER.general;
+  ta.focus(); try{ ta.setSelectionRange(0, ta.value.length); }catch(_){}
+  toast('A starting point — change anything that isn’t true of you.');
+}
+
 function wireComposer(){
   document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click', ()=>{
     CHOSEN = b.getAttribute('data-kind');
     document.querySelectorAll('[data-kind]').forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false'));
+    paintSize();
   }));
   const go = $('go'); if(go) go.addEventListener('click', generate);
+  const d = $('describe'); if(d) d.addEventListener('click', helpDescribe);
 }
 
 async function generate(){
@@ -238,10 +382,10 @@ async function generate(){
   if(!CHOSEN){ toast('Pick what you need first — a banner, a post, or a link preview.'); return; }
   if(subject.length < 3){ toast('Tell us in a few words what the image should show.'); return; }
   LAST_SUBJECT = subject;   // A7: seeds the alt-text so you accept/edit rather than retype
-  const go = $('go'); go.disabled = true; go.textContent = 'Making a few options…';
+  const go = $('go'); go.disabled = true; go.textContent = 'Making 3 options…';
   $('planhost').innerHTML = '<div class="spin" role="status" aria-label="Working"></div>';
   const r = await apiPost('/visual/generate', { kind: CHOSEN, subject, count: 3 });
-  go.disabled = false; go.textContent = 'Make a few options';
+  go.disabled = false; go.textContent = 'Make 3 options';
   if(r.status === 503){ $('planhost').innerHTML=''; toast('Making images isn’t switched on for your studio yet.'); return; }
   if(!r.ok){ $('planhost').innerHTML=''; toast((r.body&&r.body.message) || 'That didn’t come through — nothing was saved.'); return; }
   showPlan(r.body.data);
@@ -251,9 +395,10 @@ function showPlan(plan){ $('planhost').innerHTML = planView(plan); wirePlan(); }
 
 function wirePlan(){
   document.querySelectorAll('[data-use]').forEach(b=>b.addEventListener('click', ()=>use(b.getAttribute('data-use'))));
-  const vary=document.querySelector('[data-vary]'); if(vary) vary.addEventListener('click', v/*makeMore*/=>doVary());
-  const eo=document.querySelector('[data-editopen]'); if(eo) eo.addEventListener('click', ()=>{ const box=$('editbox'); box.style.display = box.style.display==='none'?'block':'none'; });
+  const vary=document.querySelector('[data-vary]'); if(vary) vary.addEventListener('click', ()=>doVary());
+  const eo=document.querySelector('[data-editopen]'); if(eo) eo.addEventListener('click', ()=>{ const box=$('editbox'); const open=box.hidden; box.hidden=!open; eo.setAttribute('aria-expanded', open?'true':'false'); if(open){ const i=$('editin'); if(i)i.focus(); } });
   const eg=document.querySelector('[data-editgo]'); if(eg) eg.addEventListener('click', doEdit);
+  const ei=$('editin'); if(ei) ei.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doEdit(); } });
   const dc=document.querySelector('[data-discard]'); if(dc) dc.addEventListener('click', discard);
   const ag=$('again'); if(ag) ag.addEventListener('click', ()=>{ $('planhost').innerHTML=''; CURRENT=null; window.scrollTo({top:0,behavior:'smooth'}); });
 }
@@ -263,7 +408,7 @@ async function use(varId){
   if(alt === null) return;
   if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.'); return; }
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'approve', variation_id:varId, alt_text:alt.trim() });
-  if(r.ok && r.body.data && r.body.data.status==='stored'){ toast('Saved to your library.'); showPlan({ ...CURRENT, status:'stored' }); return; }
+  if(r.ok && r.body.data && r.body.data.status==='stored'){ toast('Saved to your library.'); showPlan({ ...CURRENT, status:'stored' }); loadHistory(); return; }
   toast((r.body&&r.body.message) || 'That didn’t save — nothing changed. Try again.');
 }
 async function doVary(){
@@ -281,7 +426,7 @@ async function doEdit(){
 async function discard(){
   if(!(await askConfirm('Discard these options?', 'Nothing was saved, so there’s nothing to lose.', 'Discard'))) return;
   await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'abandon' });
-  $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.');
+  $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.'); loadHistory();
 }
 
 function signedOut(){ $('main').innerHTML = `<div class="center"><h2>Sign in to use the Visual Studio.</h2><p class="muted">Your images live in Files.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }

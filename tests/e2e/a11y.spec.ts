@@ -10,7 +10,7 @@ test.describe('Accessibility', () => {
   // the skip-predicate second argument was dropped in newer majors.
   test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
 
-  for (const path of ['/today.html', '/leads.html', '/client.html']) {
+  for (const path of ['/today.html', '/leads.html', '/client.html', '/help.html']) {
     test(`no serious/critical axe violations on ${path}`, async ({ page }) => {
       // client.html needs a reviewer context to render its feed
       const api = path === '/client.html' ? {
