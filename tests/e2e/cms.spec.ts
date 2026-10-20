@@ -77,3 +77,39 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#designGallery')).toContainText('print serif'); // the family's swatch tag
   });
 });
+
+// The full-screen preview ("See your site", ?view=preview from get-started, History
+// previews) must always have a way out. The shell bar (z 2147483000) once covered
+// the stage bar, so "← Back" took no clicks and a new owner was stranded.
+test.describe('Website preview stage', () => {
+  const backIsTopmost = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    const b = document.getElementById('btnStageClose')!; const r = b.getBoundingClientRect();
+    const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return t === b || b.contains(t);
+  });
+
+  test('"← Back" sits on top and closes the preview', async ({ page }) => {
+    await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(ALL_FEATURES) } });
+    await page.goto('/presence.html?view=preview');   // the onboarding "Review & preview your website →" link
+    await expect(page.locator('#stage')).toHaveClass(/\bon\b/);
+    expect(await backIsTopmost(page)).toBe(true);
+    await expect(page.locator('#verSeg button').first()).toBeVisible();
+    await page.locator('#btnStageClose').click();   // a real click: fails if anything covers it
+    await expect(page.locator('#stage')).not.toHaveClass(/\bon\b/);
+  });
+
+  test('Escape closes the preview and returns focus to the button that opened it', async ({ page }) => {
+    await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(ALL_FEATURES) } });
+    await page.goto('/presence.html');
+    // "See your site" on desktop/tablet; phones hide it and open the stage from the dock
+    await expect(page.locator('#btnPreview, #dock [data-tab="preview"]').locator('visible=true').first()).toBeVisible();
+    const opener = page.locator('#btnPreview, #dock [data-tab="preview"]').locator('visible=true').first();
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#stage')).toHaveClass(/\bon\b/);
+    expect(await backIsTopmost(page)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#stage')).not.toHaveClass(/\bon\b/);
+    await expect(opener).toBeFocused();
+  });
+});

@@ -357,6 +357,13 @@ h5.rune .whisper.ok{color:var(--sage)}
    literals, not tokens, so it never flips. ── */
 .stage{position:fixed;inset:0;background:#171320;z-index:95;display:none;flex-direction:column}
 .stage.on{display:flex}
+/* the shell bar (and an agency's client context bar) sit above every page layer, so
+   the stage starts BELOW them — otherwise they cover "← Back" and the Draft/Live and
+   page tabs, and a new owner has no way out. Phones also keep the bottom bar: end
+   the stage where it begins (the same 72px + safe-area the shell reserves). */
+html.dds-has-shell .stage{top:var(--dds-shell-h)}
+html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds-ctxbar-h))}
+@media (max-width:760.98px){html.dds-has-shell .stage{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:22px;padding:16px 26px 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
 .stagebar .back:hover{color:#efeaf7}
@@ -8001,6 +8008,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if ($("stage").classList.contains("on")) return;   // the preview stage covers the design panels — let Escape close the stage
     const t = $("trayPanel"), s = $("settingsPanel"), cm = $("commentsPanel");
     if ((t && t.classList.contains("on")) || (s && s.classList.contains("on")) || (cm && cm.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
   }, true);
