@@ -3,10 +3,15 @@ import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
-// Slice 8 — analytics.html is the Business dashboard: the Salesforce Lightning
-// "Reports & Dashboards" treatment. Two bands (Sales · Your website), an
-// "As of" + Refresh header, a session-only Period chip, and per-widget
-// honesty: null aggregates render illustration empty states, never fake zeros.
+// Slice 8 — analytics.html is the Business dashboard. Visual refresh (2026-10):
+// the approved "Analytics — business dashboard" board — title + "As of", a
+// period SEGMENTED CONTROL (role=group, aria-pressed) + Refresh, a strip of
+// stat tiles per band (Sales · Your website) and two-column cards. Per-widget
+// honesty is unchanged: null aggregates render empty states, never fake zeros.
+const dashHead = (page: import('@playwright/test').Page) => page.getByRole('heading', { level: 1, name: 'Analytics' });
+const seg = (page: import('@playwright/test').Page) => page.locator('#period');
+const tileOf = (page: import('@playwright/test').Page, strip: string, name: string) =>
+  page.locator(`${strip} .stat`, { has: page.locator('.kt', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 const DASH = { data: {
   period: 'this_month',
   generated_at: '2026-07-17T14:14:00Z',
@@ -59,7 +64,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Analytics');
-    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     await expect(page.getByText(/^As of /)).toBeVisible();
     // both bands
     await expect(page.getByRole('heading', { name: 'Sales', exact: true })).toBeVisible();
@@ -67,29 +72,33 @@ test.describe('Analytics (Business dashboard)', () => {
     // Sales KPIs
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();   // open pipeline
     await expect(page.getByText('7 open deals')).toBeVisible();
-    await expect(page.getByText('$3,850', { exact: true })).toBeVisible();    // won this month
+    await expect(tileOf(page, '#salesStats', 'Won this month').locator('.v')).toHaveText('$3,850');   // won this month
     await expect(page.getByText('↑ vs last month')).toBeVisible();
     await expect(page.getByText('3 not yet answered')).toBeVisible();
     await expect(page.getByText('oldest waiting 2 days')).toBeVisible();
-    // funnel rows carry label + value·count as real text
+    // the stage bars: stage labels and values are real SVG text, and the whole
+    // series (with counts) is the chart's accessible name
     await expect(page.getByText('New lead', { exact: true })).toBeVisible();
-    await expect(page.getByText('$5,200 · 3')).toBeVisible();
-    await expect(page.getByText('$3,600 · 2')).toBeVisible();
+    await expect(page.getByText('$5,200', { exact: true })).toBeVisible();
+    const bars = page.locator('section.card', { has: page.getByRole('heading', { name: 'Pipeline by stage' }) }).locator('svg[role="img"]');
+    await expect(bars).toHaveAttribute('aria-label', /New lead \$5,200 \(3 deals\)/);
+    await expect(bars).toHaveAttribute('aria-label', /Qualified \$3,600 \(2 deals\)/);
+    await expect(bars).toHaveAttribute('aria-label', /Won \$3,850 \(2 deals\)/);
     // Website KPIs + tables
     await expect(page.getByText('214', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('512 page views')).toBeVisible();
     await expect(page.getByText('41% of visits')).toBeVisible();
     await expect(page.getByText('patio builder near me')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Patio rebuild — Sam R.' })).toBeVisible();
+    await expect(page.getByText('Patio rebuild — Sam R.')).toBeVisible();
     // invoices donut hole total is real DOM text
     await expect(page.getByText('$1,150', { exact: true })).toBeVisible();
     await expect(page.getByText('Overdue · $250')).toBeVisible();
-    // charts are SVG (no canvas), hidden from AT — the values are text elsewhere
+    // charts are SVG (no canvas) named for AT — the values are also text elsewhere
     await expect(page.locator('canvas')).toHaveCount(0);
-    expect(await page.locator('.cb svg[aria-hidden="true"]').count()).toBeGreaterThan(3);
+    expect(await page.locator('.cb svg[role="img"]').count()).toBeGreaterThan(3);
   });
 
-  test('the Period chip is a real popup and switches the data (session-only)', async ({ page }) => {
+  test('the period segmented control is a real group of pressed buttons and switches the data (session-only)', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
       const period = new URL(route.request().url()).searchParams.get('period');
@@ -97,33 +106,29 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    const chip = page.locator('#periodBtn');
-    await expect(chip).toContainText('This month');            // opens unfiltered (default)
-    await expect(chip).toHaveAttribute('aria-expanded', 'false');
-    await chip.click();
-    await expect(chip).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('#periodMenu')).toBeVisible();
-    await page.locator('#periodMenu [data-period="last_30"]').click();
+    const control = seg(page);
+    await expect(control).toHaveAttribute('role', 'group');
+    await expect(control).toHaveAttribute('aria-label', 'Period');
+    // the FOUR windows the function accepts, in order — nothing invented
+    await expect(control.locator('[data-period]')).toHaveText(['This month', 'Last 30 days', 'This quarter', 'All time']);
+    await expect(control.locator('[data-period="this_month"]')).toHaveAttribute('aria-pressed', 'true');   // opens unfiltered (default)
+    await expect(control.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await control.locator('[data-period="last_30"]').click();
     await expect(page.getByText('$99,900', { exact: true })).toBeVisible();  // re-fetched
     await expect(page.getByText('999', { exact: true }).first()).toBeVisible();
-    await expect(page.locator('#periodBtn')).toContainText('Last 30 days');
-    // Escape closes the reopened menu and returns focus to the chip
-    await page.locator('#periodBtn').click();
-    await page.keyboard.press('Escape');
-    await expect(page.locator('#periodMenu')).toBeHidden();
-    await expect(page.locator('#periodBtn')).toBeFocused();
-    // outside click closes too
-    await page.locator('#periodBtn').click();
-    await expect(page.locator('#periodMenu')).toBeVisible();
-    await page.getByRole('heading', { name: 'Business dashboard' }).click();
-    await expect(page.locator('#periodMenu')).toBeHidden();
+    await expect(control.locator('[data-period="last_30"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(control.locator('[data-period="this_month"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect(control.locator('[aria-pressed="true"]')).toHaveCount(1);
+    // the re-render hands focus back to the pressed segment, not to the page
+    await expect(control.locator('[data-period="last_30"]')).toBeFocused();
+    // no popup anywhere: nothing to open, close or escape
+    await expect(page.locator('#periodMenu, #periodBtn, [aria-haspopup="listbox"]')).toHaveCount(0);
   });
 
-  // The same null-relatedTarget focusout bug that ate Eric's menu taps: on iOS
-  // a tap blurs the chip and focuses nothing, `.filters` closes the popup
-  // mid-tap, and the period option is gone before the click lands on it.
-  // See tests/e2e/helpers/ios-focus.ts.
-  test('touch: tapping a Period option actually switches the period', async ({ page }, testInfo) => {
+  // The segmented control is plain buttons (no popup, no focusout guard), so an
+  // iOS tap — which blurs without focusing anything — has nothing to break.
+  // Pinned with the iOS focus semantics anyway: see tests/e2e/helpers/ios-focus.ts.
+  test('touch: tapping a period segment actually switches the period', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await installIosFocusSemantics(page);
@@ -133,10 +138,8 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await page.locator('#periodBtn').tap();
-    await expect(page.locator('#periodMenu')).toBeVisible();
-    await page.locator('#periodMenu [data-period="last_30"]').tap();
-    await expect(page.locator('#periodBtn')).toContainText('Last 30 days');
+    await seg(page).locator('[data-period="last_30"]').tap();
+    await expect(seg(page).locator('[data-period="last_30"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText('$99,900', { exact: true })).toBeVisible();   // re-fetched
   });
 
@@ -150,7 +153,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
     expect(calls).toBe(1);
-    await page.getByRole('button', { name: '↻ Refresh' }).click();
+    await page.getByRole('button', { name: 'Refresh' }).click();
     await expect.poll(() => calls).toBe(2);
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
   });
@@ -158,7 +161,7 @@ test.describe('Analytics (Business dashboard)', () => {
   test('null aggregates render empty states — the invoices card hides, nothing fakes a zero', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH_EMPTY } });
     await page.goto('/analytics.html');
-    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     // invoices: null → the card is not rendered at all
     await expect(page.getByRole('heading', { name: 'Invoices' })).toHaveCount(0);
     // GSC not connected → honest empty state with a connect path, no invented number
@@ -207,20 +210,19 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await page.locator('#periodBtn').click();
-    await page.locator('#periodMenu [data-period="last_30"]').click();   // slow (gated)
-    await page.locator('#periodBtn').click();
-    await page.locator('#periodMenu [data-period="quarter"]').click();   // fast, newer
+    await seg(page).locator('[data-period="last_30"]').click();   // slow (gated)
+    await seg(page).locator('[data-period="quarter"]').click();   // fast, newer
     await expect(page.getByText('$44,400', { exact: true })).toBeVisible();
-    await expect(page.locator('#periodBtn')).toContainText('This quarter');
+    await expect(seg(page).locator('[data-period="quarter"]')).toHaveAttribute('aria-pressed', 'true');
     releaseSlow();   // NOW the stale last_30 response lands — it must be discarded
     await page.waitForTimeout(250);
     await expect(page.getByText('$44,400', { exact: true })).toBeVisible();
     await expect(page.getByText('$99,900', { exact: true })).toHaveCount(0);
-    await expect(page.locator('#periodBtn')).toContainText('This quarter');
+    await expect(seg(page).locator('[data-period="quarter"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seg(page).locator('[data-period="last_30"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('a failed period switch rolls back fully — chip, menu selection and board untouched', async ({ page }) => {
+  test('a failed period switch rolls back fully — the pressed segment and the board untouched', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
       const period = new URL(route.request().url()).searchParams.get('period');
@@ -229,16 +231,12 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await page.locator('#periodBtn').click();
-    await page.locator('#periodMenu [data-period="last_30"]').click();
+    await seg(page).locator('[data-period="last_30"]').click();
     await expect(page.getByText('Couldn’t refresh just now.')).toBeVisible();
-    // the board and the chip stay exactly as they were
+    // the board and the control stay exactly as they were — no half-committed press
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await expect(page.locator('#periodBtn')).toContainText('This month');
-    // reopened, the menu still marks This month selected — no half-committed checkmark
-    await page.locator('#periodBtn').click();
-    await expect(page.locator('#periodMenu [data-period="this_month"]')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#periodMenu [data-period="last_30"]')).toHaveAttribute('aria-selected', 'false');
+    await expect(seg(page).locator('[data-period="this_month"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seg(page).locator('[data-period="last_30"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('traffic has_data:false → "Not measured yet" empty states, never zero KPIs', async ({ page }) => {
@@ -255,16 +253,15 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('0', { exact: true })).toHaveCount(0);
   });
 
-  test('invoices:null → the deal-value card widens so the Sales row stays 12 columns', async ({ page }) => {
+  test('invoices:null → Recent wins spans the row, so the grid has no hole', async ({ page }) => {
     const D = JSON.parse(JSON.stringify(DASH));
     D.data.sales.invoices = null;
     await installApp(page, { api: { '/analytics/dashboard': D } });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Invoices' })).toHaveCount(0);
-    // deal value (c4→c6) + recent wins (c4→c6) = a full 12-column row, no hole
-    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Deal value by stage' }) })).toHaveClass(/\bc6\b/);
-    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Recent wins' }) })).toHaveClass(/\bc6\b/);
+    // the invoices card is gone, so Recent wins takes both columns — no hole
+    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Recent wins' }) })).toHaveClass(/\bspan2\b/);
   });
 
   test('a failed Search Console read → a quiet catching-its-breath state, never the connect CTA', async ({ page }) => {
@@ -276,7 +273,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('Search data is catching its breath').first()).toBeVisible();
     // the user may well be connected — a hiccuped read never shows the connect path
     await expect(page.getByText('Connect Search Console')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Search Console' })).toHaveCount(0);
   });
 
   // The scoped board is a DIFFERENT payload from the unscoped one: deals and
@@ -313,12 +310,13 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByRole('heading', { name: 'Sales' })).toBeVisible();
     expect(sentScope).toBe(CLIENT);
     // drill links carry the scope through to the report surfaces
-    await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
-    // the won-deals landing carries the scope on top of its stage param
-    await expect(page.getByRole('link', { name: 'View won deals →' }).first())
+    await expect(page.getByRole('link', { name: 'View pipeline' }).first()).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
+    // the won-deals landing carries the scope on top of its stage param (the tile's View + the card's Won deals)
+    await expect(tileOf(page, '#salesStats', 'Won this month').getByRole('link', { name: 'View' }))
       .toHaveAttribute('href', `/pipeline.html?stage=won&client=${CLIENT}`);
+    await expect(page.getByRole('link', { name: 'Won deals' })).toHaveAttribute('href', `/pipeline.html?stage=won&client=${CLIENT}`);
     // D1 + scope together: windows-aware targets carry period AND client
-    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+    await expect(page.getByRole('link', { name: 'View website insights' }).first())
       .toHaveAttribute('href', `/business-insights.html?period=this_month&client=${CLIENT}`);
   });
 
@@ -330,46 +328,48 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+    await expect(page.getByRole('link', { name: 'View website insights' }).first())
       .toHaveAttribute('href', '/business-insights.html?period=this_month');
-    await expect(page.getByRole('link', { name: 'View search insights →' }).first())
+    await expect(page.getByRole('link', { name: 'View search insights' }).first())
       .toHaveAttribute('href', '/business-insights.html?period=this_month');
-    // SS5's D1 landing is live: BOTH "View won deals" footers (Won this month +
-    // Recent wins) target /pipeline.html?stage=won — the view that provably
-    // renders won deals. No period: the pipeline's won view isn't windowed
-    // (the deals API exposes no won-date filter), and both cards state their
+    // SS5's D1 landing is live: BOTH won-deals drills (the Won-this-month tile's
+    // View + Recent wins' "Won deals") target /pipeline.html?stage=won — the view
+    // that provably renders won deals. No period: the pipeline's won view isn't
+    // windowed (the deals API exposes no won-date filter), and both state their
     // own fixed windows — the discipline keeps period off targets that can't
-    // honor it. The open-pipeline footer stays bare.
-    await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
-    const wonLinks = page.getByRole('link', { name: 'View won deals →' });
-    await expect(wonLinks).toHaveCount(2);
-    await expect(wonLinks.nth(0)).toHaveAttribute('href', '/pipeline.html?stage=won');
-    await expect(wonLinks.nth(1)).toHaveAttribute('href', '/pipeline.html?stage=won');
+    // honor it. The open-pipeline drill stays bare.
+    await expect(page.getByRole('link', { name: 'View pipeline' }).first()).toHaveAttribute('href', '/pipeline.html');
+    const wonTile = tileOf(page, '#salesStats', 'Won this month').getByRole('link', { name: 'View' });
+    const wonCard = page.getByRole('link', { name: 'Won deals' });
+    await expect(wonTile).toHaveAttribute('href', '/pipeline.html?stage=won');
+    await expect(wonCard).toHaveAttribute('href', '/pipeline.html?stage=won');
     // switching the period re-labels every windows-aware drill
-    await page.locator('#periodBtn').click();
-    await page.locator('#periodMenu [data-period="last_30"]').click();
+    await seg(page).locator('[data-period="last_30"]').click();
     await expect(page.getByText('$99,900', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View website insights →' }).first())
+    await expect(page.getByRole('link', { name: 'View website insights' }).first())
       .toHaveAttribute('href', '/business-insights.html?period=last_30');
-    await expect(page.getByRole('link', { name: 'View pipeline →' }).first()).toHaveAttribute('href', '/pipeline.html');
+    await expect(page.getByRole('link', { name: 'View pipeline' }).first()).toHaveAttribute('href', '/pipeline.html');
     // …while the stage=won targets stay stable across periods (not windowed)
-    await expect(wonLinks.nth(0)).toHaveAttribute('href', '/pipeline.html?stage=won');
+    await expect(wonTile).toHaveAttribute('href', '/pipeline.html?stage=won');
+    await expect(wonCard).toHaveAttribute('href', '/pipeline.html?stage=won');
   });
 
-  test('D2: the period-windowed KPI cards say their window, matching their siblings', async ({ page }) => {
+  test('D2: the period-windowed tiles say their window, matching their siblings', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    for (const name of ['New enquiries', 'Visitors', 'Actions taken']) {
-      await expect(page.locator('section.card', { has: page.getByRole('heading', { name, exact: true }) }).locator('.ch .s'))
-        .toHaveText(/^This month/);
+    for (const [strip, name] of [['#salesStats', 'New enquiries'], ['#siteStats', 'Visitors'], ['#siteStats', 'Actions taken']] as const) {
+      await expect(tileOf(page, strip, name).locator('.s .w')).toHaveText(/This month$/);
     }
+    // …and the tiles with a FIXED window (this month's wins, open support) carry none
+    await expect(tileOf(page, '#salesStats', 'Won this month').locator('.w')).toHaveCount(0);
+    await expect(tileOf(page, '#salesStats', 'Open support').locator('.w')).toHaveCount(0);
   });
 
   test('D3: Won this month speaks expected-deal-value truth', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
-    await expect(page.getByText('$3,850', { exact: true })).toBeVisible();
+    await expect(tileOf(page, '#salesStats', 'Won this month').locator('.v')).toHaveText('$3,850');
     await expect(page.getByText('expected value of 2 deals won')).toBeVisible();
   });
 
@@ -378,7 +378,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    const cards = page.locator('.grid > .card');
+    const cards = page.locator('.grid2 > .card');
     const first = await cards.nth(0).boundingBox();
     const second = await cards.nth(1).boundingBox();
     expect(first && second && Math.abs(first.x - second.x) < 2).toBeTruthy();   // same left edge → stacked
@@ -394,7 +394,7 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.locator('.st').first()).toBeVisible();     // slow fetch → stencil blocks
-    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     await expect(page.locator('.st')).toHaveCount(0);            // replaced by the real board
   });
 
@@ -416,7 +416,7 @@ test.describe('Analytics (Business dashboard)', () => {
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
     await installApp(page, { api: { '/analytics/dashboard': DASH_SCOPED } });
     await page.goto(`/analytics.html?client=${CLIENT}`);
-    const wonCard = page.locator('section.card', { has: page.getByRole('heading', { name: 'Won this month' }) });
+    const wonCard = tileOf(page, '#salesStats', 'Won this month');
     // "$0 · none won yet" reads the same for "no wins", "wins last month" and
     // "this band cannot see your wins" — three very different situations
     await expect(wonCard).toContainText('none won yet this month');
@@ -432,10 +432,10 @@ test.describe('Analytics (Business dashboard)', () => {
     await page.goto('/analytics.html');
     await expect(page.getByText('Publish the site first').first()).toBeVisible();
     await expect(page.getByText('Google can’t measure a draft').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+    await expect(page.getByRole('link', { name: 'Publish the site' }).first())
       .toHaveAttribute('href', '/presence.html#publish');
     // the wrong step, asked every week, is what nagging is
-    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Search Console' })).toHaveCount(0);
   });
 
   test('the draft publish link carries the scope BEFORE the fragment, not inside it', async ({ page }) => {
@@ -444,7 +444,7 @@ test.describe('Analytics (Business dashboard)', () => {
     D.data.website.search = { draft: true, publish_href: '/presence.html#publish' };
     await installApp(page, { api: { '/analytics/dashboard': D } });
     await page.goto(`/analytics.html?client=${CLIENT}`);
-    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+    await expect(page.getByRole('link', { name: 'Publish the site' }).first())
       .toHaveAttribute('href', `/presence.html?client=${CLIENT}#publish`);
   });
 
@@ -456,7 +456,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('Connected — waiting on Google').first()).toBeVisible();
     await expect(page.getByText('Google reports on whole past months').first()).toBeVisible();
     // a real connection must stop being nagged to connect
-    await expect(page.getByRole('link', { name: 'Connect Search Console →' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Search Console' })).toHaveCount(0);
     await expect(page.getByText('Not measured yet')).toHaveCount(0);
   });
 
@@ -480,11 +480,11 @@ test.describe('Analytics (Business dashboard)', () => {
     // the wrong advice must be GONE, not merely reworded
     await expect(page.getByText('Publish the site first')).toHaveCount(0);
     await expect(page.getByText('Google can’t measure a draft')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Publish the site →' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Publish the site' })).toHaveCount(0);
     // and the right one in its place, pointing where the address is recorded
     await expect(page.getByText('Where is their website?').first()).toBeVisible();
     await expect(page.getByText('nothing to publish').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Add their website address →' }).first())
+    await expect(page.getByRole('link', { name: 'Add their website address' }).first())
       .toHaveAttribute('href', '/presence.html#monitor');
   });
 
@@ -500,7 +500,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await installApp(page, { api: { '/analytics/dashboard': D } });
     await page.goto('/analytics.html');
     await expect(page.getByText('Publish the site first')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Connect Search Console →' }).first())
+    await expect(page.getByRole('link', { name: 'Connect Search Console' }).first())
       .toHaveAttribute('href', '/connections.html');
   });
 
@@ -548,8 +548,8 @@ test.describe('Analytics (Business dashboard)', () => {
     // the numbers, with their source on them
     await expect(page.getByText('512').first()).toBeVisible();
     await expect(page.getByText('via Google Analytics').first()).toBeVisible();
-    // the visitors card stopped claiming the numbers can't exist
-    const visitorsCard = page.locator('.card', { hasText: 'via Google Analytics' }).first();
+    // the visitors tile stopped claiming the numbers can't exist
+    const visitorsCard = page.locator('#siteStats .stat', { hasText: 'via Google Analytics' }).first();
     await expect(visitorsCard).not.toContainText('Not measured here');
     // the band note now explains the provenance instead of contradicting the card
     const note = page.locator('.bandnote');
@@ -601,7 +601,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByText('Not measured here')).toHaveCount(0);
     // 9d955c6 REGRESSION GUARD: our own draft still gets the publish nudge
     await expect(page.getByText('Publish the site first').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Publish the site →' }).first())
+    await expect(page.getByRole('link', { name: 'Publish the site' }).first())
       .toHaveAttribute('href', '/presence.html#publish');
   });
 
@@ -610,7 +610,7 @@ test.describe('Analytics (Business dashboard)', () => {
     D.data.website.search = null;
     await installApp(page, { api: { '/analytics/dashboard': D } });
     await page.goto('/analytics.html');
-    await expect(page.getByRole('link', { name: 'Connect Search Console →' }).first())
+    await expect(page.getByRole('link', { name: 'Connect Search Console' }).first())
       .toHaveAttribute('href', '/connections.html');
   });
 
@@ -619,7 +619,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
@@ -661,33 +661,33 @@ const AGENCY_ROSTER = { data: [
 const AGENCY_API = { '/portal/context': AGENCY_CTX, '/analytics/portfolio': PORTFOLIO, '/agency/portfolio': AGENCY_ROSTER };
 
 test.describe('Analytics (Agency portfolio lens)', () => {
-  test('wears the dashboard anatomy: header · KPI band · insight cards · rollup · print', async ({ page }) => {
+  test('wears the dashboard anatomy: header · stat strip · insight cards · rollup · print', async ({ page }) => {
     await installApp(page, { api: AGENCY_API });
     await page.goto('/analytics.html');
-    // .dhead anatomy, one h1
-    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    // the same title row as the business dashboard, one h1, an "All clients" chip
+    await expect(dashHead(page)).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('.subline .chip')).toHaveText('All clients');
     await expect(page.getByText(/^As of /)).toBeVisible();
-    await expect(page.getByRole('button', { name: '↻ Refresh' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
     await expect(page.getByText('Across 3 clients, here’s what stands out.')).toBeVisible();
-    // KPI band — every number derived from the payload (KPI tiles are c3;
-    // insight cards are c4 — 'Needs attention' titles exist in both bands)
-    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
-    await expect(kpiCard('Clients').locator('.kn')).toHaveText('3');
-    await expect(kpiCard('Clients').getByRole('link', { name: 'Open Studio →' })).toHaveAttribute('href', '/agency.html');
-    await expect(kpiCard('Needs attention').locator('.kn')).toHaveText('1');
-    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');   // 3 + 1 + 0
-    await expect(kpiCard('Sites live').locator('.kn')).toHaveText('2');
-    await expect(kpiCard('Sites live')).toContainText('1 still in draft');
-    // insight cards recut to the standard anatomy: tone chip · title · number ·
-    // sentence · one .go affordance
-    const inquiries = page.locator('section.card.c4', { has: page.getByRole('heading', { name: 'New inquiries' }) });
+    // the stat strip — every number derived from the payload ('Needs attention'
+    // is both a tile and an insight title, so tiles are looked up by strip)
+    const kpi = (name: string) => tileOf(page, '#portfolioStats', name);
+    await expect(kpi('Clients').locator('.v')).toHaveText('3');
+    await expect(kpi('Clients').getByRole('link', { name: 'Open Studio' })).toHaveAttribute('href', '/agency.html');
+    await expect(kpi('Needs attention').locator('.v')).toHaveText('1');
+    await expect(kpi('Enquiries waiting').locator('.v')).toHaveText('4');   // 3 + 1 + 0
+    await expect(kpi('Sites live').locator('.v')).toHaveText('2');
+    await expect(kpi('Sites live')).toContainText('1 still in draft');
+    // insight cards in the standard anatomy: title · tone chip · number · sentence · links
+    const inquiries = page.locator('section.card.insight', { has: page.getByRole('heading', { name: 'New inquiries' }) });
     await expect(inquiries.locator('.tchip')).toHaveText('Good news');
     await expect(inquiries.locator('.kn')).toHaveText('2');
     await expect(inquiries).toContainText('2 of your 3 clients have new inquiries waiting.');
     await expect(inquiries).toContainText('Marlow’s Kitchen, Beacon Plumbing');
-    await expect(page.locator('.tchip.attention')).toHaveText('Needs a look');
-    await expect(page.getByRole('link', { name: 'Connect it for them →' })).toHaveAttribute('href', '/connections.html?client=s3');
+    await expect(page.locator('.tchip.warn')).toHaveText('Needs a look');
+    await expect(page.getByRole('link', { name: 'Connect it for them' })).toHaveAttribute('href', '/connections.html?client=s3');
     // the per-client rollup: one row per client, name links drill SCOPED
     const rows = page.locator('.tscroll tbody tr');
     await expect(rows).toHaveCount(3);
@@ -718,9 +718,8 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(rows.nth(1).locator('td').last()).toHaveText('—');
     // a successful read with no visits is an honest 0
     await expect(rows.nth(2).locator('td').last()).toHaveText('0');
-    // the KPI band is unchanged by the extra fields
-    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
-    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');
+    // the stat strip is unchanged by the extra fields
+    await expect(tileOf(page, '#portfolioStats', 'Enquiries waiting').locator('.v')).toHaveText('4');
     // no visitors_truncated marker → numbers presented as exact, no cap notice
     await expect(page.getByText(/hidden rather than shown short/)).toHaveCount(0);
   });
@@ -749,8 +748,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByText(/hidden rather than shown short/)).toBeVisible();
     // the rest of the rollup stays exact — enquiries and drill links untouched
     await expect(rows.nth(0).getByRole('link', { name: 'Marlow’s Kitchen' })).toHaveAttribute('href', '/analytics.html?client=s1');
-    const kpiCard = (name: string) => page.locator('section.card.c3', { has: page.getByRole('heading', { name, exact: true }) });
-    await expect(kpiCard('Enquiries waiting').locator('.kn')).toHaveText('4');
+    await expect(tileOf(page, '#portfolioStats', 'Enquiries waiting').locator('.v')).toHaveText('4');
   });
 
   test('older function payload (no site_id/visitors) renders EXACTLY the shipped table', async ({ page }) => {
@@ -769,9 +767,10 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // click the row itself (not the name link) — the drill still fires
     await page.locator('.tscroll tbody tr[data-drill="/analytics.html?client=s2"] td').nth(1).click();
     await expect(page).toHaveURL(/analytics\.html\?client=s2/);
-    // and the destination is the scoped Business dashboard, scope carried
-    await expect(page.getByRole('heading', { name: 'Business dashboard' })).toBeVisible();
+    // and the destination is the scoped Business dashboard (no rollup, no "All clients"), scope carried
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+    await expect(page.locator('.tscroll')).toHaveCount(0);
+    await expect(page.locator('.subline .chip')).toHaveCount(0);
   });
 
   test('a failed portfolio read is the TROUBLE state — never the all-quiet card', async ({ page }) => {
@@ -797,8 +796,8 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await page.route('**/functions/v1/presence/agency/portfolio**', (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
     await page.goto('/analytics.html');
-    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
-    await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Clients', exact: true }) }).locator('.kn')).toHaveText('3');
+    await expect(dashHead(page)).toBeVisible();
+    await expect(tileOf(page, '#portfolioStats', 'Clients').locator('.v')).toHaveText('3');
     await expect(page.getByText('The client-by-client list wouldn’t load just now')).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(0);
   });
@@ -815,7 +814,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // now the roster hiccups while the portfolio read stays fine — ↻ must NOT
     // trade three good rows for the couldn't-load line (loadDash discipline)
     rosterFails = true;
-    await page.getByRole('button', { name: '↻ Refresh' }).click();
+    await page.getByRole('button', { name: 'Refresh' }).click();
     await expect(page.getByText('Couldn’t refresh the client list just now.')).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // last-good kept
     await expect(page.getByText('The client-by-client list wouldn’t load just now')).toHaveCount(0);
@@ -829,7 +828,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     } } } });
     await page.goto('/analytics.html');
     await expect(page.getByText('All quiet.')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // the rollup still renders
   });
 
@@ -839,7 +838,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
       '/agency/portfolio': { data: [] },
     } });
     await page.goto('/analytics.html');
-    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     // the all-quiet wording would contradict an empty portfolio
     await expect(page.getByText('Every client is current')).toHaveCount(0);
     await expect(page.getByText('Nothing to watch yet.')).toBeVisible();
@@ -865,9 +864,9 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await page.goto('/analytics.html');
     // the shipped card fell back to /agency.html whenever >1 client needed it —
     // and `grep -c connections agency.html` is 0, so it landed nowhere that could act
-    await expect(page.getByRole('link', { name: 'Connect Marlow’s Kitchen →' })).toHaveAttribute('href', '/connections.html?client=s1');
-    await expect(page.getByRole('link', { name: 'Connect Beacon Plumbing →' })).toHaveAttribute('href', '/connections.html?client=s2');
-    await expect(page.getByRole('link', { name: 'Choose a client →' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Connect Marlow’s Kitchen' })).toHaveAttribute('href', '/connections.html?client=s1');
+    await expect(page.getByRole('link', { name: 'Connect Beacon Plumbing' })).toHaveAttribute('href', '/connections.html?client=s2');
+    await expect(page.getByRole('link', { name: 'Choose a client' })).toHaveCount(0);
   });
 
   test('draft clients are asked to publish, not to connect Search Console', async ({ page }) => {
@@ -882,7 +881,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': PF } });
     await page.goto('/analytics.html');
     await expect(page.getByRole('heading', { name: 'Publish the site first' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Publish Cedar Studio →' }))
+    await expect(page.getByRole('link', { name: 'Publish Cedar Studio' }))
       .toHaveAttribute('href', '/presence.html?client=s3#publish');
   });
 
@@ -900,7 +899,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByRole('heading', { name: 'Tell us where their website is' })).toBeVisible();
     await expect(page.getByText('Nothing needs publishing.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Publish the site first' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Add the website for Cedar Studio →' }))
+    await expect(page.getByRole('link', { name: 'Add the website for Cedar Studio' }))
       .toHaveAttribute('href', '/presence.html?client=s3#monitor');
   });
 
@@ -908,7 +907,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // additive both ways — the page must never depend on the new field
     await installApp(page, { api: AGENCY_API });
     await page.goto('/analytics.html');
-    await expect(page.getByRole('link', { name: 'Connect it for them →' }))
+    await expect(page.getByRole('link', { name: 'Connect it for them' }))
       .toHaveAttribute('href', '/connections.html?client=s3');
   });
 
@@ -917,7 +916,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await installApp(page, { api: AGENCY_API });
     await page.goto('/analytics.html');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: 'Portfolio dashboard' })).toBeVisible();
+    await expect(dashHead(page)).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
@@ -958,7 +957,7 @@ test.describe('External website door (existing client)', () => {
     await page.goto('/analytics.html');
     // the publish nudge survives — for a genuine greenfield it is still right
     await expect(page.getByText('Publish the site first').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Publish the site →' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Publish the site' }).first()).toBeVisible();
     // …and the alternative is named beside it, pointing where the address is recorded
     await expect(page.getByRole('link', { name: 'Record that website’s address' }).first())
       .toHaveAttribute('href', '/presence.html#monitor');

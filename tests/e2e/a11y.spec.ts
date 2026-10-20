@@ -22,7 +22,7 @@ test.describe('Accessibility', () => {
     '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
     '/commerce/first-run': { data: { dismissed: false, complete: false, done: 1, total: 2, steps: [{ key: 'details', title: 'Add your business details', done: true, hint: '' }, { key: 'publish', title: 'Publish your website', done: false, hint: 'One calm ritual — preview, then publish.' }] } },
   };
-  for (const path of ['/today.html', '/leads.html', '/client.html', '/presence.html']) {
+  for (const path of ['/today.html', '/leads.html', '/client.html', '/presence.html', '/help.html']) {
     test(`no serious/critical axe violations on ${path}`, async ({ page }) => {
       // client.html needs a reviewer context to render its feed
       const api = path === '/presence.html' ? PRESENCE : path === '/client.html' ? {

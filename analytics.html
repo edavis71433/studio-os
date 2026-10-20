@@ -10,12 +10,20 @@
 <style>
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
      light/dark/data-theme all follow it automatically) — same aliasing pattern
-     as pipeline.html / crm.html / inbox.html. */
+     as pipeline.html / crm.html / inbox.html. Visual refresh (2026-10): the page
+     follows the approved "Analytics — business dashboard" board — title + subline
+     with "As of" · a period segmented control + Refresh · a strip of four stat
+     tiles · two-column cards (Pipeline by stage · Enquiries over time · Recent
+     wins · Invoices · Where visitors come from · Top pages · Visitors over time ·
+     Google search). Every honesty state the page had (null aggregates, external
+     hosting, GA provenance, draft/no-domain/waiting search) is kept; charts draw
+     only real data. */
   :root{
-    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
-    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
-    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);--line-2:color-mix(in srgb,var(--dds-line,#e6e6ec) 60%,var(--dds-card,#fff));
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);--bad:var(--dds-bad,#c43c3c);
+    --info:var(--dds-info,#2a6fb5);--info-soft:var(--dds-info-soft,#e8f1fb);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     /* Chart ramp — ONE ordered categorical ramp, indexed by sort order (SLDS
@@ -27,65 +35,88 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c1:#a98ff0;--c2:#8b6fd0;--c3:#6a53a8}}
   :root[data-theme="dark"]{--c1:#a98ff0;--c2:#8b6fd0;--c3:#6a53a8}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:22px 20px 60px}
-  /* ── dashboard header: object icon · serif title · "As of" + Refresh ── */
-  .dhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
-  .obj{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p-soft);display:grid;place-items:center;font-size:17px;flex:none}
-  h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.01em;outline-offset:3px}
-  .asof{color:var(--faint);font-size:12.5px;margin-left:auto;display:flex;align-items:center;gap:10px}
-  .rbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:6px 13px;font:600 12.5px var(--sans);cursor:pointer}
-  .rbtn:hover{border-color:var(--p);color:var(--p)}
-  /* ── filter chip (Lightning: filters under the header, open unfiltered) ── */
-  .filters{display:flex;gap:8px;margin:12px 0 18px;position:relative}
-  .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 13px;font:inherit;font-size:12.5px;color:var(--ink);cursor:pointer}
-  .chip b{color:var(--faint);font-weight:600;margin-right:4px}
-  .chip .car{color:var(--faint);font-size:10px}
-  .chip:hover{border-color:var(--p)}
-  .chipmenu{position:absolute;left:0;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
-  .chipmenu[hidden]{display:none}
-  .chipmenu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;border-radius:8px;cursor:pointer}
-  .chipmenu button:hover{background:var(--p-soft)}
-  /* ── the 12-column grid + Lightning card chrome ── */
-  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-  .band{grid-column:1/-1;font-family:var(--sans);font-size:12px;font-weight:500;color:var(--faint);margin:10px 2px -4px}
-  /* the honest header for a website the studio does NOT host: what these numbers
-     can and cannot say, stated once before the cards rather than implied by four
-     empty ones. Same full-width slot as .band. */
-  .bandnote{grid-column:1/-1;font-size:13px;line-height:1.55;color:var(--soft);background:var(--p-soft);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 13px;margin:2px 0 -2px}
-  .bandnote strong{color:var(--ink);font-weight:700}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
-  .ch{padding:13px 16px 0}
-  .ch .t{font-family:var(--sans);font-size:14px;font-weight:700}
-  .ch .s{font-size:12px;color:var(--faint);margin-top:2px}
-  .cb{padding:10px 16px 14px;flex:1;min-width:0}
-  .cf{border-top:1px solid var(--line);padding:8px 16px}
-  .cf a{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
-  .cf a:hover{text-decoration:underline}
-  .c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}
-  /* metric */
-  .kn{font-size:30px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-  .kn.warn{color:var(--warn)}
-  .kn.small{font-size:22px;padding-top:6px}
-  .kd{font-size:12px;color:var(--faint);margin-top:3px}
-  .kd b.up{color:var(--good);font-weight:700}
-  .kd b.down{color:var(--warn);font-weight:700}
-  /* funnel */
-  .fr{display:flex;align-items:center;gap:10px;margin:7px 0}
-  .fl{width:104px;font-size:12px;color:var(--soft);text-align:right;flex:none}
-  .fb{height:22px;border-radius:5px;flex:none;max-width:calc(100% - 200px)}
-  .fv{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
-  /* tables */
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-  th{text-align:left;color:var(--faint);font-weight:500;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
-  td{padding:7px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
-  tr:last-child td{border-bottom:none}
-  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-  /* charts */
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:20px 28px 90px}
   svg{display:block}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  a{color:var(--p)}
+
+  /* ── title row · subline · period control ── */
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15;outline-offset:3px}
+  .subline{display:flex;gap:12px;flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:5px}
+  .subline .dot{color:var(--faint)}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg);max-width:100%}
+  .seg button{font:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:none;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  .seg button:hover{color:var(--ink)}
+  .seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+  .seg button:focus-visible{outline-offset:-2px}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+  .btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);line-height:18px;white-space:nowrap}
+  .chip .d{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+  .chip.good{background:var(--good-soft);border-color:transparent;color:var(--good)} .chip.good .d{background:var(--good)}
+  .chip.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)} .chip.warn .d{background:var(--warn)}
+  .chip.p{background:var(--p-soft);border-color:transparent;color:var(--p)} .chip.p .d{background:var(--p)}
+
+  /* ── section labels · the honest header for a site the studio does not host ── */
+  .band{font-size:14px;font-weight:600;margin:22px 0 8px}
+  .band:first-of-type{margin-top:18px}
+  .bandnote{font-size:13px;line-height:1.55;color:var(--soft);background:var(--info-soft);border:1px solid color-mix(in srgb,var(--info) 22%,var(--line));border-radius:var(--dds-r,8px);padding:10px 13px;margin:0 0 12px}
+  .bandnote strong{color:var(--ink);font-weight:600}
+  .scopenote{font-size:13px;color:var(--soft);margin:0 0 10px}
+
+  /* ── stat strip ── */
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+  .stat{padding:14px 16px;border-left:1px solid var(--line);min-width:0;display:flex;align-items:flex-start;gap:12px}
+  .stat:first-child{border-left:none}
+  .stat .ico{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p);margin-top:1px}
+  .stat .ico.good{background:var(--good-soft);color:var(--good)} .stat .ico.warn{background:var(--warn-soft);color:var(--warn)} .stat .ico.info{background:var(--info-soft);color:var(--info)}
+  .stat .ico svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .stat .sb{min-width:0;flex:1}
+  .stat .k{font-size:12px;color:var(--faint);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .stat .k .w{color:var(--faint)}
+  .stat .k a{color:var(--faint);font-size:11px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:0 7px;line-height:16px;background:var(--bg)}
+  .stat .k a:hover{color:var(--p);border-color:var(--p)}
+  .stat .v{font-size:20px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+  .stat .v.warn{color:var(--warn)}
+  .stat .v.word{font-size:16px;white-space:nowrap}
+  .stat .v.none{color:var(--faint);font-weight:500}
+  .stat .s{font-size:12px;color:var(--faint);margin-top:1px}
+  .stat .s b.up{color:var(--good);font-weight:600} .stat .s b.down{color:var(--warn);font-weight:600}
+  .stat .s2{font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
+
+  /* ── cards ── */
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+  .card{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:14px;box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column}
+  .card.span2{grid-column:1/-1}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .card-h h3{margin:0;font-size:14px;font-weight:600}
+  .card-h .hr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card-h .s{font-size:12.5px;color:var(--faint)}
+  .card-h a.lk{font-size:12.5px;text-decoration:none;font-weight:500} .card-h a.lk:hover{text-decoration:underline}
+  .cb{flex:1;min-width:0;margin-top:12px}
+  .crow{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap}
+  .crow .fine{font-size:12.5px;color:var(--faint)}
+  /* charts: real SVG, role=img with the numbers in the label; the visible numbers live in the chart and the note */
+  svg.chart{width:100%;height:auto}
   .chartnote{font-size:12px;color:var(--faint);margin-top:6px;font-variant-numeric:tabular-nums}
-  .leg{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .srcs{display:grid;grid-template-columns:minmax(90px,130px) 1fr 48px;gap:10px 12px;align-items:center;font-size:13px}
+  .srcs .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .progress i{display:block;height:100%;background:var(--p);border-radius:3px}
+  .rows{display:flex;flex-direction:column}
+  .prow{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line-2);min-width:0}
+  .prow:first-child{border-top:none;padding-top:0}
+  .prow .t{flex:1;min-width:0}
+  .prow .t b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .t span{color:var(--faint);font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .n{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .prow .n small{color:var(--faint);font-weight:400;margin-left:6px}
+  .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:600;flex:0 0 auto;background:var(--good-soft);color:var(--good)}
+  .leg{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--soft);font-variant-numeric:tabular-nums;list-style:none;padding:0}
   .leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px}
   .donutwrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
   /* empty state (SLDS illustration pattern: aria-hidden art + required heading) */
@@ -93,63 +124,62 @@
   .empty svg{margin:0 auto 8px}
   .eh{font-weight:600;font-size:13.5px}
   .el{font-size:12.5px;color:var(--soft);margin-top:3px}
+  .el a{color:var(--p)}
   /* stencil loading (only shown when the fetch runs >300ms) */
   .st{background:var(--line);border-radius:var(--dds-r-lg,10px);opacity:.55}
   @media (prefers-reduced-motion:no-preference){.st{animation:stp 1.1s ease-in-out infinite alternate}}
   @keyframes stp{to{opacity:.3}}
-  /* portfolio lens (agency, unscoped — SS7: the same .dhead dashboard anatomy) */
-  .cfull{grid-column:1/-1}
-  .subline{grid-column:1/-1;color:var(--soft);font-size:14.5px;margin:2px 2px 0}
-  .tchip{display:inline-block;font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;text-transform:capitalize}
-  .tchip.good{color:var(--good);background:var(--good-soft)}
-  .tchip.attention{color:var(--warn);background:var(--warn-soft)}
-  .tchip.neutral{color:var(--p);background:var(--p-soft)}
-  .isent{font-size:14px;color:var(--ink);margin-top:4px;line-height:1.45}
-  .card .go{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
-  .card .go:hover{text-decoration:underline}
-  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:var(--dds-r-lg,10px);padding:15px 18px;color:var(--soft);font-size:14.5px}
+  /* portfolio lens (agency, unscoped — SS7: the same dashboard anatomy) */
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:12px}
+  .kn{font-size:26px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:10px}
+  .isent{font-size:13.5px;color:var(--ink);margin-top:6px;line-height:1.5}
+  .kd{font-size:12.5px;color:var(--faint);margin-top:3px}
+  .card .links{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:10px}
+  .card .links a{font-size:12.5px;text-decoration:none;font-weight:500}
+  .card .links a:hover{text-decoration:underline}
+  .quiet{background:var(--card);border:1px dashed var(--line);border-radius:var(--dds-r-lg,10px);padding:15px 18px;color:var(--soft);font-size:13.5px;margin-top:12px}
   .quiet b{color:var(--ink);font-weight:600}
   /* per-client rollup — customers.html's .tscroll anatomy (wide content scrolls
      inside its own container; the page never scrolls sideways) */
-  .tscroll{grid-column:1/-1;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
-  .tscroll table{min-width:560px}
-  .tscroll th{padding:11px 14px}
-  .tscroll td{padding:10px 14px}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
+  .tscroll table{min-width:560px;width:100%;border-collapse:collapse;font-size:13.5px}
+  .tscroll caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .tscroll th{font-size:12px;color:var(--faint);font-weight:500;text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
+  .tscroll td{padding:10px 14px;border-top:1px solid var(--line-2);vertical-align:middle}
+  .tscroll tr:first-child td{border-top:none}
+  .tscroll td.r,.tscroll th.r{text-align:right;font-variant-numeric:tabular-nums}
   .tscroll tbody tr{cursor:pointer}
-  .tscroll tbody tr:hover td{background:var(--p-soft)}
+  .tscroll tbody tr:hover td{background:var(--bg)}
   .tscroll td a{color:var(--ink);text-decoration:none;font-weight:600}
   .tscroll td a:hover{color:var(--p)}
-  .pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border-radius:999px;padding:1px 8px;white-space:nowrap;line-height:18px}
   .pill.wait{color:var(--warn);background:var(--warn-soft)} .pill.ok{color:var(--good);background:var(--good-soft)}
+  .rollnote{color:var(--soft);font-size:12.5px;margin:6px 2px 0}
+  .muted{color:var(--soft)}
   /* shared states */
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
-  .muted{color:var(--soft);font-size:14.5px}
+  .center .muted{font-size:14px}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
   @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:40}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--dds-r-lg,10px);font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:40}
   .toast.show{opacity:1}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  /* print (restored from the pre-slice-8 page): the noprint chrome hides, cards
-     never break mid-page, and the "Print this summary" button offers the path */
+  /* print: the chrome hides, cards never break mid-page, "Print this summary" offers the path */
   .print{margin-top:26px;text-align:center}
-  .print button{background:none;border:1px solid var(--line);border-radius:var(--dds-r,8px);color:var(--soft);font:inherit;font-size:13px;font-weight:500;padding:8px 16px;cursor:pointer}
-  .print button:hover{border-color:var(--p);color:var(--p)}
-  @media print{.seg,.print,.filters,.noprint,#dds-shell{display:none!important}.wrap{max-width:100%}.card,.tscroll{box-shadow:none;break-inside:avoid}}
-  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
-  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
-  /* mobile: cards stack — pairs at tablet width, a single column on phones */
-  @media (max-width:900px){.c3{grid-column:span 6}.c4,.c6{grid-column:span 12}}
-  @media (max-width:560px){.c3{grid-column:span 12}.asof{margin-left:0;width:100%}}
+  @media print{.seg,.print,.noprint,#dds-shell,#refreshBtn{display:none!important}.wrap{max-width:100%}.card,.tscroll,.stats{box-shadow:none;break-inside:avoid}}
+  /* tablet and phone: tiles pair up, then stack; cards go to one column */
+  @media (max-width:1000px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(3){border-left:none}.stat:nth-child(n+3){border-top:1px solid var(--line)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
+  @media (max-width:560px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.stats{grid-template-columns:minmax(0,1fr)}.stat{border-left:none}.stat+.stat{border-top:1px solid var(--line)}.seg{overflow-x:auto}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Analytics — your business at a glance. Numbers only where they’re real.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -168,27 +198,25 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 // ── formatting (all money is cents; everything tabular-nums) ──
 const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
 const num=(n)=>(Number(n)||0).toLocaleString();
-// hash-aware, matching shell.js:123 — a fragment target like
-// /presence.html#publish must become /presence.html?client=X#publish, never
-// /presence.html#publish?client=X (which puts the scope inside the fragment and
-// silently drops it)
+// hash-aware, matching shell.js — a fragment target like /presence.html#publish
+// must become /presence.html?client=X#publish, never /presence.html#publish?client=X
 const withScope=(href)=>{
   if(!scope()||!href)return href;
   const hi=href.indexOf('#'),hash=hi>=0?href.slice(hi):'',base=hi>=0?href.slice(0,hi):href;
   return base+(base.includes('?')?'&':'?')+'client='+encodeURIComponent(scope())+hash;
 };
-// D1 — the withScopePeriod pair: card() layers withScope onto every footer href,
+// D1 — the withScopePeriod pair: card() layers withScope onto every drill href,
 // so passing a withPeriod()'d target means the drill link carries the active
 // window AND the scope. Only targets that understand windows get a period
-// (business-insights — SS11 consumes these). Pipeline footers: the won-deals
-// footers carry ?stage=won (SS5's landing) but stay period-less — the pipeline
-// won view isn't windowed (no won-date filter on the deals API), and lying a
-// period onto a target that ignores it breaks the discipline.
+// (business-insights — SS11 consumes these). The won-deals drills carry
+// ?stage=won (SS5's landing) but stay period-less — the pipeline won view
+// isn't windowed (no won-date filter on the deals API).
 const withPeriod=(href)=>href+(href.includes('?')?'&':'?')+'period='+encodeURIComponent(PERIOD);
+// the FOUR windows the function accepts (lib/analytics_dashboard.ts DASH_PERIODS) — no others exist
 const PERIODS=[['this_month','This month'],['last_30','Last 30 days'],['quarter','This quarter'],['all','All time']];
 const periodLabel=()=>{const p=PERIODS.find(x=>x[0]===PERIOD);return p?p[1]:'This month';};
 // Truncation honesty (AN-4): a capped read is "the most recent N", so the card
-// says so — a static, esc-safe suffix on the subtitle.
+// says so — a static, esc-safe suffix.
 const based=(sub,flag)=>flag?(sub?sub+' · based on recent activity':'Based on recent activity'):sub;
 // GSC period labeling: Search Console data can lag a month — when the reported
 // period isn't the current calendar month, qualify the number (" · in June").
@@ -205,12 +233,40 @@ function gscQual(period){
 }
 function asOf(iso){const d=iso?new Date(iso):new Date();const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return (sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
 function shortDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});}
+const initials=(s)=>String(s||'').split(/[\s—–-]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'·';
+const pageName=(path)=>{if(!path||path==='/')return'Home';const seg=String(path).split('?')[0].split('#')[0].split('/').filter(Boolean).pop()||'Home';const w=seg.replace(/\.(html?|php)$/i,'').replace(/[-_]+/g,' ');return w.charAt(0).toUpperCase()+w.slice(1);};
+
+// ── icons (one per tile) ──
+const IC={
+  pipe:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+  money:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  support:'<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
+  people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+  tap:'<path d="M8 13V5a2 2 0 1 1 4 0v6"/><path d="M12 11V9a2 2 0 1 1 4 0v3"/><path d="M16 12a2 2 0 1 1 4 0v3a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-2.7L4 14a2 2 0 0 1 3.3-2.3L8 13"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  source:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  warn:'<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
+  live:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+};
+const ico=(k,tone)=>`<span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]||IC.globe}</svg></span>`;
 
 // ── building blocks ──
-function card(cls,title,sub,body,foot){
-  return `<section class="card ${cls}"><div class="ch"><h3 class="t">${esc(title)}</h3>${sub?`<p class="s">${esc(sub)}</p>`:''}</div><div class="cb">${body}</div>${foot?`<div class="cf"><a href="${esc(withScope(foot[0]))}">${esc(foot[1])} →</a></div>`:''}</section>`;
+// a stat tile: label (+ window + View) · value · one line. Empty tiles say "—"
+// and carry the honest heading + line of the state they are in — never a zero.
+function tile(o){
+  const link=o.link?` <a href="${esc(withScope(o.link[0]))}">${esc(o.link[1]||'View')}</a>`:'';
+  const win=o.window?`<span class="w"> · ${esc(o.window)}</span>`:'';
+  const v=o.empty?`<div class="v none">—</div><div class="s">${esc(o.empty[0])}</div><div class="s2">${esc(o.empty[1]||'')}${win}</div>`
+    :`<div class="v${o.mod?' '+o.mod:''}">${o.value}</div><div class="s">${o.sub||''}${win}</div>`;
+  return `<div class="stat"${o.id?` id="${o.id}"`:''}>${ico(o.icon,o.tone)}<div class="sb"><div class="k"><span class="kt">${esc(o.title)}</span>${link}</div>${v}</div></div>`;
 }
-function kpi(value,kd,mod){return `<p class="kn${mod?' '+mod:''}">${value}</p><p class="kd">${kd}</p>`;}
+// a card: title · (subtitle · one link) · body. The link is the card's drill.
+function card(cls,title,sub,body,link){
+  const hr=(sub||link)?`<span class="hr">${sub?`<span class="s">${esc(sub)}</span>`:''}${link?`<a class="lk" href="${esc(withScope(link[0]))}">${esc(link[1])}</a>`:''}</span>`:'';
+  return `<section class="card${cls?' '+cls:''}"><div class="card-h"><h3>${esc(title)}</h3>${hr}</div><div class="cb">${body}</div></section>`;
+}
 // SLDS illustration empty state: aria-hidden art + REQUIRED heading + one line.
 // `extraHtml` (optional) is trusted, pre-built markup — the one caller (the
 // draft search state's "already live elsewhere" alternative) escapes its own
@@ -222,25 +278,49 @@ function emptyState(h,line,extraHtml){
     <circle cx="58" cy="21" r="3" fill="var(--p-soft)"/>
   </svg><p class="eh">${esc(h)}</p><p class="el">${esc(line)}</p>${extraHtml||''}</div>`;
 }
-// weekly line — inline SVG, aria-hidden; the visible numbers live in the caption
-function lineChart(series,color,noun){
+// weekly line — real SVG with the dates of the first, middle and last 7-day
+// bucket (the function buckets back from generated_at, oldest first), the
+// line, the last point; the visible numbers also live in the note below.
+function lineChart(series,color,noun,endIso){
   const s=(series||[]).map(v=>Number(v)||0);
   if(s.length<2||!s.some(v=>v>0))return null;   // <2 points → the empty state (step math would NaN)
-  const W=460,max=Math.max.apply(null,s);
-  const step=W/(s.length-1);
-  const y=(v)=>Math.round((100-(v/max)*86)*10)/10;
-  const pts=s.map((v,i)=>`${Math.round(i*step)},${y(v)}`).join(' ');
-  const lastX=Math.min(Math.round((s.length-1)*step),W-4),lastY=y(s[s.length-1]);   // inset the dot — never half-clipped at the edge
+  const W=520,L=20,R=20,T=16,B=30,H=170,max=Math.max.apply(null,s);
+  const step=(W-L-R)/(s.length-1);
+  const y=(v)=>Math.round((T+(1-v/max)*(H-T-B))*10)/10;
+  const x=(i)=>Math.round(L+i*step);
+  const pts=s.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
   const total=s.reduce((a,b)=>a+b,0);
-  return `<svg viewBox="0 0 460 120" width="100%" height="130" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-    <line x1="0" y1="100" x2="460" y2="100" stroke="var(--line)"/>
-    <line x1="0" y1="55" x2="460" y2="55" stroke="var(--line)" stroke-dasharray="3 4"/>
-    <line x1="0" y1="10" x2="460" y2="10" stroke="var(--line)" stroke-dasharray="3 4"/>
-    <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${pts}"/>
-    <circle cx="${lastX}" cy="${lastY}" r="3.5" fill="${color}"/>
+  const endMs=Date.parse(endIso||'')||Date.now();
+  const startOf=(i)=>new Date(endMs-(s.length-i)*7*86400000);
+  const lab=(d)=>d.toLocaleDateString([],{month:'short',day:'numeric'});
+  const mid=Math.floor((s.length-1)/2);
+  const grid=[0,0.5,1].map(f=>`<line x1="${L}" y1="${y(max*f)}" x2="${W-R}" y2="${y(max*f)}" stroke="var(--line)"${f?' stroke-dasharray="3 4"':''}/>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of weekly ${esc(noun)}, ${lab(startOf(0))} to ${lab(startOf(s.length-1))}: ${s.map(num).join(', ')}" focusable="false">
+    ${grid}
+    <polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" points="${pts}"/>
+    <circle cx="${x(s.length-1)}" cy="${y(s[s.length-1])}" r="4" fill="${color}"/>
+    <g font-family="Inter, sans-serif" font-size="11" fill="var(--faint)"><text x="${L}" y="${H-8}">${esc(lab(startOf(0)))}</text><text x="${x(mid)}" y="${H-8}" text-anchor="middle">${esc(lab(startOf(mid)))}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${esc(lab(startOf(s.length-1)))}</text></g>
   </svg><p class="chartnote">${num(s[s.length-1])} ${esc(noun)} this week · ${num(total)} in the last 12 weeks</p>`;
 }
-// donut — total in the hole (Lightning donut canon); legend is real text
+// stage bars — value on top, stage below (the approved board's chart); every
+// number is also in the accessible label and the note
+function barChart(bars,note){
+  const W=520,H=170,L=20,R=20,T=24,B=24;
+  const max=Math.max.apply(null,bars.map(b=>Math.max(b.v,1)));
+  const slot=(W-L-R)/bars.length,bw=Math.min(64,Math.round(slot*0.62));
+  const base=H-B;
+  const rects=bars.map((b,i)=>{
+    const h=b.v>0?Math.max(3,Math.round((b.v/max)*(base-T))):0;
+    const x=Math.round(L+slot*i+(slot-bw)/2);
+    return `<rect x="${x}" y="${base-h}" width="${bw}" height="${h}" rx="3" fill="${b.c}"/>`
+      +`<text x="${x+bw/2}" y="${h?base-h-6:base-6}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">${esc(b.text)}</text>`
+      +`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--faint)">${esc(b.label)}</text>`;
+  }).join('');
+  const label='Bar chart: '+bars.map(b=>`${b.label} ${b.text}${b.count!=null?` (${num(b.count)} deal${b.count===1?'':'s'})`:''}`).join(', ');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}" focusable="false" font-family="Inter, sans-serif">
+    <line x1="${L}" y1="${base}" x2="${W-R}" y2="${base}" stroke="var(--line)"/>${rects}</svg>${note?`<p class="chartnote">${note}</p>`:''}`;
+}
+// donut — total in the hole; legend is real text
 function donut(segs,holeTop,holeBottom,legend){
   const C=289.03,total=segs.reduce((a,s)=>a+s.v,0);
   let off=0;
@@ -249,16 +329,15 @@ function donut(segs,holeTop,holeBottom,legend){
     const a=`<circle cx="60" cy="60" r="46" fill="none" stroke="${s.c}" stroke-width="17" stroke-dasharray="${len.toFixed(1)} ${C.toFixed(0)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 60 60)"/>`;
     off+=len;return a;
   }).join(''):`<circle cx="60" cy="60" r="46" fill="none" stroke="var(--line)" stroke-width="17"/>`;
-  return `<div class="donutwrap"><svg viewBox="0 0 120 120" width="118" height="118" aria-hidden="true" focusable="false">${arcs}
-    <text x="60" y="56" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)">${esc(holeTop)}</text>
+  return `<div class="donutwrap"><svg viewBox="0 0 120 120" width="118" height="118" role="img" aria-label="${esc(legend.map(l=>l.text).join(', '))}" focusable="false">${arcs}
+    <text x="60" y="56" text-anchor="middle" font-size="15" font-weight="600" fill="var(--ink)">${esc(holeTop)}</text>
     <text x="60" y="72" text-anchor="middle" font-size="9" fill="var(--faint)">${esc(holeBottom)}</text>
-  </svg><ul class="leg" style="list-style:none;padding:0">${legend.map(l=>`<li><i style="background:${l.c}"></i>${esc(l.text)}</li>`).join('')}</ul></div>`;
+  </svg><ul class="leg">${legend.map(l=>`<li><i style="background:${l.c}"></i>${esc(l.text)}</li>`).join('')}</ul></div>`;
 }
 
 // stage colors: ONE mapping, indexed by ladder order (the approved mockup ramp;
 // won = --good, exactly pipeline.html's .stage.won green)
 const STAGE_COLOR={lead:'var(--c3)',qualified:'var(--c2)',proposal:'var(--c1)',contract:'var(--c4)',won:'var(--good)'};
-const STAGE_SHORT={lead:'Lead',qualified:'Qual.',proposal:'Prop.',contract:'Agr.',won:'Won'};
 
 // ── the two bands ──
 function salesBand(d){
@@ -270,110 +349,77 @@ function salesBand(d){
   // for the reader to guess. (Older function builds send no `scope`; the line
   // simply doesn't appear, exactly as shipped.)
   if(s.scope==='client'){
-    h+=`<p class="cfull" style="color:var(--soft);font-size:.86rem;margin:-2px 2px 8px">Your deal and invoices with this client. Enquiries and support below are theirs. Your full pipeline lives at the studio level — leave this client to see it.</p>`;
+    h+=`<p class="scopenote">Your deal and invoices with this client. Enquiries and support below are theirs. Your full pipeline lives at the studio level — leave this client to see it.</p>`;
   }
-  // KPI: open pipeline
-  h+=card('c3','Open pipeline',based('',s.truncated_deals),
-    s.pipeline?kpi(money(s.pipeline.open.value_cents),`${num(s.pipeline.open.count)} open deal${s.pipeline.open.count===1?'':'s'}`)
-      :emptyState('Nothing to count yet','Your open deals will total up here.'),
-    ['/pipeline.html','View pipeline']);
-  // KPI: won this month (↑/↓ vs last month). D3: the number is summed
-  // expected_value_cents, so the copy says so — never implied invoiced revenue.
+  const trunc=(t)=>t?' · based on recent activity':'';
+  h+=`<div class="stats" id="salesStats">`;
+  // open pipeline
+  h+=tile({icon:'pipe',title:'Open pipeline',link:['/pipeline.html','View'],
+    ...(s.pipeline?{value:money(s.pipeline.open.value_cents),sub:`${num(s.pipeline.open.count)} open deal${s.pipeline.open.count===1?'':'s'}${trunc(s.truncated_deals)}`}
+      :{empty:['Nothing to count yet','Your open deals will total up here.']})});
+  // won this month (↑/↓ vs last month). D3: the number is summed expected_value_cents, so the copy says so.
   {
-    let body;
+    let t;
     if(s.won){
       const tm=s.won.this_month||{count:0,value_cents:0},lm=s.won.last_month||{count:0,value_cents:0};
       const hint=(tm.value_cents||lm.value_cents)?(tm.value_cents>lm.value_cents?' · <b class="up">↑ vs last month</b>':tm.value_cents<lm.value_cents?' · <b class="down">↓ vs last month</b>':' · same as last month'):'';
       // "$0 · none won yet" reads identically for three very different truths:
       // you had no wins, your wins were LAST month, or this band can't see your
-      // wins at all. The third is fixed server-side; this fixes the second — when
-      // there IS a win outside the window, name when it was instead of implying
-      // there is none.
+      // wins at all. When there IS a win outside the window, name when it was.
       const outside=(!tm.count&&Array.isArray(s.recent_wins)&&s.recent_wins.length)?s.recent_wins[0]:null;
       const outsideNote=outside?` · most recent win ${esc(shortDate(outside.closed_at))} (${money(outside.value_cents)})`
         :(!tm.count&&lm.count)?` · ${num(lm.count)} won last month`:'';
-      body=tm.count?kpi(money(tm.value_cents),`expected value of ${num(tm.count)} deal${tm.count===1?'':'s'} won${hint}`)
-        :kpi('$0',`none won yet this month${outsideNote||hint}`);
-    }else body=emptyState('Nothing to count yet','Deals you win will show up here.');
-    // SS5's ?stage=won landing (D1): the footer lands on the List view that
-    // provably renders won deals — never the board that hides them. No period:
-    // this card's window is fixed ("this month") and the pipeline's won view
-    // isn't windowed (the deals API has no won-date filter); scope rides via
-    // card()'s withScope as everywhere.
-    h+=card('c3','Won this month',based('',s.truncated_deals),body,['/pipeline.html?stage=won','View won deals']);
+      t=tm.count?{value:money(tm.value_cents),sub:`expected value of ${num(tm.count)} deal${tm.count===1?'':'s'} won${hint}${trunc(s.truncated_deals)}`}
+        :{value:'$0',sub:`none won yet this month${outsideNote||hint}${trunc(s.truncated_deals)}`};
+    }else t={empty:['Nothing to count yet','Deals you win will show up here.']};
+    // SS5's ?stage=won landing (D1): the drill lands on the List view that provably renders won deals
+    h+=tile({icon:'money',tone:'good',title:'Won this month',link:['/pipeline.html?stage=won','View'],...t});
   }
-  // KPI: new enquiries (D2: the count is period-windowed — label the window,
-  // matching the sibling cards' periodLabel() wording)
-  h+=card('c3','New enquiries',based(periodLabel(),s.truncated_enquiries),
-    s.enquiries?kpi(num(s.enquiries.count),s.enquiries.unanswered?`${num(s.enquiries.unanswered)} not yet answered`:'all answered')
-      :emptyState('Nothing to count yet','Website enquiries will land here.'),
-    ['/leads.html','View enquiries']);
-  // KPI: open support
-  h+=card('c3','Open support','',
-    s.support?kpi(num(s.support.open),s.support.open?(s.support.oldest_age_days>=1?`oldest waiting ${num(s.support.oldest_age_days)} day${s.support.oldest_age_days===1?'':'s'}`:'oldest arrived today'):'nothing waiting',s.support.open?'warn':'')
-      :emptyState('Nothing to count yet','Support requests will show here.'),
-    ['/inbox.html','View inbox']);
-  // funnel: pipeline by stage
-  {
-    let body;
-    if(s.pipeline&&s.pipeline.stages&&s.pipeline.stages.some(x=>x.count>0)){
-      const maxV=Math.max.apply(null,s.pipeline.stages.map(x=>Math.max(x.value_cents,1)));
-      const useCount=!s.pipeline.stages.some(x=>x.value_cents>0);
-      const maxC=Math.max.apply(null,s.pipeline.stages.map(x=>Math.max(x.count,1)));
-      body=s.pipeline.stages.map(x=>{
-        const pct=Math.max(4,Math.round((useCount?(x.count/maxC):(x.value_cents/maxV))*64));
-        return `<div class="fr"><span class="fl">${esc(x.label)}</span><div class="fb" style="width:${pct}%;background:${STAGE_COLOR[x.stage]||'var(--c1)'}" aria-hidden="true"></div><span class="fv">${money(x.value_cents)} · ${num(x.count)}</span></div>`;
-      }).join('');
-    }else body=emptyState('No open deals','Deals you add to the pipeline will stack up here by stage.');
-    h+=card('c6','Pipeline by stage',based('Open deal value, stage order',s.truncated_deals),body,['/pipeline.html','View pipeline']);
-  }
-  // line: enquiries over time
-  h+=card('c6','Enquiries over time',based('Weekly, last 12 weeks',s.truncated_enquiries),
-    (s.enquiries&&lineChart(s.enquiries.weekly,'var(--c1)','enquiries'))||emptyState('No enquiries yet','When people reach out through your website, the trend shows here.'),
-    ['/leads.html','View enquiries']);
-  // bar: deal value by stage (+ won this month) — same stages guard as the
-  // funnel (a null stages array must render the empty state, never throw
-  // mid-render on a soft refresh)
+  // new enquiries (D2: the count is period-windowed — the tile says its window)
+  h+=tile({icon:'mail',tone:'info',title:'New enquiries',window:periodLabel(),link:['/leads.html','View'],
+    ...(s.enquiries?{value:num(s.enquiries.count),sub:(s.enquiries.unanswered?`${num(s.enquiries.unanswered)} not yet answered`:'all answered')+trunc(s.truncated_enquiries)}
+      :{empty:['Nothing to count yet','Website enquiries will land here.']})});
+  // open support
+  h+=tile({icon:'support',tone:'warn',title:'Open support',link:['/inbox.html','View'],
+    ...(s.support?{value:num(s.support.open),mod:s.support.open?'warn':'',sub:s.support.open?(s.support.oldest_age_days>=1?`oldest waiting ${num(s.support.oldest_age_days)} day${s.support.oldest_age_days===1?'':'s'}`:'oldest arrived today'):'nothing waiting'}
+      :{empty:['Nothing to count yet','Support requests will show here.']})});
+  h+=`</div><div class="grid2">`;
+  // pipeline by stage — the open stages plus this month's won, as bars (a null
+  // stages array must render the empty state, never throw mid-render on a soft refresh)
   {
     let body=null;
-    if(s.pipeline&&Array.isArray(s.pipeline.stages)&&s.won){
-      const bars=s.pipeline.stages.map(x=>({label:STAGE_SHORT[x.stage]||x.stage,v:x.value_cents,c:STAGE_COLOR[x.stage]||'var(--c1)'}));
-      bars.push({label:'Won',v:(s.won.this_month||{}).value_cents||0,c:STAGE_COLOR.won});
-      if(bars.some(b=>b.v>0)){
-        const max=Math.max.apply(null,bars.map(b=>Math.max(b.v,1)));
-        const bw=34,gap=(300-bars.length*bw)/(bars.length+1);
-        body=`<svg viewBox="0 0 300 130" width="100%" height="140" aria-hidden="true" focusable="false"><line x1="0" y1="112" x2="300" y2="112" stroke="var(--line)"/>`+
-          bars.map((b,i)=>{
-            const x=Math.round(gap+(bw+gap)*i),hgt=Math.max(b.v>0?4:0,Math.round((b.v/max)*70));
-            return `<rect x="${x}" y="${112-hgt}" width="${bw}" height="${hgt}" rx="4" fill="${b.c}"/><text x="${x+bw/2}" y="126" font-size="9.5" fill="var(--faint)" text-anchor="middle">${esc(b.label)}</text>`;
-          }).join('')+`</svg><p class="chartnote">Open ${money(s.pipeline.open.value_cents)} · Won this month ${money((s.won.this_month||{}).value_cents||0)}</p>`;
-      }
+    if(s.pipeline&&Array.isArray(s.pipeline.stages)&&s.pipeline.stages.some(x=>x.count>0||x.value_cents>0)){
+      const bars=s.pipeline.stages.map(x=>({label:x.label,v:x.value_cents,count:x.count,text:money(x.value_cents),c:STAGE_COLOR[x.stage]||'var(--c1)'}));
+      if(s.won){const w=s.won.this_month||{};bars.push({label:'Won',v:w.value_cents||0,count:w.count||0,text:money(w.value_cents||0),c:STAGE_COLOR.won});}
+      const open=s.pipeline.open||{count:0,value_cents:0};
+      body=barChart(bars,`Open ${money(open.value_cents)} across ${num(open.count)} deal${open.count===1?'':'s'}${s.won?` · won this month ${money((s.won.this_month||{}).value_cents||0)}`:''}`);
     }
-    // widens to c6 when the invoices card is hidden, so the row stays c6+c6
-    h+=card(s.invoices?'c4':'c6','Deal value by stage',based('Open + won this month',s.truncated_deals),body||emptyState('No deal value yet','Give your deals a value and this chart fills in.'),['/pipeline.html','View pipeline']);
+    h+=card('','Pipeline by stage',based('Open deal value'+(s.won?' · won this month':''),s.truncated_deals),body||emptyState('No open deals','Deals you add to the pipeline will stack up here by stage.'),['/pipeline.html','View pipeline']);
   }
-  // donut: invoices — HIDDEN entirely when the read isn't available (null)
+  // enquiries over time
+  h+=card('','Enquiries over time',based('Weekly, last 12 weeks',s.truncated_enquiries),
+    (s.enquiries&&lineChart(s.enquiries.weekly,'var(--c1)','enquiries',d&&d.generated_at))||emptyState('No enquiries yet','When people reach out through your website, the trend shows here.'),
+    ['/leads.html','View enquiries']);
+  // recent wins — spans the row when the invoices read isn't available (null)
+  {
+    const rows=(s.recent_wins||[]);
+    const body=rows.length?`<div class="rows">${rows.map(w=>`<div class="prow"><span class="av" aria-hidden="true">${esc(initials(w.title))}</span><div class="t"><b>${esc(w.title)}</b><span>Won ${esc(shortDate(w.closed_at))}</span></div><span class="n">${money(w.value_cents)}</span></div>`).join('')}</div>`
+      :emptyState('No wins yet','Deals you win in the next 90 days will be listed here.');
+    // SS5's ?stage=won landing (D1) — same target as the Won-this-month tile; fixed 90-day window, so no period param.
+    h+=card(s.invoices?'':'span2','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html?stage=won','Won deals']);
+  }
+  // invoices — HIDDEN entirely when the read isn't available (null)
   if(s.invoices){
     const iv=s.invoices;
     const any=iv.paid_count||iv.sent_count||iv.overdue_count;
-    // the outstanding total lives in the (aria-hidden) donut hole AND as real
-    // text below the legend — never SVG-only
     const body=any?donut(
       [{v:iv.paid_cents,c:'var(--good)'},{v:iv.sent_cents,c:'var(--c2)'},{v:iv.overdue_cents,c:'var(--bad)'}],
       money(iv.outstanding_cents),'outstanding',
       [{c:'var(--good)',text:`Paid · ${money(iv.paid_cents)}`},{c:'var(--c2)',text:`Sent · ${money(iv.sent_cents)}`},{c:'var(--bad)',text:`Overdue · ${money(iv.overdue_cents)}`}]
     )+`<p class="chartnote">Outstanding · ${money(iv.outstanding_cents)}</p>`:emptyState('No invoices yet','Invoices you send from a deal will total up here.');
-    h+=card('c4','Invoices',based(periodLabel(),s.truncated_invoices),body,['/pipeline.html','View invoices']);
+    h+=card('','Invoices',based(periodLabel(),s.truncated_invoices),body,['/pipeline.html','View invoices']);
   }
-  // table: recent wins
-  {
-    const rows=(s.recent_wins||[]);
-    const body=rows.length?`<table><caption>Recent wins — deal, value, closed date</caption><thead><tr><th scope="col">Deal</th><th class="r" scope="col">Value</th><th class="r" scope="col">Closed</th></tr></thead><tbody>${rows.map(w=>`<tr><td>${esc(w.title)}</td><td class="r">${money(w.value_cents)}</td><td class="r">${esc(shortDate(w.closed_at))}</td></tr>`).join('')}</tbody></table>`
-      :emptyState('No wins yet','Deals you win in the next 90 days will be listed here.');
-    // SS5's ?stage=won landing (D1) — same target as the Won-this-month footer;
-    // fixed 90-day window on the card, so no period param (see the note above).
-    h+=card(s.invoices?'c4':'c6','Recent wins',based('Last 90 days',s.truncated_deals),body,['/pipeline.html?stage=won','View won deals']);
-  }
+  h+=`</div>`;
   return h;
 }
 function websiteBand(d){
@@ -385,18 +431,12 @@ function websiteBand(d){
   // search, in the order things actually happen:
   //   gDown  — the read hiccuped. NOT the connect CTA (they may well be connected).
   //   gNoDom — the studio does NOT host this website and no address is on file.
-  //            This used to be read as "still a draft" and answered with "publish
-  //            the site first" — nonsense for a client whose site has been live at
-  //            their own domain for years. Search Console reports on a verified
-  //            DOMAIN property whoever hosts it; the only blocker is the address.
+  //            Search Console reports on a verified DOMAIN property whoever hosts
+  //            it; the only blocker is the address.
   //   gDraft — a site WE host that has never been published. Google cannot measure
-  //            a page it has never been able to visit, and the sync asks for the
-  //            previous full calendar month, so connecting a draft today fetches a
-  //            month in which nothing was live. Still the right ask — but only for
-  //            the sites we actually publish.
+  //            a page it has never been able to visit.
   //   gWait  — genuinely connected; no month has landed yet. Honest lag.
-  //   g null — ready to connect (published-and-hosted, or external with a known
-  //            domain): the connect CTA is finally right.
+  //   g null — ready to connect: the connect CTA is finally right.
   //   gOk    — real numbers.
   const gDown=!!(g&&g.unavailable);
   const gNoDom=!!(g&&g.no_domain);
@@ -407,46 +447,35 @@ function websiteBand(d){
   const host=(w&&w.hosting)||null;
   const external=!!(host&&host.external);
   // ga: the connected-Google-Analytics numbers (source-labeled, monthly). Only
-  // ever shown WITH their provenance — never blended into first-party counts:
-  // our beacon and Google's tag measure differently, and a merged number would
-  // be one nobody could trust.
+  // ever shown WITH their provenance — never blended into first-party counts.
   const ga=(w&&w.ga)||null;
   const gaOk=!!(ga&&ga.has_data);
-  // D1: every business-insights drill carries the active period (it understands
-  // windows — SS11 consumes it); the connections CTA never does.
+  // D1: every business-insights drill carries the active period; the connections CTA never does.
   const BI=withPeriod('/business-insights.html');
   // the one place the "what now?" for a non-measuring search card is decided.
-  // card() layers withScope() on every footer href, so these stay unscoped here.
   const searchCta=gOk||gDown?[BI,'View search insights']
     :gNoDom?[(g&&g.record_href)||'/presence.html#monitor','Add their website address']
     :gDraft?[(g&&g.publish_href)||'/presence.html#publish','Publish the site']
     :gWait?null
     :['/connections.html','Connect Search Console'];
-  // `notConnectedLine` keeps each card's own not-connected wording (the KPI card
-  // talks about numbers, the terms table about searches); the three states before
-  // it are the same sentence wherever they appear, because they are the same fact.
-  // A draft HERE doesn't always mean nothing is live ANYWHERE: a rebuild's
-  // business may already be live at its own domain on another platform. The
-  // draft state names that door (record_href → presence.html#monitor, where the
-  // address is recorded) so "Publish the site" stops being the only exit —
-  // that dead end is exactly what Eric hit for his external clients.
+  // A draft HERE doesn't always mean nothing is live ANYWHERE: the draft state
+  // names the record-the-address door so "Publish the site" stops being the only exit.
   const recordAlt=gDraft&&g&&g.record_href
     ?`<p class="el" style="margin-top:6px">Already live on another platform? <a href="${esc(withScope(g.record_href))}">Record that website’s address</a> — its search numbers can start now, whoever hosts it.</p>`:'';
-  const searchEmpty=(notConnectedLine)=>gDown?emptyState('Search data is catching its breath','Check back shortly.')
-    :gNoDom?emptyState('Where is their website?','You don’t host this one, so there’s nothing to publish — Google reports on a domain whoever hosts it. Record their website address and their existing search numbers start arriving.')
-    :gDraft?emptyState('Publish the site first','Google can’t measure a draft — it has never been able to visit this site. Publish, and the search numbers start from the first full month it’s live.',recordAlt)
-    :gWait?emptyState('Connected — waiting on Google','Search Console is connected. Google reports on whole past months, so the first numbers land after the site has been live through one. Nothing to do.')
-    :emptyState('Not measured yet',notConnectedLine);
+  // the same honest heading + line for every non-measuring search state; each
+  // caller keeps its own not-connected wording (numbers vs. searches)
+  const searchParts=(notConnectedLine)=>gDown?['Search data is catching its breath','Check back shortly.']
+    :gNoDom?['Where is their website?','You don’t host this one, so there’s nothing to publish — Google reports on a domain whoever hosts it. Record their website address and their existing search numbers start arriving.']
+    :gDraft?['Publish the site first','Google can’t measure a draft — it has never been able to visit this site. Publish, and the search numbers start from the first full month it’s live.']
+    :gWait?['Connected — waiting on Google','Search Console is connected. Google reports on whole past months, so the first numbers land after the site has been live through one. Nothing to do.']
+    :['Not measured yet',notConnectedLine];
+  const searchEmpty=(line)=>{const p=searchParts(line);return emptyState(p[0],p[1],gDraft?recordAlt:'');};
   let h=`<h2 class="band">Your website</h2>`;
-  // Say plainly whose website this is BEFORE showing a grid of empty cards. For a
-  // client we don't host, first-party visitor numbers are not "not measured yet" —
-  // they are structurally unavailable (the counter we inject only ever lands on
-  // pages we render and deploy), while search works perfectly. Stating the reason
-  // once, up front, is the difference between an empty state and a lie.
+  // Say plainly whose website this is BEFORE showing empty tiles. For a client we
+  // don't host, first-party visitor numbers are structurally unavailable while
+  // search works perfectly. Stating the reason once, up front, is the difference
+  // between an empty state and a lie.
   if(external){
-    // Once a connected Google Analytics is reporting, "visitor numbers can't"
-    // stops being the truth — they arrive via that connection, and the note
-    // says so (with the provenance) instead of contradicting the card below.
     const visitorsBit=gaOk
       ?`<strong>Visitor numbers:</strong> via their connected Google Analytics — Google’s own measurement of their pages, not the studio counter.`
       :`<strong>Visitor numbers can’t:</strong> ${esc(host.visitors_reason||'')}`;
@@ -454,142 +483,102 @@ function websiteBand(d){
       +`<strong>Search numbers work:</strong> ${esc(host.search_reason||'')} `
       +visitorsBit+`</p>`;
   }
-  // the ONE reason a non-hosted site shows no visitor numbers — same sentence on
-  // every card that would otherwise say "not measured yet" and mean "never".
-  const offSite=(what)=>emptyState('Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${host&&host.domain?host.domain:'this website'}, so none of its pages carry our counter. Their own analytics (or a connected Google Analytics) holds these numbers.`);
-  h+=card('c3','Visitors',external&&gaOk?'':based(periodLabel(),tTrunc),
-    measuring?kpi(num(t.visitors),`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`)
-      // the external-site state 4d2e866 promised: when a connected Google
-      // Analytics holds the numbers, show them — labeled with their source.
-      :external&&gaOk?kpi(num(ga.visitors),`${num(ga.pageviews)} page view${ga.pageviews===1?'':'s'} · via Google Analytics${gscQual(ga.period)}`)
-      :external?offSite('Visitors')
-      :t?emptyState('Not measured yet','Visitor counts appear once your site is collecting them.')
-      :emptyState('Visitor counts hit a hiccup','Refresh in a moment.'),
-    external?null:[BI,'View website insights']);
-  h+=card('c3','Actions taken',based(periodLabel(),tTrunc),
-    measuring?kpi(num(t.actions),'calls, emails & booking taps')
-      :external?offSite('Calls, emails and booking taps')
-      :emptyState('Not measured yet','Calls, emails and booking taps will count up here.'),
-    external?null:[BI,'View website insights']);
-  h+=card('c3','Google clicks','',
-    gOk?kpi(num(g.clicks),`${num(g.impressions)} times seen in search${gscQual(g.period)}`):searchEmpty('Connect Search Console to see your Google numbers.'),
-    searchCta);
+  // the ONE reason a non-hosted site shows no visitor numbers — the tiles carry the
+  // short form, the cards the full sentence
+  const domainName=host&&host.domain?host.domain:'this website';
+  const offSiteTile=(what)=>['Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${domainName}, so none of its pages carry our counter.`];
+  const offSite=(what)=>emptyState('Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${domainName}, so none of its pages carry our counter. Their own analytics (or a connected Google Analytics) holds these numbers.`);
+  const win=(flag)=>based(periodLabel(),flag);
+  h+=`<div class="stats" id="siteStats">`;
+  h+=tile({icon:'people',title:'Visitors',window:external&&gaOk?'':win(tTrunc),link:external?null:[BI,'View'],
+    ...(measuring?{value:num(t.visitors),sub:`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`}
+      // the external-site state 4d2e866 promised: when a connected Google Analytics holds the numbers, show them — labeled with their source
+      :external&&gaOk?{value:num(ga.visitors),sub:`${num(ga.pageviews)} page view${ga.pageviews===1?'':'s'} · via Google Analytics${gscQual(ga.period)}`}
+      :external?{empty:offSiteTile('Visitors')}
+      :t?{empty:['Not measured yet','Visitor counts appear once your site is collecting them.']}
+      :{empty:['Visitor counts hit a hiccup','Refresh in a moment.']})});
+  h+=tile({icon:'tap',tone:'info',title:'Actions taken',window:win(tTrunc),link:external?null:[BI,'View'],
+    ...(measuring?{value:num(t.actions),sub:'calls, emails & booking taps'}
+      :external?{empty:offSiteTile('Calls, emails and booking taps')}
+      :{empty:['Not measured yet','Calls, emails and booking taps will count up here.']})});
+  const shortCta=gOk||gDown?'View':gNoDom?'Add address':gDraft?'Publish':'Connect';
+  h+=tile({icon:'search',tone:'good',title:'Google clicks',link:searchCta?[searchCta[0],shortCta]:null,
+    ...(gOk?{value:num(g.clicks),sub:`${num(g.impressions)} times seen in search${gscQual(g.period)}`}:{empty:searchParts('Connect Search Console to see your Google numbers.')})});
   {
     const top=measuring&&(t.top_sources||[])[0];
-    h+=card('c3','Top source',based('',tTrunc),
-      top?kpi(esc(top.source),`${num(top.share)}% of visits`,'small')
-        :external?offSite('Where visitors come from')
-        :emptyState('Not measured yet','Where visitors come from shows up here.'),
-      external?null:[BI,'View website insights']);
+    h+=tile({icon:'source',tone:'warn',title:'Top source',window:tTrunc?'based on recent activity':'',link:external?null:[BI,'View'],
+      ...(top?{value:esc(top.source),mod:'word',sub:`${num(top.share)}% of visits`}
+        :external?{empty:offSiteTile('Where visitors come from')}
+        :{empty:['Not measured yet','Where visitors come from shows up here.']})});
   }
-  h+=card('c6','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
-    (measuring&&lineChart(t.weekly,'var(--c2)','visitors'))
+  h+=`</div><div class="grid2">`;
+  h+=card('','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
+    (measuring&&lineChart(t.weekly,'var(--c2)','visitors',d&&d.generated_at))
       ||(external?offSite('Visits over time'):emptyState('No visits yet','Once people start visiting, the trend shows here.')),
     external?null:[BI,'View website insights']);
   {
     let body=null;
     if(measuring&&(t.top_sources||[]).length){
-      const ramp=['var(--c1)','var(--c2)','var(--c3)','var(--c5)','var(--faint)'];
-      const segs=t.top_sources.map((s,i)=>({v:s.visits,c:ramp[i]||ramp[4]}));
-      body=donut(segs,num(t.visitors),'visitors',t.top_sources.map((s,i)=>({c:ramp[i]||ramp[4],text:`${s.source} · ${num(s.share)}%`})));
+      body=`<div class="srcs">${t.top_sources.map(s=>`<span>${esc(s.source)}</span><div class="progress" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,Number(s.share)||0))}%"></i></div><span class="n">${num(s.visits)}</span>`).join('')}</div>`;
     }
-    h+=card('c6','Where visitors come from',based(periodLabel(),tTrunc),body||emptyState('No visits yet','Your visitor sources will appear here.'),[BI,'View website insights']);
+    h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visitors · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
   }
   {
     const rows=(measuring&&t.top_pages)||[];
-    const body=rows.length?`<table><caption>Top pages — page and views</caption><thead><tr><th scope="col">Page</th><th class="r" scope="col">Views</th></tr></thead><tbody>${rows.map(p=>`<tr><td>${p.path==='/'?'Home':esc(p.path)}</td><td class="r">${num(p.views)}</td></tr>`).join('')}</tbody></table>`
+    const body=rows.length?`<div class="rows">${rows.map(p=>`<div class="prow"><div class="t"><b>${esc(pageName(p.path))}</b><span>${esc(p.path)}</span></div><span class="n">${num(p.views)}</span></div>`).join('')}</div>`
       :emptyState('No page views yet','Your most-visited pages will be listed here.');
-    h+=card('c6','Top pages',based(periodLabel(),tTrunc),body,[BI,'View website insights']);
+    h+=card('','Top pages',based(periodLabel(),tTrunc),body,[BI,'View website insights']);
   }
   {
+    // Google search: the connection's state as a chip, the top searches when they
+    // exist, and ONE next step (connect · publish · record the address · view)
     const rows=(gOk&&g.top_terms)||[];
-    const body=rows.length?`<table><caption>Google search performance — search term, clicks, times seen</caption><thead><tr><th scope="col">Search</th><th class="r" scope="col">Clicks</th><th class="r" scope="col">Seen</th></tr></thead><tbody>${rows.map(q=>`<tr><td>${esc(q.term)}</td><td class="r">${num(q.clicks)}</td><td class="r">${num(q.impressions)}</td></tr>`).join('')}</tbody></table>`
+    const chip=gOk?'<span class="chip good"><i class="d"></i>Connected</span>':gWait?'<span class="chip p"><i class="d"></i>Connected</span>':gDown?'<span class="chip"><i class="d"></i>Checking</span>':'<span class="chip"><i class="d"></i>Not connected</span>';
+    const body=rows.length?`<div class="rows">${rows.map(q=>`<div class="prow"><div class="t"><b>${esc(q.term)}</b></div><span class="n">${num(q.clicks)}<small>clicks</small></span><span class="n">${num(q.impressions)}<small>seen</small></span></div>`).join('')}</div>`
       :gOk?emptyState('No search terms yet','What people search to find you will be listed here.')
       :searchEmpty('Connect Search Console to see what people search to find you.');
-    h+=card('c6','Google search performance','What people searched to find you',body,searchCta);
+    const cta=searchCta?`<div class="crow"><span class="fine">${gOk||gDown?'What people searched to find you':gNoDom||gDraft?'':'Takes about a minute. Read-only.'}</span><a class="btn sm" href="${esc(withScope(searchCta[0]))}">${esc(searchCta[1])}</a></div>`:'';
+    h+=`<section class="card" id="searchCard"><div class="card-h"><h3>Google search</h3><span class="hr">${chip}</span></div><div class="cb">${body}</div>${cta}</section>`;
   }
+  h+=`</div>`;
   return h;
 }
 
 // ── render ──
+function headRow(title,subline,withPeriod){
+  return `<header class="toprow">
+      <div><h1 class="title" id="pagehead" tabindex="-1">${esc(title)}</h1>
+        <div class="subline">${subline}</div></div>
+      <div class="actions">${withPeriod?`<div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>`:''}<button type="button" class="btn" id="refreshBtn">Refresh</button></div>
+    </header>`;
+}
 function renderDash(d){
-  let h=`<header class="dhead">
-      <span class="obj" aria-hidden="true">📊</span>
-      <h1 id="pagehead" tabindex="-1">Business dashboard</h1>
-      <span class="asof">As of ${esc(asOf(d.generated_at))} <button class="rbtn" id="refreshBtn">↻ Refresh</button></span>
-    </header>
-    <div class="filters">
-      <button class="chip" id="periodBtn" aria-haspopup="listbox" aria-expanded="false"><b>Period</b> ${esc(periodLabel())} <span class="car" aria-hidden="true">▾</span></button>
-      <div class="chipmenu" id="periodMenu" role="listbox" aria-label="Period" hidden></div>
-    </div>
-    <div class="grid">`;
+  let h=headRow('Analytics',`<span>Your business at a glance. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span>`,true);
   h+=salesBand(d);
   h+=websiteBand(d);
-  h+=`</div>`;
   $('main').innerHTML=h;
   wireDash();
 }
 function wireDash(){
   $('refreshBtn').addEventListener('click',()=>loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
-  const pb=$('periodBtn'),pm=$('periodMenu');
-  pm.innerHTML=PERIODS.map(p=>`<button type="button" role="option" data-period="${p[0]}" aria-selected="${PERIOD===p[0]?'true':'false'}">${p[1]}${PERIOD===p[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
-  const closeMenu=()=>{pm.hidden=true;pb.setAttribute('aria-expanded','false');};
-  // closing from the chip puts focus back on the chip explicitly: the pointer
-  // press below no longer focuses it, and the option that held focus is hidden
-  const toggleMenu=()=>{const open=pm.hidden;pm.hidden=!open;pb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=pm.querySelector('button');if(f)f.focus();}else pb.focus();};
-  pb.addEventListener('click',toggleMenu);
-  const filters=pb.closest('.filters');
-  // A pointer press on the chip or an option must NOT move focus. Safari (and
-  // WebKit on iPad with a trackpad) does not focus a <button> on mousedown — it
-  // moves focus to the nearest focusable ANCESTOR, here #main — so the focused
-  // option blurred with relatedTarget=#main, the focusout guard below read that
-  // as "focus left the chip+menu", and the menu was hidden before mouseup: the
-  // click landed on the page and the period never switched. Keyboard focus is
-  // managed explicitly (open → first option, close → chip), so nothing is lost.
-  if(filters)filters.addEventListener('mousedown',(e)=>{if(e.target.closest('button'))e.preventDefault();});
-  // the minimal popup keyboard contract (slice 2): focus first option on open;
-  // arrows move; Home/End jump; Escape closes + returns focus; Enter activates
-  // natively. Escape works from the CHIP too, and tabbing/clicking beyond the
-  // chip+menu closes it without stealing focus (focusout below).
-  pb.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!pm.hidden){e.preventDefault();closeMenu();}});
-  pm.addEventListener('keydown',(e)=>{
-    const opts=[...pm.querySelectorAll('button')];if(!opts.length)return;
-    const i=opts.indexOf(document.activeElement);
-    if(e.key==='Escape'){e.preventDefault();closeMenu();pb.focus();}
-    else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
-    else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
-    else if(e.key==='Home'){e.preventDefault();opts[0].focus();}
-    else if(e.key==='End'){e.preventDefault();opts[opts.length-1].focus();}
-  });
-  if(filters)filters.addEventListener('focusout',(e)=>{
-    if(pm.hidden)return;
-    const to=e.relatedTarget;
-    // a NULL relatedTarget is NOT "focus left the document": iOS Safari blurs
-    // on tap without focusing anything, so closing here would hide the option
-    // between pointerdown and click and the period would never switch.
-    if(!to)return;                             // iOS tap / focus left the document — keep open
-    if(!filters.contains(to))closeMenu();      // focus left chip+menu → close, no focus steal
-  });
   // PERIOD is committed only on a successful render (loadDash) — a failed
-  // switch leaves the chip, checkmarks and state exactly as they were.
-  pm.querySelectorAll('[data-period]').forEach(b=>b.addEventListener('click',()=>{
-    closeMenu();pb.focus();   // focus never sits on a hidden option while the read runs
-    loadDash(true,b.getAttribute('data-period')).then(()=>{const nb=$('periodBtn');if(nb)nb.focus();});
+  // switch leaves the control and state exactly as they were. The segmented
+  // control is plain buttons: no popup, so nothing to close and no focus to guard.
+  document.querySelectorAll('#period [data-period]').forEach(b=>b.addEventListener('click',()=>{
+    const p=b.getAttribute('data-period'); if(p===PERIOD)return;
+    loadDash(true,p).then(()=>{const nb=document.querySelector(`#period [data-period="${PERIOD}"]`);if(nb)nb.focus();});
   }));
 }
-// one delegated outside-click closer (attached ONCE — renders rebuild the chip)
-document.addEventListener('click',(e)=>{
-  const pm=$('periodMenu'),pb=$('periodBtn');
-  if(pm&&pb&&!pm.hidden&&!e.target.closest('.filters')){pm.hidden=true;pb.setAttribute('aria-expanded','false');}
-});
 
 // stencil loading — layout-shaped gray blocks, shown only when the fetch runs
 // >300ms (SLDS: no stencil flash on fast loads)
 function renderStencil(title){
-  const blocks=['c3','c3','c3','c3','c6','c6','c4','c4','c4','c3','c3','c3','c3','c6','c6'];
-  $('main').innerHTML=`<header class="dhead"><span class="obj" aria-hidden="true">📊</span><h1 id="pagehead" tabindex="-1">${esc(title||'Business dashboard')}</h1></header>
+  $('main').innerHTML=`<header class="toprow"><div><h1 class="title" id="pagehead" tabindex="-1">${esc(title||'Analytics')}</h1></div></header>
     <p class="sr-only" role="status">Loading your dashboard</p>
-    <div class="grid" aria-hidden="true">${blocks.map(c=>`<div class="st ${c}" style="height:${c==='c3'?'110px':'190px'}"></div>`).join('')}</div>`;
+    <div aria-hidden="true"><div class="st" style="height:92px;margin-top:18px"></div>
+    <div class="grid2">${['','','',''].map(()=>`<div class="st" style="height:220px"></div>`).join('')}</div>
+    <div class="st" style="height:92px;margin-top:16px"></div>
+    <div class="grid2">${['','','',''].map(()=>`<div class="st" style="height:220px"></div>`).join('')}</div></div>`;
 }
 
 // ── page states ──
@@ -597,33 +586,26 @@ function warming(){$('main').innerHTML=`<div class="center"><h2>This dashboard i
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 
-// ── the agency portfolio lens (unscoped agency operators — SS7 retires AN-7:
-//    the same .dhead dashboard anatomy the scoped Business dashboard wears) ──
+// ── the agency portfolio lens (unscoped agency operators — SS7: the same
+//    dashboard anatomy the scoped Business dashboard wears) ──
 // Every number below is derived from the payload — clients/needs-attention/
 // enquiries/live come from /analytics/portfolio's websites[] rollup; the
 // per-client table reads /agency/portfolio (the one read that carries the
-// edition/status and attention COUNT its columns render). SS7 seams: the
-// enriched websites[] rows now carry site_id + visitors, so the table gains a
-// Visitors column by a site_id join — the PAIRED model stays (each read keeps
-// its own shipped failure degradation), the join only ENRICHES.
+// edition/status and attention COUNT its columns render).
 function insightCard(i){
-  const tone=i.tone==='good'?'good':i.tone==='attention'?'attention':'neutral';
-  const chip=tone==='good'?'Good news':tone==='attention'?'Needs a look':'Worth knowing';
-  const head=`<div class="ch"><span class="tchip ${tone}">${chip}</span><h3 class="t" style="margin-top:7px">${esc(i.title||'Across your clients')}</h3></div>`;
-  const body=`${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}`;
-  // `sites`: one link PER CLIENT. The shipped card had a single href that fell
-  // back to '/agency.html' whenever more than one client needed the same thing —
-  // and Studio has no Search Console affordance at all (`grep -c connections
-  // agency.html` is 0), so the CTA landed somewhere that could not act. A card
-  // that asks you to do something must say where. Feature-detected on shape, so
-  // an older function build still renders exactly its single href.
+  const tone=i.tone==='good'?'good':i.tone==='attention'?'warn':'p';
+  const chipText=tone==='good'?'Good news':tone==='warn'?'Needs a look':'Worth knowing';
+  // `sites`: one link PER CLIENT. A card that asks you to do something must say
+  // where. Feature-detected on shape, so an older function build still renders
+  // exactly its single href.
   const many=Array.isArray(i.sites)&&i.sites.length?i.sites.filter(s=>s&&s.href):null;
-  const foot=many&&many.length>1
-    ?`<div class="cf" style="flex-wrap:wrap;gap:6px 14px">${many.map(s=>`<a class="go" href="${esc(s.href)}">${esc(s.cta||s.name||'Open')} →</a>`).join('')}</div>`
+  const links=many&&many.length>1
+    ?`<div class="links">${many.map(s=>`<a href="${esc(s.href)}">${esc(s.cta||s.name||'Open')}</a>`).join('')}</div>`
     :many&&many.length===1
-    ?`<div class="cf"><a class="go" href="${esc(many[0].href)}">${esc(many[0].cta||i.cta||'Take a look')} →</a></div>`
-    :i.href?`<div class="cf"><a class="go" href="${esc(i.href)}">${esc(i.cta||'Take a look')} →</a></div>`:'';
-  return `<section class="card c4">${head}<div class="cb">${body}</div>${foot}</section>`;
+    ?`<div class="links"><a href="${esc(many[0].href)}">${esc(many[0].cta||i.cta||'Take a look')}</a></div>`
+    :i.href?`<div class="links"><a href="${esc(i.href)}">${esc(i.cta||'Take a look')}</a></div>`:'';
+  return `<section class="card insight"><div class="card-h"><h3>${esc(i.title||'Across your clients')}</h3><span class="chip tchip ${tone}"><i class="d"></i>${chipText}</span></div>
+    ${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}${links}</section>`;
 }
 function portfolioRollup(roster,ws,vTrunc){
   // roster: /agency/portfolio rows (site_id · name · edition · status ·
@@ -636,16 +618,14 @@ function portfolioRollup(roster,ws,vTrunc){
   // the visits read failed server-side → an honest —, never a fake 0.
   // vTrunc (data-honesty): the function's visitors_truncated marker — the bulk
   // visits read hit its cap, so NO per-client count is attributable as exact.
-  // The whole column shows the honest unknown (—) + one notice, instead of
-  // possibly-short numbers. An older function never sends the marker → numbers.
   const vs=Array.isArray(ws)&&ws.length&&ws.every(x=>x&&typeof x.site_id==='string'&&('visitors' in x))?new Map(ws.map(x=>[x.site_id,x.visitors])):null;
   let h=`<h2 class="band">Client by client</h2>`;
   if(roster===null){
-    h+=`<div class="cfull card"><div class="cb" style="padding:14px 16px;color:var(--soft)">The client-by-client list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div></div>`;
+    h+=`<div class="quiet" style="margin-top:0">The client-by-client list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div>`;
     return h;
   }
   if(!roster.length){
-    h+=`<div class="cfull card"><div class="cb">${emptyState('No clients yet','Businesses you add from your Studio tools will be listed here.')}</div></div>`;
+    h+=`<div class="card">${emptyState('No clients yet','Businesses you add from your Studio tools will be listed here.')}</div>`;
     return h;
   }
   const rows=roster.map(c=>{
@@ -658,55 +638,49 @@ function portfolioRollup(roster,ws,vTrunc){
   h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   // the one honest line for the — column: a partial count per client would be
   // wrong, so nothing pretends. Everything else in the table is exact.
-  if(vs&&vTrunc)h+=`<p class="cfull" style="color:var(--soft);font-size:.85rem;margin:6px 2px 0">A busy week — visits crossed what the portfolio can count client by client, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
+  if(vs&&vTrunc)h+=`<p class="rollnote">A busy week — visits crossed what the portfolio can count client by client, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
   return h;
 }
 function renderPortfolio(d,roster){
   const ws=Array.isArray(d.websites)?d.websites:null;
-  let h=`<header class="dhead">
-      <span class="obj" aria-hidden="true">📊</span>
-      <h1 id="pagehead" tabindex="-1">Portfolio dashboard</h1>
-      <span class="asof">As of ${esc(asOf())} <button class="rbtn" id="refreshBtn">↻ Refresh</button></span>
-    </header>
-    <div class="grid" style="margin-top:12px">
-    <p class="subline">${esc(d.headline||'Across your clients.')}</p>`;
+  let h=headRow('Analytics',`<span class="chip p"><i class="d"></i>All clients</span><span>${esc(d.headline||'Across your clients.')}</span><span class="dot">·</span><span>As of ${esc(asOf())}</span>`,false);
   // KPI band — only from numbers the payload really carries (an older function
   // build without websites[] simply shows fewer tiles, never a fake zero)
   if(ws||d.client_count!=null){
-    h+=`<h2 class="band">Across your clients</h2>`;
+    h+=`<h2 class="band">Across your clients</h2><div class="stats" id="portfolioStats">`;
     const clients=d.client_count!=null?d.client_count:ws.length;
-    h+=card('c3','Clients','',kpi(num(clients),'in your portfolio'),['/agency.html','Open Studio']);
+    h+=tile({icon:'people',title:'Clients',link:['/agency.html','Open Studio'],value:num(clients),sub:'in your portfolio'});
     if(ws){
       const att=ws.filter(w=>w&&w.needs_attention).length;
-      h+=card('c3','Needs attention','',kpi(num(att),att?'worth a look today':'all clear',att?'warn':''));
+      h+=tile({icon:'warn',tone:'warn',title:'Needs attention',value:num(att),mod:att?'warn':'',sub:att?'worth a look today':'all clear'});
       const enq=ws.reduce((a,w)=>a+(Number(w&&w.leads_waiting)||0),0);
-      h+=card('c3','Enquiries waiting','',kpi(num(enq),enq?'not yet answered':'nothing waiting',enq?'warn':''));
+      h+=tile({icon:'mail',tone:'info',title:'Enquiries waiting',value:num(enq),mod:enq?'warn':'',sub:enq?'not yet answered':'nothing waiting'});
       const live=ws.filter(w=>w&&w.draft_live==='live').length;
-      h+=card('c3','Sites live','',kpi(num(live),ws.length-live?`${num(ws.length-live)} still in draft`:'every site is live'));
+      h+=tile({icon:'live',tone:'good',title:'Sites live',value:num(live),sub:ws.length-live?`${num(ws.length-live)} still in draft`:'every site is live'});
     }
+    h+=`</div>`;
   }
   // insight cards — the standard card anatomy (tone chip · title · number ·
-  // sentence · one .go affordance). An empty list on a SUCCESSFUL read is the
-  // honest all-quiet; a failed read never reaches here (loadPortfolio → trouble).
+  // sentence · links). An empty list on a SUCCESSFUL read is the honest
+  // all-quiet; a failed read never reaches here (loadPortfolio → trouble).
   h+=`<h2 class="band">What stands out</h2>`;
   const ins=d.insights||[];
   // The all-quiet line speaks about "every client" — with ZERO clients that's a
   // contradiction, so the empty portfolio gets its own calm first-step line.
   const clientCount=d.client_count!=null?(Number(d.client_count)||0):(ws?ws.length:0);
   // Phase 3 (one source for numbers): this lens only sees the CLIENTS. The bell's
-  // own count (support requests, enquiries, client messages on the studio's own
-  // site) is patched in below once the shell context lands, so this line never
-  // says "nothing needs you" on a day Today says four things do.
+  // own count is patched in below once the shell context lands, so this line
+  // never says "nothing needs you" on a day Today says four things do.
   if(!ins.length)h+=clientCount>0
-    ?`<div class="quiet cfull" id="allQuiet"><b>All quiet.</b> Every client is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
-    :`<div class="quiet cfull"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
+    ?`<div class="quiet" id="allQuiet" style="margin-top:0"><b>All quiet.</b> Every client is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
+    :`<div class="quiet" style="margin-top:0"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
   if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>{
     const n=ctx&&Number(ctx.attention_count)||0; const el=document.getElementById('allQuietStudio'); if(!el||!n)return;
     el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/today.html">see Today</a>.`;
   }).catch(()=>{});
-  h+=ins.map(insightCard).join('');
+  if(ins.length)h+=`<div class="grid3" style="margin-top:0">${ins.map(insightCard).join('')}</div>`;
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
-  h+=`</div><div class="print noprint"><button onclick="window.print()">Print this summary</button></div>`;
+  h+=`<div class="print noprint"><button type="button" class="btn" onclick="window.print()">Print this summary</button></div>`;
   $('main').innerHTML=h;
   const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
   // row click drills into the client's scoped Business dashboard; the name link
@@ -722,7 +696,7 @@ function renderPortfolio(d,roster){
 // Request-generation guard: a slow response that resolves after a newer request
 // started is DISCARDED — it can never overwrite the board mislabeled. PERIOD
 // commits only on a successful render (commit-on-success): a failed or stale
-// switch leaves the chip and state untouched, so the next Refresh can't
+// switch leaves the control and state untouched, so the next Refresh can't
 // silently swap periods.
 let REQ_SEQ=0;
 async function loadDash(soft,nextPeriod){
@@ -744,7 +718,7 @@ async function loadDash(soft,nextPeriod){
   // belt-and-braces: if the server echoes a period, it must be the one we asked
   // for — otherwise this response can't honestly label the board
   if(data.period&&data.period!==period)return;
-  PERIOD=period;   // commit only now — render below derives chip/checkmarks from it
+  PERIOD=period;   // commit only now — render below derives the pressed segment from it
   DASH=data;
   renderDash(DASH);
 }
@@ -758,7 +732,7 @@ let PF=null,ROSTER=null;   // ROSTER: the last GOOD /agency/portfolio rows (soft
 async function loadPortfolio(soft){
   const gen=++REQ_SEQ;
   let stencilTimer=null;
-  if(!soft)stencilTimer=setTimeout(()=>{if(!PF)renderStencil('Portfolio dashboard');},300);
+  if(!soft)stencilTimer=setTimeout(()=>{if(!PF)renderStencil('Analytics');},300);
   let r,a;
   try{
     [r,a]=await Promise.all([

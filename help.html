@@ -8,119 +8,209 @@
 <meta name="description" content="How Studio OS works — publishing, your data, connected services, billing, and how to reach a person.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically). Visual refresh (2026-10):
+     the page follows the approved "Help — ask in your own words" board — title ·
+     one big ask box (the existing Concierge, /concierge/ask) · suggested
+     questions · Browse by topic · Popular answers (the same plain answers this
+     page always had, now one row each) · a rail with Still stuck? and the tour. */
   :root{
-    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;
-    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;
-    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);--line-2:color-mix(in srgb,var(--dds-line,#e6e6ec) 60%,var(--dds-card,#fff));
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
-  *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:40px 22px 96px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,5vw,36px);margin:14px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:16px;margin:0;max-width:56ch}
-  section{margin-top:32px}
-  h2{font-family:var(--serif);font-weight:500;font-size:21px;margin:0 0 4px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px}
-  .card p{margin:0;color:var(--soft);font-size:15px}
-  .card p + p{margin-top:8px}
-  .q{font-weight:600;color:var(--ink);font-size:15.5px;margin:0 0 5px}
-  .contact{margin-top:14px;padding:18px 20px;background:var(--good-soft);border-radius:var(--dds-r-lg,10px)}
-  .contact h2{margin-bottom:6px}
-  .contact p{color:var(--ink);font-size:15px;margin:0}
-  a.link{color:var(--p);text-decoration:none;font-weight:500}
-  a.link:hover{text-decoration:underline}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px}
-  .grid a{display:block;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:12px 14px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px}
-  .grid a:hover{border-color:var(--p);color:var(--p)}
-  .grid a span{display:block;color:var(--faint);font-weight:400;font-size:12.5px;margin-top:2px}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#171320}}
+  :root[data-theme="dark"] .btn.primary{color:#171320}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 28px 90px}
+  svg{display:block}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
+  .subline{color:var(--soft);font-size:13px;margin:5px 0 0;max-width:72ch}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+  .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .btn.ghost:hover{background:var(--line-2);color:var(--ink)}
+  .btn:disabled{opacity:.55;cursor:default}
+
+  /* ── the ask box ── */
+  .askbox{display:flex;gap:10px;margin-top:14px}
+  .askbox input{flex:1;min-width:0;height:44px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:0 14px;font:inherit;font-size:14.5px;background:var(--card);color:var(--ink)}
+  .askbox input::placeholder{color:var(--faint)}
+  .askbox input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .askbox .btn{height:44px;padding:0 18px;font-size:14px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .chips button{font:inherit;font-size:12px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;line-height:18px;transition:.15s}
+  .chips button:hover{border-color:var(--line-strong);color:var(--ink)}
+  /* the answer is a live region — in the tree from first render (never display:none) so the FIRST answer is announced */
+  .answer{margin-top:12px;padding:13px 15px;background:var(--p-soft);border-radius:var(--dds-r-lg,10px);font-size:14px;white-space:pre-wrap;line-height:1.55}
+  .answer:empty{padding:0;margin:0;background:transparent}
+
+  /* ── sections · topic cards · answers ── */
+  .sec{margin-top:24px}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .sec-h h2{margin:0;font-size:14px;font-weight:600}
+  .setgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .setcard{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:16px 18px;display:flex;gap:14px;align-items:flex-start;color:inherit;text-decoration:none;transition:.15s;min-width:0}
+  .setcard:hover{border-color:var(--line-strong)}
+  .setcard .ico{width:36px;height:36px;border-radius:9px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .setcard .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .setcard .t{flex:1;min-width:0} .setcard .t b{display:block;font-weight:600;margin-bottom:2px} .setcard .t span{color:var(--faint);font-size:13px}
+  .cols{display:flex;gap:24px;margin-top:4px;flex-wrap:wrap;align-items:flex-start}
+  .col-main{flex:999 1 480px;min-width:0}
+  .col-rail{flex:1 1 300px;min-width:0}
+  .list{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
+  .list details{border-top:1px solid var(--line-2)}
+  .list details:first-child{border-top:none}
+  .list summary{display:flex;align-items:center;gap:14px;padding:11px 14px;cursor:pointer;list-style:none;min-width:0}
+  .list summary::-webkit-details-marker{display:none}
+  .list summary:hover{background:var(--bg)}
+  .list summary .t{flex:1;min-width:0}
+  .list summary .t b{font-weight:600;display:block}
+  .list summary .t span{color:var(--faint);font-size:12.5px}
+  .list summary .car{color:var(--faint);transition:transform .15s;flex:0 0 auto}
+  .list details[open] summary .car{transform:rotate(90deg)}
+  .list .body{padding:0 14px 14px 14px;color:var(--soft);font-size:13.5px;line-height:1.6}
+  .list .body p{margin:0} .list .body p+p{margin-top:8px}
+  .list .body a{color:var(--p);text-decoration:none;font-weight:500} .list .body a:hover{text-decoration:underline}
+  .list .body b{color:var(--ink);font-weight:600}
+  .card{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:14px;box-shadow:var(--shadow)}
+  .card-h h2{margin:0;font-size:14px;font-weight:600}
+  .card p{font-size:13px;color:var(--soft);margin:8px 0 0;line-height:1.55}
+  .card .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .card .fine{font-size:12.5px;color:var(--faint);margin-top:10px}
+  .card .fine a{color:var(--faint)}
   footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
+  .toast.show{opacity:1}
+  @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid{grid-template-columns:minmax(0,1fr)}.askbox{flex-wrap:wrap}.askbox input{flex-basis:100%}h1.title{font-size:24px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="rolebadge">● Help</div>
-    <h1>How Studio OS works</h1>
-    <p class="sub">Plain answers to the things people ask most — and a real person when you need one.</p>
+  <header class="toprow">
+    <div>
+      <h1 class="title">How can we help?</h1>
+      <p class="subline">Ask in your own words. The answer uses what’s true of your studio — your pages, your customers, your invoices.</p>
+    </div>
   </header>
 
-  <section>
-    <h2>Getting around</h2>
-    <div class="card">
-      <p>The bar at the top is the same everywhere — your pages, search (press Ctrl K, or ⌘K on a Mac), what needs a look, and your account. What you see adapts to your plan and role; anything you don't have simply isn't shown, so there are no dead ends.</p>
-    </div>
-    <div class="grid">
-      <a href="/today.html">Today<span>What needs you</span></a>
-      <a href="/presence.html">Your website<span>Edit &amp; publish</span></a>
-      <a href="/customers.html">Customers<span>Enquiries, contacts &amp; pipeline</span></a>
-      <a href="/projects.html">Projects<span>Work in motion</span></a>
-      <a href="/files.html">Files<span>Photos, brand &amp; documents</span></a>
-      <a href="/inbox.html">Inbox<span>Everything that needs you</span></a>
-      <a href="/analytics.html">Analytics<span>How it's going</span></a>
-      <a href="/connections.html">Connections<span>Your services</span></a>
+  <form class="askbox" id="askForm">
+    <input type="text" id="q" aria-label="Ask a question" placeholder="e.g. how do I change the Saturday hours on the Contact page?" autocomplete="off">
+    <button class="btn primary" type="submit" id="ask">Ask</button>
+  </form>
+  <div class="chips" id="suggest" aria-label="Suggested questions">
+    <button type="button" data-q="How do I publish a change?">How do I publish a change?</button>
+    <button type="button" data-q="Where do enquiries go?">Where do enquiries go?</button>
+    <button type="button" data-q="How does a client pay an invoice?">How does a client pay an invoice?</button>
+    <button type="button" data-q="What can clients see?">What can clients see?</button>
+  </div>
+  <div class="answer" id="ans" role="status" aria-live="polite"></div>
+
+  <section class="sec" aria-labelledby="topicsHead">
+    <div class="sec-h"><h2 id="topicsHead">Browse by topic</h2></div>
+    <div class="setgrid">
+      <a class="setcard" href="/get-started.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="t"><b>Getting started</b><span>The first week: your profile, your first customer, your first invoice.</span></span></a>
+      <a class="setcard" href="/presence.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="t"><b>Your website</b><span>Editing pages, photos, publishing and scheduling, the live site.</span></span></a>
+      <a class="setcard" href="/crm.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg></span><span class="t"><b>Customers and deals</b><span>Enquiries, the pipeline, next steps, what “won” means.</span></span></a>
+      <a class="setcard" href="/pipeline.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/></svg></span><span class="t"><b>Invoices and payments</b><span>Sending, deposits, reminders, Stripe payouts.</span></span></a>
+      <a class="setcard" href="/files.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg></span><span class="t"><b>Files and sharing</b><span>What clients see, private files, reviewer links.</span></span></a>
+      <a class="setcard" href="/connections.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="t"><b>Connections</b><span>Google, email sending, Stripe, bookings.</span></span></a>
     </div>
   </section>
 
-  <section>
-    <h2>Working with your studio</h2>
-    <div class="card">
-      <p class="q">Your project, in one place.</p>
-      <p>When a studio builds for you, your project lives in <a class="link" href="/client.html">your updates page</a> — progress, files to review, things waiting on your OK, messages, and invoices. Anything that needs you also lands in your email, so nothing depends on you checking in. Proposals and agreements arrive as a link you can read, sign, and (when there's a deposit) pay — all in one sitting, and a signed copy comes straight back to your inbox.</p>
+  <div class="cols">
+    <div class="col-main">
+      <section class="sec" aria-labelledby="answersHead">
+        <div class="sec-h"><h2 id="answersHead">Popular answers</h2></div>
+        <div class="list" id="answers">
+          <details id="a-publish"><summary><span class="t"><b>Publishing a change — and undoing it</b><span>Your website</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p><b>Nothing goes live without your OK.</b> You edit a draft, preview it, then publish with one calm step. Every publish is kept as a version — if anything looks wrong, you can restore an earlier one. Your live site never changes until you publish, and a failed publish leaves it untouched.</p></div></details>
+          <details id="a-client"><summary><span class="t"><b>What a client sees in their portal</b><span>Files and sharing</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p><b>Your project, in one place.</b> When a studio builds for you, your project lives in <a href="/client.html">your updates page</a> — progress, files to review, things waiting on your OK, messages, and invoices. Anything that needs you also lands in your email, so nothing depends on you checking in. Proposals and agreements arrive as a link you can read, sign, and (when there’s a deposit) pay — all in one sitting, and a signed copy comes straight back to your inbox.</p></div></details>
+          <details id="a-around"><summary><span class="t"><b>Getting around</b><span>Getting started</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p>The navigation is the same everywhere — <a href="/today.html">Today</a> for what needs you, <a href="/presence.html">your website</a> to edit and publish, <a href="/crm.html">Customers</a> for enquiries, contacts and the pipeline, <a href="/projects.html">Projects</a> for work in motion, <a href="/files.html">Files</a> for photos, brand and documents, <a href="/inbox.html">Inbox</a> for everything that needs a reply, and <a href="/analytics.html">Analytics</a> for how it’s going. Search is one key away (press Ctrl K, or ⌘K on a Mac). What you see adapts to your plan and role; anything you don’t have simply isn’t shown, so there are no dead ends.</p></div></details>
+          <details id="a-data"><summary><span class="t"><b>Your data, and who owns it</b><span>Your account</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p><b>It’s yours, always.</b> You can export everything you own at any time, connect or disconnect services freely, and leave without penalty. We store business facts and text, never your customers’ card details (billing is handled by Stripe).</p></div></details>
+          <details id="a-connect"><summary><span class="t"><b>What connecting a service does</b><span>Connections</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p>Connect the tools you already use to read your own data — safely, with only the access you approve. Any change we’d make on your behalf is proposed first and waits for your approval. You can disconnect at any time and your accounts stay exactly as they are. <a href="/connections.html">See your connections</a>.</p></div></details>
+          <details id="a-billing"><summary><span class="t"><b>Your plan and billing</b><span>Your account</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p>Your plan decides which features you see. Upgrading adds capabilities — nothing resets and no data is lost. Downgrading simply hides what you’re not using; your information is preserved and comes back if you upgrade again. Manage your subscription, payment method, or cancel any time from your billing portal.</p><p><a href="/pricing.html">See plans and pricing</a></p></div></details>
+          <details id="a-uptime"><summary><span class="t"><b>Reliability and your website’s uptime</b><span>Your website</span></span><span class="car" aria-hidden="true">›</span></summary>
+            <div class="body"><p>Your published website is served as plain, fast pages from a global content network — it keeps working even if our platform is having a bad day. Every version you publish is kept and restorable in one click, so a mistake is never more than a minute from fixed. Publishing changes nothing until it succeeds; there are no maintenance windows and your site never goes down for updates.</p><p>The workspace itself runs on infrastructure with independently published uptime commitments and security audits (SOC&nbsp;2). If we’re ever the reason something’s down, we’ll say so plainly and fix it.</p></div></details>
+        </div>
+      </section>
     </div>
-  </section>
-
-  <section>
-    <h2>Publishing &amp; approval</h2>
-    <div class="card">
-      <p class="q">Nothing goes live without your OK.</p>
-      <p>You edit a draft, preview it, then publish with one calm step. Every publish is kept as a version — if anything looks wrong, you can restore an earlier one. Your live site never changes until you publish, and a failed publish leaves it untouched.</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Your data &amp; ownership</h2>
-    <div class="card">
-      <p class="q">It's yours, always.</p>
-      <p>You can export everything you own at any time, connect or disconnect services freely, and leave without penalty. We store business facts and text, never your customers' card details (billing is handled by Stripe).</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Connected services</h2>
-    <div class="card">
-      <p>Connect the tools you already use to read your own data — safely, with only the access you approve. Any change we'd make on your behalf is proposed first and waits for your approval. You can disconnect at any time and your accounts stay exactly as they are.</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Your plan &amp; billing</h2>
-    <div class="card">
-      <p>Your plan decides which features you see. Upgrading adds capabilities — nothing resets and no data is lost. Downgrading simply hides what you're not using; your information is preserved and comes back if you upgrade again. Manage your subscription, payment method, or cancel any time from your billing portal.</p>
-      <p style="margin-top:10px"><a class="link" href="/pricing.html">See plans &amp; pricing →</a></p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Reliability &amp; your website's uptime</h2>
-    <div class="card">
-      <p>Your published website is served as plain, fast pages from a global content network — it keeps working even if our platform is having a bad day. Every version you publish is kept forever and restorable in one click, so a mistake is never more than a minute from fixed. Publishing changes nothing until it succeeds; there are no maintenance windows and your site never goes down for updates.</p>
-      <p style="margin-top:10px">The workspace itself runs on infrastructure with independently published uptime commitments and security audits (SOC&nbsp;2). If we're ever the reason something's down, we'll say so plainly and fix it.</p>
-    </div>
-  </section>
-
-  <div class="contact">
-    <h2>Talk to a person</h2>
-    <p>Studio OS is run by a real studio. If something isn't right, email <a class="link" href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a> and a person who knows the product will help.</p>
+    <aside class="col-rail">
+      <div class="card" id="stuck">
+        <div class="card-h"><h2>Still stuck?</h2></div>
+        <p>Studio OS is run by a real studio. Write to us and a person who knows the product replies. Say which page you were on and we’ll look at it with you.</p>
+        <div class="actions"><a class="btn" href="mailto:support@davisdigitalstudio.com?subject=Studio%20OS%20help" id="writeSupport">Write to support</a></div>
+        <div class="fine"><a href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a></div>
+      </div>
+      <div class="card" id="tourCard" style="margin-top:14px">
+        <div class="card-h"><h2>Take the tour again</h2></div>
+        <p>A short walk through Today, your customers and your website — the same tour you saw on your first day.</p>
+        <div class="actions"><button class="btn ghost" type="button" id="startTour">Start the tour</button></div>
+      </div>
+    </aside>
   </div>
 
   <footer>Studio OS · by Davis Digital Studio — calm software, real people.</footer>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// The ask box is the EXISTING Concierge (POST /concierge/ask — the same call
+// connections.html and today.html make). Signed out, it says so and points at
+// support; it never guesses an answer.
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+let TOKEN = "", BUSY = false;
+sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
+const SCOPE = (new URLSearchParams(location.search).get('client')||'');
+const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':SCOPE });
+async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
+function toast(m){ if(window.ddsToast) return void ddsToast(m); const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+
+async function ensureToken(){
+  if(TOKEN) return TOKEN;
+  try{ const { data } = await sb.auth.getSession(); TOKEN = (data && data.session && data.session.access_token) || ""; }catch(_){ TOKEN=""; }
+  return TOKEN;
+}
+async function ask(question){
+  const q=(question||'').trim(); if(!q||BUSY) return;
+  const box=$('ans'), btn=$('ask');
+  if(!(await ensureToken())){
+    box.textContent='Sign in to ask about your own studio — the answer uses your pages, customers and invoices. Signed out, the answers below still apply, and support is one message away.';
+    return;
+  }
+  BUSY=true; btn.disabled=true; btn.textContent='Asking…'; box.textContent='Looking at your studio…';
+  const r = await apiPost('/concierge/ask', { question:q });
+  box.textContent = (r.ok && r.body && r.body.data && r.body.data.text)
+    || (r.offline ? 'Your connection dropped before the question went through — nothing changed. Try again when you’re back online.'
+    : 'I don’t have anything measured on that yet — I’d rather say so than guess. The answers below cover the essentials, and support can look with you.');
+  BUSY=false; btn.disabled=false; btn.textContent='Ask';
+}
+$('askForm').addEventListener('submit', (e)=>{ e.preventDefault(); ask($('q').value); });
+$('suggest').querySelectorAll('[data-q]').forEach(b=>b.addEventListener('click', ()=>{ $('q').value=b.getAttribute('data-q'); ask($('q').value); }));
+// the shell's own tour (window.ddsTour) — it only exists once the shell has
+// rendered, and only shows steps whose targets are on screen
+$('startTour').addEventListener('click', ()=>{ if(typeof window.ddsTour==='function'){ window.ddsTour(); } else { toast('The tour starts from the signed-in app — sign in and press this again.'); } });
+// #a-publish etc.: a deep link opens its answer
+function openHash(){ const id=(location.hash||'').slice(1); const d=id&&document.getElementById(id); if(d&&d.tagName==='DETAILS'){ d.open=true; d.scrollIntoView({block:'start'}); } }
+window.addEventListener('hashchange', openHash); openHash();
+</script>
 </body>
 </html>
