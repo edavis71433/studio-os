@@ -259,10 +259,85 @@
        NOT fabricated proof — a designated slot that reads as intentional. Replace
        with the real <article> from the template comment below once a client's
        written permission (name + screenshots + any quote/outcome) is confirmed. -->
-  <div class="reveal mt-l" style="border:1.5px dashed var(--hair);border-radius:16px;padding:26px;background:var(--paper);text-align:center">
-    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p)">Selected work &middot; coming soon</div>
-    <p class="lead-muted" style="margin:10px auto 0;max-width:58ch">The first featured case study is being written up &mdash; with the client's permission and following exactly the structure above. It'll appear here when it's real and approved, and not a moment before.</p>
-  </div>
+  <!-- ============================================================
+       FEATURED CASE STUDY 01 — Hettie Orange Designs.
+       PERMISSION: granted by Hettie, confirmed by Eric 2026-08-25.
+       This page's standard (client permission before a named study
+       publishes) is satisfied.
+       Screenshots are captures of the finished static build
+       (case-studies/hettie/, jpg + webp), taken at 1440px and scaled
+       to 1009px to match the bacchus set. Re-shoot from the live site
+       once the domain is connected.
+
+       SOURCE FOR THE "BEFORE" CLAIMS (all verifiable, none inferred):
+       the previous Drupal 9 site, archived at
+       https://web.archive.org/web/20250803172054/http://hettieorange.com/
+         - <title> was "Home page | Hetti Orange" (CMS default + her
+           name misspelled)
+         - nav carried the theme's demo pages: "Portfolio Grid",
+           "Portfolio Masonry Styles", "Portfolio Detail"
+         - a homepage feature block still held theme filler about an
+           outdoor space with "vivid colors and abstract patterns"
+         - no meta description
+         - corporate "We are your creative force" voice
+       If any beat is ever challenged, that snapshot is the receipt.
+       ============================================================ -->
+  <article class="reveal case-study mt-l" style="border-top:1px solid var(--hair);padding-top:40px">
+    <span class="eyebrow">Hettie Orange Designs &middot; Design, publishing &amp; web &middot; Atlanta, GA</span>
+    <h3 class="kicker mt-s" style="font-size:26px">Her name was misspelled in her own browser tab.</h3>
+    <p class="lead-muted mt-m"><strong>The situation:</strong> Hettie had two decades of design, publishing, and print work behind her &mdash; magazines, newsletters, books, and annual reports for churches, nonprofits, and authors &mdash; and a website that showed almost none of it. The browser tab read &ldquo;Home page | Hetti Orange&rdquo;: the content system's default title, with her name misspelled. The menu still listed the template's demo pages. One of the featured blocks on her own homepage described an outdoor space with &ldquo;vivid colors and abstract patterns&rdquo; &mdash; filler that shipped with the theme and never got taken out. None of that was her doing. She'd been sold a heavy content system and left to finish configuring it herself.</p>
+    <p class="lead-muted mt-m"><strong>What I fixed first:</strong> the things quietly costing her the most. A title that spells her name correctly. Pages that describe her work instead of a theme demo's. Then the spine &mdash; home, services, work, plans, about, contact &mdash; each answering a question a prospective client actually asks. Print and web sit side by side, because that combination is what makes her unusual. And the voice changed from &ldquo;We are your creative force&rdquo; to &ldquo;I'm Hettie Orange,&rdquo; because the second one is true and the first one is what a template told her to say.</p>
+    <p class="lead-muted mt-m"><strong>The honest call:</strong> she didn't need another content system. A one-person studio shouldn't be patching a CMS to keep a six-page site online, so I rebuilt it as plain HTML and CSS &mdash; nothing to update, nothing to break, nothing to log into. The portfolio page was built to start small and grow rather than padded to look busy on day one, and the monthly care plans got a page of their own, because an ongoing relationship is worth explaining properly instead of burying in a footer.</p>
+    <p class="by" style="font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:22px">Status: build complete, awaiting domain connection. Screenshots below are the finished pages. Featured with Hettie's permission.</p>
+
+    <div class="mt-l" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px">
+      <figure style="margin:0">
+        <div style="border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--paper);aspect-ratio:4/3">
+          <picture>
+            <source srcset="/case-studies/hettie/hettie-home.webp" type="image/webp">
+            <img src="/case-studies/hettie/hettie-home.jpg" alt="The Home page of the Hettie Orange Designs website &mdash; the hero, the three service lanes, and the first call to action." width="1009" height="3879" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+          </picture>
+        </div>
+        <figcaption class="fine" style="margin-top:8px">Home</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <div style="border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--paper);aspect-ratio:4/3">
+          <picture>
+            <source srcset="/case-studies/hettie/hettie-services.webp" type="image/webp">
+            <img src="/case-studies/hettie/hettie-services.jpg" alt="The Services page of the Hettie Orange Designs website &mdash; each service explained in the client's language, not the industry's." width="1009" height="2809" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+          </picture>
+        </div>
+        <figcaption class="fine" style="margin-top:8px">Services</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <div style="border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--paper);aspect-ratio:4/3">
+          <picture>
+            <source srcset="/case-studies/hettie/hettie-work.webp" type="image/webp">
+            <img src="/case-studies/hettie/hettie-work.jpg" alt="The Our Work page of the Hettie Orange Designs website &mdash; the portfolio, built to grow as projects are approved for release." width="1009" height="2833" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+          </picture>
+        </div>
+        <figcaption class="fine" style="margin-top:8px">Our Work</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <div style="border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--paper);aspect-ratio:4/3">
+          <picture>
+            <source srcset="/case-studies/hettie/hettie-plans.webp" type="image/webp">
+            <img src="/case-studies/hettie/hettie-plans.jpg" alt="The Monthly Plans page of the Hettie Orange Designs website &mdash; the ongoing care plans, priced and explained in plain terms." width="1009" height="2978" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+          </picture>
+        </div>
+        <figcaption class="fine" style="margin-top:8px">Monthly Plans</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <div style="border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--paper);aspect-ratio:4/3">
+          <picture>
+            <source srcset="/case-studies/hettie/hettie-about.webp" type="image/webp">
+            <img src="/case-studies/hettie/hettie-about.jpg" alt="The About page of the Hettie Orange Designs website &mdash; the twenty-year story that earns the trust the rest of the site asks for." width="1009" height="2818" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+          </picture>
+        </div>
+        <figcaption class="fine" style="margin-top:8px">About</figcaption>
+      </figure>
+    </div>
+  </article>
 </div>
 </section>
 
@@ -302,10 +377,10 @@
 <div class="wrap" style="max-width:720px">
   <details class="decision-reveal reveal" style="border-left:1px solid var(--brass);padding-left:28px">
     <summary>
-      <span class="serif" style="font-size:22px;color:var(--ink)">Notice something? There's no portfolio grid on this page.</span>
+      <span class="serif" style="font-size:22px;color:var(--ink)">Notice something? One project, not a grid of forty.</span>
       <span class="toggle-icon" aria-hidden="true">+</span>
     </summary>
-    <p class="lead-muted mt-m">A grid of thumbnails is easy to fill with placeholder work, stock photography, or old projects that don't reflect how I work now. It's also the fastest way to imply more volume than is true. I'd rather show you a few decisions I stand behind than forty screenshots that don't tell you anything about how I think. When client work is ready to share &mdash; with permission &mdash; it'll live on this page. Until then, this is the honest version.</p>
+    <p class="lead-muted mt-m">A grid of thumbnails is easy to fill with placeholder work, stock photography, or old projects that don't reflect how I work now. It's also the fastest way to imply more volume than is true. I'd rather show you a few decisions I stand behind than forty screenshots that don't tell you anything about how I think. Client work appears here one project at a time, with permission, as it becomes real. That's why there's one above and not forty.</p>
   </details>
 </div>
 </section>

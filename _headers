@@ -73,6 +73,12 @@
   Cache-Control: no-cache, must-revalidate
 /home-services-web-design
   Cache-Control: no-cache, must-revalidate
+/burbank-web-design
+  Cache-Control: no-cache, must-revalidate
+/glendale-web-design
+  Cache-Control: no-cache, must-revalidate
+/pasadena-web-design
+  Cache-Control: no-cache, must-revalidate
 /how-we-work
   Cache-Control: no-cache, must-revalidate
 /work

@@ -49,6 +49,7 @@ Davis Digital Studio speaks as **one person: Eric.** First-person singular ("I d
 - **Ownership & no lock-in:** the client owns their site; they can leave without penalty. ("Cancel anytime" on the Growth Partnership.)
 - **Honesty:** "I'll tell you honestly what I think — whether or not that means hiring me."
 - **Fee credit:** "Every audit fee is credited toward a project — you never pay twice."
+- **A real number, on a call:** "I'll give you a real number for your business on the call." We do **not** publish prices — see §11.
 - **After launch:** "I don't disappear after launch. When you need a change, you just ask."
 
 ## 7. Promises NOT to make
@@ -80,7 +81,8 @@ Davis Digital Studio speaks as **one person: Eric.** First-person singular ("I d
 ## 11. How to describe ongoing support (Growth Partnership)
 - **Frame:** momentum and a partner who stays — not "maintenance" (which sounds like a cost/chore).
 - **Say:** "This isn't maintenance. It's momentum." "The same person, paying attention, every month." "Your site keeps up with you instead of slowly falling behind."
-- **Include:** honest pricing ("starts around $400/month"), no lock-in ("cancel anytime"), and the human ("it's still me").
+- **Include:** no lock-in ("cancel anytime") and the human ("it's still me").
+- **Pricing:** **do not publish an amount.** Superseded on 2026-08-25 — the site published "starts around $1,500" / "$400 a month" / audit tiers, and now publishes nothing. Every number is quoted on the free call. `/pricing` explains **how** work is priced and what changes the number; it never says how much. Pinned by `tests/e2e/marketing.spec.ts` (MS2), which fails the build on any `$` amount on a money page.
 - **Never:** "subscription," "SaaS," "license," "plan tier," "platform fee." It's a **service relationship**, priced monthly.
 
 ## 12. Headlines
