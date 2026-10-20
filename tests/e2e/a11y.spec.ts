@@ -60,8 +60,13 @@ test.describe('Accessibility', () => {
     } } } });
     await page.goto('/leads.html');
     await page.waitForLoadState('networkidle');
-    await page.locator('.dds-nav .sec > button[data-sec="customers"]').click();
-    await expect(page.locator('.dds-nav .sec.open .menu')).toBeVisible();
+    // visual refresh: in the sidebar the section you are in (Customers, on
+    // leads.html) is already expanded inline — the scan covers it open as-is;
+    // clicking its trigger would FOLD it
+    const customers = page.locator('.dds-nav .sec:has(> button[data-sec="customers"])');
+    await expect(customers).toHaveClass(/\bopen\b/);
+    await expect(customers.locator('.menu')).toBeVisible();
+    await expect(customers.locator('.menu a.here')).toHaveText('Enquiries');
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
