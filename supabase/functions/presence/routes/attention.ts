@@ -15,7 +15,8 @@ import type { SiteRow } from '../lib/site.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { linksForCustomer } from '../lib/service_bridge.ts';
 import { siteContentTree } from './room.ts';
-import { noticeHref } from './workspace.ts';
+import { noticeHrefFor } from './workspace.ts';
+import { freshEnquiries } from '../lib/inbox_feed.ts';
 import { notifLabel } from '../lib/notifications.ts';
 import { buildAttentionCenter, type AttentionInput } from '../lib/attention_center.ts';
 
@@ -34,7 +35,7 @@ export async function handleAttentionCenter(site: SiteRow, cors: Record<string, 
 
   // ── everything else — one bounded parallel gather from existing tables ─────
   const [noticeQ, schedQ, enquiryQ, connQ, infraQ, writeQ, fileQ] = await Promise.all([
-    svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=kind,headline,body&order=created_at.desc&limit=10`),
+    svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=kind,period,headline,body&order=created_at.desc&limit=10`),
     svc(`presence_scheduled_publishes?site_id=eq.${site.id}&status=eq.pending&select=scheduled_for,summary,kind&order=scheduled_for.asc&limit=5`),
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id&limit=50`),
     svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health`),
@@ -43,7 +44,7 @@ export async function handleAttentionCenter(site: SiteRow, cors: Record<string, 
     svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,metadata&limit=50`),
   ]);
 
-  const notices = arr(noticeQ).map((n) => ({ kind: n.kind, headline: n.headline, body: n.body, href: noticeHref(n.kind) }));
+  const notices = arr(noticeQ).map((n) => ({ kind: n.kind, headline: n.headline, body: n.body, href: noticeHrefFor(n) }));
   const scheduled = arr(schedQ).map((s) => ({ at: s.scheduled_for, summary: s.summary, kind: s.kind }));
   const connections_attention = arr(connQ)
     .filter((c) => ['expired', 'error', 'revoked'].includes(c.status) || ['attention', 'down'].includes(c.health))
@@ -84,7 +85,9 @@ export async function handleAttentionCenter(site: SiteRow, cors: Record<string, 
     missing,
     notices,
     scheduled,
-    new_enquiries: num(enquiryQ),
+    // an AGED lead already has a lead_followup notice card below — counting it
+    // here too rendered the same lead twice (the bell has always deduped it).
+    new_enquiries: freshEnquiries(num(enquiryQ), notices),
     connections_attention,
     approvals_waiting,
     project_approvals_waiting,

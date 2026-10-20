@@ -13,6 +13,7 @@ import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
+import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor } from '../lib/navigation.ts';
 import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
@@ -23,7 +24,30 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount, noticeDismissible } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries, invoiceReminderIds, renderableNotices } from '../lib/inbox_feed.ts';
+import { clearNotice } from '../lib/notice.ts';
+
+// ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
+// RENDERS are the same rows. Drops the client_* throttle notices (their counted
+// half is a message/support row) and any invoice reminder whose invoice is no
+// longer open — and clears those stale reminders so the badge self-heals. One
+// batched invoices read, only when a reminder exists; a failed read keeps every
+// reminder (never an under-count). Best-effort end to end.
+async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
+  const ids = invoiceReminderIds(rows);
+  let open: ReadonlySet<string> | null = null;
+  if (ids.length) {
+    try {
+      const r = await svc(`presence_invoices?site_id=eq.${site.id}&id=in.(${ids.join(',')})&select=id,status&limit=${ids.length}`);
+      if (r.ok && Array.isArray(r.json)) open = new Set((r.json as any[]).filter((i) => String(i.status) === 'open').map((i) => String(i.id)));
+    } catch { open = null; }
+  }
+  const { keep, stale } = renderableNotices(rows, open);
+  if (stale.length && site.client_id) {
+    for (const n of stale) { try { await clearNotice(String(site.client_id), 'deal_followup', String(n.period)); } catch { /* best-effort */ } }
+  }
+  return keep;
+}
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
@@ -160,7 +184,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   let attention_count = 0;
   try {
     attention_count = studioBellCount({
-      notices: ((nQ.json as any[]) || []),
+      notices: await verifiedNotices(site, ((nQ.json as any[]) || [])),
       newEnquiries: ((eQ.json as any[])?.length || 0),
       proposedPlans: (iQ || 0),
       proposedWrites: (wQ || 0),
@@ -192,7 +216,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     }
   } catch { /* best-effort */ }
 
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient };
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName };
   return json({ data: {
     site_role: role,
     capabilities: caps,
@@ -218,16 +242,17 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 // Phase FLOW: where each notice kind sends the owner when tapped in the bell —
 // straight to the page that resolves it, not a generic landing (one fewer hop).
 const NOTICE_HREF: Record<string, string> = {
-  lead_followup: '/leads.html',
-  website_enquiry: '/leads.html',      // FIX 1: a brand-new website enquiry → the leads inbox
+  lead_followup: '/inbox.html#enquiries',
+  website_enquiry: '/inbox.html#enquiries',   // FIX 1: a brand-new website enquiry → the Inbox's Enquiries view
   connection_expired: '/connections.html', // FIX 2: a degraded connection → reconnect
-  missing_required: '/content-tree.html',  // FIX 4: a section blocking publish → the website map
+  missing_required: '/presence.html#pages',  // FIX 4: a section blocking publish → the overview's Pages (content-tree.html retired, Oct 2026)
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   support_aging: '/projects.html', // service edge #3: an aging support request needs a reply (support lives in the project view)
   invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
   invoice_void_paid: '/pipeline.html',   // 0119: money landed on a WITHDRAWN invoice → the deal, where the voided row is
   publish_failed: '/presence.html#publish',
+  studio_published: '/presence.html',   // audit change 2: the client's studio published for them → their Website overview
   site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)
   domain_expiry: '/presence.html#business',
   search_setup: '/presence.html#search',
@@ -237,7 +262,7 @@ const NOTICE_HREF: Record<string, string> = {
   capacity: '/presence.html#settings', trial_ending: '/presence.html#settings', trial_ended: '/presence.html#settings',
   payment_trouble: '/presence.html#settings', account_lapsed: '/presence.html#settings',
   winddown_reminder: '/presence.html#settings', win_back: '/presence.html#settings', deletion_requested: '/presence.html#settings',
-  approval_decided: '/timeline.html',   // a reviewer/client decided something — the story lives on the timeline
+  approval_decided: '/presence.html#activity',   // a reviewer/client decided something — the overview's Recent activity (timeline.html retired)
   new_booking: '/presence.html#bookings',   // a customer booked online → the Bookings desk (confirm/cancel)
   booking_followup: '/presence.html#bookings', // #164: a past appointment needs marking done / no-show
   booking_reminder: '/presence.html#bookings', // #164: silent send-once ledger (dismissed; never shown) — mapped for completeness
@@ -251,9 +276,18 @@ const NOTICE_HREF: Record<string, string> = {
   client_message: '/inbox.html',      // a client wrote (portal or emailed in) → the Inbox conversation list
   client_request: '/inbox.html',      // a support/service request opened or replied → same list (support rows live there)
   client_upload: '/projects.html',    // a client sent a file → project Files
-  client_approval: '/timeline.html',  // a client decided an approval → the story lives on the timeline (matches approval_decided)
+  client_approval: '/presence.html#activity',  // a client decided an approval → Recent activity (matches approval_decided)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
+// A notice whose period names ONE row deep-links that row (Oct 2026 audit, gap 2):
+// lead_followup's period is `lead:<id>` (commercial.ts leadFollowupNoticeKey), so
+// its href selects that enquiry in the Inbox's Enquiries view — the reply is one
+// click away instead of two. Every other kind keeps its kind-only landing.
+export const noticeHrefFor = (n: { kind: string; period?: string | null }): string => {
+  const base = noticeHref(n.kind);
+  const id = n.kind === 'lead_followup' ? leadIdOfNoticePeriod(n.period) : null;
+  return id ? `${base}?sel=lead:${id}` : base;
+};
 
 /** The client portal's read: only what's shared with the reviewer — shared
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
@@ -349,7 +383,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
   // the server would refuse, and refuses one the client never drew. Synthetic rows
   // below carry no id/period at all; the client's UUID guard is what excludes them.
-  const notices = (((noticeQ.ok && noticeQ.json) || []) as any[]).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHref(n.kind), dismissible: noticeDismissible(n.kind, n.period) }));
+  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing
@@ -359,8 +393,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // so one submission never stacks two rows. (inbox.html renders per-lead detail
   // from /forms/inbox and filters this aggregate kind to avoid a double listing.)
   if (seesFull) {
-    const leadFollowups = notices.filter((n) => n.kind === 'lead_followup').length;
-    const newEnquiries = Math.max(0, (((enqQ.ok && enqQ.json) || []) as any[]).length - leadFollowups);
+    const newEnquiries = freshEnquiries((((enqQ.ok && enqQ.json) || []) as any[]).length, notices);
     if (newEnquiries > 0) notices.unshift({
       id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,

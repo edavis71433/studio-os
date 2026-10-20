@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
 
 // Rosters as Salesforce list views (redesign slice 3): customers.html and
 // contacts.html get a list-view header (object icon + fixed-view dropdown +
@@ -139,10 +139,11 @@ test.describe('Customers list view', () => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
-    // "Manage their website" is a row action (only with a customer site)
+    // "Their website" is a row action (only with a customer site); "Open record" rides every row
     await expect(page.locator('tbody [data-web]')).toHaveCount(2);
+    await expect(page.locator('tbody [data-rec]')).toHaveCount(await page.locator('tbody tr').count());
     await page.locator('tbody tr').first().locator('td').first().click();
-    await expect(page).toHaveURL(/crm\.html\?client=site-acme&tab=delivery/);
+    await expect(page).toHaveURL(/crm\.html\?client=site-acme$/);
   });
 });
 
@@ -218,6 +219,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await page.goto('/customers.html');
     await page.locator('#addCust').click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-biz').fill('Acme Bakery');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
@@ -521,5 +523,61 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await expect(done).toContainText('the invitation email couldn’t be sent');
     await expect(done).not.toContainText('Invitation sent to');
     await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
+  });
+});
+
+// ── Oct 2026 studio audit, change 3 (one roster): an agency member at studio
+// level has their roster on agency.html (portfolio + this bridge list, merged) —
+// customers.html forwards them there. Drilled into a client it stays the escape
+// hatch UP to the full roster, and a plain studio owner never leaves.
+test.describe('Customers — the agency member is forwarded to the one roster', () => {
+  const agencyCtx = (scope?: { site_id: string; name: string }) => ({ data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+    is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'view_all'],
+    landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV, ...(scope ? { scope } : {}),
+  } });
+  test('studio level → /agency.html', async ({ page }) => {
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx(), '/agency/me': { data: { agency: 'Bright Studio', role: 'owner' } }, '/agency/portfolio': { data: [] }, '/agency/queues': { data: { queues: [] } }, '/agency/kits': { data: [] } } });
+    await page.goto('/customers.html');
+    await page.waitForURL(/\/agency\.html$/);
+  });
+  // Oct 2026 studio audit, change 4: the rosters' copies of the dialog offer "Start
+  // from" a kit only when the caller IS an agency (ddsContext.is_agency) — a plain
+  // studio owner has no kits and never sees the field.
+  const KITS = { data: [{ id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', name: 'Restaurant starter' }] };
+  test('customers (drilled agency) — the Start-from kit select lists /agency/kits; a plain owner never sees it', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
+    await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
+    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
+    await expect(page.locator('#cu-signup')).toBeHidden();      // provision mode: no pricing box
+    // the owner's copy: no agency, no field — even with kits fixtured
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+  });
+  test('contacts — the same gate on its copy: agency sees the kit field, owner does not', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
+    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+  });
+  test('drilled into a client (?client=) it stays, as the way UP to the roster', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
+    await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await expect(page.locator('.tscroll table tbody tr', { hasText: 'Acme Bakery' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/customers.html');
   });
 });

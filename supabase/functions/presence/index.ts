@@ -27,7 +27,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
-import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
@@ -56,7 +56,7 @@ import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
 import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
 import { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } from './routes/comments.ts';
@@ -355,6 +355,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     });
     if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
     site = sc.site; scopedName = sc.scoped.name;
+    // Studio audit change 2: the principal now KNOWS it is acting for a client,
+    // so every attribution downstream (publishes, snapshots, change events,
+    // connection events — lib/actor_kind.ts) says "the studio" without a second
+    // membership query. Set only here, only after the scope was authorised.
+    principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
   } else {
     site = await resolveSite(jwt);
     // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns
@@ -633,6 +638,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // answers 409 with the attached history until ?confirm=1). Site-scoped.
     const m = route.match(/^\/sales\/contacts\/([0-9a-f-]{36})$/);
     if (m && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) return handleSalesContact(req, site, principal, m[1], cors);
+    // Phase 4 (delete safety): the Undo behind a removal — the soft delete is
+    // reversed in place (deleted_at → null). Site-scoped; 404 once nothing is there.
+    const mr = route.match(/^\/sales\/contacts\/([0-9a-f-]{36})\/restore$/);
+    if (mr && method === 'POST') return handleSalesContactRestore(site, mr[1], cors);
   }
   // Add an EXISTING customer directly — no deal/sign/convert ceremony. Studio-gated
   // like every /sales/* route (relationship feature + the reviewer boundary above).
@@ -702,6 +711,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'DELETE') return handleSalesTemplateDelete(site, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
+    // ONE LINK (benchmark 2026-10, item 5): send the proposal AND the agreement
+    // in one email, on one deal-bound page (choose → sign → pay). The per-document
+    // sends above and below stay for sending one at a time.
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/send$/);
+    if (m && method === 'POST') return handleSalesDealSend(req, site, principal, m[1], cors);
     // Revise a sent/declined proposal → a new draft vN+1 on the same deal (clones
     // items + discount/tax + terms, records the trail, supersedes the prior).
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/revise$/);
@@ -887,6 +901,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
+  }
+  {
+    const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})\/reply$/);
+    if (m && method === 'POST') return handleFormReply(req, jwt, site, principal, m[1], cors);
   }
   if (route === '/approve/send' && method === 'POST') return handleApproveSend(site, principal, cors);
 

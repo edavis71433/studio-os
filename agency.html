@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Studio — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
+<!-- The studio home is never scoped: a stray ?client= (the nav carries the drill-in
+     scope onto every link) is dropped here, BEFORE the deferred shell reads the URL,
+     so landing on Customers always means "back at studio level". -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
   /* SS2: page skin = the shell's --dds-* tokens (shell.css is the canonical
@@ -31,24 +35,24 @@
 
   /* ── list-view header (SLDS list-view anatomy, dds skin) — the same .lhead/
         .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / files.html ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
   .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
   .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 12px}
 
   /* fixed-view chips (leads.html's filter anatomy; role=group + aria-pressed) */
   .filters{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
-  .filters button{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:6px 13px;cursor:pointer}
+  .filters button{font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:var(--dds-r,8px);padding:6px 13px;cursor:pointer}
   .filters button[aria-pressed="true"]{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
 
-  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:14px}
+  .search{width:100%;font-family:inherit;font-size:14.5px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);margin-bottom:14px}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
 
   /* ── the table view (customers.html .tscroll anatomy): sortable columns; the
@@ -57,9 +61,9 @@
      (position:absolute). With no positioned ancestor its containing block was
      the initial one, so overflow:auto could not clip it and the 1px span gave
      the BODY a sideways scroll at phone widths. Same fix as contacts.html. */
-  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:680px}
-  .tscroll thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  .tscroll thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   .tscroll thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   .tscroll thead th .thb:hover{color:var(--p)}
   .tscroll thead th .arrow{font-size:10px;color:var(--p)}
@@ -86,32 +90,34 @@
   @media (min-width:768px){:root[data-theme="dark"] .tscroll th.acts,:root[data-theme="dark"] .tscroll td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
-  .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .rowact.ghost{color:var(--soft);border-color:transparent}
+  td.acts{white-space:nowrap;text-align:right} td.acts .rowact+.rowact{margin-left:6px}
+  .pill{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
 
   /* ── the card view (the page's original look, kept for warmth) ── */
-  .client{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:0;cursor:pointer;transition:.15s;width:100%;text-align:left;font-family:inherit;color:inherit;font-size:inherit}
+  .client{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:0;cursor:pointer;transition:.15s;width:100%;text-align:left;font-family:inherit;color:inherit;font-size:inherit}
   .client:hover{border-color:var(--p)}
-  .client .av{width:38px;height:38px;border-radius:10px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+  .client .av{width:38px;height:38px;border-radius:var(--dds-r,8px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
   .client .n{font-weight:600;font-size:15px} .client .m{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
   .client .bitln{font-size:12px;color:var(--warn);font-family:var(--sans)}
   .client .badge{margin-left:auto;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
   .badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
   .managerow{text-align:right;margin-top:5px}
-  .managerow button{background:none;border:none;color:var(--p);font-weight:600;font-size:12.5px;cursor:pointer;padding:2px 4px;font-family:inherit}
+  .managerow button{background:none;border:none;color:var(--p);font-weight:500;font-size:12.5px;cursor:pointer;padding:2px 4px;font-family:inherit}
 
   /* ── work queues panel — today.html's rail-card (.rcard/.rrows) anatomy ── */
-  .qhead{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 10px}
-  .rcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:10px}
-  .rcard .rh{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin:0 0 6px}
+  .qhead{font-size:13px;color:var(--soft);font-weight:600;margin:0 0 10px}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:10px}
+  .rcard .rh{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 6px}
   .rrows a{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
   .rrows a:first-child{border-top:0}
   .rrows a:hover{color:var(--p)}
   .rrows a:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:8px}
   .rrows .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap}
   .qmore{color:var(--soft);font-size:12.5px;margin:6px 0 0}
-  .qfail{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-bottom:10px;font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .qfail button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 12px;cursor:pointer}
+  .qfail{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:13px 16px;margin-bottom:10px;font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .qfail button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:transparent;color:var(--ink);padding:5px 12px;cursor:pointer}
   .qfail button:hover{border-color:var(--p);color:var(--p)}
   #queues{margin-bottom:22px}
 
@@ -121,21 +127,60 @@
      paragraph running 1560px are just the roster's width leaking into content
      that gains nothing from it. The card still spans the page (it lines up with
      the table above), but its prose and controls hold the focused measure. */
-  .kitcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);margin-top:18px}
+  .kitcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-top:18px}
   .kitcard p,.kitcard .kitrow{max-width:var(--dds-w-focus,760px)}
   .kitcard h2{font-size:15px;font-weight:600;font-family:var(--sans);margin:0 0 6px}
   .kitcard .muted{margin-bottom:10px}
   .kitrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
-  .kitrow select,.kitrow input{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);flex:1;min-width:150px;margin:0}
+  .kitrow select,.kitrow input{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);flex:1;min-width:150px;margin:0}
   .kitrow select:focus,.kitrow input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
-  .kitrow .btn{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 16px;cursor:pointer;flex:0 0 auto}
+  .kitrow .btn{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 16px;cursor:pointer;flex:0 0 auto}
   .kitrow .btn:hover{border-color:var(--p);color:var(--p)}
   .kitrow .btn[disabled]{opacity:.6;cursor:default}
   .kitchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;margin:0 6px 6px 0;font-size:13px}
   .kitchip button{border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px;font-family:inherit}
 
-  button.primary{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}a.link:hover{text-decoration:underline}
+  /* ── the studio strip (one home): Today's money tiles + This week + Key deals,
+        read from the studio's OWN site (never scoped) — pipeline's .stats anatomy ── */
+  #studio{margin-bottom:22px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
+  .stat{display:flex;gap:12px;align-items:center;padding:14px 16px;border-right:1px solid var(--line);color:inherit;text-decoration:none;min-width:0}
+  .stat:last-child{border-right:0} .stat:hover .sv{color:var(--p)}
+  .stat .sk{font-size:12px;color:var(--faint)} .stat .sv{font-size:22px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15} .stat .ss{font-size:12.5px;color:var(--soft)}
+  .stat .sv.warn{color:var(--warn)} .stat .sv.good{color:var(--good)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media (max-width:759px){.two{grid-template-columns:1fr}}
+  .two .rcard{margin-bottom:0}
+  .rrows .late{color:var(--bad)} .rrows a .rn.due{color:var(--warn)}
+  .rfoot{margin-top:8px;font-size:12.5px} .rfoot a{color:var(--p);text-decoration:none;font-weight:500}
+  .quiet{font-size:12.5px;color:var(--faint);margin:6px 0 0}
+  /* ── the top row: agency name · role · + Add a customer · platform health (staff) ── */
+  .top .acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn:hover{filter:brightness(1.05)}
+  #healthLine{font-size:12.5px;color:var(--soft)} #healthLine a{color:var(--p);text-decoration:none;font-weight:500} #healthLine .warnw{color:var(--warn)}
+  /* ── the Add-a-customer dialog — customers.html's custDlg, ported wholesale and kept in sync by hand ── */
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dbody{padding:22px;max-height:calc(84vh - 22px);overflow:auto}
+  .dbody h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 12px}
+  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
+  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:9px 12px;outline:none}
+  .dbody input:focus,.dbody select:focus{border-color:var(--p)}
+  .dbody .note{font-size:12.5px;color:var(--faint);margin:12px 0 0;line-height:1.5}
+  #cu-mode{display:grid;gap:8px;margin:0 0 6px}
+  .modeopt{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
+  .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
+  .modeopt input{width:auto;margin-top:3px;accent-color:var(--p)}
+  .modeopt strong{display:block;font-weight:600;font-size:13.5px}
+  .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
+  .dbody .done{text-align:center;padding:8px 0 4px}
+  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px}
+  .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
+  .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+  .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
+  button.primary{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
   .center{text-align:center;padding:52px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
@@ -147,11 +192,61 @@
 </head>
 <body>
 <div class="wrap">
-  <!-- queues live OUTSIDE #main: the roster re-renders #main.innerHTML per
-       keystroke and must never wipe the cockpit panel -->
+  <!-- the top row, the queues and the studio strip live OUTSIDE #main: the roster
+       re-renders #main.innerHTML per keystroke and must never wipe them -->
+  <div id="top"></div>
   <section id="queues" aria-label="Work queues" hidden></section>
+  <section id="studio" aria-label="Your studio" hidden></section>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<!-- customers.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
+<dialog id="custDlg" aria-label="Add a customer">
+  <form id="custForm" class="dbody">
+    <div id="cust-fields">
+      <h3>Add a customer</h3>
+      <div id="cu-mode" role="radiogroup" aria-label="How would you like to add them?">
+        <label class="modeopt"><input type="radio" name="cumode" value="provision" checked>
+          <span><strong>I’ll set them up now</strong><span class="modehint">Create their workspace and email them a sign-in link.</span></span></label>
+        <label class="modeopt"><input type="radio" name="cumode" value="connect">
+          <span><strong>They’ll sign up themselves — connect by email</strong><span class="modehint">Just record their email. You don’t set anything up.</span></span></label>
+      </div>
+      <label for="cu-name">Their name</label>
+      <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+      <label for="cu-email">Email</label>
+      <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
+      <div id="cu-provision-only">
+        <label for="cu-biz">Business name</label>
+        <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+        <label for="cu-edition">What kind of work is this?</label>
+        <select id="cu-edition">
+          <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
+          <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
+          <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
+          <option value="presence_monitor">Just monitoring a site they already have</option>
+        </select>
+        <div id="cu-kit-wrap" style="display:none">
+          <label for="cu-kit">Start from</label>
+          <select id="cu-kit"><option value="">No kit — start empty</option></select>
+          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site. Their own business details stay theirs to fill in.</p>
+        </div>
+        <div id="cu-website-wrap" style="display:none">
+          <label for="cu-website">Their existing website address</label>
+          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. You can add or change this later on their website page.</p>
+        </div>
+        <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
+      </div>
+      <div id="cu-connect-only" style="display:none">
+        <p class="note">Enter their email. If they already have an account, they connect to you now. If not, they’ll connect automatically the moment they sign up with that email.</p>
+        <!-- the pricing box belongs to CONNECT only: in provision mode nothing is
+             bought — the studio provisions the site and bills for its work -->
+        <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
+      </div>
+      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
+    </div>
+    <div id="cust-done" style="display:none"></div>
+  </form>
+</dialog>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -170,6 +265,7 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 // styled toast via the shared shell (replaces native alert()); bad→error styling
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 let TOKEN="",ME=null,CLIENTS=[],PROJECT_BY_SITE={},CUST_FAILED=false,LOADED_ONCE=false,LOADED_AT=0;
+const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
@@ -193,10 +289,10 @@ const viewMatch=(c)=>{
   // search_issues counts too: a search-issues-only client is platform-flagged
   // (and already kept out of "All clear") — without this it was invisible in
   // every focused view.
-  if(VIEWNAME==='attention')return att>0||Number(c.search_issues||0)>0;
+  if(VIEWNAME==='attention')return att>0||Number(c.search_issues||0)>0||Number(c.open_support||0)>0;
   if(VIEWNAME==='domain')return domainSoon(c);
   if(VIEWNAME==='billing')return !!c.billing_issue;
-  if(VIEWNAME==='clear')return att===0&&!c.billing_issue&&!domainSoon(c)&&!Number(c.search_issues||0);
+  if(VIEWNAME==='clear')return att===0&&!c.billing_issue&&!domainSoon(c)&&!Number(c.search_issues||0)&&!Number(c.open_support||0);
   return true;
 };
 // Table ⇄ Cards display choice, persisted; small screens default to Cards.
@@ -217,7 +313,7 @@ let SORT={key:'name',dir:1};
 
 function sortedRows(){
   const q=Q.trim().toLowerCase();
-  const list=CLIENTS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.domain||'').toLowerCase().includes(q));
+  const list=CLIENTS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.domain||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
@@ -230,6 +326,7 @@ function statusBits(c,skipColumns){
     if(de!==null&&de<=DOMAIN_SOON_DAYS)bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);}
   const si=Number(c.search_issues||0);if(si)bits.push(`${si} search issue${si===1?'':'s'}`);
   if(c.billing_issue)bits.push('billing needs a look');
+  const os=Number(c.open_support||0);if(os)bits.push(`${os} support request${os===1?'':'s'} open`);
   return bits;
 }
 
@@ -269,13 +366,13 @@ function tableHtml(list){
     const att=Number(c.attention||0);
     const bits=statusBits(c,true);   // leads/domain have their own columns here
     return `<tr data-open="${esc(c.site_id)}" tabindex="0" aria-label="Open ${esc(c.name||'(unnamed)')}">
-      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
+      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${c.email?`<div class="sub">${esc(c.email)}</div>`:''}${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
       <td>${esc(c.edition||'presence')}</td>
       <td><span class="pill">${esc(c.status||'—')}</span></td>
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td class="num">${Number(c.leads_waiting||0)}</td>
       <td>${domainCell(c)}</td>
-      <td class="acts">${PROJECT_BY_SITE[c.site_id]?`<button class="rowact" data-web="${esc(c.site_id)}">Manage their website</button>`:''}</td>
+      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button>${c.bridge_only?'':`<button class="rowact ghost" data-web="${esc(c.site_id)}">Their website</button>`}</td>
     </tr>`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -291,7 +388,7 @@ function cardsHtml(list){
       <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
     // FIX 7: opening a client goes to your DELIVERY view; managing their website
     // is the clearly-secondary action.
-    if(PROJECT_BY_SITE[c.site_id])h+=`<div class="managerow"><button data-web="${esc(c.site_id)}">Manage their website →</button></div>`;
+    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button>${c.bridge_only?'':`<button data-web="${esc(c.site_id)}">Their website →</button>`}</div>`;
     h+=`</div>`;
   }
   return h;
@@ -315,13 +412,12 @@ function kitCardHtml(){
 
 function render(){
   const list=sortedRows();
-  let h=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><span class="rolebadge">● ${esc((ME&&ME.role)||'member')}</span></div>`;
-  h+=lheadHtml(list.length);
+  let h=lheadHtml(list.length);
   h+=chipsHtml();
   h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
   if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
   if(!list.length){
-    h+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet — add businesses from your studio tools.'}</p></div>`;
+    h+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet.'}</p>${CLIENTS.length?'':'<p style="margin-top:14px"><button type="button" class="btn" id="addCustEmpty">+ Add a customer</button></p>'}</div>`;
   }else{
     h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
   }
@@ -338,6 +434,7 @@ function render(){
 function wire(){
   // search — client-side filter, re-rendered live; render() preserves input/caret/focus
   const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;render();});
+  const ae=$('addCustEmpty');if(ae)ae.addEventListener('click',openAddCustomer);
   // fixed-view chips — focus returns to the clicked chip after the re-render
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
     VIEWNAME=b.getAttribute('data-view');render();
@@ -348,7 +445,7 @@ function wire(){
   // failure state honestly; no listeners survive its innerHTML swap, so nothing
   // double-mounts) — ↻ used to leave it stale all morning.
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{
-    mountQueues();
+    mountQueues();mountStudio();
     load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true));
   });
   const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
@@ -368,7 +465,10 @@ function wire(){
     tr.addEventListener('click',open);
     tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();openClient(tr.getAttribute('data-open'));}});
   });
-  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/today.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  // Phase 1 overhaul: "Open record" → the customer hub; "Their website" → the
+  // client's website editor in their scope (was their Today, which reads like the studio's own).
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/presence.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openClient(b.getAttribute('data-rec'));}));
 }
 
 // ── starter kits: data + painting. Events are DELEGATED ONCE below — the old
@@ -430,11 +530,13 @@ document.addEventListener('click',async(e)=>{
 // fall back to their client record.
 function openClient(siteId){
   const c = CLIENTS.find(x=>x.site_id===siteId); if(!c) return;
+  // a customer the portfolio does not know yet: by their site when they have one, else by their client id
+  if(c.bridge_only){ location.href=String(c.site_id).startsWith('client:')?'/crm.html?client_id='+encodeURIComponent(c.client_id):'/crm.html?client='+encodeURIComponent(c.site_id); return; }
   // Open the customer's unified CLIENT RECORD (Overview · Deal · Delivery · Details).
   const pid = PROJECT_BY_SITE[siteId];
   // SC-1: the project drill-in mints the client site scope like its sibling below —
   // without it the record page resolves against the agency's own tenant.
-  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&tab=delivery&client=' + encodeURIComponent(siteId); return; }
+  if(pid){ location.href = '/crm.html?project=' + encodeURIComponent(pid) + '&client=' + encodeURIComponent(siteId); return; }
   location.href = '/crm.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
@@ -472,11 +574,191 @@ async function load(soft){
   if(!CUST_FAILED){
     const clist=Array.isArray(cust.body.data)?cust.body.data:[];
     PROJECT_BY_SITE={};clist.forEach(c=>{if(c.customer_site_id&&c.project_id)PROJECT_BY_SITE[c.customer_site_id]=c.project_id;});
+    // ONE roster (Oct 2026 studio audit, change 3): the bridge roster customers.html
+    // used to show (email · support waiting · projects · status) folds into the
+    // portfolio row for the same site; a customer the portfolio does not know yet
+    // (the portfolio link is best-effort at provisioning) still gets a row, so
+    // nobody is on one list and missing from the other.
+    const bySite={};CLIENTS.forEach(c=>{if(c.site_id)bySite[c.site_id]=c;});
+    clist.forEach(c=>{
+      const row=c.customer_site_id?bySite[c.customer_site_id]:null;
+      if(row){row.client_id=c.client_id;row.email=c.email||row.email||null;row.open_support=Number(c.open_support||0);row.project_count=Number(c.project_count||0);if(c.status&&c.status!=='active')row.customer_status=c.status;return;}
+      if(!c.client_id)return;
+      CLIENTS.push({site_id:c.customer_site_id||('client:'+c.client_id),client_id:c.client_id,name:c.name||c.email||'Customer',email:c.email||null,edition:c.customer_site_id?'presence':'—',status:c.status||'active',
+        attention:0,leads_waiting:0,search_issues:0,billing_issue:false,domain:null,domain_registrar:null,domain_expires_at:null,open_support:Number(c.open_support||0),project_count:Number(c.project_count||0),bridge_only:true});
+    });
   }
   LOADED_ONCE=true;LOADED_AT=Date.now();
   render();
   loadKits();
 }
+
+// ── the top row: who you are, + Add a customer, platform health (staff) ──
+function renderTop(){
+  const t=$('top');if(!t)return;
+  t.innerHTML=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><div class="acts"><span id="healthLine"></span><span class="rolebadge">● ${esc((ME&&ME.role)||'member')}</span><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
+  const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
+}
+
+// ── the studio strip (one home, Oct 2026 studio audit change 3): the money tiles,
+//    This week and Key deals that today.html shows for the studio's OWN site —
+//    here, on the page the agency lands on. Every read is best-effort: a failed
+//    or forbidden read drops its piece, never fake zeros; nothing at all → hidden. ──
+const OPEN_STAGES=['lead','qualified','proposal','contract'];
+function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fromYmd||'')),b=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(toYmd||''));if(!a||!b)return null;return Math.round((Date.UTC(+b[1],+b[2]-1,+b[3])-Date.UTC(+a[1],+a[2]-1,+a[3]))/86400000);}
+function dueLabel(ymd){const d=daysBetween(localYmd(),ymd);if(d==null)return'No date';const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd));const when=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',day:'numeric'});if(d<0)return'Overdue · '+when;if(d===0)return'Today';if(d===1)return'Tomorrow';return when;}
+function weekTodos(list){
+  const out=(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0&&String(d.next_step||'').trim())
+    .map(d=>({id:String(d.id),title:String(d.next_step).trim(),deal:d.title||'',at:d.next_step_at||null,days:daysBetween(localYmd(),d.next_step_at)}))
+    .filter(r=>r.days==null||r.days<7);
+  out.sort((a,b)=>(a.days==null?1:0)-(b.days==null?1:0)||(a.days||0)-(b.days||0)||String(a.deal).localeCompare(String(b.deal)));
+  return out.slice(0,6);
+}
+function keyDeals(list){return(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0).sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0)).slice(0,5);}
+function statTiles(s){
+  const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
+  if(!s||typeof s!=='object')return t;
+  const ar=s.ar;
+  if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
+  if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',tone:'good',href:'/pipeline.html'});}
+  if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',tone:'',href:'/pipeline.html'});}
+  return t;
+}
+let SSEQ=0;
+async function mountStudio(){
+  const host=$('studio');if(!host)return;
+  const gen=++SSEQ;
+  const get=async(p)=>{try{const r=await api(p);return r.ok?r.body.data:null;}catch(_){return null;}};
+  const [summary,deals]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100')]);
+  if(gen!==SSEQ)return;
+  const tiles=statTiles(summary);const todos=weekTodos(deals);const top=keyDeals(deals);
+  if(!tiles.length&&!todos.length&&!top.length){host.hidden=true;host.innerHTML='';return;}
+  let h='';
+  if(tiles.length)h+=`<div class="stats" role="list" aria-label="Your numbers">${tiles.map(t=>`<a class="stat" role="listitem" id="${esc(t.id)}" href="${esc(t.href)}"><div><div class="sk">${esc(t.k)}</div><div class="sv ${esc(t.tone)}">${esc(t.v)}</div><div class="ss">${esc(t.s)}</div></div></a>`).join('')}</div>`;
+  if(todos.length||top.length){
+    h+='<div class="two">';
+    if(todos.length){const late=todos.some(r=>r.days!=null&&r.days<0);
+      h+=`<div class="rcard" id="this-week"><p class="rh">This week · ${todos.length}</p><div class="rrows">${todos.map(r=>`<a href="/crm.html?deal=${encodeURIComponent(r.id)}" data-noscope="1"><span${r.days!=null&&r.days<0?' class="late"':''}>${esc(r.title)}${r.deal?' <span style="color:var(--soft);font-weight:400">· '+esc(r.deal)+'</span>':''}</span><span class="rn${r.days!=null&&r.days<=0?' due':''}">${esc(dueLabel(r.at))}</span></a>`).join('')}</div>${late?'':'<p class="quiet">Nothing overdue.</p>'}<div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;}
+    if(top.length)h+=`<div class="rcard" id="key-deals"><p class="rh">Key deals</p><div class="rrows">${top.map(d=>`<a href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1">${esc(d.title||'A deal')}<span class="rn">${esc(money(d.expected_value_cents))}</span></a>`).join('')}</div><div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;
+    h+='</div>';
+  }
+  host.hidden=false;host.innerHTML=h;
+}
+
+// ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by
+//    hand: set up a customer with their own workspace + a sign-in invitation, or
+//    just connect them by email. POST /sales/customers (handleSalesAddCustomer)
+//    reads mode/name/business_name/email/edition/website_url. ──
+function cuPlan(){const v=$('cu-edition').value;return v==='business_os_no_site'?'business_os_only':v;}
+function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_only'||v==='presence_monitor';}
+function syncCuSignup(){
+  const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
+}
+function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
+function syncCuMode(){
+  const connect=cuMode()==='connect';
+  const po=$('cu-provision-only');if(po)po.style.display=connect?'none':'';
+  const co=$('cu-connect-only');if(co)co.style.display=connect?'':'none';
+  const sb2=$('cu-submit');if(sb2)sb2.textContent=connect?'Save':'Set up + invite';
+  if(!connect)syncCuSignup();
+}
+// Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
+// kits, offered in provision mode only, applied to the NEW site once the provision
+// POST answers with its site_id. A studio without an agency never sees the field;
+// no kits (or a failed read) hides it too — the dialog never offers what it can't do.
+async function cuIsAgency(){return true;}   // this IS the agency's home
+async function syncCuKits(){
+  const w=$('cu-kit-wrap'),sel=$('cu-kit');if(!w||!sel)return;
+  w.style.display='none';sel.innerHTML='<option value="">No kit — start empty</option>';
+  try{
+    if(!(await cuIsAgency()))return;
+    const r=await api('/agency/kits');
+    const kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];
+    if(!kits.length)return;
+    sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+'</option>').join('');
+    w.style.display='';
+  }catch(_){/* kits are a nicety — the field just stays hidden */}
+}
+function openAddCustomer(){
+  $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
+  const wf=$('cu-website');if(wf)wf.value='';
+  const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
+  const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();syncCuKits();
+  $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
+  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+}
+$('cu-cancel').onclick=()=>$('custDlg').close();
+// ⌘K's "Add a customer" lands here as /agency.html#add (lib/navigation.ts) — open the
+// dialog and clear the hash, so Back or a reload never reopens it. Boot calls it once
+// the member is known; a hash change while already on the home opens it too.
+function openFromHash(){
+  if(location.hash!=='#add')return;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
+  if(ME)openAddCustomer();
+}
+window.addEventListener('hashchange',openFromHash);
+$('cu-edition').onchange=syncCuSignup;
+document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
+$('cu-signup-copy').onclick=()=>{const el=$('cu-signup-link');if(el&&el.value&&navigator.clipboard){navigator.clipboard.writeText(el.value).then(()=>toast('Sign-up link copied')).catch(()=>{});}};
+$('custForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const mode=cuMode();
+  const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
+  const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
+  if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.',true);$('cu-email').focus();return;}
+  const label=mode==='connect'?'Save':'Set up + invite';
+  const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
+  const body=mode==='connect'
+    ?{mode:'connect',name:name||undefined,email}
+    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
+       website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
+  try{
+    const r=await apiSend('POST','/sales/customers',body);
+    if(!r.ok){
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      toast(m,true);btn.disabled=false;btn.textContent=label;return;
+    }
+    const d=(r.body&&r.body.data)||{};
+    const who=esc(business_name||name||email);
+    let heading,line;
+    if(mode==='connect'){
+      if(d.connected){heading='Connected to their workspace';line=who+' already had an account — they’re connected to you now.';}
+      else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
+    }else if(d.already_exists){
+      heading='They already have a workspace';
+      line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
+    }else if(d.invited===false){
+      heading='Account created — the invitation email couldn’t be sent';
+      line='Their workspace is ready, but our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.';
+    }else{
+      heading='Invitation sent';
+      line='Invitation sent to '+esc(email)+'. They’ll sign in from the email and land in their client portal.';
+    }
+    // the kit, applied to THEIR new site — after the provision succeeded, on its own
+    // try/catch: a kit that won't apply must never repaint the set-up as a failure
+    let kitLine='';
+    if(kitId){
+      if(d.already_exists)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
+      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
+      else{
+        let k={ok:false};try{k=await apiSend('POST','/agency/kits/'+encodeURIComponent(kitId)+'/apply',{site_id:d.site_id});}catch(_){k={ok:false};}
+        kitLine=k.ok?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply — apply it from the Starter kits card on your studio home.';
+      }
+    }
+    const showLink=d.portal_url&&(mode!=='connect'||d.connected);
+    const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
+    $('cust-fields').style.display='none';
+    const done=$('cust-done');
+    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
+    done.style.display='';
+    const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
+  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.',true);btn.disabled=false;btn.textContent=label;return;}
+  // the creation SUCCEEDED — the roster refresh is best-effort and must never
+  // repaint that success as a failure: a soft refresh toasts on its own
+  load(true).catch(()=>toast('We couldn’t refresh the list just now — Refresh will catch it up.',true));
+};
 
 // The full boot path — named so trouble()'s Try-again can re-run ALL of it.
 async function boot(){
@@ -487,8 +769,11 @@ async function boot(){
     if(me.status===403){notAgency();return;}
     if(!me.ok){trouble();return;}
     ME=me.body.data||{};
+    renderTop();
+    openFromHash();   // ⌘K → /agency.html#add
     await load();
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
+    mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
     mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
 }
@@ -501,16 +786,12 @@ async function mountHealthDoor(){
   try{
     const r=await api('/admin/health-center');
     if(!r.ok)return;
-    if(document.getElementById('healthDoor'))return;
-    const host=document.createElement('div');
-    host.id='healthDoor';
-    host.style.cssText='max-width:980px;margin:0 auto 26px;padding:0 20px;font-size:13.5px';
-    host.innerHTML='<a href="/admin-health.html" style="color:var(--p,#5b3fa0);font-weight:600;text-decoration:none">Platform health — background jobs, errors, email posture →</a>';
-    // OUTSIDE #main (same reason as the queues panel): the client-search re-render
-    // rewrites #main.innerHTML on every keystroke and would wipe this doorway.
-    const list=document.getElementById('main');
-    if(list&&list.parentNode)list.parentNode.appendChild(host);
-    else document.body.appendChild(host);
+    const host=$('healthLine');if(!host)return;
+    // the door is a status line in the top row (it used to be a text link under the
+    // kits, below the fold): the count of areas needing a look, or "all good"
+    const areas=(r.body&&r.body.data&&Array.isArray(r.body.data.areas))?r.body.data.areas:[];
+    const n=areas.filter(a=>a&&a.state==='attention').length;
+    host.innerHTML='<a id="healthDoor" href="/admin-health.html">'+(n?'<span class="warnw">Platform: '+n+' area'+(n===1?'':'s')+' need'+(n===1?'s':'')+' a look</span>':'Platform: all good')+' →</a>';
   }catch(_){/* the door is a nicety, never a blocker */}
 }
 
@@ -526,7 +807,7 @@ async function mountQueues(){
   if(gen!==QSEQ)return;   // a newer queues read started — drop this one
   if(!r.ok||!r.body.data){
     host.hidden=false;
-    host.innerHTML=`<h2 class="qhead">What needs you today</h2>
+    host.innerHTML=`<h2 class="qhead">Needs you</h2>
       <div class="qfail">Your queues wouldn’t load just now.<button id="qretry" type="button">Try again</button></div>`;
     const qr=$('qretry');if(qr)qr.addEventListener('click',()=>mountQueues());
     return;
@@ -534,7 +815,7 @@ async function mountQueues(){
   const queues=((r.body.data.queues)||[]).filter(q=>q.items&&q.items.length);
   if(!queues.length){host.hidden=true;host.innerHTML='';return;}   // genuinely nothing waiting — absence is truth
   host.hidden=false;
-  host.innerHTML=`<h2 class="qhead">What needs you today</h2>`+
+  host.innerHTML=`<h2 class="qhead">Needs you</h2>`+
     queues.map(q=>`<div class="rcard">
       <p class="rh">${esc(q.title)} · ${q.items.length}</p>
       <div class="rrows">${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}"><span><strong>${esc(it.name)}</strong> — ${esc(it.why)}</span><span class="rn" aria-hidden="true">→</span></a>`).join('')}</div>

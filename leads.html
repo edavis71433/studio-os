@@ -1,231 +1,34 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Website enquiries — Studio OS</title>
-<meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Messages people sent through your website — in one place.">
-<link rel="stylesheet" href="/fonts/brand.css">
+<meta name="robots" content="noindex,nofollow">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  RETIRED (Oct 2026 workflow audit, change 5 — docs/design/WORKFLOW-AUDIT-2026-10.md).
+  The Enquiries page was a second queue for what the Inbox already lists. Its
+  tools moved into the Inbox's Enquiries view: the in-app reply, → Deal, Make
+  customer, Mark read, Not a fit, Spam, "New enquiry", the Open/New/All chips,
+  the kind filter and Newest/Oldest.
+  This page now forwards to the Inbox's Enquiries view, keeping ?client= and any
+  other query, so bookmarks, emails (clever-api's operator alert, the follow-up
+  nudge) and old notices still land in the right place. The clean URL pair in
+  _redirects is unchanged (it serves this stub).
+
+  ROLLBACK: the full former page is in git history —
+  `git log --follow -- leads.html` and restore the last full version.
+═══════════════════════════════════════════════════════════════════════════ -->
 <style>
-  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
-     light/dark/data-theme all follow it automatically) — same aliasing pattern
-     as crm.html / contacts.html / inbox.html (SS6, C5: the hand-maintained
-     dark-theme copy is retired). */
-  :root{
-    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
-    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);
-    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
-    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  }
-  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lead .acts a.reply{color:#171320}}
-  :root[data-theme="dark"] .lead .acts a.reply{color:#171320}
-  *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:34px 20px 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — slice 7 polish:
-        the same .lhead/.lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html/
-        contacts.html/inbox.html, header ONLY (the card feed stays — it's a
-        triage queue, not a roster). ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin:14px 0 0}
-  .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
-  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
-  .lbtn:hover{color:var(--p);background:var(--p-soft)}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .filters{display:flex;gap:8px;margin:16px 0 6px}
-  .filters button{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:999px;padding:6px 13px;cursor:pointer}
-  .filters button.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
-  /* ── C2 search — the rosters' .search anatomy (contacts.html), kept in sync by hand ── */
-  .bar{display:flex;gap:8px;margin:0 0 10px;align-items:center}
-  .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
-  .search:focus{border-color:var(--p)}
-  .lead{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
-  .lead.new{border-left:3px solid var(--p)}
-  .lead .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .lead .who{font-weight:600;font-size:15.5px}
-  .lead .kindtag{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;font-weight:600}
-  .lead .when{font-size:12.5px;color:var(--faint)}
-  .lead .contact{font-size:13.5px;color:var(--soft);margin-top:2px}
-  .lead .contact a{color:var(--p);text-decoration:none}
-  .lead .msg{margin-top:10px;font-size:14.5px;white-space:pre-wrap}
-  .lead .acts{display:flex;gap:8px;margin-top:14px}
-  .lead .acts button{font-family:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:6px 13px;cursor:pointer}
-  .lead .acts button:hover{border-color:var(--p);color:var(--p)}
-  .lead .acts a.reply{background:var(--p);color:#fff;border:1px solid var(--p);border-radius:999px;padding:6px 14px;text-decoration:none;font-size:12.5px;font-weight:600}
-  .muted{color:var(--soft);font-size:14.5px}
-  .center{text-align:center;padding:56px 20px}
-  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
-  .toast.show{opacity:1}
-  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
-  @keyframes sp{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;color:#1b1525;background:#f7f6fb;max-width:460px;margin:16vh auto;padding:0 24px;text-align:center;line-height:1.6}
+  a{color:#5b3fa0;font-weight:600}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<script>
+  location.replace('/inbox.html' + location.search + '#enquiries');
+</script>
 </head>
 <body>
-<div class="wrap">
-  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Enquiries — everyone who reached out through your website, in one calm place.</footer>
-</div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<!-- PT-5: one-time contextual tip -->
-<div class="dds-hint" data-hint="leads-reply" hidden>Replying to someone here marks their message as handled — no extra step.</div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
-<script>
-const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
-const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
-const $=(id)=>document.getElementById(id);
-const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",ALL=[],FILTER='open',Q="",LOADED_AT=Date.now();
-// SS6 shared ~150ms debounce — kept in sync by hand with contacts.html/customers.html
-const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
-const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
-sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
-function when(iso){const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
-// SC-1: JS navigations must carry the agency drill-in scope themselves (shell.js
-// only rewrites <a href> anchors) — the same idiom as contacts.html openDetail.
-function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
-const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
-
-// the rows the queue shows: status filter first, then the C2 search across
-// everything a row displays (name · email · phone · message)
-function leadRows(){
-  const q=Q.trim().toLowerCase();
-  return ALL.filter(l=>FILTER==='open'?l.status!=='archived':FILTER==='new'?l.status==='new':true)
-    .filter(l=>!q||((l.name||'')+' '+(l.email||'')+' '+(l.phone||'')+' '+(l.message||'')).toLowerCase().includes(q));
-}
-function render(){
-  const unread=ALL.filter(l=>l.status==='new').length;
-  let h=`<div class="rolebadge">● Website enquiries</div>
-    <header class="lhead">
-      <div class="lrow1">
-        <span class="obj-ic" aria-hidden="true">📥</span>
-        <h1 id="pagehead" tabindex="-1">Website enquiries</h1>
-        <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
-      </div>
-      <div class="lmeta" id="lmeta"></div>
-    </header>
-    <div class="filters" role="group" aria-label="Filter enquiries">
-      <button aria-pressed="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
-      <button aria-pressed="${FILTER==='new'?'true':'false'}" data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
-      <button aria-pressed="${FILTER==='all'?'true':'false'}" data-f="all" class="${FILTER==='all'?'on':''}">All</button>
-    </div>
-    <div class="bar"><input class="search" id="q" type="search" aria-label="Search enquiries" placeholder="Search name, email, or message…" value="${esc(Q)}"></div>
-    <div id="leadlist"></div>`;
-  $('main').innerHTML=h;wire();renderLeadList();
-}
-// C2/C5: search re-renders ONLY the list zone — the input node stays put, so
-// the caret and focus are never disturbed (the rosters' static-input contract).
-function renderLeadList(){
-  const host=$('leadlist');if(!host)return;
-  const unread=ALL.filter(l=>l.status==='new').length;
-  const rows=leadRows();
-  // C7 vocabulary: "N enquiries · M new" — the same non-archived + new-qualifier
-  // counting the Inbox's Enquiries view uses (one queue, one arithmetic).
-  const lm=$('lmeta');if(lm)lm.textContent=`${rows.length} enquir${rows.length===1?'y':'ies'}${unread?` · ${unread} new`:''} · ${updatedLabel()}`;
-  let h='';
-  if(!rows.length){
-    h=Q.trim()?`<p class="muted" style="text-align:center;padding:30px">No enquiries match “${esc(Q)}”.</p>`
-      :`<div class="center"><h2>Nothing yet.</h2><p class="muted">When someone fills in your website's contact form, it lands here — and in Customers.</p><p style="margin-top:16px"><a class="link" href="/crm.html">Open Customers →</a></p></div>`;
-  }else for(const l of rows){
-    const who=esc(l.name||l.email||l.phone||'Someone');
-    h+=`<div class="lead ${l.status==='new'?'new':''}">
-      <div class="top"><span class="who">${who}</span><span class="when">${esc(when(l.created_at))}</span></div>
-      <div class="top"><span class="kindtag">${esc(KIND[l.form_kind]||'Message')}</span></div>
-      <div class="contact">${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}${l.email&&l.phone?' · ':''}${l.phone?`<a href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''}</div>
-      ${l.message?`<div class="msg">${esc(l.message)}</div>`:''}
-      <div class="acts">
-        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:'')}
-        ${l.converted?`<a class="reply" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
-        ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
-        ${l.converted?'':`<button data-arch="${esc(l.id)}">Archive</button>`}
-      </div></div>`;
-  }
-  host.innerHTML=h;wireList();
-}
-// Prefill the reply so responding to a customer is one tap, not a blank email.
-function replyHref(l){
-  const kind=l.form_kind==='quote'?'quote request':l.form_kind==='booking'?'booking request':'message';
-  const subject=`Re: your ${kind}`;
-  const hi=l.name?`Hi ${l.name.split(' ')[0]},`:'Hi,';
-  const quoted=l.message?`\n\n> ${l.message.replace(/\n/g,'\n> ')}`:'';
-  const body=`${hi}\n\nThanks for reaching out.${quoted}\n\n`;
-  return `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-function wire(){
-  document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{FILTER=b.getAttribute('data-f');render();}));
-  // C2 search — debounced (~150ms), list-only re-render: no keystroke rebuilds
-  const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderLeadList();}));
-  // list-view refresh (slice 7 header polish) — re-load in SOFT mode (a failed
-  // refresh toasts and keeps the current list — never the full-page error that
-  // would destroy the list and the button), then return focus to the control
-  // (the rosters' pattern). NOTE: load must be wrapped, never passed as the
-  // handler — the click event would become its soft flag.
-  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.')));
-  const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
-}
-// row-level actions live in the list zone (re-wired on every list re-render)
-function wireList(){
-  document.querySelectorAll('[data-read]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-read'),'read')));
-  document.querySelectorAll('[data-arch]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-arch'),'archived')));
-  // replying to a lead auto-marks it read — no manual bookkeeping
-  document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&l.status==='new')setStatus(id,'read',true);}));
-  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
-}
-async function setStatus(id,status,silent){const r=await api('/forms/inbox/'+id,'POST',{status});if(r.ok){const l=ALL.find(x=>x.id===id);if(l)l.status=status;if(!silent){toast(status==='archived'?'Archived.':'Marked read.');render();
-  // a11y: render() rebuilt #main and dropped focus — return it to the same lead's
-  // remaining control (Archive survives a mark-read), or the page heading if the row left the list.
-  const nx=document.querySelector('[data-arch="'+id+'"]')||$('pagehead');if(nx)nx.focus();}}else if(!silent)toast('That didn’t update.');}
-// P2-C (Seam 3): promote a captured inquiry into a pipeline deal — no re-typing.
-// Reuses the existing form submission as the deal's source (source_submission_id).
-async function createDeal(id){
-  const l=ALL.find(x=>x.id===id); if(!l)return;
-  const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
-  try{
-    let contactId=null;
-    if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
-    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
-    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
-    const dealId=d.body&&d.body.data&&d.body.data.id;
-    // reflect converted state locally (idempotent: server returns the existing deal on a repeat)
-    l.converted=true; l.deal_id=dealId; if(l.status==='new')l.status='read';
-    toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.'); render();
-    if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
-  }catch(_){toast('Couldn’t start that deal.');}
-}
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
-// soft=true (the refresh button): any failure keeps the current list and toasts —
-// the full-page error screens are for the initial load only.
-// REQ_SEQ (SS6): a superseded load must never paint — only the newest request's
-// response (success OR failure) is allowed to touch the page.
-let REQ_SEQ=0;
-async function load(soft){
-  const seq=++REQ_SEQ;
-  let r; try{r=await api('/forms/inbox');}catch(_){r={ok:false,status:0,body:{}};}
-  if(seq!==REQ_SEQ)return;
-  if(!r.ok){
-    if(soft){toast('Couldn’t refresh just now.');return;}
-    if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Enquiries live in your studio workspace.</h2></div>`;return;}
-    trouble();return;
-  }
-  ALL=(r.body.data&&r.body.data.submissions)||[];LOADED_AT=Date.now();render();
-}
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
-</script>
+  <h1 style="font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:22px">This has moved</h1>
+  <p style="color:#6b6478">Your website enquiries are in the Inbox now. <a href="/inbox.html#enquiries">Take me there →</a></p>
 </body>
 </html>

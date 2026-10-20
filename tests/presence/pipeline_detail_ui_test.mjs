@@ -38,7 +38,7 @@ ok('board: a stage move re-renders the OPEN deal via the panel (not a dialog.ope
 ok('Path: chevron bar renders in the drawer (pathHost + pstep steps)', /id="pathHost"/.test(pipe) && /data-pstep=/.test(pipe) && /pstep \$\{cls\}/.test(pipe));
 ok('Path: kept in sync with crm.html by hand (the hand-copy contract)', /kept in sync with crm\.html by hand/.test(pipe) && /const PATH_STEPS=\['lead','qualified','proposal','contract'\]/.test(pipe));
 ok('Path: guidance renders BOTH tip and action (the :694 suggested_action bug, fixed)', /esc\(g\.tip\)/.test(pipe) && /esc\(g\.action\)/.test(pipe) && !/g\.suggested_action/.test(pipe));
-ok('Path: forward = "Mark Stage as Complete" via the EXISTING stage POST', /Mark Stage as Complete/.test(pipe) && /\/stage','POST',\{to\}/.test(pipe));
+ok('Path: forward = "Mark stage complete" via the EXISTING stage POST', /Mark stage complete/.test(pipe) && /\/stage','POST',\{to\}/.test(pipe));
 ok('Path: non-interactive steps leave the tab order (tabindex=-1 + aria-disabled)', /tabindex="-1" aria-disabled="true"/.test(pipe));
 ok('Path: won stays convert-only — contract+signed points at the EXISTING Convert section', /id="pathConvert"/.test(pipe) && /signedNow/.test(pipe));
 ok('Path: won/lost terminal chips render', /terminal-chip won/.test(pipe) && /terminal-chip lost/.test(pipe));

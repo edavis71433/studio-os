@@ -8,6 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
+import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
@@ -16,6 +17,7 @@ import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
+import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -25,8 +27,9 @@ import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
-  summarizePipeline,
+  summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
+  currentProposal, flowSignGate,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -80,18 +83,59 @@ export function linkSecret(): string | null {
 }
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
-export async function signSalesToken(payload: { t: 'proposal' | 'contract'; id: string; site_id: string; exp: number }, secret: string): Promise<string> {
+// Three token kinds share one signature: `proposal` and `contract` name ONE
+// document (the links sent before Oct 2026 — they keep working); `flow` names
+// the DEAL, so one link carries choose → sign → pay and the page reads whatever
+// the deal currently has (benchmark 2026-10, item 5).
+export type SalesTokenKind = 'proposal' | 'contract' | 'flow';
+export async function signSalesToken(payload: { t: SalesTokenKind; id: string; site_id: string; exp: number }, secret: string): Promise<string> {
   const body = b64url(JSON.stringify(payload));
   return `${body}.${await hmacHex(secret, body)}`;
 }
-async function verifySalesToken(token: string, secret: string, nowSec: number): Promise<{ t: string; id: string; site_id: string; exp: number } | null> {
+async function verifySalesToken(token: string, secret: string, nowSec: number): Promise<{ t: SalesTokenKind; id: string; site_id: string; exp: number } | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
   if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
-  if (!p || (p.t !== 'proposal' && p.t !== 'contract') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
+  if (!p || (p.t !== 'proposal' && p.t !== 'contract' && p.t !== 'flow') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   if (p.exp < nowSec) return null;
   return p;
+}
+/** The ONE client link for a deal: sign.html with a deal-bound `flow` token.
+ *  Every send (proposal, agreement, or both at once) and every reminder mints
+ *  this same URL, so the client only ever holds one link. 30 days, like the
+ *  per-document links before it. Null when no signing secret is configured. */
+const FLOW_TTL_SEC = 30 * 86400;
+async function flowLink(siteId: string, dealId: string): Promise<string | null> {
+  const secret = linkSecret();
+  if (!secret || !UUID_RE.test(dealId || '')) return null;
+  const token = await signSalesToken({ t: 'flow', id: dealId, site_id: siteId, exp: Math.floor(Date.now() / 1000) + FLOW_TTL_SEC }, secret);
+  return `${siteUrl()}/sign.html?t=${token}`;
+}
+/** Does this token reach this document? A document token must name the document
+ *  itself; a flow token must name the document's deal. Anything else: no. */
+function tokenCovers(tok: { t: string; id: string }, kind: 'proposal' | 'contract', docId: string, dealId: unknown): boolean {
+  if (tok.t === kind) return tok.id === docId;
+  if (tok.t === 'flow') return typeof dealId === 'string' && tok.id === dealId;
+  return false;
+}
+/** The deal's CURRENT documents as the client should see them: the newest
+ *  proposal that was actually sent and not superseded (an accepted one wins),
+ *  and the newest agreement that is out or signed. Drafts never show — a client
+ *  sees only what the studio sent. `contract_pending` says a draft exists, so the
+ *  page can say "your studio is preparing the agreement" instead of nothing. */
+async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal: any | null; proposal_pending: boolean; contract: any | null; contract_pending: boolean }> {
+  // EVERY live proposal row (drafts and superseded versions included): the pure
+  // currentProposal() decides which one the client sees — and whether the deal
+  // is between versions (Revise → v1 superseded, v2 still a draft), which must
+  // read as PENDING, never as "no proposal". first_viewed_at/expires_at land
+  // with migration 0107 — same tolerant read as the public view.
+  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
+  if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
+  const { proposal, pending } = currentProposal<any>(rows(pr));
+  const cons = rows(await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name&order=created_at.desc&limit=20`));
+  const contract = cons.find((c) => c.status === 'signed') || cons.find((c) => c.status === 'sent') || null;
+  return { proposal, proposal_pending: pending, contract, contract_pending: !contract && cons.some((c) => c.status === 'draft') };
 }
 
 /** Mint a URL to the branded, printable Document of Record for an artifact. The
@@ -115,6 +159,33 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
 
 /** R1: auto-advance the deal stage AND record the stage_change (pipeline history
  *  no longer jumps silently). Guarded to `from` stages; only emits when a row moved. */
+// Phase 4 (delete safety): Undo for a removed contact. The DELETE above is a
+// soft delete (deleted_at), so restoring is the same one-column write back —
+// nothing was cascaded, every FK still points at the row. 404 when the id is
+// not a removed contact on this site (already restored, or never here).
+export async function handleSalesContactRestore(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,name,email`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: null }) });
+  if (!r.ok) return json({ error: 'write_failed', message: 'We couldn’t put that contact back just now — please try again.' }, 502, cors);
+  const row = rows(r)[0];
+  if (!row) return json({ error: 'not_found', message: 'That contact isn’t in the removed list — refresh to see the current roster.' }, 404, cors);
+  return json({ data: { ok: true, restored: true, id: row.id, name: String(row.name || row.email || 'Contact') } }, 200, cors);
+}
+
+// Phase 3 (stage-aware): a free-text next step that names a thing that has now
+// happened ("Sign contract" after the signature, "Request the deposit" once the
+// deal is won) is cleared, so the record never shows an overdue step for work
+// that is done. Pure rule in lib/sales_lifecycle.ts; best-effort here — a
+// pre-0089 database without the column simply keeps going.
+async function clearStaleNextStep(siteId: string, dealId: string, event: 'signed' | 'won'): Promise<void> {
+  try {
+    const r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=next_step&limit=1`);
+    const cur = rows(r)[0]?.next_step;
+    if (!nextStepStaleAfter(cur, event)) return;
+    await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ next_step: null, next_step_at: null }) });
+  } catch { /* best-effort */ }
+}
+
 async function advanceStage(siteId: string, dealId: string, to: Stage, from: Stage[], principal: Principal) {
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&stage=in.(${from.join(',')})&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) }).catch(() => ({ json: [] } as any));
   if (rows(up)[0]) await dealEvent(siteId, dealId, 'stage_change', principal, { to_stage: to }); // only when a row actually moved
@@ -132,9 +203,16 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // must still say whose they are rather than degrade to "—". It never widens
     // tenant scope (site_id is still pinned) and the roster never asks for it.
     const withDeleted = u.searchParams.get('include_deleted') === '1';
-    let path = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=id,name,email,phone,company,updated_at${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
-    if (q) path += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
-    const r = await svc(path);
+    // Phase 2: client_id (migration 0130) rides the select — the roster links a
+    // person to their customer. A database without the column 400s the widened
+    // select; retry the narrow one so the roster never goes dark pre-apply.
+    const mkPath = (cols: string) => {
+      let p = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
+      if (q) p += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+      return p;
+    };
+    let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
+    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
     const list = rows(r);
     // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
@@ -401,33 +479,56 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const [r, invR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`),
     // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
-    // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only.
-    svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`),
+    // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only;
+    // processing_since (migration 0132) with the pre-0132 fallback.
+    (async () => { let q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date,processing_since&limit=1000`); if (!q.ok) q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`); return q; })(),
   ]);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
   const deals = rows(r);
   const today = nowIso().slice(0, 10);
-  let outstanding = 0, overdue = 0, overdueCount = 0;
-  for (const iv of rows(invR)) { const amt = Number(iv.amount_cents) || 0; outstanding += amt; if (iv.due_date && String(iv.due_date) < today) { overdue += amt; overdueCount++; } }
-  const ar = { outstanding_cents: outstanding, count: rows(invR).length, overdue_cents: overdue, overdue_count: overdueCount };
-  return json({ data: { ...summarizePipeline(deals, nowIso()), ar }, truncated: deals.length >= CAP }, 200, cors);
+  // Oct 2026 (item 2): the SAME formula as /sales/receivables' total — outstanding
+  // is what still WAITS on a client (upcoming + overdue); a processing payment is
+  // on its way and gets its own number, so the Outstanding tile and the money band
+  // can never disagree about the same invoice.
+  const b = moneyBuckets(rows(invR), today);
+  const ar = { outstanding_cents: b.upcoming.cents + b.overdue.cents, count: b.upcoming.count + b.overdue.count, overdue_cents: b.overdue.cents, overdue_count: b.overdue.count, processing_cents: b.processing.cents, processing_count: b.processing.count };
+  // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
+  // days — three won deals read "100% (1 of 1)" under the old window.
+  return json({ data: { ...summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS), ar }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
+/** How far back the receivables payload's Paid bucket looks. */
+const PAID_WINDOW_DAYS = 30;
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   // stripe_url rides along so the list rows can offer the SAME per-invoice
   // actions the deal drawer has (Send vs Resend label, Copy link) — chasing
   // payment is this list's whole point, and voiding a mistake shouldn't
   // require a detour through the deal.
-  const invs = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,due_date,deal_id,created_at,stripe_url&order=due_date.asc.nullslast,created_at.asc&limit=300`));
-  const dealIds = [...new Set(invs.map((i: any) => i.deal_id).filter(Boolean))];
+  // processing_since lands with migration 0132 — deploy-order tolerant (full
+  // select first, pre-0132 shape second) so Today's money band never blanks.
+  const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
+  let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  const invs = rows(invR);
+  // Oct 2026 benchmark (item 2): the Paid bucket — what landed in the last 30
+  // days — rides along so the band can show all four states from ONE list.
+  // Best-effort: a failed read here drops the Paid bucket, never the band.
+  const since = new Date(Date.now() - PAID_WINDOW_DAYS * 86400_000).toISOString();
+  const paidRows = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since)}&select=id,title,amount_cents,status,paid_at,deal_id&order=paid_at.desc&limit=300`).catch(() => ({ json: [] })));
+  const dealIds = [...new Set([...invs, ...paidRows].map((i: any) => i.deal_id).filter(Boolean))];
   const dealById: Record<string, string> = {};
   if (dealIds.length) for (const d of rows(await svc(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&select=id,title`))) dealById[String(d.id)] = String(d.title || '');
   const today = nowIso().slice(0, 10);
-  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, overdue: !!(i.due_date && String(i.due_date) < today), deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null }));
-  const total = items.reduce((a, i) => a + i.amount_cents, 0);
-  const overdue = items.filter((i) => i.overdue).reduce((a, i) => a + i.amount_cents, 0);
-  return json({ data: { items, total_cents: total, overdue_cents: overdue } }, 200, cors);
+  // `state` is the one formula (lib/money_state.ts) against the server's UTC day;
+  // `overdue` stays for older page builds. Today re-runs the same mirrored formula
+  // against the studio's local day, so its chips and the record's agree.
+  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null }));
+  const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: 'paid', paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
+  const buckets = moneyBuckets([...items, ...paid], today);
+  // total_cents = what is still WAITING on a client (upcoming + overdue) — a
+  // processing payment is on its way, not due; it has its own number.
+  return json({ data: { items, paid, buckets, paid_window_days: PAID_WINDOW_DAYS, total_cents: buckets.upcoming.cents + buckets.overdue.cents, overdue_cents: buckets.overdue.cents, processing_cents: buckets.processing.cents } }, 200, cors);
 }
 
 // ═══ DEAL TASKS — first-class to-dos on a deal (Salesforce Activities parity) ═══
@@ -516,7 +617,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       if (!rows(c)[0]) return json({ error: 'bad_contact', message: 'That contact isn’t in this workspace.' }, 422, cors);
     }
     let srcSub: string | null = UUID_RE.test(b.source_submission_id || '') ? b.source_submission_id : null;
-    // The enquiry TEXT travels with the deal. The one-tap "→ Deal" (leads.html)
+    // The enquiry TEXT travels with the deal. The one-tap "→ Deal" (the Inbox enquiry pane)
     // only ever carried name/email, so the message that started the whole
     // relationship — "we need a site before our March opening" — was lost the
     // moment the enquiry became a deal, and the drawer showed a bare "No notes".
@@ -583,15 +684,22 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // exposure, and the deal read already carries proposals' full line_items.
       svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
-      svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`),
+      // processing_since lands with migration 0132 — tolerant fetch (same posture
+      // as the proposals read above) so the record's Billing tab never blanks.
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
     ]);
     const eventRows = rows(events);
+    // Oct 2026 benchmark (item 2): every invoice row carries its money state from
+    // the one formula (lib/money_state.ts, server UTC day); the record re-runs the
+    // mirrored formula against the studio's local day for its chips.
+    const invToday = nowIso().slice(0, 10);
+    const invoiceRows = rows(invoices).map((i: any) => ({ ...i, processing_since: i.processing_since || null, state: moneyState(i, invToday) }));
     // ONE reverse-chronological timeline: manual activities (call/email/meeting/
     // dated note) + system events live in the same presence_deal_events table, so
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
     const timeline = mergeDealTimeline(eventRows);
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: rows(invoices) } }, 200, cors);
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -905,6 +1013,30 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
   } catch { return false; }
 }
 
+/** ONE email for the one link: "Your proposal and agreement from <studio>".
+ *  Sent by the combined send (handleSalesDealSend) — the client gets one message,
+ *  one button, one page. Best-effort; false when the deal has no contact email. */
+async function emailSalesFlow(siteId: string, dealId: string, url: string | null, has: { proposal: boolean; contract: boolean }): Promise<boolean> {
+  if (!url) return false;
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
+    if (!email) return false;
+    const brand = await loadEmailBrand(siteId);
+    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+    const who = esc(brand.name);
+    const what = has.proposal && has.contract ? 'proposal and agreement' : has.contract ? 'agreement' : 'proposal';
+    const line = has.proposal && has.contract
+      ? `${who} has prepared your proposal and agreement. It’s all on one page: accept the proposal, sign the agreement, then pay the deposit — nothing is final until you act.`
+      : has.contract
+        ? `${who} has prepared your agreement. Read and sign it on one page — nothing is final until you do.`
+        : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
+    const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
+    const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+  } catch { return false; }
+}
+
 /** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort. */
 async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number, invoiceId?: string): Promise<boolean> {
   try {
@@ -1075,6 +1207,8 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   const inv = rows(await svc(`presence_invoices?id=eq.${invoiceId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
   if (inv.status !== 'open') return json({ error: 'bad_state', message: inv.status === 'paid' ? 'That stage is already paid.' : 'That invoice isn’t open.' }, 409, cors);
+  // Oct 2026 (item 2): the client already paid — Stripe is settling it. Nothing to resend.
+  if (inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Nothing to resend.' }, 409, cors);
   const hadLink = !!inv.stripe_url;
   let payUrl: string | null = inv.stripe_url || null;
   let repaired = false;
@@ -1141,9 +1275,15 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
  *  stays visible as "Voided" — the withdrawal is part of the record, not a hole. */
 export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
-  const inv = rows(await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`))[0];
+  // processing_since lands with migration 0132 — tolerant read (pre-0132 shape second)
+  let invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id,processing_since&limit=1`);
+  if (!invR.ok) invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`);
+  const inv = rows(invR)[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
   if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back.' }, 409, cors);
+  // Oct 2026 (item 2): the client already paid and Stripe is settling it — voiding
+  // now would leave money landing on a withdrawn invoice. Wait for it to land.
+  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back.' }, 409, cors);
   if (inv.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
   const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'void', updated_at: nowIso() }) });
@@ -1337,31 +1477,86 @@ async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' 
   return false;
 }
 
+/** draft → sent for a proposal: the status flip (guarded in the WHERE), the
+ *  30-day expiry, the deal event and the stage move. Null when the row had
+ *  already left draft (a send landed first). Shared by the per-document send
+ *  and the one-link send below — ONE transition, two doors. */
+async function markProposalSent(site: SiteRow, principal: Principal, p: any): Promise<any | null> {
+  const up = await svc(`presence_proposals?id=eq.${p.id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
+  if (!up.ok || !rows(up)[0]) return null;
+  // Default a 30-day expiry on send (best-effort; no-ops before migration 0107). The
+  // signing link already carries a 30-day token — this makes the expiry explicit and
+  // blocks a late acceptance after the window closes.
+  svc(`presence_proposals?id=eq.${p.id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ expires_at: new Date(Date.now() + 30 * 86400000).toISOString() }) }).catch(() => {});
+  await dealEvent(site.id, p.deal_id, 'proposal_sent', principal, { detail: { proposal_id: p.id } });
+  // move the deal to 'proposal' if it's earlier (guarded; records the stage change)
+  await advanceStage(site.id, p.deal_id, 'proposal', ['lead', 'qualified'], principal);
+  return rows(up)[0];
+}
+/** draft → sent for an agreement: the status flip (guarded), the deal event,
+ *  and the deposit mint (ensureDepositForContractSend — at most once, ever).
+ *  `row` is null when the agreement had already left draft. */
+async function markContractSent(site: SiteRow, principal: Principal, c: any): Promise<{ row: any | null; deposit: Awaited<ReturnType<typeof ensureDepositForContractSend>> }> {
+  const up = await svc(`presence_contracts?id=eq.${c.id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
+  if (!up.ok || !rows(up)[0]) return { row: null, deposit: { minted: false } };
+  await dealEvent(site.id, c.deal_id, 'contract_sent', principal, { detail: { contract_id: c.id } });
+  // The agreement just promised a 50% deposit — make sure the sign page can
+  // collect it (see ensureDepositForContractSend; at most once, never $0).
+  const deposit = await ensureDepositForContractSend(site, principal, rows(up)[0]);
+  return { row: rows(up)[0], deposit };
+}
+
 export async function handleSalesProposalSend(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`);
   const p = rows(r)[0];
   if (!p) return json({ error: 'not_found' }, 404, cors);
   if (p.status === 'sent') { // idempotent: already sent → return the existing link
-    const secret = linkSecret();
-    const link = secret ? `${siteUrl()}/sign.html?t=${await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
-    return json({ data: p, url: link, already_sent: true }, 200, cors);
+    return json({ data: p, url: await flowLink(site.id, p.deal_id), already_sent: true }, 200, cors);
   }
   if (p.status !== 'draft') return json({ error: 'bad_state', message: 'Only a draft proposal can be sent.' }, 409, cors);
-  const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
-  if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
-  // Default a 30-day expiry on send (best-effort; no-ops before migration 0107). The
-  // signing link already carries a 30-day token — this makes the expiry explicit and
-  // blocks a late acceptance after the window closes.
-  svc(`presence_proposals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ expires_at: new Date(Date.now() + 30 * 86400000).toISOString() }) }).catch(() => {});
-  const secret = linkSecret();
-  const token = secret ? await signSalesToken({ t: 'proposal', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret) : null;
-  const url = token ? `${siteUrl()}/sign.html?t=${token}` : null;   // the human signing PAGE, not the raw API
-  await dealEvent(site.id, p.deal_id, 'proposal_sent', principal, { detail: { proposal_id: id } });
-  // move the deal to 'proposal' if it's earlier (guarded; records the stage change)
-  await advanceStage(site.id, p.deal_id, 'proposal', ['lead', 'qualified'], principal);
+  const sentRow = await markProposalSent(site, principal, p);
+  if (!sentRow) return json({ error: 'conflict' }, 409, cors);
+  const url = await flowLink(site.id, p.deal_id);   // the human signing PAGE (one link per deal), not the raw API
   const emailed = await emailSalesDoc(site.id, p.deal_id, 'proposal', url);   // auto-send to the contact
-  return json({ data: rows(up)[0], url, emailed }, 200, cors);
+  return json({ data: sentRow, url, emailed }, 200, cors);
+}
+
+/** ONE LINK, ONE EMAIL (benchmark 2026-10, item 5): send the proposal and the
+ *  agreement together. Each draft makes the same draft → sent transition its own
+ *  send makes (markProposalSent / markContractSent — the deposit mints itself
+ *  there), then ONE email carries the deal's flow link. A document that is
+ *  already out simply rides along: the page shows whatever the deal has.
+ *  Body (optional): { proposal_id, contract_id } to name the drafts; default is
+ *  the newest draft of each, else the newest sent one. Studio-gated & site-scoped. */
+export async function handleSalesDealSend(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  const deal = await loadDeal(site.id, dealId);
+  if (!deal) return json({ error: 'not_found' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { /* body optional */ }
+  const props = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&order=created_at.desc&limit=20`)).filter((p) => !splitLineItems(p.line_items).meta.superseded_by);
+  const cons = rows(await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&order=created_at.desc&limit=20`));
+  const pick = (list: any[], wanted: unknown) => UUID_RE.test(String(wanted || '')) ? (list.find((x) => x.id === wanted) || null) : (list.find((x) => x.status === 'draft') || list.find((x) => x.status === 'sent' || x.status === 'accepted' || x.status === 'signed') || null);
+  let proposal = pick(props, b.proposal_id);
+  let contract = pick(cons, b.contract_id);
+  if (!proposal && !contract) return json({ error: 'nothing_to_send', message: 'Draft a proposal or an agreement first.' }, 409, cors);
+  const sent = { proposal: false, contract: false };
+  let deposit: Awaited<ReturnType<typeof ensureDepositForContractSend>> = { minted: false };
+  if (proposal && proposal.status === 'draft') { const row = await markProposalSent(site, principal, proposal); if (row) { proposal = row; sent.proposal = true; } }
+  if (contract && contract.status === 'draft') { const r = await markContractSent(site, principal, contract); if (r.row) { contract = r.row; sent.contract = true; deposit = r.deposit; } }
+  else if (contract && contract.status === 'sent') deposit = await ensureDepositForContractSend(site, principal, contract);   // an older send still lands its signer on pay (idempotent)
+  const url = await flowLink(site.id, dealId);
+  // Nothing newly out → nothing to announce (same rule as the per-document
+  // resend): hand the link back for copying, email nobody twice.
+  if (!sent.proposal && !sent.contract) return json({ data: { proposal, contract, deposit }, url, emailed: false, sent, already_sent: true }, 200, cors);
+  // the email describes what is WAITING on them: a proposal only while it is
+  // still open (an accepted or declined one is not a step to take), the
+  // agreement only while it is unsigned
+  const emailed = await emailSalesFlow(site.id, dealId, url, {
+    proposal: !!proposal && proposal.status === 'sent',
+    contract: !!contract && contract.status === 'sent',
+  });
+  return json({ data: { proposal, contract, deposit }, url, emailed, sent }, 200, cors);
 }
 
 /** Public (token) OR authed proposal decision. */
@@ -1374,10 +1569,12 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   const secret = linkSecret();
   if (!secret) return json({ error: 'unavailable' }, 503, cors);
   const tok = await verifySalesToken(String(b.token || ''), secret, Math.floor(Date.now() / 1000));
-  if (!tok || tok.t !== 'proposal' || tok.id !== id) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
+  // a proposal link must name THIS proposal; a flow link must name its deal (checked below)
+  if (!tok || !(tok.t === 'proposal' ? tok.id === id : tok.t === 'flow')) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
   const r = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&select=*&limit=1`);
   const p = rows(r)[0];
   if (!p) return json({ error: 'not_found' }, 404, cors);
+  if (!tokenCovers(tok, 'proposal', id, p.deal_id)) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
   // A revised (superseded) proposal's old link can NEVER be accepted — the studio
   // replaced it with a newer version (the enforcement point for revise/supersede).
   if (splitLineItems(p.line_items).meta.superseded_by) return json({ error: 'superseded', message: 'This proposal was replaced by a newer version — ask your studio for the latest.' }, 409, cors);
@@ -1546,8 +1743,7 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
   const r = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`);
   const c = rows(r)[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
-  const secret = linkSecret();
-  const mkLink = async () => secret ? `${siteUrl()}/sign.html?t=${await signSalesToken({ t: 'contract', id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)}` : null;
+  const mkLink = () => flowLink(site.id, c.deal_id);   // the deal's ONE link — it shows the agreement (and the proposal before it)
   if (c.status === 'signed') return json({ error: 'already_signed' }, 409, cors);
   if (c.status === 'sent') {
     // A RESEND still ensures the deposit exists (the helper's at-most-once guard
@@ -1556,15 +1752,12 @@ export async function handleSalesContractSend(req: Request, site: SiteRow, princ
     const dep = await ensureDepositForContractSend(site, principal, c);
     return json({ data: c, url: await mkLink(), content_hash: c.content_hash, already_sent: true, deposit: dep }, 200, cors);
   }
-  const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'sent', sent_at: nowIso() }) });
-  if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
+  // draft → sent + the deposit mint, the one transition markContractSent owns
+  const { row, deposit } = await markContractSent(site, principal, c);
+  if (!row) return json({ error: 'conflict' }, 409, cors);
   const link = await mkLink();
-  await dealEvent(site.id, c.deal_id, 'contract_sent', principal, { detail: { contract_id: id } });
   const emailed = await emailSalesDoc(site.id, c.deal_id, 'contract', link);   // auto-send to the contact
-  // The agreement just promised a 50% deposit — make sure the sign page can
-  // collect it (see ensureDepositForContractSend; at most once, never $0).
-  const deposit = await ensureDepositForContractSend(site, principal, rows(up)[0]);
-  return json({ data: rows(up)[0], url: link, content_hash: c.content_hash, emailed, deposit }, 200, cors);
+  return json({ data: row, url: link, content_hash: c.content_hash, emailed, deposit }, 200, cors);
 }
 
 /** Remove an agreement that was never sent for signature.
@@ -1598,11 +1791,22 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const secret = linkSecret();
   if (!secret) return json({ error: 'unavailable' }, 503, cors);
   const tok = await verifySalesToken(String(b.token || ''), secret, Math.floor(Date.now() / 1000));
-  if (!tok || tok.t !== 'contract' || tok.id !== id) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
+  // a contract link must name THIS agreement; a flow link must name its deal (checked below)
+  if (!tok || !(tok.t === 'contract' ? tok.id === id : tok.t === 'flow')) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
   const r = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&select=*&limit=1`);
   const c = rows(r)[0];
   if (!c) return json({ error: 'not_found' }, 404, cors);
+  if (!tokenCovers(tok, 'contract', id, c.deal_id)) return json({ error: 'invalid_link', message: 'This link isn’t valid or has expired.' }, 403, cors);
   if (c.status === 'signed') return json({ data: { status: 'signed', signed_at: c.signed_at }, already: true }, 200, cors); // idempotent
+  // FORCED ORDER on the one-link page: choose, THEN sign. The page locks the
+  // agreement until the proposal is accepted; this is the same rule server-side,
+  // so a hand-built request can't skip the step. A per-document contract link
+  // (sent on its own, no proposal in play) is not subject to it.
+  if (tok.t === 'flow') {
+    const { proposal, proposal_pending } = await flowDocuments(tok.site_id, tok.id);
+    const gate = flowSignGate({ proposal, pending: proposal_pending });   // pure — tested on the revise window
+    if (gate) return json(gate, 409, cors);
+  }
   const presented = clean(b.presented_hash, 64);
   const chk = canSignContract(c.status, c.content_hash, presented);
   if (!chk.ok) return json({ error: chk.reason, message: chk.reason === 'version_mismatch' ? 'This agreement was updated — please reload the latest version before signing.' : 'This agreement can’t be signed right now.' }, 409, cors);
@@ -1618,6 +1822,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
+  await clearStaleNextStep(tok.site_id, dealId, 'signed');   // Phase 3: "Sign contract" is done now
   const signedIsNews = await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
 
   // ── TELL THE OPERATOR. A client signed a contract and the studio got NO email:
@@ -1692,7 +1897,11 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   // its payment link straight back — the moment of "yes" is the moment to pay.
   let pay: { url: string; amount_cents: number } | null = null;
   try {
-    const dep = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`))[0];
+    // Oct 2026 (item 2): a deposit whose payment is already settling is not
+    // waiting — its link is spent (tolerant: pre-0132 the filter 400s → fall back)
+    let depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&processing_since=is.null&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`);
+    if (!depR.ok) depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`);
+    const dep = rows(depR)[0];
     if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
   } catch { /* optional */ }
   return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null, copy_emailed: copyEmailed } }, 200, cors);
@@ -1709,6 +1918,30 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   // hiring, not a generic plum. Accent is Brand-Kit contrast-safe already.
   let brand: { name: string; accent: string } | null = null;
   try { const eb = await loadEmailBrand(tok.site_id); brand = { name: eb.name, accent: eb.accent }; } catch { /* neutral fallback */ }
+  if (tok.t === 'flow') {
+    // ONE PAGE: the proposal, the agreement and the deposit for this deal, in
+    // the order the client walks them. The forced order is enforced HERE as well
+    // as on the page: the agreement's text (and the hash the sign route needs)
+    // leaves the server only once the proposal is accepted, and the pay link
+    // only once the agreement is signed.
+    const deal = rows(await svc(`presence_deals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title&limit=1`))[0];
+    if (!deal) return json({ error: 'not_found' }, 404, cors);
+    const { proposal, proposal_pending, contract, contract_pending } = await flowDocuments(tok.site_id, tok.id);
+    if (proposal && !proposal.first_viewed_at) { svc(`presence_proposals?id=eq.${proposal.id}&site_id=eq.${tok.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ first_viewed_at: nowIso() }) }).catch(() => {}); }
+    // chosen = the agreement may be read: the proposal is accepted, or the deal
+    // never had one in play. Between versions (proposal_pending) it stays locked.
+    const chosen = proposal ? proposal.status === 'accepted' : !proposal_pending;
+    const contractOut = !contract ? null
+      : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
+      : { id: contract.id, title: contract.title, status: contract.status, locked: true };
+    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null } | null = null;
+    try {
+      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
+      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
+    } catch { /* optional — the page says "nothing to pay right now" */ }
+    const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit } }, 200, cors);
+  }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
     // back to the pre-0107 shape so a deploy ahead of the migration never breaks the
@@ -1830,6 +2063,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   }
   const clientId = acct.clientId;
   const createdClient = acct.createdClient, createdAuthId = acct.createdAuthId, isNewLogin = acct.isNewLogin;
+  await linkContactToCustomer(site.id, deal.contact_id, clientId);   // Phase 2: the contact belongs to the customer now
 
   // 3) stamp the chain onto the deal (we hold the claim; converted_client_id UNIQUE
   //    also blocks a client already converted from ANOTHER deal).
@@ -1845,6 +2079,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
     return json({ error: 'convert_conflict', message: 'That customer is already linked to another deal.' }, 409, cors);
   }
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
+  await clearStaleNextStep(site.id, dealId, 'won');   // Phase 3: closing/signing/deposit steps are behind us
   if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNoticePrefix(site.client_id, 'deal_followup', dealFollowupPeriodPrefix(dealId)); await clearNotice(site.client_id, 'deal_followup', dealFollowupLegacyPeriod(dealId)); } // the deal is a customer now — clear the "ready to convert" + stale "follow up on this deal" notices (weekly-bucketed → prefix clear + legacy key)
   await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
@@ -1877,10 +2112,10 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
 
-/** Re-send the welcome / set-password email to an already-converted customer —
+/** Re-send the welcome / sign-in email to an already-converted customer —
  *  the "they never got it / it expired" recovery. Reuses the ONE invite helper
- *  (sendCustomerInvite → a fresh signed set-password link), so a resend is byte-
- *  identical to the original. Only for a converted deal with an email on file;
+ *  (sendCustomerInvite → a fresh magic link, set-password as the fallback), so a
+ *  resend is byte-identical to the original. Only for a converted deal with an email on file;
  *  logged as an email activity on the deal timeline. Idempotent to re-tap. */
 export async function handleSalesResendInvite(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
@@ -2022,9 +2257,13 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
   } catch { return false; } // portfolio link is best-effort
 }
 
-/** The one-tap sign-in invite. A brand-new login gets a signed set-password link
- *  (they never chose a password) that lands them straight in the EXISTING guided
- *  first-run (via ?next=); an existing login gets a welcome. Best-effort.
+/** The one-tap sign-in invite: a GoTrue magic link (invite for a new login,
+ *  magiclink for an existing one — the same minter the reviewer invite uses, so
+ *  a client and a reviewer get the same kind of door) that signs them straight
+ *  in at the portal, which routes them to their client landing. No password to
+ *  set; they can add one later from "Forgot your password?". If no magic link
+ *  can be minted, a signed set-password link is the fallback; if neither can, the
+ *  plain portal door (one-time code). Best-effort — never blocks the set-up.
  *
  *  ON THE STUDIO'S BRAND, in the studio's voice — never the platform's. The
  *  client just signed with THEIR studio; a "welcome to Studio OS" from an
@@ -2047,16 +2286,19 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
   // brand name; the subject then stays bare rather than greeting the client from
   // a product they've never heard of.
   const studioName = brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name : '';
-  // Every provisioned customer needs to CREATE their password. Always send a signed
-  // set-password link that lands them in the guided first-run; if it can't be generated
-  // they can still get in passwordlessly (one-time email code) at the portal.
   // Converted customers are CLIENTS — they land in their client portal (client.html),
   // where they work WITH the studio (files, approvals, messages, invoices), NOT the
-  // Studio OS operator surfaces. (/client.html is whitelisted in set-password.html's
-  // NEXT_OK.) Self-running workspaces are a different persona (self-serve signup).
-  const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
+  // Studio OS operator surfaces. The magic link lands on the portal door, which asks
+  // /portal/context and sends a client to their landing (client.html) — the same
+  // leg the reviewer invite (lib/workspace.ts sendSiteInvite) takes. The set-
+  // password fallback keeps ?next=/client.html (whitelisted in set-password.html's
+  // NEXT_OK). Self-running workspaces are a different persona (self-serve signup).
+  const magic = await mintSignInLink(email, '/portal.html').catch(() => '');
+  const link = magic ? '' : await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
   const btnStyle = `display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none`;
-  const cta = link
+  const cta = magic
+    ? `<p class="cta"><a href="${magic}" style="${btnStyle}">Sign in to your client portal →</a></p><p style="font-size:13px;color:#6b6478">No password to set — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`
+    : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
   sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
@@ -2101,6 +2343,22 @@ export async function bridgeCustomerToStudio(opts: {
  *  tag (so signup only auto-connects emails the studio explicitly pre-listed, never
  *  a coincidental CRM lead); it's appended, never clobbering the operator's notes.
  *  Reuses the presence_contacts store's (site,email) uniqueness — no new table. */
+// Phase 2 (one customer model): a contact belongs to the customer it became.
+// presence_contacts.client_id (migration 0130) is set here on deal convert and
+// on "Add a customer"; best-effort — a database without the column just keeps
+// the two unlinked (the roster then shows company text, no record link).
+async function linkContactToCustomer(siteId: string, contactId: string | null | undefined, clientId: string | null | undefined): Promise<void> {
+  if (!contactId || !clientId || !UUID_RE.test(String(contactId)) || !UUID_RE.test(String(clientId))) return;
+  try { await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ client_id: clientId }) }); } catch { /* best-effort */ }
+}
+// …and the website enquiry that started it all is marked converted, so it leaves
+// the queue and Today the same way a deal conversion does.
+async function markSubmissionConverted(siteId: string, submissionId: unknown): Promise<void> {
+  const id = String(submissionId || '');
+  if (!UUID_RE.test(id)) return;
+  try { await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }); } catch { /* best-effort */ }
+}
+
 async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
   const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
   if (existing) {
@@ -2148,7 +2406,9 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
       const clientId = existing.id;
       const customerSite = rows(await svc(`presence_sites?client_id=eq.${clientId}&select=id&limit=1`))[0];
       const managed = await linkAgencyPortfolio(principal, customerSite?.id, email);
-      await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      const ct = await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      await linkContactToCustomer(site.id, ct?.id, clientId);
+      await markSubmissionConverted(site.id, b.source_submission_id);
       let projectId: string | null = null, bridged = false, ownedElsewhere = false;
       if (clientId !== site.client_id) {   // self-guard: never bridge the studio to itself
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
@@ -2192,6 +2452,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
     const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: acct.siteId || null, label: businessName });
     projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
   }
+
+  // Phase 2: the person is a contact who belongs to this customer, and the
+  // enquiry that started it (when one did) is converted.
+  { const ct = await ensureConnectContact(site.id, email, name, false); await linkContactToCustomer(site.id, ct?.id, clientId); await markSubmissionConverted(site.id, b.source_submission_id); }
 
   // Already had a workspace → friendly "they're already set up" (with a link), no
   // duplicate, no fresh invite (they already have access).

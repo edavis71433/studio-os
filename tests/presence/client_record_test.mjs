@@ -19,7 +19,7 @@ const pipeline = read('pipeline.html');
 const projects = read('projects.html');
 const customers = read('customers.html');
 const contacts = read('contacts.html');
-const leads = read('leads.html');
+const inbox = read('inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
 const agency = read('agency.html');
 
 // ═══ Resolver (backend) ═══
@@ -31,7 +31,7 @@ ok('RESOLVER: wired in index.ts', /route === '\/crm\/record' && method === 'GET'
 
 // ═══ The record page ═══
 ok('RECORD: crm.html loads the resolver', /\/crm\/record/.test(crm) && /function loadRecord/.test(crm));
-ok('RECORD: renders the related-card tab bar (Details · Deal · Delivery · Files)', /TAB_ORDER=\['details','deal','delivery','files'\]/.test(crm) && /class="tabs"/.test(crm));
+ok('RECORD: renders the related-card tab bar (Details · Deal · Billing · Delivery · Files)', /TAB_ORDER=\['details','deal','billing','delivery','files'\]/.test(crm) && /class="tabs"/.test(crm));
 ok('RECORD: old deep links keep working (?tab=messages/overview aliases)', /TAB_ALIAS=\{overview:'details',messages:'details'/.test(crm));
 ok('RECORD: with NO identity it shows a picker (never /crm/profile as the landing)', /function picker\(\)/.test(crm) && /if\(!rq\)\{ picker\(\); return; \}/.test(crm));
 ok('RECORD: Deal + Delivery are related-list CARDS linking out — no iframes', /pipeline\.html[\s\S]*?Open in pipeline/.test(crm) && /projects\.html[\s\S]*?Open project/.test(crm) && !/<iframe/.test(crm) && !/embed=1/.test(crm));
@@ -51,7 +51,7 @@ ok('PATH: STAGE_LABEL is byte-identical to pipeline.html', stageLabelMap(crm) !=
 const guidanceMap = (src) => (src.match(/const PIPELINE_GUIDANCE=\{[\s\S]*?\n\};/) || [''])[0];
 ok('PATH: PIPELINE_GUIDANCE is byte-identical to pipeline.html', guidanceMap(crm) !== '' && guidanceMap(crm) === guidanceMap(pipeline));
 ok('PATH: guidance renders BOTH tip and action (the pipeline.html:694 bug, fixed here)', /esc\(g\.tip\)/.test(crm) && /esc\(g\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
-ok('PATH: Mark Stage as Complete advances via the stage route', /Mark Stage as Complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
+ok('PATH: Mark stage complete advances via the stage route', /Mark stage complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
 ok('PATH: won is convert-only — the button becomes a pipeline link', /Convert to customer →/.test(crm) && /signed/.test(crm));
 
 // ═══ Embed mode on the panel pages (still supported for other hosts) ═══
@@ -61,7 +61,7 @@ ok('EMBED: projects.html supports ?embed=1 (hides shell + list)', /dds-embed/.te
 // ═══ Every entry point opens the record ═══
 ok('ENTRY: customers roster opens the record', /crm\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
 ok('ENTRY: contacts open the record (Details tab), not a here-only modal', /\/crm\.html\?contact='\+encodeURIComponent\(id\)\+'&tab=details'/.test(contacts));
-ok('ENTRY: leads "view deal" + convert open the record (Deal tab)', /\/crm\.html\?deal=/.test(leads));
+ok('ENTRY: the Inbox enquiry pane\'s "view deal" + convert open the record (Deal tab)', /\/crm\.html\?deal=/.test(inbox));
 ok('ENTRY: agency opens the record', /crm\.html\?project=/.test(agency));
 
 // ═══ Unified messaging → the ONE activity timeline (Salesforce anatomy) ═══
@@ -87,6 +87,17 @@ ok('ACTIVITY: the Notes chip is a real notes view (pinned-first /crm/notes + Pin
 ok('ACTIVITY: the reply composer keeps the honest no-target hint', /Replies open once this client has a project or an open support thread\./.test(crm));
 ok('ACTIVITY: Upcoming & Overdue band with done-checkbox on deal to-dos', /Upcoming &amp; overdue/.test(crm) && /\/sales\/deal-tasks\//.test(crm));
 ok('MESSAGES: inbox conversations open the record Messages tab', /tab=messages/.test(ws) && /\/crm\.html\?project=/.test(ws));
+
+// ═══ ONE LINK (benchmark 2026-10, item 5): the three sends collapse to one ═══
+// With a draft proposal AND a draft agreement on an open deal, the record and the
+// pipeline drawer show ONE "Send proposal & agreement" (POST /sales/deals/:id/
+// send); the per-document sends + Request deposit sit under More.
+ok('SEND: crm.html decides the pair in one place (sendBothDocs: draft proposal, not superseded + draft agreement, open deal)', /function sendBothDocs\(\)/.test(crm) && /if\(d\.stage==='won'\|\|d\.stage==='lost'\|\|d\.converted_client_id\)return null/.test(crm));
+ok('SEND: crm.html action bar headlines "Send proposal & agreement" as the ONE filled button when both exist', /id:'act-send-both',label:'Send proposal & agreement',primary:true/.test(crm) && /primary:!both,on:\(\)=>openBilling\('invoice'\)/.test(crm) && /const FRONT=\[both\?'act-send-both':'act-invoice'/.test(crm));
+ok('SEND: crm.html Billing shows the one button + More (proposal only · agreement only · deposit), and the rows lose their own Send', /id="sendBothBtn" data-send-both="1"/.test(crm) && /id="sendMoreMenu" hidden/.test(crm) && /Send the proposal only/.test(crm) && /Send the agreement only/.test(crm) && /p\.status==='draft'&&!closed&&!both/.test(crm) && /k\.status==='draft'&&!both/.test(crm));
+ok('SEND: crm.html posts the combined route with the pair it showed', /billingSend\('\/sales\/deals\/'\+d\.id\+'\/send','Proposal and agreement sent',\{proposal_id:sb\.getAttribute\('data-prop'\),contract_id:sb\.getAttribute\('data-con'\)\}\)/.test(crm));
+ok('SEND: pipeline.html mirrors it — SEND_BOTH hides the row sends and renders the band + More', /const SEND_BOTH=!!\(draftProp&&draftCon\)/.test(pipeline) && /SEND_BOTH\?'':`<button class="btn" data-send-proposal=/.test(pipeline) && /\(SEND_BOTH\?'':`<button class="btn" data-send-contract=/.test(pipeline) && /id="sendBothBtn" data-prop=/.test(pipeline) && /id="sendMoreMenu" hidden/.test(pipeline));
+ok('SEND: pipeline.html runs the agreement’s blanks guards before the combined send too', /const sb=\$\('sendBothBtn'\);[\s\S]*?confirmBlanks\(k\.body\)[\s\S]*?confirmMoneyBlanks\(k\.body\)[\s\S]*?api\('\/sales\/deals\/'\+id\+'\/send','POST',\{proposal_id:sb\.dataset\.prop,contract_id:sb\.dataset\.con\}\)/.test(pipeline));
 
 // ═══ "Won stays put" ═══
 ok('WON: convert posts to the parent record instead of navigating away', /window\.parent\.postMessage\(\{type:'dds-deal-converted'/.test(pipeline));

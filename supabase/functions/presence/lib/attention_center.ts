@@ -96,7 +96,7 @@ export function buildAttentionCenter(input: AttentionInput): AttentionCenter {
     needs.push({ tone: 'needs_attention', icon: '✏️', title: `${m.section} needs a little more`, why: `${m.page} can’t go live until this is filled in.`, action_label: 'Add it', action_href: m.href });
   }
   if (input.missing.length > miss.length) {
-    needs.push({ tone: 'needs_attention', icon: '✏️', title: `${input.missing.length - miss.length} more items need filling in`, why: 'A few sections still need something before you can publish.', action_label: 'See what’s left', action_href: '/content-tree.html' });
+    needs.push({ tone: 'needs_attention', icon: '✏️', title: `${input.missing.length - miss.length} more items need filling in`, why: 'A few sections still need something before you can publish.', action_label: 'See what’s left', action_href: '/presence.html#pages' });
   }
 
   // 3) changes waiting for the customer's approval (own site + bridged delivery)
@@ -119,7 +119,7 @@ export function buildAttentionCenter(input: AttentionInput): AttentionCenter {
 
   // 6) new enquiries from the website
   if (input.new_enquiries > 0) {
-    needs.push({ tone: 'needs_attention', icon: '✉️', title: input.new_enquiries === 1 ? 'A new enquiry came in' : `${input.new_enquiries} new enquiries came in`, why: 'Someone reached out through your website and is waiting to hear back.', action_label: 'Read it', action_href: '/leads.html' });
+    needs.push({ tone: 'needs_attention', icon: '✉️', title: input.new_enquiries === 1 ? 'A new enquiry came in' : `${input.new_enquiries} new enquiries came in`, why: 'Someone reached out through your website and is waiting to hear back.', action_label: 'Read it', action_href: '/inbox.html#enquiries' });
   }
 
   // 7) unpublished changes that are otherwise ready to go

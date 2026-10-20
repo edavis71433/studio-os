@@ -49,15 +49,15 @@ html.dds-embed #detailWrap{padding-top:0}
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
         customers.html / contacts.html / leads.html / inbox.html by hand
         (.lhead/.lrow1/.obj-ic/.lbtn/.lmeta + the Table ⇄ Cards seg) ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
   .lrow1{display:flex;align-items:center;gap:6px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--serif);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
 
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
@@ -66,7 +66,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .search:focus{border-color:var(--p)}
   .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
-  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.ghost:hover{border-color:var(--p);color:var(--p)}
   .btn.sm{font-size:12.5px;padding:6px 10px}
@@ -74,9 +74,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .spacer{flex:1}
 
   /* ── the roster TABLE: sortable columns; scrolls in its OWN container ── */
-  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
-  thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   thead th .thb:hover{color:var(--p)}
   thead th .arrow{font-size:10px;color:var(--p)}
@@ -87,7 +87,7 @@ html.dds-embed #detailWrap{padding-top:0}
   td .n{font-weight:600}
   /* the row's REAL control: the project name is a button (accessible name +
      native Enter/Space); the whole-row click stays as pointer convenience */
-  td .rowlink{font:inherit;font-weight:600;color:var(--ink);background:none;border:none;padding:0;cursor:pointer;text-align:left}
+  td .rowlink{font:inherit;font-weight:500;color:var(--ink);background:none;border:none;padding:0;cursor:pointer;text-align:left}
   td .rowlink:hover{color:var(--p);text-decoration:underline}
   td.num{font-variant-numeric:tabular-nums}
   td .mutcell{color:var(--faint)}
@@ -99,12 +99,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .badge.wait{color:var(--warn);background:var(--warn-soft)}
 
   /* ── the card view (the original roster look, kept for small screens) ── */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;box-shadow:var(--shadow)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;box-shadow:var(--shadow)}
   .card:hover{border-color:var(--p)}
   .card .t{font-weight:600}
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
   .card .cprog{margin-top:8px;max-width:220px}
-  .pill{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .pill{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .pill.complete{background:var(--good-soft);color:var(--good)}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
 
@@ -115,7 +115,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .crumbs .crumb:hover{background:var(--p-soft)}
   .crumbs [aria-current="page"]{color:var(--ink);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rhead{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
-  .rhead .obj-ic{width:44px;height:44px;border-radius:12px;font-size:20px;box-shadow:var(--shadow)}
+  .rhead .obj-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);font-size:20px;box-shadow:var(--shadow)}
   .rhead-t{min-width:0;flex:1}
   .rhead h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2;overflow-wrap:anywhere}
   .rec-sub{color:var(--soft);font-size:14px;margin-top:5px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
@@ -123,7 +123,7 @@ html.dds-embed #detailWrap{padding-top:0}
   /* Status ▾ dropdown — the slice-2 popup contract (aria-expanded · Escape
      returns focus · outside click via the ONE document-level delegated closer) */
   .statusdd{position:relative}
-  #statusMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #statusMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #statusMenu [role=menuitem]{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
   #statusMenu [role=menuitem]:hover{background:var(--p-soft)}
   /* .rcar, not .car — shell.js's injected nav uses .car for its own caret and
@@ -131,13 +131,18 @@ html.dds-embed #detailWrap{padding-top:0}
   .rcar{font-size:10px;color:var(--faint)}
 
   /* highlights panel: label-over-value tiles */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
-  .hl{background:var(--card);padding:10px 14px;min-width:0}
-  .hl-k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
-  .hl-v{font-family:var(--serif);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:none}
+  .hl{background:var(--card);padding:12px 12px;min-width:0;display:flex;align-items:center;gap:9px;border-left:1px solid var(--line)}
+  .hl:first-child{border-left:none}
+  .hl .ico{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .hl .ico svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .hl .hl-main{min-width:0;flex:1}
+  .hl-k{font-size:12px;color:var(--faint);font-weight:500}
+  .hl-v{font-family:var(--sans);font-size:15px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
 
   /* ── the Path = milestones in order (Lightning chevrons, dds skin) ── */
-  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px}
   .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   ol.path{display:flex;flex:1 1 340px;min-width:0;list-style:none;padding:0;margin:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .pstep{flex:1;min-width:72px;font-size:12.5px;font-weight:600;padding:9px 16px;text-align:center;
@@ -151,6 +156,17 @@ html.dds-embed #detailWrap{padding-top:0}
   .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 12px}
   .terminal-chip.won{background:var(--good-soft);color:var(--good)}
+  /* ── Oct 2026 review: milestones in the record's lifecycle idiom (crm.html's
+     "Visual refresh" .pstep rules, the mock's .ms) — same <li class="pstep">
+     DOM, same done ✓ / current / todo states and aria-current the spec pins. */
+  ol.path{gap:6px;flex:1 1 520px}
+  .pstep,.pstep:first-child,.pstep:last-child,.pstep:only-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;line-height:1.3}
+  .pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .pstep.current{color:var(--p)}
+  .pathcard{box-shadow:none;padding:12px 16px}
+  @media (max-width:640px){.pstep,.pstep:first-child,.pstep:last-child{flex:0 0 auto;min-width:96px}}
 
   /* ── two-column body: related-list cards ── */
   .dbody{margin-top:18px}
@@ -162,14 +178,14 @@ html.dds-embed #detailWrap{padding-top:0}
      its OWN div.sec wrapper (shell.js nav markup); an unscoped .sec here
      would restyle the flat slice-7 bar into boxed buttons. Page classes must
      never collide with shell markup. */
-  .rsec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .rsec{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow)}
   .rsec h3{font-size:14.5px;font-weight:700;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
   .rsec h3 .n{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:2px}
   /* Messages keeps its intentional accent emphasis (the pre-slice styling) */
   #detailInner .rsec.msgs{border-color:var(--p);box-shadow:0 1px 3px rgba(91,63,160,.08)}
   #detailInner .rsec.msgs form.mini textarea{min-height:90px}
   #detailInner .rsec.msgs form.mini{background:var(--card)}
-  .subhead{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:14px 0 4px}
+  .subhead{font-size:12px;color:var(--faint);font-weight:500;margin:14px 0 4px}
   .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);min-width:0}
   .item:last-child{border-bottom:none}
   .item .t{font-size:14px;line-height:1.45;overflow-wrap:anywhere;min-width:0}
@@ -180,31 +196,31 @@ html.dds-embed #detailWrap{padding-top:0}
   .titem:last-child{border-bottom:none}
   .titem .tmain{flex:1;min-width:0}
   .titem input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin-top:3px}
-  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap}
+  .tag{font-size:12px;font-weight:500;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap;text-transform:capitalize}
   .tag.client{background:var(--p-soft);color:var(--p)}
   .tag.fromclient{background:var(--good-soft);color:var(--good)}
   .tag.action{background:var(--warn-soft);color:var(--warn)}
   .tag.overdue{background:var(--warn-soft);color:var(--bad)}
   .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .empty{color:var(--soft);font-size:13.5px;padding:6px 0}
-  .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:0;text-decoration:none}
+  .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:500;cursor:pointer;padding:0;text-decoration:none}
   .linkbtn:hover{text-decoration:underline}
 
-  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
-  input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
+  input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%}
   textarea{min-height:70px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
   /* the standard-step picker: the ten delivery steps we already know about,
      ticked in a list (several at once), with the ones this project already
      holds shown but disabled so the absence is explained, never mysterious */
-  .sp-h{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--soft)}
+  .sp-h{font-size:12px;font-weight:500;color:var(--soft)}
   .sp-row{align-items:flex-start;gap:8px;padding:2px 0;cursor:pointer}
   .sp-row input{margin-top:2px;flex:0 0 auto;accent-color:var(--p)}
   .sp-row .sp-t{min-width:0}
   .sp-row.has{opacity:.62;cursor:default}
   .sp-has{display:block;font-size:11.5px;color:var(--soft);margin-top:1px}
-  .stepnudge{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:2px 0 8px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:13.5px;color:var(--soft)}
+  .stepnudge{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:2px 0 8px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg);font-size:13.5px;color:var(--soft)}
   .stepnudge .sn-t{flex:1 1 190px;min-width:0}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
@@ -217,7 +233,7 @@ html.dds-embed #detailWrap{padding-top:0}
      <dialog> itself must not scroll either (browsers won't programmatically
      scroll the top-layer element) — the form inside is the scroller, and its
      controls hold 16px so a phone focus never zooms the visual viewport. */
-  dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);margin:8vh auto;padding:18px 20px}
+  dialog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);margin:8vh auto;padding:18px 20px}
   dialog form{max-height:calc(84vh - 56px);overflow:auto}
   dialog input,dialog textarea,dialog select{font-size:16px}
   dialog::backdrop{background:rgba(27,21,37,.4)}
@@ -271,7 +287,27 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+// Oct 2026 review: scoped into a client (?client=<their site>), every read on
+// this page used to go to the CLIENT's site — where no project lives (projects
+// are created on the AGENCY site; service_bridge ensureProjectForDeal takes
+// agencySiteId) — so the roster painted "Projects live at the studio level" and
+// a record 404'd. Once the scope resolves to a customer through the bridge
+// (resolveScopedClient below), AG_MODE drops the scope header: the roster, the
+// record, its tasks, files and support all read the studio's own site, and the
+// list is filtered to that customer's projects. A scope that is NOT a bridged
+// customer keeps the old behaviour (the honest studio-level notice).
+let AG_MODE=false,SCOPED_CLIENT=null,OPENED_ONCE=false;
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':AG_MODE?'':scope()});
+async function resolveScopedClient(){
+  const site=scope(); if(!site)return null;
+  try{
+    const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
+    const b=await r.json().catch(()=>({}));
+    const rows=Array.isArray(b&&b.data)?b.data:[];
+    const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
+    return hit?{client_id:String(hit.client_id),name:String(hit.name||'')}:null;
+  }catch(_){return null;}
+}
 // valid next stages mirror lib/service_delivery.ts (project + task ladders)
 const P_NEXT={active:['on_hold','complete','archived'],on_hold:['active','complete','archived'],complete:['active','archived'],archived:['active']};
 const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked','done'],blocked:['todo','in_progress'],done:['todo','in_progress']};
@@ -280,7 +316,9 @@ let TOKEN="",FILTER="",STUDIO=true;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
-const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
+// "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
+const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
 const statusLabel=(s)=>String(s||'').replace('_',' ');
 
 async function api(path,method,body){
@@ -292,12 +330,12 @@ async function api(path,method,body){
 
 // ── roster state: items · per-project report cache · customer-name map ───────
 let ITEMS=[],LOADED_AT=0,Q="";
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+// SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
 let CUSTTRIED=false;
-const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
+const updatedLabel=()=>{if(!LOADED_AT)return 'Couldn’t load just now';const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 // Table ⇄ Cards display choice, persisted; small screens default to Cards
 // (customers.html's list-view mobile pattern, kept in sync by hand).
@@ -348,6 +386,7 @@ function headerHtml(list){
   const active=list.filter(p=>p.status==='active').length;
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   const mid=FILTER?` · ${esc(statusLabel(FILTER))}`:` · ${active} active`;
+  const who=SCOPED_CLIENT?`For ${esc(SCOPED_CLIENT.name||'this client')} · `:'';
   return `<div class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">📁</span>
@@ -358,7 +397,7 @@ function headerHtml(list){
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${who}${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </div>`;
 }
 
@@ -403,7 +442,7 @@ function tableHtml(list){
       <td>${cust==='Internal'?'<span class="mutcell">Internal</span>':(cust==='—'?'<span class="mutcell">—</span>':esc(cust))}</td>
       <td><span class="pill ${esc(st)}">${esc(statusLabel(st))}</span></td>
       <td>${progressCell(p)}</td>
-      <td class="num">${p.target_date?esc(p.target_date):'<span class="mutcell">—</span>'}</td>
+      <td class="num">${p.target_date?esc(niceDay(p.target_date)):'<span class="mutcell">—</span>'}</td>
       <td class="num">${approvalsCell(p)}</td>
     </tr>`;
   }).join('');
@@ -415,7 +454,7 @@ function cardsHtml(list){
     const r=REPORTS[p.id];
     const cust=customerName(p);
     const prog=(r&&r.progress&&r.progress.total>0)?`<div class="cprog"><div class="prog"><i style="width:${Number(r.progress.pct||0)}%"></i></div><span class="pnum mut" style="font-size:11.5px">${Number(r.progress.done||0)}/${Number(r.progress.total||0)} tasks</span></div>`:'';
-    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
+    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(niceDay(p.target_date))):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
   }).join('');
 }
 
@@ -434,6 +473,7 @@ function renderRoster(){
     // projects are created on the AGENCY site (service_bridge ensureProjectForDeal
     // takes agencySiteId). So it is not "no projects yet", it is "projects don't
     // live here", and "New project" would be a trap. Say the true thing instead.
+    else if(SCOPED_CLIENT&&!Q.trim()&&window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects for '+(SCOPED_CLIENT.name||'this client')+' yet',body:FILTER?'No '+statusLabel(FILTER)+' projects for them right now — try “All”.':'A project starts when their deal is won — convert the deal in the pipeline and it lands here.'});
     else if(!Q.trim()&&!FILTER&&window.ddsStudioLevel&&window.ddsStudioLevel($('list'),{noun:'Projects',lower:'projects'})){/* painted */}
     else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
     else $('list').innerHTML='<p class="mut">No projects yet.</p>';
@@ -485,14 +525,23 @@ function wireRoster(){
 async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
+    if(scope()&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
     const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
     // Scoped into a client, POST /projects would file the project on the CLIENT's
     // site — projects live on the agency site (service_bridge ensureProjectForDeal
     // takes agencySiteId), so it would land where nothing else can see it. Hide
     // the action rather than offer a button that does the wrong thing quietly.
     STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO||!!scope();
-    ITEMS=res.data||[]; LOADED_AT=Date.now();
+    ITEMS=res.data||[];
+    if(SCOPED_CLIENT)ITEMS=ITEMS.filter(p=>String(p.client_id||'')===SCOPED_CLIENT.client_id);   // this client's work only
+    LOADED_AT=Date.now();
     renderRoster();
+    // one project for this client and nothing else asked for → open it straight away
+    if(SCOPED_CLIENT&&!soft&&!OPENED_ONCE&&ITEMS.length===1){
+      OPENED_ONCE=true;
+      const qp=new URLSearchParams(location.search);
+      if(!qp.get('project')&&!qp.get('support'))openProject(ITEMS[0].id);
+    }
     // enrichment (existing routes only): customer names once + per-project report
     // summaries for Progress / Open approvals — cells fill in as they arrive.
     // These re-renders are async: keep the user's keyboard focus where it was.
@@ -500,6 +549,7 @@ async function load(soft){
     ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();});
   }catch(e){
     if(soft)throw e;
+    if(!$('lhead').innerHTML.trim())$('lhead').innerHTML=headerHtml([]);   // the page keeps its name even when the list could not load
     if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
   }
 }
@@ -664,7 +714,7 @@ function pathHtml(milestones){
   }).join('');
   let side='';
   if(curIdx===-1)side='<span class="terminal-chip won">All milestones complete ✓</span>';
-  else if(STUDIO)side=`<button class="btn sm" id="msComplete" data-ms="${esc(milestones[curIdx].id)}">Mark Milestone Complete</button>`;
+  else if(STUDIO)side=`<button class="btn sm" id="msComplete" data-ms="${esc(milestones[curIdx].id)}">Mark milestone complete</button>`;
   return `<div class="pathcard"><div class="pathrow"><ol class="path" aria-label="Milestones">${steps}</ol><div class="path-side">${side}</div></div></div>`;
 }
 
@@ -690,30 +740,44 @@ async function openProject(id){
         <button class="btn ghost sm" id="statusBtn" aria-haspopup="menu" aria-expanded="false">Status <span class="rcar" aria-hidden="true">▾</span></button>
         <div id="statusMenu" role="menu" aria-label="Change status" hidden>${nextP.map(s=>`<button role="menuitem" data-pstatus="${s}">Mark ${esc(statusLabel(s))}</button>`).join('')}</div>
       </div>`:'';
-    const acts=STUDIO?`<div class="rhead-acts">${statusDd}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
+    // Phase 1 overhaul: the project links straight to its customer's record hub
+    // (deal · billing · files · messages) — billing is never more than a click away.
+    const recLink=(STUDIO&&p.client_id)?`<a class="btn ghost sm" href="/crm.html?project=${encodeURIComponent(p.id)}&client_id=${encodeURIComponent(p.client_id)}&tab=billing" data-noscope="1" style="text-decoration:none">Customer record →</a>`:'';
+    const acts=STUDIO?`<div class="rhead-acts">${statusDd}${recLink}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
 
     // ── highlights: Customer · Target date · Progress · Waiting on client · Files
     //    (+ the old overview's remaining stats: open client actions when any
     //    exist, CSAT when the report carries ratings — omitted honestly otherwise) ──
     const hl=[
       ['Customer',esc(cust)],
-      ['Target date',p.target_date?esc(p.target_date):'—'],
+      ['Target date',p.target_date?esc(niceDay(p.target_date)):'—'],
       ['Progress',rp&&rp.progress?`${Number(rp.progress.pct||0)}% <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">· ${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)} tasks</span>`:'—'],
       ['Waiting on client',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
       ['Files',rp?String(Number(rp.shared_files||0))+' shared':'—'],
     ];
     if(rp&&Number(rp.open_client_actions||0)>0)hl.push(['Client actions',String(Number(rp.open_client_actions))+' open']);
     if(rp&&rp.csat&&Number(rp.csat.count||0)>0)hl.push(['CSAT',`${esc(String(rp.csat.average))}★ <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">(${Number(rp.csat.count)})</span>`]);
-    const hlHtml=`<div class="hl-panel">${hl.map(t=>`<div class="hl"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div>`).join('')}</div>`;
+    // Oct 2026 review: the mock's stat-tile anatomy — an icon per tile, the
+    // label/value pair unchanged (the spec reads .hl-panel's text, not its shape)
+    const HLI={
+      'Customer':['','<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M4 21a8 8 0 0 1 16 0"/>'],
+      'Target date':['info','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+      'Progress':['','<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>'],
+      'Waiting on client':['warn','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+      'Files':['good','<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>'],
+      'Client actions':['warn','<path d="M20 6L9 17l-5-5"/>'],
+      'CSAT':['good','<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z"/>'],
+    };
+    const hlHtml=`<div class="hl-panel">${hl.map(t=>{const ic=HLI[t[0]]||['','<circle cx="12" cy="12" r="9"/>'];return `<div class="hl"><span class="ico ${ic[0]}" aria-hidden="true"><svg viewBox="0 0 24 24">${ic[1]}</svg></span><div class="hl-main"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div></div>`;}).join('')}</div>`;
 
     // ── related lists ──
-    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(m.due_date)}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';
+    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(niceDay(m.due_date))}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';
     const ts=(data.tasks||[]).map(t=>{
       const d=t.derived||{}; const done=t.status==='done';
       const canBox=done||(T_NEXT[t.status]||[]).includes('done');
       const box=STUDIO?`<input type="checkbox" data-tdone="${t.id}"${done?' checked':''}${canBox?'':' disabled'} aria-label="${canBox?(done?'Reopen':'Mark done')+': '+esc(t.title):esc(t.title)+' is blocked — move it to to-do or in progress first'}">`:'';
       const others=STUDIO?(T_NEXT[t.status]||[]).filter(s=>s!=='done'&&!(done&&s==='todo')).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(statusLabel(s))}</button>`).join(''):'';
-      return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
+      return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">needs the client</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
     }).join('')||'<div class="empty">No tasks yet — add the first one.</div>';
     // the ten standard delivery steps, as the SERVER sees them for this project
     // (absent on the client side, and on any response that predates the field)

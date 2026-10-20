@@ -90,7 +90,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // Architecture v1.0 (frozen refinements): Analytics is first-class; utilities overflow.
   ok('nav: Analytics is a first-class outcome (not a utility)', owner.some(s=>s.key==='analytics' && !s.utility && s.items[0].href==='/analytics.html'));
   ok('nav: utilities (Connections/Settings/Help) live in the overflow (utility:true)', ['connections','settings','help'].every(k=>{const s=owner.find(x=>x.key===k);return !!s && s.utility===true;}));
-  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','projects','files','analytics','inbox','studio'].includes(s.key)));
+  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','pipeline','projects','files','analytics','inbox','studio'].includes(s.key)));
   // FIX 6: the primary "Customers" item opens the ROSTER (customers.html), not the
   // single-client CRM detail (which un-scoped showed the owner his OWN profile).
   ok('nav: Customers opens the roster (customers.html), not the single-client detail', owner.find(s=>s.key==='customers').items[0].href==='/customers.html');
@@ -111,7 +111,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // An agency operator scope-switched INTO a customer keeps operator tools: the
   // workspace guard yields isManagedClient=false for them, so buildNav is unchanged.
   const agencyScoped = buildNav(ctx({ capabilities: caps('business_owner'), isAgency:true, isManagedClient:false }));
-  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools + Studio', agencyScoped.some(s=>s.key==='customers') && agencyScoped.some(s=>s.key==='studio'));
+  // Oct 2026 studio audit (one home, one roster): at studio level the Customers item IS the studio home.
+  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools; Customers opens the studio home', agencyScoped.some(s=>s.key==='customers') && agencyScoped.find(s=>s.key==='customers').items[0].href==='/agency.html' && !agencyScoped.some(s=>s.key==='studio'));
 
   const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
   ok('nav: Monitor edition hides Publish (observe-only)', !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
@@ -120,7 +121,14 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: business_staff cannot invite (no Sharing in Settings)', !staff.find(s=>s.key==='settings').items.some(i=>i.key==='sharing'));
 
   const agency = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner') }));
-  ok('nav: agency member gets the Studio scope; landing = Studio', agency.some(s=>s.key==='studio') && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+  ok('nav: agency member: landing = Studio, Customers → the studio home, no Today in the primary bar', !agency.some(s=>s.key==='today') && agency.find(s=>s.key==='customers').items[0].href==='/agency.html' && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+  // drilled INTO a client the bar is the client's: Today and Website come back, Customers is the roster page
+  const drilled = buildNav(ctx({ isAgency:true, scoped:true, capabilities: caps('business_owner') }));
+  ok('nav: agency member drilled into a client keeps Today + Website; Customers → customers.html', drilled.some(s=>s.key==='today') && drilled.some(s=>s.key==='website' && !s.utility) && drilled.find(s=>s.key==='customers').items[0].href==='/customers.html');
+  // Oct 2026 studio audit, change 4: onboarding is findable from ⌘K at studio level ("add", "client")
+  const addItem = agency.find(s=>s.key==='customers').items.find(i=>i.key==='add_client');
+  ok('nav: agency member at studio level has "Add a customer" → /agency.html#add in the Customers group (⌘K finds "add"/"client")', !!addItem && addItem.label==='Add a customer' && addItem.href==='/agency.html#add' && /client/i.test(addItem.desc||''));
+  ok('nav: the add_client entry is studio-level only (not drilled into a client, not for a plain owner)', !drilled.find(s=>s.key==='customers').items.some(i=>i.key==='add_client') && !owner.find(s=>s.key==='customers').items.some(i=>i.key==='add_client'));
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));

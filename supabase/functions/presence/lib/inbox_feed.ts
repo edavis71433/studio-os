@@ -4,6 +4,7 @@
 // whole request. Both got a defect that only a behavioural test would have
 // caught, so they live here now: no imports, no I/O, one job each.
 //
+//   freshEnquiries(..)           new enquiries not already spoken for by a lead_followup notice
 //   studioBellCount(..)          what the shell bell badge shows
 //   shapeClientConversations(..) the per-project Inbox conversation rows
 //
@@ -134,16 +135,25 @@ export interface BellInput {
   lastSeenAt: string | null;
 }
 
+/** One lead must never stack two signals. The lead-followup cron raises a
+ *  per-lead notice for AGED 'new' enquiries — that notice IS an enquiry signal,
+ *  so any surface that counts new enquiries alongside active notices reports the
+ *  same lead twice unless it subtracts the ones already spoken for. This is the
+ *  ONE place the rule lives: it used to be inlined in the bell count and the
+ *  portal feed only, so /attention rendered an aged lead as two cards while the
+ *  bell counted it once. Every counter of new enquiries must route through this. */
+export function freshEnquiries(newEnquiries: number, notices: Array<{ kind?: unknown }>): number {
+  const spokenFor = (notices || []).filter((n) => n && n.kind === 'lead_followup').length;
+  return Math.max(0, (newEnquiries || 0) - spokenFor);
+}
+
 /** The ONE "needs you" number behind the shell bell badge (studio surfaces).
  *  Every input is best-effort upstream, so a missing slot arrives as 0/[] and
  *  simply contributes nothing. */
 export function studioBellCount(i: BellInput): number {
   const notices = i.notices || [];
-  // FIX 1 dedupe (unchanged): the lead-followup cron already raises a per-lead
-  // notice for AGED 'new' leads, so count only the fresh enquiries not yet
-  // represented by one — a single lead never stacks two signals.
-  const leadFollowups = notices.filter((n) => n && n.kind === 'lead_followup').length;
-  const newEnquiries = Math.max(0, (i.newEnquiries || 0) - leadFollowups);
+  // FIX 1 dedupe — see freshEnquiries.
+  const newEnquiries = freshEnquiries(i.newEnquiries || 0, notices);
   // F1: the client-portal notices are the email throttle key, not a count.
   const countedNotices = notices.filter((n) => !CLIENT_ACTIVITY_NOTICE_KINDS.has(String(n?.kind ?? ''))).length;
   // detail.from='client' is stamped ONLY by the client door (client_delivery.ts /
@@ -237,4 +247,49 @@ export function shapeClientConversations(events: ConversationEvent[]): Map<strin
     row.needsReply = ask !== '' && ask > (newestStudio.get(pid) || '');
   }
   return out;
+}
+
+// ── Phase 3 (one source for numbers): which notice rows may RENDER ──────────
+// Today, the Inbox and the bell must list one row per real record. Two kinds of
+// row broke that:
+//   • the four client_* throttle notices — their counted half already renders
+//     as a message / support row, so showing the notice too listed the same
+//     client action twice (and, before service_bridge pre-dismissed them,
+//     three times: notice + conversation + support request).
+//   • an invoice reminder (deal_followup + `invremind:<invoice id>`) whose
+//     invoice has since been paid or voided — the teardown runs on the paid
+//     echo, but a row raised before that path existed (or a missed webhook)
+//     left "Still unpaid: Deposit $1,600" on Today while the record said Paid.
+// `openInvoiceIds` is the set of invoice ids that are STILL open; null means
+// the invoices could not be read, in which case reminders are kept (never an
+// under-count on a read failure). `stale` is what the caller may clear so the
+// bell count self-heals on the next load.
+export const INVOICE_REMINDER_PREFIX = 'invremind:';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The invoice ids that the reminder notices in `rows` point at (UUIDs only). */
+export function invoiceReminderIds(rows: Array<{ kind?: unknown; period?: unknown }>): string[] {
+  const out = new Set<string>();
+  for (const n of rows || []) {
+    if (String(n?.kind ?? '') !== 'deal_followup') continue;
+    const p = String(n?.period ?? '');
+    if (!p.startsWith(INVOICE_REMINDER_PREFIX)) continue;
+    const id = p.slice(INVOICE_REMINDER_PREFIX.length);
+    if (UUID_RE.test(id)) out.add(id);
+  }
+  return [...out];
+}
+export function renderableNotices<T extends { kind?: unknown; period?: unknown }>(rows: T[], openInvoiceIds: ReadonlySet<string> | null): { keep: T[]; stale: T[] } {
+  const keep: T[] = []; const stale: T[] = [];
+  for (const n of rows || []) {
+    const kind = String(n?.kind ?? '');
+    if (CLIENT_ACTIVITY_NOTICE_KINDS.has(kind)) continue;          // its counted half renders elsewhere
+    const p = String(n?.period ?? '');
+    if (kind === 'deal_followup' && p.startsWith(INVOICE_REMINDER_PREFIX) && openInvoiceIds) {
+      const id = p.slice(INVOICE_REMINDER_PREFIX.length);
+      // only an id we could have looked up is judged; a malformed period is kept
+      if (UUID_RE.test(id) && !openInvoiceIds.has(id)) { stale.push(n); continue; }    // paid or voided → no longer owed
+    }
+    keep.push(n);
+  }
+  return { keep, stale };
 }

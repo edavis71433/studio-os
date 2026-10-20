@@ -161,7 +161,7 @@ test.describe('Projects list view', () => {
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
     await expect(page.locator('tbody tr').first()).toContainText('3/6 tasks');
     await expect(page.locator('tbody tr').first().locator('.badge.wait')).toHaveText('2 waiting');
-    await expect(page.locator('tbody tr').first()).toContainText('2026-08-01');
+    await expect(page.locator('tbody tr').first()).toContainText('Aug 1, 2026');   // dates read as words, never as database strings
     // p3 = internal project with NO report fixture → honest degradation
     const p3row = page.locator('tbody tr[data-id="p3"]');
     await expect(p3row).toContainText('Internal');
@@ -388,7 +388,7 @@ test.describe('Project record page', () => {
     // highlights: Customer · Target date · Progress · Waiting on client · Files
     const hl = page.locator('.hl-panel');
     await expect(hl).toContainText('Acme Bakery');
-    await expect(hl).toContainText('2026-08-01');
+    await expect(hl).toContainText('Aug 1, 2026');   // dates read as words (Oct 2026 experience review)
     await expect(hl).toContainText('50%');
     await expect(hl).toContainText('3/6 tasks');
     await expect(hl).toContainText('2 approvals');
@@ -418,7 +418,7 @@ test.describe('Project record page', () => {
     await expect(page.locator('#tsList .titem')).toHaveCount(2);
     // visibility tags survive the redesign
     await expect(page.locator('#tsList .tag.client')).toHaveText('shared');
-    await expect(page.locator('#tsList .tag.action')).toHaveText('your action');
+    await expect(page.locator('#tsList .tag.action')).toHaveText('needs the client');
     // done task: checked + struck; open task: unchecked
     await expect(page.locator('[data-tdone="t2"]')).toBeChecked();
     await expect(page.locator('[data-tdone="t1"]')).not.toBeChecked();
@@ -973,5 +973,62 @@ test.describe('Project record — the standard-step picker', () => {
     const r = await new AxeBuilder({ page }).analyze();
     const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(bad.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+});
+
+// ── Oct 2026 review: Projects inside a client context ─────────────────────────
+// ?client=<their site> used to read the CLIENT's site (no project lives there)
+// and paint the studio-level notice. The page now resolves the scope to a
+// customer through /studio/customers (customer_site_id → client_id), reads the
+// studio's projects WITHOUT the scope header, keeps that client's, and opens
+// the single project straight away. An unbridged scope keeps the old notice
+// (scoped-empty.spec.ts).
+test.describe('Projects — a client context lists that client’s projects', () => {
+  const TWO = { data: [
+    ...LIST.data,
+    { id: 'p4', name: 'Acme spring campaign', status: 'active', client_visible: true, client_id: 'c-acme', deal_id: null, start_date: null, target_date: null, updated_at: '2026-07-12T00:00:00Z' },
+  ], is_studio_view: true };
+
+  test('exactly one project for the client → it opens directly, read agency-side, scope kept in the URL', async ({ page }) => {
+    const scopes: Record<string, string> = {};
+    await pinTable(page);   // phones default the roster to cards — this test reads table rows
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      scopes[path] = route.request().headers()['x-dds-scope-site'] ?? '(none)';
+      return route.fallback();
+    });
+    await page.goto('/projects.html?client=site-acme');
+    await expect(page.locator('#dtitle')).toHaveText('Acme website build');
+    await expect(page).toHaveURL(/project=p1/);
+    await expect(page).toHaveURL(/client=site-acme/);
+    // the bridge read itself is unscoped, and so is everything after it resolved
+    expect(scopes['/studio/customers']).toBe('');
+    expect(scopes['/projects']).toBe('');
+    expect(scopes['/projects/p1']).toBe('');
+    // the roster behind the record carries only Acme's project
+    await page.locator('.crumbs .crumb').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr[data-id="p1"]')).toBeVisible();
+    await expect(page.locator('.lmeta')).toContainText('For Acme Bakery');
+    await expect(page.getByRole('button', { name: 'New project' })).toHaveCount(0);
+  });
+
+  test('two projects for the client → the roster lists exactly those two', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: { ...API, '/projects': TWO } });
+    await page.goto('/projects.html?client=site-acme');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('tbody tr[data-id="p1"]')).toBeVisible();
+    await expect(page.locator('tbody tr[data-id="p4"]')).toBeVisible();
+    await expect(page.locator('#detailWrap')).toBeHidden();
+    await expect(page.getByText('Projects live at the studio level')).toHaveCount(0);
+  });
+
+  test('a bridged client with no project yet gets an honest empty state, not the studio-level notice', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/projects': { data: [LIST.data[2]], is_studio_view: true } } });
+    await page.goto('/projects.html?client=site-beta');
+    await expect(page.getByRole('heading', { name: 'No projects for Beta Salon yet' })).toBeVisible();
+    await expect(page.getByText('Projects live at the studio level')).toHaveCount(0);
   });
 });

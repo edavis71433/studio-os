@@ -10,7 +10,7 @@ import { installApp } from './helpers/app';
 const FEED = { data: {
   role: 'business_owner',
   moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
-  notices: [{ id: 'n1', kind: 'lead_followup', headline: 'A quote request is waiting for a reply', body: '', href: '/leads.html' }],
+  notices: [{ id: 'n1', kind: 'lead_followup', headline: 'A quote request is waiting for a reply', body: '', href: '/inbox.html#enquiries' }],
   pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
   last_published: null,
   client_messages: [
@@ -24,6 +24,11 @@ const FEED = { data: {
 
 const API = {
   '/portal/feed': FEED,
+  // the Enquiries view's queue (GET /forms/inbox) — the same enquiry the feed
+  // carries, so a row picked in either view is the same enquiry (l-9)
+  '/forms/inbox': { data: { submissions: [
+    { id: 'l-9', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'new', created_at: '2026-07-13T00:00:00Z' },
+  ], unread: 1 } },
   '/notifications': { data: [
     { kind: 'milestone_done', label: 'Milestone reached — Design', href: '/projects/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', created_at: '2026-07-10T00:00:00Z', read: false },
   ], unread_count: 1 },
@@ -205,7 +210,8 @@ test.describe('Inbox — split-view console', () => {
     await page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' }).click();
     const pane = page.locator('#rpane');
     await expect(pane).toContainText('Can I get a quote for a patio?');
-    await expect(pane.getByRole('link', { name: 'Reply' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
+    await expect(pane.getByRole('button', { name: 'Send reply' })).toBeVisible();   // the reply is sent from here (audit change 5)
+    await expect(pane.getByRole('link', { name: 'Use your email app instead' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
     await expect(pane.getByRole('button', { name: '→ Deal' })).toBeVisible();
     const readReq = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/forms/inbox/l-9'));
     await pane.getByRole('button', { name: 'Mark read' }).click();
@@ -280,7 +286,7 @@ test.describe('Inbox — split-view console', () => {
     const misc = rows.getByRole('option').filter({ hasText: 'Other clients' });
     await expect(misc).toBeVisible();
     // F11/C7: no enquiries key → leads come from the page's own /forms/inbox read,
-    // counting NON-ARCHIVED (new + read — the same arithmetic as leads.html Open);
+    // counting NON-ARCHIVED (new + read — the same arithmetic as the Enquiries view's Open);
     // archived stays out
     await expect(rows.getByRole('option').filter({ hasText: 'Sam Rivera' })).toBeVisible();
     await expect(rows.getByRole('option').filter({ hasText: 'Dana Lee' })).toBeVisible();
@@ -456,7 +462,7 @@ test.describe('SS6 — inbox console quick wins', () => {
     await page.locator('#viewMenu [data-view="enquiries"]').click();
     const rows = page.locator('#rows');
     await expect(rows.getByRole('option')).toHaveCount(2);   // non-archived: new + read
-    // one queue, one vocabulary: "N enquiries · M new" — leads.html's arithmetic
+    // one queue, one vocabulary: "N enquiries · M new" (Open hides archived)
     await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new');
   });
 
@@ -489,7 +495,7 @@ test.describe('SS6 — inbox console quick wins', () => {
           ...FEED.data.notices,
           { id: 'n-up', kind: 'client_upload', headline: 'New file from Marlow’s Kitchen', body: 'menu-final.pdf', href: '/projects.html' },
           { id: 'n-req', kind: 'client_request', headline: 'New request from Marlow’s Kitchen', body: 'Can you refresh the gallery?', href: '/inbox.html' },
-          { id: 'n-ap', kind: 'client_approval', headline: 'Approval decision from Marlow’s Kitchen', body: 'Approved — Homepage copy', href: '/timeline.html' },
+          { id: 'n-ap', kind: 'client_approval', headline: 'Approval decision from Marlow’s Kitchen', body: 'Approved — Homepage copy', href: '/presence.html#activity' },
         ],
       } },
     };
@@ -870,3 +876,162 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fClient')).toBeInViewport();
   });
 });
+
+// ── Oct 2026 review: support triage from the reading pane ────────────────────
+// Resolve · Close (· Make it a task when the request sits on a project) live in
+// the pane header for open / in_progress requests; "Reply and resolve" sits
+// beside Send. Every status change goes through the ONE existing route
+// (PATCH /support/:id), and a resolved or closed request leaves the list — the
+// server already keeps it out of the feed and the bell (status filters in
+// routes/workspace.ts), so the next refresh agrees.
+test.describe('Inbox — support triage in the pane', () => {
+  const PROJ = 'bbbbbbbb-3333-4333-8333-bbbbbbbbbbbb';
+  const WITH_PROJECT = { data: { ...API['/portal/feed'].data, client_messages: [
+    { type: 'support', id: 's-1', subject: 'Logo tweak', status: 'open', project: 'Rebrand', project_id: PROJ, client_id: 'c-1', client: 'Marlow’s Kitchen', created_at: '2026-07-14T00:00:00Z', thread_key: 'support:s-1', unread: true, href: '' },
+  ] } };
+
+  test('Resolve in the header PATCHes status=resolved and the row leaves the list', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await expect(pane.locator('#paneStatusChip')).toHaveText('Open');
+    await expect(pane.locator('#supResolve')).toBeVisible();
+    await expect(pane.locator('#supClose')).toBeVisible();
+    await expect(pane.locator('#supTask')).toHaveCount(0);   // no project → nothing to file it on
+    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
+    await pane.locator('#supResolve').click();
+    expect((await patchReq).postDataJSON()).toEqual({ status: 'resolved' });
+    await expect(page.locator('.dds-toast')).toContainText('Resolved');
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+    await expect(pane.locator('#supResolve')).toHaveCount(0);
+  });
+
+  test('Close PATCHes status=closed', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
+    await page.locator('#rpane #supClose').click();
+    expect((await patchReq).postDataJSON()).toEqual({ status: 'closed' });
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+  });
+
+  test('"Reply and resolve" posts the reply first, then resolves', async ({ page }) => {
+    const calls: Array<{ method: string; path: string; body: unknown }> = [];
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/support/**', async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') return route.fallback();
+      calls.push({ method: req.method(), path: new URL(req.url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body: req.postDataJSON() });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await pane.locator('#supBody').fill('Done — bigger logo is live.');
+    await pane.locator('#supReplyResolve').click();
+    await expect(page.locator('.dds-toast')).toContainText('Resolved');
+    expect(calls).toEqual([
+      { method: 'POST', path: '/support/s-1/messages', body: { body: 'Done — bigger logo is live.' } },
+      { method: 'PATCH', path: '/support/s-1', body: { status: 'resolved' } },
+    ]);
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+  });
+
+  test('"Make it a task" files the request on its project through POST /projects/:id/tasks', async ({ page }) => {
+    let posted: { path: string; body: unknown } | null = null;
+    await installApp(page, { api: { ...API, '/portal/feed': WITH_PROJECT } });
+    await page.route('**/functions/v1/presence/projects/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      posted = { path: new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body: route.request().postDataJSON() };
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'tk-9' } }) });
+    });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const btn = page.locator('#rpane #supTask');
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(btn).toHaveText('Task added ✓');
+    expect(posted!.path).toBe(`/projects/${PROJ}/tasks`);
+    expect(posted!.body).toEqual({ title: 'Logo tweak', client_visible: false });
+  });
+
+  test('a request already resolved shows no triage buttons', async ({ page }) => {
+    const RESOLVED = { data: { ...API['/support/s-1'].data, request: { ...API['/support/s-1'].data.request, status: 'resolved' } } };
+    await installApp(page, { api: { ...API, '/support/s-1': RESOLVED } });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await expect(pane.locator('#paneStatusChip')).toHaveText('Resolved');   // the server's status wins over the feed's
+    await expect(pane.locator('#supReplyResolve')).toHaveCount(0);
+  });
+});
+
+// ── the Website and Needs-your-OK views by hash: the retired Website attention and
+//    Approvals pages land here (Oct 2026 workflow audit, change 1) ─────────────────
+test.describe('Inbox — views by hash', () => {
+  test('#website shows what the site needs: approvals, its enquiries, its notices — not client messages', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#website');
+    await expect(page.locator('#viewBtn')).toContainText('Website');
+    const rows = page.locator('#rows');
+    await expect(rows).toContainText('Protect your email');
+    await expect(rows).toContainText('Sam Rivera');
+    await expect(rows).toContainText('A quote request is waiting for a reply');
+    await expect(rows).not.toContainText('Logo tweak');
+    await expect(rows).not.toContainText('Milestone reached');
+  });
+  test('#ok opens on Needs your OK', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#ok');
+    await expect(page.locator('#viewBtn')).toContainText('Needs your OK');
+    await expect(page.locator('#rows').getByRole('option')).toHaveCount(1);
+    await expect(page.locator('#rows').getByRole('option').first()).toContainText('Protect your email');
+  });
+  test('the view menu lists Website', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#viewBtn').click();
+    await expect(page.locator('#viewMenu [data-view="website"]')).toHaveText('Website');
+  });
+});
+
+// ── Oct 2026 workflow audit, change 5: an enquiry is answered from the Inbox itself ──
+test.describe('Inbox — reply to an enquiry in place', () => {
+  test('the enquiry pane has a composer; Send reply POSTs to /forms/inbox/:id/reply', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/forms/inbox/l-9/reply': { data: { sent: true, status: 'replied' } } } });
+    await page.goto('/inbox.html#enquiries');
+    await page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' }).click();
+    const ta = page.getByRole('textbox', { name: 'Reply to Sam Rivera' });
+    await expect(ta).toHaveValue(/^Hi Sam,/);
+    await expect(page.getByRole('link', { name: 'Use your email app instead' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
+    await ta.fill('Hi Sam — yes, we do patios. Can you send a photo?');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l-9\/reply$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send reply' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Hi Sam — yes, we do patios. Can you send a photo?' });
+    await expect(page.locator('.lreply')).toContainText('Can you send a photo?');
+  });
+
+  // Oct 2026 audit, gap 2: the lead_followup notice deep-links its row, so the
+  // reply is one click from the nudge (Take care of it → Send reply), not two.
+  test('#enquiries?sel=lead:<id> opens that enquiry on arrival — composer ready, row selected, no click', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#enquiries?sel=lead:l-9');
+    await expect(page.getByRole('textbox', { name: 'Reply to Sam Rivera' })).toHaveValue(/^Hi Sam,/);
+    // (a CSS locator: on phones the open pane hides the list, which drops its rows from the a11y tree)
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toHaveCount(1);
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toContainText('Sam Rivera');
+    await expect(page.locator('#viewBtn')).toContainText('Enquiries');   // the view part of the hash still lands
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeVisible();
+  });
+
+  test('a ?sel= that names no row is ignored — the view opens as before, nothing invented', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#enquiries?sel=lead:nope');
+    await expect(page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' })).toHaveAttribute('aria-selected', 'false');
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toHaveCount(0);
+    await expect(page.locator('#viewBtn')).toContainText('Enquiries');
+  });
+});
+

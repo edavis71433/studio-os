@@ -26,6 +26,7 @@ export interface NavContext {
   isOperator: boolean;          // staff/system (operator)
   editionKey?: EditionKey;      // Phase D: the FEATURE edition; when absent, all features (today's behavior)
   isManagedClient?: boolean;    // the caller is an agency's CLIENT signed into their OWN (bridged) site — client experience, not operator tools
+  scoped?: boolean;             // Phase 1 overhaul: an agency operator drilled INTO a client (x-dds-scope-site set) — the client's Website is primary there
 }
 
 const has = (c: NavContext, cap: SiteCapability) => c.capabilities.includes(cap);
@@ -65,37 +66,70 @@ export function buildNav(c: NavContext): NavSection[] {
   const single = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }] });
   const utility = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }], utility: true });
 
-  // Today — the calm home
-  if (f.hasBusinessOS) single('today', 'Today', '/today.html');
+  // Phase 1 overhaul / Oct 2026 studio audit: an AGENCY member at studio level
+  // (not drilled into a client) lands on agency.html, which is their home AND
+  // their one roster — so Today leaves their primary bar (it stays for a drilled-in
+  // client as "Their Today") and the Customers item opens the studio home.
+  const studioLevel = !!c.isAgency && !c.scoped;
 
-  // Website — one home; its contents are sub-items (internally: the CMS)
-  if (f.hasWebsite) {
-    const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
+  // Today — the calm home
+  if (f.hasBusinessOS && !studioLevel) single('today', 'Today', '/today.html');
+
+  // Website — one home; its contents are sub-items (internally: the CMS).
+  // Phase 1 overhaul: for an AGENCY operator at studio level the primary bar is
+  // the studio's work (customers, pipeline, projects, inbox); their OWN marketing
+  // site moves to the overflow menu as "Your website". Drilled into a client, or
+  // for any non-agency owner, the Website stays primary — it is their product.
+  const websiteItems = (): NavItem[] => {
+    // the desc keeps "health" findable from ⌘K (website-health.html retired; the
+    // Health check is a card on this overview — Oct 2026 audit, gap 3).
+    const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' }];
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
-    if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
-    if (canPublish(c)) website.push({ key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' });
+    // the two jobs the audit found unfindable (⌘K "domain"/"page" → nothing): named, one click away
+    if (canDraft(c)) website.push({ key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', desc: 'A new page on your site — pick a layout or start blank.' });
+    if (canPublish(c)) website.push({ key: 'domain', label: 'Domain & email', href: '/presence.html#domain', desc: 'Put your site on your own domain (yourbusiness.com); email records and the padlock.' });
+    // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
+    // the desc keeps "schedule" findable from ⌘K, which matches on desc).
+    if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish', desc: 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.' });
     if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
-    sections.push({ key: 'website', label: 'Website', items: website });
-  }
+    return website;
+  };
+  if (f.hasWebsite && !studioLevel) sections.push({ key: 'website', label: 'Website', items: websiteItems() });
 
-  // Customers — the relationship area (internally: the CRM). Leads + the P2-C
-  // sales Pipeline fold in here as sub-items (the primary bar stays outcomes-only).
-  // FIX 6: the primary "Customers" item opens the ROSTER of this studio's customers
-  // (customers.html), not the single-client CRM detail (which un-scoped showed the
-  // owner his OWN profile). Opening a customer from the roster re-scopes into them.
+  // Customers — the relationship area (internally: the CRM): the roster, the
+  // people, broadcasts. FIX 6: the primary "Customers" item opens
+  // the ROSTER (customers.html), not the single-client record. Opening a customer
+  // from the roster lands on the record hub (crm.html).
   if (f.hasRelationship) {
-    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html' }];
-    customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html' });
-    customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html' });
-    customers.push({ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' });
+    // Oct 2026 studio audit, change 3 (one home, one roster): for an agency at
+    // studio level the Customers item IS the studio home — every client with what
+    // needs you today and your studio's money — and customers.html forwards there.
+    const customers: NavItem[] = [studioLevel
+      ? { key: 'customers', label: 'Customers', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, and your money.' }
+      : { key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
+    // Oct 2026 studio audit, change 4: onboarding a client is findable from ⌘K
+    // ("add", "client", "new") — agency.html opens its Add-a-customer dialog on #add.
+    if (studioLevel) customers.push({ key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.' });
+    customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html', desc: 'The people — one may belong to a customer.' });
+    // Enquiries folded into the Inbox (Oct 2026 workflow audit, change 5) — the
+    // Inbox's desc says "new enquiries", so ⌘K still finds them there.
     customers.push({ key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
 
+  // Pipeline — the sales deals, as its own top-level outcome (Phase 1 overhaul:
+  // it was a sub-item under Customers, which hid where the money lived).
+  if (f.hasRelationship) single('pipeline', 'Pipeline', '/pipeline.html', 'Deals by stage — proposals, agreements and payments move through here.');
+
   // Projects — the service-delivery area (P2-D): the work you do FOR customers.
   // A first-class outcome; its tasks/files/messages/approvals live on the project.
   if (f.hasRelationship) single('projects', 'Projects', '/projects.html');
+
+  // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
+  // Everything below in "Focused views" is just a narrower cut of this same data —
+  // the label + desc make Inbox read as the primary, the rest as optional lenses.
+  single('inbox', 'Inbox', '/inbox.html', 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.');
 
   // Files — the business library (internally: the DAM). Photos, brand, documents,
   //  downloads — plus AI-generated assets via Visual Studio.
@@ -109,45 +143,28 @@ export function buildNav(c: NavContext): NavSection[] {
   //  (internally: Analytics/reporting). Reserved home; the later phase enriches it.
   if (f.hasReports) single('analytics', 'Analytics', '/analytics.html');
 
-  // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
-  // Everything below in "Focused views" is just a narrower cut of this same data —
-  // the label + desc make Inbox read as the primary, the rest as optional lenses.
-  single('inbox', 'Inbox', '/inbox.html', 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.');
+  // Studio — the agency scope. Since Oct 2026 (one home, one roster) the studio
+  // home is the Customers item above; an agency edition WITHOUT the relationship
+  // feature still needs a way to its portfolio, so only then does Studio render.
+  if (f.hasAgency && studioLevel && !f.hasRelationship) single('studio', 'Studio', '/agency.html');
 
-  // Studio — the agency scope (agency roles only); open a client to re-scope
-  if (f.hasAgency && c.isAgency) single('studio', 'Studio', '/agency.html');
+  // The agency's OWN website, out of the primary bar (overflow menu + ⌘K).
+  if (f.hasWebsite && studioLevel) sections.push({ key: 'website', label: 'Your website', items: websiteItems(), utility: true });
 
-  // ── Deeper views (profile/overflow menu + ⌘K, never the primary bar) ─────────
-  // Every capability stays reachable — nothing is retired. The old single long
-  // "More views" list was the confusion, so it's split into two clearly-named,
-  // purpose-labelled groups. Nothing here competes with the Inbox: the first group
-  // is explicitly focused CUTS of the Inbox, the second is calm read-outs you look
-  // at on purpose (history / what's ahead / understanding), never a to-do.
-  if (has(c, 'view_all')) {
-    // Group 1 — focused cuts of the Inbox (the same "needs you" data, one lens).
-    const focus: NavItem[] = [];
-    if (f.hasBusinessOS || f.hasWebsite) {
-      focus.push({ key: 'attention', label: 'Website attention', href: '/attention.html', desc: 'Just your website’s to-dos — the website-only slice of your Inbox.' });
-      focus.push({ key: 'approval_center', label: 'Approvals', href: '/approval-center.html', desc: 'Only the things waiting for your go-ahead before they go live.' });
-    }
-    if (focus.length) sections.push({ key: 'focus_views', label: 'Focused views', items: focus, utility: true });
-
-    // Group 2 — calm read-outs: understand the business, look back, look ahead.
-    const lenses: NavItem[] = [];
-    if (f.hasWebsite) lenses.push({ key: 'view_content_tree', label: 'Website map', href: '/content-tree.html', desc: 'Every page and section of your site, laid out as one simple tree.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html', desc: 'A plain-English check-up of your live site.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_timeline', label: 'Website story', href: '/timeline.html', desc: 'A plain-English history of everything that’s happened to your site.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_snapshots', label: 'Version history', href: '/snapshot-history.html', desc: 'Past saved versions of your site you can look back on or restore.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_upcoming', label: 'What’s coming next', href: '/upcoming.html', desc: 'Scheduled and expected changes — a calm look ahead, nothing guessed.' });
-    if (f.hasBusinessOS) lenses.push({ key: 'view_insights', label: 'Business insights', href: '/business-insights.html', desc: 'Plain observations about how your business is doing — only what we can measure.' });
-    if (lenses.length) sections.push({ key: 'views', label: 'Understand your site', items: lenses, utility: true });
-  }
+  // Oct 2026 workflow audit, changes 1–2: the overflow's "Focused views" and
+  // "Understand your site" lens pages are gone — each showed data that already
+  // had a home. Website attention / Approvals → Inbox #website / #ok; Version
+  // history → Website › History; What's coming next → Today; Business insights
+  // → Analytics; Website health, Website map and Website story → cards on the
+  // Website overview (#health, #pages, #activity). The old URLs forward there.
 
   // Connections — integrations (the connected services)
   if (f.hasConnected) utility('connections', 'Connections', '/connections.html');
 
   // Settings — account, sharing/access, developer (Billing lives here, per the constitution)
-  const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
+  // Oct 2026 review: Settings is its own page (one load, eight cards) — the old
+  // /presence.html#settings deep link still routes to the builder's Business view.
+  const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/settings.html' }];
   if (f.hasClientPortal && has(c, 'invite')) settings.push({ key: 'sharing', label: 'Sharing & access', href: '/sharing.html' });
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
   sections.push({ key: 'settings', label: 'Settings', items: settings, utility: true });

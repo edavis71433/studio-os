@@ -67,7 +67,7 @@ test.describe('Pipeline table view', () => {
     await expect(page.locator('#table th[aria-sort="descending"]')).toContainText('Deal');
     await expect(page.locator('#table tbody tr').first()).toContainText('Beta rebrand');
     // the summary strip and stage filter chips survive alongside the table
-    await expect(page.locator('#summary')).toContainText('Open:');
+    await expect(page.locator('#summary')).toContainText('Open');
     await expect(page.locator('#filters .chip').first()).toBeVisible();
   });
 
@@ -667,8 +667,8 @@ test.describe('Deal drawer Path', () => {
     const guide = page.locator('#pathHost .path-guide');
     await expect(guide).toContainText('Your proposal is with them — a gentle nudge often seals it.');   // tip
     await expect(guide).toContainText('Follow up, then send the agreement once they say yes');          // action
-    // forward is the brand "Mark Stage as Complete" button
-    await expect(page.locator('#markComplete')).toContainText('Mark Stage as Complete');
+    // forward is the brand "Mark stage complete" button (sentence case, Oct 2026 experience review)
+    await expect(page.locator('#markComplete')).toContainText('Mark stage complete');
     // "Mark as lost" stays the separate quiet action, outside the Path
     await expect(page.locator('#markLost')).toContainText('Mark as lost');
   });
@@ -687,7 +687,7 @@ test.describe('Deal drawer Path', () => {
     await expect(page.locator('#pathHost .path-confirm')).toHaveCount(0);
   });
 
-  test('Mark Stage as Complete advances via the existing stage POST', async ({ page }) => {
+  test('Mark stage complete advances via the existing stage POST', async ({ page }) => {
     let stagePost = '';
     await installApp(page, { api: API });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, async (route) => {
@@ -839,7 +839,7 @@ test.describe('deal page — Contact block (ask 2)', () => {
     await installApp(page, { api: CONTACT_API });
     await page.route(`**/functions/v1/presence/sales/contracts/k-1/send`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://example.test/sign/abc', emailed: false }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.goto(`/pipeline.html?deal=${DEAL3}&dtab=billing`);
     await page.locator('[data-send-contract="k-1"]').first().click();
     const toast = page.locator('.dds-toast');
     await expect(toast).toContainText('there’s no client email on this deal, so nothing was sent');
@@ -1002,11 +1002,16 @@ test.describe('services catalog — starter list (ask 1)', () => {
   });
 });
 
+// NOTE (Oct 2026 review): the deal page groups its sections under Overview ·
+// Billing · Activity tabs; every id/data-* hook below is unchanged, but the
+// proposal / agreement / invoice / convert controls live on the Billing tab, so
+// the tests that act on them open the deal at `&dtab=billing` (the deep link the
+// page's own openers use). Hidden-tab content still exists in the DOM.
 // ── CRM deal page (ask 4): the studio's real agreement is the default ────────
 test.describe('agreement form — the studio’s standard contract (ask 4)', () => {
   test('an empty agreement form opens with the real 19-section agreement, placeholders FILLED', async ({ page }) => {
     await installApp(page, { api: API });                                      // '/sales/templates': { data: [] } → no saved templates
-    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect(body).toBeVisible();
@@ -1041,7 +1046,7 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
     await installApp(page, { api: { ...API, '/sales/templates': saved } });
     await page.route('**/functions/v1/presence/sales/templates?with_body=contract', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: 'tpl-1', name: 'My agreement', title: 'My agreement', body: 'MY OWN WORDING for {{client_company}} — {{deal_value}}.' }] }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect.poll(async () => await body.inputValue(), { timeout: 7000 }).toContain('MY OWN WORDING');
@@ -1053,7 +1058,7 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
   test('a deal with no value and no contact degrades readably — no {{tokens}}, no misleading $0', async ({ page }) => {
     const BARE = { data: { ...CONTACTLESS.data, deal: { ...CONTACTLESS.data.deal, expected_value_cents: 0, title: '' }, contracts: [] } };
     await installApp(page, { api: { ...API, [`/sales/deals/${DEAL3}`]: BARE, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } } });
-    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.goto(`/pipeline.html?deal=${DEAL3}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect.poll(async () => (await body.inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
@@ -1102,7 +1107,7 @@ test.describe('deal page — remove an unsent draft', () => {
       calls.push({ path, method: route.request().method() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
 
     // the draft row carries a Delete; the sent row carries none
     await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();
@@ -1132,7 +1137,7 @@ test.describe('deal page — remove an unsent draft', () => {
       calls.push({ path, method: route.request().method() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
 
     await expect(page.locator('[data-del-con="k-draft"]')).toBeVisible();
     await expect(page.locator('[data-del-con="k-signed"]')).toHaveCount(0);
@@ -1152,7 +1157,7 @@ test.describe('deal page — remove an unsent draft', () => {
       if (route.request().method() !== 'DELETE') return route.fallback();
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
     page.once('dialog', (d) => d.accept());
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('already sent');
@@ -1182,7 +1187,7 @@ const seeded = async (page: import('@playwright/test').Page) => {
 test.describe('agreement — one per package', () => {
   test('the form asks which package, defaults to the first, and seeds Growth with the deal’s fees', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
 
     // the chooser offers every shipped package, in order, and defaults sensibly
@@ -1214,7 +1219,7 @@ test.describe('agreement — one per package', () => {
 
   test('choosing Custom + Photography swaps to that agreement, scope and all', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await page.locator('#conPkg').selectOption('custom_photography');
@@ -1234,7 +1239,7 @@ test.describe('agreement — one per package', () => {
 
   test('choosing Template build seeds the published tier — SEO stays a bracketed option, never a promise', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await page.locator('#conPkg').selectOption('template_build');
@@ -1253,7 +1258,7 @@ test.describe('agreement — one per package', () => {
 
   test('the legal terms are byte-identical whichever package is chosen', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const growth = await seeded(page);
     await page.locator('#conPkg').selectOption('custom_photography');
@@ -1265,7 +1270,7 @@ test.describe('agreement — one per package', () => {
 
   test('switching away from words HE typed asks first; declining keeps them', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await conBody(page).fill('MY OWN WORDING, typed by hand.');
@@ -1293,7 +1298,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     let msg = '';
@@ -1310,7 +1315,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     page.once('dialog', (d) => d.accept());
@@ -1325,7 +1330,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const text = await seeded(page);
     await conBody(page).fill(text.replace(/\[[A-Z]{2}[^\]\n]*\]/g, 'Squarespace'));
@@ -1341,7 +1346,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: withBlanks } });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     let msg = '';
     page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
     await page.locator('[data-send-contract="k-blank"]').first().click();
@@ -1359,7 +1364,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: done } });
     await postsTo(page, calls);
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('[data-send-contract="k-done"]').first().click();
     await expect.poll(() => calls).toContain('/sales/contracts/k-done/send');
     expect(dialogs).toBe(0);
@@ -1418,7 +1423,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
       saved = route.request().postData() || '';
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { term_end: '2027-07-15' } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     await expect(page.locator('#detailInner')).toContainText('reads as a 12-month term');
     await expect(page.locator('#con-term-k-sg')).toHaveValue('2027-07-15');      // signed 2026-07-15 + 12 months
     expect(saved).toBe('');                                                      // NOTHING was written yet — the default is only a prefill
@@ -1441,7 +1446,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
     await page.route('**/functions/v1/presence/sales/contracts/k-dr/send', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-dr', status: 'sent' }, url: 'https://example.test/sign/x', emailed: true, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     await page.locator('[data-send-contract="k-dr"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('deposit request is ready — they can pay the moment they sign');
     expect(dialogs).toBe(0);                                                     // a valued deal warns about nothing
@@ -1457,7 +1462,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
       calls.push(new URL(route.request().url()).pathname);
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     let msg = '';
     page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
     await page.locator('[data-send-contract="k-bl"]').first().click();
@@ -1465,6 +1470,105 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     expect(msg).toContain('the deal has no value set');
     expect(msg).toContain('the deposit request will make itself when you send');
     expect(calls).toHaveLength(0);                                               // declining sends nothing at all
+  });
+});
+
+// ── ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ──────────
+// With BOTH a proposal and an agreement drafted on an open deal, the drawer's
+// Billing shows ONE "Send proposal & agreement" (POST /sales/deals/:id/send —
+// one email, one page: accept → sign → pay). The row sends and Request a
+// deposit move under More ▾; the agreement's blanks guards still run.
+const DEAL8 = '88888888-8888-4888-8888-888888888888';
+const bothDeal = (over: Record<string, unknown> = {}) => ({ data: {
+  deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'qualified', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [{ id: 'p-b', title: 'Website build', status: 'draft', version: 1, line_items: [{ label: 'Build', qty: 1, unit_cents: 500000 }], first_viewed_at: null, expires_at: null }],
+  contracts: [{ id: 'k-b', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'A non-refundable deposit of 50% of the total project fee is due before work begins.' }],
+  events: [], timeline: [], invoices: [], last_contacted_at: null, ...over,
+} });
+const bothApi = (over: Record<string, unknown> = {}) => ({ ...API, [`/sales/deals/${DEAL8}`]: bothDeal(over), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } });
+
+test.describe('deal drawer — one "Send proposal & agreement"', () => {
+  test('both drafted: one filled send, the row sends under More ▾, the rows keep their chips and other actions', async ({ page }) => {
+    await installApp(page, { api: bothApi() });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    const band = page.locator('#sendBoth');
+    await expect(band).toBeVisible();
+    await expect(band).toContainText('Sam Rivera accepts, signs, then pays the deposit on one page.');
+    await expect(page.locator('#sendBothBtn')).toHaveText('Send proposal & agreement to Sam Rivera →');
+    // the rows: chip + View / print + Delete stay; their own Send is gone
+    await expect(page.locator('.lr [data-send-proposal="p-b"]')).toHaveCount(0);
+    await expect(page.locator('.lr [data-send-contract="k-b"]')).toHaveCount(0);
+    await expect(page.locator('.lr .stage', { hasText: 'Draft — not sent yet' })).toHaveCount(2);
+    await expect(page.locator('[data-doc-prop="p-b"]')).toBeVisible();
+    await expect(page.locator('[data-del-con="k-b"]')).toBeVisible();
+    // More ▾ — the per-document sends + Request a deposit, with the menu-button contract
+    const more = page.locator('#sendMore');
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#sendMoreMenu')).toBeHidden();
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    const menu = page.locator('#sendMoreMenu');
+    await expect(menu.locator('[data-send-proposal="p-b"]')).toHaveText('Send the proposal only');
+    await expect(menu.locator('[data-send-contract="k-b"]')).toHaveText('Send the agreement only');
+    await expect(menu.locator('#moreDeposit')).toHaveText('Request a deposit');
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(more).toBeFocused();
+    // Request a deposit from More opens the deposit mini-form in the invoice section
+    await more.click();
+    await menu.locator('#moreDeposit').click();
+    await expect(page.locator('#invForm #mf-amount')).toBeVisible();
+  });
+
+  test('the one button POSTs /sales/deals/:id/send with both ids; the toast names the client and the minted deposit', async ({ page }) => {
+    let dialogs = 0;
+    await installApp(page, { api: bothApi() });
+    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { proposal: { id: 'p-b', status: 'sent' }, contract: { id: 'k-b', status: 'sent' }, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }, url: 'https://example.test/sign.html?t=flow', emailed: true, sent: { proposal: true, contract: true } }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/sales/deals/${DEAL8}/send`));
+    await page.locator('#sendBothBtn').click();
+    expect(JSON.parse((await posted).postData() || '{}')).toEqual({ proposal_id: 'p-b', contract_id: 'k-b' });
+    // one toast carries both facts (it is brief — read it in one go)
+    await expect(page.locator('.dds-toast')).toContainText('Proposal and agreement sent — emailed to Sam Rivera. A $2,500 deposit request is ready — they can pay the moment they sign.');
+    expect(dialogs).toBe(0);                                                     // a complete, valued agreement warns about nothing
+  });
+
+  test('the agreement’s blanks guard runs on the combined send too — declining sends nothing at all', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: bothApi({ contracts: [{ id: 'k-bl', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'Pages: [LIST THE FIVE CORE PAGES]. A deposit is due at signing.' }] }) });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      if (route.request().method() === 'GET') return route.fallback();
+      calls.push(new URL(route.request().url()).pathname);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await page.locator('#sendBothBtn').click();
+    await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks, then send it.');
+    expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
+    expect(calls).toHaveLength(0);
+  });
+
+  test('with no client email the combined send says exactly why, and copies the link', async ({ page }) => {
+    await installApp(page, { api: bothApi({ contact: null, deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'qualified', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: null, converted_client_id: null, retainer: null } }) });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { deposit: { minted: false } }, url: 'https://example.test/sign.html?t=flow', emailed: false, sent: { proposal: true, contract: true } }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await page.locator('#sendBothBtn').click();
+    const toast = page.locator('.dds-toast');
+    await expect(toast).toContainText('Proposal and agreement prepared — there’s no client email on this deal, so nothing was sent.');
+    await expect(toast).toContainText('Add their email in Details');
+  });
+
+  test('a won deal, or only one document drafted, never shows the combined send', async ({ page }) => {
+    await installApp(page, { api: bothApi({ proposals: [] }) });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(page.locator('#sendBoth')).toHaveCount(0);
+    await expect(page.locator('.lr [data-send-contract="k-b"]')).toBeVisible();   // the agreement's own Send stands
   });
 });
 
@@ -1501,7 +1605,7 @@ test.describe('invoice — the Void control', () => {
 
   test('Void is offered on an OPEN invoice — sent or not — and never on a paid or already-voided one', async ({ page }) => {
     await installApp(page, { api: invApi([OPEN_SENT, OPEN_UNSENT, PAID, VOIDED]) });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     // The already-emailed invoice is exactly the one that needs withdrawing.
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
     await expect(page.locator(`[data-void-inv="${INV_UNSENT}"]`)).toBeVisible();
@@ -1516,7 +1620,7 @@ test.describe('invoice — the Void control', () => {
 
   test('the existing "Voided" render displays correctly now a row can reach that state', async ({ page }) => {
     await installApp(page, { api: invApi([VOIDED]) });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     const row = page.locator('.lr').filter({ hasText: 'Duplicate build' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('Voided');
@@ -1549,7 +1653,7 @@ test.describe('invoice — the Void control', () => {
       }
       return route.fallback();
     });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     // Destructive → confirms first, and declining sends nothing.
@@ -1577,12 +1681,13 @@ test.describe('invoice — the Void control', () => {
       if (route.request().method() !== 'POST') return route.fallback();
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     page.once('dialog', (d) => d.accept());
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
-    // Nothing was hidden on a refusal — the invoice is still there and still sendable.
-    await expect(page.locator('.lr').filter({ hasText: 'Website build' })).toContainText('Awaiting payment');
+    // Nothing was hidden on a refusal — the invoice is still there, still waiting
+    // (its chip is the money state word now, not "Awaiting payment"), still sendable.
+    await expect(page.locator('.lr').filter({ hasText: 'Website build' }).locator('.stage')).toHaveText('Upcoming');
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeEnabled();
   });
 });
@@ -1731,5 +1836,271 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await expect.poll(() => calls).toContain(`/sales/invoices/${RINV1}/send`);
     // The re-read leaves both rows — a resend changes nothing to hide.
     await expect(page.locator('.rcv-row')).toHaveCount(2);
+  });
+});
+
+// ── Oct 2026 benchmark (item 2): money in four states on this page too ───────
+// PR #31 gave client.html / today.html / crm.html ONE formula (lib/money_state.ts,
+// mirrored verbatim, pinned byte-identical by tests/presence/money_state_test.mjs)
+// for Paid · Processing · Upcoming · Overdue. This page's two invoice surfaces —
+// the drawer's "Invoice & deposit" rows and the "Who owes you" list — still
+// printed the raw status word ("Awaiting payment", a lowercase "overdue" pill)
+// and offered Resend / Copy link / Void on a settling payment the server already
+// 409s. Now both wear the one chip in its one tone, "overdue" is judged on the
+// studio's local day, and a processing row has no Send/Resend · Copy link · Void
+// — the client already paid; the money is on its way.
+const DEAL10 = '10101010-1010-4010-8010-101010101010';
+const M_PAID = 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbbb';
+const M_PROC = 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbbb';
+const M_UP = 'bbbbbbb3-3333-4333-8333-bbbbbbbbbbbb';
+const M_OVER = 'bbbbbbb4-4444-4444-8444-bbbbbbbbbbbb';
+const M_VOID = 'bbbbbbb5-5555-4555-8555-bbbbbbbbbbbb';
+const futureDay = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+const MONEY_INVOICES = [
+  { id: M_PAID, title: 'Discovery', amount_cents: 90000, purpose: 'service', status: 'paid', stripe_url: 'https://pay.example/p', due_date: null, paid_at: past(2), processing_since: null },
+  // due three days ago, but the client paid on Stripe and the ACH is settling — settling beats late
+  { id: M_PROC, title: 'Deposit', amount_cents: 160000, purpose: 'deposit', status: 'open', stripe_url: 'https://pay.example/d', due_date: pastDay(3), paid_at: null, processing_since: past(0) },
+  { id: M_UP, title: 'Balance', amount_cents: 160000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/b', due_date: futureDay(5), paid_at: null, processing_since: null },
+  { id: M_OVER, title: 'Hosting', amount_cents: 12000, purpose: 'service', status: 'open', stripe_url: null, due_date: pastDay(1), paid_at: null, processing_since: null },
+  { id: M_VOID, title: 'Duplicate', amount_cents: 12000, purpose: 'service', status: 'void', stripe_url: null, due_date: null, paid_at: null, processing_since: null },
+];
+// the receivables read ships the open rows as the server composes them (status,
+// processing_since, its UTC `state`) — the page re-runs the mirror on its own day
+const MONEY_RCV = MONEY_INVOICES.filter((i) => i.status === 'open').map((i) => ({
+  id: i.id, title: i.title, amount_cents: i.amount_cents, due_date: i.due_date, status: 'open', processing_since: i.processing_since,
+  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL10, deal: 'Harbor Dental', stripe_url: i.stripe_url,
+}));
+const MONEY_API = {
+  ...API,
+  [`/sales/deals/${DEAL10}`]: { data: {
+    deal: { id: DEAL10, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
+    contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Harbor Dental', notes: '' },
+    proposals: [], contracts: [], events: [], timeline: [], invoices: MONEY_INVOICES, last_contacted_at: past(1),
+  } },
+  [`/sales/deals/${DEAL10}/tasks`]: { data: [] },
+  '/sales/summary': { data: {
+    total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
+    by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
+    ar: { outstanding_cents: 172000, count: 2, overdue_cents: 12000, overdue_count: 1, processing_cents: 160000, processing_count: 1 },
+  } },
+  '/sales/receivables': { data: { items: MONEY_RCV, total_cents: 172000, overdue_cents: 12000, processing_cents: 160000 } },
+};
+
+test.describe('money in four states — the drawer rows and the "Who owes you" list', () => {
+  test('every row wears Paid · Processing · Upcoming · Overdue from the one formula, and a processing row has no Resend / Copy link / Void', async ({ page }) => {
+    await installApp(page, { api: MONEY_API });
+    await page.goto(`/pipeline.html?deal=${DEAL10}&dtab=billing`);
+    const row = (t: string) => page.locator('#detailInner .lr').filter({ hasText: t });
+    // the chip is the state word in its one tone — never the raw status word
+    await expect(row('Discovery').locator('.stage')).toHaveText('Paid');
+    await expect(row('Discovery').locator('.stage')).toHaveClass(/\bgood\b/);
+    await expect(row('Deposit').locator('.stage')).toHaveText('Processing');
+    await expect(row('Deposit').locator('.stage')).toHaveClass(/\binfo\b/);
+    await expect(row('Balance').locator('.stage')).toHaveText('Upcoming');
+    await expect(row('Balance').locator('.stage')).not.toHaveClass(/\b(good|info|bad)\b/);
+    await expect(row('Hosting').locator('.stage')).toHaveText('Overdue');
+    await expect(row('Hosting').locator('.stage')).toHaveClass(/\bbad\b/);
+    await expect(row('Duplicate').locator('.stage')).toHaveText('Voided');
+    await expect(page.locator('#detailInner')).not.toContainText('Awaiting payment');
+    // the processing row: the client paid — nothing to resend, copy or void (the
+    // server 409s all three); the printable copy stays, and no "due now" nag
+    const proc = row('Deposit');
+    await expect(proc).toContainText('payment on its way');
+    await expect(proc).not.toContainText('due');
+    await expect(proc.locator(`[data-send-inv="${M_PROC}"]`)).toHaveCount(0);
+    await expect(proc.locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(proc.locator(`[data-void-inv="${M_PROC}"]`)).toHaveCount(0);
+    await expect(proc.locator(`[data-doc-inv="${M_PROC}"]`)).toBeVisible();
+    // the waiting rows keep the drawer's rules: sent → Resend + Copy link + Void;
+    // never sent (and overdue) → Send + Void, no link to copy
+    await expect(row('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
+    await expect(row('Balance').locator('[data-copy-pay]')).toHaveAttribute('data-copy-pay', 'https://pay.example/b');
+    await expect(row('Balance').locator(`[data-void-inv="${M_UP}"]`)).toBeVisible();
+    await expect(row('Hosting').locator(`[data-send-inv="${M_OVER}"]`)).toHaveText('Send');
+    await expect(row('Hosting')).toContainText('not sent yet');
+    await expect(row('Hosting').locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(row('Hosting').locator(`[data-void-inv="${M_OVER}"]`)).toBeVisible();
+    // paid and void rows: no chase controls either (as before)
+    await expect(row('Discovery').locator('[data-void-inv], [data-send-inv]')).toHaveCount(0);
+    await expect(row('Duplicate').locator('[data-void-inv], [data-send-inv]')).toHaveCount(0);
+    // the Overview Money card: Outstanding is what still WAITS (upcoming + overdue);
+    // the settling payment rides along as processing, never inside the total
+    await page.locator('#detailInner .tabs [data-dtab="overview"]').click();
+    const money = page.locator('#dpanel-overview .dkv');
+    await expect(money).toContainText('Outstanding $1,720 · 2 invoices');
+    await expect(money).toContainText('$1,600 processing');
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"] .n')).toHaveText('3 open');
+
+    // "Who owes you": the same chips by the same rule, and the header says what's settling.
+    // The Outstanding tile's sub is at its longest here — "2 invoices · $120 overdue ·
+    // $1,600 processing · see who →" — and it wraps rather than ellipsising, so a real
+    // tap lands on the link on the phone and tablet too (not just a dispatched click).
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#arOpen')).toBeInViewport({ ratio: 1 });
+    await page.locator('#arOpen').click();
+    await expect(page.locator('#detailInner')).toContainText('Who owes you');
+    await expect(page.locator('#detailInner .dhead')).toContainText('Outstanding: $1,720 · $120 overdue · $1,600 processing');
+    const rc = (t: string) => page.locator('.rcv-row').filter({ hasText: t });
+    await expect(rc('Deposit').locator('.stage')).toHaveText('Processing');
+    await expect(rc('Deposit').locator('.stage')).toHaveClass(/\binfo\b/);
+    await expect(rc('Balance').locator('.stage')).toHaveText('Upcoming');
+    await expect(rc('Hosting').locator('.stage')).toHaveText('Overdue');
+    await expect(rc('Hosting').locator('.stage')).toHaveClass(/\bbad\b/);
+    await expect(page.locator('.rcv-row .pill')).toHaveCount(0);   // the old lowercase "overdue" pill is gone
+    // the processing row: Open deal only
+    await expect(rc('Deposit')).toContainText('payment on its way');
+    await expect(rc('Deposit').locator('[data-send-inv], [data-copy-pay], [data-void-inv]')).toHaveCount(0);
+    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL10}"]`)).toBeVisible();
+    // the waiting rows keep chasing
+    await expect(rc('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
+    await expect(rc('Balance').locator('[data-copy-pay]')).toHaveCount(1);
+    await expect(rc('Balance').locator(`[data-void-inv="${M_UP}"]`)).toBeVisible();
+    await expect(rc('Hosting').locator(`[data-send-inv="${M_OVER}"]`)).toHaveText('Send');
+    await expect(rc('Hosting').locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(rc('Hosting').locator(`[data-void-inv="${M_OVER}"]`)).toBeVisible();
+  });
+});
+
+// ── Oct 2026 review: the deal page's tab strip ───────────────────────────────
+// Overview (details · to-dos · a Money card) · Billing (proposals, agreement,
+// invoices, retainer, convert) · Activity (quick-log + timeline). Every section
+// is still rendered — the tabs only toggle `hidden` — the URL mirrors the tab
+// (?dtab=), and the openers that live outside the strip switch tab first.
+const WON_DEAL = '88888888-8888-4888-8888-888888888888';
+const WON_DETAIL = { data: {
+  deal: { id: WON_DEAL, title: 'Bacchus rebuild', stage: 'won', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-bacchus', created_project_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Claud Beltran', email: 'claud@example.com', phone: '', company: 'Bacchus', notes: '' },
+  proposals: [], contracts: [{ id: 'k-w', title: 'Service agreement', status: 'signed', signer_name: 'Claud Beltran', signed_at: '2026-08-08T10:00:00.000Z', version: 1, terms_snapshot: { term_end: '2027-08-08' }, body: 'Agreed.' }],
+  events: [], timeline: [{ at: '2026-08-08T10:00:00.000Z', text: 'Agreement signed', icon: '✍️' }, { at: '2026-08-01T10:00:00.000Z', text: 'Proposal sent', icon: '📄' }],
+  invoices: [
+    { id: 'inv-paid', title: 'Deposit', amount_cents: 160000, purpose: 'deposit', status: 'paid', stripe_url: 'https://pay.example/d', due_date: null, paid_at: '2026-08-08T12:00:00.000Z' },
+    { id: 'inv-open', title: 'Balance', amount_cents: 160000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/b', due_date: null, paid_at: null },
+  ],
+  last_contacted_at: past(0),
+} };
+const TAB_API = { ...API, [`/sales/deals/${WON_DEAL}`]: WON_DETAIL, [`/sales/deals/${WON_DEAL}/tasks`]: { data: [] } };
+
+test.describe('deal page — Overview · Billing · Activity tabs', () => {
+  test('opens on Overview: details + to-dos + the Money card; Billing and Activity are rendered but hidden', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await expect(page.locator('#detailInner .tabs [data-dtab="overview"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#ed-cname')).toBeVisible();
+    await expect(page.locator('#dt-preset')).toBeVisible();
+    // the lifecycle bar sits above the tabs — visible on every tab
+    await expect(page.locator('#pathHost .pstep')).toHaveCount(4);
+    // the Money card reads the facts already on the deal read
+    const money = page.locator('#dpanel-overview .dkv');
+    await expect(money).toContainText('Paid $1,600');
+    await expect(money).toContainText('Outstanding $1,600');
+    await expect(money).toContainText('Agreement signed');
+    await expect(money).toContainText('No proposal yet');
+    // counts on the strip: one open invoice, two timeline items
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"] .n')).toHaveText('1 open');
+    await expect(page.locator('#detailInner .tabs [data-dtab="activity"] .n')).toHaveText('2');
+    // the other panels exist (every id keeps its home) but are hidden
+    await expect(page.locator('#sendInvoice')).toBeHidden();
+    await expect(page.locator('#sendInvoice')).toHaveCount(1);
+    await expect(page.locator('#qlSave')).toBeHidden();
+  });
+
+  test('a tab click shows that panel and mirrors it in the URL; the arrow keys move selection', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').click();
+    await expect(page.locator('#sendInvoice')).toBeVisible();
+    await expect(page.locator('#ed-cname')).toBeHidden();
+    await expect(page).toHaveURL(/dtab=billing/);
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').press('ArrowRight');
+    await expect(page.locator('#detailInner .tabs [data-dtab="activity"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#qlSave')).toBeVisible();
+    await expect(page).toHaveURL(/dtab=activity/);
+    await page.locator('#detailInner .tabs [data-dtab="activity"]').press('Home');
+    await expect(page.locator('#ed-cname')).toBeVisible();
+    await expect(page).not.toHaveURL(/dtab=/);
+  });
+
+  test('?dtab=billing deep-links straight to Billing', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
+    await expect(page.locator('#ed-cname')).toBeHidden();
+  });
+
+  test('the won deal’s "Send invoice" opener switches to Billing and opens the invoice form', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#wonInvoice').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#invForm form')).toBeVisible();
+  });
+
+  test('the signed guidance’s "Convert them" deep-link lands on the Billing tab’s convert button', async ({ page }) => {
+    await installApp(page, { api: conApi(SIGNED_NO_TERM) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.locator('#guideConvert').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#convert')).toBeFocused();
+  });
+
+  test('the Money card’s "Billing →" link opens the tab and focuses it', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#dpanel-overview [data-goto-tab="billing"]').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toBeFocused();
+    await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
+  });
+});
+
+// ── "Manage their access →" drills sharing.html into the CUSTOMER (studio audit
+// 2026-10, change 1). The converted deal's customer site is on the deal read
+// (presence_deals.converted_site_id, select=*); the link carries it as ?client=
+// so Sharing & access acts on the new customer's site, not the studio's own.
+// Unknown (older rows, a convert that made no site) → the bare link, as before.
+const CUSTOMER_SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
+const DEAL9 = '99999999-9999-4999-8999-999999999999';
+const wonDeal = (dealExtras: Record<string, unknown>) => ({ data: {
+  deal: { id: DEAL9, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [SIGNED_NO_TERM], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} });
+const accessLink = (page: import('@playwright/test').Page) => page.getByRole('link', { name: 'Manage their access →' });
+
+test.describe('deal page — "Manage their access" carries the customer', () => {
+  test('a converted deal with a customer site links /sharing.html?client=<that site>', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+
+  test('no customer site on the deal → the bare link; a non-uuid value is not trusted', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({}), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+  });
+
+  test('right after convert, the re-read deal’s customer site lands on the link', async ({ page }) => {
+    // the deal read flips from "signed, not yet converted" to "converted" once
+    // the convert POST has answered — exactly what the server does.
+    let converted = false;
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') {
+        converted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { converted: true, client_id: 'c-marlow', site_id: CUSTOMER_SITE, project_id: null, invited: true } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(converted
+        ? { data: { ...contractDeal(SIGNED_NO_TERM).data, deal: { ...contractDeal(SIGNED_NO_TERM).data.deal, stage: 'won', converted_client_id: 'c-marlow', converted_site_id: CUSTOMER_SITE } } }
+        : contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await expect(accessLink(page)).toHaveCount(0);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 });

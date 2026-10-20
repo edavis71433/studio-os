@@ -49,7 +49,10 @@
     (nav || []).forEach(function (sec) {
       (sec.items || []).forEach(function (it) {
         var href = normalizePath(it.href);
-        if (href === here) best = { key: it.key, len: 999, exact: true };
+        // the FIRST exact match wins (lib/shell.ts returns on it) — the old
+        // "last exact wins" let /presence.html#settings outrank /presence.html,
+        // so the Website page read as "Settings" in the breadcrumb
+        if (href === here) { if (!(best && best.exact)) best = { key: it.key, len: 999, exact: true }; }
         else if (!(best && best.exact) && href !== '/' && (here === href || here.indexOf(href + '/') === 0)) {
           if (!best || href.length > best.len) best = { key: it.key, len: href.length };
         }
@@ -217,7 +220,29 @@
   // The bell's contents (icon + badge) — factored out of render() so the B4
   // refresh below can repaint JUST the badge without re-rendering the whole bar
   // (a re-render would tear down any open dropdown under the operator's cursor).
-  function bellInner(n) { return '🔔' + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+  // ── Visual refresh: stroke icons for the chrome and the nav (no emoji) ──────
+  // Keyed by nav section key; unknown keys fall back to a plain dot so a new
+  // section never renders without an icon slot (the sidebar aligns labels on it).
+  var ICON = {
+    today: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    inbox: '<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',
+    customers: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+    pipeline: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+    projects: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    files: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
+    analytics: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
+    website: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+    client: '<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
+    account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+    dot: '<circle cx="12" cy="12" r="3"/>'
+  };
+  function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
+  function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
 
   function render() {
     var nav = (CTX && CTX.nav) || [];
@@ -248,16 +273,24 @@
       var hasItem = sec.items.some(function (i) { return i.key === activeKey; });     // item-level: a genuine href match
       if (single) {
         var it = sec.items[0];
-        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + esc(sec.label) + '</a></div>';
+        return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span></a></div>';
       }
-      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (hasItem ? ' aria-current="true"' : '') + '>' + esc(sec.label) + ' <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
+      // Visual refresh (sidebar ≥761px): a multi-item section's menu is an INLINE
+      // list under its item, not a flyout — and the section you are IN starts
+      // expanded (pinned: see pinnedSec), with the current page's row lit.
+      var startOpen = isActive && sidebarMode();
+      return '<div class="sec' + (isActive ? ' active' : '') + (startOpen ? ' open' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="' + (startOpen ? 'true' : 'false') + '"' + (hasItem ? ' aria-current="true"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span> <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
     }).join('');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
     var scope = CTX && CTX.scope;
     var brandHtml = scope && scope.name
-      ? '<span class="dds-brand"><span class="mark">P</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
-      : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">P</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
+      ? '<span class="dds-brand"><span class="mark">S</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
+      : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">S</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
+    // Phase 1 overhaul: Settings gets its own gear in the bar (it was reachable
+    // only through the account menu / launcher). The href is the nav's own.
+    var settingsHref = '';
+    UTILS.forEach(function (sec) { if (sec.key === 'settings' && sec.items.length) settingsHref = sec.items[0].href; });
 
     root.innerHTML =
       // The App Launcher waffle (the burger's successor at EVERY width): CLICK-
@@ -266,15 +299,43 @@
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
-      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>🔍</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
+      '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
-        '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">?</a>' +
-        '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">◐</button>' +
+        (settingsHref ? '<a class="dds-ic" href="' + esc(withScope(settingsHref)) + '" id="dds-settings" aria-label="Settings" title="Settings">' + icon('settings') + '</a>' : '') +
+        '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
+        '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
 
     wire(nav);
     mountMobileBar(nav, activeKey, att);
+    mountContextBar(scope);
+  }
+
+  // ── client context bar (Phase 1 overhaul) ────────────────────────────────────
+  // Whenever an agency operator is drilled into ONE client, a colored band sits
+  // under the top bar saying so — with the record, the client's own Today, and
+  // the exit back to the studio. The breadcrumb alone ("Studio › name") was too
+  // quiet: the studio-level and client-level pages look identical otherwise.
+  function mountContextBar(scope) {
+    var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
+    if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
+    var sid = scope.site_id || scopeId();
+    var rec = '/crm.html?client=' + encodeURIComponent(sid);
+    var bar = el('<div id="dds-ctxbar" role="region" aria-label="Client context">' +
+      '<span class="lbl">Viewing client</span><strong>' + esc(scope.name) + '</strong>' +
+      '<span class="acts">' +
+        '<a href="' + esc(rec) + '" data-noscope="1">Open record</a>' +
+        '<a href="' + esc(withScope('/today.html')) + '">Their Today</a>' +
+        '<a href="' + esc(withScope('/presence.html')) + '">Their website</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Switch client</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Exit to Studio</a>' +
+      '</span></div>');
+    // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
+    // lay it out as a card under the nav; on phones shell.css keeps it fixed
+    // under the top bar (a fixed child escapes the column's flow).
+    root.appendChild(bar);
+    document.documentElement.classList.add('dds-has-ctxbar');
   }
 
   // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
@@ -322,13 +383,28 @@
         sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
         if (focusFirst) { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
       }
+      // A pointer press on the trigger or inside the menu must NOT move focus.
+      // Safari (and WebKit on iPad with a trackpad) does not focus a <button> or
+      // <a> on mousedown — it moves focus to the nearest focusable ANCESTOR
+      // (#main on every page) — so the focusout guard below saw focus "leave"
+      // the section and closed the menu before mouseup: a menu link's click
+      // fell through to the page, and a click on the trigger of an OPEN menu
+      // closed-then-reopened it. Focus is placed explicitly instead: the
+      // trigger after a pointer click, the first item after a keyboard one.
+      sec.addEventListener('mousedown', function (e) {
+        if (e.target.closest && e.target.closest('button, a')) e.preventDefault();
+      });
       b.addEventListener('click', function (e) {
         e.stopPropagation();
         var wasOpen = sec.classList.contains('open');
         closeAllLayers();
         // e.detail === 0 → keyboard activation (Enter/Space): move focus into the
-        // menu. A pointer click keeps focus on the trigger (menu-button pattern).
-        if (!wasOpen) openSec(e.detail === 0);
+        // menu. A pointer click keeps focus on the trigger (menu-button pattern)
+        // — placed explicitly, since the mousedown above no longer does it.
+        // The trigger of an OPEN section folds it — a pinned (active, sidebar)
+        // section too, since closeAllLayers leaves pinned sections alone.
+        if (e.detail !== 0) b.focus();
+        if (wasOpen) closeSec(sec); else openSec(e.detail === 0);
       });
       // ArrowDown from the trigger opens the menu (if needed) and enters it
       b.addEventListener('keydown', function (e) {
@@ -349,13 +425,14 @@
         var to = e.relatedTarget;
         if (!to) return;                      // iOS tap / focus left the document — keep open
         if (sec.contains(to)) return;         // focus moved WITHIN the section — keep open
-        sec.classList.remove('open'); b.setAttribute('aria-expanded', 'false');
+        if (pinnedSec(sec)) return;           // the section you are in stays expanded (sidebar)
+        closeSec(sec);
       });
       var menu = sec.querySelector('.menu');
       if (menu) menu.addEventListener('keydown', function (e) {
         var links = [].slice.call(menu.querySelectorAll('a'));
         var i = links.indexOf(document.activeElement);
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus(); b.focus(); }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus(); closeSec(sec); b.focus(); }
         else if (e.key === 'ArrowDown') { e.preventDefault(); if (links.length) links[Math.min(i + 1, links.length - 1)].focus(); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); if (links.length) links[Math.max(i - 1, 0)].focus(); }
       });
@@ -382,11 +459,24 @@
     // references a real element, not a lazily-created one
     ensureDrawer();
   }
+  // The sidebar layout (shell.css html.dds-side, ≥761px). Phones/tablets under
+  // 761px keep the top bar, where a section menu is still a dropdown.
+  function sidebarMode() {
+    try { return document.documentElement.classList.contains('dds-side') && window.matchMedia('(min-width:761px)').matches; } catch (_) { return false; }
+  }
+  // A PINNED section: in the sidebar, the section the operator is working in
+  // stays expanded — outside clicks and Tab-out never fold it (it is the map
+  // of where you are, not a popup). Its own trigger and Escape still toggle it.
+  function pinnedSec(sec) { return sidebarMode() && sec.classList.contains('active'); }
+  function closeSec(sec) {
+    sec.classList.remove('open');
+    var b = sec.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
+  }
   function closeMenus() {
     if (!root || !root.querySelectorAll) return;
     root.querySelectorAll('.dds-nav .sec.open').forEach(function (s) {
-      s.classList.remove('open');
-      var b = s.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
+      if (pinnedSec(s)) return;   // the section you are in stays expanded in the sidebar
+      closeSec(s);
     });
   }
   // ── layer mutual exclusion: the shell has five floating layers (section
@@ -506,6 +596,9 @@
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner((CTX && CTX.attention_count) || 0);
   }
+  // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
+  // resolving a support request) can ask for the badge now, past the throttle.
+  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(); };
   function refreshAttention() {
     if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
     if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;
@@ -861,6 +954,10 @@
     root = document.getElementById('dds-shell');
     if (!root) { root = document.createElement('div'); root.id = 'dds-shell'; document.body.insertBefore(root, document.body.firstChild); }
     document.documentElement.classList.add('dds-has-shell');
+    // Visual refresh: the left sidebar (shell.css ≥761px). The website builder
+    // keeps the top bar — it has its own left rail — and embedded frames have
+    // no chrome at all.
+    if (location.pathname.indexOf('/presence') !== 0 && !document.documentElement.classList.contains('dds-embed')) document.documentElement.classList.add('dds-side');
     // A11y (central): give EVERY shelled page a skip link + a main landmark
     // without editing each one. The page's primary container is #main on most
     // pages; fall back to .wrap or a real <main>. role=main is the ARIA landmark
@@ -879,7 +976,7 @@
     } catch (_) { /* a11y enhancement is best-effort */ }
   }
   function minimalShell() {
-    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
+    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────
@@ -899,6 +996,7 @@
   }
   // declarative page-level hints (marked in the HTML). One at a time; never intrusive.
   function scanHints() {
+    if (tour) return;   // Phase 4: never stack a hint on top of the first-login tour
     var seen = hintsSeen();
     Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]:not(.dds-live)'), function (node) {
       var key = node.getAttribute('data-hint');
@@ -911,6 +1009,7 @@
   window.ddsHint = function (key, html) {
     var seen = hintsSeen();
     if (!key || seen[key]) return false;
+    if (tour) return false;   // Phase 4: the tour is already teaching — one thing at a time
     if (document.querySelector('.dds-hint.show')) return false;   // never stack
     var bar = el('<div class="dds-hint dds-live" role="note"><span class="t"></span></div>');
     bar.querySelector('.t').innerHTML = html;
@@ -1125,12 +1224,21 @@
       (onRetry ? '<button type="button" class="retry" data-dds-retry>Try again</button>' : '') + '</div>';
     if (onRetry) { var b = host.querySelector('[data-dds-retry]'); if (b) b.addEventListener('click', onRetry); }
   };
-  window.ddsToast = function (message, kind) {
+  // Phase 4 (delete safety): an optional third argument {label, onClick} adds ONE
+  // action to the toast — "Undo" after a removal. A toast with an action stays
+  // up longer and is clickable; plain toasts are unchanged.
+  window.ddsToast = function (message, kind, action) {
     var t = el('<div class="dds-toast ' + (kind === 'err' ? 'err' : 'ok') + '" role="status" aria-live="polite"><span class="ico">' + (kind === 'err' ? '!' : '✓') + '</span><span class="t"></span></div>');
     t.querySelector('.t').textContent = String(message == null ? '' : message);
+    var ms = kind === 'err' ? 5200 : 3200;
+    if (action && action.label && typeof action.onClick === 'function') {
+      var a = document.createElement('button'); a.type = 'button'; a.className = 'act'; a.textContent = String(action.label);
+      a.addEventListener('click', function () { try { action.onClick(); } finally { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); } });
+      t.appendChild(a); t.classList.add('has-act'); ms = 8000;
+    }
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.classList.add('show'); });
-    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, kind === 'err' ? 5200 : 3200);
+    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, ms);
     return t;
   };
 

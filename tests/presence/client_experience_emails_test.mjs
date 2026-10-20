@@ -32,7 +32,14 @@ ok('invite: subject is studio-voiced — "Your client portal is ready — <studi
 ok('invite: "Studio OS" appears NOWHERE in the subject or body', !/Studio OS/.test(invite.split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '').replace(/\/\* .*?\*\//g, '')).join('\n').replace(/EMAIL_BRAND_DEFAULT/g, '')));
 ok('invite: an unnamed studio degrades to a BARE subject, never the platform name', /brand\.name !== EMAIL_BRAND_DEFAULT\.name \? brand\.name : ''/.test(invite));
 ok('invite: says what the portal is FOR (progress · messages · files/approvals · invoices)', /progress/.test(invite) && /message me directly/.test(invite) && /share files and approve work/.test(invite) && /invoice/.test(invite));
-ok('invite: the set-password CTA is kept (signed link → client portal)', /generateSetPasswordLink\(email, `\$\{base\}\/set-password\.html\?next=\/client\.html`\)/.test(invite));
+// Oct 2026 studio audit, change 4: the client signs in from the email WITHOUT a
+// password — a GoTrue magic link from the SAME minter the reviewer invite uses
+// (lib/workspace.ts mintSignInLink), landing on the portal door (→ client.html).
+ok('invite: a one-tap magic link is minted first (shared minter, lands on the portal door)', /const magic = await mintSignInLink\(email, '\/portal\.html'\)/.test(invite) && /import \{ mintSignInLink \} from '\.\.\/lib\/workspace\.ts'/.test(sales));
+ok('invite: the magic-link button reads "Sign in to your client portal →"', /<a href="\$\{magic\}" style="\$\{btnStyle\}">Sign in to your client portal →<\/a>/.test(invite));
+ok('invite: the footer says a password can come later ("Forgot your password?")', /No password to set — this link signs you straight in\. Want a password for next time\? Use “Forgot your password\?” on the sign-in page any time\./.test(invite));
+ok('invite: the set-password link is the FALLBACK only when no magic link could be minted (→ client portal)', /const link = magic \? '' : await generateSetPasswordLink\(email, `\$\{base\}\/set-password\.html\?next=\/client\.html`\)/.test(invite) && /Create your password &amp; sign in →/.test(invite));
+ok('invite: the shared minter tries invite (new user) then magiclink (existing), never throws', (() => { const ws = read('supabase/functions/presence/lib/workspace.ts'); const i = ws.indexOf('export async function mintSignInLink'); const m = ws.slice(i, ws.indexOf('\n}', i)); return i > 0 && /await gen\('invite'\)/.test(m) && /await gen\('magiclink'\)/.test(m) && /catch \{ return ''; \}/.test(m) && /sendInviteLink[\s\S]*?const link = await mintSignInLink\(email, opts\.next\)/.test(ws); })());
 ok('invite: sends exactly ONCE (one sendEmail call in the helper)', (invite.match(/sendEmail\(/g) || []).length === 1);
 ok('invite: every caller passes its own site id (convert, resend, add-customer)', (sales.match(/sendCustomerInvite\(site\.id, email, /g) || []).length === 3 && !/sendCustomerInvite\(email,/.test(sales));
 

@@ -16,6 +16,7 @@ import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
+import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
@@ -67,24 +68,41 @@ export async function clientEvent(agencySiteId: string, projectId: string, kind:
 export async function handleClientBilling(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const me = customerOf(site);
   if (!me) return json({ data: { billing_type: 'service', invoices: [], summary: { open_count: 0, paid_count: 0 } }, message: 'No service billing is linked to your account yet.' }, 200, cors);
-  const r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at&order=created_at.desc&limit=200`);
-  const list = rows(r).map((i) => ({
-    id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
-    amount: (Number(i.amount_cents) || 0) / 100, status: i.status, due_date: i.due_date, paid_at: i.paid_at,
-    // Only an OPEN invoice is payable. This was `!== 'paid'`, which was harmless
-    // only while 'void' was unreachable — now that POST /sales/invoices/:id/void
-    // exists, a not-paid test would hand the client a live pay button for an
-    // invoice their studio has WITHDRAWN. Allow-list the one payable state.
-    pay_url: (i.status === 'open' && i.stripe_url) ? i.stripe_url : null,
-    created_at: i.created_at,
-  }));
-  const open = list.filter((i) => i.status !== 'paid' && i.status !== 'void' && i.status !== 'canceled');
-  const paid = list.filter((i) => i.status === 'paid');
+  // processing_since lands with migration 0132 — deploy-order tolerant: the full
+  // select first, then the pre-0132 shape, so a function deploy ahead of the
+  // migration never blanks the client's money surface.
+  const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at';
+  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
+  if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
+  // Oct 2026 benchmark (item 2): the four money states — paid · processing ·
+  // upcoming · overdue — come from ONE formula (lib/money_state.ts), computed
+  // here against the server's UTC day. The portal re-runs the same mirrored
+  // formula against the client's LOCAL day (PS2's rule) and adds the
+  // just-came-back-from-Stripe case; `state` on the wire is the server's word.
+  const today = nowIso().slice(0, 10);
+  const list = rows(r).map((i) => {
+    const state = moneyState(i, today);
+    return {
+      id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
+      amount: (Number(i.amount_cents) || 0) / 100, status: i.status, state, due_date: i.due_date, paid_at: i.paid_at,
+      processing_since: i.processing_since || null,
+      // Only an invoice that is still WAITING on payment is payable: never a paid
+      // one, never a voided one (POST /sales/invoices/:id/void withdraws it — a
+      // not-paid test would hand the client a live pay button for it), and never
+      // one whose payment is already PROCESSING (a second charge on a settling
+      // ACH payment is a double-pay). Allow-list the two payable states.
+      pay_url: ((state === 'upcoming' || state === 'overdue') && i.stripe_url) ? i.stripe_url : null,
+      created_at: i.created_at,
+    };
+  });
+  const b = moneyBuckets(list, today);
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription
     note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.',
     invoices: list,
-    summary: { open_count: open.length, paid_count: paid.length },
+    // open_count = still waiting on the client (upcoming + overdue); processing
+    // money is neither open nor paid yet, so it gets its own count.
+    summary: { open_count: b.upcoming.count + b.overdue.count, paid_count: b.paid.count, processing_count: b.processing.count, overdue_count: b.overdue.count, upcoming_count: b.upcoming.count },
   } }, 200, cors);
 }
 

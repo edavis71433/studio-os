@@ -7,6 +7,7 @@
 //   GET  /media            — the library, with in-use flags
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
@@ -21,6 +22,7 @@ import { buildContentTree } from '../lib/content_tree.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { lastPublishDetail } from '../lib/actor_kind.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -117,7 +119,7 @@ export async function handleHealth(site: SiteRow, cors: Record<string, string>) 
           ? { state: 'changes', label: `${st.changes.count} change${st.changes.count > 1 ? 's' : ''}`, detail: st.blockers ? `${st.blockers} to fix before publishing` : 'ready to publish' }
           : { state: 'clean', label: 'Up to date', detail: 'no unpublished changes' },
         last_publish: st.lastLive
-          ? { label: new Date(st.lastLive.completed_at || st.lastLive.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), detail: st.lastLive.actor_kind === 'staff' ? 'published by your studio' : 'published by you' }
+          ? { label: new Date(st.lastLive.completed_at || st.lastLive.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), detail: lastPublishDetail(st.lastLive.actor_kind) }   // staff OR operator = the studio (audit change 2)
           : { label: '—', detail: 'no publishes yet' },
         domain,
       },
@@ -251,8 +253,17 @@ export async function handleRestoreToDraft(req: Request, site: SiteRow, principa
 
 /** GET /media — the photo library with in-use flags (which entities use each). */
 export async function handleMediaList(site: SiteRow, cors: Record<string, string>) {
+  // 0131: a file private to a client never reaches the site's picker. The filter
+  // 400s on a database that has not run the apply pack yet, so it retries bare on
+  // that precise missing-column signal only (the 0130 deploy-order idiom).
+  const mediaPath = (filter: string) => `presence_media?site_id=eq.${site.id}&deleted_at=is.null${filter}&select=id,storage_path,alt_text,mime,width,height,bytes,created_at&order=created_at.desc`;
+  const mediaRead = (async () => {
+    let r = await svc(mediaPath('&client_private=is.false'));
+    if (!r.ok && missingColumnSignal(r.json, r.text, 'client_private')) r = await svc(mediaPath(''));
+    return r;
+  })();
   const [media, offerings, posts, settings] = await Promise.all([
-    svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,bytes,created_at&order=created_at.desc`),
+    mediaRead,
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&media_id=not.is.null&select=media_id,name,is_visible`),
     svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&hero_media_id=not.is.null&select=hero_media_id,title`),
     svc(`presence_settings?site_id=eq.${site.id}&select=cover_media_id&limit=1`),

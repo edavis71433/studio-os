@@ -4,6 +4,7 @@
 // (G1 §14): detail carries changed-field NAMES only, never values.
 import { svc } from './db.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { changeActorKind, actorKindCheckViolation, legacyActorKind } from './actor_kind.ts';
 
 export async function writeChangeEvent(opts: {
   siteId: string;
@@ -15,8 +16,9 @@ export async function writeChangeEvent(opts: {
   provenance?: 'human' | 'ai_approved' | 'import';
   fields?: string[];    // changed field names only
 }): Promise<boolean> {
-  const actorKind = opts.principal.kind === 'staff' ? 'staff' : opts.principal.kind === 'system' ? 'system' : 'client';
-  const r = await svc('presence_change_events', {
+  // audit change 2: 'operator' when an agency member acts inside a client's scope
+  const actorKind = changeActorKind(opts.principal);
+  const write = (byKind: string) => svc('presence_change_events', {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({
@@ -26,10 +28,14 @@ export async function writeChangeEvent(opts: {
       action: opts.action,
       summary: opts.summary,
       actor_user_id: opts.principal.userId,
-      actor_kind: actorKind,
+      actor_kind: byKind,
       provenance: opts.provenance ?? 'human',
       detail: opts.fields && opts.fields.length ? { fields: opts.fields } : {},
     }),
   });
+  let r = await write(actorKind);
+  // a database that predates migration 0133 rejects 'operator' — record the
+  // studio's hand as 'staff' rather than lose the provenance row
+  if (!r.ok && actorKind === 'operator' && actorKindCheckViolation(r.json, r.text)) r = await write(legacyActorKind(actorKind));
   return r.ok;
 }

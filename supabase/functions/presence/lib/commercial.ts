@@ -112,7 +112,8 @@ export function leadFollowupCopy(form_kind: string, who: string): { headline: st
  *  (auto-marks read), mark read, or archive — resolves it; a still-'new' lead
  *  does not. Pure. */
 export function leadFollowupResolvesOn(status: string): boolean {
-  return status === 'read' || status === 'archived';
+  // Phase 4 (triage): replied and not-a-fit resolve the nudge too — only `new` waits
+  return status === 'read' || status === 'replied' || status === 'archived' || status === 'not_a_fit';
 }
 
 /** PP-1: the exact notices-rail key for a lead's follow-up nudge. Because the
@@ -120,6 +121,13 @@ export function leadFollowupResolvesOn(status: string): boolean {
  *  notice (or a notice of any other kind). Pure. */
 export function leadFollowupNoticeKey(leadId: string): { kind: string; period: string } {
   return { kind: 'lead_followup', period: `lead:${leadId}` };
+}
+/** The inverse: the lead id a lead_followup notice's period names, or null for
+ *  anything else (a weekly bucket, a blank, another kind's period). Pure. The
+ *  notice's href deep-links that row (Oct 2026 audit, gap 2). */
+export function leadIdOfNoticePeriod(period: string | null | undefined): string | null {
+  const m = /^lead:([A-Za-z0-9_-]+)$/.exec(String(period || ''));
+  return m ? m[1] : null;
 }
 
 // ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────

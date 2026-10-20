@@ -27,11 +27,14 @@ ok('FIX6: customers.html has a plain-language empty state', /haven’t added a c
 ok('FIX6: roster handler is tenant-scoped to the operator’s own site + active links', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active/.test(cd));
 
 // ═══ FIX 7 — opening a customer → the delivery view ═══
-ok('FIX7: customers.html "Open" routes to the unified Client Record (crm.html)', /crm\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers) && /tab=delivery/.test(customers));
-ok('FIX7: customers.html keeps "Manage their website" as a secondary action', /Manage their website/.test(customers) && /today\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
+ok('FIX7: customers.html "Open" routes to the unified Client Record (crm.html)', /crm\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
+// Phase 1 overhaul: the record is the PRIMARY row action; "Their website" is the
+// secondary one and opens the client's website editor (presence.html in their scope).
+ok('P1: customers.html rows carry "Open record" → the hub', /data-rec=/.test(customers) && /Open record/.test(customers));
+ok('P1: customers.html keeps "Their website" as a secondary action → the website editor', /Their website/.test(customers) && /presence\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
 ok('FIX7: agency.html opens the unified Client Record when a project exists', /const pid = PROJECT_BY_SITE\[siteId\];[\s\S]*?crm\.html\?project=/.test(agency));
 ok('FIX7: agency.html builds the site→project map from /studio/customers', /\/studio\/customers/.test(agency) && /PROJECT_BY_SITE\[c\.customer_site_id\]=c\.project_id/.test(agency));
-ok('FIX7: agency.html keeps "Manage their website" as a secondary action', /data-web=/.test(agency) && /Manage their website/.test(agency));
+ok('P1: agency.html rows carry "Open record" + "Their website"', /data-rec=/.test(agency) && /data-web=/.test(agency) && /Open record/.test(agency) && /Their website/.test(agency));
 
 // ═══ FIX D — the project detail is a full-screen in-page view ═══
 ok('FIXD: the modal <dialog id="detail"> is gone', !/<dialog id="detail"/.test(projects));
@@ -55,7 +58,7 @@ ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Mess
 // (slice 2 review F2: the total now counts what the list actually RENDERS — the
 // per-client conversation items built from feed.client_messages, with keyless
 // rows bucketed instead of dropped — so client messages still count, grouped.)
-ok('FIX5: inbox counts client messages toward "needs you" total', /TOTAL=ITEMS\.length\+SYSROWS\.length/.test(inbox) && /clientMsgs\.filter\(x=>x\.type==='message'\)/.test(inbox));
+ok('FIX5: inbox counts client messages toward "needs you" total', /TOTAL=inboxCount\(\)/.test(inbox) && /const inboxCount=\(\)=>ITEMS\.filter\(x=>!x\.queue\)\.length\+SYSROWS\.length/.test(inbox) && /clientMsgs\.filter\(x=>x\.type==='message'\)/.test(inbox));
 ok('FIX5: projects.html can open + reply to a project-less request (full-screen)', /function openStudioSupportFull/.test(projects) && /params\.get\('support'\)/.test(projects));
 
 // ═══ BY-CLIENT — Inbox groups client messages by CLIENT (with a dropdown); the

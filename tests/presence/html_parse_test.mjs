@@ -1,5 +1,5 @@
 // ── HTML inline-script parse gate ─────────────────────────────────────────────
-// leads.html shipped DEAD for days (one unclosed paren → whole-page SyntaxError,
+// leads.html (since retired) shipped DEAD for days (one unclosed paren → whole-page SyntaxError,
 // perpetual spinner) and nothing in CI could notice. This gate machine-parses
 // every root page's inline <script> blocks so a broken page fails the sweep,
 // not a customer. Pure filesystem; no network.

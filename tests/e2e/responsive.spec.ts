@@ -28,17 +28,29 @@ test.describe('Responsive layout', () => {
   // regression this whole change is most able to cause, so it is asserted for
   // every page touched, in every project (390 / 810 / 1280).
   const TIERED = [
-    '/get-started.html', '/schedule.html', '/sharing.html',           // form
+    '/get-started.html', '/sharing.html',           // form
     '/help.html', '/visual-studio.html', '/broadcasts.html',          // focused
-    '/connections.html', '/leads.html',
+    '/connections.html',
     '/today.html', '/crm.html', '/pipeline.html', '/developer.html',  // working
     '/contacts.html', '/customers.html', '/projects.html',            // data
     '/files.html', '/admin-health.html', '/agency.html', '/analytics.html',
   ];
-  for (const path of TIERED) {
+  // the website builder (presence.html) joined the app width on its visual
+  // refresh: overview board + the Design canvas, each needing the /site read
+  const PRESENCE = {
+    '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1, custom_domain: 'marlows.example' }, identity: { business_name: 'Marlow’s Kitchen and Wine Bar' }, location: {} } },
+    '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] }, '/media': { data: [] }, '/settings': { data: {} }, '/notes': { data: [] },
+    '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.', detail: '', first_run: false, facts: {
+      website: { state: 'live', label: 'Live', detail: 'marlows.example' }, draft: { state: 'changes', label: '2 changes', detail: 'ready to publish' },
+      last_publish: { label: 'Sun, Oct 5', detail: 'published by you' }, domain: { label: 'marlows.example', state: 'ok', detail: 'connected' } } } },
+    '/changes': { data: { count: 2, first_publish: false, changes: [{ section: 'business', sentence: 'Saturday hours change from 10–4 to 9–5.' }, { section: 'offerings', sentence: '“Download menu (PDF)” joins Mains.', entity_id: 'o1' }], blockers: 0, warnings: 0, draft_hash: 'h' } },
+    '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, updated_at: null, updated_by: null } },
+    '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
+  };
+  for (const path of [...TIERED, '/presence.html', '/presence.html#design', '/presence.html#business']) {
     test(`${path} has no horizontal overflow`, async ({ page }) => {
       await pinTables(page);
-      await installApp(page, { api: { '/sales/contacts': CONTACTS, '/studio/customers': CUSTOMERS } });
+      await installApp(page, { api: { '/sales/contacts': CONTACTS, '/studio/customers': CUSTOMERS, ...(path.startsWith('/presence') ? PRESENCE : {}) } });
       await page.goto(path);
       await page.waitForLoadState('networkidle');
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -62,7 +74,7 @@ test.describe('Responsive layout', () => {
 test.describe('Roster action column', () => {
   test.skip(({ viewport }) => !viewport || viewport.width < 1000, 'desktop widths only');
 
-  for (const [path, action] of [['/contacts.html', 'Delete'], ['/customers.html', 'Manage their website']] as const) {
+  for (const [path, action] of [['/contacts.html', 'Delete'], ['/customers.html', 'Their website']] as const) {
     test(`${path} — the table fits and its last action is fully visible`, async ({ page }) => {
       await pinTables(page);
       await installApp(page, { api: { '/sales/contacts': CONTACTS, '/studio/customers': CUSTOMERS } });

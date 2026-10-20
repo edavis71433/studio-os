@@ -7572,7 +7572,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
           await leadDb('lead_messages', 'POST', { lead_id: lead.id, who: 'them', body: lmessage || lsubject });
         }
 
-        // TWO-DOOR BRIDGE: the owner's working inbox is now leads.html, which
+        // TWO-DOOR BRIDGE: the owner's working inbox is the Inbox's Enquiries view, which
         // reads presence_form_submissions on the STUDIO's own workspace. Without
         // this insert, marketing-site enquiries reached only an email — never the
         // product's Leads/Pipeline. Resolve the studio workspace via the same
@@ -7603,7 +7603,7 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
           notifyShell('New lead in your inbox', [
             `${lname || 'Someone'} just reached out${lsubject ? ` about “${lsubject}”` : ''}.`,
             lmessage ? lmessage.slice(0, 300) : '',
-          ], { label: 'Open your enquiries →', href: 'https://davisdigitalstudio.com/leads.html' })); } catch (_) {}
+          ], { label: 'Open your enquiries →', href: 'https://davisdigitalstudio.com/inbox.html#enquiries' })); } catch (_) {}
 
         // ACKNOWLEDGE THE ENQUIRER — the promise on the contact page ("I reply
         // personally, usually within one business day" + "You'll also get a short

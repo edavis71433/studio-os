@@ -28,7 +28,7 @@
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   :focus-visible{outline:2px solid var(--p);outline-offset:1px;border-radius:4px}
-  a.link{color:var(--p);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
+  a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -45,19 +45,20 @@
   /* ── list-pane header (SLDS list-view header anatomy, dds skin) ── */
   .lhead{border-bottom:1px solid var(--line);padding:10px 12px 8px;flex:0 0 auto}
   .lrow1{display:flex;align-items:center;gap:6px}
-  .obj-ic{width:30px;height:30px;border-radius:9px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:14px;flex:0 0 auto}
+  .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
+  .obj-ic{width:30px;height:30px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:14px;flex:0 0 auto}
   .viewdd{position:relative;min-width:0;flex:1}
-  #viewBtn{font:inherit;font-weight:700;font-size:15.5px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;max-width:100%}
+  #viewBtn{font:inherit;font-weight:500;font-size:15.5px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
   #viewBtn .car{font-size:10px;color:var(--faint)}
-  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .ovf{position:relative}
-  #ovfMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:30}
+  #ovfMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #ovfMenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
   #ovfMenu button:hover{background:var(--p-soft)}
   .lmeta{margin-top:4px;font-size:12px;color:var(--faint)}
@@ -75,6 +76,19 @@
   .lfilters select{flex:1 1 45%;min-width:0;font-size:13px;padding:6px 9px;border-radius:999px;background:var(--bg)}
   .lfilters select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
   .lclear{margin-top:12px}
+  /* ── the Enquiries view's triage toolbar (Oct 2026 audit, change 5: the old
+     Enquiries page folded in here). Open · New · All are an honest role=group
+     with aria-pressed; kind + sort are native selects; New enquiry logs a
+     phone or walk-in enquiry. ── */
+  .efilt{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .efilt button{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border-radius:999px;padding:4px 11px;color:var(--soft)}
+  .efilt button.on{background:var(--p-soft);color:var(--p);border-color:transparent}
+  .efilt .n{font-size:11px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
+  .efilt button.on .n{background:var(--p);color:#fff}
+  .ebar{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+  .ebar select{flex:1 1 30%;min-width:0;font-size:13px;padding:6px 9px;border-radius:999px;background:var(--bg)}
+  .ebar select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
+  .ebar #newEnq{flex:0 0 auto;font-size:12.5px;border-radius:999px;padding:6px 12px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── two-line rows (SLDS split-view listbox idiom) ── */
@@ -93,7 +107,7 @@
   .rwhen{margin-left:auto;flex:0 0 auto;font-size:11.5px;color:var(--faint)}
   .rprev{display:flex;align-items:center;gap:7px;min-width:0}
   .rprev .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--soft)}
-  .rchip{flex:0 0 auto;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .rchip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:1px 7px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .rchip.support{background:var(--warn-soft);color:var(--warn)}
   .rchip.lead{background:var(--good-soft);color:var(--good)}
   .cmbadge{flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--faint);color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -104,40 +118,69 @@
   /* ── reading pane ── */
   .phead{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--card)}
   .phead .avatar{width:40px;height:40px;font-size:14px}
-  .pname{font-family:var(--serif);font-weight:500;font-size:19px;line-height:1.2}
+  .pname{font-family:var(--sans);font-weight:600;font-size:19px;line-height:1.2}
   .psub{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--soft);margin-top:2px;flex-wrap:wrap}
-  .pchip{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--good-soft);color:var(--good)}
+  .pchip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--good-soft);color:var(--good)}
   .pchip.plain{background:var(--p-soft);color:var(--p)}
   .pback{display:none;font:inherit;border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;flex:0 0 auto}
+  /* Oct 2026 review: a support request's triage lives in the pane header —
+     Resolve · Close · Make it a task — beside the honest status select. */
+  .phead .pacts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+  .phead .pacts button{padding:5px 11px;font-size:12.5px}
+  .pchip.open,.pchip.in_progress{background:var(--warn-soft);color:var(--warn)}
+  .pchip.resolved,.pchip.closed{background:var(--line);color:var(--soft)}
+  @media (max-width:760px){.phead .pacts{margin-left:0;flex-basis:100%}}
   .pbody{flex:1;overflow-y:auto;padding:16px 18px}
   .pcomposer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--card);padding:12px 18px}
-  .pcomposer textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;min-height:58px}
+  .pcomposer textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;resize:vertical;min-height:58px}
   .pcomposer textarea:focus{outline:none;border-color:var(--p)}
   .crow{display:flex;gap:8px;align-items:center;margin-top:8px}
   .crow .spacer{flex:1}
-  button{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 14px;cursor:pointer;transition:.15s}
+  button{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 14px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
   button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
-  a.btnlink{display:inline-block;font-size:13px;font-weight:600;border-radius:999px;border:1px solid var(--p);color:var(--p);padding:6px 13px;text-decoration:none}
-  a.btnlink:hover{background:var(--p-soft)}
-  a.btnlink.primary{background:var(--p);color:#fff}
-  select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 9px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
+  a.btnlink,button.btnlink{display:inline-block;font-family:inherit;font-size:13px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:transparent;color:var(--p);padding:6px 13px;text-decoration:none;cursor:pointer}
+  a.btnlink:hover,button.btnlink:hover{background:var(--p-soft)}
+  a.btnlink.primary,button.btnlink.primary{background:var(--p);color:#fff}
+  .lreply{margin-top:12px;padding:10px 12px;border-left:3px solid var(--p);background:var(--p-soft);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
+  .lreply .body{margin-top:4px;white-space:pre-wrap}
+  select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 9px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .card .who{font-weight:600;font-size:15.5px}
   .card .body{margin-top:8px;font-size:14.5px;color:var(--soft);white-space:pre-wrap}
-  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  /* Phase 4 (triage): Spam is a quiet text button at the row's far end */
+  .acts button.quiet{border-color:transparent;color:var(--faint);margin-left:auto}
+  .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
+  .pchip.stchip.not_a_fit,.pchip.stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  /* ── dialogs: Make customer (Phase 2) and Log an enquiry ── */
+  /* margin:auto puts the modal back in the middle (the page's *{margin:0} reset pins it top-left) */
+  dialog{margin:auto;border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:460px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:var(--dds-shadow-pop,0 20px 60px rgba(0,0,0,.25))}
+  dialog::backdrop{background:rgba(21,20,26,.4)}
+  #convForm,#newForm{padding:18px 20px}
+  #convForm h3,#newForm h3{margin:0 0 4px;font-size:16px;font-weight:600}
+  #convForm label,#newForm label{display:block;font-size:12.5px;color:var(--soft);margin:12px 0 4px}
+  #convForm label.check,#newForm label.check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13.5px;margin-top:14px}
+  #convForm input[type=text],#convForm input[type=email],#newForm input[type=text],#newForm input[type=email],#newForm input[type=tel],#newForm textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
+  #newForm textarea{min-height:76px;resize:vertical}
+  #convForm input:focus,#newForm input:focus,#newForm textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  #convForm .small,#newForm .small{font-size:12.5px;margin-top:10px}
+  #convForm .row2,#newForm .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #convForm button.primary,:root:not([data-theme="light"]) #newForm button.primary,:root:not([data-theme="light"]) #newEnq{color:#171320}}
+  :root[data-theme="dark"] #convForm button.primary,:root[data-theme="dark"] #newForm button.primary,:root[data-theme="dark"] #newEnq{color:#171320}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
-  .allclear{background:var(--good-soft);border:1px solid transparent;border-radius:14px;color:var(--good);text-align:center;padding:22px;margin:0 auto;max-width:420px}
+  .allclear{background:var(--good-soft);border:1px solid transparent;border-radius:var(--dds-r-lg,10px);color:var(--good);text-align:center;padding:22px;margin:0 auto;max-width:420px}
   .allart{font-size:40px;line-height:1;margin-bottom:10px}
 
   /* support thread bubbles (a back-and-forth is genuinely a chat here) */
-  .bub{max-width:82%;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:9px 13px;font-size:14px;margin:7px 0;white-space:pre-wrap}
+  .bub{max-width:82%;border:1px solid var(--line);background:var(--card);border-radius:var(--dds-r-lg,10px);padding:9px 13px;font-size:14px;margin:7px 0;white-space:pre-wrap}
   .bub.studio{margin-left:auto;background:var(--p-soft);border-color:transparent}
   .bub .bwhen{display:block;font-size:11px;color:var(--faint);margin-top:4px}
 
   /* ── the timeline — kept in sync with crm.html by hand (.tl-month/.ti blocks) ── */
-  .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
+  .tl-month{font-size:12px;color:var(--faint);font-weight:500;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
   .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
   .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
   .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
@@ -154,7 +197,7 @@
   button.ti-head{cursor:pointer;border-radius:0}
   .ti-title{font-weight:600;min-width:0}
   .ti-car{color:var(--faint);font-size:10px;flex:0 0 auto}
-  .ti-meta{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
+  .ti-meta{font-size:12px;font-weight:500;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
   .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;margin-top:5px;border-left:2px solid var(--line);padding-left:10px}
   .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
 
@@ -172,29 +215,29 @@
 
   /* Support toolkit editor sheets (Saved replies, Customer FAQ) — unchanged */
   .sheet-back{position:fixed;inset:0;background:rgba(20,15,30,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto;z-index:1000}
-  .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:560px;padding:22px;margin:auto}
+  .sheet{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);width:100%;max-width:560px;padding:22px;margin:auto}
   .sheet-head{display:flex;align-items:center;gap:10px}
   .sheet-head h3{font-family:var(--serif);font-weight:500;font-size:21px;margin:0}
   .sheet .x{margin-left:auto;background:none;border:none;font-size:24px;line-height:1;color:var(--soft);cursor:pointer;padding:2px 6px;border-radius:7px}
   .sheet .x:hover{color:var(--ink)}
   .sheet-intro{color:var(--soft);font-size:14px;margin:8px 0 16px}
   .sheet-list{display:flex;flex-direction:column;gap:14px}
-  .erow{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .erow{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:12px}
   .erow .mv{display:flex;flex-direction:column;gap:4px}
   .erow .mv button{width:30px;height:26px;border:1px solid var(--line);background:var(--card);border-radius:7px;cursor:pointer;color:var(--ink);font-size:13px;padding:0}
   .erow .mv button:disabled{opacity:.35;cursor:default}
   .erow .ef{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
   .fl{display:flex;flex-direction:column;gap:4px}
   .fl>span{font-size:12px;font-weight:600;color:var(--faint)}
-  .fl input,.fl textarea,#sheet-extra input{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%;resize:vertical}
+  .fl input,.fl textarea,#sheet-extra input{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%;resize:vertical}
   .fl input:focus,.fl textarea:focus,#sheet-extra input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .erow .del{align-self:flex-start;background:none;border:1px solid var(--line);border-radius:8px;color:var(--soft);font-size:12.5px;padding:6px 10px;cursor:pointer}
   .erow .del:hover{color:#a4342b;border-color:#a4342b}
   #sheet-extra:not(:empty){margin-bottom:14px}
-  .addbtn{margin-top:14px;background:var(--p-soft);color:var(--p);border:1px dashed var(--p);border-radius:10px;padding:10px;width:100%;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+  .addbtn{margin-top:14px;background:var(--p-soft);color:var(--p);border:1px dashed var(--p);border-radius:var(--dds-r,8px);padding:10px;width:100%;font:inherit;font-weight:500;font-size:14px;cursor:pointer}
   .sheet-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
-  .sheet-foot .ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
-  .sheet-foot .save{background:var(--p);color:#fff;border:none;border-radius:9px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+  .sheet-foot .ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:var(--dds-r,8px);padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+  .sheet-foot .save{background:var(--p);color:#fff;border:none;border-radius:var(--dds-r,8px);padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
   .sheet-foot .save:disabled{opacity:.6;cursor:default}
   .empty{padding:10px 2px}
 </style>
@@ -203,6 +246,41 @@
 <body>
 <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 <div id="sheet-host"></div>
+<!-- Phase 2 (one customer model): Make customer — contact + customer (+ a deal)
+     from ONE enquiry. Moved here with the rest of the old Enquiries page. -->
+<dialog id="convDlg" aria-labelledby="convTitle">
+  <form method="dialog" id="convForm">
+    <h3 id="convTitle">Make them a customer</h3>
+    <p class="muted" id="convWho"></p>
+    <label for="conv-biz">Business name</label>
+    <input id="conv-biz" type="text" maxlength="120" placeholder="e.g. Bacchus Kitchen + Wine Bar">
+    <label for="conv-email">Email <span class="muted">(their sign-in invitation goes here)</span></label>
+    <input id="conv-email" type="email" maxlength="160">
+    <label class="check"><input id="conv-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
+    <p class="muted small">This sets up their workspace and emails them a sign-in link. They land in Customers with the whole relationship in one record.</p>
+    <div class="row2"><button type="button" id="conv-cancel">Not now</button><button type="submit" class="primary" id="conv-go">Make customer</button></div>
+  </form>
+</dialog>
+<!-- "New enquiry" — log someone who reached out by phone or in person. Reuses
+     the existing contact + deal routes (POST /sales/contacts, POST /sales/deals
+     with source:'manual'); the website form stays the only source of rows in
+     the Enquiries queue. -->
+<dialog id="newDlg" aria-labelledby="newTitle">
+  <form method="dialog" id="newForm">
+    <h3 id="newTitle">Log an enquiry</h3>
+    <p class="muted">Someone reached out by phone or in person? Put them in Customers so nothing slips.</p>
+    <label for="ne-name">Name</label>
+    <input id="ne-name" type="text" maxlength="120" autocomplete="off">
+    <label for="ne-email">Email</label>
+    <input id="ne-email" type="email" maxlength="160" autocomplete="off">
+    <label for="ne-phone">Phone <span class="muted">(optional)</span></label>
+    <input id="ne-phone" type="tel" maxlength="40" autocomplete="off">
+    <label for="ne-msg">What did they ask? <span class="muted">(optional)</span></label>
+    <textarea id="ne-msg" maxlength="2000" placeholder="e.g. Wants a quote for a patio before spring"></textarea>
+    <label class="check"><input id="ne-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
+    <div class="row2"><button type="button" id="ne-cancel">Not now</button><button type="submit" class="primary" id="ne-go">Log enquiry</button></div>
+  </form>
+</dialog>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The studio Inbox — a split-view console (Salesforce Split View anatomy,  ──
@@ -214,9 +292,12 @@
 // your OK · Enquiries · Support. RIGHT: the reading pane renders the selected
 // conversation IN PLACE — the client's activity timeline + a Message composer
 // (same anatomy as the record page), the approval card with inline Approve/Not
-// yet, the enquiry card with Reply/→Deal/Mark read/Archive, or the support
-// thread with a status control + reply. <760px the panes stack (D5): list
-// first, picking a row pushes the pane in with a back button.
+// yet, the enquiry card with Reply/→Deal/Make customer/Mark read/Not a fit/Spam,
+// or the support thread with a status control + reply. <760px the panes stack
+// (D5): list first, picking a row pushes the pane in with a back button.
+// Oct 2026 workflow audit, change 5: the Enquiries view IS the old Enquiries page
+// (leads.html, now a forwarding stub) — every enquiry, one row each, with its
+// Open · New · All chips, the kind filter, Newest/Oldest and "New enquiry".
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -227,6 +308,9 @@ let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
+// ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
+const SI={cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',check:'<path d="M5 12l5 5 9-10"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',flag:'<path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/>'};
+const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
 const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
@@ -239,7 +323,18 @@ function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/(
 // ── state ─────────────────────────────────────────────────────────────────────
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
 let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest partial notice (both → the boot error)
-let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// A view can be deep-linked by hash (#ok, #website, #enquiries…): the retired
+// Approvals (approval-center.html) and Website attention (attention.html) pages
+// redirect here as #ok and #website (Oct 2026 workflow audit, change 1).
+// The hash may also name the row to open — #enquiries?sel=lead:<id> is the
+// lead_followup notice's href (Oct 2026 audit, gap 2): the reply is one click
+// from the nudge, not two. Read once at boot; openLinkedRow() acts on it.
+const HASH_LINK=(()=>{const raw=String(location.hash||'').slice(1);const i=raw.indexOf('?');return {view:i<0?raw:raw.slice(0,i),sel:i<0?'':(new URLSearchParams(raw.slice(i+1)).get('sel')||'')};})();
+let VIEW=['messages','ok','enquiries','website','support'].indexOf(HASH_LINK.view)>=0?HASH_LINK.view:'everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// the Enquiries view's own narrowing (the old Enquiries page's controls):
+// status chip · kind · order. Open = still in play (new, read, replied,
+// converted); Not a fit / archived only under All.
+let EFILTER='open',KIND_F='all',SORT='newest';
 // ── the client · project lenses (D-filter) ───────────────────────────────────
 // Eric: "messages still cant be filtered by project/contact unless i go through
 // their profile". This is a LENS, not a relocation. Every option is derived from
@@ -266,7 +361,7 @@ function inboxUrl(){
   const q=p.toString();return location.pathname+(q?'?'+q:'');
 }
 function readFiltersFromUrl(){const q=QP();FCLIENT=q.get('client_id')||'';FPROJECT=q.get('project')||'';}
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+// SS6 shared ~150ms debounce — kept in sync by hand with contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 // one delegated closer for both header menus (attached ONCE — renderConsole may
 // rebuild the header many times; per-render document listeners would pile up)
@@ -275,9 +370,18 @@ document.addEventListener('click',(e)=>{
   if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
   if(om&&ob&&!om.hidden&&!e.target.closest('.ovf')){om.hidden=true;ob.setAttribute('aria-expanded','false');}
 });
-const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['support','Support & requests']];
+const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['website','Website'],['support','Support & requests']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
-const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='support'&&it.kind==='support');
+// The Enquiries view lists the QUEUE rows (every enquiry from /forms/inbox, one
+// row each, any status); every other view lists the feed's per-person rows. If
+// the /forms/inbox read failed, Enquiries falls back to the feed's rows.
+const viewMatch=(it)=>{
+  if(VIEW==='enquiries')return it.kind==='lead'&&(LEADS_FAILED?!it.queue:!!it.queue);
+  if(it.queue)return false;
+  return VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='website'&&(it.kind==='approval'||it.kind==='lead'))||(VIEW==='support'&&it.kind==='support');
+};
+// what the Everything view counts — the queue's rows are the Enquiries view's own
+const inboxCount=()=>ITEMS.filter(x=>!x.queue).length+SYSROWS.length;
 
 // ── build the conversation items from the ONE feed (+ enquiry fallback) ──────
 // Messages from your clients — feed.client_messages, grouped ONE row per client
@@ -323,7 +427,7 @@ function buildItems(feed,leads,notifs){
     const pid=pidOf(c);
     items.push({kind:'support',id:'sup:'+c.id,support_id:String(c.id||''),thread_key:c.thread_key||('support:'+c.id),
       name:c.client||'Support request',when:String(c.created_at||''),preview:c.subject||'A support request',
-      chip:'Support'+(c.status?' · '+String(c.status).replace(/_/g,' '):''),chipCls:'support',status:String(c.status||'open'),
+      chip:'Support'+(c.status?' · '+capFirst(String(c.status).replace(/_/g,' ')):''),chipCls:'support',status:String(c.status||'open'),
       unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),
       project_id:pid,projects:pid?[{id:pid,name:String(c.project||'')}]:[],href:String(c.href||'')});
   }
@@ -334,11 +438,33 @@ function buildItems(feed,leads,notifs){
   // enquiries: the feed's per-lead rows (slice 2 — the server serves status=new
   // only). An older function build without feed.enquiries degrades to the page's
   // own /forms/inbox read, counting NON-ARCHIVED (C7: the same arithmetic as
-  // leads.html's Open — one queue, one count; heuristic dots for 'new' only).
-  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived');
+  // the Enquiries view's Open — one queue, one count; heuristic dots for 'new' only).
+  // A feed row and a queue row for the same enquiry SHARE one lead object, so a
+  // mark made from either view (read, replied, in pipeline) shows in both.
+  const leadById=new Map((leads||[]).map(l=>[String(l.id),l]));
+  // (the feed's fields win where both carry one — it is the per-thread read)
+  const shared=(l)=>{const q=leadById.get(String(l.id));return (q&&q!==l)?Object.assign(q,l):l;};
+  const enq=(Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit')).map(shared);
+  // Phase 4 (triage): one row per PERSON. The same visitor submitting four forms
+  // showed as four rows ("Eddie ×4"); they group under the newest, with a count.
+  const byPerson=new Map();
   for(const l of enq){
+    const key=String(l.email||'').trim().toLowerCase()||('id:'+l.id);
+    const cur=byPerson.get(key);
+    if(!cur){byPerson.set(key,{lead:l,count:1});continue;}
+    cur.count++;
+    if(String(l.created_at||'')>String(cur.lead.created_at||''))cur.lead=l;   // the newest fronts the row
+  }
+  for(const {lead:l,count} of byPerson.values()){
     items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
-      name:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      name:(l.name||l.email||'Someone')+(count>1?` · ${count} messages`:''),when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
+  }
+  // the Enquiries queue (the old Enquiries page): EVERY enquiry, one row each,
+  // whatever its status — the view's chips decide which ones show
+  for(const l of (leads||[])){
+    items.push({kind:'lead',queue:true,id:'enq:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
+      name:l.name||l.email||l.phone||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
       chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
   }
   // sorted by newest first; undated items (approvals) stay on top — they're waiting
@@ -361,11 +487,11 @@ function buildSystem(feed,notifs){
   // rows in view. It is only ever used to MATCH — never to name a lens option
   // (a notification carries no project name, and an unnamed dropdown entry is
   // exactly the dead affordance we're avoiding).
-  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:'⚙',label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,project_id:String(n.project_id||''),href:scoped(notifLink(n))}));
-  for(const n of notices)rows.push({sys:true,id:'sys:not:'+n.id,icon:'👀',label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
+  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:si('cog'),label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,project_id:String(n.project_id||''),href:scoped(notifLink(n))}));
+  for(const n of notices)rows.push({sys:true,notice:true,id:'sys:not:'+n.id,icon:si('eye'),label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
   // moments render ACTIVE (undimmed, no ✓) — the feed only carries the still-open
   // ones, and the old page listed them as live items; they stay counted in TOTAL.
-  for(const m of moments)rows.push({sys:true,id:'sys:mom:'+m.id,icon:'✨',label:m.headline||'A moment',tag:'Worth a look',when:String(m.created_at||''),read:false,href:scoped('/today.html')});
+  for(const m of moments)rows.push({sys:true,id:'sys:mom:'+m.id,icon:si('sparkles'),label:m.headline||'A moment',tag:'Worth a look',when:String(m.created_at||''),read:false,href:scoped('/today.html')});
   return rows;
 }
 
@@ -377,7 +503,7 @@ function renderConsole(){
     <aside class="lpane" aria-label="Conversation list">
       <div class="lhead">
         <div class="lrow1">
-          <span class="obj-ic" aria-hidden="true">📥</span>
+          <span class="obj-ic" aria-hidden="true"><svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/></svg></span>
           <div class="viewdd">
             <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false">${esc(VIEW_LABEL[VIEW])} <span class="car" aria-hidden="true">▾</span></button>
             <div id="viewMenu" role="listbox" aria-label="Inbox views" hidden></div>
@@ -393,6 +519,7 @@ function renderConsole(){
         </div>
         <input class="search" id="q" type="search" aria-label="Search conversations" placeholder="Search conversations…" value="${esc(Q)}">
         <div class="lfilters" id="lfilters" hidden></div>
+        ${VIEW==='enquiries'?enqToolbar():''}
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -440,6 +567,47 @@ function renderConsole(){
     else if(e.key==='Enter'&&ACTIVE>=0&&vis[ACTIVE]){e.preventDefault();activateRow(vis[ACTIVE]);}
   });
   renderLenses();
+  wireEnqToolbar();
+}
+
+// ── the Enquiries view's toolbar (the old Enquiries page's controls) ─────────
+// Built once per view change; a chip, kind or sort change repaints the LIST
+// only, so the controls (and the search input) keep their nodes and focus.
+function enqToolbar(){
+  const chip=(f,label)=>`<button type="button" data-ef="${f}" aria-pressed="${EFILTER===f?'true':'false'}" class="${EFILTER===f?'on':''}">${label}${f==='all'?'':' <span class="n" hidden></span>'}</button>`;
+  const opt=(v,label,cur)=>`<option value="${v}"${cur===v?' selected':''}>${label}</option>`;
+  return `<div class="efilt" id="efilt" role="group" aria-label="Filter enquiries">${chip('open','Open')}${chip('new','New')}${chip('all','All')}</div>
+    <div class="ebar">
+      <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
+      <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
+      <button type="button" class="btnlink" id="newEnq">+ New enquiry</button>
+    </div>`;
+}
+function wireEnqToolbar(){
+  const ef=$('efilt');if(!ef)return;
+  ef.querySelectorAll('[data-ef]').forEach(b=>b.addEventListener('click',()=>{
+    EFILTER=b.getAttribute('data-ef');
+    ef.querySelectorAll('[data-ef]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});
+    narrowed();
+  }));
+  const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
+  const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
+  $('newEnq').addEventListener('click',openNew);
+}
+// the queue's counts on the Open / New chips — every enquiry, before search
+function paintEnqCounts(){
+  const ef=$('efilt');if(!ef)return;
+  const q=ITEMS.filter(x=>x.kind==='lead'&&viewMatch(x)).map(x=>String((x.lead&&x.lead.status)||'new'));
+  const n={open:q.filter(s=>s!=='archived'&&s!=='not_a_fit').length,new:q.filter(s=>s==='new').length};
+  ef.querySelectorAll('[data-ef] .n').forEach(s=>{const v=n[s.parentNode.getAttribute('data-ef')]||0;s.textContent=String(v);s.hidden=!v;});
+}
+// a narrower list: the roving index resets, and a selection the list no longer
+// shows is let go (never strand the pane on a hidden row)
+function narrowed(){
+  ACTIVE=-1;
+  const lost=SEL&&!visibleRows().some(r=>r.id===SEL);
+  if(lost)SEL='';
+  renderList();if(lost)renderPane();
 }
 
 // ── the client · project lenses ───────────────────────────────────────────────
@@ -508,8 +676,27 @@ window.addEventListener('popstate',()=>{
 // preview · chip) and system rows (label · tag) alike.
 function rowMatch(r){
   const q=Q.trim().toLowerCase();if(!q)return true;
-  const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+(r.chip||''));
+  // an enquiry also answers to its email and phone (the old Enquiries search)
+  const l=r.lead||{};
+  const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+rowChip(r)+' '+(l.email||'')+' '+(l.phone||''));
   return hay.toLowerCase().includes(q);
+}
+// the Enquiries view's status chip + kind filter (other views: no-op)
+function enqMatch(r){
+  if(VIEW!=='enquiries'||r.kind!=='lead')return true;
+  const l=r.lead||{},st=String(l.status||'new');
+  if(EFILTER==='open'&&(st==='archived'||st==='not_a_fit'))return false;
+  if(EFILTER==='new'&&st!=='new')return false;
+  return KIND_F==='all'||(l.form_kind||'contact')===KIND_F;
+}
+// Phase 4 (triage): where an enquiry went, in plain words. `new` and `read`
+// show nothing (the dot says "new"); in the pipeline shows the deal link.
+const STATUS_LABEL={replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit'};
+// a queue row's chip says the kind AND where it went, so All reads at a glance
+function rowChip(r){
+  if(!(r.queue&&r.lead))return r.chip||'';
+  const st=r.lead.converted?'In pipeline':STATUS_LABEL[r.lead.status];
+  return (KIND[r.lead.form_kind]||'Message')+(st?' · '+st:'');
 }
 // The lenses narrow by IDENTITY, not by text — a client row answers to its own
 // client_id (0115's durable link, resolved server-side), a conversation to every
@@ -524,7 +711,12 @@ function lensMatch(r){
   if(FPROJECT&&itemProjects(r).indexOf(FPROJECT)<0)return false;
   return true;
 }
-function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])].filter(lensMatch).filter(rowMatch);}
+// the Website view = what your site needs: approvals, its enquiries, and the site's own notices
+function visibleRows(){
+  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch);
+  // the Enquiries view can flip to oldest first (ITEMS are newest first)
+  return (VIEW==='enquiries'&&SORT==='oldest')?v.sort((a,b)=>String(a.when).localeCompare(String(b.when))):v;
+}
 // Every narrowing that is actually in force, in plain words. The VIEW is left
 // out on purpose — it has its own visible control and its own older copy.
 function activeLens(){
@@ -552,10 +744,11 @@ function renderList(){
   const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
   if(VIEW==='enquiries'){
-    // C7: the Enquiries count speaks leads.html's vocabulary — non-archived
-    // total with the "M new" qualifier (one queue, one arithmetic).
+    // C7: "N enquiries · M new" — what the queue SHOWS (chip, kind and search
+    // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
-    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by newest`;
+    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
+    paintEnqCounts();
   }else{
     $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
   }
@@ -571,6 +764,14 @@ function renderList(){
   // this codebase's recurring defect is the empty state that won't say why.
   if(!vis.length){
     const bits=activeLens();
+    // the Enquiries view's own narrowing names itself (the old page's copy)
+    if(VIEW==='enquiries'&&!FCLIENT&&!FPROJECT){
+      const msg=(Q.trim()||KIND_F!=='all')?`No enquiries match${Q.trim()?` “${esc(Q.trim())}”`:' that filter'}.`
+        :EFILTER==='new'?'No new enquiries — you’re caught up.'
+        :'Nothing yet. When someone fills in your website’s contact form, it lands here — and in Customers.';
+      rows.innerHTML=`<li class="lempty" role="presentation">${msg}${bits.length?`<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`:''}</li>`;
+      renderPane();return;
+    }
     rows.innerHTML=`<li class="lempty" role="presentation">${bits.length
       ?`Nothing here matches ${joinBits(bits)}.<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`
       :VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;
@@ -590,7 +791,7 @@ function renderList(){
       <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
       <span class="rmain">
         <span class="rtop"><span class="rname">${esc(it.name)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
-        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(it.chip)}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
+        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(rowChip(it))}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
       </span></li>`;
   }
   rows.innerHTML=h;
@@ -602,6 +803,8 @@ function openItem(id){
   const it=ITEMS.find(x=>x.id===id);if(!it)return;
   SEL=id;
   it.unread=false;   // the dot clears the moment the conversation opens (optimistic)
+  // …and on its twin: an enquiry's feed row and queue row are one thread
+  if(it.thread_key)ITEMS.forEach(x=>{if(x.thread_key===it.thread_key)x.unread=false;});
   if(it.thread_key)api('/threads/read','POST',{thread_key:it.thread_key}).catch(()=>{});
   renderList();
   renderPane();
@@ -640,7 +843,7 @@ function renderPane(){
       ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Pick a conversation</h2><p class="muted">Choose a row on the left — it opens right here.</p></div>`
       :bits.length
       ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing matches this filter</h2><p class="muted">Nothing here matches ${joinBits(bits)}.</p><p class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></p></div>`
-      :ITEMS.length
+      :ITEMS.some(x=>!x.queue)
         ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing in this view</h2><p class="muted">Nothing in this view — check Everything.</p></div>`
         :`<div class="center" style="margin:auto"><div class="allclear"><div class="allart" aria-hidden="true">🌤</div>✓ Nothing needs you right now — the platform is watching the rest.<p style="margin-top:12px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p></div></div>`;
     return;
@@ -650,10 +853,11 @@ function renderPane(){
   if(it.kind==='approval')return void paneApproval(host,it);
   if(it.kind==='lead')return void paneLead(host,it);
 }
-const paneHead=(it,subHtml)=>`<div class="phead">
+const paneHead=(it,subHtml,actsHtml)=>`<div class="phead">
   <button type="button" class="pback" id="paneBack">← Inbox</button>
   <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
   <div style="min-width:0"><div class="pname">${esc(it.name)}</div><div class="psub">${subHtml}</div></div>
+  ${actsHtml?`<div class="pacts" id="paneActs">${actsHtml}</div>`:''}
 </div>`;
 function wireBack(){const b=$('paneBack');if(b)b.addEventListener('click',closePane);}
 
@@ -667,7 +871,7 @@ let PANE_SEQ=0;   // a stale async pane render must never paint over a newer one
 // pane render lands (slice-1's snapComposer pattern, crm.html). The draft is
 // keyed to the SELECTED item so it can never leak into another conversation;
 // successful sends clear their field BEFORE re-rendering, so nothing resurrects.
-const COMPOSER_FIELDS=['msgBody','supBody'];
+const COMPOSER_FIELDS=['msgBody','supBody','leadBody'];
 let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by the pane loaders
 // ── C3 (SS6): insertSavedReplies(textareaId) — the shared saved-reply insert.
 // ONE lazy cached fetch of /service/saved-replies per page-load; a picker only
@@ -771,7 +975,7 @@ function convItem(m){
 // the timeline renderer — kept in sync with crm.html by hand (its
 // renderMergedTimeline: month groups + typed icons on a connector line +
 // expandable rows; no filter chips / notes actions here — record-page only)
-const TYPE_ICON={message:'💬',email:'✉',call:'📞',task:'✓',note:'✐',system:'⚙'};
+const TYPE_ICON={message:si('message'),email:si('mail'),call:si('phone'),task:si('check'),note:si('pencil'),system:si('cog')};
 const EXPANDED=new Set();
 function renderTL(host,items){
   if(!items.length){host.innerHTML='<p class="muted" style="font-size:13.5px">Nothing here yet — messages and activity will appear as they happen.</p>';return;}
@@ -800,12 +1004,45 @@ function renderTL(host,items){
 // legal transitions — kept in sync with lib/intake.ts SUPPORT_NEXT by hand
 const SUPPORT_NEXT={open:['in_progress','resolved','closed'],in_progress:['open','resolved','closed'],resolved:['open','closed'],closed:['open']};
 const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',closed:'Closed'};
+// Oct 2026 review: ONE path for every status change — the select, the header's
+// Resolve / Close, and "Reply and resolve". PATCH /support/:id (the existing
+// triage route; the server re-checks the ladder). Resolved or closed ENDS the
+// wait: the row leaves this list and the bell's count (the server counts open +
+// in_progress only — workspace.ts status=in.(open,in_progress) for the badge,
+// not.in.(resolved,closed) for the feed), so the next refresh agrees with us.
+async function setSupportStatus(host,it,to,ctl){
+  if(!to||to===it.status)return false;
+  if(ctl)ctl.disabled=true;
+  const pr=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{status:to});
+  if(pr.ok){
+    toast(to==='resolved'?'Resolved — nice work.':to==='closed'?'Closed.':'Status updated.');
+    it.status=to;it.chip='Support · '+String(to).replace(/_/g,' ');
+    if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();renderConsole();bumpBell();return true;}
+    renderList();paneSupport(host,it);return true;
+  }
+  toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');
+  paneSupport(host,it);return false;
+}
+// the shell's bell re-reads /portal/context on its own cadence; nudge it now so
+// a resolved request leaves the badge without waiting for the next tick
+function bumpBell(){try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}}
 async function paneSupport(host,it){
   const seq=++PANE_SEQ;
   const recHref=it.client_id?scoped('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):'';
-  host.innerHTML=paneHead(it,`<span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}`)+
+  const projHref=(it.projects&&it.projects[0]&&it.projects[0].id)?scoped('/projects.html?project='+encodeURIComponent(it.projects[0].id)):'';
+  const openNow=it.status==='open'||it.status==='in_progress';
+  const acts=openNow?`${it.project_id?'<button type="button" id="supTask" title="Add this request as a task on their project">Make it a task</button>':''}<button type="button" id="supResolve">Resolve</button><button type="button" id="supClose" class="ghost">Close</button>`:'';
+  host.innerHTML=paneHead(it,`<span class="pchip ${esc(it.status||'open')}" id="paneStatusChip">${esc(SUPPORT_LABEL[it.status]||it.status||'Open')}</span><span class="pchip plain">Support request</span><span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}${projHref&&it.projects[0].name?`<a class="link" href="${esc(projHref)}">${esc(it.projects[0].name)} →</a>`:''}`,acts)+
     `<div class="pbody" id="pbody" aria-live="polite"><div class="spin" role="status" aria-label="Loading request"></div></div><div class="pcomposer" id="pcomposer"></div>`;
   wireBack();
+  const sr=$('supResolve');if(sr)sr.addEventListener('click',()=>setSupportStatus(host,it,'resolved',sr));
+  const sc=$('supClose');if(sc)sc.addEventListener('click',()=>setSupportStatus(host,it,'closed',sc));
+  const st=$('supTask');if(st)st.addEventListener('click',async()=>{
+    st.disabled=true;
+    const r=await api('/projects/'+encodeURIComponent(it.project_id)+'/tasks','POST',{title:String(it.preview||'Support request').slice(0,200),client_visible:false});
+    if(r.ok){toast('Added to their project’s tasks.');st.textContent='Task added ✓';}
+    else{toast((r.body&&r.body.message)||'Couldn’t add that task.');st.disabled=false;}
+  });
   let r;
   try{r=await api('/support/'+encodeURIComponent(it.support_id));}
   catch(_){r={ok:false,body:{}};}   // a network-level reject lands on the same "couldn't load" branch
@@ -817,36 +1054,32 @@ async function paneSupport(host,it){
   // status control: current + only the legal transitions (PATCH /support/:id —
   // the existing triage route; the server re-checks the ladder)
   const cur=String(req.status||'open');
+  if(cur!==it.status){it.status=cur;const chip=$('paneStatusChip');if(chip){chip.textContent=SUPPORT_LABEL[cur]||cur;chip.className='pchip '+cur;}}   // the server's status wins over the feed's
   const opts=[cur,...(SUPPORT_NEXT[cur]||[])];
   $('paneStatusWrap').innerHTML=`<label for="paneStatus" style="font-size:11px;color:var(--faint)">Status</label> <select id="paneStatus" aria-label="Support request status">${opts.map(s=>`<option value="${esc(s)}"${s===cur?' selected':''}>${esc(SUPPORT_LABEL[s]||s)}</option>`).join('')}</select>`;
-  $('paneStatus').addEventListener('change',async(e)=>{
-    const to=e.target.value;if(to===cur)return;
-    e.target.disabled=true;
-    const pr=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{status:to});
-    if(pr.ok){
-      toast(to==='resolved'?'Resolved — nice work.':'Status updated.');
-      it.status=to;it.chip='Support · '+String(to).replace(/_/g,' ');
-      if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();return;}
-      renderList();paneSupport(host,it);
-    }else{toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');paneSupport(host,it);}
-  });
+  $('paneStatus').addEventListener('change',(e)=>setSupportStatus(host,it,e.target.value,e.target));
   let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
     h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
   }
   pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
+  const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
-  $('supForm').onsubmit=async(e)=>{
-    e.preventDefault();
-    const ta=$('supBody');const body=(ta.value||'').trim();if(!body)return;
-    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+  // one send path: post the reply; "Reply and resolve" then ends the wait too
+  const sendReply=async(andResolve)=>{
+    const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
+    const btns=[...$('supForm').querySelectorAll('button')];btns.forEach(b=>b.disabled=true);
     const rr=await api('/support/'+encodeURIComponent(it.support_id)+'/messages','POST',{body});
-    if(rr.ok){ta.value='';toast('Sent.');paneSupport(host,it);}
-    else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
+    if(!rr.ok){toast((rr.body&&rr.body.message)||'Couldn’t send.');btns.forEach(b=>b.disabled=false);return;}
+    ta.value='';
+    if(andResolve){await setSupportStatus(host,it,'resolved');return;}   // its own toast says resolved
+    toast('Sent.');paneSupport(host,it);
   };
+  $('supForm').onsubmit=(e)=>{e.preventDefault();sendReply(false);};
+  const rr2=$('supReplyResolve');if(rr2)rr2.addEventListener('click',()=>sendReply(true));
   insertSavedReplies('supBody');   // C3: the saved-reply picker, when any exist
   restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
 }
@@ -870,70 +1103,205 @@ function paneApproval(host,it){
   // pane — list scroll and console state survive — then re-run the loaders so
   // the feed-derived counts catch up. Never location.reload(), which nuked the
   // whole console (view, collapse, scroll, drafts).
-  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=ITEMS.length+SYSROWS.length;SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
+  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=inboxCount();SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
   host.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
   host.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
 }
 
-// ── An enquiry row → the lead card: Reply (mailto) · → Deal · Mark read · Archive ─
+// ── An enquiry row → the lead card: a reply composer (sent from Studio OS) ·
+//    → Deal · Make customer · Mark read · Not a fit · Spam ─────────────────────
+// Oct 2026 workflow audit, change 5: the reply is written and sent HERE
+// (POST /forms/inbox/:id/reply) — it used to be a mailto: that left the app and
+// recorded nothing. The person's email reply comes back to this Inbox; the
+// mail-app link stays as a quiet fallback. The triage that lived on the old
+// Enquiries page (leads.html) moved here with it: Make customer, Not a fit,
+// Spam, and the "✓ In pipeline — view deal" state of a converted enquiry.
+function leadGreeting(l){return (l.name?`Hi ${String(l.name).split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';}
 function paneLead(host,it){
   const l=it.lead||{};
+  const sent=Array.isArray(l.replies)?l.replies:[];
+  const st=String(l.status||'new');
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
-  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${STATUS_LABEL[st]?`<span class="pchip plain stchip ${esc(st)}">${STATUS_LABEL[st]}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
+      ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
       <div class="acts">
-        ${l.email?`<a class="btnlink primary" id="leadReply" href="${leadReplyHref(l)}">Reply</a>`:''}
-        <button id="leadDeal" title="Start a deal in your pipeline from this enquiry">→ Deal</button>
-        ${String(l.status||'new')==='new'?`<button id="leadRead">Mark read</button>`:''}
-        <button id="leadArch">Archive</button>
+        ${l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
+        ${(l.converted||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
+        ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
+        ${(l.converted||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
+        ${l.converted?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`}
       </div>
-      <p class="muted" style="margin-top:12px;font-size:12.5px">Replying opens your email app — sending a deal keeps them in your pipeline.</p>
-    </div></div>`;
+    </div></div>
+    ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
+      <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
+      <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
+    :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
-  const done=(status,removeRow)=>{
-    if(it.lead)it.lead.status=status;
-    if(removeRow){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderPane();}
-    renderList();
-  };
-  const lr=$('leadReply');if(lr)lr.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
-  const mr=$('leadRead');if(mr)mr.addEventListener('click',async()=>{mr.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'});if(r.ok){toast('Marked read.');done('read',false);paneLead(host,it);}else{toast('That didn’t update.');mr.disabled=false;}});
-  const ar=$('leadArch');if(ar)ar.addEventListener('click',async()=>{ar.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'archived'});if(r.ok){toast('Archived.');done('archived',true);}else{toast('That didn’t update.');ar.disabled=false;}});
+  // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
+  const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
+  const lf=$('leadForm');
+  if(lf){
+    lf.onsubmit=async(e)=>{
+      e.preventDefault();
+      const ta=$('leadBody');const body=(ta.value||'').trim();
+      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return;}
+      const btn=$('leadSend');btn.disabled=true;btn.textContent='Sending…';
+      const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/reply','POST',{body});
+      if(r.ok){
+        ta.value='';
+        l.replies=sent.concat([{body,at:new Date().toISOString()}]);
+        toast(`Sent to ${l.email} — their reply comes back here.`);
+        leadMarked(it,'replied');   // the server marked it Replied; every row that shows it agrees
+      }else{
+        toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
+        btn.disabled=false;btn.textContent='Send reply';
+      }
+    };
+    insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
+    restoreComposer(it);
+  }
+  const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));
+  // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
+  const nf=$('leadNotFit');if(nf)nf.addEventListener('click',()=>setLeadStatus(it,'not_a_fit',nf));
+  const sp=$('leadSpam');if(sp)sp.addEventListener('click',()=>markSpam(it,sp));
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
+  const cv=$('leadConvert');if(cv)cv.addEventListener('click',()=>openConvert(it));
 }
-// Prefill the reply so responding is one tap — kept in sync with leads.html by hand
+// ONE path for every enquiry mark. The lead object is shared by the enquiry's
+// feed row and its queue row, so the new status shows in every view at once;
+// rows that can no longer show it drop out (Everything lists only what's still
+// waiting; spam leaves everywhere), and the pane lets go of a row the list no
+// longer shows. Focus never drops to <body>: it stays in the pane when the row
+// stays, else returns to the list.
+function leadMarked(it,status){
+  const id=it.lead_id;
+  if(status!=='spam'&&it.lead)it.lead.status=status;
+  const leaves=(x)=>status==='spam'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
+  ITEMS=ITEMS.filter(x=>!(x.kind==='lead'&&x.lead_id===id&&leaves(x)));
+  ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id&&status!=='new')x.unread=false;});
+  TOTAL=inboxCount();
+  if(SEL&&!visibleRows().some(r=>r.id===SEL))SEL='';
+  renderList();renderPane();
+  if(!SEL){const r=$('rows');if(r)r.focus();return;}
+  const h=document.querySelector('#rpane .pname');
+  const f=(status==='read'||status==='not_a_fit')&&$('leadNotFit')||h;
+  if(f){if(f===h)h.setAttribute('tabindex','-1');f.focus();}
+}
+async function setLeadStatus(it,status,btn){
+  if(btn)btn.disabled=true;
+  const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status});
+  if(!r.ok){toast('That didn’t update.');if(btn)btn.disabled=false;return;}
+  toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='replied'?'Marked replied.':'Marked read.');
+  leadMarked(it,status);
+}
+async function markSpam(it,btn){
+  btn.disabled=true;
+  const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:true});
+  if(!r.ok){toast('That didn’t update.');btn.disabled=false;return;}
+  toast('Marked as spam — it won’t show again.');
+  leadMarked(it,'spam');
+}
+// Phase 2 (one customer model): Make customer = contact + customer (+ deal) from
+// ONE enquiry, no re-typing. The customer route (POST /sales/customers)
+// provisions the workspace and links the contact; the deal rides on the same
+// contact. Then their record opens.
+function openConvert(it){
+  const l=it.lead||{},id=it.lead_id;
+  $('convWho').textContent=(l.name||l.email)+(l.message?' — “'+l.message.slice(0,80)+(l.message.length>80?'…':'')+'”':'');
+  $('conv-biz').value=l.name||''; $('conv-email').value=l.email||''; $('conv-deal').checked=true;
+  const dlg=$('convDlg'); if(!dlg.open)dlg.showModal();
+  $('conv-cancel').onclick=()=>dlg.close();
+  $('convForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const go=$('conv-go'); go.disabled=true; go.textContent='Setting up…';
+    const email=$('conv-email').value.trim(); const biz=$('conv-biz').value.trim()||l.name||'';
+    try{
+      const r=await api('/sales/customers','POST',{email,name:l.name||'',business_name:biz,source_submission_id:id});
+      if(!r.ok){go.disabled=false;go.textContent='Make customer';toast((r.body&&r.body.message)||'Couldn’t set them up just now.');return;}
+      const d=r.body&&r.body.data||{};
+      let dealId=null;
+      if($('conv-deal').checked){
+        let contactId=null;
+        const c=await api('/sales/contacts','POST',{name:l.name||'',email,phone:l.phone||''}); if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;
+        const dd=await api('/sales/deals','POST',{title:biz||l.name||email,contact_id:contactId,source:'website_form',source_submission_id:id});
+        if(dd.ok)dealId=dd.body&&dd.body.data&&dd.body.data.id;
+      }
+      l.converted=true; l.status='converted'; if(dealId)l.deal_id=dealId;
+      go.disabled=false; go.textContent='Make customer';
+      dlg.close(); toast(d.already_exists?'They already had a workspace — opening their record.':'They’re a customer now. Opening their record.');
+      leadMarked(it,'converted');
+      const href=d.site_id?('/crm.html?client='+encodeURIComponent(d.site_id)):(d.client_id?('/crm.html?client_id='+encodeURIComponent(d.client_id)):'/customers.html');
+      setTimeout(()=>{location.href=href;},800);
+    }catch(_){go.disabled=false;go.textContent='Make customer';toast('Couldn’t set them up just now.');}
+  };
+}
+// "New enquiry" — a phone or walk-in enquiry becomes a contact (+ a manual deal)
+// through the routes the page already uses; nothing new server-side.
+function openNew(){
+  const dlg=$('newDlg'); if(!dlg)return;
+  $('ne-name').value='';$('ne-email').value='';$('ne-phone').value='';$('ne-msg').value='';$('ne-deal').checked=true;
+  if(!dlg.open)dlg.showModal();   // showModal() focuses the first field (Name) itself — no timer, no WebKit focus race
+  $('ne-cancel').onclick=()=>dlg.close();
+  $('newForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const name=$('ne-name').value.trim(),email=$('ne-email').value.trim(),phone=$('ne-phone').value.trim(),msg=$('ne-msg').value.trim();
+    if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.');return;}
+    const go=$('ne-go'); go.disabled=true; go.textContent='Logging…';
+    try{
+      const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):''});
+      if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.');return;}
+      const contactId=c.body&&c.body.data&&c.body.data.id;
+      let dealId=null;
+      if($('ne-deal').checked){
+        const d=await api('/sales/deals','POST',{title:name||email||phone,contact_id:contactId,source:'manual',notes:msg?('Enquiry: '+msg):''});
+        if(d.ok)dealId=d.body&&d.body.data&&d.body.data.id;
+      }
+      dlg.close(); go.disabled=false; go.textContent='Log enquiry';
+      toast(dealId?'Logged — they’re in your pipeline.':'Logged — they’re in Customers.');
+      const href=dealId?('/crm.html?deal='+encodeURIComponent(dealId)+'&tab=deal'):(contactId?('/crm.html?contact='+encodeURIComponent(contactId)):'/contacts.html');
+      setTimeout(()=>{location.href=scoped(href);},800);
+    }catch(_){go.disabled=false;go.textContent='Log enquiry';toast('Couldn’t log that just now.');}
+  };
+}
+// Prefill the reply so responding is one tap
 function leadReplyHref(l){
   const kind=l.form_kind==='quote'?'quote request':l.form_kind==='booking'?'booking request':'message';
   const hi=l.name?`Hi ${l.name.split(' ')[0]},`:'Hi,';
   const quoted=l.message?`\n\n> ${String(l.message).replace(/\n/g,'\n> ')}`:'';
   return `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent('Re: your '+kind)}&body=${encodeURIComponent(hi+'\n\nThanks for reaching out.'+quoted+'\n\n')}`;
 }
-// P2-C (Seam 3): promote a captured enquiry into a pipeline deal — no re-typing.
-// Kept in sync with leads.html createDeal by hand; navigates to the new Record.
+// P2-C (Seam 3): promote a captured enquiry into a pipeline deal — no re-typing
+// (source_submission_id carries the enquiry; the server copies its text).
+// Navigates to the new Record.
 async function createDeal(it,btn){
-  const l=it.lead||{};btn.disabled=true;
+  const l=it.lead||{},id=it.lead_id;btn.disabled=true;
   const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
   try{
     let contactId=null;
     if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
-    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:it.lead_id});
+    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
     if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));btn.disabled=false;return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     // reflect converted state locally + suppress navigation on already_converted
-    // (idempotent: the server returns the existing deal on a repeat) — mirrors
-    // leads.html createDeal, this function's declared sync source.
-    l.converted=true;l.deal_id=dealId;if(String(l.status||'new')==='new')l.status='read';
-    it.unread=false;
+    // (idempotent: the server returns the existing deal on a repeat)
+    l.converted=true;l.deal_id=dealId;
     toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.');
-    renderList();renderPane();
+    leadMarked(it,String(l.status||'new')==='new'?'read':String(l.status));
     if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
   }catch(_){toast('Couldn’t start that deal.');btn.disabled=false;}
 }
 
 // ── data load / refresh ───────────────────────────────────────────────────────
+// REQ_SEQ (SS6, from the old Enquiries page): a superseded load never paints —
+// two quick refreshes whose first response lands last keep the newest rows.
+let REQ_SEQ=0;
 async function loadData(){
+  const seq=++REQ_SEQ;
   const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false,body:{}}))]);
+  if(seq!==REQ_SEQ)return 'stale';
   if(!feed.ok&&!leads.ok)return false;
   // exactly one of feed/leads failing still renders the surviving half — but
   // WITH a notice (renderList), never as a quietly complete inbox
@@ -946,12 +1314,13 @@ async function loadData(){
   // the meta line's honesty: TOTAL counts what the Everything view actually
   // RENDERS (conversation items + system rows) — never raw feed rows, which
   // group and fold differently (one row per client; moments stay counted).
-  TOTAL=ITEMS.length+SYSROWS.length;
+  TOTAL=inboxCount();
   return true;
 }
 async function refresh(){
   let ok=false;
   try{ok=await loadData();}catch(_){ok=false;}   // a network-level reject must still fire the toast
+  if(ok==='stale')return;   // a newer refresh owns the page
   if(!ok){toast('Couldn’t refresh just now.');return;}
   DRAFT=snapComposer();   // an in-progress reply survives the pane rebuild (restored by the pane loaders)
   if(SEL&&!ITEMS.some(x=>x.id===SEL))SEL='';
@@ -1052,13 +1421,28 @@ async function saveFaq(){
 
 // ── boot ──────────────────────────────────────────────────────────────────────
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your inbox.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your inbox just now.</h2><p class="muted">A brief hiccup — try again in a moment.</p><p><button type="button" class="btnlink primary" id="retryLoad">Try again</button></p></div>`;const b=$('retryLoad');if(b)b.addEventListener('click',()=>{b.disabled=true;load();});}
+const capFirst=(s)=>{s=String(s||'');return s.charAt(0).toUpperCase()+s.slice(1);};
 async function load(){
   readFiltersFromUrl();   // a linked ?client_id=/?project= view lands already narrowed
   const ok=await loadData();
+  if(ok==='stale')return;
   if(!ok){trouble();return;}
   renderConsole();renderList();renderPane();
+  openLinkedRow();
   api('/notifications/read','POST',{}).catch(()=>{});   // opening the Inbox marks activity seen (clears the bell)
+}
+// the deep-linked row (?sel=lead:<id>, or a row id): opened exactly as a click
+// would — selected, its dot cleared, the pane in (and slid in on phones). A row
+// the view shows is preferred; one it does not is still opened, never invented.
+function openLinkedRow(){
+  const want=HASH_LINK.sel;if(!want)return;
+  const m=/^lead:(.+)$/.exec(want);
+  const byLead=(r)=>r.kind==='lead'&&r.lead_id===m[1];
+  const it=m?(visibleRows().find(byLead)||ITEMS.find(byLead)):ITEMS.find(r=>r.id===want);
+  if(!it)return;
+  openItem(it.id);
+  const row=document.getElementById('row-'+cssId(it.id));if(row&&row.scrollIntoView)row.scrollIntoView({block:'nearest'});
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

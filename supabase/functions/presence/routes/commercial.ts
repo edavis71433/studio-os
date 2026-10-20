@@ -11,6 +11,8 @@ import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { isStudioSide, studioDenied } from './projects.ts';
+import { buildActivityDetail } from '../crm/deal_activity.ts';
 import { decideWritePlan } from '../connected/writestore.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import {
@@ -173,7 +175,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 }
 
 export async function handleFormInbox(site: SiteRow, cors: Record<string, string>) {
-  const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at&order=created_at.desc&limit=100`);
+  const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=100`);
   const rows = Array.isArray(r.json) ? r.json : [];
   // P2-F G1 — link each website enquiry to the CRM deal it became (if any), so the
   // inbox can show "converted → view deal" and disable a second conversion. One
@@ -184,19 +186,95 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
     const dq = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&source_submission_id=in.(${ids.join(',')})&select=id,source_submission_id`);
     for (const d of (Array.isArray(dq.json) ? dq.json : [])) if (d.source_submission_id) dealMap.set(String(d.source_submission_id), String(d.id));
   }
-  const submissions = rows.map((s: any) => ({ ...s, deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
+  // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
+  // form values stay server-side as before; each row carries `replies` instead.
+  const submissions = rows.map(({ fields, ...s }: any) => ({ ...s, replies: leadReplies(fields), deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length } }, 200, cors);
 }
 
+// ═══ Oct 2026 workflow audit, change 5 · reply to a website enquiry from Studio OS ═══
+// The reply used to be a mailto: — written in the owner's mail app, recorded nowhere.
+// POST /forms/inbox/:id/reply { body } sends it through the ONE send point
+// (sendEmail, the site's brand, reply-to = the site's inbound address), so:
+//   · the person exists as a contact first (ensureLeadContact) — the inbound door
+//     only lands mail from KNOWN senders, so their answer threads back into the Inbox;
+//   · the enquiry is marked Replied (its follow-up nudge resolves, like any reply);
+//   · the reply text is kept on the submission (fields.__studio_replies, newest last,
+//     capped) — no new table — and, when the enquiry became a deal, logged on it as
+//     an email activity, so the customer record's timeline shows the answer.
+const LEAD_REPLY_MAX = 4000;
+const LEAD_REPLIES_KEPT = 20;
+export function leadReplies(fields: unknown): Array<{ body: string; at: string }> {
+  const list = fields && typeof fields === 'object' ? (fields as any).__studio_replies : null;
+  return Array.isArray(list) ? list.filter((r: any) => r && typeof r.body === 'string').map((r: any) => ({ body: String(r.body), at: String(r.at || '') })) : [];
+}
+export function leadReplyHtml(body: string, original: string): string {
+  const paras = String(body).split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const quoted = original ? `<p style="margin-top:18px;color:#6b6478;font-size:13px">You wrote:</p><blockquote style="margin:0;padding-left:12px;border-left:3px solid #e2dff0;color:#6b6478;font-size:13px">${esc(original).replace(/\n/g, '<br>')}</blockquote>` : '';
+  return paras + quoted;
+}
+async function ensureLeadContact(siteId: string, email: string, name: string, phone: string): Promise<void> {
+  const hit = await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id&limit=1`);
+  if (Array.isArray(hit.json) && hit.json.length) return;
+  await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ site_id: siteId, name: name || '', email, phone: phone || '' }) }).catch(() => {});
+}
+export async function handleFormReply(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  if (!(await isStudioSide(jwt, site, principal))) return studioDenied(cors);
+  let b: any = {}; try { b = await req.json(); } catch { /* */ }
+  const body = typeof b?.body === 'string' ? b.body.trim() : '';
+  if (!body) return json({ error: 'empty', message: 'Write your reply first.' }, 400, cors);
+  if (body.length > LEAD_REPLY_MAX) return json({ error: 'too_long', message: 'That reply is too long to send — keep it under 4,000 characters.' }, 400, cors);
+  const sr = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=id,form_kind,name,email,phone,message,status,fields&limit=1`);
+  const sub = Array.isArray(sr.json) ? sr.json[0] : null;
+  if (!sub) return json({ error: 'not_found' }, 404, cors);
+  const email = String(sub.email || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'no_email', message: 'They left no email address — there’s no way to reply by email.' }, 400, cors);
+  // a studio sends a handful of these a day; this only stops a runaway loop
+  if (!(await rateAllow(`lead-reply:${site.id}`, 60, 3600))) return json({ error: 'rate_limited', message: 'That’s a lot of replies in an hour — try again in a little while.' }, 429, cors);
+  await ensureLeadContact(site.id, email, String(sub.name || ''), String(sub.phone || '')).catch(() => {});
+  const kind = sub.form_kind === 'quote' ? 'quote request' : sub.form_kind === 'booking' ? 'booking request' : 'message';
+  const brand = await loadEmailBrand(site.id);
+  const sent = await sendEmail(email, `Re: your ${kind}`, leadReplyHtml(body, String(sub.message || '')), brand, { critical: true, siteId: site.id });
+  if (!sent) return json({ error: 'not_sent', message: 'We couldn’t send that just now — nothing went out. Try again in a moment, or use your email app.' }, 503, cors);
+  const at = new Date().toISOString();
+  const fields = sub.fields && typeof sub.fields === 'object' ? sub.fields : {};
+  const replies = leadReplies(fields).concat([{ body, at }]).slice(-LEAD_REPLIES_KEPT);
+  const patch: Record<string, unknown> = { fields: { ...fields, __studio_replies: replies } };
+  if (sub.status === 'new' || sub.status === 'read') patch.status = 'replied';
+  await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => {});
+  if (leadFollowupResolvesOn('replied')) {
+    const k = leadFollowupNoticeKey(id);
+    await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  }
+  // the enquiry became a deal → the answer shows on the customer record's timeline
+  try {
+    const dq = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&source_submission_id=eq.${id}&select=id&limit=1`);
+    const dealId = Array.isArray(dq.json) && dq.json[0] ? String(dq.json[0].id) : '';
+    if (dealId) await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ deal_id: dealId, site_id: site.id, kind: 'note', actor: principal.email || principal.userId || 'system', actor_kind: principal.kind, detail: buildActivityDetail('email', body, at) }) });
+  } catch { /* the timeline mirror is best-effort — the email went out */ }
+  return json({ data: { sent: true, at, status: patch.status || sub.status } }, 200, cors);
+}
+
+/** The user-settable enquiry statuses (migration 0129). `converted` is system-set. */
+export const ENQUIRY_STATUSES = ['new', 'read', 'replied', 'archived', 'not_a_fit'];
 export async function handleFormStatus(req: Request, site: SiteRow, id: string, cors: Record<string, string>) {
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
-  const status = ['new', 'read', 'archived'].includes(b?.status) ? b.status : 'read';
-  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status }) });
+  // Phase 4 (triage): New · Read · Replied · Not a fit (archived is the old name
+  // for the same shelf) · Spam (the boolean). Only `new` counts as needs-you, so
+  // every other mark takes the enquiry off Today, the bell and the Inbox at once.
+  const spamFlag = typeof b?.spam === 'boolean' ? b.spam : null;
+  const status = ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null ? 'read' : null);
+  const patch: Record<string, unknown> = {};
+  if (status) patch.status = status;
+  if (spamFlag !== null) patch.spam = spamFlag;
+  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!(r.ok && r.json?.[0])) return json({ error: 'not_found' }, 404, cors);
   // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the
   // bell, and the attention badge (all reading active notices) drop it at once.
   // Keyed period=lead:<id>, this touches exactly this lead's notice, nothing else.
-  if (leadFollowupResolvesOn(status)) {
+  if ((status && leadFollowupResolvesOn(status)) || spamFlag === true) {
     const k = leadFollowupNoticeKey(id);
     await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, {
       method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),

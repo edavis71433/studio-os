@@ -41,51 +41,84 @@ html.dds-embed #detailWrap{padding-top:0}
   .sub{color:var(--soft);font-size:14px;margin-bottom:20px}
   /* ── roster header (.lhead) — the same list-view anatomy as customers.html /
         leads.html / contacts.html: object icon · ONE h1 · ↻ · count/money meta ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px}
   .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:10px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lhead h1{font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 10px;min-height:34px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
-  .search{width:100%;font-family:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink);margin-bottom:12px}
+  .search{width:100%;font-family:inherit;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);margin-bottom:12px}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   /* the calm "your numbers" strip — plain numbers, tabular, no chart */
   .summary{margin-bottom:18px}
   .summary:empty{display:none}
-  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
+  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:11px 14px;font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
   .sum-line strong{color:var(--ink);font-weight:600}
   .sum-line .dot{color:var(--line);margin:0 5px}
   .sum-line .mut{color:var(--faint);font-size:12.5px}
+  /* visual refresh: the summary is four icon stat tiles in one bordered strip */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
+  .stats .st{display:flex;align-items:center;gap:12px;padding:13px 16px;border-left:1px solid var(--line);min-width:0}
+  .stats .st:first-child{border-left:none}
+  .stats .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .stats .ico.good{background:var(--good-soft);color:var(--good)} .stats .ico.warn{background:var(--warn-soft);color:var(--warn)} .stats .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .stats .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .stats .st-main{min-width:0;flex:1}
+  .stats .k{font-size:12px;color:var(--faint)}
+  .stats .v{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stats .s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Oct 2026: the Outstanding tile's sub carries the "see who →" opener, and with both an
+     overdue and a processing amount it outgrows a phone/tablet tile — so that one sub wraps
+     instead of ellipsising (which clipped the link). The other three tiles keep the one line. */
+  .stats .s.multiline{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}
   .sum-stages{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:88px}
-  .sum-stages .sc-l{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);min-width:88px}
+  .sum-stages .sc-l{font-size:12px;color:var(--faint)}
   .sum-stages .sc-n{font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .chip{font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
-  .btn{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:9px;padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  /* visual refresh: the display toggle is a segmented control, not chips */
+  .viewtog{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
+  .viewtog .chip{border:none;border-radius:0;background:transparent;padding:5px 11px;font-size:12.5px;font-weight:500}
+  .viewtog .chip.on{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.danger{background:var(--warn)}
   .btn:disabled{opacity:.5;pointer-events:none}
   .spacer{flex:1}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
   .card:hover{border-color:var(--p)}
   .card .t{font-weight:600}
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
-  .stage{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .stage{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .stage.won{background:var(--good-soft);color:var(--good)}
   .stage.lost{background:transparent;border:1px solid var(--line);color:var(--soft)}
+  /* Oct 2026 (benchmark item 2): the money-state chip — Paid · Processing · Upcoming ·
+     Overdue — on the drawer's invoice rows and the "Who owes you" list, in MONEY_TONE's
+     one colour each (good · info · '' · bad); crm.html's .schip recipe on this page's .stage. */
+  .stage.good{background:var(--good-soft);color:var(--good)}
+  .stage.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .stage.bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+  .stage.void{background:var(--bg);color:var(--faint)}
   .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
-  dialog{border:none;border-radius:16px;padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
   .dbody{padding:18px 20px;max-height:64vh;overflow:auto}
-  .sec{margin-top:16px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
+  .sec{margin-top:16px}.sec h3{font-size:12px;color:var(--faint);margin-bottom:8px}
   .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+  /* the "More ▾" beside the one send button (same shape as crm.html's action bar menu) */
+  .more{position:relative;display:inline-block}
+  .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:220px;background:var(--card,var(--bg));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:4px;display:flex;flex-direction:column;gap:2px}
+  .more-menu[hidden]{display:none}
+  .more-menu .btn{border:none;background:transparent;color:var(--ink);text-align:left;border-radius:var(--dds-r-sm,6px);width:100%}
+  .more-menu .btn:hover{background:var(--bg)}
+  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
   form.mini .grid{display:flex;gap:8px;flex-wrap:wrap}
-  input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+  input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%}
   textarea{min-height:90px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
   .mut{color:var(--soft);font-size:13px}
@@ -93,10 +126,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .hrow:last-child{border-bottom:none}
   .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
   /* activity quick-log + merged timeline */
-  .qlog{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);margin-bottom:12px}
+  .qlog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:12px;background:var(--bg);margin-bottom:12px}
   .qlog .kinds{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-  .qlog .kb{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
-  .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .qlog .kb{font:inherit;font-size:13px;padding:6px 11px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
+  .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:500}
   .qlog textarea{min-height:44px}
   .qlog .qrow{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
   .qlog .qrow input[type=date]{width:auto;flex:0 0 auto}
@@ -115,7 +148,7 @@ html.dds-embed #detailWrap{padding-top:0}
         interactivity rules (only the current step + the one legal back-target). ── */
   .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;cursor:default;
+  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:9px 16px;cursor:default;
     background:var(--card);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:0;
     clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
   .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
@@ -136,9 +169,9 @@ html.dds-embed #detailWrap{padding-top:0}
   /* View toggle (List · Board · Table) */
   .viewtog{display:inline-flex;gap:4px}
   /* ── Table view: sortable columns; the table scrolls in its OWN container ── */
-  #table .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  #table .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px)}
   #table table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
-  #table thead th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  #table thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   #table thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
   #table thead th .thb:hover{color:var(--p)}
   #table thead th .arrow{font-size:10px;color:var(--p)}
@@ -155,7 +188,13 @@ html.dds-embed #detailWrap{padding-top:0}
   /* Kanban board — columns = open stages, cards = deals, tap/drag to move */
   .board-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:2px 20px 6px}
   .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;align-items:start}
-  .col{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:220px}
+  .col{background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px;min-width:220px}
+  /* visual refresh: a soft tint per stage (same order as the open STAGES) so the
+     board reads at a glance; the dark palette keeps the plain surface */
+  .col:nth-child(1){background:#f5f2fc} .col:nth-child(2){background:#fdf6ec} .col:nth-child(3){background:#eef4fb} .col:nth-child(4){background:#fbeff5}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .col{background:var(--bg)}}
+  :root[data-theme="dark"] .col{background:var(--bg)}
+  .col-tip{color:var(--soft)}
   .col-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
   .col-t{font-weight:600;font-size:13.5px;flex:1}
   .col-n{font-size:12px;color:var(--faint);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
@@ -165,20 +204,20 @@ html.dds-embed #detailWrap{padding-top:0}
   .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
   .col-body.drop-over{background:var(--p-soft)}
   .bempty{font-size:12px;text-align:center;padding:10px 4px;opacity:.7}
-  .bcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;position:relative}
+  .bcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px;cursor:pointer;position:relative}
   .bcard:hover{border-color:var(--p)}
   .bcard.dragging{opacity:.5}
   .bc-t{font-weight:600;font-size:13.5px;line-height:1.35}
   .bc-v{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;margin-top:3px}
   .bc-m{color:var(--faint);font-size:12px;margin-top:3px}
   .bcard.is-stale{border-left:2px solid var(--warn,#775d31)}
-  .bc-stale{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
+  .bc-stale{display:inline-block;font-size:12px;font-weight:500;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
   .bc-actions{margin-top:8px;position:relative}
   /* popup contract: the Move trigger + every menu option meet the 44px touch floor */
   .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 12px;min-height:44px;cursor:pointer}
   .bc-move:hover{border-color:var(--p)}
-  .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
+  .bc-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;min-width:170px}
   .bc-menu button{font:inherit;font-size:13px;text-align:left;background:transparent;border:none;color:var(--ink);padding:8px 10px;min-height:44px;display:flex;align-items:center;border-radius:7px;cursor:pointer}
   .bc-menu button:hover{background:var(--p-soft)}
   .board-foot{margin-top:12px;font-size:12.5px}
@@ -190,13 +229,13 @@ html.dds-embed #detailWrap{padding-top:0}
      #detailInner so the pipeline list, board, and the other dialogs are untouched.
      ───────────────────────────────────────────────────────────────────────── */
   #detailWrap{max-width:var(--dds-w-app,1280px)}
-  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-  .backbar{padding:16px 20px 0}
+  #detailInner{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden}
+  .backbar{padding:16px 20px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .backbar .btn{padding:8px 14px}
   /* compact record header — the record page's header idiom (crm.html .rec-head):
      object icon · serif name · one clean sub-row of chips + facts */
   #detailInner .dhead{padding:16px 22px 18px;justify-content:flex-start;align-items:flex-start;gap:14px}
-  #detailInner .dh-ic{width:44px;height:44px;border-radius:12px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+  #detailInner .dh-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
   #detailInner #dtitle{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;outline-offset:3px}
   #detailInner .dh-sub{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:14px;color:var(--soft);margin-top:5px}
   #detailInner .dh-sub a{color:var(--p);text-decoration:none}
@@ -204,7 +243,7 @@ html.dds-embed #detailWrap{padding-top:0}
   #detailInner .dh-sub .fact strong{color:var(--ink);font-weight:600}
   /* it's a full page now — no inner scroll box; each section breathes as a card */
   #detailInner .dbody{padding:8px 22px 28px;max-height:none;overflow:visible}
-  #detailInner .sec{margin:0 0 16px;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  #detailInner .sec{margin:0 0 16px;background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px}
   #detailInner .sec:last-child{margin-bottom:0}
   /* related-list card headers — same idiom as crm.html's Deal-tab cards (.card-h .t) */
   #detailInner .sec h3{font-family:var(--sans);font-weight:700;font-size:14.5px;text-transform:none;letter-spacing:normal;color:var(--ink);margin-bottom:12px}
@@ -220,6 +259,43 @@ html.dds-embed #detailWrap{padding-top:0}
   /* the inline mini-forms + quick-log sit on the card surface for contrast */
   #detailInner form.mini{background:var(--card)}
   @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
+  /* ── Oct 2026 review: the deal page in the record's idiom. The lifecycle bar
+     is crm.html's "Visual refresh" .path rules, copied by hand (same DOM, same
+     ✓ done / current / canback / lost-terminal states the spec pins); a tab
+     strip (Overview · Billing · Activity) sits over the EXISTING sections and
+     only toggles `hidden`; Overview is two columns — details + to-dos, with a
+     Money card and the latest activity in the rail. Every id and data-* hook
+     is unchanged. ── */
+  #detailInner .sec.life{padding:12px 16px 14px}
+  #detailInner .sec.life>h3{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}   /* the bar speaks for itself; the heading stays for the outline + the unit pin */
+  .path{gap:6px;flex:1 1 520px}
+  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
+  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
+  .path button.pstep.current:hover{filter:none;color:var(--p-deep,var(--p))}
+  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
+  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
+  .path-guide{margin-top:10px;font-size:13px}
+  .terminal-chip{font-weight:600;padding:3px 10px;font-size:12px}
+  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
+  #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:.15s}
+  #detailInner .tabs button:hover{color:var(--ink);background:transparent}
+  #detailInner .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
+  #detailInner .tabs button .n{margin-left:6px;font-size:11.5px;color:var(--faint);font-weight:500}
+  #detailInner .dtab[hidden]{display:none}
+  #detailInner .dcols{display:grid;gap:16px;align-items:start}
+  @media(min-width:960px){#detailInner .dcols{grid-template-columns:minmax(0,1fr) 320px}}
+  #detailInner .dcol-main,#detailInner .dcol-rail{min-width:0}
+  #detailInner .dcol-rail .sec:last-child{margin-bottom:0}
+  #detailInner .sec h3 .hlink{float:right;font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer;text-decoration:none}
+  #detailInner .sec h3 .hlink:hover{text-decoration:underline}
+  #detailInner .dkv{display:grid;grid-template-columns:16px 1fr;gap:9px 10px;font-size:13px;align-items:center}
+  #detailInner .dkv svg{width:15px;height:15px;stroke:var(--faint);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  #detailInner .dkv .muted{color:var(--faint)}
+  #detailInner .tl-mini .tl-i{padding:7px 0}
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>
@@ -228,7 +304,7 @@ html.dds-embed #detailWrap{padding-top:0}
 <div class="wrap" id="listWrap">
   <div class="lhead">
     <div class="lrow1">
-      <span class="obj-ic" aria-hidden="true">🤝</span>
+      <span class="obj-ic" aria-hidden="true"><svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/></svg></span>
       <h1>Pipeline</h1>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
@@ -290,6 +366,10 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// a converted deal's customer SITE (presence_deals.converted_site_id, on the deal
+// read) — the id "Manage their access" drills sharing.html into. UUID-shaped only.
+const SITE_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const customerSite=(d)=>(d&&d.converted_site_id&&SITE_UUID.test(String(d.converted_site_id)))?String(d.converted_site_id):'';
 // The roster's canonical URL: scope + the active stage filter — so a filtered
 // view (notably analytics' ?stage=won landing, D1) is linkable and survives a
 // deal-open round-trip. Kept in sync by the chips and closeDealDetail.
@@ -301,6 +381,35 @@ const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
+// ── Oct 2026 benchmark (item 2): money in four states, ONE formula ──────────
+// Paid · Processing · Upcoming · Overdue come from moneyState — a VERBATIM mirror
+// of supabase/functions/presence/lib/money_state.ts (this page has no bundler).
+// tests/presence/money_state_test.mjs pins this copy byte-identical to the lib
+// and to client.html / today.html / crm.html: change all of them or none.
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
+// "overdue" is judged on the STUDIO's local day — the operator's calendar, the
+// same one crm.html and today.html use — never on the browser's UTC date slice.
+function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+const invState=(v)=>moneyState(v,localYmd());
+// upcoming / overdue = still waiting on the client; paid, processing and void are not
+const invWaits=(v)=>{const st=invState(v);return st==='upcoming'||st==='overdue';};
+// the chip itself: the state word in its one tone; a voided row says so, quietly
+const moneyChip=(v)=>{const st=invState(v);return st?`<span class="stage ${MONEY_TONE[st]}" data-money="${st}">${MONEY_WORD[st]}</span>`:'<span class="stage void" data-money="void">Voided</span>';};
 // money0 shows a real cents PAIR when the value is fractional ("$2,500.50",
 // never "$2,500.5") and stays whole-dollar clean otherwise.
 const money0=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{minimumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
@@ -421,7 +530,10 @@ const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:
 // "Last contacted …" reads the same everywhere.
 function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))return'';const days=Math.floor((now-then)/86400000);if(days<=0)return'today';if(days===1)return'yesterday';if(days<7)return days+' days ago';if(days<14)return'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
 // The activity quick-log kinds (calm, plain — icon + label).
-const ACTKINDS=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
+// ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
+const SI={phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',pipeline:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',hourglass:'<path d="M6 2h12M6 22h12"/><path d="M7 2c0 6 5 6 5 10s-5 4-5 10M17 2c0 6-5 6-5 10s5 4 5 10"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
+const svgi=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
+const ACTKINDS=[['call',svgi('phone')+' Call'],['email',svgi('mail')+' Email'],['meeting',svgi('users')+' Meeting'],['note',svgi('pencil')+' Note']];
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
 // The roster read's page size = the server's MAX_PAGE (lib/sales_lifecycle.ts
 // clampLimit). A bare read gets clamped to DEFAULT_PAGE=25, which silently
@@ -450,10 +562,33 @@ let SERVICES=[],CURRENT_DEAL=null;
 // Path state (kept in sync with crm.html by hand): the guidance strip toggle +
 // the pending one-back confirmation.
 let GUIDE_OPEN=true,PENDING_BACK='';
+// ── Oct 2026 review: the deal page's tab strip. Overview (details, to-dos, a
+// Money card) · Billing (proposals, agreement, invoices, retainer, convert) ·
+// Activity (the quick-log + timeline). Every section is still RENDERED — the
+// tabs only toggle `hidden` — so each id/data-* hook keeps its one home. The
+// URL mirrors the tab (?dtab=billing) for shareable deep links; openers that
+// live outside the tab (the won deal's "Send invoice", the guidance's
+// "Convert them") switch to the right tab before they act.
+const DTAB_KEYS=['overview','billing','activity'];
+let DTAB='overview';
+function showDealTab(tab,opts){
+  opts=opts||{};
+  if(!DTAB_KEYS.includes(tab))tab='overview';
+  DTAB=tab;
+  const root=$('detailInner'); if(!root)return;
+  root.querySelectorAll('.tabs [data-dtab]').forEach(b=>{const on=b.dataset.dtab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.setAttribute('tabindex',on?'0':'-1');});
+  root.querySelectorAll('[data-dtab-panel]').forEach(p=>{p.hidden=p.dataset.dtabPanel!==tab;});
+  // ?dtab= mirrors the tab; Overview is the bare deal URL
+  try{const q=new URLSearchParams(location.search);if(tab==='overview')q.delete('dtab');else q.set('dtab',tab);history.replaceState(null,'',location.pathname+'?'+q.toString());}catch(_){}
+  if(opts.focus){const b=root.querySelector('.tabs [data-dtab="'+tab+'"]');if(b)b.focus();}
+}
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
-const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
+// "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
+const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
+const sourceWord=(s)=>({manual:'Added by you',enquiry:'From an enquiry',form:'From your website',import:'Imported'}[String(s||'').toLowerCase()]||String(s||''));
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -1273,16 +1408,26 @@ async function renderSummary(gen){
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
   const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
-  const openPart=open.count?`Open: <strong>${money(open.value_cents)||'$0'}</strong> across ${plur(open.count,'deal')}`:`Open: <strong>no open deals yet</strong>`;
-  const wonPart=wm.count?`Won this month: <strong>${money(wm.value_cents)||'$0'}</strong> (${wm.count})`:`Won this month: <strong>none yet</strong>`;
-  const winPart=(wr.pct===null||wr.pct===undefined)?`Win rate: <strong>—</strong> <span class="mut">(no closed deals yet)</span>`
-    :`Win rate: <strong>${wr.pct}%</strong> <span class="mut">(${wr.won} of ${wr.won+wr.lost}, last 90 days)</span>`;
+  // visual refresh: four icon tiles (Open · Won this month · Win rate ·
+  // Outstanding) in place of the one-line strip; the per-stage cells follow.
+  const ICO={open:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+    won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+    rate:'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
+    ar:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
+  const tile=(k,v,sub,ico,tone,subCls)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s${subCls?' '+subCls:''}">${sub}</div>`:''}</div></div>`;
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal'),'open',''):tile('Open','$0','no open deals yet','open','');
+  const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
+  const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','no closed deals yet','rate','info')
+    :tile('Win rate',wr.pct+'%',`${wr.won} of ${wr.won+wr.lost}${(wr.window_days||0)>=3650?', all time':`, last ${wr.window_days||90} days`}`,'rate','info');
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
-  // AR strip — "who owes me money" across all deals, in one glance (open invoices).
-  const ar=s.ar||{}; let arPart='';
-  if((ar.count||0)>0){ arPart=`<div class="sum-line" style="margin-top:6px">💰 Outstanding: <strong>${money(ar.outstanding_cents)||'$0'}</strong> across ${plur(ar.count,'invoice')}`+((ar.overdue_count||0)>0?` <span class="dot">·</span> <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong> (${ar.overdue_count})`:'')+` <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a></div>`; }
-  host.innerHTML=`<div class="sum-line">${openPart} <span class="dot">·</span> ${wonPart} <span class="dot">·</span> ${winPart}</div>`
-    +(open.count?`<div class="sum-stages">${cells}</div>`:'')+arPart;
+  // AR tile — "who owes me money" across all deals, in one glance (open invoices).
+  const ar=s.ar||{}; let arT='';
+  // Oct 2026 (item 2): outstanding = what still waits (the server's ar runs the one
+  // money formula); a processing payment is on its way and is named, not owed
+  const arProc=(ar.processing_cents||0)>0?` · ${money(ar.processing_cents)} processing`:'';
+  if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+`&nbsp;· <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600;white-space:nowrap">see who →</a>`,'ar','warn','multiline'); }
+  host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
+    +(open.count?`<div class="sum-stages">${cells}</div>`:'');
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
 }
 
@@ -1338,11 +1483,19 @@ async function openReceivables(){
   let d=null;try{const r=await api('/sales/receivables');d=r&&r.data;}catch(e){/* */}
   if(!d){$('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dbody mut">Couldn’t load receivables just now.</div>';const b=$('rcBack');if(b)b.onclick=closeDealDetail;return;}
   const items=d.items||[];
-  // Every row here is an OPEN invoice by definition (the endpoint filters), so
-  // Void always applies; Send reads Resend once a payment link exists, and Copy
-  // link only renders when there's a link to copy — the drawer's exact rules.
-  const list=items.length?items.map(i=>`<div class="item rcv-row"><div><div class="t">${esc(i.title)}${i.overdue?' <span class="pill" style="color:var(--bad,#a3423a)">overdue</span>':''}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}</div></div><span class="rcv-acts"><button class="btn ghost sm" data-send-inv="${esc(i.id)}">${i.stripe_url?'Resend':'Send'}</button>${i.stripe_url?`<button class="btn ghost sm" data-copy-pay="${esc(i.stripe_url)}">Copy link</button>`:''}<button class="btn ghost sm" data-void-inv="${esc(i.id)}" title="${i.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${esc(i.title)}">Void</button>${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</span></div>`).join(''):'<div class="mut">Nobody owes you anything — you’re all paid up. 🎉</div>';
-  $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}</div></div></div><div class="dbody">${list}</div>`;
+  // Every row here is an OPEN invoice (the endpoint filters), and each wears its
+  // money state from the one formula — Processing · Upcoming · Overdue — on the
+  // studio's local day. Send/Resend · Copy link · Void apply only while the
+  // invoice still WAITS on the client (upcoming / overdue): a processing row is
+  // already paid — the money is settling — so chasing or withdrawing it is
+  // wrong, and the server 409s both anyway. Copy link only renders when there's
+  // a link to copy — the drawer's exact rules.
+  const list=items.length?items.map(i=>{const st=invState(i);const waits=invWaits(i);const title=esc(i.title);
+    const acts=waits?`<button class="btn ghost sm" data-send-inv="${esc(i.id)}">${i.stripe_url?'Resend':'Send'}</button>${i.stripe_url?`<button class="btn ghost sm" data-copy-pay="${esc(i.stripe_url)}">Copy link</button>`:''}<button class="btn ghost sm" data-void-inv="${esc(i.id)}" title="${i.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${title}">Void</button>`:'';
+    return `<div class="item rcv-row"><div><div class="t">${title} ${moneyChip(i)}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}${st==='processing'?' · payment on its way':''}</div></div><span class="rcv-acts">${acts}${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</span></div>`;}).join(''):'<div class="mut">Nobody owes you anything — you’re all paid up. 🎉</div>';
+  // Outstanding = what still waits (upcoming + overdue) — the server's total from the
+  // same formula; what's settling rides along as "processing", never inside the total.
+  $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}${d.processing_cents?` · ${money(d.processing_cents)} processing`:''}</div></div></div><div class="dbody">${list}</div>`;
   const b=$('rcBack');if(b)b.onclick=closeDealDetail;
   $('detailInner').querySelectorAll('[data-rcdeal]').forEach(x=>x.onclick=()=>openDeal(x.dataset.rcdeal));
   // After a send/void the list re-reads itself (the row leaves, the Outstanding
@@ -1510,7 +1663,7 @@ function renderList(){
   host.innerHTML=list.map(d=>{
     const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
-    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
@@ -1583,7 +1736,7 @@ function boardCard(d,today){
   // Stalled: no contact in 30+ days (a card the system nudges you about instead of
   // relying on memory). Never-contacted brand-new deals don't flag — avoids noise.
   const stale=d.last_contacted_at&&((Date.now()-Date.parse(d.last_contacted_at))/86400000>=30);
-  const staleBadge=stale?`<span class="bc-stale" title="No contact in 30+ days — worth a nudge">⏳ Stalled</span>`:'';
+  const staleBadge=stale?`<span class="bc-stale" title="No contact in 30+ days — worth a nudge">${svgi('hourglass')} Stalled</span>`:'';
   const canMove=boardMoveTargets(d.stage).length>0;
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
   return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}<div class="bc-actions">${moveBtn}</div></article>`;
@@ -1804,8 +1957,10 @@ async function openDeal(id){
   const dgen=++DET_SEQ;                  // detail-read generation: a slower older open must never paint over this one
   const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
+  // the tab: a ?dtab= deep link on a fresh open; an in-view refresh keeps the current one
+  if(CURRENT_DEAL!==id){const u=new URLSearchParams(location.search).get('dtab');DTAB=DTAB_KEYS.includes(u)?u:'overview';}
   CURRENT_DEAL=id;
-  history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
+  history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():'')+(DTAB!=='overview'?'&dtab='+DTAB:''));
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
@@ -1826,6 +1981,15 @@ async function openDeal(id){
     // (LINKS) so it's never silently stuck. `forWhom` personalises the CTA.
     const forWhom=(c&&c.name)?(' to '+esc(c.name)):'';
     const linkNote=(kind,docId,label)=>LINKS[docId]?`<div class="mut" style="flex-basis:100%;margin-top:4px">Prepared — <a href="${esc(LINKS[docId])}" target="_blank" rel="noopener">open the ${label}</a>, or use “Copy ${label}”. It wasn’t emailed, so share it yourself.</div>`:'';
+    // ONE LINK (benchmark 2026-10, item 5): when BOTH a proposal and an agreement
+    // are drafted on an open deal, the two sends collapse to one — "Send proposal
+    // & agreement" (one email, one page: accept → sign → pay). The per-document
+    // sends and "Request a deposit" move under More; every row keeps its chip
+    // and its other actions.
+    const dealOpen=!(d.stage==='won'||d.stage==='lost'||!!d.converted_client_id);
+    const draftProp=dealOpen?(data.proposals||[]).find(p=>p.status==='draft'&&!(propTotals(p.line_items).meta||{}).superseded_by):null;
+    const draftCon=dealOpen?(data.contracts||[]).find(k=>k.status==='draft'):null;
+    const SEND_BOTH=!!(draftProp&&draftCon);
     const props=(data.proposals||[]).map(p=>{
       const T=propTotals(p.line_items);
       const superseded=!!(T.meta&&T.meta.superseded_by);
@@ -1834,7 +1998,10 @@ async function openDeal(id){
       // A sent/declined proposal that hasn't already been replaced can be revised
       // into a fresh vN+1 (renegotiation), which supersedes this one.
       const canRevise=!superseded&&(p.status==='sent'||p.status==='declined');
-      const act=superseded?'':p.status==='draft'?`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `:p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
+      // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft —
+      // the draft stays viewable, the Send button goes.
+      const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+      const act=superseded?'':p.status==='draft'?(closed?`<span class="mut">Never sent — the deal ${d.stage==='lost'?'closed':'was won'} without it</span> `:SEND_BOTH?'':`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `):p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
       const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
       // A draft was never sent to anyone, so a mistaken one (the duplicate you
       // meant to overwrite) can simply go. The moment it IS sent it becomes part
@@ -1844,8 +2011,8 @@ async function openDeal(id){
       // viewed-tracking + expiry (#205): tell the operator whether the prospect opened
       // it and when it lapses. first_viewed_at/expires_at are null before migration 0107.
       const vbits=[];
-      if(p.first_viewed_at)vbits.push('👁 Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
-      if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?'⏳ Expired':'Expires '+exp.toLocaleDateString());}
+      if(p.first_viewed_at)vbits.push(svgi('eye')+' Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
+      if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString());}
       const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
@@ -1854,7 +2021,7 @@ async function openDeal(id){
       const signed=k.status==='signed';
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
-      const act=k.status==='draft'?`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `:k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
+      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone
       // holds a signing link, and a signature is permanent. Draft only.
@@ -1871,7 +2038,7 @@ async function openDeal(id){
         termMonths=impliedTermMonths(k.body);
         if(termMonths&&k.signed_at)termDefault=addMonthsISO(k.signed_at,termMonths);
       }
-      const termHint=(signed&&!termEnd)?`<div class="mut" style="font-size:12px;margin-top:6px;color:var(--warn,#775d31)">⏰ No renewal date — the renewal reminder can’t arm.${termDefault?` This agreement reads as a ${termMonths}-month term, so ${esc(termDefault)} is filled in below — press Save to confirm it (nothing is set until you do).`:' Add one below and we’ll nudge you before it ends.'}</div>`:'';
+      const termHint=(signed&&!termEnd)?`<div class="mut" style="font-size:12px;margin-top:6px;color:var(--warn,#775d31)">${svgi('clock')} No renewal date — the renewal reminder can’t arm.${termDefault?` This agreement reads as a ${termMonths}-month term, so ${esc(termDefault)} is filled in below — press Save to confirm it (nothing is set until you do).`:' Add one below and we’ll nudge you before it ends.'}</div>`:'';
       const renewRow=signed?`${termHint}<div class="row2" style="margin-top:6px;align-items:center"><label class="mut" for="con-term-${k.id}" style="margin:0">Renewal date (optional)</label><input type="date" id="con-term-${k.id}" value="${esc(termEnd||termDefault)}" style="max-width:170px"><button class="btn ghost" data-set-term="${k.id}">Save</button></div><div class="mut" style="font-size:12px;margin-top:2px">We’ll remind you ~30 and ~7 days before it ends — nothing auto-renews.</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
@@ -1895,25 +2062,65 @@ async function openDeal(id){
       const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
       return `<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}</div></div></li>`;
     }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
+    // ── the Overview rail: a Money card (what's paid, owed, signed, proposed —
+    //    each a fact already on this read) and the three latest timeline items;
+    //    plus the tab counts (open invoices · activity items) ──
+    const invs=(data.invoices||[]).filter(v=>v.status!=='void');
+    const paidInv=invs.filter(v=>v.status==='paid');
+    const paidC=paidInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    // Outstanding = what still WAITS on the client (upcoming + overdue, the one
+    // formula); a settling payment is "processing" — on its way, not outstanding.
+    const openInv=invs.filter(invWaits);
+    const openC=openInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    const procInv=invs.filter(v=>invState(v)==='processing');
+    const procC=procInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    const signedK=(data.contracts||[]).find(k=>k.status==='signed');
+    const sentK=(data.contracts||[]).find(k=>k.status==='sent');
+    const accP=(data.proposals||[]).find(p=>p.status==='accepted');
+    const sentP=(data.proposals||[]).find(p=>p.status==='sent');
+    const IK={
+      money:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/></svg>',
+      clock:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+      doc:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>',
+      repeat:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    };
+    const kv=(ic,txt,muted)=>`${ic}<span${muted?' class="muted"':''}>${txt}</span>`;
+    const lastPaid=paidInv.filter(v=>v.paid_at).sort((a,b)=>a.paid_at<b.paid_at?1:-1)[0];
+    const moneyKv=[
+      paidC?kv(IK.money,`Paid ${money(paidC)}${paidInv.length===1?(paidInv[0].purpose==='deposit'?' · deposit':' · invoice'):' · '+paidInv.length+' invoices'}${lastPaid?', '+esc(evtDate(lastPaid.paid_at)):''}`):kv(IK.money,'Nothing paid yet',true),
+      openC?kv(IK.clock,`Outstanding ${money(openC)} · ${openInv.length===1?(openInv[0].purpose==='deposit'?'deposit':'invoice'):openInv.length+' invoices'}${openInv.every(v=>!v.stripe_url)?', not sent yet':openInv[0].due_date?', due '+esc(openInv[0].due_date):', due now'}${procC?` · ${money(procC)} processing`:''}`):procC?kv(IK.clock,`${money(procC)} processing — payment on its way`):kv(IK.clock,'Nothing outstanding',true),
+      signedK?kv(IK.check,`Agreement signed${signedK.signed_at?' '+esc(evtDate(signedK.signed_at)):''}`):sentK?kv(IK.check,'Agreement out — awaiting signature'):draftContract?kv(IK.check,'Agreement drafted, not sent',true):kv(IK.check,'No agreement yet',true),
+      accP?kv(IK.doc,'Proposal accepted'):sentP?kv(IK.doc,'Proposal sent — awaiting their answer'):(data.proposals||[]).length?kv(IK.doc,'Proposal drafted, not sent',true):kv(IK.doc,'No proposal yet',true),
+    ];
+    if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
+    const billN=(openInv.length+procInv.length)?`${openInv.length+procInv.length} open`:'';
+    const tlN=tlItems.length?String(tlItems.length):'';
+    const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
+    const dtabBtn=(k,label,n)=>`<button type="button" role="tab" data-dtab="${k}" id="dtab-${k}" aria-controls="dpanel-${k}" aria-selected="false" tabindex="-1">${label}${n?`<span class="n">${esc(n)}</span>`:''}</button>`;
+    const dpanel=(k)=>`<div class="dtab" id="dpanel-${k}" role="tabpanel" aria-labelledby="dtab-${k}" data-dtab-panel="${k}" hidden>`;
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
-      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div>
+      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
       <div class="dhead">
-        <div class="dh-ic" aria-hidden="true">🤝</div>
+        <div class="dh-ic" aria-hidden="true">${svgi('pipeline')}</div>
         <div style="min-width:0;flex:1"><div id="dtitle" tabindex="-1">${esc(d.title||'Deal')}</div>
           <div class="dh-sub">${stageBadge(d.stage,signedNow)}
             <span>${c?(c.name?esc(c.name):(c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Contact')):'No contact'}${(c&&c.name&&c.email)?` · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span>
             ${d.expected_value_cents?`<span class="fact"><strong>${money(d.expected_value_cents)}</strong> value</span>`:''}
-            ${d.expected_close?`<span class="fact">Closes <strong>${esc(d.expected_close)}</strong></span>`:''}
+            ${d.expected_close?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
             ${data.last_contacted_at?`<span>Last contacted ${esc(ago(data.last_contacted_at))}</span>`:''}
           </div></div></div>
+      ${(d.stage==='won'||d.converted_client_id)?`<div class="row2 dh-acts" style="padding:0 22px 14px"><button class="btn" id="wonInvoice">Send invoice</button>${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}&client=" data-noscope="1" style="text-decoration:none">Open project</a>`:''}<a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="text-decoration:none">Customer record</a></div>`:''}
       <div class="dbody">
-        <div class="sec"><h3>Move stage</h3><div id="pathHost"></div>
+        <div class="sec life" id="dealLife"><h3>Move stage</h3><div id="pathHost"></div>
           ${d.converted_client_id?'<div class="mut" style="margin-top:10px">Won ✓ — converted to a customer</div>'
             :d.stage==='lost'?`<div class="row2" style="margin-top:10px"><span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button></div>`
             :nextStages.includes('lost')?`<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button class="btn ghost" id="markLost" style="border-color:transparent;color:var(--soft)">Mark as lost (not a fit)</button></div>`:''}
           <div id="lostForm"></div></div>
+        <div class="tabs" role="tablist" aria-label="Deal sections">${dtabBtn('overview','Overview','')}${dtabBtn('billing','Billing',billN)}${dtabBtn('activity','Activity',tlN)}</div>
+        ${dpanel('overview')}<div class="dcols"><div class="dcol-main">
         <div class="sec"><h3>Details</h3>
           <!-- CONTACT first: without a client email NOTHING sends itself — the
                agreement, the deposit and the welcome all fall back to "copy the
@@ -1947,10 +2154,26 @@ async function openDeal(id){
                free-text path first-class. The POST is unchanged. -->
           <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
           <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
+        </div><aside class="dcol-rail">
+          <div class="sec"><h3>Money<button type="button" class="hlink" data-goto-tab="billing">Billing →</button></h3><div class="dkv">${moneyKv.join('')}</div></div>
+          <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
+        </aside></div></div>
+        ${dpanel('billing')}
+        ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
+          <div class="row2" style="margin-top:8px"><button class="btn" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
-          <div class="lrows">${(data.invoices||[]).map(v=>`<div class="row2 lr"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}${v.due_date?` · due ${esc(v.due_date)}`:(v.status==='open'?' · due now':'')}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">${v.stripe_url?'Awaiting payment':'Not sent yet'}</span> <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))}">Void</button>`}<button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`).join('')}</div>
+          <div class="lrows">${(data.invoices||[]).map(v=>{
+            // Oct 2026 (item 2): the row's word is the money state — Paid · Processing ·
+            // Upcoming · Overdue — from the one formula on the studio's local day; sent-ness
+            // moves to the sub-line. Send/Resend · Copy link · Void only while the invoice
+            // still waits on the client: a processing row is paid (settling) and a void row
+            // is closed — neither can be chased or withdrawn, and the server 409s both.
+            const st=invState(v);const waits=invWaits(v);const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+            const when=st==='paid'?(v.paid_at?` · paid ${esc(evtDate(v.paid_at))}`:''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:' · due now')+(v.stripe_url?'':' · not sent yet'):'';
+            const acts=waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'';
+            return `<div class="row2 lr"><span class="mut">${name} — ${money(v.amount_cents)}${when}</span><span>${moneyChip(v)}${acts} <button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`;}).join('')}</div>
           ${(()=>{const inv=(data.invoices||[]).filter(v=>v.status!=='void');if(inv.length<2)return '';const sum=inv.reduce((a,b)=>a+(b.amount_cents||0),0);const paid=inv.filter(v=>v.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);return `<div class="mut" style="margin-top:4px">Payment plan: ${inv.length} stages · ${money(sum)} total${paid?' · '+money(paid)+' paid':''}</div>`;})()}
           <div class="mut" style="margin-top:6px">Send the client a secure payment link, or set up a plan — a deposit now with the balance on completion, or milestone installments.</div>
           <div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button><button class="btn ghost" id="setupPlan">Set up a payment schedule</button></div><div id="invForm"></div></div>
@@ -1958,11 +2181,13 @@ async function openDeal(id){
           ${(()=>{const r=d.retainer;if(r&&r.status&&r.status!=='canceled'){const per=r.interval==='year'?'year':'month';const st=r.status==='active'?'<span style="color:var(--good,#33664b);font-weight:700">Active</span>':r.status==='past_due'?'<span style="color:var(--bad,#a3423a);font-weight:700">Payment overdue</span>':'<span style="color:var(--warn,#775d31);font-weight:600">Awaiting the client’s authorization</span>';const copyLink=(r.status==='pending'&&r.checkout_url)?` <button class="btn ghost" data-copy-pay="${esc(r.checkout_url)}">Copy authorization link</button>`:'';return `<div class="row2"><span class="mut"><strong>${money(r.amount_cents)}</strong> every ${per} · ${st}</span><span>${copyLink}<button class="btn ghost" id="cancelRetainer">Cancel retainer</button></span></div>`;}return `<div class="mut" style="margin-top:2px">Bill this client automatically for ongoing work — the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do, and either of you can stop it any time.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRetainer">Set up a retainer</button></div><div id="retForm"></div>`;})()}
         </div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
+          ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html${customerSite(d)?'?client='+esc(encodeURIComponent(customerSite(d))):''}">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
             canConvert?`<div id="convWrap"><button class="btn" id="convert">Convert — set up their workspace</button><div class="mut" style="margin-top:8px">${convExplain}</div></div>`:
             draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
             `<div id="convWrap"><button class="btn" disabled>Sign the agreement first</button></div>`}
         </div>
+        </div>
+        ${dpanel('activity')}
         <div class="sec"><h3>Activity</h3>
           <div class="qlog">
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
@@ -1971,9 +2196,26 @@ async function openDeal(id){
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
+        </div>
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=closeDealDetail;
+    // ── tabs: show the requested one (a ?dtab= deep link, a refresh's current
+    //    tab, else Overview); clicks + the record tablist's arrow-key contract ──
+    showDealTab(DTAB);
+    $('detailInner').querySelectorAll('.tabs [data-dtab]').forEach(b=>b.onclick=()=>showDealTab(b.dataset.dtab));
+    $('detailInner').querySelectorAll('[data-goto-tab]').forEach(b=>b.onclick=()=>showDealTab(b.dataset.gotoTab,{focus:true}));
+    const dtl=$('detailInner').querySelector('.tabs[role=tablist]');
+    if(dtl)dtl.addEventListener('keydown',(e)=>{
+      const tabsEls=[...dtl.querySelectorAll('[data-dtab]')];const i=tabsEls.indexOf(document.activeElement);
+      if(i<0)return;let j=-1;
+      if(e.key==='ArrowRight')j=(i+1)%tabsEls.length;
+      else if(e.key==='ArrowLeft')j=(i-1+tabsEls.length)%tabsEls.length;
+      else if(e.key==='Home')j=0;
+      else if(e.key==='End')j=tabsEls.length-1;
+      if(j<0)return;e.preventDefault();
+      showDealTab(tabsEls[j].dataset.dtab,{focus:true});
+    });
     // ── Path: the chevron stage bar — kept in sync with crm.html by hand (its
     // renderPath/moveStage: same markup, same done ✓/current/todo + won/lost
     // terminal states, same interactivity rules — ONLY the current step (the
@@ -2004,7 +2246,7 @@ async function openDeal(id){
       if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
       else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
       else if(stage==='contract'&&signedNow)side=`<button type="button" class="btn" id="pathConvert">Convert to customer ↓</button>`;
-      else if(fwdOk)side=`<button type="button" class="btn" id="markComplete">Mark Stage as Complete</button>`;
+      else if(fwdOk)side=`<button type="button" class="btn" id="markComplete">Mark stage complete</button>`;
       else side=`<span class="mut" style="font-size:13px">Get the agreement signed to convert</span>`;
       host.innerHTML=`<div class="pathrow"><div class="path" role="group" aria-label="Deal stages">${steps}</div><div class="path-side">${side}</div></div>
         ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button type="button" class="btn" id="backGo">Move back</button><button type="button" class="btn ghost" id="backNo">Cancel</button></div>`:''}
@@ -2012,7 +2254,7 @@ async function openDeal(id){
       const mc=$('markComplete'); if(mc)mc.onclick=()=>pathMove(fwd,mc);
       // the Convert flow stays exactly where it is — these just point at it
       // (the side button AND the signed-guidance "Do next" deep-link).
-      const goConvert=()=>{const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
+      const goConvert=()=>{showDealTab('billing');const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
       const pc=$('pathConvert'); if(pc)pc.onclick=goConvert;
       const gc=$('guideConvert'); if(gc)gc.onclick=(e)=>{e.preventDefault();goConvert();};
       host.querySelectorAll('.pstep.canback').forEach(b=>b.onclick=()=>{PENDING_BACK=b.getAttribute('data-pstep');renderDrawerPath();});   // only the honest one-back move renders interactive
@@ -2120,6 +2362,8 @@ async function openDeal(id){
     // via the page's Print button). `table` is the plural /sales/* segment.
     const openDoc=async(table,docId,el)=>{if(el)el.disabled=true;try{const r=await api('/sales/'+table+'/'+docId+'/document');if(r&&r.url)window.open(r.url,'_blank','noopener');else toast('Couldn’t open the document just now.',true);}catch(e){toast(nice(e),true);}finally{if(el)el.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // Phase 3 (stage-aware): the won deal's headline verb opens the invoice form
+    const wi=$('wonInvoice'); if(wi)wi.onclick=()=>{showDealTab('billing');const b=$('sendInvoice');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};
     // Sending a SAVED draft is the other half of the blanks guard — the draft may
     // have been seeded weeks ago and never completed. The deal read carries each
     // agreement's body for exactly this check. If the body is MISSING (review F2:
@@ -2137,6 +2381,35 @@ async function openDeal(id){
         toast('Not sent — open it with View / print to check it first.');return;
       }
       b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // ONE LINK: send the proposal AND the agreement in one go (POST /sales/deals/
+    // :id/send). The agreement's blanks guards run exactly as they do for its own
+    // Send — a client must never receive [LIST THE FIVE CORE PAGES] this way either.
+    const sb=$('sendBothBtn'); if(sb)sb.onclick=async()=>{
+      const k=(data.contracts||[]).find(x=>x.id===sb.dataset.con);
+      if(k&&typeof k.body==='string'){
+        if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+        if(!confirmMoneyBlanks(k.body)){toast('Not sent — set the deal value in Details first.');return;}
+      }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
+        toast('Not sent — open it with View / print to check it first.');return;
+      }
+      sb.disabled=true;
+      try{
+        const r=await api('/sales/deals/'+id+'/send','POST',{proposal_id:sb.dataset.prop,contract_id:sb.dataset.con});
+        if(r.url&&!r.emailed){LINKS[sb.dataset.prop]=r.url;LINKS[sb.dataset.con]=r.url;}
+        const dep=(r.data&&r.data.deposit)||{};
+        const depNote=dep.minted?' A '+money(dep.amount_cents)+' deposit request is ready — they can pay the moment they sign.':'';
+        toast(r.emailed?('Proposal and agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+'.'+depNote):(NO_EMAIL?noEmailWhy('Proposal and agreement','link'):'Proposal and agreement prepared — nothing was emailed, so copy the link and send it yourself.'));
+        copyToClip(r.url);openDeal(id);
+      }catch(e){toast(nice(e),true);sb.disabled=false;}};
+    // the per-document sends live under More when the one button shows
+    const sm=$('sendMore'); if(sm){const menu=$('sendMoreMenu');
+      sm.onclick=(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}};
+      const close=()=>{if(!menu.hidden){menu.hidden=true;sm.setAttribute('aria-expanded','false');}};
+      // ONE document listener across renders (openDeal re-renders the drawer after every send)
+      if(window.__sendMoreClose)document.removeEventListener('click',window.__sendMoreClose);
+      window.__sendMoreClose=close;document.addEventListener('click',close);
+      menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});
+      const md=$('moreDeposit'); if(md)md.onclick=()=>{close();const b=$('sendDeposit');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};}
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
     $('detailInner').querySelectorAll('[data-doc-prop]').forEach(b=>b.onclick=()=>openDoc('proposals',b.dataset.docProp,b));
@@ -2422,6 +2695,8 @@ async function boot(){
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
+    // Settings → Invoices & agreements lands here with ?services=1: open the catalog straight away
+    if(new URLSearchParams(location.search).get('services')==='1'){const sb=$('mngServicesTop');if(sb)sb.click();}
   }catch(_){
     $('list').innerHTML='<div class="dds-error"><span class="ico">!</span><span>We couldn’t load your pipeline just now.</span><button type="button" class="retry" id="bootRetry">Try again</button></div>';
     const b=$('bootRetry'); if(b)b.onclick=()=>boot();

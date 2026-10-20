@@ -206,7 +206,7 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     if (isFirst) matched.enquiry = true;
     events.push({
       ...m, category: isFirst ? 'Milestones' : 'Communication', actor: 'A visitor',
-      href: '/leads.html', related_page: 'Your messages',
+      href: '/inbox.html#enquiries', related_page: 'Your messages',
       ...(isFirst ? { title: 'Your first website enquiry', description: m.description || 'Someone reached out through your website for the first time.', milestone: true, iconOverride: M_STAR } : {}),
     });
   }
@@ -274,7 +274,7 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     events.push({ at: ms.firstPublishAt, category: 'Milestones', actor: 'You', title: 'Your website went live', description: 'Your site was published for the very first time.', href: '/presence.html#history', related_page: 'Your website', milestone: true, iconOverride: M_LIVE });
   }
   if (ms.firstEnquiryAt && !matched.enquiry) {
-    events.push({ at: ms.firstEnquiryAt, category: 'Milestones', actor: 'A visitor', title: 'Your first website enquiry', description: 'Someone reached out through your website for the first time.', href: '/leads.html', related_page: 'Your messages', milestone: true, iconOverride: M_STAR });
+    events.push({ at: ms.firstEnquiryAt, category: 'Milestones', actor: 'A visitor', title: 'Your first website enquiry', description: 'Someone reached out through your website for the first time.', href: '/inbox.html#enquiries', related_page: 'Your messages', milestone: true, iconOverride: M_STAR });
   }
   if (ms.firstTestimonialAt && !matched.testimonial) {
     events.push({ at: ms.firstTestimonialAt, category: 'Milestones', actor: 'You', title: 'Your first testimonial is up', href: '/presence.html#testimonials', related_page: 'Your website', milestone: true, iconOverride: M_STAR });

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import AxeBuilder from '@axe-core/playwright';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // ── connections.html + connections-callback.html ─────────────────────────────
 // The "Search Console circle": Eric pressed Connect Search Console and came
@@ -40,7 +41,7 @@ const SURFACE = (over: Record<string, unknown> = {}) => ({ data: {
 } });
 
 test.describe('Connections — the Connect button exists at all', () => {
-  test('a live provider renders Connect; a planned one honestly says coming soon', async ({ page }) => {
+  test('a live provider renders Connect; a planned one honestly says there is nothing to connect yet', async ({ page }) => {
     await installApp(page, { api: { '/connections': SURFACE() } });
     await page.goto('/connections.html');
 
@@ -48,12 +49,12 @@ test.describe('Connections — the Connect button exists at all', () => {
     const connect = page.locator('#svc-google_search_console button[data-connect]');
     await expect(connect).toBeVisible();
     await expect(connect).toHaveText('Connect');
-    await expect(page.locator('#svc-google_search_console .badge')).toHaveText('Not connected');
+    await expect(page.locator('#svc-google_search_console .chip.status')).toHaveText('Not connected');
 
     // and a genuinely-unshipped provider still tells the truth rather than
     // offering a button that would dead-end
     await expect(page.locator('#svc-bing_webmaster button[data-connect]')).toHaveCount(0);
-    await expect(page.locator('#svc-bing_webmaster')).toContainText('This one’s coming soon.');
+    await expect(page.locator('#svc-bing_webmaster')).toContainText('Nothing to connect yet.');
   });
 
   test('an attention badge carries the REASON it needs attention', async ({ page }) => {
@@ -62,10 +63,96 @@ test.describe('Connections — the Connect button exists at all', () => {
         reason: 'The permission lapsed on the service’s side. Reconnecting takes one tap and fixes it.' },
     }) } });
     await page.goto('/connections.html');
-    await expect(page.locator('#svc-google_search_console .badge')).toHaveText('Needs a quick reconnect');
+    await expect(page.locator('#svc-google_search_console .chip.status')).toHaveText('Needs a quick reconnect');
     // a badge with no reason beside it leaves "press Connect again and hope"
     await expect(page.locator('#svc-google_search_console .why'))
       .toContainText('The permission lapsed on the service’s side.');
+  });
+});
+
+// ── the refresh anatomy: crumb · title + chips · a warning band · rows · rail ──
+test.describe('Connections — the refreshed page says what is connected, and what needs you', () => {
+  const MIXED = () => { const s = SURFACE({
+    connection: { status: 'expired', health: 'attention', last_sync_at: '2026-10-12T09:00:00Z', connected_at: '2026-08-02T00:00:00Z',
+      reason: 'The permission lapsed on the service’s side. Reconnecting takes one tap and fixes it.' },
+  }); (s.data.groups as Record<string, unknown[]>)['Your numbers'] = [{
+    key: 'google_analytics', label: 'your visitor numbers', purpose: 'Understand how many people visit and what they look at — in plain numbers.',
+    reads: ['visitors and page views'], approval: 'You approve access on the provider’s sign-in screen.', availability: 'Read-only',
+    connection: { status: 'connected', health: 'ok', last_sync_at: '2026-10-19T16:20:00Z', connected_at: '2026-09-30T00:00:00Z', reason: '' },
+    property: { id: '1', name: 'Bacchus Kitchen', auto_selected: true }, data: { visitors: 512, pageviews: 2100, as_of: '2026-10-19T16:20:00Z' },
+  }]; return s; };
+
+  test('crumb, title chips and the warning band are derived from the rows — and Reconnect in the band is the row’s own action', async ({ page }) => {
+    await installApp(page, { api: { '/connections': MIXED() } });
+    await page.goto('/connections.html');
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Settings');
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).locator('[aria-current="page"]')).toHaveText('Connections');
+    await expect(page.getByRole('heading', { level: 1, name: 'Connections' })).toBeVisible();
+    // 1 ok + 1 attention + 1 planned → the two counts, nothing invented
+    await expect(page.locator('#counts .chip')).toHaveText(['1 connected', '1 needs attention']);
+    // the band names the row and the reason, and its button is the SAME connect action
+    const band = page.locator('#attention');
+    await expect(band).toContainText('How you show up in Google Search needs attention.');
+    await expect(band).toContainText('The permission lapsed on the service’s side.');
+    await expect(band.locator('button[data-connect="google_search_console"]')).toHaveText('Reconnect');
+    // the row itself: icon · sentence-cased name · one-line meaning · chip · action
+    const row = page.locator('#svc-google_search_console');
+    await expect(row.locator('.t > b')).toHaveText('How you show up in Google Search');
+    await expect(row.locator('.t > span').first()).toHaveText('See which searches bring people to you, and whether Google can find your pages.');
+    await expect(row.locator('.chip.status')).toHaveText('Needs a quick reconnect');
+    await expect(row.locator('button[data-connect]')).toHaveText('Reconnect');
+    // grouped exactly as the server groups them
+    await expect(page.locator('.col-main .sec-h h2')).toHaveText(['Being found', 'Your numbers']);
+  });
+
+  test('a connected row folds Refresh and Disconnect behind Manage; the rail lists what each connection reads and when it was read', async ({ page }) => {
+    await installApp(page, { api: { '/connections': MIXED() } });
+    await page.goto('/connections.html');
+    const row = page.locator('#svc-google_analytics');
+    await expect(row.locator('.chip.status')).toHaveText('Connected');
+    await expect(row).toContainText('512 recent visitors');
+    const manage = row.getByRole('button', { name: 'Manage' });
+    await expect(manage).toHaveAttribute('aria-expanded', 'false');
+    await expect(row.locator('[data-refresh]')).toBeHidden();
+    await manage.click();
+    await expect(manage).toHaveAttribute('aria-expanded', 'true');
+    await expect(row.locator('[data-refresh]')).toBeVisible();
+    await expect(row.locator('[data-disc]')).toBeVisible();
+    await expect(row.locator('#more-google_analytics')).toContainText('visitors and page views');
+    // the rail: only the CONNECTED rows, with what they read; activity from the rows' own timestamps
+    const what = page.locator('.col-rail .card').first();
+    await expect(what).toContainText('What connecting does');
+    await expect(what.locator('.tl li')).toHaveCount(1);
+    await expect(what.locator('.tl li')).toContainText('Your visitor numbers');
+    await expect(what.locator('.tl li')).toContainText('Reads visitors and page views.');
+    const activity = page.locator('.col-rail .card').nth(1);
+    await expect(activity).toContainText('Recent activity');
+    await expect(activity.locator('.tl li').first()).toContainText('Read your visitor numbers');
+    await expect(activity.locator('.tl li').first()).toContainText('Oct 19');
+    await expect(activity).toContainText('Connected your visitor numbers');
+  });
+
+  test('nothing connected → no band, an honest header chip, and an empty-but-true rail', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE() } });
+    await page.goto('/connections.html');
+    await expect(page.locator('#counts .chip')).toHaveText(['Nothing connected yet']);
+    await expect(page.locator('#attention')).toHaveCount(0);
+    await expect(page.locator('.col-rail .card').first()).toContainText('Nothing is connected yet.');
+    await expect(page.locator('.col-rail .card').nth(1)).toContainText('Nothing yet');
+    // the concierge still lives on the page (its endpoint and ids unchanged)
+    await expect(page.locator('#cq')).toBeVisible();
+    await expect(page.locator('#cask')).toHaveText('Ask');
+  });
+
+  test('no serious/critical axe violations (desktop)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: { '/connections': MIXED() } });
+    await page.goto('/connections.html');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#svc-google_analytics')).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
   });
 });
 
@@ -136,7 +223,7 @@ test.describe('Connections — Google Analytics chooses its property', () => {
     const connect = page.locator('#svc-google_analytics button[data-connect]');
     await expect(connect).toBeVisible();
     await expect(connect).toHaveText('Connect');
-    await expect(page.locator('#svc-google_analytics')).not.toContainText('This one’s coming soon.');
+    await expect(page.locator('#svc-google_analytics')).not.toContainText('Nothing to connect yet.');
   });
 
   test('MANY properties → "Which property is this website?" with the real list; picking one records it', async ({ page }) => {
@@ -289,5 +376,42 @@ test.describe('Connections — the operator connects FOR a client', () => {
     await expect(page.getByText('the approval screen was left open too long')).toBeVisible();
     // the message the page used to show for all four distinct server errors
     await expect(page.getByText('Please try connecting again from your presence.')).toHaveCount(0);
+  });
+});
+
+// ── Speak as the studio when acting for a client (studio audit Oct 2026, change 2) ──
+// The row's "About" panel told a scoped operator "Who owns it: you do. It's your
+// account and your permission" — the owner's sentence, in the studio's hands.
+// Scoped in, the row now says who is connecting for whom; the owner's own page
+// keeps its words.
+test.describe('Connections — the row speaks as the studio when scoped into a client', () => {
+  const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+  const SCOPED_CTX = { data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+    edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true,
+    capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+    scope: { site_id: CLIENT, name: 'Joe’s Plumbing' },
+  } };
+
+  test('scoped: "You connect this for <client> with a Google account that has access to their property."', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE(), '/portal/context': SCOPED_CTX } });
+    await page.goto(`/connections.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-ctxbar')).toContainText('Joe’s Plumbing');
+    const row = page.locator('#svc-google_search_console');
+    await row.getByRole('button', { name: 'About' }).click();
+    const more = row.locator('#more-google_search_console');
+    await expect(more).toBeVisible();
+    await expect(more).toContainText('You connect this for Joe’s Plumbing with a Google account that has access to their property.');
+    await expect(more).not.toContainText('Who owns it: you do');
+  });
+
+  test('un-scoped: the owner still reads "Who owns it: you do"', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE() } });
+    await page.goto('/connections.html');
+    const row = page.locator('#svc-google_search_console');
+    await row.getByRole('button', { name: 'About' }).click();
+    const more = row.locator('#more-google_search_console');
+    await expect(more).toContainText('Who owns it: you do. It’s your account and your permission');
+    await expect(more).not.toContainText('You connect this for');
   });
 });

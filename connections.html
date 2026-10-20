@@ -8,75 +8,144 @@
 <meta name="description" content="Connect the services you already use — read-only, always with your approval, and yours to disconnect any time.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically). Visual refresh (2026-10):
+     the page follows the approved "Connections — outside services" board —
+     crumb · title + connected/needs-attention chips · a warning band for the
+     one that needs you · one row per service (icon · name · one-line meaning ·
+     status chip · Manage/Reconnect/Connect) grouped as the server groups them ·
+     a rail with "What connecting does" and "Recent activity". Same endpoints
+     (GET /connections, POST /connections/:key/{connect,refresh,disconnect},
+     the GA4 property pair, /concierge/ask); only the look and markup changed. */
   :root{
-    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;
-    --accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;
-    --warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.05);
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);--line-2:color-mix(in srgb,var(--dds-line,#e6e6ec) 60%,var(--dds-card,#fff));
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);--bad:var(--dds-bad,#c43c3c);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--accent:#5b3fa0;--accent-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--accent:#b79ceb;--accent-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#171320}}
+  :root[data-theme="dark"] .btn.primary{color:#171320}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:44px 22px 96px}
-  a.back{font-size:13px;color:var(--soft);text-decoration:none} a.back:hover{color:var(--accent)}
-  header h1{font-family:var(--serif);font-weight:500;font-size:32px;line-height:1.14;margin:.4em 0 .15em}
-  header .sub{color:var(--soft);font-size:15.5px;margin:0;max-width:52ch}
-  .group{margin-top:38px}
-  .group h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);font-weight:600;margin:0 0 12px}
-  .svc{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
-  .svc-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  .svc h3{font-family:var(--serif);font-weight:500;font-size:18px;margin:0}
-  .svc .purpose{color:var(--soft);font-size:14px;margin:4px 0 0}
-  .badge{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
-  .badge.ok{color:var(--good);background:var(--good-soft)} .badge.attn{color:var(--warn);background:var(--warn-soft)}
-  .badge.off{color:var(--soft);background:transparent;border-color:var(--line)} .badge.wait{color:var(--accent);background:var(--accent-soft)}
-  .data{margin-top:12px;font-size:15px;color:var(--ink);font-weight:500}
-  .data .asof{font-size:12px;color:var(--soft);font-weight:400;margin-left:8px}
-  .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;align-items:center}
-  button{font-family:inherit;font-size:14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
-  button:hover{background:var(--accent-soft);border-color:var(--accent)} button:disabled{opacity:.5;cursor:default}
-  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button.primary:hover{filter:brightness(1.05)}
-  button.ghost{border-color:transparent;color:var(--soft)} button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .about{margin-top:6px} .about summary{cursor:pointer;font-size:13px;color:var(--accent);list-style:none;padding:8px 0}
-  .about summary::-webkit-details-marker{display:none}
-  .about summary::before{content:"About this connection · ";color:var(--soft)}
-  .about[open] summary::before{content:"About this connection"}
-  .about .body{font-size:13.5px;color:var(--soft);padding:4px 0 6px;border-top:1px solid var(--line)}
-  .about .body b{color:var(--ink);font-weight:600}
-  .about ul{margin:6px 0 10px;padding-left:18px} .about li{margin:2px 0}
-  .keybox{margin-top:12px;display:none;gap:9px;flex-wrap:wrap}
-  .keybox input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
-  .note{font-size:13px;color:var(--soft);margin-top:8px}
-  /* the reason under a badge, and the persistent problem panel — a failure the
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:20px 28px 90px}
+  svg{display:block}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ── crumb · title row · chips ── */
+  .crumb{font-size:12.5px;color:var(--faint);display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .crumb a{color:var(--faint);text-decoration:none;border-radius:6px;padding:1px 4px;margin-left:-4px}
+  .crumb a:hover{color:var(--p);background:var(--p-soft)}
+  .crumb [aria-current="page"]{color:var(--ink);font-weight:500}
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
+  .subline{display:flex;gap:12px;flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:5px}
+  .subline .dot{color:var(--faint)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);line-height:18px;white-space:nowrap}
+  .chip .d{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+  .chip.good{background:var(--good-soft);border-color:transparent;color:var(--good)} .chip.good .d{background:var(--good)}
+  .chip.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)} .chip.warn .d{background:var(--warn)}
+  .chip.p{background:var(--p-soft);border-color:transparent;color:var(--p)} .chip.p .d{background:var(--p)}
+
+  /* ── buttons (hairline, 8px) — no filled button on this screen: nothing here is the one thing to do ── */
+  .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+  .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .btn.ghost:hover{background:var(--line-2);color:var(--ink)}
+  .btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+  .btn:disabled{opacity:.55;cursor:default}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  /* ── the warning band ── */
+  .alert{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--warn) 28%,var(--line));background:var(--warn-soft);border-radius:var(--dds-r-lg,10px);margin-top:16px;flex-wrap:wrap}
+  .alert .ico{width:28px;height:28px;border-radius:7px;background:var(--card);color:var(--warn);display:grid;place-items:center;flex:0 0 auto}
+  .alert .ico svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .alert .t{flex:1 1 300px;font-size:13.5px} .alert .t b{font-weight:600}
+
+  /* ── two columns · sections · rows ── */
+  .cols{display:flex;gap:24px;margin-top:20px;flex-wrap:wrap;align-items:flex-start}
+  .col-main{flex:999 1 480px;min-width:0}
+  .col-rail{flex:1 1 300px;min-width:0}
+  .sec{margin-bottom:22px}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .sec-h h2{margin:0;font-size:14px;font-weight:600}
+  .list{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
+  .row{display:flex;align-items:center;gap:14px;padding:11px 14px;border-top:1px solid var(--line-2);min-width:0;flex-wrap:wrap}
+  .row:first-child{border-top:none}
+  .row .ic{width:30px;height:30px;border-radius:var(--dds-r-sm,6px);background:var(--bg);display:grid;place-items:center;color:var(--soft);flex:0 0 auto}
+  .row .ic svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .row .t{flex:1 1 220px;min-width:0}
+  .row .t > b{font-weight:600;display:block}
+  .row .t > span{color:var(--faint);font-size:12.5px;display:block}
+  .row .acts{display:flex;gap:6px;align-items:center;margin-left:auto}
+  .row .data{font-size:12.5px;color:var(--ink);font-weight:500;margin-top:2px}
+  .row .data .asof{color:var(--faint);font-weight:400;margin-left:6px}
+  .row .note{font-size:12.5px;color:var(--faint);margin:4px 0 0}
+  .row .note b{color:var(--ink);font-weight:600}
+  /* the reason under a chip, and the persistent problem panel — a failure the
      owner must act on never expires on a 2.6s timer */
-  .why{font-size:13.5px;color:var(--warn);margin:8px 0 0}
-  .prob{display:none;margin-top:12px;padding:12px 14px;border-radius:11px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--ink);font-size:13.5px;line-height:1.5}
-  .prob code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:5px;word-break:break-all}
-  .prob ul{margin:4px 0 0}
-  .center{text-align:center;padding:56px 20px}
-  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
-  a.link{color:var(--accent);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none}
-  .toast.show{opacity:1}
+  .row .why{font-size:12.5px;color:var(--warn);margin:4px 0 0}
+  .prob{display:none;flex-basis:100%;margin-top:4px;padding:10px 12px;border-radius:var(--dds-r,8px);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 28%,var(--line));color:var(--ink);font-size:13px;line-height:1.5}
+  .prob code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--card);padding:1px 5px;border-radius:5px;word-break:break-all}
+  .prob p{margin:6px 0 0} .prob ul{margin:4px 0 0;padding-left:18px}
+  .keybox{display:none;flex-basis:100%;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .keybox input{flex:1;min-width:180px;height:32px;font:inherit;font-size:13.5px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .keybox input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  /* Manage / About: the row's own details, folded until asked for */
+  .more{flex-basis:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);font-size:13px;color:var(--soft);line-height:1.55}
+  .more[hidden]{display:none}
+  .more b{color:var(--ink);font-weight:600}
+  .more p{margin:0} .more p+p{margin-top:6px}
+  .more ul{margin:2px 0 6px;padding-left:18px}
+  .more .actions{margin-top:10px}
+  .pickbox .row2{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+
+  /* ── rail cards · timeline ── */
+  .card{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:14px;box-shadow:var(--shadow)}
+  .card-h h2{margin:0;font-size:14px;font-weight:600}
+  .card p{font-size:13px;color:var(--soft);margin:8px 0 0;line-height:1.55}
+  .tl{list-style:none;margin:8px 0 0;padding:0}
+  .tl li{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line-2);align-items:flex-start}
+  .tl li:first-child{border-top:none}
+  .tl .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);margin-top:7px;flex:0 0 auto}
+  .tl .dot.good{background:var(--good)} .tl .dot.warn{background:var(--warn)} .tl .dot.p{background:var(--p)}
+  .tl .body{flex:1;min-width:0;font-size:13px}
+  .tl .body b{font-weight:600}
+  .tl .body span{display:block;color:var(--faint);font-size:12.5px}
+  .tl .empty{color:var(--faint);font-size:13px;padding:6px 0 0}
+  .askrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .askrow input{flex:1;min-width:160px;height:32px;font:inherit;font-size:13.5px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .askrow input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
   /* a11y: the Concierge answer is a live region — it stays in the accessibility
      tree from first render (never display:none) so the FIRST answer is announced;
      while empty it is zero-height/invisible */
-  .answer{margin-top:12px;padding:13px 15px;background:var(--accent-soft);border-radius:11px;font-size:14px;white-space:pre-wrap}
+  .answer{margin-top:10px;padding:11px 13px;background:var(--p-soft);border-radius:var(--dds-r,8px);font-size:13.5px;white-space:pre-wrap}
   .answer:empty{padding:0;margin:0;background:transparent}
+
+  /* ── states ── */
+  .center{text-align:center;padding:56px 20px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
+  .center .sub{color:var(--soft);font-size:14px;max-width:52ch;margin:8px auto 0}
+  a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.row .acts{margin-left:0}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Connections</h1>
-    <p class="sub" id="sub">Connect the services you already use. Everything is read-only, always with your approval, and yours to disconnect any time.</p>
+  <nav class="crumb" aria-label="Breadcrumb"><a href="/presence.html#settings">Settings</a><span aria-hidden="true">›</span><span aria-current="page">Connections</span></nav>
+  <header class="toprow">
+    <div>
+      <h1 class="title">Connections</h1>
+      <div class="subline"><span id="sub">The outside services your studio talks to.</span><span class="dot" id="subdot" hidden>·</span><span class="chips" id="counts"></span></div>
+    </div>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
@@ -98,6 +167,27 @@ let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
 const SCOPE = (new URLSearchParams(location.search).get('client')||'');
+// Studio audit change 2: while an operator is scoped into a client, the rows
+// speak as the studio ("You connect this for Marlow’s Kitchen…"), never as the
+// owner ("Who owns it: you do"). The name comes from the shell's /portal/context
+// (scope.name — the same source the "Viewing client" bar paints); resolved once
+// before the first render, with a plain fallback if the shell has nothing.
+let CLIENT_NAME = '';
+// shell.js is deferred, so window.ddsContext may not exist yet when init() runs
+// — listen for the shell's own 'dds:context' event instead (2.5s cap, like it).
+function shellContext(){
+  return new Promise((resolve)=>{
+    if(window.__ddsContext) return resolve(window.__ddsContext);
+    let done=false; const fin=()=>{ if(done) return; done=true; resolve(window.__ddsContext||null); };
+    document.addEventListener('dds:context', fin, { once:true });
+    setTimeout(fin, 2500);
+  });
+}
+async function resolveClientName(){
+  if(!SCOPE) return '';
+  try { const c = await shellContext(); return (c && c.scope && c.scope.name) ? String(c.scope.name) : ''; }
+  catch(_e){ return ''; }
+}
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':SCOPE });
 async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
@@ -105,7 +195,7 @@ async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST',
 function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
 
 // A failure that needs the OWNER to do something must not evaporate in 2.6
-// seconds. `problem()` writes the server's own message into the card, where it
+// seconds. `problem()` writes the server's own message into the row, where it
 // stays until the next successful attempt — the operator can read it twice,
 // copy a secret name out of it, or walk away and come back. Toasts stay for
 // things that are merely *news* ("Up to date."), never for things that need
@@ -115,9 +205,9 @@ function problem(key, msg, extra){
   const box = $('prob-'+key); if(!box) return void toast(msg);
   let h = `<b>${esc(msg)}</b>`;
   if(extra && Array.isArray(extra.missing) && extra.missing.length){
-    h += `<p style="margin:6px 0 0">Set these as Supabase Edge Function secrets:</p><ul style="margin:4px 0 0;padding-left:18px">${extra.missing.map(m=>`<li><code>${esc(m)}</code></li>`).join('')}</ul>`;
+    h += `<p>Set these as Supabase Edge Function secrets:</p><ul>${extra.missing.map(m=>`<li><code>${esc(m)}</code></li>`).join('')}</ul>`;
   }
-  if(extra && extra.redirect_uri){ h += `<p style="margin:6px 0 0">Redirect URI to register: <code>${esc(extra.redirect_uri)}</code></p>`; }
+  if(extra && extra.redirect_uri){ h += `<p>Redirect URI to register: <code>${esc(extra.redirect_uri)}</code></p>`; }
   box.innerHTML = h; box.style.display='block';
 }
 function clearProblem(key){ const box=$('prob-'+key); if(box){ box.innerHTML=''; box.style.display='none'; } }
@@ -129,16 +219,12 @@ const serverMsg = (r, fallback) => (r && r.body && typeof r.body.message === 'st
 function askConfirm(title, body, okLabel){
   return new Promise((resolve)=>{
     const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
+    dlg.style.cssText='border:1px solid var(--line,#e6e6ec);border-radius:10px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(21,20,26,.22);background:var(--card,#fff);color:var(--ink,#15141a)';
+    const box=document.createElement('div'); box.style.cssText='padding:18px 20px';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; box.appendChild(h);
+    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; box.appendChild(p); }
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary
-        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid #5b3fa0;background:#5b3fa0;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
-        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
-      return b; };
+    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label; b.className='btn'+(primary?' primary':''); return b; };
     const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
     row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
     let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
@@ -159,6 +245,29 @@ function statusOf(e){
   if(e.availability && e.availability!=='Read-only' && e.availability!=='Read/Write') return { label:'Not available yet', cls:'off', unavailable:true };
   return { label:'Not connected', cls:'off', connected:false };
 }
+const CHIP = { ok:'good', attn:'warn', wait:'p', off:'' };
+// the row title: the server's customer-facing label, sentence-cased ("your
+// visitor numbers" → "Your visitor numbers"); toasts keep the label as sent.
+const titleOf = (label) => { const s=String(label||''); return s.charAt(0).toUpperCase()+s.slice(1); };
+
+// one line icon per service — by key, then by what it is for
+const ICONS = {
+  chart:'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  pin:'<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  card:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+  star:'<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
+  share:'<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.6M8.2 13.2l7.6 4.6"/>',
+  tag:'<path d="M3 12V4h8l9 9-8 8z"/><path d="M7 8h.01"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+};
+const KEY_ICON = { google_analytics:'chart', google_tag_manager:'tag', google_search_console:'search', bing_webmaster:'search', google_business_profile:'pin', apple_business_connect:'pin',
+  google_calendar:'calendar', calendly:'calendar', stripe_connect:'card', mailchimp:'mail', klaviyo:'mail', hubspot:'people', salesforce:'people', yelp:'star', trustpilot:'star',
+  meta_business:'share', facebook_page:'share', instagram:'share', linkedin:'share', youtube:'share' };
+const iconFor = (key) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[KEY_ICON[key]]||ICONS.link}</svg>`;
 
 // the customer's own numbers, in plain words (from the read cache)
 function dataLine(d){
@@ -198,44 +307,104 @@ function propertyBlock(e, s){
   return `<div class="pickbox" id="pick-google_analytics"><p class="note">Checking which Analytics properties that account can see…</p></div>`;
 }
 
-function card(e){
+function row(e){
   const s = statusOf(e);
   const reads = (e.reads||[]).map(r=>`<li>${esc(r)}</li>`).join('');
   let actions = '';
   if(s.connected){
-    actions = `<button data-refresh="${esc(e.key)}">Refresh</button><button class="ghost" data-disc="${esc(e.key)}" data-label="${esc(e.label)}">Disconnect</button>`;
+    actions = `<button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">Manage</button>`;
   } else if(s.unavailable){
-    actions = `<span class="note">This one’s coming soon.</span>`;
+    actions = `<span class="note">Nothing to connect yet.</span><button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">About</button>`;
   } else {
-    actions = `<button class="primary" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">${s.reconnect?'Reconnect':'Connect'}</button>`;
+    actions = `<button type="button" class="btn sm" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">${s.reconnect?'Reconnect':'Connect'}</button><button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">About</button>`;
   }
-  // The reason UNDER the badge. An "attention" badge with nothing beside it is
+  // The reason UNDER the chip. An "attention" chip with nothing beside it is
   // the dead end this page shipped with: something is wrong, and the only move
   // left is to press Connect again and hope.
   const reason = (e.connection && e.connection.reason) ? String(e.connection.reason) : '';
   const why = (reason && (s.cls==='attn'||s.cls==='off') && !s.unavailable) ? `<p class="why">${esc(reason)}</p>` : '';
-  return `<article class="svc" id="svc-${esc(e.key)}">
-    <div class="svc-top">
-      <div><h3>${esc(e.label)}</h3><p class="purpose">${esc(e.purpose)}</p></div>
-      <span class="badge ${s.cls}">${esc(s.label)}</span>
-    </div>
-    ${why}
-    ${s.connected ? dataLine(e.data) : ''}
-    ${propertyBlock(e, s)}
-    <div class="row">${actions}</div>
+  const manage = s.connected ? `<div class="actions"><button type="button" class="btn sm" data-refresh="${esc(e.key)}">Refresh</button><button type="button" class="btn sm ghost" data-disc="${esc(e.key)}" data-label="${esc(e.label)}">Disconnect</button></div>` : '';
+  return `<div class="row" id="svc-${esc(e.key)}">
+    <span class="ic">${iconFor(e.key)}</span>
+    <div class="t"><b>${esc(titleOf(e.label))}</b><span>${esc(e.purpose)}</span>${why}${s.connected ? dataLine(e.data) : ''}${propertyBlock(e, s)}</div>
+    <span class="chip status ${CHIP[s.cls]||''}"><i class="d"></i>${esc(s.label)}</span>
+    <div class="acts">${actions}</div>
     <div class="prob" id="prob-${esc(e.key)}" role="alert"></div>
     <div class="keybox" id="key-${esc(e.key)}">
       <input type="password" placeholder="Paste your read-only key" aria-label="Read-only key" id="keyin-${esc(e.key)}">
-      <button class="primary" data-keygo="${esc(e.key)}" data-label="${esc(e.label)}">Connect</button>
+      <button type="button" class="btn sm" data-keygo="${esc(e.key)}" data-label="${esc(e.label)}">Connect</button>
     </div>
-    <details class="about"><summary></summary><div class="body">
+    <div class="more" id="more-${esc(e.key)}" hidden>
       <p><b>What we read:</b></p><ul>${reads || '<li>your public details</li>'}</ul>
       <p><b>What we never change:</b> nothing — this is read-only. We never post, edit, or remove anything on ${esc(e.label)}, and nothing on your own website changes.</p>
       <p><b>Approval:</b> ${esc(e.approval || 'You approve access on the service’s own screen, and can revoke it any time.')}</p>
-      <p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>
+      ${SCOPE
+        ? `<p><b>Whose account:</b> You connect this for ${esc(CLIENT_NAME || 'this client')} with a Google account that has access to their property. Studio OS only reads what that account allows, and either of you can disconnect any time with one tap. Their data at the service is untouched.</p>`
+        : `<p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>`}
       <p><b>If you don’t connect:</b> nothing changes. Studio OS keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
-    </div></details>
-  </article>`;
+      ${manage}
+    </div>
+  </div>`;
+}
+
+// the header chips + the warning band, from the same entries the rows show
+function headCounts(entries){
+  const connected = entries.filter(e=>statusOf(e).cls==='ok').length;
+  const attention = entries.filter(e=>statusOf(e).cls==='attn');
+  let h='';
+  if(connected) h+=`<span class="chip good"><i class="d"></i>${connected} connected</span>`;
+  if(attention.length) h+=`<span class="chip warn"><i class="d"></i>${attention.length} need${attention.length===1?'s':''} attention</span>`;
+  if(!connected && !attention.length) h+=`<span class="chip"><i class="d"></i>Nothing connected yet</span>`;
+  $('counts').innerHTML=h; $('subdot').hidden=false;
+  return attention;
+}
+function alertBand(attention){
+  if(!attention.length) return '';
+  const e=attention[0], s=statusOf(e);
+  const reason=(e.connection&&e.connection.reason)?String(e.connection.reason):'Reconnect to keep its numbers flowing.';
+  const more=attention.length>1?` ${attention.length-1} more below need${attention.length-1===1?'s':''} a look too.`:'';
+  const btn = s.reconnect
+    ? `<button type="button" class="btn sm" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">Reconnect</button>`
+    : `<button type="button" class="btn sm" data-refresh="${esc(e.key)}">Try again</button>`;
+  return `<div class="alert" id="attention" role="status">
+    <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+    <div class="t"><b>${esc(titleOf(e.label))} needs attention.</b> ${esc(reason)}${esc(more)}</div>
+    <div class="actions">${btn}</div>
+  </div>`;
+}
+// the rail — every line derived from the entries, never invented
+const when=(iso)=>{const d=new Date(iso||'');return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});};
+function railWhat(entries){
+  const on=entries.filter(e=>statusOf(e).connected);
+  let h=`<div class="card"><div class="card-h"><h2>What connecting does</h2></div>
+    <p>Each connection is read-only unless it says otherwise. Studio OS never posts, publishes or charges on your behalf without you pressing the button.</p>`;
+  if(on.length){
+    h+=`<ul class="tl">${on.map(e=>`<li><span class="dot good"></span><div class="body"><b>${esc(titleOf(e.label))}</b><span>Reads ${esc((e.reads||[]).join(', ')||'your public details')}.</span></div></li>`).join('')}</ul>`;
+  } else {
+    h+=`<p class="tl empty">Nothing is connected yet. Each one you connect is listed here with what it reads.</p>`;
+  }
+  return h+`</div>`;
+}
+function railActivity(entries){
+  const items=[];
+  for(const e of entries){
+    const c=e.connection||{}; const s=statusOf(e);
+    if(c.connected_at) items.push({ at:c.connected_at, text:`Connected ${e.label}`, tone:'good' });
+    if(c.last_sync_at) items.push({ at:c.last_sync_at, text:`Read ${e.label}`, tone:'p' });
+    if(s.cls==='attn') items.push({ at:c.last_sync_at||c.connected_at||'', text:`${titleOf(e.label)} needs attention`, tone:'warn' });
+  }
+  items.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
+  let h=`<div class="card" style="margin-top:14px"><div class="card-h"><h2>Recent activity</h2></div>`;
+  h+=items.length
+    ?`<ul class="tl">${items.slice(0,6).map(i=>`<li><span class="dot ${i.tone}"></span><div class="body">${esc(i.text)}<span>${esc(when(i.at)||'date unknown')}</span></div></li>`).join('')}</ul>`
+    :`<p class="tl empty">Nothing yet — connect a service and what happens with it lands here.</p>`;
+  return h+`</div>`;
+}
+function railAsk(){
+  return `<div class="card" style="margin-top:14px"><div class="card-h"><h2>Questions about connecting</h2></div>
+    <p>Ask anything — why connect a service, what it helps with, whether Studio OS can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
+    <div class="askrow"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting"><button type="button" class="btn sm" id="cask">Ask</button></div>
+    <div class="answer" id="cans" aria-live="polite"></div></div>`;
 }
 
 function render(surface){
@@ -243,22 +412,19 @@ function render(surface){
   const keys = Object.keys(groups);
   if(surface && surface.note) $('sub').textContent = surface.note;
   if(!keys.length){
+    $('counts').innerHTML=''; $('subdot').hidden=true;
     $('main').innerHTML = `<div class="center"><h2>Nothing to connect just yet.</h2>
-      <p class="sub" style="margin:0 auto">As services become available for your plan, they’ll appear here — nothing to set up in advance.</p></div>`;
+      <p class="sub">As services become available for your plan, they’ll appear here — nothing to set up in advance.</p></div>`;
     return;
   }
-  let html = '';
+  const entries = keys.flatMap(g=>groups[g]||[]);
+  const attention = headCounts(entries);
+  let html = alertBand(attention);
+  html += `<div class="cols"><div class="col-main">`;
   for(const g of keys){
-    html += `<section class="group"><h2>${esc(g)}</h2>${(groups[g]||[]).map(card).join('')}</section>`;
+    html += `<section class="sec"><div class="sec-h"><h2>${esc(g)}</h2></div><div class="list">${(groups[g]||[]).map(row).join('')}</div></section>`;
   }
-  // the existing Concierge — ask about connecting in your own words
-  html += `<section class="group" style="margin-top:40px">
-    <h2>Questions about connecting</h2>
-    <div class="svc">
-      <p class="purpose" style="margin-top:0">Ask anything — why connect a service, what it helps with, whether Studio OS can change anything, or what happens if you don’t. It answers plainly and only about what’s true of your business.</p>
-      <div class="row"><input id="cq" type="text" placeholder="e.g. why would I connect my Google listing?" aria-label="Ask about connecting" style="flex:1;min-width:200px;font-family:inherit;font-size:14px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="primary" id="cask">Ask</button></div>
-      <div class="answer" id="cans" aria-live="polite"></div>
-    </div></section>`;
+  html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();
 }
@@ -268,6 +434,10 @@ function wire(){
   document.querySelectorAll('[data-keygo]').forEach(b=>b.addEventListener('click', ()=>connectKey(b.getAttribute('data-keygo'), b.getAttribute('data-label'))));
   document.querySelectorAll('[data-disc]').forEach(b=>b.addEventListener('click', ()=>disconnect(b.getAttribute('data-disc'), b.getAttribute('data-label'), b)));
   document.querySelectorAll('[data-refresh]').forEach(b=>b.addEventListener('click', ()=>refresh(b.getAttribute('data-refresh'), b)));
+  document.querySelectorAll('[data-more]').forEach(b=>b.addEventListener('click', ()=>{
+    const box=$('more-'+b.getAttribute('data-more')); if(!box) return;
+    const open=box.hidden; box.hidden=!open; b.setAttribute('aria-expanded', open?'true':'false');
+  }));
   const cask=$('cask'), cq=$('cq');
   if(cask){ cask.addEventListener('click', askConcierge); cq.addEventListener('keydown', e=>{ if(e.key==='Enter') askConcierge(); }); }
   if($('pick-google_analytics')) loadGaProperties();
@@ -289,8 +459,8 @@ async function loadGaProperties(){
       box.innerHTML=`<p class="why">${esc(d.note||'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics.')}</p>`;
       return;
     }
-    box.innerHTML=`<p class="note" style="color:var(--ink);font-weight:600;margin-top:12px">Which property is this website?</p>
-      <div class="row" style="margin-top:8px">${props.map(p=>`<button data-gaprop="${esc(p.id)}">${esc(p.name)}${p.account?` · ${esc(p.account)}`:''}</button>`).join('')}</div>
+    box.innerHTML=`<p class="note" style="color:var(--ink);font-weight:600;margin-top:8px">Which property is this website?</p>
+      <div class="row2">${props.map(p=>`<button type="button" class="btn sm" data-gaprop="${esc(p.id)}">${esc(p.name)}${p.account?` · ${esc(p.account)}`:''}</button>`).join('')}</div>
       <p class="note">Pick the one that measures this website — read-only either way, and changeable any time by reconnecting.</p>`;
     box.querySelectorAll('[data-gaprop]').forEach(b=>b.addEventListener('click',()=>pickGaProperty(b.getAttribute('data-gaprop'),b)));
   }catch(_status){
@@ -309,11 +479,12 @@ async function askConcierge(){
   const question=(cq.value||'').trim(); if(!question) return;
   btn.disabled=true; btn.textContent='…'; box.textContent='Thinking about your presence…';
   const r = await apiPost('/concierge/ask', { question });
-  box.textContent = (r.ok && r.body && r.body.data && r.body.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess. The “About this connection” note above answers the essentials.';
+  box.textContent = (r.ok && r.body && r.body.data && r.body.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess. “About” on a row answers the essentials.';
   btn.disabled=false; btn.textContent='Ask';
 }
 
 async function connect(key, label, btn){
+  const old = btn.textContent;
   btn.disabled = true; btn.textContent = 'One moment…'; clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/connect', {});
   if(r.ok && r.body && r.body.data && r.body.data.mode === 'oauth' && r.body.data.authorize_url){
@@ -331,7 +502,7 @@ async function connect(key, label, btn){
     location.href = r.body.data.authorize_url; return;
   }
   if(r.ok && r.body && r.body.data && r.body.data.connected){ toast('Connected ' + label + '.'); return reload(); }
-  btn.disabled=false; btn.textContent='Connect';
+  btn.disabled=false; btn.textContent=old;
   // Needs a pasted read-only key — the server answers 422 for api-key providers.
   // Status ONLY, never a /key/i sniff of the message: the real 503 activation
   // text names CONNECTION_ENC_KEY, and the sniff showed an OAuth provider a
@@ -370,25 +541,26 @@ async function refresh(key, btn){
   problem(key, serverMsg(r, 'Couldn’t read from it just now — it may need a quick reconnect.'), r.body);
 }
 
-function signedOut(){ $('sub').textContent=''; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub" style="margin:8px auto 0">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
+function signedOut(){ $('sub').textContent=''; $('counts').innerHTML=''; $('subdot').hidden=true; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
 // A 404 here is `no_site` — the caller owns no site of their own (an agency
 // operator, which is exactly Eric). That is PERMANENT: "please refresh in a
 // moment" sent him round the loop forever, because refreshing can never fix it.
 // The fix is a client scope, so say that, and hand him the door.
 function trouble(status){
+  $('counts').innerHTML=''; $('subdot').hidden=true;
   if(status === 404){
     $('main').innerHTML = `<div class="center"><h2>Open a client first.</h2>
-      <p class="sub" style="margin:8px auto 0">Connections belong to a particular business, and your studio account doesn’t have a website of its own. Pick a client and you’ll see everything they can connect — refreshing this page won’t change it.</p>
+      <p class="sub">Connections belong to a particular business, and your studio account doesn’t have a website of its own. Pick a client and you’ll see everything they can connect — refreshing this page won’t change it.</p>
       <p style="margin-top:22px"><a class="link" href="/agency.html">Pick a client from Studio →</a></p></div>`;
     return;
   }
   if(status === 403){
     $('main').innerHTML = `<div class="center"><h2>You don’t have access to that client.</h2>
-      <p class="sub" style="margin:8px auto 0">Nothing changed. If this is one of your clients, open them from Studio and try again from there.</p>
+      <p class="sub">Nothing changed. If this is one of your clients, open them from Studio and try again from there.</p>
       <p style="margin-top:22px"><a class="link" href="/agency.html">Back to Studio →</a></p></div>`;
     return;
   }
-  $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub" style="margin:8px auto 0">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`;
+  $('main').innerHTML = `<div class="center"><h2>We couldn’t load your connections just now.</h2><p class="sub">Nothing’s wrong with your services — this is only this page. Please refresh in a moment.</p></div>`;
 }
 
 async function reload(){
@@ -400,6 +572,7 @@ async function reload(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
+    CLIENT_NAME = await resolveClientName();
     await reload();
   }catch(_){ trouble(0); }
 })();

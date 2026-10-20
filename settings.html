@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Settings — Studio OS</title>
+<meta name="description" content="Your studio's settings in one place — profile, team, billing, invoices, connections, domains and developer tools.">
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* ── Oct 2026 review: Settings is its own page. It used to be a deep link into
+     the website builder (/presence.html#settings), which waited on the builder's
+     whole read wave before it could even switch views — the "Setting the table…"
+     stall. This page loads in one go: eight cards that route to where each
+     thing already lives, and the studio profile editable inline. Page skin =
+     the shell's --dds-* tokens (same aliasing as crm.html / files.html). ── */
+  :root{
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);--bad:var(--dds-bad,#c43c3c);
+    --serif:var(--dds-serif,'Fraunces',Georgia,serif);--sans:var(--dds-sans,'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:26px 20px 90px}
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;margin:0;letter-spacing:-.01em}
+  .subline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:5px}
+  .subline .dot{color:var(--faint)}
+  .setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+  @media (max-width:700px){.setgrid{grid-template-columns:minmax(0,1fr)}}
+  .setcard{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:16px 18px;display:flex;gap:14px;align-items:flex-start;color:inherit;text-decoration:none;transition:.15s}
+  a.setcard:hover{border-color:var(--dds-line-strong,#d2d2db);background:var(--card)}
+  a.setcard:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .setcard .ico{width:36px;height:36px;border-radius:9px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .setcard .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .setcard .t{flex:1;min-width:0} .setcard .t b{display:block;font-weight:600;margin-bottom:2px} .setcard .t span{color:var(--faint);font-size:13px}
+  .setcard .t .st{display:inline-block;margin-top:6px;font-size:12px;font-weight:500;border-radius:999px;padding:1px 8px;background:var(--good-soft);color:var(--good)}
+  .setcard .t .st.warn{background:var(--warn-soft);color:var(--warn)}
+  .setcard .t .st.plain{background:var(--p-soft);color:var(--p)}
+  .card{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:16px 18px;margin-top:18px}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .card-h h2{margin:0;font-size:15px;font-weight:600}
+  .card-h .hint{font-size:12.5px;color:var(--faint)}
+  .form2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin-top:12px}
+  @media (max-width:640px){.form2{grid-template-columns:minmax(0,1fr)}}
+  .form2 label{display:block;font-size:12.5px;color:var(--faint);margin-bottom:4px}
+  .form2 input,.form2 select{width:100%;height:34px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 10px;font:inherit;font-size:13.5px;background:var(--card);color:var(--ink)}
+  .form2 input:focus,.form2 select:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .form2 .full{grid-column:1/-1}
+  .form2 .note{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--dds-line-strong,#d2d2db)} .btn:disabled{opacity:.55;cursor:default}
+  .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#171320}}
+  :root[data-theme="dark"] .btn.primary{color:#171320}
+  .btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+  .center{text-align:center;padding:56px 20px;color:var(--soft)}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px;color:var(--ink)}
+  a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
+  .plan{margin-top:12px;font-size:14px}
+  .plan .line{margin:0 0 6px} .plan .line.warn{color:var(--warn)} .plan .limits{color:var(--soft);margin:0 0 10px}
+  .plan .team{color:var(--soft);margin:0} .plan .team a{color:var(--p);text-decoration:none;font-weight:500} .plan .team a:hover{text-decoration:underline}
+  .plan .aside{color:var(--faint);font-size:12.5px;margin:10px 0 0}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<div class="wrap" id="main">
+  <div class="toprow">
+    <div><h1 id="pagehead" tabindex="-1">Settings</h1><div class="subline" id="subline"><span>Loading…</span></div></div>
+  </div>
+  <div class="setgrid" id="cards" aria-label="Settings areas"></div>
+  <section class="card" id="studio" aria-labelledby="profileHead" hidden>
+    <div class="card-h"><h2 id="profileHead">Studio profile</h2><button class="btn sm primary" type="button" id="profileSave">Save</button></div>
+    <form class="form2" id="profileForm">
+      <div><label for="f-name">Studio name</label><input id="f-name" maxlength="120" autocomplete="organization"></div>
+      <div><label for="f-industry">Kind of business</label><select id="f-industry"><option value="generic">General / other</option>
+          <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
+          <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
+          <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
+          <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
+          <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
+          <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option></select></div>
+      <div><label for="f-email">Email</label><input id="f-email" type="email" maxlength="160" autocomplete="email"></div>
+      <div><label for="f-phone">Phone</label><input id="f-phone" type="tel" maxlength="40" placeholder="Optional" autocomplete="tel"></div>
+      <div class="full"><label for="f-area">Where you work from</label><input id="f-area" maxlength="160" placeholder="e.g. Burbank, CA"></div>
+      <div class="note" id="profileNote">The kind of business drives the nudges on Today and the wording across the app. The rest is what your clients see on documents and emails.</div>
+    </form>
+  </section>
+  <!-- Studio audit 2026-10, change 5: the plan lives HERE. The card used to send
+       the owner to the builder's Business view; now the status line, the agency
+       limits and the one way to change the plan sit on Settings. Never while
+       scoped into a client — /commerce/* answers for the CALLER's own account. -->
+  <section class="card" id="billing" aria-labelledby="billingHead" hidden>
+    <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
+    <div class="plan" id="plan" aria-live="polite"></div>
+  </section>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN = SUPABASE_URL + "/functions/v1/presence";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SCOPE = (function () { const v = new URLSearchParams(location.search).get('client') || ''; return UUID_RE.test(v) ? v : ''; })();
+const withClient = (href) => { if (!SCOPE) return href; const i = href.indexOf('#'); const h = i >= 0 ? href.slice(0, i) : href, hash = i >= 0 ? href.slice(i) : ''; return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(SCOPE) + hash; };
+const possessive = (n) => /s$/i.test(n) ? n + '’' : n + '’s';
+// the client's NAME comes from the shell's context (its scope.name is what the
+// "Viewing client" bar shows); the shell may settle after our first paint
+function scopeName() { const c = CTX || window.__ddsContext; const sc = SCOPE && c && c.scope; return (sc && sc.name) ? String(sc.name) : ''; }
+let TOKEN = "";
+sb.auth.onAuthStateChange(function (_e, s) { if (s && s.access_token) TOKEN = s.access_token; });
+const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE });
+async function api(path, method, body) {
+  const r = await fetch(FN + path, { method: method || 'GET', headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
+  return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
+}
+const toast = (m, bad) => { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok'); };
+const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.test(b.message) && b.message.length < 200) ? b.message : fallback;
+
+// ── the eight areas. Each card routes to where the thing already lives; a card
+//    the caller's plan or role doesn't include is left out, never shown dead. ──
+const IC = {
+  studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+  billing: '<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+  money: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><path d="M8 7V5h8v2"/>',
+  connections: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  notify: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  domains: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  dev: '<path d="M8 9l-4 3 4 3"/><path d="M16 9l4 3-4 3"/><path d="M14 5l-4 14"/>',
+};
+const CARDS = [
+  { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.',
+    scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
+  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true },
+  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, when it renews, and how to change it.', ownerOnly: true },
+  { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
+  { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
+  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
+  // an owner lands on the Domain & email desk; only an operator gets the platform-wide domains view (admin-health said "Operators only" to everyone else — Oct 2026 experience review)
+  { key: 'domains', href: '/presence.html#domain', hrefOperator: '/admin-health.html', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website', scoped: true },
+  // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
+  { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', feature: 'developer', cap: 'use_developer_mode',
+    scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
+];
+let CTX = null;   // /portal/context — the shell already has it; fall back to our own read
+function hasFeature(f) { const list = CTX && CTX.edition_features; return !Array.isArray(list) || list.includes(f); }
+function hasCap(c) { const list = CTX && CTX.capabilities; return !Array.isArray(list) || list.includes(c); }
+// Scoped (?client=), a card either CARRIES the client (scoped: true → ?client= is
+// written into the href here, so the page is honest on its own, not only after
+// the shell's rewrite pass) or says it leaves them (data-noscope + scopedTitle).
+// Platform staff keep the operators-only domains view; everyone else gets the
+// domain desk of the site in scope.
+function cardHtml(c, status) {
+  if (c.hrefOperator && CTX && CTX.is_operator) c = { ...c, href: c.hrefOperator, scoped: false };
+  const who = scopeName() || 'this client';
+  const href = (SCOPE && c.scoped) ? withClient(c.href) : c.href;
+  const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : c.title;
+  const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : c.desc;
+  const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
+  return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}>` +
+    `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.key]}</svg></span>` +
+    `<span class="t"><b>${esc(title)}</b><span>${esc(desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span></a>`;
+}
+const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
+function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); }
+function renderCards() {
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE));
+  $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('');
+  const sc = $('cards').querySelector('[data-card="studio"]');
+  if (sc) sc.addEventListener('click', (e) => { e.preventDefault(); reveal('studio', 'f-name'); });
+  const bc = $('cards').querySelector('[data-card="billing"]');
+  if (bc) bc.addEventListener('click', (e) => { e.preventDefault(); reveal('billing', 'billingHead'); });
+}
+function setStatus(key, status) {
+  STATUSES[key] = status;
+  const card = $('cards').querySelector(`[data-card="${key}"] .t`);
+  if (!card) return;
+  const old = card.querySelector('.st'); if (old) old.remove();
+  if (status) card.insertAdjacentHTML('beforeend', `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>`);
+}
+// ── whose settings: the title and the profile heading name the client in scope ──
+function paintScope() {
+  const who = scopeName();
+  const h = $('pagehead'); if (h) h.textContent = 'Settings' + (who ? ' — ' + who : '');
+  document.title = 'Settings' + (who ? ' — ' + who : '') + ' — Studio OS';
+  const ph = $('profileHead'), pn = $('profileNote');
+  if (SCOPE) {
+    const name = who || 'This client';
+    if (ph) ph.textContent = possessive(name) + ' profile';
+    if (pn) pn.textContent = `These are ${possessive(name)} details, not your studio’s: what their customers see on their site, documents and emails. The kind of business drives their nudges.`;
+    const ln = document.querySelector('label[for="f-name"]'), la = document.querySelector('label[for="f-area"]');
+    if (ln) ln.textContent = 'Business name'; if (la) la.textContent = 'Where they work from';
+  }
+}
+document.addEventListener('dds:context', () => { paintScope(); if (SCOPE && $('cards').children.length) renderCards(); });
+
+// ── the plan, inline. /commerce/subscription answers for the caller's OWN account,
+//    so this only ever runs unscoped. Agencies also see their limits (/agency/usage:
+//    seats + clients, used and limit). ONE action: Stripe's portal when the plan is
+//    self-serve, else the honest sentence — Agency/Enterprise changes go through us. ──
+const STATUS_WORD = { active: 'Active', paused: 'Paused — payment needs attention', lapsed: 'Ended — update payment to reactivate', deleted: 'Closed' };
+const SUPPORT = 'mailto:support@davisdigitalstudio.com';
+const shortDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+async function loadPlan() {
+  if (SCOPE) return;
+  const host = $('plan'), sec = $('billing');
+  const [r, u] = await Promise.all([api('/commerce/subscription'), (CTX && CTX.is_agency) ? api('/agency/usage').catch(() => null) : Promise.resolve(null)]);
+  const s = r.ok && r.body && r.body.data;
+  sec.hidden = false;
+  if (!s) {
+    host.innerHTML = `<p class="line">We couldn’t find a plan on this account.</p><p class="team"><a href="${SUPPORT}?subject=${encodeURIComponent('My Studio OS plan')}">Ask our team →</a></p>`;
+    return;
+  }
+  const planName = s.plan_name || s.plan || 'Your plan';
+  const word = STATUS_WORD[s.status] || (s.status ? String(s.status).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Active');
+  const bad = s.status && s.status !== 'active';
+  setStatus('billing', { text: planName + ' · ' + word, cls: bad ? 'warn' : '' });
+  let line = esc(planName) + ' · ' + esc(word);
+  if (s.current_period_end && !bad) line += ' · ' + (s.cancel_at_period_end ? 'ends ' : 'renews ') + esc(shortDate(s.current_period_end));
+  if (s.in_grace) line += ' · a payment didn’t go through — your site stays up while you fix it';
+  let html = `<p class="line${bad ? ' warn' : ''}" id="planLine">${line}</p>`;
+  const usage = u && u.ok && u.body && u.body.data;
+  if (usage && (usage.clients || usage.seats)) {
+    const part = (o, noun) => { if (!o || typeof o.used !== 'number' && typeof o.active !== 'number') return ''; const used = typeof o.active === 'number' ? o.active : o.used; return (o.limit ? `${used} of ${o.limit} ${noun}` : `${used} ${noun}`); };
+    const bits = [part(usage.clients, 'clients'), part(usage.seats, 'seats')].filter(Boolean);
+    if (bits.length) html += `<p class="limits" id="planLimits">${esc(bits.join(' · '))}</p>`;
+  }
+  if (s.can_manage_billing) {
+    html += `<button class="btn primary" type="button" id="manageBilling">${(s.status === 'paused' || s.status === 'lapsed') ? 'Update payment' : 'Manage billing'}</button>`;
+  } else {
+    html += `<p class="team" id="planTeam">Changes to your ${esc(planName)} plan go through our team. <a href="${SUPPORT}?subject=${encodeURIComponent('Changing my ' + planName + ' plan')}">Write to us →</a></p>`;
+  }
+  if (s.has_service_billing) html += `<p class="aside">Invoices for project work from your studio are billed separately.</p>`;
+  host.innerHTML = html;
+  const b = $('manageBilling');
+  if (b) b.addEventListener('click', async () => {
+    b.disabled = true; const t = b.textContent; b.textContent = 'Opening…';
+    try {
+      const p = await api('/commerce/portal', 'POST', {});
+      if (p.ok && p.body && p.body.data && p.body.data.url) { location.href = p.body.data.url; return; }
+      toast(nice(p.body, 'Billing management isn’t available right now.'), true);
+    } catch (_) { toast('Couldn’t open billing.', true); }
+    b.disabled = false; b.textContent = t;
+  });
+}
+
+// ── the studio profile, inline: GET /identity + the industry from /settings;
+//    Save = PUT /identity (the builder's own route, same validation) + PUT /settings. ──
+let IDENT = null, SETTINGS = null;
+async function loadProfile() {
+  const [i, s] = await Promise.all([api('/identity'), api('/settings')]);
+  IDENT = (i.ok && i.body && i.body.data) || null;
+  SETTINGS = (s.ok && s.body && s.body.data) || null;
+  const d = IDENT || {};
+  $('f-name').value = d.business_name || '';
+  $('f-email').value = d.email || '';
+  $('f-phone').value = d.phone || '';
+  $('f-area').value = d.service_area || '';
+  const ind = $('f-industry'); ind.value = (SETTINGS && SETTINGS.industry_key) || 'generic'; if (ind.selectedIndex < 0) ind.value = 'generic';
+  $('studio').hidden = false;
+  return d;
+}
+async function saveProfile() {
+  const b = $('profileSave'); b.disabled = true;
+  const name = $('f-name').value.trim();
+  if (!name) { toast('Give your studio a name.', true); b.disabled = false; $('f-name').focus(); return; }
+  const identity = { business_name: name, email: $('f-email').value.trim(), phone: $('f-phone').value.trim(), service_area: $('f-area').value.trim() };
+  const industry = $('f-industry').value || 'generic';
+  const writes = [api('/identity', 'PUT', identity)];
+  if (!SETTINGS || SETTINGS.industry_key !== industry) writes.push(api('/settings', 'PUT', { industry_key: industry }));
+  const rs = await Promise.all(writes);
+  b.disabled = false;
+  const bad = rs.find((r) => !r.ok);
+  if (bad) { toast(nice(bad.body, bad.status === 422 ? 'Some fields need a second look.' : 'That didn’t save — nothing was changed.'), true); return; }
+  IDENT = (rs[0].body && rs[0].body.data) || { ...(IDENT || {}), ...identity };
+  if (rs[1]) SETTINGS = (rs[1].body && rs[1].body.data) || { ...(SETTINGS || {}), industry_key: industry };
+  toast('Saved.');
+  renderSubline();
+}
+function renderSubline() {
+  const bits = [];
+  if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
+  if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name) + (CTX.plan_key ? '' : ''));
+  $('subline').innerHTML = bits.map((x, i) => (i ? '<span class="dot">·</span>' : '') + '<span>' + x + '</span>').join('');
+}
+function signedOut() {
+  $('main').innerHTML = '<div class="center"><h2>Sign in to see your settings.</h2><p><a class="link" href="/studio.html">Sign in →</a></p></div>';
+}
+(async function init() {
+  try {
+    const { data } = await sb.auth.getSession();
+    TOKEN = (data && data.session && data.session.access_token) || "";
+    if (!TOKEN) { signedOut(); return; }
+    // the shell's context is the same read — reuse it, fall back to our own
+    try { CTX = window.ddsContext ? await window.ddsContext() : null; } catch (_) { CTX = null; }
+    if (!CTX) { const r = await api('/portal/context'); CTX = (r.ok && r.body && r.body.data) || null; }
+    paintScope();
+    renderCards();
+    $('profileSave').addEventListener('click', saveProfile);
+    $('profileForm').addEventListener('submit', (e) => { e.preventDefault(); saveProfile(); });
+    await loadProfile().catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
+    renderSubline();
+    // small, honest statuses on the cards that can answer quickly — never a blocker
+    // GET /connections answers { data: { groups: { <category>: [ { connection: { status, health } } ] } } }
+    // (routes/connections.ts) — the same rows connections.html paints its chips from.
+    if (hasFeature('connected')) api('/connections').then((r) => {
+      const d = (r.ok && r.body && r.body.data) || null; if (!d) return;
+      const list = d.groups && typeof d.groups === 'object' ? Object.values(d.groups).flat() : (d.services || d.connections);
+      if (!Array.isArray(list)) return;
+      const stateOf = (x) => { const c = (x && x.connection) || x || {}; const st = c.status, hl = c.health; if (st === 'connected' && hl !== 'down' && hl !== 'attention') return 'on'; if (st === 'connected' || st === 'expired' || st === 'error' || st === 'attention' || hl === 'attention' || hl === 'down') return 'attn'; return 'off'; };
+      const states = list.map(stateOf);
+      const on = states.filter((x) => x === 'on').length, attn = states.filter((x) => x === 'attn').length;
+      if (on || attn) setStatus('connections', { text: `${on} connected${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
+    }).catch(() => {});
+    loadPlan().catch(() => {});
+    if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
+    if (location.hash === '#billing') { const sec = $('billing'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
+  } catch (_) {
+    $('main').innerHTML = '<div class="center"><h2>We couldn’t load your settings just now.</h2><p>Nothing’s wrong with your account — refresh to try again.</p></div>';
+  }
+})();
+</script>
+</body>
+</html>

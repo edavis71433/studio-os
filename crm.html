@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Client — Studio OS</title>
+<title>Customer — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="One client record — the whole relationship from first enquiry through delivery, in one place.">
 <link rel="stylesheet" href="/fonts/brand.css">
@@ -34,29 +34,49 @@
 
   /* ── record header (Lightning anatomy: object icon · name · status) ── */
   .rec-head{margin-top:14px;display:flex;gap:14px;align-items:flex-start}
-  .obj-ic{width:44px;height:44px;border-radius:12px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto;box-shadow:var(--shadow)}
+  .obj-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto;box-shadow:var(--shadow)}
   .obj-ic.customer{background:var(--good)}
   .rec-head h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2}
   .rec-sub{color:var(--soft);font-size:14px;margin-top:4px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
   .rec-sub a{color:var(--p);text-decoration:none} .rec-sub a:hover{text-decoration:underline}
-  .statuschip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p)}
+  .statuschip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p);text-transform:capitalize}
   .statuschip.customer{background:var(--good-soft);color:var(--good)}
 
   /* ── highlights panel: label-over-value tiles ── */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:var(--shadow)}
   .hl{background:var(--card);padding:10px 14px;min-width:0}
-  .hl-k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;display:flex;align-items:center;gap:6px}
-  .hl-v{font-family:var(--serif);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hl-k{font-size:12px;color:var(--faint);font-weight:500;display:flex;align-items:center;gap:6px}
+  .hl-v{font-family:var(--sans);font-size:17.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
   .hl-v .word{text-transform:capitalize}
   .hl-edit{border:none;background:none;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px;border-radius:4px}
   .hl-edit:hover{color:var(--p)}
   .hl input{width:100%;font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin-top:3px}
 
+  /* ── action bar: the record's verbs, always one click away ── */
+  .actbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .actbar:empty{display:none}
+  .abtn{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.15s;box-shadow:var(--shadow)}
+  .abtn:hover{border-color:var(--p);color:var(--p)}
+  .abtn.primary{background:var(--p);color:#fff;border-color:var(--p)} .abtn.primary:hover{background:var(--p-deep);color:#fff}
+  /* billing rows: status chip + the row's own buttons */
+  .brow{flex-wrap:wrap}
+  .racts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .rbtn{font-family:inherit;font-size:12.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;text-transform:none;letter-spacing:0;display:inline-flex;align-items:center}
+  .rbtn:hover{border-color:var(--p);color:var(--p)} .rbtn:disabled{opacity:.5;cursor:default}
+  .link-btn{border:none;background:none;color:var(--p);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;padding:0;text-transform:none;letter-spacing:0;border-radius:0}
+  .link-btn:hover{text-decoration:underline}
+  .bform{background:var(--card);border:1px solid var(--p);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .brow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .brow2 label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--faint);font-weight:600}
+  .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;width:100%}
+  .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
+  .bacts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+
   /* ── Path (Lightning chevrons, dds skin) ── */
-  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px}
   .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;cursor:default;
+  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:9px 16px;cursor:default;
     background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
   .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
@@ -84,13 +104,13 @@
   @media (max-width:1000px){.body{grid-template-columns:minmax(0,1fr)}.rail{order:-1}}
 
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .tabs button{border:none;background:transparent;font-family:inherit;font-size:14.5px;font-weight:600;color:var(--soft);padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap;transition:.15s}
+  .tabs button{border:none;background:transparent;font-family:inherit;font-size:14.5px;font-weight:500;color:var(--soft);padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap;transition:.15s}
   .tabs button:hover{color:var(--ink)}
   .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
   #tabbody{margin-top:18px}
 
   /* related-list cards */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
   .card-h .t{font-weight:700;font-size:14.5px}
   .rrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;border-top:1px solid var(--line);font-size:14px;min-width:0}
@@ -99,50 +119,51 @@
   .rrow .rt .s{color:var(--faint);font-size:12.5px;display:block}
   a.rlink{color:inherit;text-decoration:none;display:block;min-width:0;flex:1}
   a.rlink:hover .rt{color:var(--p)}
-  .schip{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .schip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .schip.good{background:var(--good-soft);color:var(--good)}
   .schip.warn{background:var(--warn-soft);color:var(--warn)}
   .schip.bad{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+  .schip.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}   /* Oct 2026: the Processing money state */
   .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:14.5px}
   .kv .k{color:var(--faint);font-weight:600}
   .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
-  .fact{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-  .fact .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
-  .fact .v{font-family:var(--serif);font-size:18px;margin-top:2px}
+  .fact{background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px 12px}
+  .fact .k{font-size:12px;color:var(--faint);font-weight:500}
+  .fact .v{font-family:var(--sans);font-size:18px;margin-top:2px;font-weight:600;font-variant-numeric:tabular-nums}
   .fact .v small{font-family:var(--sans);font-size:12px;color:var(--soft);font-weight:400}
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px}
   .chip .d{width:7px;height:7px;border-radius:50%}
   .chip.healthy{background:var(--good-soft);color:var(--good)} .chip.healthy .d{background:var(--good)}
   .chip.attention{background:var(--warn-soft);color:var(--warn)} .chip.attention .d{background:var(--warn)}
   .chip.new,.chip.quiet{background:var(--p-soft);color:var(--p)} .chip.new .d,.chip.quiet .d{background:var(--p)}
-  h2{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between}
+  h2{font-size:12.5px;color:var(--faint);font-weight:500;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between}
   section{margin-top:22px} section:first-child{margin-top:0}
 
   /* ── the activity rail ── */
   .acard{padding:14px 16px}
   .composer-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 -4px}
-  .composer-tabs button{border:none;background:none;font-family:inherit;font-size:13px;font-weight:600;color:var(--soft);padding:8px 10px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap}
+  .composer-tabs button{border:none;background:none;font-family:inherit;font-size:13px;font-weight:500;color:var(--soft);padding:8px 10px;cursor:pointer;border-bottom:2.5px solid transparent;border-radius:0;white-space:nowrap}
   .composer-tabs button.on{color:var(--p);border-bottom-color:var(--p)}
   .composer-pane{padding:12px 0 4px}
-  .composer-pane textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;min-height:64px}
+  .composer-pane textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;resize:vertical;min-height:64px}
   .composer-pane textarea:focus{outline:none;border-color:var(--p)}
-  .composer-pane input[type=text],.composer-pane input[type=date]{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  .composer-pane input[type=text],.composer-pane input[type=date]{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
   .composer-row{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
   .composer-row .spacer{flex:1}
   .kindchips{display:flex;gap:6px;flex-wrap:wrap}
-  .kindchips button{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:600}
+  .kindchips button{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:500}
   .kindchips button.on{background:var(--p-soft);color:var(--p);border-color:var(--p)}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:600;cursor:pointer}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden}
+  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button.on{background:var(--p-soft);color:var(--p)}
 
   .fchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
-  .fchips button{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-family:inherit}
+  .fchips button{font-size:12px;font-weight:500;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-family:inherit}
   .fchips button.on{background:var(--p-soft);border-color:var(--p);color:var(--p)}
 
   /* Upcoming & overdue band */
-  .upband{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
-  .upband .bt{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:6px}
+  .upband{margin-top:14px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px 12px;background:var(--bg)}
+  .upband .bt{font-size:12px;color:var(--faint);font-weight:500;margin-bottom:6px}
   .uprow{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:13.5px}
   .uprow .due{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
   .uprow.overdue .due{color:var(--bad);font-weight:700}
@@ -152,11 +173,12 @@
   .uprow a:hover{color:var(--p)}
 
   /* the timeline: connector line + white-ring type icons + expandable rows */
-  .tl-month{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
+  .tl-month{font-size:12px;color:var(--faint);font-weight:500;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
   .tl-month:after{content:"";flex:1;height:1px;background:var(--line)}
   .ti{position:relative;display:flex;gap:10px;padding:9px 0 9px 34px;align-items:flex-start}
   .ti:before{content:"";position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--line)}
   .ti:first-of-type:before{top:12px} .ti:last-of-type:before{bottom:auto;height:22px}
+  .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
   .ti .ti-icon{position:absolute;left:1px;top:8px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#fff;box-shadow:0 0 0 3px var(--card)}
   .ti.t-message:before{background:color-mix(in srgb,var(--act-message) 35%,transparent)} .ti.t-message .ti-icon{background:var(--act-message)}
   .ti.t-email:before{background:color-mix(in srgb,var(--act-email) 35%,transparent)} .ti.t-email .ti-icon{background:var(--act-email)}
@@ -169,7 +191,7 @@
   button.ti-head{cursor:pointer}
   .ti-title{font-weight:600;min-width:0}
   .ti-car{color:var(--faint);font-size:10px;flex:0 0 auto}
-  .ti-meta{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
+  .ti-meta{font-size:12px;font-weight:500;border-radius:999px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);color:var(--faint);white-space:nowrap;flex:0 0 auto}
   .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;margin-top:5px;border-left:2px solid var(--line);padding-left:10px}
   .ti-body .note-acts{margin-top:6px}
   .ti-body .note-acts button{font-size:11.5px;padding:3px 9px}
@@ -177,13 +199,13 @@
   .ti a.ti-link{color:var(--p);text-decoration:none;font-size:12px;font-weight:600}
   .ti a.ti-link:hover{text-decoration:underline}
 
-  textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;resize:vertical;min-height:70px}
+  textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:11px 12px;resize:vertical;min-height:70px}
   textarea:focus{outline:none;border-color:var(--p)}
-  button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:.15s}
+  button{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
   button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
-  a.link{color:var(--p);text-decoration:none;font-weight:600;font-size:14px} a.link:hover{text-decoration:underline}
-  a.btnlink{display:inline-block;font-size:13.5px;font-weight:600;border-radius:999px;border:1px solid var(--p);color:var(--p);padding:7px 14px;text-decoration:none}
+  a.link{color:var(--p);text-decoration:none;font-weight:500;font-size:14px} a.link:hover{text-decoration:underline}
+  a.btnlink{display:inline-block;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);color:var(--p);padding:7px 14px;text-decoration:none}
   a.btnlink:hover{background:var(--p-soft)}
   a.btnlink.primary{background:var(--p);color:#fff} a.btnlink.primary:hover{background:var(--p-deep)}
   .muted{color:var(--soft);font-size:14px}
@@ -195,6 +217,103 @@
   footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none !important}}
+
+  /* ── Visual refresh (2026-10): the hub in the new look. These rules come last
+     on purpose — they restate the pieces above in the refreshed idiom (initials
+     avatar, icon stat tiles, the lifecycle bar, an invoice table, a details card
+     in the rail, dot timeline) without touching the markup contracts the tests
+     pin (#actbar ids, .pstep states, data-* hooks). ── */
+  .rec-head{margin-top:10px;align-items:center}
+  .obj-ic{width:40px;height:40px;border-radius:50%;background:var(--p-soft);color:var(--p);font-family:var(--sans);font-size:14px;font-weight:600;box-shadow:none;letter-spacing:.02em}
+  .obj-ic.customer{background:var(--good-soft);color:var(--good)}
+  .rec-head h1{font-size:28px}
+  .rec-sub{font-size:13px;margin-top:3px;gap:6px 10px}
+  .rec-sub .sep{color:var(--faint)}
+  .statuschip{padding:2px 8px;line-height:18px}
+  .statuschip:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+  /* stat tiles */
+  .hl-panel{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;background:var(--card);box-shadow:none;margin-top:16px}
+  .hl{display:flex;align-items:center;gap:12px;padding:13px 16px;border-left:1px solid var(--line);background:var(--card)}
+  .hl:first-child{border-left:none}
+  .hl .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .hl .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .hl .hl-main{min-width:0;flex:1}
+  .hl-v{font-size:19px;letter-spacing:-.01em;line-height:1.2;margin-top:1px}
+  .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hl-edit{font-size:11.5px}
+  /* the action bar: one filled button, quiet secondaries, the rest under More */
+  .actbar{margin-top:14px;gap:6px;align-items:center}
+  .abtn{box-shadow:none;height:32px;padding:0 12px;font-size:13px}
+  .abtn:hover{border-color:var(--dds-line-strong,#d2d2db);color:var(--ink);background:var(--bg)}
+  .abtn.primary:hover{background:var(--p-deep);color:#fff}
+  .more{position:relative;display:inline-block}
+  .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:4px;display:flex;flex-direction:column}
+  .more-menu[hidden]{display:none}
+  .more-menu .abtn{border:none;background:transparent;justify-content:flex-start;border-radius:var(--dds-r-sm,6px);height:34px;width:100%;box-shadow:none}
+  .more-menu .abtn:hover{background:var(--bg)}
+  /* lifecycle bar: Lead → Qualified → Proposal → Agreement → Won → Project → Growth */
+  .pathcard{box-shadow:none;padding:12px 16px}
+  .path{gap:6px;flex:1 1 520px}
+  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
+  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
+  .path button.pstep.current:hover{filter:none;color:var(--p-deep)}
+  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
+  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
+  .path-guide{margin-top:10px;font-size:13px}
+  .terminal-chip{font-weight:600;padding:3px 10px;font-size:12px}
+  /* tabs + sections */
+  .tabs button{font-size:13.5px;padding:9px 12px;border-bottom-width:2px}
+  .tabs button .n{margin-left:6px;font-size:11.5px;color:var(--faint);font-weight:500}
+  #tabbody{margin-top:16px}
+  #tabbody h2,section h2{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:8px}
+  .card{box-shadow:none;padding:14px 16px}
+  .card.tcard{padding:0;overflow:hidden}
+  .btable{width:100%;border-collapse:collapse;font-size:13.5px}
+  .btable th{font-size:12px;color:var(--faint);font-weight:500;text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
+  .btable td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:middle}
+  .btable tr:first-child td{border-top:none}
+  .btable td.amt,.btable th.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .btable td .rt{display:block;min-width:0} .btable td .rt .s{display:block;color:var(--faint);font-size:12.5px}
+  .btable td.due{color:var(--bad);font-weight:500;white-space:nowrap}
+  .btable td.racts{text-align:right;white-space:nowrap}
+  .btable .racts{justify-content:flex-end;flex-wrap:nowrap;gap:2px}
+  .btable .racts .rbtn{font-size:12px;padding:3px 7px}
+  .btable td .rt{white-space:nowrap}
+  .card.tcard{overflow-x:auto}
+  .btable{min-width:540px}
+  .rbtn{border-color:transparent;color:var(--soft);padding:4px 9px}
+  .rbtn:hover{border-color:var(--line);background:var(--bg);color:var(--ink)}
+  h2 .rbtn,.sec-acts .rbtn{border-color:var(--line);color:var(--ink)}
+  .rbtn.primary,h2 .rbtn.primary{background:var(--p);border-color:var(--p);color:#fff} .rbtn.primary:hover{background:var(--p-deep);color:#fff}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media (max-width:640px){.btable thead{display:none}.btable td{display:block;border-top:none;padding:4px 14px}.btable tr{display:block;border-top:1px solid var(--line);padding:8px 0}.btable tr:first-child{border-top:none}.btable td.racts,.btable td.amt{text-align:left}}
+  /* rail: details card · composer · segmented filter · dot timeline */
+  .rail .card{margin-bottom:14px}
+  .dcard .card-h{margin-bottom:6px}
+  .dkv{display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px 10px;font-size:13px;align-items:center}
+  .dkv svg{width:15px;height:15px;stroke:var(--faint);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .dkv span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dkv .muted{color:var(--faint);font-size:12.5px}
+  .dkv a{color:var(--p);text-decoration:none} .dkv a:hover{text-decoration:underline}
+  /* phones: the seven lifecycle steps scroll sideways instead of truncating */
+  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
+  .composer-tabs button{font-size:12.5px;padding:7px 9px;border-bottom-width:2px}
+  .fchips{display:inline-flex;gap:0;margin-top:14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
+  .fchips button{border:none;border-radius:0;padding:5px 10px;font-size:12.5px;background:transparent;color:var(--soft);font-weight:500}
+  .fchips button.on{background:var(--card);color:var(--ink);border-color:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+  .upband{border-radius:var(--dds-r,8px);background:var(--bg)}
+  .upband .bt{font-size:12px;font-weight:500}
+  .tl-month{font-size:12px;font-weight:500;color:var(--faint);margin:16px 0 2px}
+  .ti{padding:9px 0 9px 22px}
+  .ti:before{left:3px}
+  .ti .ti-icon{left:0;top:13px;width:8px;height:8px;font-size:0;box-shadow:none}
+  .ti .ti-icon *{display:none}
+  .ti-head{font-size:13px}
+  .ti-meta{border-radius:999px;font-weight:500;text-transform:none;letter-spacing:0;font-size:11px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -247,6 +366,31 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const fmtC=(c)=>'$'+Math.round((Number(c)||0)/100).toLocaleString();
 const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)+'T12:00:00Z');if(isNaN(t))return'';return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+// ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
+// mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
+// one case table against the module and every page's copy). The record runs
+// it against the studio's LOCAL day, exactly as today.html does, so the band
+// and the record never disagree about the same invoice. ──
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
+function recTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+const invState=(v)=>moneyState(v,recTodayYmd());
+// still WAITING on the client (upcoming + overdue) — a processing payment is on its way, not owed
+const invWaiting=(list)=>(list||[]).filter(v=>{const s=invState(v);return s==='upcoming'||s==='overdue';});
 
 // ── stage maps — kept in sync with pipeline.html by hand (its STAGES /
 // PIPELINE_GUIDANCE / BOARD_NEXT blocks, which mirror lib/pipeline_guidance.ts
@@ -278,10 +422,13 @@ let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null;
 let ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};
 let FILTER='all', COMPOSER='message', LOGKIND='call', NEWAUD='internal', FOCUS_COMPOSER=false, PENDING_BACK='', GUIDE_OPEN=true;
 const EXPANDED=new Set();
-const TAB_LABEL={details:'Details',deal:'Deal',delivery:'Delivery',files:'Files'};
-const TAB_ORDER=['details','deal','delivery','files'];
+// Phase 1 overhaul: the record is THE hub. Billing (proposals · agreement ·
+// invoices · retainer, with their actions) lives here now; Delivery reads as
+// "Project" because that is what the owner calls it.
+const TAB_LABEL={details:'Details',deal:'Deal',billing:'Billing',delivery:'Project',files:'Files'};
+const TAB_ORDER=['details','deal','billing','delivery','files'];
 // old deep links keep working (inbox.html links ?tab=messages; older links carry overview)
-const TAB_ALIAS={overview:'details',messages:'details',deal:'deal',delivery:'delivery',details:'details',files:'files'};
+const TAB_ALIAS={overview:'details',messages:'details',deal:'deal',billing:'billing',invoices:'billing',money:'billing',delivery:'delivery',project:'delivery',details:'details',files:'files'};
 
 // Build the query for /crm/record from whatever the URL carries.
 function recordQuery(){
@@ -296,6 +443,7 @@ function availTabs(){
   const s=(REC&&REC.sections)||{}; const out=[];
   if(s.details||s.overview)out.push('details');
   if(s.deal)out.push('deal');
+  if(s.deal)out.push('billing');
   if(s.delivery)out.push('delivery');
   if(s.deal||s.delivery)out.push('files');
   return out;
@@ -325,6 +473,12 @@ async function loadRecord(){
   renderShell();
   if(TAB)showTab(TAB,true);
   loadPanels();
+  // Phase 2 (⌘K actions): ?act=invoice opens the invoice form on Billing once the
+  // deal has loaded; ?act=message brings the composer forward. One hop from
+  // "Send invoice to Claud" in the palette to the amount field.
+  const act=QP().get('act');
+  if(act==='invoice'||act==='deposit')DEAL_READY.then(()=>{if(idParams().deal)openBilling(act);});
+  else if(act==='message'||act==='note'||act==='task')setTimeout(()=>focusComposer(act),300);
 }
 
 // ── the record shell: header + highlights + Path + two-region body ──────────
@@ -339,22 +493,26 @@ function renderShell(){
   // a customer-scoped record (sections.overview) resolves its identity from the
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
+  // visual refresh: an initials avatar instead of an emoji object tile
+  const initials=String(nm).split(/\s+/).map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase()||'?';
   $('main').innerHTML=`
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
-      <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${isCust?'🏢':'👤'}</div>
+      <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
       <div style="min-width:0">
         <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
-        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' · ')+'</span>':''}</div>
+        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span class="sep">·</span> <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
       </div>
     </div>
     <div id="hlpanel"></div>
+    <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
+        <div id="dcard"></div>
         <div class="card acard" id="acard"><div class="spin" role="status" aria-label="Loading activity"></div></div>
       </aside>
     </div>`;
@@ -374,6 +532,113 @@ function renderShell(){
   });
   HL_EDIT=false;   // the shell rebuild destroyed any open editor — never leave the flag stale
   renderHighlights();
+  renderActions();
+  renderDetailsCard();
+}
+
+// ── Visual refresh: inline stroke icons for the stat tiles + details card ────
+const SVG={
+  value:'<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><path d="M8 7V5h8v2"/>',
+  paid:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+  owed:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  next:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  health:'<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  site:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  company:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+};
+const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
+// The "Customer details" card in the rail: the contact facts always in view,
+// so the operator never leaves Billing to find a phone number. Edit opens the
+// Details tab, where the full form lives.
+function renderDetailsCard(){
+  const host=$('dcard'); if(!host)return;
+  const s=(REC&&REC.sections)||{}; const hd=(REC&&REC.header)||{}; const p=(PROFILE&&PROFILE.profile)||null;
+  if(!(s.overview||s.details)){host.innerHTML='';return;}
+  const rows=[];
+  if(hd.email)rows.push([svg('mail'),`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`]);
+  if(hd.phone)rows.push([svg('phone'),`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`]);
+  if(hd.company)rows.push([svg('company'),esc(hd.company)]);
+  if(p)rows.push([svg('site'),'Website: '+esc(p.live?'live':(p.last_published_at?'offline':'not yet'))]);
+  if(p&&p.health)rows.push([svg('health'),'Health: '+esc(p.health==='attention'?'needs attention':p.health==='new'?'getting set up':p.health)]);
+  if(!rows.length)rows.push(['<span></span>','<span class="muted">No details yet — add them under Edit.</span>']);
+  host.innerHTML=`<div class="card dcard"><div class="card-h"><span class="t">Customer details</span>${s.details?'<button type="button" class="link-btn" data-edit-details>Edit</button>':''}</div><div class="dkv">${rows.map(r=>r[0]+'<span>'+r[1]+'</span>').join('')}</div></div>`;
+  const eb=host.querySelector('[data-edit-details]');
+  if(eb)eb.addEventListener('click',()=>{showTab('details');const f=document.querySelector('#tabbody [data-edit]');if(f)f.click();});
+}
+
+// ── the action bar: every common thing you do for a client, one click from the
+// record. Salesforce puts these at the top of every record (New Opportunity, Log
+// a Call, Send Email); here they are the studio's verbs. Each button either
+// opens a small inline form on the Billing tab or focuses the composer in the
+// rail. Deal-backed actions render only when the record has a deal. ──
+function renderActions(){
+  const host=$('actbar'); if(!host)return;
+  const ids=idParams(); const d=(DEAL&&DEAL.deal)||null;
+  const btns=[];
+  // ONE LINK (benchmark 2026-10, item 5): with BOTH a proposal and an agreement
+  // drafted on an open deal, the headline act is "Send proposal & agreement" —
+  // one email, one page. The per-document sends sit under More.
+  const both=!!(d&&sendBothDocs());
+  if(ids.deal){
+    if(both)btns.push({id:'act-send-both',label:'Send proposal & agreement',primary:true,on:()=>openBilling('both')});
+    btns.push({id:'act-invoice',label:'Send invoice',primary:!both,on:()=>openBilling('invoice')});
+    btns.push({id:'act-deposit',label:'Request deposit',on:()=>openBilling('deposit')});
+    const draft=d&&(DEAL.proposals||[]).find(p=>p.status==='draft');
+    const stage=d&&d.stage;
+    // stage-aware: a won deal never pushes an unsent proposal as the headline act
+    if(draft&&stage!=='won'&&stage!=='lost')btns.push({id:'act-proposal',label:'Send proposal',on:()=>openBilling('proposal:'+draft.id)});
+    const draftCon=d&&(DEAL.contracts||[]).find(k=>k.status==='draft');
+    if(draftCon&&stage!=='won'&&stage!=='lost')btns.push({id:'act-agreement',label:'Send agreement',on:()=>openBilling('contract:'+draftCon.id)});
+    btns.push({id:'act-log',label:'Log activity',on:()=>focusComposer('logcall')});
+    btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});
+  }
+  btns.push({id:'act-message',label:'Message',on:()=>focusComposer('message')});
+  if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
+  if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
+  if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
+  // visual refresh: one filled verb, three quiet ones, the rest under "More"
+  // (every button keeps its id and handler — only where it sits changed)
+  const render=(b)=>b.href
+    ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
+    :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
+  const FRONT=[both?'act-send-both':'act-invoice','act-message','act-log','act-project'];
+  const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
+  const rest=btns.filter(b=>!FRONT.includes(b.id));
+  host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
+  btns.forEach(b=>{if(b.on){const el=$(b.id);if(el)el.addEventListener('click',()=>{closeMore();b.on();});}});
+  const mb=$('act-more');
+  if(mb)mb.addEventListener('click',(e)=>{e.stopPropagation();const m=$('act-menu');const open=m.hidden;m.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=m.querySelector('button,a');if(f)f.focus();}});
+}
+function closeMore(){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}}
+document.addEventListener('click',closeMore);
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore();});
+// The pair the one "Send proposal & agreement" button sends: the newest draft
+// proposal (not superseded) AND the newest draft agreement, on an open deal.
+// Null when either is missing — then the per-document sends stand on their own.
+function sendBothDocs(){
+  const d=DEAL&&DEAL.deal; if(!d)return null;
+  if(d.stage==='won'||d.stage==='lost'||d.converted_client_id)return null;
+  const isSup=(p)=>Array.isArray(p.line_items)&&p.line_items.some(el=>el&&typeof el==='object'&&el.__meta__&&el.__meta__.superseded_by);
+  const prop=(DEAL.proposals||[]).find(p=>p.status==='draft'&&!isSup(p));
+  const con=(DEAL.contracts||[]).find(k=>k.status==='draft');
+  return (prop&&con)?{prop,con}:null;
+}
+// Switch to Billing and open one of its inline forms (invoice · deposit ·
+// proposal:<id> · contract:<id> · both). The form opens once the tab has rendered.
+let BILLING_OPEN='';
+function openBilling(which){
+  BILLING_OPEN=which||'';
+  if(TAB!=='billing'){showTab('billing');}
+  else renderBillingTab($('tabbody'));
+}
+// Bring the rail composer forward on the requested publisher tab. On narrow
+// screens the rail sits above the tabs, so scrolling to it is the whole move.
+function focusComposer(tab){
+  COMPOSER=tab; renderComposer();
+  const host=$('acard'); if(host)host.scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>{const f=document.querySelector('#composer textarea, #composer input[type=text]');if(f)f.focus({preventScroll:true});},250);
 }
 
 // panels that arrive after the record: profile (health), deal, project, activity.
@@ -383,9 +648,9 @@ let DEAL_READY=Promise.resolve();
 async function loadPanels(){
   const ids=idParams(); const s=(REC&&REC.sections)||{};
   const jobs=[];
-  if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();if(TAB==='details')showTab(TAB,true);}));
-  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();if(TAB==='deal'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
-  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
+  if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();renderDetailsCard();if(TAB==='details')showTab(TAB,true);}));
+  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
+  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
 }
@@ -396,16 +661,30 @@ function renderHighlights(){
   const host=$('hlpanel'); if(!host)return;
   if(HL_EDIT)return;   // don't destroy the open editor + typed text; the render after save/cancel catches up
   const hl=REC.highlights||{}; const d=(DEAL&&DEAL.deal)||{}; const p=(PROFILE&&PROFILE.profile)||null;
+  // visual refresh: four icon tiles — money first (value · paid · outstanding),
+  // then the next step. Stage moved into the lifecycle bar; health and website
+  // live in the rail's details card, and only fill in here when there's no deal.
   const tiles=[];
-  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value))});
-  const stage=d.stage||hl.stage; if(stage)tiles.push({k:'Stage',v:`<span class="word">${esc(stageLabel(stage))}</span>`});
-  if(hl.owed_cents)tiles.push({k:'Outstanding',v:esc(fmtC(hl.owed_cents))});
+  const inv=(DEAL&&DEAL.invoices)||[];
+  const paid=inv.filter(v=>invState(v)==='paid'); const openInv=invWaiting(inv);
+  const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const owed=DEAL&&DEAL.deal?openInv.reduce((a,b)=>a+(b.amount_cents||0),0):(hl.owed_cents||0);
+  // the four states, one formula (item 2): the tile's sub-line names them
+  const mb=moneyBuckets(inv,recTodayYmd());
+  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.title&&d.title!==((REC.header||{}).name||'')?d.title:'')});
+  if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
+    tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
+  const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
+  if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':(mb.processing.count?'info':''),s:esc(owedSub)});
   const ns=(d.id?d.next_step:hl.next_step)||'';
-  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||'—'),edit:!!d.id});   // inline-editable when a real deal field backs it
-  if(p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`});
-  if(p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet'))});
+  // Phase 3 (stage-aware): with no next step set, the tile suggests the stage's
+  // own "do next" (a won deal says "open their project", never a blank dash)
+  const suggested=(d.id&&!ns&&d.stage)?guidanceFor(d.stage).action:'';
+  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:d.next_step_at?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
+  if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
+  if(!d.id&&p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet')),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
-  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,6).map((t,i)=>`<div class="hl"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div></div>`).join('')}</div>`;
+  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,4).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
   const eb=host.querySelector('[data-hledit]');
   if(eb)eb.addEventListener('click',()=>{
     const tile=eb.closest('.hl'); const cur=(DEAL&&DEAL.deal&&DEAL.deal.next_step)||'';
@@ -439,8 +718,19 @@ function renderPath(){
     const state=done?'complete':current?'current stage':'upcoming';
     const attrs=canBack?'':current?` aria-expanded="${GUIDE_OPEN?'true':'false'}"`:' tabindex="-1" aria-disabled="true"';
     const hint=canBack?'. Activate to move the deal back here.':current?'. Activate to show or hide the stage guidance.':'';
-    return `<button class="pstep ${cls}" data-stage="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${done?'✓ ':''}${esc(stageLabel(s))}</button>`;
-  }).join('');
+    return `<button class="pstep ${cls}" data-stage="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${esc(stageLabel(s))}</button>`;
+  }).join('')
+  // visual refresh: the bar is the whole relationship, not just the sale —
+  // Won · Project · Growth follow the four sales stages (read-only markers;
+  // the sales stages keep their interactivity rules above).
+  +(function(){
+    const won=stage==='won'; const proj=(PROJ&&PROJ.project)||null;
+    const projDone=won&&proj&&proj.status==='complete';
+    const projCur=won&&!projDone;
+    const mk=(label,cls)=>`<span class="pstep ${cls}" aria-hidden="true">${label}</span>`;
+    if(stage==='lost')return '';
+    return mk('Won',won?'done':'')+mk('Project',projDone?'done':projCur?'current':'')+mk('Growth',projDone?'current':'');
+  })();
   const g=guidanceFor(stage);
   // the right-side action: forward = "Mark Stage as Complete" (BOARD_NEXT[stage][0]
   // when it's a forward move); at contract+signed it becomes Convert (won is
@@ -448,10 +738,10 @@ function renderPath(){
   const fwd=(BOARD_NEXT[stage]||[])[0];
   const fwdOk=fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>curIdx;
   let side='';
-  if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
+  if(stage==='won')side='';   // the lifecycle bar already shows Won — no second badge
   else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
   else if(stage==='contract'&&signed)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Convert to customer →</a>`;
-  else if(fwdOk)side=`<button class="primary" id="markComplete">Mark Stage as Complete</button>`;
+  else if(fwdOk)side=`<button class="primary" id="markComplete">Mark stage complete</button>`;
   else side=`<span class="muted" style="font-size:13px">Get the agreement signed to convert</span>`;
   host.innerHTML=`<div class="pathcard">
     <div class="pathrow">
@@ -496,6 +786,7 @@ function showTab(tab,initial){
   host.setAttribute('aria-labelledby','tab-'+tab);
   if(tab==='details')return loadDetails(host);
   if(tab==='deal')return renderDealTab(host);
+  if(tab==='billing')return renderBillingTab(host);
   if(tab==='delivery')return renderDeliveryTab(host);
   if(tab==='files')return renderFilesTab(host);
 }
@@ -620,7 +911,6 @@ function renderDealTab(host){
   const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
   const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
   const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
-  const invChip=(s)=>s==='paid'?'good':s==='open'?'warn':'';
   let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(d.title||'Deal')}</span><a class="link" href="${esc(link)}">Open in pipeline →</a></div><div class="kv">`;
   const rows=[];
   if(d.expected_value_cents)rows.push(['Value',fmtC(d.expected_value_cents)]);
@@ -630,15 +920,220 @@ function renderDealTab(host){
   if(DEAL.last_contacted_at)rows.push(['Last contacted',when(DEAL.last_contacted_at)]);
   html+=rows.map(r=>`<div class="k">${esc(r[0])}</div><div>${esc(r[1])}</div>`).join('')||'<div class="muted">No details yet.</div>';
   html+=`</div></div></section>`;
-  const list=(title,items,rowFn,empty)=>{
-    let s=`<section><h2>${title}</h2><div class="card">`;
-    s+=items.length?items.map(rowFn).join(''):`<p class="muted" style="font-size:13.5px">${empty}</p>`;
-    return s+`</div></section>`;
-  };
-  html+=list('Proposals',DEAL.proposals||[],(p)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span></a><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span></div>`,'No proposals yet — create one in the pipeline.');
-  html+=list('Agreement',DEAL.contracts||[],(cn)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(cn.title||'Agreement')}${cn.signer_name?`<span class="s">Signed by ${esc(cn.signer_name)}</span>`:''}</span></a><span class="schip ${conChip(cn.status)}">${esc(cn.status||'draft')}</span></div>`,'No agreement yet.');
-  html+=list('Invoices',DEAL.invoices||[],(iv)=>`<div class="rrow"><a class="rlink" href="${esc(link)}"><span class="rt">${esc(iv.title||'Invoice')}<span class="s">${esc(fmtC(iv.amount_cents))}${iv.due_date?' · due '+esc(dueLabel(iv.due_date)):''}</span></span></a><span class="schip ${invChip(iv.status)}">${esc(iv.status||'open')}</span></div>`,'No invoices yet.');
+  // Stage-aware "what now": one honest line + the one button that matters.
+  // A won deal points at billing and the project, never at an unsent draft.
+  const inv=DEAL.invoices||[]; const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
+  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
+  let now='';
+  if(d.stage==='won'){
+    now=owed?`${fmtC(owed)} is awaiting payment across ${open.length} invoice${open.length===1?'':'s'}.`:(paid.length?`All ${fmtC(paid.reduce((a,b)=>a+(b.amount_cents||0),0))} paid so far. Send the next invoice when a milestone lands.`:'Nothing invoiced yet.');
+    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+  }else if(d.stage==='contract'){
+    now=signed?'Agreement signed. Request the deposit, then convert them to a customer.':'The agreement is out for signature.';
+    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+  }else if(d.stage==='proposal'){ now='Your proposal is with them. <button class="link-btn" data-go="billing">See proposals →</button>'; }
+  else if(d.stage==='lost'){ now='Marked not a fit. The record stays so you can pick it back up.'; }
+  if(now)html+=`<section><h2>What now</h2><div class="card"><p style="font-size:14.5px;margin:0">${now}</p></div></section>`;
+  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Billing →</button></div>`;
+  html+=`<section><h2>Documents</h2><div class="card">`
+    +sum('Proposals',0,(DEAL.proposals||[]).length?(DEAL.proposals||[]).map(p=>esc(p.title||'Proposal')+' · '+esc(p.status||'draft')).join(' · '):'None yet')
+    +sum('Agreement',0,(DEAL.contracts||[]).length?(DEAL.contracts||[]).map(c=>esc(c.title||'Agreement')+' · '+esc(c.status||'draft')).join(' · '):'None yet')
+    +sum('Invoices',0,inv.length?`${inv.length} · ${fmtC(inv.reduce((a,b)=>a+(b.amount_cents||0),0))} total${owed?' · '+fmtC(owed)+' open':''}`:'None yet')
+    +`</div></section>`;
   host.innerHTML=html;
+  host.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-go'))));
+}
+
+// ── Billing tab: the money, with its actions, ON the record ──────────────────
+// Proposals · Agreement · Invoices · Retainer. Every row carries the verb that
+// goes with it (Send / Resend · Copy link · View / print · Void). New invoice,
+// deposit and retainer open as small inline forms. The proposal and agreement
+// EDITORS, payment-schedule builder and templates stay on pipeline.html (linked),
+// so nothing there is rebuilt — the routes below are the same ones it calls.
+function renderBillingTab(host){
+  if(!DEAL){host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';return;}
+  if(DEAL.error||!DEAL.deal){host.innerHTML='<p class="muted">Couldn’t load billing just now.</p>';return;}
+  const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
+  const c=DEAL.contact||REC.header||{}; const noEmail=!(c&&c.email);
+  const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
+  const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
+  const inv=(DEAL.invoices||[]); const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
+  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0); const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const act=(attrs,label,title)=>`<button type="button" class="rbtn" ${attrs}${title?` title="${esc(title)}"`:''}>${label}</button>`;
+  let html='';
+  // visual refresh: the money facts live in the header tiles now (value · paid ·
+  // outstanding) — the tab opens straight on the invoices.
+  if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
+  // ONE LINK (benchmark 2026-10, item 5): both drafted → one filled "Send
+  // proposal & agreement"; the per-document sends and Request deposit go under
+  // More, and "+ Invoice" steps back to a quiet button (one filled per screen).
+  const both=sendBothDocs();
+  if(both)html+=`<section id="sendBoth"><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">The proposal and the agreement are drafted. Send them together — one email, one link: they accept, sign, then pay the deposit on one page.</p>
+    <span class="racts" style="display:inline-flex;gap:6px;align-items:center"><button type="button" class="rbtn primary" id="sendBothBtn" data-send-both="1" data-prop="${esc(both.prop.id)}" data-con="${esc(both.con.id)}">Send proposal &amp; agreement</button><span class="more"><button type="button" class="rbtn" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button type="button" class="abtn" data-send-prop="${esc(both.prop.id)}">Send the proposal only</button><button type="button" class="abtn" data-send-con="${esc(both.con.id)}">Send the agreement only</button><button type="button" class="abtn" data-bform="deposit">Request deposit</button></div></span></span></div></section>`;
+  // invoices + the new-invoice / deposit forms
+  html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px">${both?'':'<button type="button" class="rbtn" data-bform="deposit">Request deposit</button>'}<a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn${both?'':' primary'}" data-bform="invoice">+ Invoice</button></span></h2>
+    <div id="bform"></div>`;
+  html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
+    const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+    // Oct 2026 (item 2): the chip is the money state word — Paid · Processing ·
+    // Upcoming · Overdue — in its one colour; sent-ness moves to the sub-line.
+    const st=invState(v);
+    let sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
+    let state, acts='', due='', dueCls='';
+    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(dueLabel(v.paid_at)):'';}
+    else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
+    else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
+    else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
+      if(!v.stripe_url)sub=(sub?sub+' · ':'')+'Not sent yet';
+      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
+      acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
+      if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
+      acts+=act(`data-void-inv="${esc(v.id)}"`,'Void','Withdraw this invoice — the payment link stops working');}
+    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View','Open a branded, printable copy (save as PDF)');
+    return `<tr class="brow"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
+  }).join('')+`</tbody></table></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
+  html+=`</section>`;
+  // proposals
+  html+=`<section><h2>Proposals <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Proposal (in pipeline)</a></h2><div class="card">`;
+  const props=DEAL.proposals||[];
+  html+=props.length?props.map(p=>{
+    let acts='';
+    // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft
+    const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+    if(p.status==='draft'&&!closed&&!both)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
+    else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
+    acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
+    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
+  }).join(''):`<p class="muted" style="font-size:13.5px">No proposals yet — draft one in the pipeline.</p>`;
+  html+=`</div></section>`;
+  // agreement
+  html+=`<section><h2>Agreement <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Agreement (in pipeline)</a></h2><div class="card">`;
+  const cons=DEAL.contracts||[];
+  html+=cons.length?cons.map(k=>{
+    let acts='';
+    if(k.status==='draft'&&!both)acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
+    else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
+    acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
+    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(dueLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
+  }).join(''):`<p class="muted" style="font-size:13.5px">No agreement yet.</p>`;
+  html+=`</div></section>`;
+  // retainer
+  const r=d.retainer;
+  html+=`<section><h2>Retainer</h2><div class="card">`;
+  if(r&&r.status&&r.status!=='canceled'){
+    const st=r.status==='active'?'<span class="schip good">Active</span>':r.status==='past_due'?'<span class="schip bad">Payment overdue</span>':'<span class="schip warn">Awaiting authorization</span>';
+    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1"','Cancel retainer')}</span></div>`;
+  }else{
+    html+=`<p class="muted" style="font-size:13.5px;margin-bottom:10px">Bill this client the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do.</p><button type="button" class="rbtn" data-bform="retainer">Set up a retainer</button><div id="rform"></div>`;
+  }
+  html+=`</div></section>`;
+  host.innerHTML=html;
+  wireBilling(host,d);
+  if(BILLING_OPEN){const w=BILLING_OPEN;BILLING_OPEN='';
+    if(w==='invoice'||w==='deposit')billingForm(w);
+    else if(w==='retainer')billingForm('retainer');
+    else if(w.indexOf('proposal:')===0){const b=host.querySelector(`[data-send-prop="${w.slice(9)}"]`);if(b){reveal(b);}}
+    else if(w.indexOf('contract:')===0){const b=host.querySelector(`[data-send-con="${w.slice(9)}"]`);if(b){reveal(b);}}
+    else if(w==='both'){const b=host.querySelector('#sendBothBtn');if(b){b.scrollIntoView({block:'center'});b.focus();}}
+  }
+  // a per-document send that lives under More: open the menu so the focus lands
+  function reveal(b){const m=b.closest('.more-menu');if(m){m.hidden=false;const t=host.querySelector('#sendMore');if(t)t.setAttribute('aria-expanded','true');}b.scrollIntoView({block:'center'});b.focus();}
+}
+// one send path per document kind — same routes pipeline.html uses
+async function billingSend(path,okLabel,body){
+  const r=await apiAg(path,'POST',body||{});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return null;}
+  const b=r.body||{}; const url=b.url||(b.data&&b.data.url)||'';
+  if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
+  toast(b.emailed?okLabel+' — emailed to the client':(url?okLabel.replace('sent','prepared')+' — link copied, nothing was emailed':okLabel));
+  return b;
+}
+async function reloadDeal(){
+  const ids=idParams(); if(!ids.deal)return;
+  const r=await apiAg('/sales/deals/'+encodeURIComponent(ids.deal)); DEAL=r.ok?(r.body.data||null):{error:true};
+  renderHighlights();renderPath();renderActions();
+  if(TAB==='billing'||TAB==='deal'||TAB==='files')showTab(TAB,true);
+  loadActivity();
+}
+function wireBilling(host,d){
+  host.querySelectorAll('[data-bform]').forEach(b=>b.addEventListener('click',()=>billingForm(b.getAttribute('data-bform'))));
+  host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.'));}));
+  host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.');}));
+  host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
+  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.'))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){toast(r.body.already?'Already voided':'Invoice voided');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.');b.disabled=false;}}));
+  host.querySelectorAll('[data-send-prop]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/proposals/'+b.getAttribute('data-send-prop')+'/send',b.hasAttribute('data-resend')?'Proposal link copied':'Proposal sent');if(r)reloadDeal();else b.disabled=false;}));
+  host.querySelectorAll('[data-send-con]').forEach(b=>b.addEventListener('click',async()=>{
+    const k=(DEAL.contracts||[]).find(x=>x.id===b.getAttribute('data-send-con'));
+    if(k&&k.status==='draft'&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    b.disabled=true;const r=await billingSend('/sales/contracts/'+b.getAttribute('data-send-con')+'/send',b.hasAttribute('data-resend')?'Signing link copied':'Agreement sent');if(r)reloadDeal();else b.disabled=false;}));
+  // ONE LINK: both drafts in one go (POST /sales/deals/:id/send) — the same
+  // blanks confirm the agreement's own Send runs, then one email, one page.
+  const sb=host.querySelector('[data-send-both]'); if(sb)sb.addEventListener('click',async()=>{
+    const k=(DEAL.contracts||[]).find(x=>x.id===sb.getAttribute('data-con'));
+    if(k&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    sb.disabled=true;const r=await billingSend('/sales/deals/'+d.id+'/send','Proposal and agreement sent',{proposal_id:sb.getAttribute('data-prop'),contract_id:sb.getAttribute('data-con')});if(r)reloadDeal();else sb.disabled=false;});
+  const sm=host.querySelector('#sendMore'); if(sm){const menu=host.querySelector('#sendMoreMenu');
+    sm.addEventListener('click',(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}});
+    const close=()=>{if(menu.hidden)return;menu.hidden=true;sm.setAttribute('aria-expanded','false');};
+    // ONE document listener across renders (the tab re-renders on every reload)
+    if(window.__sendMoreClose)document.removeEventListener('click',window.__sendMoreClose);
+    window.__sendMoreClose=close;document.addEventListener('click',close);
+    menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});}
+  const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
+}
+// the small inline forms: invoice · deposit · retainer
+function billingForm(kind){
+  const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
+  const today=new Date().toISOString().slice(0,10);
+  if(kind==='retainer'){
+    host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
+  }else{
+    const dep=kind==='deposit';
+    const html=`<div class="bform"><div class="brow2"><label>${dep?'Deposit amount (USD)':'Amount (USD)'}<input type="number" id="bf-amt" step="0.01" min="1" placeholder="${dep?'500':'2500'}"${dep?'':' aria-describedby="bf-hint"'}></label><label>Label<input type="text" id="bf-title" maxlength="80" placeholder="${dep?'Deposit':'e.g. Balance at launch'}"></label><label>Due<input type="date" id="bf-due" min="${today}"></label></div>${dep?'':'<p class="muted" id="bf-hint" style="font-size:12.5px;margin-top:6px">Leave the amount blank to invoice the accepted proposal.</p>'}<div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">${dep?'Request deposit':'Send invoice'}</button></div></div>`;
+    host.innerHTML=html;
+  }
+  host.scrollIntoView({block:'center',behavior:'smooth'});
+  setTimeout(()=>{const a=$('bf-amt');if(a)a.focus({preventScroll:true});},150);
+  $('bf-cancel').addEventListener('click',()=>{host.innerHTML='';});
+  $('bf-go').addEventListener('click',async()=>{
+    const go=$('bf-go'); go.disabled=true;
+    const amt=parseFloat(($('bf-amt').value||'').trim());
+    if(kind==='retainer'){
+      if(!amt||amt<1){toast('Enter a retainer amount of at least $1.');go.disabled=false;return;}
+      const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
+      if(r.ok){const x=r.body.data||{};toast(x.emailed?'Retainer set up — the authorization link was emailed':'Retainer set up — authorization link copied');if(x.url&&!x.emailed&&navigator.clipboard)navigator.clipboard.writeText(x.url).catch(()=>{});reloadDeal();}
+      else{toast((r.body&&r.body.message)||'Couldn’t set that up.');go.disabled=false;}
+      return;
+    }
+    const dep=kind==='deposit';
+    if(dep&&(!amt||amt<1)){toast('Enter a deposit amount.');go.disabled=false;return;}
+    const body={purpose:dep?'deposit':'service'};
+    if(amt)body.amount_cents=Math.round(amt*100);
+    const title=($('bf-title').value||'').trim(); if(title)body.title=title; else if(dep)body.title='Deposit';
+    const due=$('bf-due').value; if(due)body.due_date=due;
+    await sendMoney(body,host);
+  });
+}
+async function sendMoney(body,host){
+  const d=(DEAL&&DEAL.deal)||{}; const label=body.purpose==='deposit'?'Deposit request':'Invoice';
+  const r=await apiAg('/sales/deals/'+d.id+'/invoice','POST',body);
+  if(r.ok){
+    const b=r.body||{}; const url=b.url||'';
+    if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
+    toast(b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
+    if(host)host.innerHTML='';
+    reloadDeal(); return;
+  }
+  if(r.status===409&&r.body&&r.body.error==='amount_mismatch'&&host){
+    const open=r.body.open_invoice||{};
+    host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists at a different amount.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} link</button><button type="button" class="primary" id="bf-force">Send another for the new amount</button></div></div>`;
+    $('bf-resend').addEventListener('click',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
+    $('bf-force').addEventListener('click',()=>sendMoney({...body,force:true},host));
+    return;
+  }
+  toast((r.body&&r.body.message)||'That didn’t go through.');
+  const go=$('bf-go'); if(go)go.disabled=false;
 }
 
 // ── Delivery tab: the project as a related-list card (heavy tools stay on
@@ -775,14 +1270,19 @@ async function loadActivityFallback(q,seq){
   for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),href:dealHref});
   const d=DEAL&&DEAL.deal;
   if(d&&d.next_step)upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),href:dealHref});
-  for(const iv of (DEAL&&DEAL.invoices)||[])if(iv.status==='open')upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:!!(iv.due_date&&String(iv.due_date).slice(0,10)<today),href:dealHref});
+  // item 2: only an invoice still WAITING on the client belongs here, and its
+  // overdue flag is the one formula's word (a processing payment is on its way)
+  for(const iv of invWaiting((DEAL&&DEAL.invoices)||[]))upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:invState(iv)==='overdue',href:dealHref});
   upcoming.sort((a,b)=>{if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:a.due>b.due?1:0;});
   ACT={items,upcoming,reply_to:md.reply_to||null,reply_support_to:md.reply_support_to||null,failed:false};
 }
 
 const FILTER_DEFS=[['all','All'],['message','Messages'],['call','Calls'],['task','Tasks'],['note','Notes'],['system','System']];
 const filterMatch=(it)=>FILTER==='all'||(FILTER==='message'?(it.type==='message'||it.type==='email'):it.type===FILTER);
-const TYPE_ICON={message:'💬',email:'✉',call:'📞',task:'✓',note:'✐',system:'⚙'};
+// ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
+const SI={message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',check:'<path d="M5 12l5 5 9-10"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',pin:'<path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3z"/>'};
+const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
+const TYPE_ICON={message:si('message'),email:si('mail'),call:si('phone'),task:si('check'),note:si('pencil'),system:si('cog')};
 
 // A rail refresh (Upcoming checkbox, Remove note, stage move…) rebuilds #acard —
 // snapshot the composer's in-progress drafts first and restore them after, so a
@@ -862,7 +1362,7 @@ function renderComposer(){
       html+=`<p class="muted" style="font-size:13.5px">Replies open once this client has a project or an open support thread.</p>`;
     }
   }else if(COMPOSER==='logcall'){
-    const kinds=[['call','📞 Call'],['email','✉️ Email'],['meeting','🤝 Meeting'],['note','📝 Note']];
+    const kinds=[['call',si('phone')+' Call'],['email',si('mail')+' Email'],['meeting',si('users')+' Meeting'],['note',si('pencil')+' Note']];
     html+=`<div class="kindchips" role="group" aria-label="What are you logging?">${kinds.map(k=>`<button data-lk="${k[0]}"${LOGKIND===k[0]?' class="on" aria-pressed="true"':' aria-pressed="false"'}>${k[1]}</button>`).join('')}</div>
       <textarea id="logBody" style="margin-top:9px" placeholder="What happened? (optional for calls/emails/meetings)" aria-label="Activity notes"></textarea>
       <div class="composer-row"><label for="logDate" style="font-size:12.5px;color:var(--faint)">When</label><input type="date" id="logDate" max="${new Date().toISOString().slice(0,10)}" value="${new Date().toISOString().slice(0,10)}" aria-label="When it happened"><span class="spacer"></span><button class="primary" id="logGo">Log it</button></div>`;
@@ -951,7 +1451,7 @@ function renderUpcoming(){
   const ups=ACT.upcoming||[];
   if(!ups.length){host.innerHTML='';return;}
   host.innerHTML=`<div class="upband"><div class="bt">Upcoming &amp; overdue</div>`+ups.map(u=>{
-    const icon=u.kind==='invoice'?'🧾':u.kind==='next_step'?'→':'';
+    const icon=u.kind==='invoice'?si('receipt'):u.kind==='next_step'?'→':'';
     const box=u.kind==='task'&&u.id?`<input type="checkbox" data-updone="${esc(u.id)}" aria-label="Mark done: ${esc(u.title)}">`:(icon?`<span aria-hidden="true">${icon}</span>`:'');
     const title=u.href?`<a href="${esc(pinHref(u.href))}">${esc(u.title)}</a>`:esc(u.title);
     return `<div class="uprow ${u.overdue?'overdue':''}">${box}<span class="ut" style="min-width:0">${title}</span><span class="due">${u.overdue?'overdue · ':''}${esc(dueLabel(u.due))}</span></div>`;
@@ -984,7 +1484,7 @@ async function renderNotesView(host){
   host.innerHTML=notes.map(n=>{
     const aud=n.audience==='internal'?'Internal note':'Shared note';
     return `<div class="ti t-note"><span class="ti-icon" aria-hidden="true">${TYPE_ICON.note}</span><div class="ti-main">
-      <div class="ti-head"><span class="ti-title">${n.pinned?'📌 Pinned note':'Note'}</span><span class="ti-meta">${aud}</span></div>
+      <div class="ti-head"><span class="ti-title">${n.pinned?si('pin')+' Pinned note':'Note'}</span><span class="ti-meta">${aud}</span></div>
       <div class="ti-body">${esc(n.body||'')}<div class="note-acts"><button data-pin="${esc(n.id)}" data-on="${n.pinned?'':'1'}">${n.pinned?'Unpin':'Pin'}</button><button data-delnote="${esc(n.id)}">Remove</button></div></div>
     </div><span class="ti-when">${esc(when(n.created_at))}</span></div>`;
   }).join('');
@@ -1001,9 +1501,20 @@ async function renderNotesView(host){
     else{toast('Couldn’t remove that note.');b.disabled=false;}
   }));
 }
+// Phase 3 (timeline filters): website system events — publish notices, "changes
+// are waiting", connected-service pings — buried the human events (a payment, a
+// signature, a call) under 15+ rows. On the default view they collapse into ONE
+// quiet line; the System chip (or "Show") expands them. Deal events (money,
+// stage moves) are human-relevant and stay inline.
+const isSiteNoise=(it)=>it.type==='system'&&it.kind!=='deal_event';
+const SYS_FOLD_AT=3;   // one or two publish rows read fine inline; it's the pile-up that buries things
+let SYS_OPEN=false;
 function renderMergedTimeline(host){
-  const items=(ACT.items||[]).filter(filterMatch);
-  if(!items.length){host.innerHTML=`<p class="muted" style="margin-top:16px;font-size:13.5px">${(ACT.items||[]).length?'Nothing matches this filter.':'Nothing here yet — messages, calls, and system events will appear as they happen.'}</p>`;return;}
+  const all=(ACT.items||[]).filter(filterMatch);
+  const collapse=FILTER==='all'&&!SYS_OPEN&&all.filter(isSiteNoise).length>=SYS_FOLD_AT;
+  const items=collapse?all.filter(it=>!isSiteNoise(it)):all;
+  const hidden=collapse?all.length-items.length:0;
+  if(!items.length&&!hidden){host.innerHTML=`<p class="muted" style="margin-top:16px;font-size:13.5px">${(ACT.items||[]).length?'Nothing matches this filter.':'Nothing here yet — messages, calls, and system events will appear as they happen.'}</p>`;return;}
   let html=''; let curMonth='';
   for(const it of items){
     const mk=String(it.at).slice(0,7);
@@ -1025,7 +1536,9 @@ function renderMergedTimeline(host){
     }
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
+  if(hidden)html+=`<div class="ti t-system sys-fold"><span class="ti-icon" aria-hidden="true">${si('cog')}</span><div class="ti-main"><div class="ti-head"><span class="ti-title" style="font-weight:500;color:var(--faint)">${hidden===1?'1 website update':hidden+' website updates'}</span> <button type="button" class="link-btn" id="sysShow" style="font-size:12.5px">Show</button></div></div></div>`;
   host.innerHTML=html;
+  const ss=$('sysShow'); if(ss)ss.addEventListener('click',()=>{SYS_OPEN=true;renderTimeline();});
   host.querySelectorAll('[data-x]').forEach(b=>b.addEventListener('click',()=>{
     const id=b.getAttribute('data-x');
     if(EXPANDED.has(id))EXPANDED.delete(id);else EXPANDED.add(id);

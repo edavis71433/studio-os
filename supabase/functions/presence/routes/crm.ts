@@ -77,16 +77,43 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   const q = (u.searchParams.get('q') || '').replace(/[(),*"\\%]/g, ' ').trim().slice(0, 60);
   if (q.length < 2) return json({ data: { results: [] } }, 200, cors);
   const eq = encodeURIComponent(q);
+  const ql = q.toLowerCase();
   try {
-    const [contacts, deals, projects] = await Promise.all([
+    // Phase 2 (search across everything): customers and invoices join contacts,
+    // deals and projects; a money word ("invoice", "owed", "unpaid") lists what's
+    // open; and the first customers matched get ACTION rows ("Send invoice to
+    // Claud", "Message Claud") that land on the record with the form open.
+    const moneyWord = /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
+    const cents = /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
+    const [contacts, deals, projects, links, invoices] = await Promise.all([
       svc(`presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&or=(name.ilike.*${eq}*,email.ilike.*${eq}*,company.ilike.*${eq}*)&select=id,name,email,company&limit=6`),
-      svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&title=ilike.*${eq}*&select=id,title,stage&order=updated_at.desc&limit=6`),
+      svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&title=ilike.*${eq}*&select=id,title,stage,converted_client_id&order=updated_at.desc&limit=6`),
       svc(`presence_projects?site_id=eq.${site.id}&deleted_at=is.null&name=ilike.*${eq}*&select=id,name,status&limit=6`),
+      svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=customer_client_id,customer_site_id&limit=200`),
+      moneyWord
+        ? svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`)
+        : svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&or=(title.ilike.*${eq}*${cents ? `,amount_cents.eq.${cents}` : ''})&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`),
     ]);
     const results: any[] = [];
-    for (const c of arr(contacts)) results.push({ label: String(c.name || c.email || 'Contact'), sub: 'Contact' + (c.company ? ' · ' + String(c.company) : ''), href: `/crm.html?contact=${c.id}&tab=details` });
-    for (const d of arr(deals)) results.push({ label: String(d.title || 'Deal'), sub: 'Deal' + (d.stage ? ' · ' + String(d.stage) : ''), href: `/crm.html?deal=${d.id}&tab=deal` });
-    for (const p of arr(projects)) results.push({ label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
+    // customers: the studio's bridged clients, matched by name/email in memory (≤200)
+    const siteByClient: Record<string, string> = {};
+    const clientIds = [...new Set(arr(links).map((l: any) => { if (l.customer_site_id) siteByClient[String(l.customer_client_id)] = String(l.customer_site_id); return String(l.customer_client_id || ''); }).filter(Boolean))];
+    const customers = clientIds.length ? arr(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=200`)) : [];
+    const hit = (s: unknown) => String(s || '').toLowerCase().includes(ql);
+    const matchedCustomers = customers.filter((c: any) => hit(c.name) || hit(c.email)).slice(0, 6);
+    const recordHref = (c: any) => siteByClient[String(c.id)] ? `/crm.html?client=${siteByClient[String(c.id)]}` : `/crm.html?client_id=${c.id}`;
+    for (const c of matchedCustomers) results.push({ kind: 'customer', label: String(c.name || c.email || 'Customer'), sub: 'Customer', href: recordHref(c) });
+    for (const c of arr(contacts)) results.push({ kind: 'contact', label: String(c.name || c.email || 'Contact'), sub: 'Contact' + (c.company ? ' · ' + String(c.company) : ''), href: `/crm.html?contact=${c.id}&tab=details` });
+    for (const d of arr(deals)) results.push({ kind: 'deal', label: String(d.title || 'Deal'), sub: 'Deal' + (d.stage ? ' · ' + String(d.stage) : ''), href: `/crm.html?deal=${d.id}&tab=deal` });
+    for (const v of arr(invoices)) results.push({ kind: 'invoice', label: `${String(v.title || 'Invoice')} — $${Math.round((Number(v.amount_cents) || 0) / 100).toLocaleString('en-US')}`, sub: 'Invoice · ' + (v.status === 'open' ? 'awaiting payment' : String(v.status || '')), href: v.deal_id ? `/crm.html?deal=${v.deal_id}&tab=billing` : '/pipeline.html' });
+    for (const p of arr(projects)) results.push({ kind: 'project', label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
+    if (moneyWord) results.push({ kind: 'page', label: 'Who owes you', sub: 'Pipeline · outstanding invoices', href: '/pipeline.html#receivables' });
+    // actions on the matched customers (the ones with a record to land on)
+    for (const c of matchedCustomers.slice(0, 2)) {
+      const name = String(c.name || c.email || 'them');
+      results.push({ kind: 'action', label: `Send invoice to ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=billing&act=invoice` });
+      results.push({ kind: 'action', label: `Message ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=details&act=message` });
+    }
     return json({ data: { results } }, 200, cors);
   } catch (_e) {
     return json({ data: { results: [] } }, 200, cors);
@@ -279,7 +306,10 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     if (dealId || conv.clientId) {
       try {
         const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${conv.clientId}`;
-        invoices = arr(await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`));
+        // processing_since lands with migration 0132 (tolerant: pre-0132 shape second)
+        let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
+        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
+        invoices = arr(ir);
       } catch { invoices = []; }
     }
     // site-ops events (publishes, approvals, notes, connected, moments) — only

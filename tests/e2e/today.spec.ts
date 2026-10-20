@@ -12,7 +12,7 @@ test.describe('Today', () => {
     await expect(todo).toHaveCount(2); // 1 notice + 1 approval
     await expect(page.locator('.moment.todo').first()).toContainText('A quote request is waiting for a reply');
     // a notice row is a CONTAINER (link + a sibling Done button); the link is inside it
-    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/leads.html');
+    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries?sel=lead:l1');   // the notice deep-links its row (audit gap 2)
     await expect(page.getByText('Protect your email')).toBeVisible();
     // the moment card + its dismiss affordance
     await expect(page.getByRole('heading', { name: 'Add your holiday hours' })).toBeVisible();
@@ -31,7 +31,7 @@ test.describe('Today', () => {
     await summary.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await summary.click();
     await expect(page.getByText('One thing could help.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/leads.html');
+    await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/inbox.html#enquiries');
   });
 
   test('the Customer Journey celebrates milestones, never a score', async ({ page }) => {
@@ -197,7 +197,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await installApp(page);
     await page.goto(`/today.html?client=${CLIENT}`);
     const rows = page.locator('.feedcard .moment.todo');
-    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/leads.html?client=${CLIENT}`);
+    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries?sel=lead:l1`);   // scope before the hash; the row deep link rides in the hash
     await expect(rows.nth(1)).toHaveAttribute('href', `/presence.html?client=${CLIENT}#foundations`);
   });
 
@@ -508,7 +508,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   } } });
   const NOTICE = {
     id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true,
-    headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html',
+    headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries',
   };
   const UNPAID = {
     id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', kind: 'deal_followup', period: 'invremind:inv-1', dismissible: false,
@@ -516,7 +516,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   };
   const SYNTHETIC = {
     id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
-    headline: '2 new enquiries came in', body: 'Someone reached out through your website.', href: '/leads.html',
+    headline: '2 new enquiries came in', body: 'Someone reached out through your website.', href: '/inbox.html#enquiries',
   };
 
   test('a dismissable row offers Done — an unpaid invoice never does', async ({ page }) => {
@@ -598,5 +598,384 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+});
+
+// ── The studio home (2026-10 mockup): under the greeting, a money band when
+// something is due, a four-tile stat strip, then This week · Coming up in the
+// main column and a Customers card in the rail. Every piece keeps the
+// "failure ≠ empty" rule: a failed read hides its piece, never a fake zero.
+// One navigation per test: at phone widths a reload/second goto lands on the
+// signed-out view (the stub session doesn't survive it — see the slice-10
+// reload tests), and a click needs the one-time page hint out of the way.
+const ymdOffset = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return new Intl.DateTimeFormat('en-CA').format(d); };
+const SUMMARY = { data: {
+  total: 3, open: { count: 2, value_cents: 650000 }, won_month: { count: 1, value_cents: 320000 },
+  win_rate: { pct: 100, won: 1, lost: 0 }, by_stage: [], ar: { outstanding_cents: 160000, count: 1, overdue_cents: 0, overdue_count: 0 },
+} };
+const RECEIVABLES = { data: { items: [
+  { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2099-01-10', overdue: false, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: 'https://pay.example/x' },
+], total_cents: 160000, overdue_cents: 0 } };
+const FEED_WITH_ENQUIRIES = { data: {
+  role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null,
+  enquiries: [{ id: 'l1', name: 'Sam Rivera' }, { id: 'l2', name: 'Dana Lee' }],
+} };
+const NEXT_STEPS = () => ({ data: [
+  { id: 'd1', title: 'Claud Beltran — website build', stage: 'contract', expected_value_cents: 320000, next_step: 'Send Claud the kickoff details', next_step_at: ymdOffset(0) },
+  { id: 'd2', title: 'Bacchus Kitchen — menu refresh', stage: 'proposal', expected_value_cents: 450000, next_step: 'Collect content from Bacchus', next_step_at: ymdOffset(2) },
+  { id: 'd3', title: 'Hettie Orange Designs — gallery', stage: 'qualified', expected_value_cents: 200000, next_step: 'Chase the gallery photos', next_step_at: ymdOffset(10) },
+  { id: 'd4', title: 'Won already', stage: 'won', expected_value_cents: 999900, next_step: 'Open their project', next_step_at: ymdOffset(0) },
+] });
+const STUDIO_CUSTOMERS = { data: [
+  { client_id: 'c1', name: 'Bacchus Kitchen', email: 'hi@bacchus.example', project_id: 'p1', project_name: 'Menu refresh', status: 'active', customer_site_id: 's1', open_support: 0, project_count: 1 },
+  { client_id: 'c2', name: 'Hettie Orange Designs', email: 'hettie@example.com', project_id: 'p2', project_name: 'Gallery', status: 'on_hold', customer_site_id: null, open_support: 1, project_count: 1 },
+] };
+const BOOKINGS_AHEAD = () => ({ data: { appointments: [
+  { id: 'b1', type_name: 'Kickoff call', slot_start_local: `${ymdOffset(0)}T14:30`, customer_name: 'Claud Beltran', status: 'confirmed' },   // today → the schedule, not Coming up
+  { id: 'b2', type_name: 'Menu page review', slot_start_local: `${ymdOffset(3)}T10:00`, customer_name: 'Bacchus Kitchen', status: 'pending' },
+  { id: 'b3', type_name: 'Gone', slot_start_local: `${ymdOffset(1)}T10:00`, status: 'canceled' },
+], scope: 'upcoming', pending: 1 } });
+const FULL_HOME = () => ({
+  '/sales/summary': SUMMARY, '/sales/receivables': RECEIVABLES, '/sales/deals': NEXT_STEPS(), '/studio/customers': STUDIO_CUSTOMERS,
+  '/portal/feed': FEED_WITH_ENQUIRIES, '/moments': { data: [] }, '/analytics/dashboard': DASH, '/bookings/appointments': BOOKINGS_AHEAD(),
+});
+// the one-time page hint floats over the main column at phone widths and the
+// fixed bottom bar can park a target under itself — same dance as PT-2C
+const clearTheWay = async (page: import('@playwright/test').Page, target: import('@playwright/test').Locator) => {
+  await page.locator('.dds-hint').getByRole('button', { name: 'Got it' }).click();
+  await target.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+};
+
+test.describe('Today — the studio home (mockup)', () => {
+  test('the money band: one open invoice → the amount, whose, Resend → the deal’s billing tab, Open record → the deal', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': RECEIVABLES } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toBeVisible();
+    await expect(band).toContainText('$1,600 is due now');
+    await expect(band).toContainText('Claud Beltran’s invoice “Deposit” hasn’t been paid yet.');
+    await expect(band.getByRole('link', { name: 'Resend invoice' })).toHaveAttribute('href', '/crm.html?deal=d1&tab=billing');
+    await expect(band.getByRole('link', { name: 'Open record' })).toHaveAttribute('href', '/crm.html?deal=d1');
+    // the band sits above the columns, under the greeting — not inside the feed
+    expect(await band.evaluate((el) => el.nextElementSibling?.id)).toBe('home-cols');
+    await expect(page.locator('.feedcard .moment.todo')).toHaveCount(2);   // the feed is untouched
+  });
+
+  test('the money band: several invoices total up and route to Who owes you', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
+      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: null, overdue: false, deal_id: 'd2', deal: 'Bacchus Kitchen', stripe_url: null },
+    ], total_cents: 250000, overdue_cents: 160000 } } } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toContainText('$2,500 is due now');
+    await expect(band).toContainText('2 invoices are waiting on payment, 1 of them overdue.');
+    await expect(band.getByRole('link', { name: 'Who owes you' })).toHaveAttribute('href', '/pipeline.html');
+    await expect(band.getByRole('link', { name: 'Resend invoice' })).toHaveCount(0);
+  });
+
+  test('the money band: a lone overdue invoice says so and names the date it was due', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
+    ], total_cents: 160000, overdue_cents: 160000 } } } });
+    await page.goto('/today.html');
+    await expect(page.locator('#money-due')).toContainText('$1,600 is overdue — Claud Beltran’s invoice “Deposit” was due Oct 1 and hasn’t been paid yet.');
+  });
+
+  // Oct 2026 benchmark (item 2): the four money buckets under the band's line,
+  // from ONE list through the one formula (moneyState, mirrored from
+  // lib/money_state.ts) — Paid (the last 30 days, shipped as `paid`) ·
+  // Processing · Upcoming · Overdue. A processing payment is "on its way",
+  // never "due now"; a payload without `paid` (an older function build)
+  // shows no Paid bucket rather than a fake $0.
+  test('the money band: four buckets from one list — Paid (30 days) · Processing · Upcoming · Overdue — in four colours; processing money is on its way, not due', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', status: 'open', state: 'overdue', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
+      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: '2099-01-10', status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Bacchus Kitchen', stripe_url: null },
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, status: 'open', state: 'processing', processing_since: '2026-10-19T00:00:00Z', overdue: false, deal_id: 'd3', deal: 'Hettie Orange', stripe_url: 'https://pay.example/3' },
+    ], paid: [
+      { id: 'inv-0', title: 'Kickoff', amount_cents: 120000, status: 'paid', state: 'paid', paid_at: '2026-10-15T00:00:00Z', deal_id: 'd1', deal: 'Claud Beltran' },
+    ], paid_window_days: 30, total_cents: 250000, overdue_cents: 160000, processing_cents: 40000 } } } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toContainText('$2,500 is due now — 2 invoices are waiting on payment, 1 of them overdue. $400 more is processing.');
+    await expect(band.locator('[data-bucket="paid"]')).toHaveText('$1,200 Paid (30 days)');
+    await expect(band.locator('[data-bucket="processing"]')).toHaveText('$400 Processing');
+    await expect(band.locator('[data-bucket="upcoming"]')).toHaveText('$900 Upcoming');
+    await expect(band.locator('[data-bucket="overdue"]')).toHaveText('$1,600 Overdue');
+    const colours = await Promise.all(['paid', 'processing', 'upcoming', 'overdue'].map((k) => band.locator(`[data-bucket="${k}"] b`).evaluate((el) => getComputedStyle(el).color)));
+    expect(new Set(colours).size).toBe(4);   // one colour per state
+    await expect(band.getByRole('link', { name: 'Who owes you' })).toHaveAttribute('href', '/pipeline.html');
+  });
+
+  test('the money band: only processing money says "on its way" and chases nothing; an older payload without `paid` shows no Paid bucket (never a fake $0)', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, overdue: false, processing_since: '2026-10-19T00:00:00Z', deal_id: 'd3', deal: 'Hettie Orange', stripe_url: null },
+    ], total_cents: 0, overdue_cents: 0 } } } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toContainText('$400 is on its way — a payment is processing; nothing to chase.');
+    await expect(band.getByRole('link', { name: 'Resend invoice' })).toHaveCount(0);
+    await expect(band.locator('[data-bucket="paid"]')).toHaveCount(0);
+    await expect(band.locator('[data-bucket="processing"]')).toHaveText('$400 Processing');
+    await expect(band.locator('[data-bucket="upcoming"]')).toHaveText('$0 Upcoming');
+    await expect(band.locator('[data-bucket="overdue"]')).toHaveText('$0 Overdue');
+  });
+
+  test('the money band hides on an empty list', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [], total_cents: 0, overdue_cents: 0 } } } });
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#money-due')).toHaveCount(0);
+  });
+
+  test('the money band hides on a failed read — a 5xx never paints "nothing is due" (failure ≠ empty)', async ({ page }) => {
+    await installApp(page);
+    await page.route('**/functions/v1/presence/sales/receivables**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();   // the page stands…
+    await expect(page.locator('#money-due')).toHaveCount(0); // …and says nothing about money either way
+    await expect(page.getByText('$0', { exact: true })).toHaveCount(0);
+  });
+
+  test('the stat strip: four icon tiles from /sales/summary + the feed’s enquiries, each linking where it drills', async ({ page }) => {
+    await installApp(page, { api: { '/sales/summary': SUMMARY, '/portal/feed': FEED_WITH_ENQUIRIES, '/moments': { data: [] } } });
+    await page.goto('/today.html');
+    const strip = page.locator('#stat-strip');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('.hl')).toHaveCount(4);
+    const owed = strip.locator('#stat-owed');
+    await expect(owed).toContainText('Outstanding');
+    await expect(owed.locator('.hl-v')).toHaveText('$1,600');
+    await expect(owed.locator('.hl-s')).toHaveText('1 invoice');
+    await expect(owed.locator('.ico')).toHaveClass(/warn/);
+    await expect(owed).toHaveAttribute('href', '/pipeline.html');
+    const won = strip.locator('#stat-won');
+    await expect(won).toContainText('Won this month');
+    await expect(won.locator('.hl-v')).toHaveText('$3,200');
+    await expect(won.locator('.hl-s')).toHaveText('1 deal');
+    const open = strip.locator('#stat-open');
+    await expect(open.locator('.hl-v')).toHaveText('2');
+    await expect(open.locator('.hl-s')).toHaveText('$6,500 in play');
+    const enq = strip.locator('#stat-enq');
+    await expect(enq).toContainText('New enquiries');
+    await expect(enq.locator('.hl-v')).toHaveText('2');
+    await expect(enq.locator('.hl-s')).toHaveText('Waiting for a reply');
+    await expect(enq).toHaveAttribute('href', '/inbox.html#enquiries');
+    // the strip sits under the greeting, above the two columns
+    expect(await strip.evaluate((el) => el.nextElementSibling?.id)).toBe('home-cols');
+  });
+
+  test('the stat strip: a successful read’s zeros are REAL and read calmly', async ({ page }) => {
+    await installApp(page, { api: {
+      '/sales/summary': { data: { total: 0, open: { count: 0, value_cents: 0 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 }, by_stage: [], ar: { outstanding_cents: 0, count: 0, overdue_cents: 0, overdue_count: 0 } } },
+      '/portal/feed': { data: { ...FEED_WITH_ENQUIRIES.data, enquiries: [] } }, '/moments': { data: [] },
+    } });
+    await page.goto('/today.html');
+    const strip = page.locator('#stat-strip');
+    await expect(strip.locator('.hl')).toHaveCount(4);
+    await expect(strip.locator('#stat-owed .hl-s')).toHaveText('All paid up');
+    await expect(strip.locator('#stat-won .hl-s')).toHaveText('Nothing closed yet');
+    await expect(strip.locator('#stat-open .hl-v')).toHaveText('0');
+    await expect(strip.locator('#stat-open .hl-s')).toHaveText('Pipeline is clear');
+    await expect(strip.locator('#stat-enq .hl-s')).toHaveText('Nothing new');
+  });
+
+  test('the stat strip: a 403 summary (sales-less edition) keeps only the enquiries tile — never three $0s', async ({ page }) => {
+    await installApp(page, { api: { '/portal/feed': FEED_WITH_ENQUIRIES, '/moments': { data: [] } } });
+    await page.route('**/functions/v1/presence/sales/summary**', (route) =>
+      route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
+    await page.goto('/today.html');
+    await expect(page.locator('#stat-strip .hl')).toHaveCount(1);
+    await expect(page.locator('#stat-enq')).toBeVisible();
+    await expect(page.getByText('$0', { exact: true })).toHaveCount(0);
+  });
+
+  test('the stat strip: nothing honest to show → no strip at all', async ({ page }) => {
+    // the default feed carries no enquiries array (older build / failed read) and the summary read fails
+    await installApp(page);
+    await page.route('**/functions/v1/presence/sales/summary**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#stat-strip')).toHaveCount(0);
+  });
+
+  test('This week: the next step on each OPEN deal due inside the week, soonest first, each with ONE Done', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': NEXT_STEPS() } });
+    await page.goto('/today.html');
+    const week = page.locator('#this-week');
+    await expect(week).toBeVisible();
+    await expect(week.getByRole('heading', { name: 'This week' })).toBeVisible();
+    const rows = week.locator('.trow');
+    await expect(rows).toHaveCount(2);                                     // d3 is 10 days out → Coming up; d4 is won → never a to-do
+    await expect(rows.nth(0)).toContainText('Send Claud the kickoff details');
+    await expect(rows.nth(0)).toContainText('Claud Beltran — website build · Today');
+    await expect(rows.nth(0).locator('a.frow')).toHaveAttribute('href', '/crm.html?deal=d1');
+    await expect(rows.nth(1)).toContainText('Collect content from Bacchus');
+    await expect(week.getByText('Nothing overdue.')).toBeVisible();
+    await expect(week.getByText('Open their project')).toHaveCount(0);
+    await expect(rows.locator('button[data-todo-done]')).toHaveCount(2);
+    // the row is a CONTAINER: the link and its Done button are siblings (never a button inside an anchor)
+    await expect(week.locator('a button')).toHaveCount(0);
+    expect(await rows.first().evaluate((el) => Array.from(el.children).map((c) => c.tagName).join(','))).toBe('A,BUTTON');
+  });
+
+  test('This week: Done clears the step on the deal (the existing per-deal PATCH) and removes the row; the last one takes the section', async ({ page }) => {
+    const patched: Array<{ url: string; body: string }> = [];
+    await installApp(page, { api: { '/sales/deals': NEXT_STEPS() } });
+    await page.route('**/functions/v1/presence/sales/deals/*', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      patched.push({ url: route.request().url(), body: route.request().postData() || '' });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'd1', next_step: null } }) });
+    });
+    await page.goto('/today.html');
+    const rows = page.locator('#this-week .trow');
+    await expect(rows).toHaveCount(2);
+    const done = rows.nth(0).getByRole('button', { name: /^Done/ });
+    await clearTheWay(page, done);
+    await done.click();
+    await expect(rows).toHaveCount(1);
+    expect(patched.length).toBe(1);
+    expect(patched[0].url).toMatch(/\/sales\/deals\/d1$/);
+    expect(JSON.parse(patched[0].body)).toEqual({ next_step: '', next_step_at: '' });
+    // the last Done takes the (now empty) section with it
+    const last = rows.nth(0).getByRole('button', { name: /^Done/ });
+    await last.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await last.click();
+    await expect(page.locator('#this-week')).toHaveCount(0);
+  });
+
+  test('This week: an overdue step is named (and sorts first), an undated one sorts last, and the calm line goes', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': { data: [
+      { id: 'd8', title: 'No date', stage: 'lead', expected_value_cents: 1000, next_step: 'Write the proposal', next_step_at: null },
+      { id: 'd9', title: 'Late one', stage: 'lead', expected_value_cents: 1000, next_step: 'Call them back', next_step_at: '2026-01-05' },
+    ] } } });
+    await page.goto('/today.html');
+    const week = page.locator('#this-week');
+    const rows = week.locator('.trow');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toHaveClass(/late/);
+    await expect(rows.nth(0)).toContainText('Overdue · Jan 5');
+    await expect(rows.nth(1)).toContainText('No date set');          // undated sorts last
+    await expect(week.getByText('Nothing overdue.')).toHaveCount(0);
+  });
+
+  test('This week: a failed Done keeps the row and brings the button back', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': { data: [
+      { id: 'd9', title: 'Late one', stage: 'lead', expected_value_cents: 1000, next_step: 'Call them back', next_step_at: '2026-01-05' },
+    ] } } });
+    await page.route('**/functions/v1/presence/sales/deals/*', (route) =>
+      route.request().method() === 'PATCH'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) })
+        : route.fallback());
+    await page.goto('/today.html');
+    const rows = page.locator('#this-week .trow');
+    await expect(rows).toHaveCount(1);
+    const done = rows.nth(0).getByRole('button', { name: /^Done/ });
+    await clearTheWay(page, done);
+    await done.click();
+    await expect(rows).toHaveCount(1);                                 // the write failed → the row stays…
+    await expect(done).toBeEnabled();                                  // …and the button comes back
+  });
+
+  test('Coming up: a booking after today and a next step dated beyond the week, soonest first', async ({ page }) => {
+    await installApp(page, { api: { '/sales/deals': NEXT_STEPS(), '/bookings/appointments': BOOKINGS_AHEAD() } });
+    await page.goto('/today.html');
+    const up = page.locator('#coming-up');
+    await expect(up).toBeVisible();
+    await expect(up.getByRole('heading', { name: 'Coming up' })).toBeVisible();
+    const rows = up.locator('.mrow');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Menu page review · Bacchus Kitchen');
+    await expect(rows.nth(0)).toContainText('10:00 am · to confirm');
+    await expect(rows.nth(0)).toHaveAttribute('href', '/presence.html#bookings');
+    await expect(rows.nth(0).locator('.md b')).toHaveText(String(Number(ymdOffset(3).slice(8, 10))));
+    await expect(rows.nth(1)).toContainText('Chase the gallery photos');
+    await expect(rows.nth(1)).toContainText('Hettie Orange Designs — gallery · next step on the deal');
+    await expect(rows.nth(1)).toHaveAttribute('href', '/crm.html?deal=d3');
+    await expect(up.getByText('Kickoff call')).toHaveCount(0);
+    await expect(up.getByText('Gone')).toHaveCount(0);
+    await expect(page.locator('#today-schedule')).toContainText('Kickoff call');   // today's booking still lives in the schedule
+  });
+
+  test('This week and Coming up hide entirely when nothing is in play — no empty cards', async ({ page }) => {
+    await installApp(page);   // default fixtures: no deals list, no bookings
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#coming-up')).toHaveCount(0);
+    await expect(page.locator('#this-week')).toHaveCount(0);
+  });
+
+  test('the Customers card: the studio roster in the rail, addressed by site or client id', async ({ page }) => {
+    await installApp(page, { api: { '/studio/customers': STUDIO_CUSTOMERS } });
+    await page.goto('/today.html');
+    const card = page.locator('#rail-customers');
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'Customers' })).toBeVisible();
+    const rows = card.locator('.crows a');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Bacchus Kitchen');
+    await expect(rows.nth(0)).toContainText('Active · All clear');
+    await expect(rows.nth(0)).toHaveAttribute('href', '/crm.html?client=s1');       // a customer with a site → by site
+    await expect(rows.nth(0).locator('.cav')).toHaveText('BK');
+    await expect(rows.nth(1)).toContainText('Hettie Orange Designs');
+    await expect(rows.nth(1)).toContainText('On hold · 1 waiting');
+    await expect(rows.nth(1)).toHaveAttribute('href', '/crm.html?client_id=c2');    // no site yet → by client id
+    await expect(card.getByRole('link', { name: 'All customers →' })).toHaveAttribute('href', '/customers.html');
+    // the rail is the card's home — it comes first, before This month
+    expect(await card.evaluate((el) => el.parentElement?.id)).toBe('col-rail');
+  });
+
+  test('the Customers card hides on an empty roster (and, with nothing else in the rail, so does the rail)', async ({ page }) => {
+    await installApp(page, { api: { '/studio/customers': { data: [] } } });
+    await page.route('**/functions/v1/presence/analytics/dashboard**', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/today.html');
+    await expect(page.locator('.feedcard')).toBeVisible();
+    await expect(page.locator('#rail-customers')).toHaveCount(0);
+    await expect(page.locator('#col-rail')).toBeHidden();
+  });
+
+  test('a drilled-in operator (?client=) never reads the studio roster, and the band/strip/week links carry the scope', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const reads: string[] = [];
+    page.on('request', (req) => { if (/\/functions\/v1\/presence\/studio\/customers/.test(req.url())) reads.push(req.url()); });
+    await installApp(page, { api: { '/studio/customers': STUDIO_CUSTOMERS, '/sales/receivables': RECEIVABLES, '/sales/summary': SUMMARY, '/sales/deals': NEXT_STEPS() } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await expect(page.locator('#stat-strip')).toBeVisible();
+    await expect(page.locator('#rail-customers')).toHaveCount(0);
+    expect(reads).toEqual([]);   // D7: the scope header would resolve the roster against the leaf site and blank it
+    await expect(page.locator('#money-due').getByRole('link', { name: 'Resend invoice' })).toHaveAttribute('href', `/crm.html?deal=d1&tab=billing&client=${CLIENT}`);
+    await expect(page.locator('#stat-owed')).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
+    await expect(page.locator('#this-week .trow').first().locator('a.frow')).toHaveAttribute('href', `/crm.html?deal=d1&client=${CLIENT}`);
+  });
+
+  test('no serious/critical axe violations with the mockup sections in play', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await installApp(page, { api: FULL_HOME() });
+    await page.goto('/today.html');
+    await expect(page.locator('#money-due')).toBeVisible();
+    await expect(page.locator('#stat-strip')).toBeVisible();
+    await expect(page.locator('#this-week')).toBeVisible();
+    await expect(page.locator('#coming-up')).toBeVisible();
+    await expect(page.locator('#rail-customers')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+  });
+
+  test('mobile: band, strip, This week and Coming up stack without horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked check is the <980px contract');
+    await installApp(page, { api: FULL_HOME() });
+    await page.goto('/today.html');
+    await expect(page.locator('#money-due')).toBeVisible();
+    await expect(page.locator('#stat-strip')).toBeVisible();
+    await expect(page.locator('#coming-up')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 });

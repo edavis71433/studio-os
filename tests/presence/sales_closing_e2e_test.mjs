@@ -93,7 +93,8 @@ if (!secretPresent) {
   const resend3 = await A(`/sales/proposals/${prop3Id}/send`, 'POST', {});
   ok('public: re-send is idempotent (already_sent)', resend3.ok && resend3.body?.already_sent === true);
   const view3 = await P(`/sales/p/${propToken}`);
-  ok('public: prospect can VIEW the proposal by token', view3.ok && view3.body?.data?.kind === 'proposal' && view3.body?.data?.subtotal_cents === 250000);
+  // Oct 2026: a send mints the deal's ONE link (kind 'flow', the proposal nested); a pre-flow proposal token still answers kind 'proposal'
+  ok('public: prospect can VIEW the proposal by token', view3.ok && ((view3.body?.data?.kind === 'flow' && view3.body?.data?.proposal?.subtotal_cents === 250000) || (view3.body?.data?.kind === 'proposal' && view3.body?.data?.subtotal_cents === 250000)));
   const accept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });
   ok('public: prospect ACCEPTS via token → deal advances to contract', accept3.ok && accept3.body?.data?.status === 'accepted');
   const reaccept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });

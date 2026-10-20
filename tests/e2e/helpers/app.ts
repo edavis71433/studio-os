@@ -42,7 +42,7 @@ export const OWNER_SESSION = {
 export const STUDIO_NAV = [
   { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
   { key: 'website', label: 'Website', items: [
-    { key: 'content', label: 'Website', href: '/presence.html' },
+    { key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' },
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
     { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
@@ -57,7 +57,7 @@ export const STUDIO_NAV = [
   { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
   // utilities — rendered in the profile/overflow menu, not the primary bar
   { key: 'connections', label: 'Connections', utility: true, items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
-  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html' }] },
   { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
 ];
 
@@ -81,14 +81,14 @@ function defaults(): Record<string, Json> {
       moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
       // a REAL notice row: a database uuid + the period/dismissible pair the feed
       // now ships, so Today can decide whether to offer a manual "Done" at all.
-      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html' }],
+      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries?sel=lead:l1' }],
       pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
       last_published: { created_at: '2026-07-05T00:00:00Z', completed_at: '2026-07-05T00:05:00Z' },
     } },
     '/moments': { data: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', tone: 'reminder', dismissable: true }] },
     '/marketplace/features': { data: { features: ['Online menu', 'Booking link'], note: 'These come with your kind of business.' } },
     '/search/health': { data: { verification: { ok: true }, seo_fields: { title: 'Set', description: 'Set' }, links: [] } },
-    '/coach/health': { data: { status: 'attention', headline: 'One thing could help.', suggestions: [{ text: 'Someone’s waiting for a reply.', href: '/leads.html' }] } },
+    '/coach/health': { data: { status: 'attention', headline: 'One thing could help.', suggestions: [{ text: 'Someone’s waiting for a reply.', href: '/inbox.html#enquiries' }] } },
     '/coach/journey': { data: { milestones: [
       { key: 'created', label: 'Your presence began', achieved: true, at: '2026-01-01T00:00:00Z', note: 'Your workspace was created — the journey starts here.' },
       { key: 'published', label: 'First published', achieved: true, at: '2026-02-01T00:00:00Z', note: 'Your website went live for the first time. 🎉' },
@@ -151,4 +151,41 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
   });
+}
+
+// ── request-body spy for binary uploads ──────────────────────────────────────
+// Playwright's WebKit does not expose a Blob/File request body to the
+// interception layer: `request.postDataBuffer()` is null for a `fetch(url,
+// { method: 'PUT', body: file })` that Chromium reports byte for byte. The
+// bytes are still observable at the fetch boundary, so a spec that must prove
+// "the PUT body IS the picked file" installs this before goto and reads the
+// recorded bodies back with `sentBodies(page)`. The real fetch still runs —
+// the spy only reads the body it was handed.
+export interface SentBody { url: string; method: string; type: string; bytes: number[] }
+
+export async function spyRequestBodies(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __E2E_BODIES: SentBody[]; fetch: typeof fetch };
+    w.__E2E_BODIES = [];
+    const orig = w.fetch.bind(window);
+    w.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init && init.body;
+      if (body && typeof (body as Blob).arrayBuffer === 'function') {
+        const buf = await (body as Blob).arrayBuffer();
+        w.__E2E_BODIES.push({
+          url: String(input instanceof Request ? input.url : input),
+          method: String((init && init.method) || 'GET').toUpperCase(),
+          type: (body as Blob).type || '',
+          bytes: Array.from(new Uint8Array(buf)),
+        });
+      }
+      return orig(input, init);
+    };
+  });
+}
+
+/** The bodies recorded by spyRequestBodies, oldest first (bytes as a Buffer). */
+export async function sentBodies(page: Page): Promise<Array<{ url: string; method: string; type: string; body: Buffer }>> {
+  const raw = await page.evaluate(() => (window as unknown as { __E2E_BODIES?: SentBody[] }).__E2E_BODIES || []);
+  return raw.map((b) => ({ url: b.url, method: b.method, type: b.type, body: Buffer.from(b.bytes) }));
 }

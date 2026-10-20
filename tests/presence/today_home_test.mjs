@@ -35,8 +35,90 @@ function slotTime(s){const m=/T(\d\d):(\d\d)/.exec(String(s||''));if(!m)return''
 function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r.label&&typeof r.href==='string'&&/^\/(?![/\\])/.test(r.href);}).slice(0,5):[];}
 
+// ── the studio home (2026-10 mockup) pure helpers — mirrored 1:1 from
+//    today.html — keep both copies in sync ─────────────────────────────────────
+// Whole days from one calendar date to another (YYYY-MM-DD both); null on junk.
+function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fromYmd||'')),b=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(toYmd||''));if(!a||!b)return null;return Math.round((Date.UTC(+b[1],+b[2]-1,+b[3])-Date.UTC(+a[1],+a[2]-1,+a[3]))/864e5);}
+function ymdParts(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));return m?{mon:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}),day:String(+m[3]),wd:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'})}:null;}
+// When a dated to-do is due, in words: Overdue · Today · Tomorrow · a weekday
+// inside the coming week · a short date beyond it. No date → says so.
+function dueLabel(ymd,nowMs){const d=daysBetween(localYmd(nowMs),ymd);const p=ymdParts(ymd);if(d==null||!p)return'No date set';if(d<0)return'Overdue · '+p.mon+' '+p.day;if(d===0)return'Today';if(d===1)return'Tomorrow';if(d<7)return p.wd;return p.mon+' '+p.day;}
+// The stat strip — one tile per HONEST read. `s` is GET /sales/summary's data
+// (null when that read failed or 403'd → its three tiles drop); `enquiries` is
+// the feed's per-lead array (absent on a failed feed or an older build → no
+// tile). A successful read's zero is real and shows ("Pipeline is clear").
+function statTiles(s,enquiries){
+  const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
+  if(s&&typeof s==='object'){
+    const ar=s.ar;
+    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0,pc=Number(ar.processing_cents)||0;const proc=pc?money(pc)+' processing':'';t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':'')+(proc?' · '+proc:''):(proc||'All paid up'),ico:'owed',tone:ar.outstanding_cents>0?'warn':(pc?'info':''),href:'/pipeline.html'});}
+    if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
+    if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
+  }
+  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/inbox.html#enquiries'});}
+  return t;
+}
+// "This week" — the one next step on each OPEN deal (the same four-stage
+// allowlist Key deals uses), kept when it is undated, overdue, or due inside the
+// next seven days. Dated rows first (soonest first), undated last; capped at six.
+const OPEN_STAGES=['lead','qualified','proposal','contract'];
+function weekTodos(list,nowMs){
+  const out=(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0&&String(d.next_step||'').trim())
+    .map(d=>({id:String(d.id),title:String(d.next_step).trim(),deal:d.title||'',at:d.next_step_at||null,days:daysBetween(localYmd(nowMs),d.next_step_at)}))
+    .filter(r=>r.days==null||r.days<7);
+  out.sort((a,b)=>(a.days==null?1:0)-(b.days==null?1:0)||(a.days||0)-(b.days||0)||String(a.deal).localeCompare(String(b.deal)));
+  return out.slice(0,6);
+}
+// "Coming up" — the calendar: bookings after today (the next 30 days, active
+// statuses, each judged in ITS site's timezone like the schedule) and deal next
+// steps dated beyond this week. Soonest first, capped at six.
+function comingUp(deals,appts,nowMs){
+  const out=[];
+  for(const a of (Array.isArray(appts)?appts:[])){
+    if(!a||!(a.status==='pending'||a.status==='confirmed'))continue;
+    const ymd=String(a.slot_start_local||'').slice(0,10);const days=daysBetween(siteYmd(a.timezone,nowMs),ymd);
+    if(days==null||days<1||days>30)continue;
+    out.push({kind:'booking',ymd,days,title:(a.type_name||'Appointment')+(a.customer_name?' · '+a.customer_name:''),sub:slotTime(a.slot_start_local)+(a.status==='pending'?' · to confirm':''),href:'/presence.html#bookings'});
+  }
+  for(const d of (Array.isArray(deals)?deals:[])){
+    if(!d||!d.id||OPEN_STAGES.indexOf(d.stage)<0||!String(d.next_step||'').trim())continue;
+    const days=daysBetween(localYmd(nowMs),d.next_step_at);
+    if(days==null||days<7)continue;
+    out.push({kind:'next_step',ymd:String(d.next_step_at).slice(0,10),days,title:String(d.next_step).trim(),sub:(d.title?d.title+' · ':'')+'next step on the deal',href:'/crm.html?deal='+encodeURIComponent(d.id)});
+  }
+  out.sort((a,b)=>a.days-b.days||a.title.localeCompare(b.title));
+  return out.slice(0,6);
+}
+// The Customers card — GET /studio/customers (the roster customers.html shows,
+// newest link first as the route orders it). A customer is addressed by their
+// SITE when they have one (the record's best scope), else by their client id —
+// the same rule customers.html's "Open record" applies.
+function customerRows(list){
+  return (Array.isArray(list)?list:[]).filter(c=>c&&c.client_id).slice(0,5).map(c=>{
+    const st=String(c.status||'active').replace(/_/g,' ');const n=Number(c.open_support)||0;
+    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+' waiting':'All clear'),
+      href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
+  });
+}
+function initials(n){return String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';}
+
 // ── mirrors (verbatim) of the pure helpers in client.html ──
-function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
+// Oct 2026 benchmark (item 2): unpaidInvoices runs on the one money formula —
+// moneyState (lib/money_state.ts, mirrored verbatim; money_state_test.mjs pins
+// every copy) against the client's local day plus the just-paid ids (item 1).
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+function portalTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+let PAID_PENDING=[];
+function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
+function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invState(i);return s==='upcoming'||s==='overdue';});}
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
@@ -173,6 +255,12 @@ ok('greeting: morning <12, afternoon <18, evening after',
   portalGreeting(0,'')==='Good morning.' && portalGreeting(11,'')==='Good morning.'
   && portalGreeting(12,'')==='Good afternoon.' && portalGreeting(17,'')==='Good afternoon.'
   && portalGreeting(18,'')==='Good evening.' && portalGreeting(23,'')==='Good evening.');
+// Oct 2026 (item 2): the Outstanding tile names processing money (on its way, not owed)
+ok('statTiles: ar.processing_cents joins the sub-line; outstanding stays what waits',
+  statTiles({ar:{outstanding_cents:250000,count:2,overdue_cents:160000,overdue_count:1,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').s==='2 invoices · 1 overdue · $400 processing'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').s==='$400 processing'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').tone==='info'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0}}).find(t=>t.id==='stat-owed').s==='All paid up');
 ok('greeting: the first name joins only when we truly have one',
   portalGreeting(9,'Sam')==='Good morning, Sam.' && portalGreeting(9,'')==='Good morning.');
 
@@ -394,7 +482,7 @@ ok('portal: a failed website-stats read is never cached (false sentinel + cleare
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
 ok('portal: explicit CTAs whose accessible names keep the row title',
-  portal.includes('aria-label="Review &amp; approve — ') && portal.includes('aria-label="View &amp; pay — ')
+  portal.includes('aria-label="Approve — ') && portal.includes('aria-label="See it first — ') && portal.includes('aria-label="View &amp; pay — ')
   && portal.includes('aria-label="Open to-dos — '));
 ok('portal: opening the bell re-renders the messages tile WHOLE — number and pluralized label together',
   portal.includes("document.getElementById('glance-msgs')") && portal.includes('glanceTiles({newMsgs:0})[0]')
@@ -422,7 +510,7 @@ ok('portal: Recent-updates rows render momentIcon + the neutral Update chip + th
   portal.includes('momentIcon(m.moment_type)') && portal.includes('<span class="kchip">Update</span>')
   && portal.includes('<span class="qwhen">${esc(rel(m.created_at))}</span>'));
 ok('portal: the welcome tab-tour is gated on persona===client (reviewers are never toured)',
-  /function welcomeCardHtml\(\)\{\s*if\(welcomed\(\)\)return'';[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return'';/.test(portal));
+  /function welcomeCardHtml\(\)\{\s*if\(welcomed\(\)&&!WELCOME_THIS_VISIT\)return'';[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return'';/.test(portal));
 // PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
 // navFromHref ends in the Home fallback — no notification click is ever dead.
 ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',
@@ -436,6 +524,118 @@ ok('portal: openProject scrolls the EXACT anchor element first, then the section
   // exact-element-first, and its result is what scrollToSection receives.
   portal.includes('const t=anchorTarget(focusSection);scrollToSection(t);')
   && portal.includes("function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&document.getElementById(ex))?ex:sectionForAnchor(a);}"));
+
+// ═══ the studio home (2026-10 mockup): money band · stat strip · This week ·
+//     Coming up · Customers — pure helpers + structural pins ═══
+const HOME_NOW=Date.UTC(2026,9,19,19,0,0);   // Monday 2026-10-19, mid-day for every US zone
+const H=localYmd(HOME_NOW);
+const addDays=(ymd,n)=>{const d=new Date(ymd+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+ok('daysBetween: whole days either way; junk yields null',
+  daysBetween('2026-10-19','2026-10-22')===3 && daysBetween('2026-10-19','2026-10-12')===-7
+  && daysBetween('2026-10-31','2026-11-01')===1 && daysBetween('2026-10-19',null)===null && daysBetween('x','2026-10-19')===null);
+ok('dueLabel: overdue · today · tomorrow · weekday inside the week · short date beyond · no date',
+  dueLabel(addDays(H,-7),HOME_NOW).startsWith('Overdue · ') && dueLabel(H,HOME_NOW)==='Today' && dueLabel(addDays(H,1),HOME_NOW)==='Tomorrow'
+  && /^[A-Z][a-z]{2}$/.test(dueLabel(addDays(H,3),HOME_NOW)) && /^[A-Z][a-z]{2} \d{1,2}$/.test(dueLabel(addDays(H,12),HOME_NOW))
+  && dueLabel(null,HOME_NOW)==='No date set' && dueLabel('garbage',HOME_NOW)==='No date set');
+// stat strip — one tile per honest read
+const SUMMARY={total:3,open:{count:2,value_cents:650000},won_month:{count:1,value_cents:320000},win_rate:{pct:100,won:1,lost:0},by_stage:[],ar:{outstanding_cents:160000,count:1,overdue_cents:0,overdue_count:0}};
+{
+  const t=statTiles(SUMMARY,[{id:'l1'},{id:'l2'}]);
+  ok('statTiles: four tiles in strip order — Outstanding · Won this month · Open deals · New enquiries',
+    t.map(x=>x.id).join()==='stat-owed,stat-won,stat-open,stat-enq'
+    && t[0].v.replace(/,/g,'')==='$1600' && t[0].s==='1 invoice' && t[0].tone==='warn'
+    && t[1].v.replace(/,/g,'')==='$3200' && t[1].s==='1 deal' && t[1].tone==='good'
+    && t[2].v==='2' && t[2].s.replace(/,/g,'')==='$6500 in play' && t[3].v==='2' && t[3].s==='Waiting for a reply');
+  ok('statTiles: a successful read\'s zeros are REAL and stay visible in calm words',
+    (()=>{const z=statTiles({open:{count:0,value_cents:0},won_month:{count:0,value_cents:0},ar:{outstanding_cents:0,count:0,overdue_count:0}},[]);
+      return z.length===4 && z[0].s==='All paid up' && z[0].tone==='' && z[1].s==='Nothing closed yet' && z[2].s==='Pipeline is clear' && z[3].v==='0' && z[3].s==='Nothing new';})());
+  ok('statTiles: overdue invoices are named on the Outstanding tile',
+    statTiles({ar:{outstanding_cents:5000,count:3,overdue_count:2}},undefined)[0].s==='3 invoices · 2 overdue');
+  ok('statTiles: a failed/403 summary drops its three tiles; an absent enquiries array drops that one — nothing fakes a zero',
+    statTiles(null,[{id:'l1'}]).map(x=>x.id).join()==='stat-enq' && statTiles(SUMMARY,undefined).length===3
+    && statTiles(null,undefined).length===0 && statTiles({},null).length===0 && statTiles({ar:null,open:null,won_month:null},undefined).length===0);
+}
+// This week / Coming up — the next step on each open deal, split by date
+const DEALS=[
+  {id:'d1',title:'Claud',stage:'contract',next_step:'Send the kickoff details',next_step_at:H},
+  {id:'d2',title:'Bacchus',stage:'proposal',next_step:'Collect content',next_step_at:addDays(H,2)},
+  {id:'d3',title:'Hettie',stage:'qualified',next_step:'Chase the gallery photos',next_step_at:addDays(H,10)},
+  {id:'d4',title:'Late one',stage:'lead',next_step:'Call back',next_step_at:addDays(H,-3)},
+  {id:'d5',title:'No date',stage:'lead',next_step:'Write the proposal',next_step_at:null},
+  {id:'d6',title:'Won',stage:'won',next_step:'Open their project',next_step_at:H},
+  {id:'d7',title:'Lost',stage:'lost',next_step:'Nothing',next_step_at:H},
+  {id:'d8',title:'Blank step',stage:'lead',next_step:'  ',next_step_at:H},
+  {id:'d9',title:'Legacy',stage:'converted',next_step:'Old',next_step_at:H},
+];
+{
+  const w=weekTodos(DEALS,HOME_NOW);
+  ok('weekTodos: open-stage deals only, due inside the week or undated/overdue — overdue first, then soonest, undated last',
+    w.map(r=>r.id).join()==='d4,d1,d2,d5' && w[0].days===-3 && w[3].days===null && w[1].title==='Send the kickoff details' && w[1].deal==='Claud');
+  ok('weekTodos: a step dated beyond the week, a closed deal, a blank step and junk input all stay out',
+    !w.some(r=>r.id==='d3'||r.id==='d6'||r.id==='d7'||r.id==='d8'||r.id==='d9') && weekTodos(null,HOME_NOW).length===0 && weekTodos([null,{}],HOME_NOW).length===0);
+  ok('weekTodos: capped at six',
+    weekTodos(Array.from({length:9},(_,i)=>({id:'x'+i,stage:'lead',next_step:'s',next_step_at:H})),HOME_NOW).length===6);
+  const APP=[
+    {slot_start_local:addDays(H,3)+'T10:00',status:'pending',type_name:'Menu review',customer_name:'Bacchus'},
+    {slot_start_local:H+'T14:30',status:'confirmed',type_name:'Today — the schedule has it'},
+    {slot_start_local:addDays(H,1)+'T09:00',status:'canceled',type_name:'Gone'},
+    {slot_start_local:addDays(H,40)+'T09:00',status:'confirmed',type_name:'Too far'},
+    {slot_start_local:addDays(H,1)+'T09:00',status:'confirmed',type_name:'Tomorrow'},
+  ];
+  const c=comingUp(DEALS,APP,HOME_NOW);
+  ok('comingUp: bookings after today (≤30 days, active) + next steps dated beyond the week, soonest first',
+    c.map(x=>x.title).join('|')==='Tomorrow|Menu review · Bacchus|Chase the gallery photos'
+    && c[0].kind==='booking' && c[0].days===1 && c[1].sub==='10:00 am · to confirm' && c[1].href==='/presence.html#bookings'
+    && c[2].kind==='next_step' && c[2].days===10 && c[2].href==='/crm.html?deal=d3' && c[2].sub==='Hettie · next step on the deal');
+  ok('comingUp: today\'s booking, a canceled one and one 40 days out stay out; junk yields empty',
+    !c.some(x=>/Today|Gone|Too far/.test(x.title)) && comingUp(null,null,HOME_NOW).length===0 && comingUp([null],[null,{}],HOME_NOW).length===0);
+  // a booking is judged in ITS site's calendar: a row dated "tomorrow" on
+  // Kiritimati is the day after the SITE's today, whatever the viewer's zone
+  const KIRI=new Intl.DateTimeFormat('en-CA',{timeZone:'Pacific/Kiritimati'}).format(new Date(HOME_NOW));
+  ok('comingUp: a booking is "after today" by its SITE timezone, never the viewer\'s',
+    comingUp([],[{slot_start_local:addDays(KIRI,1)+'T10:00',timezone:'Pacific/Kiritimati',status:'confirmed',type_name:'kiri'}],HOME_NOW).length===1
+    && comingUp([],[{slot_start_local:KIRI+'T10:00',timezone:'Pacific/Kiritimati',status:'confirmed',type_name:'kiri-today'}],HOME_NOW).length===0);
+}
+// Customers — the roster rows, addressed like customers.html's "Open record"
+{
+  const r=customerRows([
+    {client_id:'c1',name:'Bacchus Kitchen',status:'active',customer_site_id:'s1',open_support:0},
+    {client_id:'c2',name:'Hettie Orange Designs',status:'on_hold',customer_site_id:null,open_support:2},
+    null,{name:'no id'},
+  ]);
+  ok('customerRows: by site when they have one, else by client id; status + open support in words',
+    r.length===2 && r[0].href==='/crm.html?client=s1' && r[0].sub==='Active · All clear'
+    && r[1].href==='/crm.html?client_id=c2' && r[1].sub==='On hold · 2 waiting' && r[1].name==='Hettie Orange Designs');
+  ok('customerRows: capped at five; junk yields empty',
+    customerRows(Array.from({length:8},(_,i)=>({client_id:'c'+i,name:'n'}))).length===5 && customerRows(null).length===0 && customerRows('x').length===0);
+  ok('initials: first letters of the first two words, "?" when blank',
+    initials('Bacchus Kitchen')==='BK' && initials('Hettie Orange Designs')==='HO' && initials('cher')==='C' && initials('')==='?');
+}
+// structural pins — the wiring the mockup sections must keep
+for(const fn of ['daysBetween','ymdParts','dueLabel','statTiles','weekTodos','comingUp','customerRows','initials']){
+  const m=String({daysBetween,ymdParts,dueLabel,statTiles,weekTodos,comingUp,customerRows,initials}[fn]);
+  ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
+}
+ok('today: the open-stage allowlist is shared by This week / Coming up (lead · qualified · proposal · contract)',
+  today.includes("const OPEN_STAGES=['lead','qualified','proposal','contract'];"));
+ok('today: the stat strip and the money band read /sales/summary and /sales/receivables, tolerated to null on failure',
+  today.includes("apiGet('/sales/summary').catch(()=>null)") && today.includes("apiGet('/sales/receivables').catch(()=>null)"));
+ok('today: the money band renders NOTHING on an empty list or a failed read (failure ≠ empty)',
+  /function alertBandHtml\(rcv\)\{\s*const items=\(rcv&&Array\.isArray\(rcv\.items\)\)\?rcv\.items\.filter\(i=>i&&i\.id\):\[\];\s*if\(!items\.length\)return''/.test(today));
+ok('today: Resend on the band opens the deal\'s billing tab; Open record opens the deal',
+  today.includes("'/crm.html?deal='+encodeURIComponent(i.deal_id)+'&tab=billing'") && today.includes("'/crm.html?deal='+encodeURIComponent(i.deal_id))"));
+ok('today: the strip renders only the tiles whose read came back honest (statTiles over summary + the feed\'s enquiries)',
+  today.includes('statStripHtml(statTiles(summary, feed && feed.enquiries))') && /function statStripHtml\(tiles\)\{\s*if\(!tiles\.length\)return''/.test(today));
+ok('today: This week / Coming up hide entirely when empty',
+  /function weekHtml\(todos\)\{\s*if\(!todos\.length\)return''/.test(today) && /function comingHtml\(items\)\{\s*if\(!items\.length\)return''/.test(today));
+ok('today: Done on a This-week row PATCHes the deal\'s next step through the existing per-deal route — the row leaves only after the write succeeds',
+  /todoDone\(id, btn\)\{[\s\S]*?await apiSend\('\/sales\/deals\/'\+encodeURIComponent\(id\), 'PATCH', \{ next_step: '', next_step_at: '' \}\);[\s\S]*?row\.remove\(\)/.test(today)
+  && /catch\(_\)\{ btn\.disabled = false;/.test(today));
+ok('today: the Customers card reads /studio/customers for the studio only — never for a drilled-in operator (D7)',
+  today.includes("get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")
+  && /function customersCardHtml\(list\)\{\s*const rows=customerRows\(list\);\s*if\(!rows\.length\)return''/.test(today));
+ok('today: the stat strip\'s tiles keep the .hl-panel / .hl anatomy crm.html draws (icon tile · label · value · sub)',
+  today.includes('<section class="hl-panel" id="stat-strip"') && today.includes('<div class="hl-k">') && today.includes('<div class="hl-v">') && today.includes('<div class="hl-s">'));
 
 const passed=results.filter(r=>r.p).length,failed=results.length-passed;
 console.log(`\n════ TODAY/HOME (SLICE 10): ${passed}/${results.length} PASSED ════`);

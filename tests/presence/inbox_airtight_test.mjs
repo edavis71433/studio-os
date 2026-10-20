@@ -22,14 +22,18 @@ ok('FIX1: attention_count counts new form submissions (owner-scoped, status=new)
 // rules below are now behaviourally tested in operator_notify_fixes_test.mjs);
 // the route still owns the reads and must still hand both inputs over.
 ok('FIX1: new-enquiry count is deduped against the lead_followup cron notice (no stacking)',
-  /const leadFollowups = notices\.filter\(\(n\) => n && n\.kind === 'lead_followup'\)\.length/.test(bell) &&
-  /const newEnquiries = Math\.max\(0, \(i\.newEnquiries \|\| 0\) - leadFollowups\)/.test(bell) &&
+  // the rule itself lives in ONE pure helper (freshEnquiries, behaviourally
+  // tested in fresh_enquiries_test.mjs); the bell must route through it
+  /export function freshEnquiries\(/.test(bell) &&
+  /const newEnquiries = freshEnquiries\(i\.newEnquiries \|\| 0, notices\)/.test(bell) &&
   /\+ \(i\.filesPending \|\| 0\) \+ newEnquiries/.test(bell) &&
   /newEnquiries: \(\(eQ\.json as any\[\]\)\?\.length \|\| 0\)/.test(workspace) &&
-  /notices: \(\(nQ\.json as any\[\]\) \|\| \[\]\)/.test(workspace));
+  // Phase 3: the rows the bell counts pass through verifiedNotices first (the
+  // same filter Today renders — one row per real record, stale reminders gone)
+  /notices: await verifiedNotices\(site, \(\(nQ\.json as any\[\]\) \|\| \[\]\)\)/.test(workspace));
 ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for the bell',
   /notices\.unshift\(\{[\s\S]*?kind: 'website_enquiry'/.test(workspace) &&
-  /const newEnquiries = Math\.max\(0, \(\(\(enqQ\.ok[\s\S]*?\)\.length - leadFollowups\)/.test(workspace));
+  /const newEnquiries = freshEnquiries\(\(\(\(enqQ\.ok[\s\S]*?\)\.length, notices\)/.test(workspace));
 ok('FIX1: the enquiry feed row is owner-only (reviewers never see leads)',
   /if \(seesFull\) \{[\s\S]*?kind: 'website_enquiry'/.test(workspace));
 ok('FIX1: inbox.html filters the aggregate row so it is not double-listed with /forms/inbox',
@@ -49,7 +53,7 @@ ok('FIX2: it rides the ONE notice model (reuses raiseNotice/clearNotice, no new 
   /import \{ raiseNotice, clearNotice, clearNoticePrefix, connExpiredPeriod, connExpiredPeriodPrefix, connExpiredLegacyPeriod \} from '\.\.\/lib\/notice\.ts'/.test(store));
 ok('FIX2: connection_expired has a NOTICE_HREF so its CTA lands on connections.html',
   /connection_expired: '\/connections\.html'/.test(workspace));
-ok('FIX1: website_enquiry has a NOTICE_HREF (leads.html)', /website_enquiry: '\/leads\.html'/.test(workspace));
+ok('FIX1: website_enquiry has a NOTICE_HREF (the Inbox\'s Enquiries view)', /website_enquiry: '\/inbox\.html#enquiries'/.test(workspace));
 
 // ── FIX 3: Today and the bell never disagree on the number ───────────────────
 ok('FIX3: Today sources its needs count from ctx.attention_count (the bell badge)',
@@ -62,7 +66,7 @@ ok('FIX3: when the bell rings but nothing is renderable inline, Today points to 
 ok('FIX4: the feed emits a missing_required row reusing the Content Tree signal',
   /siteContentTree/.test(workspace) && /kind: 'missing_required'/.test(workspace) &&
   /status === 'missing_required'/.test(workspace));
-ok('FIX4: missing_required has a NOTICE_HREF (content-tree.html)', /missing_required: '\/content-tree\.html'/.test(workspace));
+ok('FIX4: missing_required has a NOTICE_HREF (the overview\'s Pages — content-tree.html retired)', /missing_required: '\/presence\.html#pages'/.test(workspace));
 
 // ── moat: still ONE model — no new table/store/engine introduced here ────────
 ok('MOAT: no new notification table/store is created (reuses presence_plan_notices only)',
