@@ -1,11 +1,11 @@
 // ── Oct 2026 benchmark, items 1 + 2: money in four states, one formula ──────
 //   deno run --allow-read tests/presence/money_state_test.mjs
 // Paid · Processing · Upcoming · Overdue come from ONE function,
-// supabase/functions/presence/lib/money_state.ts. The three pages that render
-// money (client.html, today.html, crm.html) have no bundler, so each carries a
-// VERBATIM JS mirror. This suite imports the module, extracts every page's
+// supabase/functions/presence/lib/money_state.ts. The four pages that render
+// money (client.html, today.html, crm.html, pipeline.html) have no bundler, so
+// each carries a VERBATIM JS mirror. This suite imports the module, extracts every page's
 // copy, pins the copies byte-identical to each other, and runs ONE case table
-// against all four — so a drift in any copy fails here, not in a client's
+// against all five — so a drift in any copy fails here, not in a client's
 // Invoices tab. Structural pins lock the wiring: the routes attach `state`,
 // the pay link returns to /client.html?paid=, the webhook stamps Processing
 // instead of lying "paid" on an unsettled session, and the reminder sweep
@@ -20,13 +20,13 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 // ── the mirrors: extracted from each page, evaluated, compared ──
 const BLOCK = /function moneyState\(i,todayYmd,pending\)\{[\s\S]*?\n\}\nconst MONEY_WORD=[^\n]*\nconst MONEY_TONE=[^\n]*\nfunction moneyBuckets\(list,todayYmd,pending\)\{[\s\S]*?\n  return b;\n\}/;
 const pages = {};
-for (const f of ['client.html', 'today.html', 'crm.html']) {
+for (const f of ['client.html', 'today.html', 'crm.html', 'pipeline.html']) {
   const m = BLOCK.exec(read(f));
   ok(`${f}: carries the verbatim moneyState / MONEY_WORD / MONEY_TONE / moneyBuckets mirror`, !!m);
   if (m) pages[f] = { src: m[0], fns: new Function(m[0] + ';return {moneyState,MONEY_WORD,MONEY_TONE,moneyBuckets};')() };
 }
 const srcs = Object.values(pages).map((p) => p.src);
-ok('the three page mirrors are byte-identical to each other', srcs.length === 3 && srcs.every((s) => s === srcs[0]));
+ok('the four page mirrors are byte-identical to each other', srcs.length === 4 && srcs.every((s) => s === srcs[0]));
 // the module's body, with its TS signatures reduced to the JS ones, must equal the page copy
 const lib = read('supabase/functions/presence/lib/money_state.ts')
   .replace(/^\/\*\*[\s\S]*?\*\/\n/gm, '')   // the doc comments between the exports
@@ -38,7 +38,7 @@ const lib = read('supabase/functions/presence/lib/money_state.ts')
 const libBlock = BLOCK.exec(lib);
 ok('lib/money_state.ts: its body (types aside) IS the page mirror', !!libBlock && !!srcs[0] && libBlock[0] === srcs[0]);
 
-// ── one case table, four implementations ──
+// ── one case table, five implementations ──
 const T = '2026-10-20';
 const CASES = [
   ['null row → no state', [null, T], ''],
@@ -92,6 +92,7 @@ const life = read('supabase/functions/presence/commerce/lifecycle.ts');
 const client = read('client.html');
 const today = read('today.html');
 const crm = read('crm.html');
+const pipe = read('pipeline.html');
 ok('/client/billing: imports the one formula and ships `state` per invoice', /from '\.\.\/lib\/money_state\.ts'/.test(cd) && /const state = moneyState\(i, today\);/.test(cd) && /amount: \(Number\(i\.amount_cents\) \|\| 0\) \/ 100, status: i\.status, state,/.test(cd));
 ok('/client/billing: pay_url only for the two WAITING states (never processing)', /\(state === 'upcoming' \|\| state === 'overdue'\) && i\.stripe_url\) \? i\.stripe_url : null/.test(cd));
 ok('/client/billing: reads processing_since with the pre-0132 fallback (deploy-order tolerant)', /select=\$\{SEL\},processing_since&order=created_at\.desc/.test(cd) && /if \(!r\.ok\) r = await svc\(`presence_invoices\?customer_client_id=eq\.\$\{me\}&deleted_at=is\.null&select=\$\{SEL\}&order/.test(cd));
@@ -127,6 +128,7 @@ ok('client.html item 1: ?paid= → remembered, Invoices tab, thank-you toast, po
 ok('client.html item 1: "Paid" only when the server says so — the pending id alone never renders the paid state', !/pending[^\n]*return'paid'/.test(srcs[0]) && /if\(s==='paid'\)return'paid';/.test(srcs[0]));
 ok('today.html: the band derives its sentence AND the four buckets from the one formula over the one list', /const b=moneyBuckets\(items\.concat\(paidRows\|\|\[\]\),today\);/.test(today) && /data-bucket="\$\{k\}"/.test(today) && /filter\(k=>k!=='paid'\|\|paidRows\)/.test(today));
 ok('crm/activity.ts: the server-composed record band runs the one formula (processing/void/paid excluded, overdue is its word)', /const st = iv \? moneyState\(iv, today\) : '';\s*if \(st !== 'upcoming' && st !== 'overdue'\) continue;/.test(read('supabase/functions/presence/crm/activity.ts')) && /overdue: st === 'overdue'/.test(read('supabase/functions/presence/crm/activity.ts')) && /select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`\);\s*if \(!ir\.ok\) ir = await svc/.test(read('supabase/functions/presence/routes/crm.ts')));
+ok('pipeline.html: the drawer rows, the "Who owes you" list and the Money card run the one formula on the studio\'s local day; only a waiting row (upcoming/overdue) offers Send · Copy link · Void', /const invState=\(v\)=>moneyState\(v,localYmd\(\)\);/.test(pipe) && /const invWaits=\(v\)=>\{const st=invState\(v\);return st==='upcoming'\|\|st==='overdue';\};/.test(pipe) && /const moneyChip=\(v\)=>\{const st=invState\(v\);return st\?`<span class="stage \$\{MONEY_TONE\[st\]\}" data-money="\$\{st\}">\$\{MONEY_WORD\[st\]\}<\/span>`/.test(pipe) && /const acts=waits\?`<button class="btn ghost sm" data-send-inv=/.test(pipe) && /const acts=waits\?` <button class="btn ghost" data-send-inv=/.test(pipe) && /const openInv=invs\.filter\(invWaits\);/.test(pipe) && /\.stage\.info\{/.test(pipe) && !/Awaiting payment/.test(pipe) && !/class="pill"/.test(pipe));
 ok('crm.html: the Billing chip, the Outstanding tile and the record band run the one formula', /const st=invState\(v\);/.test(crm) && /const mb=moneyBuckets\(inv,recTodayYmd\(\)\);/.test(crm) && /for\(const iv of invWaiting\(\(DEAL&&DEAL\.invoices\)\|\|\[\]\)\)upcoming\.push/.test(crm) && /\.schip\.info\{/.test(crm));
 
 const failed = results.filter((r) => !r.p).length;

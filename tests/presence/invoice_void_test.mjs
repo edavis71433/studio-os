@@ -306,11 +306,12 @@ const notice = (id) => world.notices.find((r) => r.id === id);
 {
   const invRow = (pipeline.match(/<div class="lrows">\$\{\(data\.invoices\|\|\[\]\)\.map\(v=>[\s\S]*?\)\.join\(''\)\}<\/div>/) || [])[0] || '';
   ok('deal page: the invoice row renders a void control', /data-void-inv=/.test(invRow));
-  // It sits in the NOT-paid / NOT-void branch of the same ternary that already
-  // draws Send / Copy link — so a paid row and a voided row never get one.
-  const paidBranch = invRow.slice(0, invRow.indexOf('data-void-inv'));
-  ok('deal page: the void control is inside the not-paid branch', /v\.status==='paid'\?/.test(paidBranch) && /v\.status==='void'\?/.test(paidBranch));
-  ok('deal page: the existing Voided render is still there for a row that reaches that state', /v\.status==='void'\?`<span class="mut">Voided<\/span>`/.test(invRow));
+  // Oct 2026 (benchmark item 2): it sits in the WAITING branch (`acts`, drawn only
+  // when invWaits(v) — the one money formula says upcoming or overdue) alongside
+  // Send / Copy link — so a paid row, a PROCESSING row (the client already paid;
+  // the server 409s) and a voided row never get one.
+  ok('deal page: the void control is inside the waiting-only branch (never paid / processing / void)', /const waits=invWaits\(v\);/.test(invRow) && /const acts=waits\?`/.test(invRow) && invRow.indexOf('data-void-inv') > invRow.indexOf('const acts=waits?`') && /const invWaits=\(v\)=>\{const st=invState\(v\);return st==='upcoming'\|\|st==='overdue';\};/.test(pipeline));
+  ok('deal page: the existing Voided render is still there for a row that reaches that state', /\$\{moneyChip\(v\)\}/.test(invRow) && /<span class="stage void" data-money="void">Voided<\/span>/.test(pipeline));
   ok('deal page: voiding confirms first (same idiom as the draft deletes)', /\[data-void-inv\][\s\S]{0,320}confirm\(/.test(pipeline));
   // The handler is the ONE shared wiring (wireInvoiceActions) now — the drawer
   // and the "Who owes you" receivables list both call it, each with its own
