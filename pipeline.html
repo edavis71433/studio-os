@@ -92,6 +92,13 @@ html.dds-embed #detailWrap{padding-top:0}
   .stage{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .stage.won{background:var(--good-soft);color:var(--good)}
   .stage.lost{background:transparent;border:1px solid var(--line);color:var(--soft)}
+  /* Oct 2026 (benchmark item 2): the money-state chip — Paid · Processing · Upcoming ·
+     Overdue — on the drawer's invoice rows and the "Who owes you" list, in MONEY_TONE's
+     one colour each (good · info · '' · bad); crm.html's .schip recipe on this page's .stage. */
+  .stage.good{background:var(--good-soft);color:var(--good)}
+  .stage.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .stage.bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+  .stage.void{background:var(--bg);color:var(--faint)}
   .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
   dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
@@ -366,6 +373,35 @@ const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
+// ── Oct 2026 benchmark (item 2): money in four states, ONE formula ──────────
+// Paid · Processing · Upcoming · Overdue come from moneyState — a VERBATIM mirror
+// of supabase/functions/presence/lib/money_state.ts (this page has no bundler).
+// tests/presence/money_state_test.mjs pins this copy byte-identical to the lib
+// and to client.html / today.html / crm.html: change all of them or none.
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
+// "overdue" is judged on the STUDIO's local day — the operator's calendar, the
+// same one crm.html and today.html use — never on the browser's UTC date slice.
+function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+const invState=(v)=>moneyState(v,localYmd());
+// upcoming / overdue = still waiting on the client; paid, processing and void are not
+const invWaits=(v)=>{const st=invState(v);return st==='upcoming'||st==='overdue';};
+// the chip itself: the state word in its one tone; a voided row says so, quietly
+const moneyChip=(v)=>{const st=invState(v);return st?`<span class="stage ${MONEY_TONE[st]}" data-money="${st}">${MONEY_WORD[st]}</span>`:'<span class="stage void" data-money="void">Voided</span>';};
 // money0 shows a real cents PAIR when the value is fractional ("$2,500.50",
 // never "$2,500.5") and stays whole-dollar clean otherwise.
 const money0=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{minimumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
@@ -1439,11 +1475,19 @@ async function openReceivables(){
   let d=null;try{const r=await api('/sales/receivables');d=r&&r.data;}catch(e){/* */}
   if(!d){$('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dbody mut">Couldn’t load receivables just now.</div>';const b=$('rcBack');if(b)b.onclick=closeDealDetail;return;}
   const items=d.items||[];
-  // Every row here is an OPEN invoice by definition (the endpoint filters), so
-  // Void always applies; Send reads Resend once a payment link exists, and Copy
-  // link only renders when there's a link to copy — the drawer's exact rules.
-  const list=items.length?items.map(i=>`<div class="item rcv-row"><div><div class="t">${esc(i.title)}${i.overdue?' <span class="pill" style="color:var(--bad,#a3423a)">overdue</span>':''}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}</div></div><span class="rcv-acts"><button class="btn ghost sm" data-send-inv="${esc(i.id)}">${i.stripe_url?'Resend':'Send'}</button>${i.stripe_url?`<button class="btn ghost sm" data-copy-pay="${esc(i.stripe_url)}">Copy link</button>`:''}<button class="btn ghost sm" data-void-inv="${esc(i.id)}" title="${i.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${esc(i.title)}">Void</button>${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</span></div>`).join(''):'<div class="mut">Nobody owes you anything — you’re all paid up. 🎉</div>';
-  $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}</div></div></div><div class="dbody">${list}</div>`;
+  // Every row here is an OPEN invoice (the endpoint filters), and each wears its
+  // money state from the one formula — Processing · Upcoming · Overdue — on the
+  // studio's local day. Send/Resend · Copy link · Void apply only while the
+  // invoice still WAITS on the client (upcoming / overdue): a processing row is
+  // already paid — the money is settling — so chasing or withdrawing it is
+  // wrong, and the server 409s both anyway. Copy link only renders when there's
+  // a link to copy — the drawer's exact rules.
+  const list=items.length?items.map(i=>{const st=invState(i);const waits=invWaits(i);const title=esc(i.title);
+    const acts=waits?`<button class="btn ghost sm" data-send-inv="${esc(i.id)}">${i.stripe_url?'Resend':'Send'}</button>${i.stripe_url?`<button class="btn ghost sm" data-copy-pay="${esc(i.stripe_url)}">Copy link</button>`:''}<button class="btn ghost sm" data-void-inv="${esc(i.id)}" title="${i.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${title}">Void</button>`:'';
+    return `<div class="item rcv-row"><div><div class="t">${title} ${moneyChip(i)}</div><div class="mut">${money(i.amount_cents)}${i.deal?' · '+esc(i.deal):''}${i.due_date?' · due '+esc(i.due_date):''}${st==='processing'?' · payment on its way':''}</div></div><span class="rcv-acts">${acts}${i.deal_id?`<button class="btn ghost sm" data-rcdeal="${esc(i.deal_id)}">Open deal</button>`:''}</span></div>`;}).join(''):'<div class="mut">Nobody owes you anything — you’re all paid up. 🎉</div>';
+  // Outstanding = what still waits (upcoming + overdue) — the server's total from the
+  // same formula; what's settling rides along as "processing", never inside the total.
+  $('detailInner').innerHTML=`<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dhead"><div><div style="font-family:var(--serif);font-size:20px">Who owes you</div><div class="mut">Outstanding: ${money(d.total_cents)||'$0'}${d.overdue_cents?` · <span style="color:var(--bad,#a3423a)">${money(d.overdue_cents)} overdue</span>`:''}${d.processing_cents?` · ${money(d.processing_cents)} processing`:''}</div></div></div><div class="dbody">${list}</div>`;
   const b=$('rcBack');if(b)b.onclick=closeDealDetail;
   $('detailInner').querySelectorAll('[data-rcdeal]').forEach(x=>x.onclick=()=>openDeal(x.dataset.rcdeal));
   // After a send/void the list re-reads itself (the row leaves, the Outstanding
@@ -2016,8 +2060,12 @@ async function openDeal(id){
     const invs=(data.invoices||[]).filter(v=>v.status!=='void');
     const paidInv=invs.filter(v=>v.status==='paid');
     const paidC=paidInv.reduce((a,b)=>a+(b.amount_cents||0),0);
-    const openInv=invs.filter(v=>v.status==='open');
+    // Outstanding = what still WAITS on the client (upcoming + overdue, the one
+    // formula); a settling payment is "processing" — on its way, not outstanding.
+    const openInv=invs.filter(invWaits);
     const openC=openInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    const procInv=invs.filter(v=>invState(v)==='processing');
+    const procC=procInv.reduce((a,b)=>a+(b.amount_cents||0),0);
     const signedK=(data.contracts||[]).find(k=>k.status==='signed');
     const sentK=(data.contracts||[]).find(k=>k.status==='sent');
     const accP=(data.proposals||[]).find(p=>p.status==='accepted');
@@ -2033,12 +2081,12 @@ async function openDeal(id){
     const lastPaid=paidInv.filter(v=>v.paid_at).sort((a,b)=>a.paid_at<b.paid_at?1:-1)[0];
     const moneyKv=[
       paidC?kv(IK.money,`Paid ${money(paidC)}${paidInv.length===1?(paidInv[0].purpose==='deposit'?' · deposit':' · invoice'):' · '+paidInv.length+' invoices'}${lastPaid?', '+esc(evtDate(lastPaid.paid_at)):''}`):kv(IK.money,'Nothing paid yet',true),
-      openC?kv(IK.clock,`Outstanding ${money(openC)} · ${openInv.length===1?(openInv[0].purpose==='deposit'?'deposit':'invoice'):openInv.length+' invoices'}${openInv.every(v=>!v.stripe_url)?', not sent yet':openInv[0].due_date?', due '+esc(openInv[0].due_date):', due now'}`):kv(IK.clock,'Nothing outstanding',true),
+      openC?kv(IK.clock,`Outstanding ${money(openC)} · ${openInv.length===1?(openInv[0].purpose==='deposit'?'deposit':'invoice'):openInv.length+' invoices'}${openInv.every(v=>!v.stripe_url)?', not sent yet':openInv[0].due_date?', due '+esc(openInv[0].due_date):', due now'}${procC?` · ${money(procC)} processing`:''}`):procC?kv(IK.clock,`${money(procC)} processing — payment on its way`):kv(IK.clock,'Nothing outstanding',true),
       signedK?kv(IK.check,`Agreement signed${signedK.signed_at?' '+esc(evtDate(signedK.signed_at)):''}`):sentK?kv(IK.check,'Agreement out — awaiting signature'):draftContract?kv(IK.check,'Agreement drafted, not sent',true):kv(IK.check,'No agreement yet',true),
       accP?kv(IK.doc,'Proposal accepted'):sentP?kv(IK.doc,'Proposal sent — awaiting their answer'):(data.proposals||[]).length?kv(IK.doc,'Proposal drafted, not sent',true):kv(IK.doc,'No proposal yet',true),
     ];
     if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
-    const billN=openInv.length?`${openInv.length} open`:'';
+    const billN=(openInv.length+procInv.length)?`${openInv.length+procInv.length} open`:'';
     const tlN=tlItems.length?String(tlItems.length):'';
     const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
     const dtabBtn=(k,label,n)=>`<button type="button" role="tab" data-dtab="${k}" id="dtab-${k}" aria-controls="dpanel-${k}" aria-selected="false" tabindex="-1">${label}${n?`<span class="n">${esc(n)}</span>`:''}</button>`;
@@ -2108,7 +2156,16 @@ async function openDeal(id){
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
-          <div class="lrows">${(data.invoices||[]).map(v=>`<div class="row2 lr"><span class="mut">${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))} — ${money(v.amount_cents)}${v.due_date?` · due ${esc(v.due_date)}`:(v.status==='open'?' · due now':'')}</span><span>${v.status==='paid'?`<span style="color:var(--good,#33664b);font-weight:700">✓ Paid${v.paid_at?' '+new Date(v.paid_at).toLocaleDateString():''}</span>`:v.status==='void'?`<span class="mut">Voided</span>`:`<span style="color:var(--warn,#775d31);font-weight:600">${v.stripe_url?'Awaiting payment':'Not sent yet'}</span> <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'))}">Void</button>`}<button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`).join('')}</div>
+          <div class="lrows">${(data.invoices||[]).map(v=>{
+            // Oct 2026 (item 2): the row's word is the money state — Paid · Processing ·
+            // Upcoming · Overdue — from the one formula on the studio's local day; sent-ness
+            // moves to the sub-line. Send/Resend · Copy link · Void only while the invoice
+            // still waits on the client: a processing row is paid (settling) and a void row
+            // is closed — neither can be chased or withdrawn, and the server 409s both.
+            const st=invState(v);const waits=invWaits(v);const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+            const when=st==='paid'?(v.paid_at?` · paid ${esc(evtDate(v.paid_at))}`:''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:' · due now')+(v.stripe_url?'':' · not sent yet'):'';
+            const acts=waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'';
+            return `<div class="row2 lr"><span class="mut">${name} — ${money(v.amount_cents)}${when}</span><span>${moneyChip(v)}${acts} <button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`;}).join('')}</div>
           ${(()=>{const inv=(data.invoices||[]).filter(v=>v.status!=='void');if(inv.length<2)return '';const sum=inv.reduce((a,b)=>a+(b.amount_cents||0),0);const paid=inv.filter(v=>v.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);return `<div class="mut" style="margin-top:4px">Payment plan: ${inv.length} stages · ${money(sum)} total${paid?' · '+money(paid)+' paid':''}</div>`;})()}
           <div class="mut" style="margin-top:6px">Send the client a secure payment link, or set up a plan — a deposit now with the balance on completion, or milestone installments.</div>
           <div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button><button class="btn ghost" id="setupPlan">Set up a payment schedule</button></div><div id="invForm"></div></div>
