@@ -27,7 +27,7 @@ test('O2 schedule a change', async ({ page }) => {
   await w.start('/today.html');
   await w.click(shell(page).getByRole('button', { name: /^Website/ }), 'Website (sidebar section)');
   await w.click(shell(page).getByRole('link', { name: 'Publish' }), 'Publish');
-  await w.click(page.getByRole('button', { name: /Publish later/ }), 'Publish later — pick a time…');
+  w.note('the schedule panel is on the page already (Oct 20 gap 1) — Schedule it is outlined until the panel has focus');
   await w.shot('1-ritual-panel');
   await w.click(page.getByRole('button', { name: 'Schedule it' }), 'Schedule it (date prefilled +24h)');
   await w.shot('2-scheduled');
@@ -104,8 +104,7 @@ test('O5 reply to an enquiry', async ({ page }) => {
   const w = new Walk(page, 'o5-reply-enquiry');
   await w.start('/today.html');
   await w.click(page.getByRole('link', { name: /Take care of it/ }), 'Take care of it → (Today, Needs you)');
-  w.note('leads.html is retired — the nudge lands on the Inbox\'s Enquiries view');
-  await w.click(page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' }), 'the enquiry row');
+  w.note('leads.html is retired — the nudge deep-links the enquiry itself (#enquiries?sel=lead:l1, Oct 20 gap 2): the composer is open on arrival');
   await w.shot('1-composer');
   await w.type(page.locator('#leadBody'), 'Hi Sam,\n\nHappy to quote — what size is the patio?', 'the reply');
   await w.click(page.getByRole('button', { name: 'Send reply' }), 'Send reply');

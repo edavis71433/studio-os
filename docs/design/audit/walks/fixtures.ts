@@ -6,7 +6,7 @@ const one = (key: string, label: string, href: string, utility = false) => ({ ke
 export const REAL_NAV = [
   one('today', 'Today', '/today.html'),
   { key: 'website', label: 'Website', items: [
-    { key: 'content', label: 'Website', href: '/presence.html' },
+    { key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' },
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
     { key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', desc: 'A new page on your site — pick a layout or start blank.' },

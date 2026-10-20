@@ -75,7 +75,7 @@ export async function raiseNoticeDetailed(n: NoticeInput): Promise<RaiseOutcome>
     if (created && wantsPush) {
       try {
         const { pushToSite } = await import('../routes/push.ts');
-        const href = (await import('../routes/workspace.ts')).noticeHref(n.kind);
+        const href = (await import('../routes/workspace.ts')).noticeHrefFor(n);
         pushToSite(n.siteId, { title: n.headline.slice(0, 80), body: n.body.slice(0, 140), url: href, tag: `notice:${n.kind}` }).catch(() => {});
       } catch { /* push is best-effort */ }
     }

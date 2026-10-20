@@ -42,7 +42,7 @@ export const OWNER_SESSION = {
 export const STUDIO_NAV = [
   { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
   { key: 'website', label: 'Website', items: [
-    { key: 'content', label: 'Website', href: '/presence.html' },
+    { key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' },
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
     { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
@@ -81,7 +81,7 @@ function defaults(): Record<string, Json> {
       moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
       // a REAL notice row: a database uuid + the period/dismissible pair the feed
       // now ships, so Today can decide whether to offer a manual "Done" at all.
-      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries' }],
+      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries?sel=lead:l1' }],
       pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
       last_published: { created_at: '2026-07-05T00:00:00Z', completed_at: '2026-07-05T00:05:00Z' },
     } },

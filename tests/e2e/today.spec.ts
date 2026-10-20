@@ -12,7 +12,7 @@ test.describe('Today', () => {
     await expect(todo).toHaveCount(2); // 1 notice + 1 approval
     await expect(page.locator('.moment.todo').first()).toContainText('A quote request is waiting for a reply');
     // a notice row is a CONTAINER (link + a sibling Done button); the link is inside it
-    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries');
+    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries?sel=lead:l1');   // the notice deep-links its row (audit gap 2)
     await expect(page.getByText('Protect your email')).toBeVisible();
     // the moment card + its dismiss affordance
     await expect(page.getByRole('heading', { name: 'Add your holiday hours' })).toBeVisible();
@@ -197,7 +197,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await installApp(page);
     await page.goto(`/today.html?client=${CLIENT}`);
     const rows = page.locator('.feedcard .moment.todo');
-    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries`);
+    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries?sel=lead:l1`);   // scope before the hash; the row deep link rides in the hash
     await expect(rows.nth(1)).toHaveAttribute('href', `/presence.html?client=${CLIENT}#foundations`);
   });
 
@@ -822,7 +822,11 @@ test.describe('Today — the studio home (mockup)', () => {
     expect(await rows.first().evaluate((el) => Array.from(el.children).map((c) => c.tagName).join(','))).toBe('A,BUTTON');
   });
 
-  test('This week: Done clears the step on the deal (the existing per-deal PATCH) and removes the row; the last one takes the section', async ({ page }) => {
+  test('This week: Done clears the step on the deal (the existing per-deal PATCH) and removes the row; the last one takes the section', async ({ page }, testInfo) => {
+    // the mobile project runs WebKit, where the harness does not route a
+    // cross-origin write (the POST/PATCH preflight reaches the network) — the
+    // feed row's own "clicking Done" test above has the same gap
+    test.skip(testInfo.project.name === 'mobile', 'cross-origin writes are not routed under the WebKit mobile project');
     const patched: Array<{ url: string; body: string }> = [];
     await installApp(page, { api: { '/sales/deals': NEXT_STEPS() } });
     await page.route('**/functions/v1/presence/sales/deals/*', async (route) => {
@@ -862,7 +866,8 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(week.getByText('Nothing overdue.')).toHaveCount(0);
   });
 
-  test('This week: a failed Done keeps the row and brings the button back', async ({ page }) => {
+  test('This week: a failed Done keeps the row and brings the button back', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'cross-origin writes are not routed under the WebKit mobile project');
     await installApp(page, { api: { '/sales/deals': { data: [
       { id: 'd9', title: 'Late one', stage: 'lead', expected_value_cents: 1000, next_step: 'Call them back', next_step_at: '2026-01-05' },
     ] } } });
