@@ -103,7 +103,22 @@ function customerRows(list){
 function initials(n){return String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';}
 
 // ── mirrors (verbatim) of the pure helpers in client.html ──
-function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
+// Oct 2026 benchmark (item 2): unpaidInvoices runs on the one money formula —
+// moneyState (lib/money_state.ts, mirrored verbatim; money_state_test.mjs pins
+// every copy) against the client's local day plus the just-paid ids (item 1).
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+function portalTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+let PAID_PENDING=[];
+function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
+function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invState(i);return s==='upcoming'||s==='overdue';});}
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}

@@ -620,7 +620,12 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
   // Fetch a WIDE candidate window, then drop already-reminded ones up front —
   // otherwise the oldest `limit` open invoices occupy the window forever and
   // invoice #limit+1 never gets its reminder (starvation).
-  const q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit * 5}`);
+  // A payment that is PROCESSING (ACH settling — processing_since, migration
+  // 0132) is not unpaid: nudging that client would be wrong. Tolerant: before
+  // the migration the filter 400s, so fall back to the pre-0132 query.
+  const TAIL = `&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit * 5}`;
+  let q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null${TAIL}`);
+  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null${TAIL}`);
   const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string }>;
   let fresh = candidates;
   if (candidates.length) {

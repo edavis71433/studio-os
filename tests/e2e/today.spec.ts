@@ -682,6 +682,46 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(page.locator('#money-due')).toContainText('$1,600 is overdue — Claud Beltran’s invoice “Deposit” was due Oct 1 and hasn’t been paid yet.');
   });
 
+  // Oct 2026 benchmark (item 2): the four money buckets under the band's line,
+  // from ONE list through the one formula (moneyState, mirrored from
+  // lib/money_state.ts) — Paid (the last 30 days, shipped as `paid`) ·
+  // Processing · Upcoming · Overdue. A processing payment is "on its way",
+  // never "due now"; a payload without `paid` (an older function build)
+  // shows no Paid bucket rather than a fake $0.
+  test('the money band: four buckets from one list — Paid (30 days) · Processing · Upcoming · Overdue — in four colours; processing money is on its way, not due', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', status: 'open', state: 'overdue', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
+      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: '2099-01-10', status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Bacchus Kitchen', stripe_url: null },
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, status: 'open', state: 'processing', processing_since: '2026-10-19T00:00:00Z', overdue: false, deal_id: 'd3', deal: 'Hettie Orange', stripe_url: 'https://pay.example/3' },
+    ], paid: [
+      { id: 'inv-0', title: 'Kickoff', amount_cents: 120000, status: 'paid', state: 'paid', paid_at: '2026-10-15T00:00:00Z', deal_id: 'd1', deal: 'Claud Beltran' },
+    ], paid_window_days: 30, total_cents: 250000, overdue_cents: 160000, processing_cents: 40000 } } } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toContainText('$2,500 is due now — 2 invoices are waiting on payment, 1 of them overdue. $400 more is processing.');
+    await expect(band.locator('[data-bucket="paid"]')).toHaveText('$1,200 Paid (30 days)');
+    await expect(band.locator('[data-bucket="processing"]')).toHaveText('$400 Processing');
+    await expect(band.locator('[data-bucket="upcoming"]')).toHaveText('$900 Upcoming');
+    await expect(band.locator('[data-bucket="overdue"]')).toHaveText('$1,600 Overdue');
+    const colours = await Promise.all(['paid', 'processing', 'upcoming', 'overdue'].map((k) => band.locator(`[data-bucket="${k}"] b`).evaluate((el) => getComputedStyle(el).color)));
+    expect(new Set(colours).size).toBe(4);   // one colour per state
+    await expect(band.getByRole('link', { name: 'Who owes you' })).toHaveAttribute('href', '/pipeline.html');
+  });
+
+  test('the money band: only processing money says "on its way" and chases nothing; an older payload without `paid` shows no Paid bucket (never a fake $0)', async ({ page }) => {
+    await installApp(page, { api: { '/sales/receivables': { data: { items: [
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, overdue: false, processing_since: '2026-10-19T00:00:00Z', deal_id: 'd3', deal: 'Hettie Orange', stripe_url: null },
+    ], total_cents: 0, overdue_cents: 0 } } } });
+    await page.goto('/today.html');
+    const band = page.locator('#money-due');
+    await expect(band).toContainText('$400 is on its way — a payment is processing; nothing to chase.');
+    await expect(band.getByRole('link', { name: 'Resend invoice' })).toHaveCount(0);
+    await expect(band.locator('[data-bucket="paid"]')).toHaveCount(0);
+    await expect(band.locator('[data-bucket="processing"]')).toHaveText('$400 Processing');
+    await expect(band.locator('[data-bucket="upcoming"]')).toHaveText('$0 Upcoming');
+    await expect(band.locator('[data-bucket="overdue"]')).toHaveText('$0 Overdue');
+  });
+
   test('the money band hides on an empty list', async ({ page }) => {
     await installApp(page, { api: { '/sales/receivables': { data: { items: [], total_cents: 0, overdue_cents: 0 } } } });
     await page.goto('/today.html');
