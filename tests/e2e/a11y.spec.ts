@@ -10,10 +10,22 @@ test.describe('Accessibility', () => {
   // the skip-predicate second argument was dropped in newer majors.
   test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
 
-  for (const path of ['/today.html', '/leads.html', '/client.html']) {
+  // the website builder's overview needs its own /site read + a studio_os context
+  const PRESENCE = {
+    '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1, custom_domain: 'marlows.example' }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } },
+    '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] }, '/media': { data: [] }, '/settings': { data: {} }, '/notes': { data: [] },
+    '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.', detail: '', first_run: false, facts: {
+      website: { state: 'live', label: 'Live', detail: 'marlows.example' }, draft: { state: 'changes', label: '1 change', detail: 'ready to publish' },
+      last_publish: { label: 'Sun, Oct 5', detail: 'published by you' }, domain: { label: 'marlows.example', state: 'ok', detail: 'connected' } } } },
+    '/changes': { data: { count: 1, first_publish: false, changes: [{ section: 'business', sentence: 'Saturday hours change from 10–4 to 9–5.' }], blockers: 0, warnings: 0, draft_hash: 'h' } },
+    '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, updated_at: null, updated_by: null } },
+    '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
+    '/commerce/first-run': { data: { dismissed: false, complete: false, done: 1, total: 2, steps: [{ key: 'details', title: 'Add your business details', done: true, hint: '' }, { key: 'publish', title: 'Publish your website', done: false, hint: 'One calm ritual — preview, then publish.' }] } },
+  };
+  for (const path of ['/today.html', '/leads.html', '/client.html', '/presence.html']) {
     test(`no serious/critical axe violations on ${path}`, async ({ page }) => {
       // client.html needs a reviewer context to render its feed
-      const api = path === '/client.html' ? {
+      const api = path === '/presence.html' ? PRESENCE : path === '/client.html' ? {
         '/portal/context': { data: { site_role: 'client_reviewer', sees_full_workspace: false, is_client_portal: true, edition_key: 'studio_os', edition_features: ['website', 'client_portal'], attention_count: 0, nav: [{ key: 'client', label: 'Your updates', items: [{ key: 'feed', label: 'Updates', href: '/client.html' }] }] } },
         '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
       } : {};
