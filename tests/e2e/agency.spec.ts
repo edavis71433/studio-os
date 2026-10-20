@@ -244,9 +244,10 @@ test.describe('Agency portfolio', () => {
   });
 
   test('a genuinely EMPTY portfolio still earns the honest first-run copy', async ({ page }) => {
-    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [] } } });
+    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [] }, '/studio/customers': { data: [] } } });   // nothing on either list
     await page.goto('/agency.html');
-    await expect(page.locator('#main')).toContainText('No clients yet — add businesses from your studio tools.');
+    await expect(page.locator('#main')).toContainText('No clients yet.');
+    await expect(page.locator('#main').getByRole('button', { name: '+ Add a customer' })).toBeVisible();   // onboarding lives on the home page now
   });
 
   test('↻ refresh soft-fails: a failed refresh keeps the list (leads.html contract)', async ({ page }) => {
@@ -424,5 +425,111 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('#main')).toContainText('This isn’t an agency account.');
     await expect(page.locator('.client')).toHaveCount(0);
     await expect(page.locator('tbody tr')).toHaveCount(0);
+  });
+});
+
+// ── Oct 2026 studio audit, change 3: ONE home, ONE roster ─────────────────────
+// agency.html is the page the agency lands on: the studio's own money, This week
+// and Key deals (today.html's, read from the studio's OWN site), the queues, and
+// the one roster — the portfolio merged with the bridge list customers.html used
+// to show. customers.html forwards an agency member here.
+const past = (d: number) => new Date(Date.now() - d * 86400_000).toISOString();
+const ymd = (d: number) => new Date(Date.now() + d * 86400_000).toISOString().slice(0, 10);
+const DEAL = 'dddddddd-4444-4444-8444-dddddddddddd';
+const homeApi = {
+  ...agencyApi,
+  '/studio/customers': { data: [
+    { client_id: 'c1', customer_site_id: 'a1', project_id: 'p1', name: 'Marlow’s Kitchen', email: 'ana@marlows.example', status: 'active', open_support: 1, project_count: 1 },
+    { client_id: 'c4', customer_site_id: 'a4', project_id: null, name: 'Park Florist', email: 'jo@parkflorist.example', status: 'active', open_support: 0, project_count: 0 },   // bridged, not on the portfolio yet
+  ] },
+  '/sales/summary': { data: { total: 2, open: { count: 1, value_cents: 500000 }, won_month: { count: 1, value_cents: 800000 }, win_rate: { pct: 50, won: 1, lost: 1 }, by_stage: [], ar: { outstanding_cents: 120000, overdue_cents: 0, count: 1, overdue_count: 0 } } },
+  '/sales/deals': { data: [
+    { id: DEAL, title: 'Cedar Garage — new website', stage: 'proposal', expected_value_cents: 500000, expected_close: ymd(20), contact_id: 'ct-1', converted_client_id: null, updated_at: past(1), next_step: 'Send the proposal', next_step_at: ymd(0), last_contacted_at: past(3) },
+    { id: 'won-1', title: 'Bright Dental — redesign', stage: 'won', expected_value_cents: 800000, expected_close: ymd(-2), contact_id: 'ct-2', converted_client_id: null, updated_at: past(2), next_step: null, next_step_at: null },
+  ] },
+};
+
+test.describe('Agency home — one home, one roster', () => {
+  test('the studio strip: money tiles, This week and Key deals from the studio’s own site', async ({ page }) => {
+    await installApp(page, { api: homeApi });
+    await page.goto('/agency.html');
+    const strip = page.locator('#studio');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('#stat-owed')).toContainText('$1,200');
+    await expect(strip.locator('#stat-owed')).toContainText('1 invoice');
+    await expect(strip.locator('#stat-won')).toContainText('$8,000');
+    await expect(strip.locator('#stat-open')).toContainText('1');
+    await expect(strip.locator('#this-week .rrows a')).toHaveCount(1);
+    await expect(strip.locator('#this-week .rrows a').first()).toContainText('Send the proposal');
+    await expect(strip.locator('#this-week .rrows a').first()).toHaveAttribute('href', `/crm.html?deal=${DEAL}`);
+    await expect(strip.locator('#key-deals .rrows a').first()).toContainText('Cedar Garage');
+    await expect(strip.locator('#key-deals .rrows a').first()).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
+    await expect(strip.locator('#key-deals .rrows a')).toHaveCount(1);   // the won deal is not an open deal
+  });
+
+  test('the strip hides entirely when sales reads fail or are forbidden — never fake zeros', async ({ page }) => {
+    await installApp(page, { api: agencyApi });
+    await page.route(/\/functions\/v1\/presence\/sales\/(summary|deals)/, (route) => route.fulfill(boom(403)));
+    await page.goto('/agency.html');
+    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('#studio')).toBeHidden();
+    await expect(page.locator('#stat-owed')).toHaveCount(0);
+  });
+
+  test('one roster: the bridge list folds into the portfolio rows, and a bridged-only customer still gets a row', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: homeApi });
+    await page.goto('/agency.html');
+    const table = page.locator('.tscroll table');
+    const marlow = table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' });
+    await expect(marlow).toContainText('ana@marlows.example');                       // the bridge list's email, on the portfolio row
+    await expect(marlow.locator('.bits')).toContainText('1 support request open');    // and its waiting support
+    const park = table.locator('tbody tr', { hasText: 'Park Florist' });
+    await expect(park).toHaveCount(1);                                                 // on the bridge list only → still a row
+    await expect(park.locator('.rowact')).toHaveText(['Open record']);                 // Their website only when the portfolio knows the site
+    await expect(page.locator('.lhead .lmeta')).toContainText('4 businesses');
+    await page.locator('[data-view="attention"]').click();
+    await expect(table.locator('tbody tr')).toHaveCount(1);                            // Marlow (open support counts as needing attention)
+    await page.locator('[data-view="clear"]').click();
+    await expect(table.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);
+  });
+
+  test('+ Add a customer lives on the home page and POSTs /sales/customers (customers.html’s dialog)', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/sales/customers': { data: { invited: true, portal_url: 'https://studio.example/portal.html' } } } });
+    await page.goto('/agency.html');
+    await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('#cu-name').fill('Jo Park');
+    await page.locator('#cu-email').fill('jo@parkflorist.example');
+    await page.locator('#cu-biz').fill('Park Florist');
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
+    await page.locator('#cu-submit').click();
+    expect((await posted).postDataJSON()).toMatchObject({ mode: 'provision', email: 'jo@parkflorist.example', business_name: 'Park Florist', edition: 'presence' });
+    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    await expect(page.locator('#cust-done')).toContainText('land in their client portal');   // honest: the link opens the portal
+  });
+
+  test('the home is never scoped: a stray ?client= is dropped before the shell reads it', async ({ page }) => {
+    await installApp(page, { api: homeApi });
+    await page.goto('/agency.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
+    expect(new URL(page.url()).search).toBe('');
+    await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
+  });
+
+  test('the Health Center door is a status line in the top row (staff only)', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/admin/health-center': { data: { overall: 'attention', areas: [
+      { key: 'domains', label: 'Domains', state: 'attention', detail: '1 expiring.' }, { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running.' }, { key: 'billing', label: 'Billing', state: 'attention', detail: '1 with trouble.' },
+    ] } } } });
+    await page.goto('/agency.html');
+    const door = page.locator('#top #healthDoor');
+    await expect(door).toContainText('Platform: 2 areas need a look');
+    await expect(door).toHaveAttribute('href', '/admin-health.html');
+    // a non-staff member never sees it
+    await installApp(page, { api: homeApi });
+    await page.route('**/functions/v1/presence/admin/health-center', (route) => route.fulfill(boom(403)));
+    await page.goto('/agency.html');
+    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('#healthDoor')).toHaveCount(0);
   });
 });
