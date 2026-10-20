@@ -482,6 +482,85 @@ test.describe('Relationship view', () => {
     await expect(page.locator('[data-doc="proposals:p-1"]')).toBeVisible();
   });
 
+  // ── ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ────────
+  // With BOTH a proposal and an agreement drafted on an open deal, the three
+  // sends (proposal · agreement · deposit) collapse to ONE "Send proposal &
+  // agreement" — the headline act on the record and the one filled button on
+  // Billing — which POSTs /sales/deals/:id/send (one email, one page). The
+  // per-document sends and Request deposit sit under More.
+  const BOTH_RECORD = { data: { ...HUB_RECORD.data, highlights: { value_cents: 500000, stage: 'proposal', owed_cents: 0 } } };
+  const BOTH_DEAL = { data: {
+    deal: { id: DEAL, title: 'Marlow’s Kitchen', stage: 'proposal', expected_value_cents: 500000, converted_client_id: null },
+    proposals: [{ id: 'p-1', title: 'Proposal', status: 'draft', subtotal_cents: 500000, line_items: [{ label: 'Build', qty: 1, unit_cents: 500000 }] }],
+    contracts: [{ id: 'k-1', title: 'Service agreement', status: 'draft', body: 'A deposit of 50% is due at signing.' }],
+    invoices: [],
+  } };
+  const bothApi = (deal = BOTH_DEAL) => ({ '/crm/record': BOTH_RECORD, [`/sales/deals/${DEAL}`]: deal, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } });
+  test('ONE LINK — both drafted: the action bar headlines "Send proposal & agreement"; Billing shows it once, the row sends go under More', async ({ page }) => {
+    await installApp(page, { api: bothApi() });
+    await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
+    // the record's one filled verb
+    const headline = page.locator('#act-send-both');
+    await expect(headline).toBeVisible();
+    await expect(headline).toHaveClass(/primary/);
+    await expect(page.locator('#act-invoice')).not.toHaveClass(/primary/);
+    await expect(page.locator('#act-menu #act-invoice')).toHaveCount(1);          // Send invoice stepped back under More
+    await expect(page.locator('#act-menu #act-proposal')).toHaveCount(1);         // the per-document sends stay reachable
+    await expect(page.locator('#act-menu #act-agreement')).toHaveCount(1);
+    // Billing: one filled button, the per-document sends under More, the rows keep their chips
+    const both = page.locator('#sendBothBtn');
+    await expect(both).toBeVisible();
+    await expect(both).toHaveClass(/primary/);
+    await expect(page.locator('[data-bform="invoice"]')).not.toHaveClass(/primary/);   // one filled per screen
+    await expect(page.locator('#tabbody .rbtn.primary')).toHaveCount(1);
+    await expect(page.locator('#sendMoreMenu')).toBeHidden();
+    await expect(page.locator('.rrow [data-send-prop="p-1"]')).toHaveCount(0);
+    await expect(page.locator('.rrow [data-send-con="k-1"]')).toHaveCount(0);
+    await expect(page.locator('.rrow .schip', { hasText: 'draft' })).toHaveCount(2);
+    await expect(page.locator('[data-doc="proposals:p-1"]')).toBeVisible();
+    // More ▾ opens the per-document sends + Request deposit
+    await page.locator('#sendMore').click();
+    await expect(page.locator('#sendMore')).toHaveAttribute('aria-expanded', 'true');
+    const menu = page.locator('#sendMoreMenu');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('[data-send-prop="p-1"]')).toHaveText('Send the proposal only');
+    await expect(menu.locator('[data-send-con="k-1"]')).toHaveText('Send the agreement only');
+    await expect(menu.locator('[data-bform="deposit"]')).toHaveText('Request deposit');
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(page.locator('#sendMore')).toBeFocused();
+  });
+  test('ONE LINK — the one button POSTs /sales/deals/:id/send with the pair it showed, and says what went out', async ({ page }) => {
+    await installApp(page, { api: bothApi() });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { deposit: { minted: true, amount_cents: 250000 } }, url: 'https://example.test/sign.html?t=flow', emailed: true, sent: { proposal: true, contract: true } }) }));
+    await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/sales/deals/${DEAL}/send`));
+    await page.locator('#sendBothBtn').click();
+    expect(JSON.parse((await posted).postData() || '{}')).toEqual({ proposal_id: 'p-1', contract_id: 'k-1' });
+    await expect(page.locator('.dds-toast')).toContainText('Proposal and agreement sent — emailed to the client');
+  });
+  test('ONE LINK — the record’s headline act lands on the Billing button; "Send the proposal only" still posts its own route', async ({ page }) => {
+    await installApp(page, { api: bothApi() });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await page.locator('#act-send-both').click();
+    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#sendBothBtn')).toBeFocused();
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/proposals/p-1/send'));
+    await page.locator('#sendMore').click();
+    await page.locator('#sendMoreMenu [data-send-prop="p-1"]').click();
+    await posted;
+  });
+  test('ONE LINK — with only a proposal drafted, nothing collapses: the row keeps Send to client and Send invoice stays the headline', async ({ page }) => {
+    await installApp(page, { api: bothApi({ data: { ...BOTH_DEAL.data, contracts: [] } }) });
+    await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
+    await expect(page.locator('#sendBothBtn')).toHaveCount(0);
+    await expect(page.locator('#act-send-both')).toHaveCount(0);
+    await expect(page.locator('#act-invoice')).toHaveClass(/primary/);
+    await expect(page.locator('.rrow [data-send-prop="p-1"]')).toHaveText('Send to client');
+    await expect(page.locator('h2 [data-bform="deposit"]')).toBeVisible();
+  });
+
   // Comms routing pin (F1/F3): an EMAIL-landed client message is a plain
   // kind:'message' timeline item on the record — it renders inline with the
   // support ticket chronologically (one conversation), and the composer replies

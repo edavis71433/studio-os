@@ -12,7 +12,7 @@
 //
 //   deno run --allow-read tests/presence/sales_price_flow_test.mjs
 import { depositSplit, buildPlaceholderValues } from '../../supabase/functions/presence/lib/doc_placeholders.ts';
-import { agreementSigned, impliedTermMonths, summarizePipeline, proposalTotals } from '../../supabase/functions/presence/lib/sales_lifecycle.ts';
+import { agreementSigned, impliedTermMonths, summarizePipeline, proposalTotals, currentProposal, flowSignGate } from '../../supabase/functions/presence/lib/sales_lifecycle.ts';
 import { PIPELINE_GUIDANCE, CONTRACT_SIGNED_GUIDANCE, guidanceFor } from '../../supabase/functions/presence/lib/pipeline_guidance.ts';
 
 const results = [];
@@ -74,8 +74,13 @@ const pipe = read('pipeline.html');
   ok('Stripe-unconfigured environments skip the mint (a linkless invoice can’t land on pay)', /if \(!stripeConfigured\(\)\) return \{ minted: false \}/.test(h));
   ok('best-effort by construction — the whole helper is wrapped, a mint failure never blocks the send', /^async function ensureDepositForContractSend[\s\S]*?try \{[\s\S]*?\} catch \{ return \{ minted: false \}; \}\s*\}/m.test(h));
 
+  // Oct 2026 (one link): the draft → sent transition moved into markContractSent,
+  // which BOTH the per-document send and the combined deal send call — the mint
+  // lives there once, so neither door can forget it.
+  const mark = sales.slice(sales.indexOf('async function markContractSent'), sales.indexOf('export async function handleSalesProposalSend'));
   const send = sales.slice(sales.indexOf('export async function handleSalesContractSend'), sales.indexOf('export async function handleSalesContractDelete'));
-  ok('the FRESH send runs the mint and returns `deposit` to the drawer', /const deposit = await ensureDepositForContractSend\(site, principal, rows\(up\)\[0\]\)/.test(send) && /emailed, deposit \}/.test(send));
+  ok('markContractSent runs the mint on the fresh send and hands `deposit` back', /const deposit = await ensureDepositForContractSend\(site, principal, rows\(up\)\[0\]\)/.test(mark) && /return \{ row: rows\(up\)\[0\], deposit \}/.test(mark));
+  ok('the FRESH send goes through markContractSent and returns `deposit` to the drawer', /const \{ row, deposit \} = await markContractSent\(site, principal, c\)/.test(send) && /emailed, deposit \}/.test(send));
   ok('a RESEND runs the same idempotent ensure (an old send still lands its signer on pay; the guard means never twice)', /already_sent: true, deposit: dep/.test(send));
   // the sign→pay handoff this exists FOR is still in place
   ok('sign→pay: the sign route still hands back the open deposit’s pay link', /purpose=eq\.deposit&status=eq\.open&deleted_at=is\.null&select=stripe_url,amount_cents/.test(sales));
@@ -84,6 +89,64 @@ const pipe = read('pipeline.html');
   ok('pipeline.html warns BEFORE sending a valueless agreement (money-blank confirm, same shape as unfilledBlanks)', /const MONEY_BLANK_RE=\/\\\[\(\?:project fee\|50% deposit\|50% balance\)\\\]\//.test(pipe) && /function confirmMoneyBlanks\(/.test(pipe));
   ok('…wired into BOTH send paths (the list button and Save & send)', (pipe.match(/confirmMoneyBlanks\(/g) || []).length >= 3);
   ok('the send toast reports the minted deposit (and drops the stale "request it now" tip)', /dep\.minted\?'\. A '\+money\(dep\.amount_cents\)\+' deposit request is ready/.test(pipe));
+}
+
+// ═══ 2b. ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ═══
+// The deal's one page: a `flow` token bound to the DEAL carries choose → sign →
+// pay; the pay link leaves the server only once the agreement is signed, and the
+// agreement's text only once the proposal is accepted.
+{
+  const view = sales.slice(sales.indexOf('export async function handleSalesPublicView'), sales.indexOf('export async function handleSalesDocument'));
+  const sign = read('sign.html');
+  ok('flow view: the deposit’s pay URL rides back ONLY for a signed agreement with an open deposit', /url: \(contract\?\.status === 'signed' && dep\.status === 'open' && dep\.stripe_url\)/.test(view));
+  ok('flow view: a paid deposit still shows (status paid) so the page can say "deposit paid"', /purpose=eq\.deposit&status=in\.\(open,paid\)/.test(view));
+  ok('flow view: the agreement’s body + content_hash are withheld until the proposal is accepted (locked: true)', /chosen \? \{ id: contract\.id, title: contract\.title, body: contract\.body, content_hash: contract\.content_hash/.test(view) && /\{ id: contract\.id, title: contract\.title, status: contract\.status, locked: true \}/.test(view));
+  ok('flow view: chosen = accepted, or never had a proposal in play — between versions it stays locked', /const chosen = proposal \? proposal\.status === 'accepted' : !proposal_pending/.test(view) && /proposal_pending, contract: contractOut, contract_pending, deposit/.test(view));
+  ok('flow view + sign route read EVERY live proposal row and let the pure currentProposal() decide (drafts and superseded versions included)', /const \{ proposal, pending \} = currentProposal<any>\(rows\(pr\)\)/.test(sales) && !/status=in\.\(sent,accepted,declined\)/.test(sales));
+
+  // ── BEHAVIOUR: the revise window (review finding on PR #29) ──
+  // Revise marks v1 superseded and creates v2 as a DRAFT. Until v2 is sent the
+  // deal has no sendable proposal — that must read as PENDING (agreement locked,
+  // sign refused), never as "no proposal → go straight to the agreement".
+  const sup = (row, by) => ({ ...row, line_items: [...row.line_items, { __meta__: { superseded_by: by } }] });
+  const v1 = { id: 'v1', status: 'sent', line_items: [{ label: 'Site', qty: 1, unit_cents: 380000 }] };
+  const v2draft = { id: 'v2', status: 'draft', line_items: [{ label: 'Site', qty: 1, unit_cents: 360000 }] };
+  const window_ = currentProposal([v2draft, sup(v1, 'v2')]);
+  ok('REVISE WINDOW: v1 superseded + v2 draft → no current proposal, pending:true', window_.proposal === null && window_.pending === true);
+  ok('REVISE WINDOW: …and the flow sign gate refuses (409 accept_first, "updating the proposal")', (() => { const g = flowSignGate(window_); return !!g && g.error === 'accept_first' && /updating the proposal/.test(g.message); })());
+  const declinedThenRevised = currentProposal([v2draft, sup({ ...v1, status: 'declined' }, 'v2')]);
+  ok('REVISE WINDOW: a declined v1 revised into a draft v2 is pending too', declinedThenRevised.proposal === null && declinedThenRevised.pending === true && flowSignGate(declinedThenRevised)?.error === 'accept_first');
+  const v2sent = currentProposal([{ ...v2draft, status: 'sent' }, sup(v1, 'v2')]);
+  ok('after Send v2: v2 is the current proposal (not pending), still unaccepted → sign refused "Accept the proposal first"', v2sent.proposal?.id === 'v2' && v2sent.pending === false && /Accept the proposal first/.test(flowSignGate(v2sent)?.message || ''));
+  const v2accepted = currentProposal([{ ...v2draft, status: 'accepted' }, sup(v1, 'v2')]);
+  ok('after Accept v2: the gate opens (null) and the accepted version wins', v2accepted.proposal?.id === 'v2' && flowSignGate(v2accepted) === null);
+  const twoSent = currentProposal([{ id: 'b', status: 'sent', line_items: [] }, { id: 'a', status: 'accepted', line_items: [] }]);
+  ok('an accepted proposal wins over a newer sent one', twoSent.proposal?.id === 'a');
+  const declinedOnly = currentProposal([{ ...v1, status: 'declined' }]);
+  ok('a declined (not revised) proposal locks the agreement with the declined wording', declinedOnly.proposal?.status === 'declined' && /declined/.test(flowSignGate(declinedOnly)?.message || ''));
+  const none = currentProposal([]);
+  ok('a deal that never had a proposal in play starts at the agreement (not pending, gate open)', none.proposal === null && none.pending === false && flowSignGate(none) === null);
+  const draftOnly = currentProposal([v2draft]);
+  ok('a never-sent draft alone is NOT pending (the studio chose to send the agreement on its own)', draftOnly.proposal === null && draftOnly.pending === false);
+  const deleted = currentProposal([{ ...sup(v1, 'v2'), deleted_at: '2026-10-20T00:00:00Z' }]);
+  ok('a soft-deleted row counts for nothing', deleted.proposal === null && deleted.pending === false);
+  ok('garbage in → empty out, never a throw', currentProposal(null).proposal === null && currentProposal([null, 3, 'x']).pending === false);
+  // the page honours the same state
+  ok('sign.html: proposal_pending shows a locked "Your proposal" step and keeps Sign locked with the updated-proposal wording', /const pending=!p&&!!d\.proposal_pending/.test(sign) && /Your studio is updating the proposal — you’ll get an email when the new version is ready\. Nothing to do now\./.test(sign) && /Unlocks once you accept the updated proposal\./.test(sign));
+  ok('flow view: a drafted-but-unsent agreement is reported as contract_pending (the page says "preparing")', /contract_pending: !contract && cons\.some\(\(c\) => c\.status === 'draft'\)/.test(sales));
+  const dealSend = sales.slice(sales.indexOf('export async function handleSalesDealSend'), sales.indexOf('export async function handleSalesProposalDecide'));
+  ok('deal send: each draft makes the SAME transition its own send makes (markProposalSent + markContractSent)', /await markProposalSent\(site, principal, proposal\)/.test(dealSend) && /await markContractSent\(site, principal, contract\)/.test(dealSend));
+  ok('deal send: an agreement already out still gets the idempotent deposit ensure', /else if \(contract && contract\.status === 'sent'\) deposit = await ensureDepositForContractSend\(site, principal, contract\)/.test(dealSend));
+  ok('deal send: nothing newly out → no second email (already_sent, link handed back)', /if \(!sent\.proposal && !sent\.contract\) return json\(\{ data: \{ proposal, contract, deposit \}, url, emailed: false, sent, already_sent: true \}/.test(dealSend));
+  ok('deal send: ONE email — "Your proposal and agreement from <studio>"', /async function emailSalesFlow\(/.test(sales) && /`Your \$\{what\} from \$\{brand\.name\}`/.test(sales) && /const what = has\.proposal && has\.contract \? 'proposal and agreement'/.test(sales));
+  ok('deal send: the deposit is NOT emailed here either (the pay link is on the page, after signing)', !/emailInvoice\(/.test(dealSend));
+  ok('sign.html: the three-step strip — Choose · Sign · Pay — with aria-current on the open step', /steps\.push\(\{key:'choose',label:'Choose'/.test(sign) && /steps\.push\(\{key:'sign',label:'Sign'/.test(sign) && /steps\.push\(\{key:'pay',label:'Pay'/.test(sign) && /aria-current="step"/.test(sign));
+  ok('sign.html: done steps collapse (details.done), the next is open, the rest are locked (.card.locked)', /<details class="card done" id="step-choose">/.test(sign) && /<details class="card done" id="step-sign"/.test(sign) && /class="card locked" id="step-pay"/.test(sign));
+  ok('sign.html: Pay is the Stripe link only once signed — "Pay the $X deposit →"', /Pay the \$\{money\(dep\.amount_cents\)\} deposit →/.test(sign) && /else if\(dep&&dep\.url\)\{/.test(sign));
+  ok('sign.html: accepted-but-no-agreement says the studio is preparing it (and the studio got the notice)', /your studio has been told and is preparing the agreement/.test(sign));
+  ok('sign.html: the certificate block and the consent line survive on the one page', /Signature certificate/.test(sign) && /Typing your name here counts as your signature/.test(sign) && /Document fingerprint/.test(sign));
+  ok('sign.html: a per-document (old) link still renders the single document', /if\(d\.kind==='flow'\)renderFlow\(d,after\|\|null\);/.test(sign) && /else if\(d\.kind==='proposal'\)renderProposal\(d\);else renderContract\(d\);/.test(sign));
+  ok('sign.html: a stale version (409) still swaps the actions for "Load the latest version"', /Load the latest version/.test(sign));
 }
 
 // ═══ 3. The drawer stops contradicting itself on signed deals ═══
