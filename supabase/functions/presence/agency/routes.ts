@@ -515,6 +515,15 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
  *  publish runs the frozen pipeline whose history restores in one step. */
 async function runBulk(action: string, ids: string[], principal: Principal): Promise<Array<{ site_id: string; ok: boolean; note: string }>> {
   const sites = await loadSites(ids);
+  // the client names the scope carries (one batched read; the publish path
+  // only needs site_id to attribute, the name is for the record)
+  const names = new Map<string, string>();
+  if (action === 'publish' && sites.length) {
+    try {
+      const r = await svc(`presence_identity?site_id=in.(${sites.map((s) => s.id).join(',')})&select=site_id,business_name`);
+      for (const row of (Array.isArray(r.json) ? r.json : []) as Array<{ site_id: string; business_name?: string }>) if (row.business_name) names.set(row.site_id, String(row.business_name));
+    } catch { /* names are cosmetic; attribution does not depend on them */ }
+  }
   const results: Array<{ site_id: string; ok: boolean; note: string }> = [];
   for (const site of sites) {
     try {
@@ -528,7 +537,14 @@ async function runBulk(action: string, ids: string[], principal: Principal): Pro
       else if (action === 'readiness') { const r = await computeReadiness(site); results.push({ site_id: site.id, ok: !!r, note: r ? 'readiness refreshed' : 'no verified connection' }); }
       else if (action === 'publish') {
         if (site.edition === 'monitor') { results.push({ site_id: site.id, ok: false, note: 'monitor sites never publish' }); continue; }
-        const resp = await handlePublish(null, site, principal, {}); // M4: agency bulk — no client idempotency/cooldown per site
+        // Studio audit change 2 (follow-up): a bulk publish is the STUDIO's hand on
+        // each client's site, exactly like the ?client= drill-in — so hand the
+        // pipeline a principal scoped to THIS site. lib/actor_kind.ts then records
+        // actor_kind 'operator' (platform staff stay 'staff') and the client gets
+        // the "Your studio published a change" notice. A per-site copy: the
+        // member's own principal is never mutated across the loop.
+        const scoped: Principal = { ...principal, scope: { site_id: site.id, name: names.get(site.id) || 'Client' } };
+        const resp = await handlePublish(null, site, scoped, {}); // M4: agency bulk — no client idempotency/cooldown per site
         results.push({ site_id: site.id, ok: resp.status === 200, note: resp.status === 200 ? 'published through the one pipeline' : `refused (${resp.status})` });
       }
     } catch (e) {
