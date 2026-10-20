@@ -430,7 +430,7 @@ function listHtml(rows){
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="new">+ Contact</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
     +`<div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,

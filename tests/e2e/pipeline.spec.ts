@@ -667,8 +667,8 @@ test.describe('Deal drawer Path', () => {
     const guide = page.locator('#pathHost .path-guide');
     await expect(guide).toContainText('Your proposal is with them — a gentle nudge often seals it.');   // tip
     await expect(guide).toContainText('Follow up, then send the agreement once they say yes');          // action
-    // forward is the brand "Mark Stage as Complete" button
-    await expect(page.locator('#markComplete')).toContainText('Mark Stage as Complete');
+    // forward is the brand "Mark stage complete" button (sentence case, Oct 2026 experience review)
+    await expect(page.locator('#markComplete')).toContainText('Mark stage complete');
     // "Mark as lost" stays the separate quiet action, outside the Path
     await expect(page.locator('#markLost')).toContainText('Mark as lost');
   });
@@ -687,7 +687,7 @@ test.describe('Deal drawer Path', () => {
     await expect(page.locator('#pathHost .path-confirm')).toHaveCount(0);
   });
 
-  test('Mark Stage as Complete advances via the existing stage POST', async ({ page }) => {
+  test('Mark stage complete advances via the existing stage POST', async ({ page }) => {
     let stagePost = '';
     await installApp(page, { api: API });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, async (route) => {

@@ -149,6 +149,8 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
+// a scheduled moment people can read: "Nov 19, 2026, 6:00 PM" (toLocaleString printed seconds)
+const whenLabel=(iso)=>{const d=new Date(iso);return isFinite(d)?d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):String(iso||'');};
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",SEGMENTS=[],BROADCASTS=[],SEL='contacts',DRAFT=null,BUSY=false;
 let REQ_SEQ=0;      // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
@@ -228,7 +230,7 @@ const IC={
   tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
 };
 function render(){
-  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/presence.html">${IC.back}Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
+  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/customers.html">${IC.back}Customers</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
     <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">Write one message and send it to your people. You preview it and press send — nothing ever goes out on its own.</p></header>
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
@@ -282,7 +284,7 @@ function histBody(){
 }
 function bcCard(b){
   const cnt=b.status==='sent'?`${b.sent_count||0} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}`
-    :b.status==='scheduled'?`Scheduled for ${b.scheduled_at?new Date(b.scheduled_at).toLocaleString():'soon'}`
+    :b.status==='scheduled'?`Scheduled for ${b.scheduled_at?whenLabel(b.scheduled_at):'soon'}`
     :b.status==='draft'?'Draft — not sent':b.status;
   const open=OPEN===b.id;
   const acts=[];
@@ -355,7 +357,7 @@ function detailHtml(d){
   const b=(d&&d.broadcast)||{};
   let counts='';
   if(b.status==='sent')counts=`${b.sent_count||0} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}${b.sent_at?' · '+when(b.sent_at):''}`;
-  else if(b.status==='scheduled')counts=`Scheduled for ${b.scheduled_at?new Date(b.scheduled_at).toLocaleString():'soon'} · ${d.recipient_count||0} on the list today`;
+  else if(b.status==='scheduled')counts=`Scheduled for ${b.scheduled_at?whenLabel(b.scheduled_at):'soon'} · ${d.recipient_count||0} on the list today`;
   else counts=`${d.recipient_count||0} ${d.recipient_count===1?'person':'people'} would get this today${d.suppressed_count?' · '+d.suppressed_count+' unsubscribed and left out':''}`;
   // The API doesn't expose per-address failures — the honest line is the count.
   const failed=(b.status==='sent'&&b.failed_count)?`<p class="failnote">${b.failed_count} address${b.failed_count===1?'':'es'} couldn’t be reached — everyone else got it.</p>`:'';

@@ -109,12 +109,15 @@
   .feedcard .moment.todo:hover{background:var(--accent-soft)}
   .feedcard .moment.todo:focus-visible,.feedcard .frow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .feedcard .frow{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
+  .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
   .fico{flex:0 0 auto;width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap}
+  /* Oct 2026 experience review: the FIRST thing that needs you wears the page's one filled button */
+  .feedcard > .moment:first-child .fcta{background:var(--accent);color:#fff}
   /* the manual "Done" — quiet by design: the row usually clears itself, this is
      only for the residue. Never shown on money or legal obligations. */
   .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap;cursor:pointer}
@@ -512,6 +515,9 @@ const NOTICE_ID_RE = /^[0-9a-f-]{36}$/;
 // acknowledging affordance, never an imperative CTA.
 const NOTICE_FYI_KINDS = ['invoice_paid'];
 
+// ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
+const SI={mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',heart:'<path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"/>',alert:'<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 18h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>'};
+const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers){
   $('greeting').textContent = greet();
   // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
@@ -545,7 +551,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // ── the Needs-you action feed: one card, one row per item (icon · headline +
   //    meta · one CTA). Rows keep the .moment.todo identity — the attention
   //    math (cards === bell badge) is pinned on that class. ──
-  const NICON = { lead_followup:'✉️', message:'💬', support:'💬', invoice_paid:'💚', invoice_void_paid:'⚠️' };   // 0119: money on a WITHDRAWN invoice is not the green tick
+  const NICON = { lead_followup:si('mail'), message:si('message'), support:si('message'), invoice_paid:si('heart'), invoice_void_paid:si('alert') };   // 0119: money on a WITHDRAWN invoice is not the green tick
   let feedRows = '';
   for(const n of notices){
     // Most rows now tear themselves down when the work is done. What's left gets
@@ -565,7 +571,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
     const label = fyi ? 'Got it' : 'Done';
     feedRows += `<div class="moment attn todo">
       <a class="frow" href="${esc(scopeHref(n.href||'/today.html'))}">
-      <span class="fico" aria-hidden="true">${NICON[n.kind]||'🔔'}</span>
+      <span class="fico" aria-hidden="true">${NICON[n.kind]||si('bell')}</span>
       <div class="fmain"><h3 class="fhead">${esc(n.headline||'Something needs a look')}</h3>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</div>
       ${canDone && fyi ? '' : `<span class="fcta">${fyi?'Got it':'Take care of it →'}</span>`}</a>${
       canDone ? `<button type="button" class="fdone" data-dismiss-notice="${esc(n.id)}" aria-label="${esc(label+' — '+(n.headline||'this item'))}">${label}</button>` : ''}</div>`;
@@ -573,7 +579,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   for(const p of approvals){
     const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref(_base))}">
-      <span class="fico ap" aria-hidden="true">👍</span>
+      <span class="fico ap" aria-hidden="true">${si('thumbsup')}</span>
       <div class="fmain"><h3 class="fhead">${esc(p.title||'A change is ready')}</h3><span class="fmeta">Waiting for your approval${p.summary?` · ${esc(p.summary)}`:''}</span></div>
       <span class="fcta">Review &amp; approve →</span></a>`;
   }
@@ -582,7 +588,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // through to "all clear" — point to the Inbox where those items actually live.
   if(shown === 0 && bellCount > 0){
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref('/inbox.html'))}">
-      <span class="fico" aria-hidden="true">📥</span>
+      <span class="fico" aria-hidden="true">${si('inbox')}</span>
       <div class="fmain"><h3 class="fhead">${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</h3><span class="fmeta">Messages, approvals and updates that are waiting on you — all in one place.</span></div>
       <span class="fcta">Open your Inbox →</span></a>`;
   }
@@ -637,7 +643,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // column (right under the day) — asking a question is a primary action.
   main += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
-    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
+    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="ghost" id="askBtn" style="border-color:var(--line);color:var(--ink);padding-left:16px;padding-right:16px">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
 
   // ── the rail: This month · Recent records · Waiting on clients. When every

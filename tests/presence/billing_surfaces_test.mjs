@@ -50,7 +50,7 @@ ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards
   // the anchor renders ONLY through the https-allowlisted `pay` value (the
   // scheme gate is the review's defense-in-depth on the money surface)
   && /const pay=i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
-  && /:pay\?`<a class="fbtn" href="\$\{esc\(pay\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
+  && /:pay\?`<a class="fbtn pay" href="\$\{esc\(pay\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W11 BILLING SURFACES (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

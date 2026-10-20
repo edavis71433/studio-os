@@ -41,7 +41,7 @@ const SURFACE = (over: Record<string, unknown> = {}) => ({ data: {
 } });
 
 test.describe('Connections — the Connect button exists at all', () => {
-  test('a live provider renders Connect; a planned one honestly says coming soon', async ({ page }) => {
+  test('a live provider renders Connect; a planned one honestly says there is nothing to connect yet', async ({ page }) => {
     await installApp(page, { api: { '/connections': SURFACE() } });
     await page.goto('/connections.html');
 
@@ -54,7 +54,7 @@ test.describe('Connections — the Connect button exists at all', () => {
     // and a genuinely-unshipped provider still tells the truth rather than
     // offering a button that would dead-end
     await expect(page.locator('#svc-bing_webmaster button[data-connect]')).toHaveCount(0);
-    await expect(page.locator('#svc-bing_webmaster')).toContainText('This one’s coming soon.');
+    await expect(page.locator('#svc-bing_webmaster')).toContainText('Nothing to connect yet.');
   });
 
   test('an attention badge carries the REASON it needs attention', async ({ page }) => {
@@ -223,7 +223,7 @@ test.describe('Connections — Google Analytics chooses its property', () => {
     const connect = page.locator('#svc-google_analytics button[data-connect]');
     await expect(connect).toBeVisible();
     await expect(connect).toHaveText('Connect');
-    await expect(page.locator('#svc-google_analytics')).not.toContainText('This one’s coming soon.');
+    await expect(page.locator('#svc-google_analytics')).not.toContainText('Nothing to connect yet.');
   });
 
   test('MANY properties → "Which property is this website?" with the real list; picking one records it', async ({ page }) => {
