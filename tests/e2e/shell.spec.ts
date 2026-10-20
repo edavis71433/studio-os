@@ -18,7 +18,7 @@ const CRM_NAV = [
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
   { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
-  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html' }] },
 ];
 const crmCtx = () => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
@@ -182,6 +182,10 @@ test.describe('Context bar (slice 7)', () => {
     await expect(inboxLink).toHaveAttribute('href', `/inbox.html?client=${CLIENT}`);
   });
 
+  // Visual refresh: in the sidebar (≥761px) the menu is an INLINE list under
+  // the trigger rather than a flyout, but the popup contract is the same —
+  // this runs on today.html, where Customers is NOT the section you are in,
+  // so nothing pins it open (see "Sidebar — inline sections" below for that).
   test('a multi-item section is a caret dropdown: click opens, arrows move, Escape returns focus, outside click closes', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'the flat bar is hidden on phones');
     await installApp(page, { api: { '/portal/context': crmCtx() } });
@@ -831,5 +835,126 @@ test.describe('B4 — attention badge freshness', () => {
     await flipAway(page); await flipBack(page);
     await expect(page.locator('#dds-bell .dot')).toHaveText('4');
     await expect(page.locator('.dds-pop')).toContainText('Sign out');
+  });
+});
+
+// ── Visual refresh: the sidebar's multi-item sections expand INLINE ──────────
+// The boards show Website opened in place into its pages (Scheduled on the
+// scheduled-changes board) with the current page lit, and the other sections
+// folded. shell.js pins the section you are in open at render; shell.css lays
+// the .menu out as an indented list inside the column. Same DOM, same popup
+// contract (above); phones keep the top bar + drawer untouched.
+const SIDE_NAV = [
+  { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
+  { key: 'website', label: 'Website', items: [
+    { key: 'content', label: 'Website', href: '/presence.html' },
+    { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
+    { key: 'design', label: 'Design', href: '/presence.html#design' },
+    { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
+    { key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' },
+    { key: 'history', label: 'History', href: '/presence.html#history' },
+  ] },
+  { key: 'customers', label: 'Customers', items: [
+    { key: 'customers', label: 'Customers', href: '/customers.html' },
+    { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
+    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
+    { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
+  ] },
+  { key: 'pipeline', label: 'Pipeline', items: [{ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' }] },
+  { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
+];
+const sideCtx = () => ({ data: { ...crmCtx().data, nav: SIDE_NAV } });
+const secOf = (page: import('@playwright/test').Page, key: string) => page.locator(`.dds-nav .sec:has(> button[data-sec="${key}"])`);
+
+test.describe('Sidebar — inline sections (visual refresh)', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name === 'mobile', 'the sidebar shows ≥761px; phones keep the top bar + drawer'); });
+
+  test('the section you are in starts expanded with its page lit; the others stay folded', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': sideCtx(), '/schedule': { data: { scheduled: [] } } } });
+    // the scheduled-changes board: Website open, Scheduled lit
+    await page.goto('/schedule.html');
+    const website = secOf(page, 'website');
+    await expect(website).toHaveClass(/\bopen\b/);
+    await expect(website.locator('> button')).toHaveAttribute('aria-expanded', 'true');
+    await expect(website.locator('.menu')).toBeVisible();
+    await expect(website.locator('.menu a')).toHaveText(['Website', 'Business info', 'Design', 'Publish', 'Scheduled publishes', 'History']);
+    await expect(website.locator('.menu a.here')).toHaveText('Scheduled publishes');
+    await expect(website.locator('.menu a.here')).toHaveAttribute('aria-current', 'page');
+    await expect(secOf(page, 'customers')).not.toHaveClass(/\bopen\b/);
+    await expect(secOf(page, 'customers').locator('.menu')).toBeHidden();
+    await expect(page.locator('.dds-nav .sec.open')).toHaveCount(1);
+    // the enquiries board: Customers open, Enquiries lit, Website folded
+    await page.goto('/leads.html');
+    const customers = secOf(page, 'customers');
+    await expect(customers).toHaveClass(/\bopen\b/);
+    await expect(customers.locator('.menu a.here')).toHaveText('Enquiries');
+    await expect(secOf(page, 'website')).not.toHaveClass(/\bopen\b/);
+    await expect(secOf(page, 'website').locator('> button')).toHaveAttribute('aria-expanded', 'false');
+    // Today: nothing to expand — every multi-item section folded
+    await page.goto('/today.html');
+    await expect(page.locator('.dds-nav .sec.open')).toHaveCount(0);
+  });
+
+  test('the expanded list sits INSIDE the column under its trigger — an inline list, not a flyout', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': sideCtx() } });
+    await page.goto('/leads.html');
+    const customers = secOf(page, 'customers');
+    const shell = (await page.locator('#dds-shell').boundingBox())!;
+    const btn = (await customers.locator('> button').boundingBox())!;
+    const menu = (await customers.locator('.menu').boundingBox())!;
+    expect(menu.y).toBeGreaterThanOrEqual(btn.y + btn.height - 1);     // below the trigger…
+    expect(menu.x + menu.width).toBeLessThanOrEqual(shell.x + shell.width + 1);   // …and inside the column
+    // the next section (Pipeline) is pushed down below the list — real flow, not an overlay
+    const pipeline = (await page.locator('.dds-nav .sec:has(> a[data-href="/pipeline.html"])').boundingBox())!;
+    expect(pipeline.y).toBeGreaterThanOrEqual(menu.y + menu.height - 1);
+  });
+
+  test('a pinned section survives outside clicks and Tab-out; its trigger and Escape fold it; another section can open beside it', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': sideCtx() } });
+    await page.goto('/leads.html');
+    const customers = secOf(page, 'customers');
+    const btn = customers.locator('> button');
+    await page.evaluate(() => document.body.click());        // outside click: the section you are in stays
+    await expect(customers).toHaveClass(/\bopen\b/);
+    // Tab from the trigger through every item and out: still open, focus not stolen
+    await btn.focus();
+    const n = await customers.locator('.menu a').count();
+    for (let i = 0; i < n + 1; i++) await page.keyboard.press('Tab');
+    await expect(customers).toHaveClass(/\bopen\b/);
+    await expect(btn).not.toBeFocused();
+    // a second section opens beside it (no accordion in the sidebar)…
+    const website = secOf(page, 'website');
+    await website.locator('> button').click();
+    await expect(website).toHaveClass(/\bopen\b/);
+    await expect(customers).toHaveClass(/\bopen\b/);
+    // …and an outside click folds only the one you are NOT in
+    await page.evaluate(() => document.body.click());
+    await expect(website).not.toHaveClass(/\bopen\b/);
+    await expect(customers).toHaveClass(/\bopen\b/);
+    // Escape inside the pinned list folds it and returns focus to its trigger
+    await btn.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(customers.locator('.menu a').first()).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(customers).not.toHaveClass(/\bopen\b/);
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await expect(btn).toBeFocused();
+    // its own trigger re-opens and folds it
+    await btn.click();
+    await expect(customers).toHaveClass(/\bopen\b/);
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+    await btn.click();
+    await expect(customers).not.toHaveClass(/\bopen\b/);
+  });
+
+  test('tablet: a row of the expanded list navigates when tapped', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'tablet', 'iPads show the sidebar and have touch');
+    await installApp(page, { api: { '/portal/context': sideCtx() } });
+    await installIosFocusSemantics(page);
+    await page.goto('/leads.html');
+    const customers = secOf(page, 'customers');
+    await expect(customers).toHaveClass(/\bopen\b/);
+    await customers.locator('.menu').getByRole('link', { name: 'Contacts', exact: true }).tap();
+    await page.waitForURL(/\/contacts\.html/, { timeout: 7_000 });
   });
 });

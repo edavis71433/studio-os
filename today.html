@@ -147,6 +147,62 @@
   .schedrow .sm .who{color:var(--soft)}
   .schip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn);text-transform:capitalize}
   .schedempty{margin:0;color:var(--soft);font-size:13.5px}
+  /* ── the studio home (2026-10 mockup): money band · stat strip · This week ·
+     Coming up · Customers. Same language as the refresh — hairline borders,
+     8px corners, one icon tile per fact, sentence case, no shadows. ── */
+  .alert{display:flex;align-items:center;gap:12px;padding:10px 14px;margin-top:22px;border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);background:var(--warn-soft);border-radius:var(--dds-r-lg,10px);flex-wrap:wrap}
+  .alert .ico{width:28px;height:28px;border-radius:7px;background:var(--card);color:var(--warn);display:grid;place-items:center;flex:0 0 auto}
+  .alert .ico svg,.hl .ico svg{stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .alert .ico svg{width:15px;height:15px}
+  .alert .t{flex:1 1 300px;font-size:13.5px;color:var(--ink)} .alert .t b{font-weight:600}
+  .aacts{display:flex;gap:6px;flex-wrap:wrap}
+  .abtn{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12.5px;font-weight:500;text-decoration:none;white-space:nowrap}
+  .abtn:hover{border-color:var(--dds-line-strong,#d2d2db)}
+  .abtn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .abtn.ghost:hover{color:var(--ink);background:var(--card)}
+  .abtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* the stat strip — crm.html's .hl-panel anatomy (icon tile · label · value · sub);
+     a 1px line-coloured gap draws the hairlines however the tiles wrap */
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin-top:18px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--line);overflow:hidden}
+  .hl{display:flex;align-items:center;gap:12px;padding:13px 16px;min-width:0;background:var(--card);color:inherit;text-decoration:none}
+  .hl:hover{background:var(--bg)}
+  .hl:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .hl .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--accent-soft);color:var(--accent)}
+  .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .hl .ico svg{width:17px;height:17px}
+  .hl-main{min-width:0;flex:1}
+  .hl-k{font-size:12px;color:var(--faint);font-weight:500}
+  .hl-v{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* section label + a quiet right-hand link */
+  .sech{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .seclink{font-size:12.5px;color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap}
+  .seclink:hover{text-decoration:underline}
+  /* This week — to-do rows: a box, the step, the deal + when, one Done */
+  .rcard.list{padding:0;overflow:hidden}
+  .trow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line)}
+  .trow:first-child{border-top:0}
+  .trow:hover{background:var(--accent-soft)}
+  .trow .frow{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
+  .trow .frow:focus-visible,.mrow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .tdot{width:16px;height:16px;border:1.5px solid var(--dds-line-strong,#c9c9d2);border-radius:4px;flex:0 0 auto;background:var(--card)}
+  .trow.late .fmeta{color:var(--warn)}
+  .quiet{margin:0;padding:9px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--soft);background:var(--bg)}
+  /* Coming up — dated rows: month + day block, the thing, one CTA */
+  .mrow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);color:inherit;text-decoration:none}
+  .mrow:first-child{border-top:0}
+  .mrow:hover{background:var(--accent-soft)}
+  .md{width:42px;text-align:center;font-size:11px;color:var(--faint);line-height:1.15;flex:0 0 auto}
+  .md b{display:block;font-size:15px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+  @media (max-width:600px){.trow,.mrow{flex-wrap:wrap}.trow .fdone,.mrow .fcta{margin-left:28px}}
+  /* Customers — avatar · name · status, in the rail */
+  .crows a{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px}
+  .crows a:first-child{border-top:0}
+  .crows a:hover .cn{color:var(--accent)}
+  .crows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+  .cav{width:26px;height:26px;border-radius:50%;background:var(--good-soft);color:var(--good);font-size:10.5px;font-weight:600;display:grid;place-items:center;flex:0 0 auto}
+  .cmain{min-width:0;display:flex;flex-direction:column}
+  .cn{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cs{font-size:12px;color:var(--faint)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -165,7 +221,8 @@
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features,
-//    /portal/context|feed, /analytics/dashboard, /bookings/appointments, /projects.
+//    /portal/context|feed, /analytics/dashboard, /bookings/appointments, /projects,
+//    /sales/summary|receivables|deals, /studio/customers.
 //    No engine, no new system. Calm, plain language; nothing technical.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -224,6 +281,129 @@ function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d
 // same-origin-path guard shell.js applies (localStorage is user-tamperable).
 function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r.label&&typeof r.href==='string'&&/^\/(?![/\\])/.test(r.href);}).slice(0,5):[];}
 function readRecents(){try{return safeRecents(JSON.parse(localStorage.getItem('dds-recent-records')||'[]'));}catch(_){return[];}}
+
+// ── the studio home (2026-10 mockup) pure helpers — mirrored 1:1 in
+//    tests/presence/today_home_test.mjs ─────────────────────────────────────
+// Whole days from one calendar date to another (YYYY-MM-DD both); null on junk.
+function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fromYmd||'')),b=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(toYmd||''));if(!a||!b)return null;return Math.round((Date.UTC(+b[1],+b[2]-1,+b[3])-Date.UTC(+a[1],+a[2]-1,+a[3]))/864e5);}
+function ymdParts(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));return m?{mon:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}),day:String(+m[3]),wd:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'})}:null;}
+// When a dated to-do is due, in words: Overdue · Today · Tomorrow · a weekday
+// inside the coming week · a short date beyond it. No date → says so.
+function dueLabel(ymd,nowMs){const d=daysBetween(localYmd(nowMs),ymd);const p=ymdParts(ymd);if(d==null||!p)return'No date set';if(d<0)return'Overdue · '+p.mon+' '+p.day;if(d===0)return'Today';if(d===1)return'Tomorrow';if(d<7)return p.wd;return p.mon+' '+p.day;}
+// The stat strip — one tile per HONEST read. `s` is GET /sales/summary's data
+// (null when that read failed or 403'd → its three tiles drop); `enquiries` is
+// the feed's per-lead array (absent on a failed feed or an older build → no
+// tile). A successful read's zero is real and shows ("Pipeline is clear").
+function statTiles(s,enquiries){
+  const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
+  if(s&&typeof s==='object'){
+    const ar=s.ar;
+    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',ico:'owed',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
+    if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
+    if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
+  }
+  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/leads.html'});}
+  return t;
+}
+// "This week" — the one next step on each OPEN deal (the same four-stage
+// allowlist Key deals uses), kept when it is undated, overdue, or due inside the
+// next seven days. Dated rows first (soonest first), undated last; capped at six.
+const OPEN_STAGES=['lead','qualified','proposal','contract'];
+function weekTodos(list,nowMs){
+  const out=(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0&&String(d.next_step||'').trim())
+    .map(d=>({id:String(d.id),title:String(d.next_step).trim(),deal:d.title||'',at:d.next_step_at||null,days:daysBetween(localYmd(nowMs),d.next_step_at)}))
+    .filter(r=>r.days==null||r.days<7);
+  out.sort((a,b)=>(a.days==null?1:0)-(b.days==null?1:0)||(a.days||0)-(b.days||0)||String(a.deal).localeCompare(String(b.deal)));
+  return out.slice(0,6);
+}
+// "Coming up" — the calendar: bookings after today (the next 30 days, active
+// statuses, each judged in ITS site's timezone like the schedule) and deal next
+// steps dated beyond this week. Soonest first, capped at six.
+function comingUp(deals,appts,nowMs){
+  const out=[];
+  for(const a of (Array.isArray(appts)?appts:[])){
+    if(!a||!(a.status==='pending'||a.status==='confirmed'))continue;
+    const ymd=String(a.slot_start_local||'').slice(0,10);const days=daysBetween(siteYmd(a.timezone,nowMs),ymd);
+    if(days==null||days<1||days>30)continue;
+    out.push({kind:'booking',ymd,days,title:(a.type_name||'Appointment')+(a.customer_name?' · '+a.customer_name:''),sub:slotTime(a.slot_start_local)+(a.status==='pending'?' · to confirm':''),href:'/presence.html#bookings'});
+  }
+  for(const d of (Array.isArray(deals)?deals:[])){
+    if(!d||!d.id||OPEN_STAGES.indexOf(d.stage)<0||!String(d.next_step||'').trim())continue;
+    const days=daysBetween(localYmd(nowMs),d.next_step_at);
+    if(days==null||days<7)continue;
+    out.push({kind:'next_step',ymd:String(d.next_step_at).slice(0,10),days,title:String(d.next_step).trim(),sub:(d.title?d.title+' · ':'')+'next step on the deal',href:'/crm.html?deal='+encodeURIComponent(d.id)});
+  }
+  out.sort((a,b)=>a.days-b.days||a.title.localeCompare(b.title));
+  return out.slice(0,6);
+}
+// The Customers card — GET /studio/customers (the roster customers.html shows,
+// newest link first as the route orders it). A customer is addressed by their
+// SITE when they have one (the record's best scope), else by their client id —
+// the same rule customers.html's "Open record" applies.
+function customerRows(list){
+  return (Array.isArray(list)?list:[]).filter(c=>c&&c.client_id).slice(0,5).map(c=>{
+    const st=String(c.status||'active').replace(/_/g,' ');const n=Number(c.open_support)||0;
+    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+' waiting':'All clear'),
+      href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
+  });
+}
+function initials(n){return String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';}
+
+// ── inline stroke icons for the band + stat tiles (crm.html's set) ──────────
+const SVG={
+  owed:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
+  open:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+};
+const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
+
+// ── the money band — GET /sales/receivables (open invoices with their deal).
+// One line when something is due; NOTHING on an empty list or a failed read
+// (failure ≠ empty: a 5xx must never paint "nothing is due"). Resend opens the
+// deal's billing tab, where the invoice's own Resend lives. ──
+function alertBandHtml(rcv){
+  const items=(rcv&&Array.isArray(rcv.items))?rcv.items.filter(i=>i&&i.id):[];
+  if(!items.length)return'';
+  const total=items.reduce((a,i)=>a+(Number(i.amount_cents)||0),0);
+  const late=items.filter(i=>i.overdue).length;
+  let text,acts;
+  if(items.length===1){
+    const i=items[0];const p=ymdParts(i.due_date);
+    text=`<b>${esc(money(i.amount_cents))} is ${i.overdue?'overdue':'due now'}</b> — ${i.deal?esc(i.deal)+'’s invoice':'An invoice'}${i.title?` “${esc(i.title)}”`:''}${i.overdue&&p?` was due ${esc(p.mon+' '+p.day)} and`:''} hasn’t been paid yet.`;
+    acts=i.deal_id
+      ?`<a class="abtn" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)+'&tab=billing'))}">Resend invoice</a><a class="abtn ghost" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)))}">Open record</a>`
+      :`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
+  }else{
+    text=`<b>${esc(money(total))} is due now</b> — ${items.length} invoices are waiting on payment${late?`, ${late} of them overdue`:''}.`;
+    acts=`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
+  }
+  return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}</div><div class="aacts">${acts}</div></div>`;
+}
+function statStripHtml(tiles){
+  if(!tiles.length)return'';
+  return `<section class="hl-panel" id="stat-strip" aria-label="Your numbers">${tiles.map(t=>`<a class="hl" id="${esc(t.id)}" href="${esc(scopeHref(t.href))}"><span class="ico ${esc(t.tone)}" aria-hidden="true">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${esc(t.k)}</div><div class="hl-v">${esc(t.v)}</div><div class="hl-s">${esc(t.s)}</div></div></a>`).join('')}</section>`;
+}
+// "This week" — hidden entirely when no open deal carries a next step (a quiet
+// pipeline is not an empty card). A row's Done clears the step on the deal.
+function weekHtml(todos){
+  if(!todos.length)return'';
+  const late=todos.some(r=>r.days!=null&&r.days<0);
+  return `<section class="home-sec" id="this-week"><div class="sech"><h2 class="seclab">This week</h2><a class="seclink" href="${esc(scopeHref('/pipeline.html'))}">Pipeline →</a></div><div class="rcard list">${
+    todos.map(r=>`<div class="trow${r.days!=null&&r.days<0?' late':''}" data-todo="${esc(r.id)}"><a class="frow" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(r.id)))}"><span class="tdot" aria-hidden="true"></span><div class="fmain"><h3 class="fhead">${esc(r.title)}</h3><span class="fmeta">${r.deal?esc(r.deal)+' · ':''}${esc(dueLabel(r.at))}</span></div></a><button type="button" class="fdone" data-todo-done="${esc(r.id)}" aria-label="Done — ${esc(r.title)}">Done</button></div>`).join('')
+  }${late?'':'<p class="quiet">Nothing overdue.</p>'}</div></section>`;
+}
+function comingHtml(items){
+  if(!items.length)return'';
+  return `<section class="home-sec" id="coming-up"><div class="sech"><h2 class="seclab">Coming up</h2><a class="seclink" href="${esc(scopeHref('/presence.html#bookings'))}">Bookings →</a></div><div class="rcard list">${
+    items.map(i=>{const p=ymdParts(i.ymd);return `<a class="mrow" data-kind="${esc(i.kind)}" href="${esc(scopeHref(i.href))}"><span class="md" aria-hidden="true"><span>${p?esc(p.mon):''}</span><b>${p?esc(p.day):'—'}</b></span><div class="fmain"><h3 class="fhead">${esc(i.title)}</h3><span class="fmeta">${p?esc(p.wd)+' · ':''}${esc(i.sub)}</span></div><span class="fcta">Open →</span></a>`;}).join('')
+  }</div></section>`;
+}
+function customersCardHtml(list){
+  const rows=customerRows(list);
+  if(!rows.length)return'';
+  return `<div class="rcard" id="rail-customers"><h2 class="rh">Customers</h2><div class="crows">${rows.map(c=>`<a href="${esc(c.href)}" data-customer="${esc(c.id)}"><span class="cav" aria-hidden="true">${esc(initials(c.name))}</span><span class="cmain"><span class="cn">${esc(c.name)}</span><span class="cs">${esc(c.sub)}</span></span></a>`).join('')}</div><div class="rfoot"><a class="link" href="/customers.html">All customers →</a></div></div>`;
+}
 
 // ── the rail cards ───────────────────────────────────────────────────────────
 // "This month" — fed by GET /analytics/dashboard. Deploy-order tolerant: a 404
@@ -332,7 +512,7 @@ const NOTICE_ID_RE = /^[0-9a-f-]{36}$/;
 // acknowledging affordance, never an imperative CTA.
 const NOTICE_FYI_KINDS = ['invoice_paid'];
 
-function render(moments, features, feed, ctx, dash, appts, deals){
+function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers){
   $('greeting').textContent = greet();
   // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
   // three times (three "Walk me through it" cards about one publish step)
@@ -448,6 +628,10 @@ function render(moments, features, feed, ctx, dash, appts, deals){
 
   // Today's schedule — real bookings, a confirmed-clear day, or an honest "couldn't check"
   main += scheduleHtml(appts);
+  // This week (the next step on each open deal) · Coming up (bookings after
+  // today + next steps dated beyond the week). Both hide when there's nothing.
+  main += weekHtml(weekTodos(deals));
+  main += comingHtml(comingUp(deals, Array.isArray(appts) ? appts : null));
 
   // the Concierge — a knowledgeable partner, not a chatbot. Stays in the main
   // column (right under the day) — asking a question is a primary action.
@@ -460,10 +644,13 @@ function render(moments, features, feed, ctx, dash, appts, deals){
   // rail card degrades away, the aside is dropped (hidden + a single-column
   // grid) so main spans the full width instead of leaving a dead ~30% gutter;
   // a late Waiting-on-clients card revives it (see waitingCard). ──
-  const railCards = monthCardHtml(dash) + keyDealsCardHtml(deals) + winsCardHtml(dash) + recentsCardHtml();
+  const railCards = customersCardHtml(customers) + monthCardHtml(dash) + keyDealsCardHtml(deals) + winsCardHtml(dash) + recentsCardHtml();
   const railEmpty = !railCards;
   const rail = railCards + '<div id="rail-waiting" hidden></div>';
-  $('main').innerHTML = `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
+  // Above the columns, full width: the money band (only when something is due)
+  // and the stat strip (only the tiles whose read came back honest).
+  const top = alertBandHtml(rcv) + statStripHtml(statTiles(summary, feed && feed.enquiries));
+  $('main').innerHTML = top + `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
   // "what comes with your business" — the Industry Pack, made invisible. Secondary
   // context, so it opens inside the collapsible "More about your business" below.
   const feats = (features && features.features) || [];
@@ -497,6 +684,7 @@ function wire(){
   document.querySelectorAll('[data-explain]').forEach(b => b.addEventListener('click', () => explain(b.getAttribute('data-explain'), b)));
   document.querySelectorAll('[data-dismiss]').forEach(b => b.addEventListener('click', () => dismiss(b.getAttribute('data-dismiss'), b)));
   document.querySelectorAll('[data-dismiss-notice]').forEach(b => b.addEventListener('click', () => dismissNotice(b.getAttribute('data-dismiss-notice'), b)));
+  document.querySelectorAll('[data-todo-done]').forEach(b => b.addEventListener('click', () => todoDone(b.getAttribute('data-todo-done'), b)));
   const askBtn = $('askBtn'), q = $('q');
   if(askBtn){ askBtn.addEventListener('click', ask); q.addEventListener('keydown', e => { if(e.key==='Enter') ask(); }); }
 }
@@ -540,6 +728,23 @@ async function dismissNotice(id, btn){
   }
   catch(_){ btn.disabled = false; }
 }
+// ── "Done" on a This-week row ────────────────────────────────────────────────
+// Clears the deal's next step through the EXISTING per-deal PATCH (the same
+// field crm.html's inline editor saves) — no new endpoint. The row leaves only
+// AFTER the write succeeds; on failure the button comes back. An emptied list
+// takes its section with it (no empty card).
+async function apiSend(path, method, body){ const r = await fetch(FN + path, { method, headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function todoDone(id, btn){
+  const row = btn.closest('.trow'); btn.disabled = true;
+  try{
+    await apiSend('/sales/deals/'+encodeURIComponent(id), 'PATCH', { next_step: '', next_step_at: '' });
+    const sec = row && row.closest('#this-week');
+    if(row) row.remove();
+    if(sec && !sec.querySelector('.trow')) sec.remove();
+    if(window.ddsToast) ddsToast('Done.');
+  }
+  catch(_){ btn.disabled = false; if(window.ddsToast) ddsToast('Couldn’t save that just now — try again in a moment.', 'err'); }
+}
 async function ask(){
   const q = $('q'), box = $('askAns'), btn = $('askBtn');
   const question = (q.value||'').trim(); if(!question) return;
@@ -568,7 +773,7 @@ function trouble(){
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
     let feedFailed = false;
-    const [moments, features, ctx, feed, bridged, dash, appts, deals] = await Promise.all([
+    const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
@@ -577,10 +782,13 @@ function trouble(){
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
       apiGet('/bookings/appointments').catch((e)=>e===404||e===403?'dormant':null),   // "Today's schedule" — 404/403 = bookings dormant (no card); else an honest couldn't-check line
       apiGet('/sales/deals?limit=100').catch(()=>null),      // "Key deals" (C6) — hidden entirely on empty/403/failure, never an empty card. ?limit=100 (the route's MAX_PAGE): the default page is only the 25 most-recently-UPDATED deals, which could hide a big open deal from the top-5 window
+      apiGet('/sales/summary').catch(()=>null),              // the stat strip — its three money tiles drop on a failed/403 read, never fake zeros
+      apiGet('/sales/receivables').catch(()=>null),          // the money band — hidden on a failed read (a 5xx must never paint "nothing is due")
+      (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)),   // the Customers card — the studio's own roster, never for a drilled-in operator (D7: the scope header would blank it)
     ]);
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
-    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data);
+    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data, summary && summary.data, rcv && rcv.data, customers && customers.data);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);

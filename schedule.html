@@ -8,27 +8,84 @@
 <meta name="description" content="Publish your current draft at a future time — set it and forget it.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — the hand-maintained
+     four-block copy this page carried is retired. Visual refresh (2026-10): the
+     page follows the approved "Scheduled changes" board — breadcrumb · title +
+     explainer · the Schedule-this-draft card (date · time · note · button) with
+     a Preview panel beside it · an Upcoming card with a calm empty state. */
+  :root{
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.primary{color:#171320}}
+  :root[data-theme="dark"] button.primary{color:#171320}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:34px 20px 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px;margin:0;max-width:52ch}
-  section{margin-top:28px}
-  h2{font-size:12.5px;color:var(--faint);font-weight:500;margin:0 0 14px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:12px}
-  label{display:block;font-size:12.5px;font-weight:600;color:var(--soft);margin-bottom:6px}
-  input[type=datetime-local],input[type=text]{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:11px 13px}
-  input:focus{outline:none;border-color:var(--p)}
-  .hint{font-size:12.5px;color:var(--faint);margin-top:8px}
-  button{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 18px;cursor:pointer;transition:.15s}
-  button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.55;cursor:default}
-  button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
-  .sch{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:26px 20px 90px}
+  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+  /* ── breadcrumb + page head ── */
+  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 14px;flex-wrap:wrap}
+  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 2px;border-radius:6px}
+  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
+  .crumbs .sep{color:var(--line-strong)}
+  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
+  header.phead{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
+  .ptitle{flex:1 1 360px;min-width:0}
+  header h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
+  header .sub{color:var(--soft);font-size:14.5px;margin:6px 0 0;max-width:60ch}
+  .pside{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:0 0 auto}
+  .illo{width:120px;height:72px}
+  @media (max-width:700px){.pside{flex-direction:row;align-items:center;justify-content:space-between;width:100%}.illo{width:96px;height:58px}}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+
+  /* ── cards ── */
+  section{margin-top:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow)}
+  .card-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .card-h .cic{width:30px;height:30px;border-radius:var(--dds-r,8px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .card-h .cic svg{width:15px;height:15px}
+  h2{font-family:var(--sans);font-size:15.5px;font-weight:600;color:var(--ink);margin:0}
+  .sgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+  @media (max-width:900px){.sgrid{grid-template-columns:minmax(0,1fr)}}
+  label{display:block;font-size:13px;font-weight:500;color:var(--ink);margin-bottom:6px}
+  label .tz{font-weight:400;color:var(--faint)}
+  .fld{position:relative;display:inline-flex;align-items:center;min-width:0}
+  .fld svg{position:absolute;left:11px;color:var(--soft);pointer-events:none}
+  .fld input[type=date],.fld input[type=time]{padding-left:36px}
+  .whenrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .whenrow .fld{flex:1 1 150px;max-width:220px}
+  input[type=date],input[type=time],input[type=text]{width:100%;font-family:inherit;font-size:14.5px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 12px;height:40px;min-width:0}
+  input[type=text]{max-width:520px}
+  input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:10px;max-width:56ch}
+  button{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 16px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:8px}
+  button:hover{border-color:var(--line-strong);background:var(--bg)} button:disabled{opacity:.55;cursor:default}
+  button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  /* the Preview panel beside the form */
+  .pv{background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px}
+  .pv .pvh{font-weight:600;font-size:14px}
+  .pv a.link{display:inline-block;font-size:12.5px;margin-top:2px}
+  .pvcard{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px;font-size:12.5px;color:var(--soft);line-height:1.45}
+  .pvcard b{color:var(--ink);font-weight:600}
+  /* a neutral site frame — illustration only, never a stand-in screenshot */
+  .frame{margin-top:10px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--card)}
+  .frame .bar{height:14px;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:3px;padding:0 6px}
+  .frame .bar i{width:5px;height:5px;border-radius:50%;background:var(--line-strong);display:block}
+  .frame .body{padding:10px;display:grid;gap:6px}
+  .frame .body i{display:block;height:7px;border-radius:999px;background:var(--line)}
+  .frame .body i.w{width:62%;background:var(--p-soft)} .frame .body i.m{width:84%} .frame .body i.s{width:40%}
+  .frame .body .pic{height:34px;border-radius:5px;background:var(--p-soft);margin-top:2px}
+  /* ── upcoming rows ── */
+  .sch{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:12px 0}
+  .sch:first-of-type{border-top:none;padding-top:0}
   /* long unbroken notes must wrap inside the row, never force the page wide */
   .sch>div{min-width:0;overflow-wrap:anywhere}
   .sch>button{flex:none}
@@ -36,10 +93,15 @@
   .sch .m{font-size:13px;color:var(--soft);margin-top:2px}
   .sch .k{font-size:12px;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;font-weight:500}
   .sch button{font-size:12.5px;padding:6px 13px}
+  .empty{text-align:center;padding:22px 10px 12px}
+  .empty .eic{width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--bg);border:1px solid var(--line);color:var(--soft);display:grid;place-items:center;margin:0 auto 10px}
+  .empty .eic svg{width:17px;height:17px}
+  .empty .t{font-weight:500;font-size:14px}
+  .empty p{color:var(--faint);font-size:13px;margin:2px 0 0}
   .muted{color:var(--soft);font-size:14px}
-  .center{text-align:center;padding:20px}
+  .center{text-align:center;padding:40px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
-  a.link{color:var(--p);text-decoration:none;font-weight:500}
+  a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
   .toast.show{opacity:1}
@@ -70,40 +132,75 @@ async function api(path,method,body){const r=await fetch(FN+path,{method:method|
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function fmt(iso){return new Date(iso).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'});}
 function tzName(){try{return new Date().toLocaleTimeString('en-US',{timeZoneName:'short'}).split(' ').pop();}catch(_){return 'local';}}
-function localMin(){const d=new Date(Date.now()+60000);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
+const pad=(n)=>String(n).padStart(2,'0');
+function todayYmd(){const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+// the date + time fields compose into the one local datetime the route expects
+function pickedLocal(){const d=$('when-date')&&$('when-date').value,t=$('when-time')&&$('when-time').value;return(d&&t)?(d+'T'+t):'';}
+const IC={
+  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>',
+  cal:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  clock:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  calx:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+};
+// the clock-on-a-blob illustration beside the title (decorative)
+const ILLO=`<svg class="illo" viewBox="0 0 120 72" aria-hidden="true"><ellipse cx="62" cy="40" rx="48" ry="28" fill="var(--p-soft)"/><rect x="26" y="14" width="40" height="30" rx="6" fill="var(--card)" stroke="var(--line)"/><rect x="31" y="20" width="18" height="4" rx="2" fill="var(--line)"/><rect x="31" y="28" width="30" height="4" rx="2" fill="var(--line)"/><rect x="31" y="36" width="12" height="4" rx="2" fill="var(--p-soft)"/><circle cx="82" cy="40" r="17" fill="var(--p)"/><circle cx="82" cy="40" r="12" fill="var(--card)"/><path d="M82 33v7l4 3" stroke="var(--p)" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`;
 
 function render(){
-  let h=`<div class="rolebadge">● Scheduled</div>
-    <header><h1>Scheduled changes</h1><p class="sub">Publish your current draft at a future moment — holiday hours, a seasonal update, a launch. Nothing goes live until then.</p></header>
-    <section><h2>Schedule this draft</h2>
+  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/presence.html">${IC.back}Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Scheduled changes</span></nav>
+    <header class="phead">
+      <div class="ptitle"><h1 id="pagehead" tabindex="-1">Scheduled changes</h1><p class="sub">Publish your current draft at a future moment — holiday hours, a seasonal update, a launch. Nothing goes live until then.</p></div>
+      <div class="pside">${ILLO}<a class="btn" href="/presence.html">View current draft →</a></div>
+    </header>
+    <section>
       <div class="card">
-        <p style="margin:0 0 14px;font-size:14px"><a class="link" href="/presence.html">See exactly what will publish — preview your draft →</a></p>
-        <label for="when">When should your current draft go live? <span style="font-weight:400;color:var(--faint)">(${esc(tzName())} time)</span></label>
-        <input type="datetime-local" id="when" min="${localMin()}">
-        <label for="note" style="margin-top:14px">A note for yourself (optional)</label>
-        <input type="text" id="note" placeholder="e.g. Holiday hours">
-        <div style="margin-top:16px"><button class="primary" id="add">Schedule publish</button></div>
-        <p class="hint">This freezes your draft exactly as it is now. Keep editing freely — the scheduled version won't change.</p>
+        <div class="card-h"><span class="cic" aria-hidden="true">${IC.cal}</span><h2>Schedule this draft</h2></div>
+        <div class="sgrid">
+          <div>
+            <label for="when-date">When should your current draft go live? <span class="tz">(${esc(tzName())} time)</span></label>
+            <div class="whenrow">
+              <span class="fld">${IC.cal}<input type="date" id="when-date" min="${todayYmd()}" aria-label="Date"></span>
+              <span class="fld">${IC.clock}<input type="time" id="when-time" value="10:00" aria-label="Time"></span>
+            </div>
+            <label for="note">A note for yourself (optional)</label>
+            <input type="text" id="note" placeholder="e.g. Holiday hours" maxlength="200">
+            <div style="margin-top:16px"><button class="primary" id="add" type="button">${IC.cal}Schedule publish</button></div>
+            <p class="hint">This freezes your draft exactly as it is now. Keep editing freely — the scheduled version won't change.</p>
+          </div>
+          <aside class="pv" aria-label="Preview">
+            <div class="pvh">Preview</div>
+            <a class="link" href="/presence.html?view=preview">See exactly what will publish →</a>
+            <div class="pvcard"><div id="pvWhen">Pick a date and time to see when your changes go live.</div>
+              <div class="frame" aria-hidden="true"><div class="bar"><i></i><i></i><i></i></div><div class="body"><i class="w"></i><i class="m"></i><i class="s"></i><div class="pic"></div></div></div>
+            </div>
+            <a class="link" href="/presence.html" style="margin-top:10px">Open draft →</a>
+          </aside>
+        </div>
       </div>
     </section>
-    <section><h2 id="upcomingH" tabindex="-1">Upcoming</h2>`;
-  if(!LIST.length)h+=`<p class="muted">Nothing scheduled. When you schedule a publish, it appears here until it goes live.</p><p style="margin-top:10px"><a class="link" href="/presence.html?view=preview">Preview your draft →</a></p>`;
+    <section>
+      <div class="card">
+        <div class="card-h"><h2 id="upcomingH" tabindex="-1">Upcoming</h2></div>`;
+  if(!LIST.length)h+=`<div class="empty"><span class="eic" aria-hidden="true">${IC.calx}</span><div class="t">Nothing scheduled.</div><p>When you schedule a publish, it will appear here until it goes live.</p></div>`;
   else for(const s of LIST){
-    h+=`<div class="sch"><div><div class="w">${esc(fmt(s.scheduled_for))}</div><div class="m"><span class="k">${s.kind==='revert'?'Revert':'Publish'}</span> ${esc(s.summary||'')}</div></div><button data-cancel="${esc(s.id)}">Cancel</button></div>`;
+    h+=`<div class="sch"><div><div class="w">${esc(fmt(s.scheduled_for))}</div><div class="m"><span class="k">${s.kind==='revert'?'Revert':'Publish'}</span> ${esc(s.summary||'')}</div></div><button data-cancel="${esc(s.id)}" type="button">Cancel</button></div>`;
   }
-  h+=`</section>`;
+  h+=`</div></section>`;
   $('main').innerHTML=h;wire();
 }
 function wire(){
   $('add').addEventListener('click',add);
+  // the preview line follows the picked moment as it's typed
+  const sync=()=>{const v=pickedLocal();const el=$('pvWhen');if(!el)return;el.innerHTML=v?`Your changes will go live on <b>${esc(fmt(v))} (${esc(tzName())})</b>.`:'Pick a date and time to see when your changes go live.';};
+  ['when-date','when-time'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',sync);});
   document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancel(b.getAttribute('data-cancel'))));
 }
 async function add(){
-  const v=$('when').value;if(!v){toast('Pick a date and time.');return;}
+  const v=pickedLocal();if(!v){toast('Pick a date and time.');return;}
   const iso=new Date(v).toISOString();
+  if(Date.parse(iso)<=Date.now()){toast('Pick a time in the future.');return;}
   const btn=$('add');btn.disabled=true;btn.textContent='Scheduling…';
   const r=await api('/schedule','POST',{scheduled_for:iso,note:$('note').value||''});
-  btn.disabled=false;btn.textContent='Schedule publish';
+  btn.disabled=false;btn.innerHTML=IC.cal+'Schedule publish';
   // load() rebuilds #main via innerHTML, which silently drops keyboard focus —
   // put it back on the recreated control (or the list heading after a cancel).
   if(r.ok){toast(r.body.data&&r.body.data.message||'Scheduled.');await load();const b=$('add');if(b)b.focus();}
@@ -111,7 +208,7 @@ async function add(){
 }
 async function cancel(id){const r=await api('/schedule/'+id+'/cancel','POST');if(r.ok){toast('Canceled.');await load();const h=$('upcomingH');if(h)h.focus();}else toast('Couldn’t cancel that.');}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to schedule a publish.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load this just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" type="button">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
 async function load(){const r=await api('/schedule');if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Scheduling lives in your studio workspace.</h2></div>`;return;}if(!r.ok){trouble();return;}LIST=(r.body.data&&r.body.data.scheduled)||[];render();}
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

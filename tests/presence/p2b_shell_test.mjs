@@ -13,7 +13,9 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const h = read('presence.html');
   ok('presence.html includes the shared shell (css + js)', /<link[^>]+href="\/shell\.css"/.test(h) && /<script[^>]+src="\/shell\.js"/.test(h));
   ok('presence.html routes toasts through the shared ddsToast (shared success/error/conflict state)', /typeof window\.ddsToast === "function"/.test(h) && /window\.ddsToast\(msg, bad \? "err" : "ok"\)/.test(h));
-  ok('presence.html reconciles the rail under the shell (hides the duplicate wordmark)', /dds-has-shell \.rail \.wordmark\{display:none\}/.test(h));
+  // PR #16: the page's own rail + wordmark are gone; it pre-stamps html.dds-side so the
+  // shell's sidebar is the one navigation (no duplicate wordmark can exist).
+  ok('presence.html uses the shell sidebar and carries no wordmark of its own', /<html[^>]*class="dds-side"/.test(h) && !/class="wordmark"/.test(h));
   // M9 optimistic-lock behavior PRESERVED (not touched by the shell adoption)
   ok('M9 PRESERVED: presence.html still sends If-Match from api()', /If-Match.*S\.draftHash/.test(h));
   ok('M9 PRESERVED: presence.html still handles the stale_draft 409', /error === "stale_draft"/.test(h) && /S\.draftHash = \(j && j\.current_hash\)/.test(h));

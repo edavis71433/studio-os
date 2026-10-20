@@ -275,7 +275,11 @@
         var it = sec.items[0];
         return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span></a></div>';
       }
-      return '<div class="sec' + (isActive ? ' active' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="false"' + (hasItem ? ' aria-current="true"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span> <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
+      // Visual refresh (sidebar ≥761px): a multi-item section's menu is an INLINE
+      // list under its item, not a flyout — and the section you are IN starts
+      // expanded (pinned: see pinnedSec), with the current page's row lit.
+      var startOpen = isActive && sidebarMode();
+      return '<div class="sec' + (isActive ? ' active' : '') + (startOpen ? ' open' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="' + (startOpen ? 'true' : 'false') + '"' + (hasItem ? ' aria-current="true"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span> <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
     }).join('');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
@@ -379,13 +383,28 @@
         sec.classList.add('open'); b.setAttribute('aria-expanded', 'true');
         if (focusFirst) { var f = sec.querySelector('.menu a'); if (f) f.focus(); }
       }
+      // A pointer press on the trigger or inside the menu must NOT move focus.
+      // Safari (and WebKit on iPad with a trackpad) does not focus a <button> or
+      // <a> on mousedown — it moves focus to the nearest focusable ANCESTOR
+      // (#main on every page) — so the focusout guard below saw focus "leave"
+      // the section and closed the menu before mouseup: a menu link's click
+      // fell through to the page, and a click on the trigger of an OPEN menu
+      // closed-then-reopened it. Focus is placed explicitly instead: the
+      // trigger after a pointer click, the first item after a keyboard one.
+      sec.addEventListener('mousedown', function (e) {
+        if (e.target.closest && e.target.closest('button, a')) e.preventDefault();
+      });
       b.addEventListener('click', function (e) {
         e.stopPropagation();
         var wasOpen = sec.classList.contains('open');
         closeAllLayers();
         // e.detail === 0 → keyboard activation (Enter/Space): move focus into the
-        // menu. A pointer click keeps focus on the trigger (menu-button pattern).
-        if (!wasOpen) openSec(e.detail === 0);
+        // menu. A pointer click keeps focus on the trigger (menu-button pattern)
+        // — placed explicitly, since the mousedown above no longer does it.
+        // The trigger of an OPEN section folds it — a pinned (active, sidebar)
+        // section too, since closeAllLayers leaves pinned sections alone.
+        if (e.detail !== 0) b.focus();
+        if (wasOpen) closeSec(sec); else openSec(e.detail === 0);
       });
       // ArrowDown from the trigger opens the menu (if needed) and enters it
       b.addEventListener('keydown', function (e) {
@@ -406,13 +425,14 @@
         var to = e.relatedTarget;
         if (!to) return;                      // iOS tap / focus left the document — keep open
         if (sec.contains(to)) return;         // focus moved WITHIN the section — keep open
-        sec.classList.remove('open'); b.setAttribute('aria-expanded', 'false');
+        if (pinnedSec(sec)) return;           // the section you are in stays expanded (sidebar)
+        closeSec(sec);
       });
       var menu = sec.querySelector('.menu');
       if (menu) menu.addEventListener('keydown', function (e) {
         var links = [].slice.call(menu.querySelectorAll('a'));
         var i = links.indexOf(document.activeElement);
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus(); b.focus(); }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenus(); closeSec(sec); b.focus(); }
         else if (e.key === 'ArrowDown') { e.preventDefault(); if (links.length) links[Math.min(i + 1, links.length - 1)].focus(); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); if (links.length) links[Math.max(i - 1, 0)].focus(); }
       });
@@ -439,11 +459,24 @@
     // references a real element, not a lazily-created one
     ensureDrawer();
   }
+  // The sidebar layout (shell.css html.dds-side, ≥761px). Phones/tablets under
+  // 761px keep the top bar, where a section menu is still a dropdown.
+  function sidebarMode() {
+    try { return document.documentElement.classList.contains('dds-side') && window.matchMedia('(min-width:761px)').matches; } catch (_) { return false; }
+  }
+  // A PINNED section: in the sidebar, the section the operator is working in
+  // stays expanded — outside clicks and Tab-out never fold it (it is the map
+  // of where you are, not a popup). Its own trigger and Escape still toggle it.
+  function pinnedSec(sec) { return sidebarMode() && sec.classList.contains('active'); }
+  function closeSec(sec) {
+    sec.classList.remove('open');
+    var b = sec.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
+  }
   function closeMenus() {
     if (!root || !root.querySelectorAll) return;
     root.querySelectorAll('.dds-nav .sec.open').forEach(function (s) {
-      s.classList.remove('open');
-      var b = s.querySelector('button[data-sec]'); if (b) b.setAttribute('aria-expanded', 'false');
+      if (pinnedSec(s)) return;   // the section you are in stays expanded in the sidebar
+      closeSec(s);
     });
   }
   // ── layer mutual exclusion: the shell has five floating layers (section
@@ -563,6 +596,9 @@
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner((CTX && CTX.attention_count) || 0);
   }
+  // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
+  // resolving a support request) can ask for the badge now, past the throttle.
+  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(); };
   function refreshAttention() {
     if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
     if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;

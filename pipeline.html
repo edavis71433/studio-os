@@ -241,6 +241,43 @@ html.dds-embed #detailWrap{padding-top:0}
   /* the inline mini-forms + quick-log sit on the card surface for contrast */
   #detailInner form.mini{background:var(--card)}
   @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
+  /* ── Oct 2026 review: the deal page in the record's idiom. The lifecycle bar
+     is crm.html's "Visual refresh" .path rules, copied by hand (same DOM, same
+     ✓ done / current / canback / lost-terminal states the spec pins); a tab
+     strip (Overview · Billing · Activity) sits over the EXISTING sections and
+     only toggles `hidden`; Overview is two columns — details + to-dos, with a
+     Money card and the latest activity in the rail. Every id and data-* hook
+     is unchanged. ── */
+  #detailInner .sec.life{padding:12px 16px 14px}
+  #detailInner .sec.life>h3{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}   /* the bar speaks for itself; the heading stays for the outline + the unit pin */
+  .path{gap:6px;flex:1 1 520px}
+  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
+  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
+  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
+  .path button.pstep.current:hover{filter:none;color:var(--p-deep,var(--p))}
+  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
+  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
+  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
+  .path-guide{margin-top:10px;font-size:13px}
+  .terminal-chip{font-weight:600;padding:3px 10px;font-size:12px}
+  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
+  #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:.15s}
+  #detailInner .tabs button:hover{color:var(--ink);background:transparent}
+  #detailInner .tabs button.on{color:var(--p);border-bottom-color:var(--p)}
+  #detailInner .tabs button .n{margin-left:6px;font-size:11.5px;color:var(--faint);font-weight:500}
+  #detailInner .dtab[hidden]{display:none}
+  #detailInner .dcols{display:grid;gap:16px;align-items:start}
+  @media(min-width:960px){#detailInner .dcols{grid-template-columns:minmax(0,1fr) 320px}}
+  #detailInner .dcol-main,#detailInner .dcol-rail{min-width:0}
+  #detailInner .dcol-rail .sec:last-child{margin-bottom:0}
+  #detailInner .sec h3 .hlink{float:right;font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer;text-decoration:none}
+  #detailInner .sec h3 .hlink:hover{text-decoration:underline}
+  #detailInner .dkv{display:grid;grid-template-columns:16px 1fr;gap:9px 10px;font-size:13px;align-items:center}
+  #detailInner .dkv svg{width:15px;height:15px;stroke:var(--faint);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  #detailInner .dkv .muted{color:var(--faint)}
+  #detailInner .tl-mini .tl-i{padding:7px 0}
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>
@@ -471,6 +508,26 @@ let SERVICES=[],CURRENT_DEAL=null;
 // Path state (kept in sync with crm.html by hand): the guidance strip toggle +
 // the pending one-back confirmation.
 let GUIDE_OPEN=true,PENDING_BACK='';
+// ── Oct 2026 review: the deal page's tab strip. Overview (details, to-dos, a
+// Money card) · Billing (proposals, agreement, invoices, retainer, convert) ·
+// Activity (the quick-log + timeline). Every section is still RENDERED — the
+// tabs only toggle `hidden` — so each id/data-* hook keeps its one home. The
+// URL mirrors the tab (?dtab=billing) for shareable deep links; openers that
+// live outside the tab (the won deal's "Send invoice", the guidance's
+// "Convert them") switch to the right tab before they act.
+const DTAB_KEYS=['overview','billing','activity'];
+let DTAB='overview';
+function showDealTab(tab,opts){
+  opts=opts||{};
+  if(!DTAB_KEYS.includes(tab))tab='overview';
+  DTAB=tab;
+  const root=$('detailInner'); if(!root)return;
+  root.querySelectorAll('.tabs [data-dtab]').forEach(b=>{const on=b.dataset.dtab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.setAttribute('tabindex',on?'0':'-1');});
+  root.querySelectorAll('[data-dtab-panel]').forEach(p=>{p.hidden=p.dataset.dtabPanel!==tab;});
+  // ?dtab= mirrors the tab; Overview is the bare deal URL
+  try{const q=new URLSearchParams(location.search);if(tab==='overview')q.delete('dtab');else q.set('dtab',tab);history.replaceState(null,'',location.pathname+'?'+q.toString());}catch(_){}
+  if(opts.focus){const b=root.querySelector('.tabs [data-dtab="'+tab+'"]');if(b)b.focus();}
+}
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
@@ -1832,8 +1889,10 @@ async function openDeal(id){
   const dgen=++DET_SEQ;                  // detail-read generation: a slower older open must never paint over this one
   const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
+  // the tab: a ?dtab= deep link on a fresh open; an in-view refresh keeps the current one
+  if(CURRENT_DEAL!==id){const u=new URLSearchParams(location.search).get('dtab');DTAB=DTAB_KEYS.includes(u)?u:'overview';}
   CURRENT_DEAL=id;
-  history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():''));
+  history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():'')+(DTAB!=='overview'?'&dtab='+DTAB:''));
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   bizName(); // warm the studio-name cache so the agreement starter fills instantly
   try{
@@ -1926,6 +1985,39 @@ async function openDeal(id){
       const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
       return `<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}</div></div></li>`;
     }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
+    // ── the Overview rail: a Money card (what's paid, owed, signed, proposed —
+    //    each a fact already on this read) and the three latest timeline items;
+    //    plus the tab counts (open invoices · activity items) ──
+    const invs=(data.invoices||[]).filter(v=>v.status!=='void');
+    const paidInv=invs.filter(v=>v.status==='paid');
+    const paidC=paidInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    const openInv=invs.filter(v=>v.status==='open');
+    const openC=openInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    const signedK=(data.contracts||[]).find(k=>k.status==='signed');
+    const sentK=(data.contracts||[]).find(k=>k.status==='sent');
+    const accP=(data.proposals||[]).find(p=>p.status==='accepted');
+    const sentP=(data.proposals||[]).find(p=>p.status==='sent');
+    const IK={
+      money:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/></svg>',
+      clock:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+      doc:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>',
+      repeat:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    };
+    const kv=(ic,txt,muted)=>`${ic}<span${muted?' class="muted"':''}>${txt}</span>`;
+    const lastPaid=paidInv.filter(v=>v.paid_at).sort((a,b)=>a.paid_at<b.paid_at?1:-1)[0];
+    const moneyKv=[
+      paidC?kv(IK.money,`Paid ${money(paidC)}${paidInv.length===1?(paidInv[0].purpose==='deposit'?' · deposit':' · invoice'):' · '+paidInv.length+' invoices'}${lastPaid?', '+esc(evtDate(lastPaid.paid_at)):''}`):kv(IK.money,'Nothing paid yet',true),
+      openC?kv(IK.clock,`Outstanding ${money(openC)} · ${openInv.length===1?(openInv[0].purpose==='deposit'?'deposit':'invoice'):openInv.length+' invoices'}${openInv.every(v=>!v.stripe_url)?', not sent yet':openInv[0].due_date?', due '+esc(openInv[0].due_date):', due now'}`):kv(IK.clock,'Nothing outstanding',true),
+      signedK?kv(IK.check,`Agreement signed${signedK.signed_at?' '+esc(evtDate(signedK.signed_at)):''}`):sentK?kv(IK.check,'Agreement out — awaiting signature'):draftContract?kv(IK.check,'Agreement drafted, not sent',true):kv(IK.check,'No agreement yet',true),
+      accP?kv(IK.doc,'Proposal accepted'):sentP?kv(IK.doc,'Proposal sent — awaiting their answer'):(data.proposals||[]).length?kv(IK.doc,'Proposal drafted, not sent',true):kv(IK.doc,'No proposal yet',true),
+    ];
+    if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
+    const billN=openInv.length?`${openInv.length} open`:'';
+    const tlN=tlItems.length?String(tlItems.length):'';
+    const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
+    const dtabBtn=(k,label,n)=>`<button type="button" role="tab" data-dtab="${k}" id="dtab-${k}" aria-controls="dpanel-${k}" aria-selected="false" tabindex="-1">${label}${n?`<span class="n">${esc(n)}</span>`:''}</button>`;
+    const dpanel=(k)=>`<div class="dtab" id="dpanel-${k}" role="tabpanel" aria-labelledby="dtab-${k}" data-dtab-panel="${k}" hidden>`;
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
       <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
@@ -1941,11 +2033,13 @@ async function openDeal(id){
           </div></div></div>
       ${(d.stage==='won'||d.converted_client_id)?`<div class="row2 dh-acts" style="padding:0 22px 14px"><button class="btn" id="wonInvoice">Send invoice</button>${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}&client=" data-noscope="1" style="text-decoration:none">Open project</a>`:''}<a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="text-decoration:none">Customer record</a></div>`:''}
       <div class="dbody">
-        <div class="sec"><h3>Move stage</h3><div id="pathHost"></div>
+        <div class="sec life" id="dealLife"><h3>Move stage</h3><div id="pathHost"></div>
           ${d.converted_client_id?'<div class="mut" style="margin-top:10px">Won ✓ — converted to a customer</div>'
             :d.stage==='lost'?`<div class="row2" style="margin-top:10px"><span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button></div>`
             :nextStages.includes('lost')?`<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button class="btn ghost" id="markLost" style="border-color:transparent;color:var(--soft)">Mark as lost (not a fit)</button></div>`:''}
           <div id="lostForm"></div></div>
+        <div class="tabs" role="tablist" aria-label="Deal sections">${dtabBtn('overview','Overview','')}${dtabBtn('billing','Billing',billN)}${dtabBtn('activity','Activity',tlN)}</div>
+        ${dpanel('overview')}<div class="dcols"><div class="dcol-main">
         <div class="sec"><h3>Details</h3>
           <!-- CONTACT first: without a client email NOTHING sends itself — the
                agreement, the deposit and the welcome all fall back to "copy the
@@ -1979,6 +2073,11 @@ async function openDeal(id){
                free-text path first-class. The POST is unchanged. -->
           <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
           <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
+        </div><aside class="dcol-rail">
+          <div class="sec"><h3>Money<button type="button" class="hlink" data-goto-tab="billing">Billing →</button></h3><div class="dkv">${moneyKv.join('')}</div></div>
+          <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
+        </aside></div></div>
+        ${dpanel('billing')}
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
@@ -1995,6 +2094,8 @@ async function openDeal(id){
             draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
             `<div id="convWrap"><button class="btn" disabled>Sign the agreement first</button></div>`}
         </div>
+        </div>
+        ${dpanel('activity')}
         <div class="sec"><h3>Activity</h3>
           <div class="qlog">
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
@@ -2003,9 +2104,26 @@ async function openDeal(id){
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
+        </div>
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=closeDealDetail;
+    // ── tabs: show the requested one (a ?dtab= deep link, a refresh's current
+    //    tab, else Overview); clicks + the record tablist's arrow-key contract ──
+    showDealTab(DTAB);
+    $('detailInner').querySelectorAll('.tabs [data-dtab]').forEach(b=>b.onclick=()=>showDealTab(b.dataset.dtab));
+    $('detailInner').querySelectorAll('[data-goto-tab]').forEach(b=>b.onclick=()=>showDealTab(b.dataset.gotoTab,{focus:true}));
+    const dtl=$('detailInner').querySelector('.tabs[role=tablist]');
+    if(dtl)dtl.addEventListener('keydown',(e)=>{
+      const tabsEls=[...dtl.querySelectorAll('[data-dtab]')];const i=tabsEls.indexOf(document.activeElement);
+      if(i<0)return;let j=-1;
+      if(e.key==='ArrowRight')j=(i+1)%tabsEls.length;
+      else if(e.key==='ArrowLeft')j=(i-1+tabsEls.length)%tabsEls.length;
+      else if(e.key==='Home')j=0;
+      else if(e.key==='End')j=tabsEls.length-1;
+      if(j<0)return;e.preventDefault();
+      showDealTab(tabsEls[j].dataset.dtab,{focus:true});
+    });
     // ── Path: the chevron stage bar — kept in sync with crm.html by hand (its
     // renderPath/moveStage: same markup, same done ✓/current/todo + won/lost
     // terminal states, same interactivity rules — ONLY the current step (the
@@ -2044,7 +2162,7 @@ async function openDeal(id){
       const mc=$('markComplete'); if(mc)mc.onclick=()=>pathMove(fwd,mc);
       // the Convert flow stays exactly where it is — these just point at it
       // (the side button AND the signed-guidance "Do next" deep-link).
-      const goConvert=()=>{const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
+      const goConvert=()=>{showDealTab('billing');const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({behavior:'smooth',block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});};
       const pc=$('pathConvert'); if(pc)pc.onclick=goConvert;
       const gc=$('guideConvert'); if(gc)gc.onclick=(e)=>{e.preventDefault();goConvert();};
       host.querySelectorAll('.pstep.canback').forEach(b=>b.onclick=()=>{PENDING_BACK=b.getAttribute('data-pstep');renderDrawerPath();});   // only the honest one-back move renders interactive
@@ -2153,7 +2271,7 @@ async function openDeal(id){
     const openDoc=async(table,docId,el)=>{if(el)el.disabled=true;try{const r=await api('/sales/'+table+'/'+docId+'/document');if(r&&r.url)window.open(r.url,'_blank','noopener');else toast('Couldn’t open the document just now.',true);}catch(e){toast(nice(e),true);}finally{if(el)el.disabled=false;}};
     $('detailInner').querySelectorAll('[data-send-proposal]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendProposalById(b.dataset.sendProposal);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // Phase 3 (stage-aware): the won deal's headline verb opens the invoice form
-    const wi=$('wonInvoice'); if(wi)wi.onclick=()=>{const b=$('sendInvoice');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};
+    const wi=$('wonInvoice'); if(wi)wi.onclick=()=>{showDealTab('billing');const b=$('sendInvoice');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};
     // Sending a SAVED draft is the other half of the blanks guard — the draft may
     // have been seeded weeks ago and never completed. The deal read carries each
     // agreement's body for exactly this check. If the body is MISSING (review F2:
@@ -2456,6 +2574,8 @@ async function boot(){
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
+    // Settings → Invoices & agreements lands here with ?services=1: open the catalog straight away
+    if(new URLSearchParams(location.search).get('services')==='1'){const sb=$('mngServicesTop');if(sb)sb.click();}
   }catch(_){
     $('list').innerHTML='<div class="dds-error"><span class="ico">!</span><span>We couldn’t load your pipeline just now.</span><button type="button" class="retry" id="bootRetry">Try again</button></div>';
     const b=$('bootRetry'); if(b)b.onclick=()=>boot();

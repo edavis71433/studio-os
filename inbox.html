@@ -109,6 +109,13 @@
   .pchip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--good-soft);color:var(--good);text-transform:capitalize}
   .pchip.plain{background:var(--p-soft);color:var(--p)}
   .pback{display:none;font:inherit;border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;flex:0 0 auto}
+  /* Oct 2026 review: a support request's triage lives in the pane header —
+     Resolve · Close · Make it a task — beside the honest status select. */
+  .phead .pacts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+  .phead .pacts button{padding:5px 11px;font-size:12.5px}
+  .pchip.open,.pchip.in_progress{background:var(--warn-soft);color:var(--warn)}
+  .pchip.resolved,.pchip.closed{background:var(--line);color:var(--soft)}
+  @media (max-width:760px){.phead .pacts{margin-left:0;flex-basis:100%}}
   .pbody{flex:1;overflow-y:auto;padding:16px 18px}
   .pcomposer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--card);padding:12px 18px}
   .pcomposer textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;resize:vertical;min-height:58px}
@@ -660,10 +667,11 @@ function renderPane(){
   if(it.kind==='approval')return void paneApproval(host,it);
   if(it.kind==='lead')return void paneLead(host,it);
 }
-const paneHead=(it,subHtml)=>`<div class="phead">
+const paneHead=(it,subHtml,actsHtml)=>`<div class="phead">
   <button type="button" class="pback" id="paneBack">← Inbox</button>
   <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
   <div style="min-width:0"><div class="pname">${esc(it.name)}</div><div class="psub">${subHtml}</div></div>
+  ${actsHtml?`<div class="pacts" id="paneActs">${actsHtml}</div>`:''}
 </div>`;
 function wireBack(){const b=$('paneBack');if(b)b.addEventListener('click',closePane);}
 
@@ -810,12 +818,45 @@ function renderTL(host,items){
 // legal transitions — kept in sync with lib/intake.ts SUPPORT_NEXT by hand
 const SUPPORT_NEXT={open:['in_progress','resolved','closed'],in_progress:['open','resolved','closed'],resolved:['open','closed'],closed:['open']};
 const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',closed:'Closed'};
+// Oct 2026 review: ONE path for every status change — the select, the header's
+// Resolve / Close, and "Reply and resolve". PATCH /support/:id (the existing
+// triage route; the server re-checks the ladder). Resolved or closed ENDS the
+// wait: the row leaves this list and the bell's count (the server counts open +
+// in_progress only — workspace.ts status=in.(open,in_progress) for the badge,
+// not.in.(resolved,closed) for the feed), so the next refresh agrees with us.
+async function setSupportStatus(host,it,to,ctl){
+  if(!to||to===it.status)return false;
+  if(ctl)ctl.disabled=true;
+  const pr=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{status:to});
+  if(pr.ok){
+    toast(to==='resolved'?'Resolved — nice work.':to==='closed'?'Closed.':'Status updated.');
+    it.status=to;it.chip='Support · '+String(to).replace(/_/g,' ');
+    if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();renderConsole();bumpBell();return true;}
+    renderList();paneSupport(host,it);return true;
+  }
+  toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');
+  paneSupport(host,it);return false;
+}
+// the shell's bell re-reads /portal/context on its own cadence; nudge it now so
+// a resolved request leaves the badge without waiting for the next tick
+function bumpBell(){try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}}
 async function paneSupport(host,it){
   const seq=++PANE_SEQ;
   const recHref=it.client_id?scoped('/crm.html?client_id='+encodeURIComponent(it.client_id)+'&tab=messages'):'';
-  host.innerHTML=paneHead(it,`<span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}`)+
+  const projHref=(it.projects&&it.projects[0]&&it.projects[0].id)?scoped('/projects.html?project='+encodeURIComponent(it.projects[0].id)):'';
+  const openNow=it.status==='open'||it.status==='in_progress';
+  const acts=openNow?`${it.project_id?'<button type="button" id="supTask" title="Add this request as a task on their project">Make it a task</button>':''}<button type="button" id="supResolve">Resolve</button><button type="button" id="supClose" class="ghost">Close</button>`:'';
+  host.innerHTML=paneHead(it,`<span class="pchip ${esc(it.status||'open')}" id="paneStatusChip">${esc(SUPPORT_LABEL[it.status]||it.status||'Open')}</span><span class="pchip plain">Support request</span><span id="paneStatusWrap"></span>${recHref?`<a class="link" href="${esc(recHref)}">Open full record →</a>`:''}${projHref&&it.projects[0].name?`<a class="link" href="${esc(projHref)}">${esc(it.projects[0].name)} →</a>`:''}`,acts)+
     `<div class="pbody" id="pbody" aria-live="polite"><div class="spin" role="status" aria-label="Loading request"></div></div><div class="pcomposer" id="pcomposer"></div>`;
   wireBack();
+  const sr=$('supResolve');if(sr)sr.addEventListener('click',()=>setSupportStatus(host,it,'resolved',sr));
+  const sc=$('supClose');if(sc)sc.addEventListener('click',()=>setSupportStatus(host,it,'closed',sc));
+  const st=$('supTask');if(st)st.addEventListener('click',async()=>{
+    st.disabled=true;
+    const r=await api('/projects/'+encodeURIComponent(it.project_id)+'/tasks','POST',{title:String(it.preview||'Support request').slice(0,200),client_visible:false});
+    if(r.ok){toast('Added to their project’s tasks.');st.textContent='Task added ✓';}
+    else{toast((r.body&&r.body.message)||'Couldn’t add that task.');st.disabled=false;}
+  });
   let r;
   try{r=await api('/support/'+encodeURIComponent(it.support_id));}
   catch(_){r={ok:false,body:{}};}   // a network-level reject lands on the same "couldn't load" branch
@@ -827,36 +868,32 @@ async function paneSupport(host,it){
   // status control: current + only the legal transitions (PATCH /support/:id —
   // the existing triage route; the server re-checks the ladder)
   const cur=String(req.status||'open');
+  if(cur!==it.status){it.status=cur;const chip=$('paneStatusChip');if(chip){chip.textContent=SUPPORT_LABEL[cur]||cur;chip.className='pchip '+cur;}}   // the server's status wins over the feed's
   const opts=[cur,...(SUPPORT_NEXT[cur]||[])];
   $('paneStatusWrap').innerHTML=`<label for="paneStatus" style="font-size:11px;color:var(--faint)">Status</label> <select id="paneStatus" aria-label="Support request status">${opts.map(s=>`<option value="${esc(s)}"${s===cur?' selected':''}>${esc(SUPPORT_LABEL[s]||s)}</option>`).join('')}</select>`;
-  $('paneStatus').addEventListener('change',async(e)=>{
-    const to=e.target.value;if(to===cur)return;
-    e.target.disabled=true;
-    const pr=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{status:to});
-    if(pr.ok){
-      toast(to==='resolved'?'Resolved — nice work.':'Status updated.');
-      it.status=to;it.chip='Support · '+String(to).replace(/_/g,' ');
-      if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();return;}
-      renderList();paneSupport(host,it);
-    }else{toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');paneSupport(host,it);}
-  });
+  $('paneStatus').addEventListener('change',(e)=>setSupportStatus(host,it,e.target.value,e.target));
   let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
     h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
   }
   pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
+  const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
-  $('supForm').onsubmit=async(e)=>{
-    e.preventDefault();
-    const ta=$('supBody');const body=(ta.value||'').trim();if(!body)return;
-    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+  // one send path: post the reply; "Reply and resolve" then ends the wait too
+  const sendReply=async(andResolve)=>{
+    const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
+    const btns=[...$('supForm').querySelectorAll('button')];btns.forEach(b=>b.disabled=true);
     const rr=await api('/support/'+encodeURIComponent(it.support_id)+'/messages','POST',{body});
-    if(rr.ok){ta.value='';toast('Sent.');paneSupport(host,it);}
-    else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
+    if(!rr.ok){toast((rr.body&&rr.body.message)||'Couldn’t send.');btns.forEach(b=>b.disabled=false);return;}
+    ta.value='';
+    if(andResolve){await setSupportStatus(host,it,'resolved');return;}   // its own toast says resolved
+    toast('Sent.');paneSupport(host,it);
   };
+  $('supForm').onsubmit=(e)=>{e.preventDefault();sendReply(false);};
+  const rr2=$('supReplyResolve');if(rr2)rr2.addEventListener('click',()=>sendReply(true));
   insertSavedReplies('supBody');   // C3: the saved-reply picker, when any exist
   restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
 }

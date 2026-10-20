@@ -415,7 +415,9 @@ html.dds-embed .dds-waffle{display:none!important}
   /* header row: brand + the launcher waffle on the right */
   html.dds-side .dds-brand{order:0;padding:2px 6px 10px;font-size:14px;gap:8px}
   html.dds-side .dds-brand .mark{width:24px;height:24px;border-radius:6px;font-size:14px}
-  html.dds-side .dds-brand .ctx{font-size:12.5px}
+  /* the "· Customers" context label is redundant beside an expanded section and
+     ran under the launcher button; the lit section row says where you are */
+  html.dds-side .dds-brand .ctx{display:none}
   html.dds-side #dds-waffle{order:0;position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:var(--dds-r-sm)}
   html.dds-side #dds-search{order:1;height:32px;margin:0 0 8px;border-radius:var(--dds-r);padding:0 10px;background:var(--dds-card)}
   html.dds-side #dds-search span:first-child{display:inline-flex}
@@ -429,8 +431,22 @@ html.dds-embed .dds-waffle{display:none!important}
   html.dds-side .dds-nav .sec > .it .nic{width:17px;height:17px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   html.dds-side .dds-nav .sec > .it .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   html.dds-side .dds-nav .sec > .it .car{font-size:9px;color:var(--dds-faint)}
-  /* multi-item sections (Customers, Files) fly out to the right of the column */
-  html.dds-side .dds-nav .sec .menu{top:0;left:calc(100% + 6px);min-width:220px;border-radius:var(--dds-r-lg);box-shadow:var(--dds-shadow-pop)}
+  /* multi-item sections (Website, Customers, Files) expand INLINE under their
+     item — an indented list, the section you are in open by default (shell.js
+     pins it) and the current page's row carrying the plum pill, as mocked.
+     The DOM is unchanged: .sec > button[data-sec][aria-expanded] + .menu. */
+  html.dds-side .dds-nav .sec .menu{position:static;min-width:0;background:transparent;border:0;box-shadow:none;border-radius:0;padding:1px 0 4px;margin:0;gap:1px}
+  html.dds-side .dds-nav .sec .menu a{font-size:13px;color:var(--dds-soft);padding:6px 10px 6px 37px;border-radius:var(--dds-r);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.dds-side .dds-nav .sec .menu a:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+  html.dds-side .dds-nav .sec .menu a.here{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p);font-weight:500}
+  html.dds-side .dds-nav .sec .menu .grp{padding:8px 10px 2px 37px;border-top:0;margin-top:2px;font-size:10.5px}
+  html.dds-side .dds-nav .sec .menu a.rec,html.dds-side .dds-nav .sec .menu a.qa{max-width:none}
+  html.dds-side .dds-nav .sec > .it .car{transition:transform .15s}
+  html.dds-side .dds-nav .sec.open > .it .car{transform:rotate(180deg)}
+  /* expanded + a current child: the child wears the pill, the parent a quiet tint;
+     expanded with no current child (a record page under Customers) keeps the pill on the parent */
+  html.dds-side .dds-nav .sec.active.open:has(.menu a.here) > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
+  @media (prefers-reduced-motion:reduce){html.dds-side .dds-nav .sec > .it .car{transition:none}}
   /* the client context card, inside the column under the nav */
   html.dds-side #dds-ctxbar{order:3;position:static;height:auto;margin:10px 0 0;padding:10px;flex-direction:column;align-items:stretch;gap:6px;
     background:var(--dds-card);color:var(--dds-ink);border:1px solid var(--dds-line);border-radius:var(--dds-r-lg);font-size:13px}
