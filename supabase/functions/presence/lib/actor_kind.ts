@@ -56,7 +56,7 @@ export function lastPublishDetail(actorKind: string | null | undefined): string 
   return studioActed(actorKind) ? 'published by your studio' : 'published by you';
 }
 
-/** Pre-migration degrade (the 0130/0131 deploy-order idiom): migration 0132
+/** Pre-migration degrade (the 0130/0131 deploy-order idiom): migration 0133
  *  widens the three actor_kind CHECKs to accept 'operator'. Until it is applied
  *  PostgREST answers 23514 (check_violation) naming the constraint; the writer
  *  then falls back to 'staff' — still the studio's hand, so the client's room
@@ -69,7 +69,7 @@ export function actorKindCheckViolation(json: unknown, text: unknown): boolean {
   const isCheck = String(j.code ?? '') === '23514' || hay.includes('violates check constraint');
   return isCheck && /(actor_kind|created_by_kind)/.test(hay);
 }
-/** The value to retry with when the database predates 0132. */
+/** The value to retry with when the database predates 0133. */
 export function legacyActorKind<K extends string>(k: K): K | 'staff' {
   return k === 'operator' ? 'staff' : k;
 }

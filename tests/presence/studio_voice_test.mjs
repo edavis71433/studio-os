@@ -3,7 +3,7 @@
 // Behavioural pins on the pure attribution helpers (lib/actor_kind.ts) + the
 // wiring that makes them matter: publish.ts records 'operator' and raises the
 // client's notice, room.ts reads the studio's hand back as "published by your
-// studio", connections.ts logs the operator, migration 0132 + its apply pack
+// studio", connections.ts logs the operator, migration 0133 + its apply pack
 // widen the CHECKs, and the two pages carry the scoped copy while the owner's
 // copy stays byte-identical. No network, no database.
 const AK = await import('../../supabase/functions/presence/lib/actor_kind.ts');
@@ -45,7 +45,7 @@ ok('room: the owner\'s own publish → "published by you"', lastPublishDetail('c
 ok('room: unknown/legacy/system falls to "published by you" (unchanged behaviour)', lastPublishDetail('system') === 'published by you' && lastPublishDetail(undefined) === 'published by you' && lastPublishDetail('') === 'published by you');
 ok('studioActed: staff + operator only', studioActed('staff') && studioActed('operator') && !studioActed('client') && !studioActed('system') && !studioActed(null));
 
-// ═══ 5. the pre-0132 degrade: only an actor_kind CHECK violation retries ═══
+// ═══ 5. the pre-0133 degrade: only an actor_kind CHECK violation retries ═══
 ok('degrade: PostgREST 23514 naming the actor_kind constraint is recognised',
   actorKindCheckViolation({ code: '23514', message: 'new row for relation "presence_publishes" violates check constraint "presence_publishes_actor_kind_check"' }, ''));
 ok('degrade: …and the created_by_kind one on snapshots',
@@ -67,7 +67,7 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
     /published \$\{n\} change\$\{n === 1 \? '' : 's'\} to your website/.test(pub) && /brought back an earlier version/.test(pub));
   ok('publish.ts: the count is the diff engine\'s (what the ritual button showed), read only for an operator',
     /if \(publishActorKind\(principal\) === 'operator'\)/.test(pub) && /describeChanges\(snapshot\.content, liveContent\)\.count/.test(pub));
-  ok('publish.ts: pre-0132 degrade is wired for both inserts', (pub.match(/actorKindCheckViolation\(/g) || []).length >= 2 && /legacyActorKind\(actorKind\)/.test(pub));
+  ok('publish.ts: pre-0133 degrade is wired for both inserts', (pub.match(/actorKindCheckViolation\(/g) || []).length >= 2 && /legacyActorKind\(actorKind\)/.test(pub));
 
   const room = read('supabase/functions/presence/routes/room.ts');
   ok('room.ts: /health last_publish.detail is lastPublishDetail(actor_kind)', /detail: lastPublishDetail\(st\.lastLive\.actor_kind\)/.test(room) && !/actor_kind === 'staff' \? 'published by your studio'/.test(room));
@@ -96,20 +96,20 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   ok('website_timeline.ts: operator already reads as "Your studio" on the timeline', /case 'staff': case 'operator': return 'Your studio'/.test(tl));
 }
 
-// ═══ 7. migration 0132 + apply pack ═══
+// ═══ 7. migration 0133 + apply pack ═══
 {
-  const mig = read('supabase/migrations/0132_actor_kind_operator.sql');
+  const mig = read('supabase/migrations/0133_actor_kind_operator.sql');
   for (const c of ['presence_snapshots_created_by_kind_check', 'presence_publishes_actor_kind_check', 'presence_change_events_actor_kind_check']) {
-    ok(`0132: drops + re-adds ${c} with 'operator'`, new RegExp(`drop constraint if exists ${c};[\\s\\S]{0,200}add constraint ${c}\\s+check \\([a-z_]+ in \\('client','staff','operator','system'\\)\\)`).test(mig));
+    ok(`0133: drops + re-adds ${c} with 'operator'`, new RegExp(`drop constraint if exists ${c};[\\s\\S]{0,200}add constraint ${c}\\s+check \\([a-z_]+ in \\('client','staff','operator','system'\\)\\)`).test(mig));
   }
-  ok('0132: widens the notice-kind CHECK to studio_published, carrying the 0127 superset', /presence_plan_notices_kind_check/.test(mig) && /'studio_published'/.test(mig) && /'retainer_status','deal_task_due'/.test(mig) && /'invoice_void_paid'/.test(mig));
-  ok('0132: first line is the rollback note (migrations/README convention)', /^-- rollback:/.test(mig));
-  const pack = read('docs/presence/APPLY-0132-prod.sql');
-  ok('APPLY-0132: the owner-apply pack carries the same four constraints + a verify query', /presence_publishes_actor_kind_check/.test(pack) && /presence_snapshots_created_by_kind_check/.test(pack) && /presence_change_events_actor_kind_check/.test(pack) && /'studio_published'/.test(pack) && /-- Verify/.test(pack));
+  ok('0133: widens the notice-kind CHECK to studio_published, carrying the 0127 superset', /presence_plan_notices_kind_check/.test(mig) && /'studio_published'/.test(mig) && /'retainer_status','deal_task_due'/.test(mig) && /'invoice_void_paid'/.test(mig));
+  ok('0133: first line is the rollback note (migrations/README convention)', /^-- rollback:/.test(mig));
+  const pack = read('docs/presence/APPLY-0133-prod.sql');
+  ok('APPLY-0133: the owner-apply pack carries the same four constraints + a verify query', /presence_publishes_actor_kind_check/.test(pack) && /presence_snapshots_created_by_kind_check/.test(pack) && /presence_change_events_actor_kind_check/.test(pack) && /'studio_published'/.test(pack) && /-- Verify/.test(pack));
   // every notice kind the code raises must be in the migration's list
   const kinds = new Set(); const re = /raiseNotice(?:Detailed)?\(\{[\s\S]{0,400}?kind: '([a-z_]+)'/g; let m;
   for (const f of ['routes/publish.ts']) { const src = read('supabase/functions/presence/' + f); while ((m = re.exec(src)) !== null) kinds.add(m[1]); }
-  ok('0132: every kind publish.ts raises is in the CHECK list', [...kinds].every((k) => mig.includes(`'${k}'`)), [...kinds].join(','));
+  ok('0133: every kind publish.ts raises is in the CHECK list', [...kinds].every((k) => mig.includes(`'${k}'`)), [...kinds].join(','));
 }
 
 // ═══ 8. the pages ═══

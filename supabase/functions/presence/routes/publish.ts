@@ -96,7 +96,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
       }),
     });
     let ins = await insertSnapshot(actorKind);
-    // a database that predates migration 0132 rejects 'operator' (23514) — degrade
+    // a database that predates migration 0133 rejects 'operator' (23514) — degrade
     // to 'staff' for the WHOLE pipeline (snapshot + publish record agree), never 502
     if (!ins.ok && actorKind === 'operator' && actorKindCheckViolation(ins.json, ins.text)) { actorKind = legacyActorKind(actorKind); ins = await insertSnapshot(actorKind); }
     if (!ins.ok || !ins.json?.[0]?.id) return json({ error: 'snapshot_failed', message: CALM }, 502, cors);
@@ -112,7 +112,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     body: JSON.stringify({ site_id: site.id, snapshot_id: snapshotId, kind, actor: principal.userId, actor_kind: byKind, change_summary: summary, ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}) }),
   });
   let rec = await insertRecord(actorKind);
-  if (!rec.ok && rec.status !== 409 && actorKind === 'operator' && actorKindCheckViolation(rec.json, rec.text)) { actorKind = legacyActorKind(actorKind); rec = await insertRecord(actorKind); }   // pre-0132 degrade (see above)
+  if (!rec.ok && rec.status !== 409 && actorKind === 'operator' && actorKindCheckViolation(rec.json, rec.text)) { actorKind = legacyActorKind(actorKind); rec = await insertRecord(actorKind); }   // pre-0133 degrade (see above)
   if (rec.status === 409) {
     // Distinguish the two per-site unique gates. With a key, a 409 is (almost
     // always) the idempotency index racing an identical retry → replay the

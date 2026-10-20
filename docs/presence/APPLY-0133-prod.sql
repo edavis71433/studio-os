@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  APPLY PACK · migration 0132  (owner-apply, prod)
+--  APPLY PACK · migration 0133  (owner-apply, prod)
 -- ═══════════════════════════════════════════════════════════════════════════
 --  Run this ONCE (Supabase → SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships the presence function. ADDITIVE and IDEMPOTENT (drop constraint
@@ -15,7 +15,7 @@
 --  your studio", and a dismissible "Your studio published a change" notice
 --  reaches the client.
 --
---  Covers: supabase/migrations/0132_actor_kind_operator.sql
+--  Covers: supabase/migrations/0133_actor_kind_operator.sql
 -- ═══════════════════════════════════════════════════════════════════════════
 
 alter table public.presence_snapshots
@@ -37,7 +37,7 @@ alter table public.presence_change_events
   check (actor_kind in ('client','staff','operator','system'));
 
 comment on column public.presence_publishes.actor_kind is
-  'Who published: client (the owner), staff (the platform), operator (the client''s studio — an agency member scoped into the client, 0132), system (the scheduler). The client''s room reads staff/operator as "published by your studio".';
+  'Who published: client (the owner), staff (the platform), operator (the client''s studio — an agency member scoped into the client, 0133), system (the scheduler). The client''s room reads staff/operator as "published by your studio".';
 
 alter table public.presence_plan_notices
   drop constraint if exists presence_plan_notices_kind_check;
@@ -60,7 +60,7 @@ alter table public.presence_plan_notices
   ));
 
 comment on constraint presence_plan_notices_kind_check on public.presence_plan_notices is
-  'Notice kinds the code raises. 0132 added studio_published (the client''s studio published for them — routes/publish.ts raises one dismissible row per operator publish, period pub:<publish id>). Full 0127 superset carried forward — no kind dropped.';
+  'Notice kinds the code raises. 0133 added studio_published (the client''s studio published for them — routes/publish.ts raises one dismissible row per operator publish, period pub:<publish id>). Full 0127 superset carried forward — no kind dropped.';
 
 -- Verify (expect three rows, each listing 'operator'):
 -- select conrelid::regclass as table_name, pg_get_constraintdef(oid)

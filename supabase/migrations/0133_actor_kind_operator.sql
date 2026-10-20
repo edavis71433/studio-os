@@ -54,7 +54,7 @@ alter table public.presence_change_events
   check (actor_kind in ('client','staff','operator','system'));
 
 comment on column public.presence_publishes.actor_kind is
-  'Who published: client (the owner), staff (the platform), operator (the client''s studio — an agency member scoped into the client, 0132), system (the scheduler). The client''s room reads staff/operator as "published by your studio".';
+  'Who published: client (the owner), staff (the platform), operator (the client''s studio — an agency member scoped into the client, 0133), system (the scheduler). The client''s room reads staff/operator as "published by your studio".';
 
 alter table public.presence_plan_notices
   drop constraint if exists presence_plan_notices_kind_check;
@@ -77,9 +77,9 @@ alter table public.presence_plan_notices
     'invoice_void_paid',
     -- added by 0127 (the never-silent pass):
     'retainer_status','deal_task_due',
-    -- added by 0132 (speak as the studio when acting for a client):
+    -- added by 0133 (speak as the studio when acting for a client):
     'studio_published'
   ));
 
 comment on constraint presence_plan_notices_kind_check on public.presence_plan_notices is
-  'Notice kinds the code raises. 0132 added studio_published (the client''s studio published for them — routes/publish.ts raises one dismissible row per operator publish, period pub:<publish id>). Full 0127 superset carried forward — no kind dropped.';
+  'Notice kinds the code raises. 0133 added studio_published (the client''s studio published for them — routes/publish.ts raises one dismissible row per operator publish, period pub:<publish id>). Full 0127 superset carried forward — no kind dropped.';

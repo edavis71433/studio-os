@@ -34,7 +34,7 @@ export async function writeChangeEvent(opts: {
     }),
   });
   let r = await write(actorKind);
-  // a database that predates migration 0132 rejects 'operator' — record the
+  // a database that predates migration 0133 rejects 'operator' — record the
   // studio's hand as 'staff' rather than lose the provenance row
   if (!r.ok && actorKind === 'operator' && actorKindCheckViolation(r.json, r.text)) r = await write(legacyActorKind(actorKind));
   return r.ok;
