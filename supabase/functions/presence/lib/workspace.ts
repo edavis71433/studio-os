@@ -65,21 +65,34 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
  *  caller's brand, landing on `next`. Returns true only if an email was
  *  actually sent — so the caller can honestly say whether the person was
  *  notified (rather than silently swallowing a failed send). */
-export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string }): Promise<boolean> {
+/** Mint the ONE-TAP sign-in link every invite email carries: a GoTrue `invite`
+ *  for a brand-new user (creates the account), else a `magiclink` for an existing
+ *  one — signed by GoTrue, landing on `next` on the Site URL. Returns '' when no
+ *  link can be minted (missing env, GoTrue refused), so callers can fall back
+ *  honestly (a set-password link, or the plain portal door). Shared by the site/
+ *  agency member invites here and the client-portal welcome in routes/sales.ts. */
+export async function mintSignInLink(email: string, next: string): Promise<string> {
   const base = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  if (!base || !key) return false;
+  if (!base || !key) return '';
   const site = Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com';
   const gen = async (type: string) => {
-    const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
-      method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, email, options: { redirect_to: `${site}${opts.next}` } }),
-    });
-    const j = await r.json().catch(() => null);
-    return (r.ok && j && (j.action_link || j.properties?.action_link)) || '';
+    try {
+      const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
+        method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, email, options: { redirect_to: `${site}${next}` } }),
+      });
+      const j = await r.json().catch(() => null);
+      return String((r.ok && j && (j.action_link || j.properties?.action_link)) || '');
+    } catch { return ''; }
   };
   let link = await gen('invite');            // new user → invite (creates the account)
   if (!link) link = await gen('magiclink');  // existing user → magic link
+  return link;
+}
+
+export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string }): Promise<boolean> {
+  const link = await mintSignInLink(email, opts.next);
   if (!link) return false;
   const { sendEmail } = await import('../commerce/account.ts');
   const sent = await sendEmail(email, opts.subject,

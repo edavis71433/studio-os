@@ -106,9 +106,11 @@ const DEAL = 'dddddddd-4444-4444-8444-dddddddddddd';
     invoices: [
       { id: 'i1', title: 'Deposit', amount_cents: 250000, due_date: '2026-07-14', status: 'open' },  // overdue
       { id: 'i2', title: 'Paid one', amount_cents: 100, due_date: '2026-07-01', status: 'paid' },    // paid → excluded
+      { id: 'i3', title: 'Settling', amount_cents: 500, due_date: '2026-07-01', status: 'open', processing_since: '2026-07-15T00:00:00Z' },   // Oct 2026: processing → excluded (the client paid; the bank is settling)
+      { id: 'i4', title: 'Withdrawn', amount_cents: 500, due_date: '2026-07-01', status: 'void' },   // void → excluded
     ],
   }, NOW);
-  ok('upcoming: open items only (done/paid excluded)', up.length === 5 && !up.some((u) => u.title.includes('Old thing') || u.title.includes('Paid one')));
+  ok('upcoming: open items only (done/paid/processing/void excluded) — the one money formula decides', up.length === 5 && !up.some((u) => u.title.includes('Old thing') || u.title.includes('Paid one') || u.title.includes('Settling') || u.title.includes('Withdrawn')));
   const t1 = up.find((u) => u.title === 'Chase signature');
   ok('past-due to-do flagged overdue + checkbox id', t1.overdue === true && t1.kind === 'task' && t1.id === 't1');
   ok('future to-do not overdue', up.find((u) => u.title === 'Kickoff prep').overdue === false);

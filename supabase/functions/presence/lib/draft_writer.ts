@@ -8,6 +8,7 @@
 //     not deleted (the toggle philosophy, applied to time).
 //   • Media references that no longer resolve are dropped, counted, and told.
 import { svc } from './db.ts';
+import { publishActorKind } from './actor_kind.ts';
 import { serializeDraft, variantPath } from './serializer.ts';
 import { writeChangeEvent } from './provenance.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from './render_types.ts';
@@ -49,7 +50,7 @@ export async function applySnapshotToDraft(
   // applied from a degenerate snapshot would blank the draft
   if (!snapshotContentUsable(snapshot.content)) return { ok: false, error: 'unusable_snapshot' };
   const c: SnapshotContent = normalizeSnapshotContent(structuredClone(snapshot.content));
-  const actorKind = principal.kind === 'staff' ? 'staff' : 'client';
+  const actorKind = publishActorKind(principal);   // audit change 2: 'operator' when scoped into a client
 
   // 1. safety snapshot — the current draft is set aside, never lost
   try {

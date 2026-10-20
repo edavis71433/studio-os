@@ -38,6 +38,14 @@
   <script>
     // Audit buyers arrive with ?kind=audit and aren't portal clients — swap the
     // invoice/project copy for what actually happens next with an audit order.
+    // Oct 2026 (item 1): Stripe now returns service-invoice payers to
+    // /client.html?paid=<id>; a payer with no portal sign-in is forwarded HERE
+    // with the same ?paid=, so the button names the thing they can do next.
+    (function () {
+      if (!/^[0-9a-zA-Z-]{1,64}$/.test(new URLSearchParams(location.search).get('paid') || '')) return;
+      document.getElementById('sub').textContent = 'On my side, everything updates automatically — your invoice shows as paid as soon as Stripe confirms it, usually within a minute. If you have a workspace sign-in, your Invoices tab will show it; if not, nothing to do: your invitation arrives by email once your project kicks off.';
+      document.getElementById('cta').textContent = 'Sign in to see your invoice →';
+    })();
     (function () {
       if (new URLSearchParams(location.search).get('kind') !== 'audit') return;
       document.getElementById('h').textContent = 'Payment received — your audit is booked.';

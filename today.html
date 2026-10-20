@@ -109,12 +109,15 @@
   .feedcard .moment.todo:hover{background:var(--accent-soft)}
   .feedcard .moment.todo:focus-visible,.feedcard .frow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .feedcard .frow{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
+  .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
   .fico{flex:0 0 auto;width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap}
+  /* Oct 2026 experience review: the FIRST thing that needs you wears the page's one filled button */
+  .feedcard > .moment:first-child .fcta{background:var(--accent);color:#fff}
   /* the manual "Done" — quiet by design: the row usually clears itself, this is
      only for the residue. Never shown on money or legal obligations. */
   .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap;cursor:pointer}
@@ -156,6 +159,12 @@
   .alert .ico svg{width:15px;height:15px}
   .alert .t{flex:1 1 300px;font-size:13.5px;color:var(--ink)} .alert .t b{font-weight:600}
   .aacts{display:flex;gap:6px;flex-wrap:wrap}
+  /* Oct 2026 benchmark (item 2): the four money buckets under the band's line —
+     Paid green · Processing blue · Upcoming neutral · Overdue red, the same
+     families crm.html's .schip and client.html's .fst use. */
+  .mbuckets{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:5px;font-size:12.5px;color:var(--soft)}
+  .mbuckets .mb b{font-weight:600;color:var(--ink)} .mbuckets .mb i{font-style:normal;color:var(--faint)}
+  .mbuckets .mb.good b{color:var(--good)} .mbuckets .mb.bad b{color:var(--dds-bad,#c43c3c)} .mbuckets .mb.info b{color:var(--dds-info,#2a6fb5)}
   .abtn{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12.5px;font-weight:500;text-decoration:none;white-space:nowrap}
   .abtn:hover{border-color:var(--dds-line-strong,#d2d2db)}
   .abtn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .abtn.ghost:hover{color:var(--ink);background:var(--card)}
@@ -298,7 +307,7 @@ function statTiles(s,enquiries){
   const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   if(s&&typeof s==='object'){
     const ar=s.ar;
-    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',ico:'owed',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
+    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0,pc=Number(ar.processing_cents)||0;const proc=pc?money(pc)+' processing':'';t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':'')+(proc?' · '+proc:''):(proc||'All paid up'),ico:'owed',tone:ar.outstanding_cents>0?'warn':(pc?'info':''),href:'/pipeline.html'});}
     if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
     if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
   }
@@ -362,23 +371,60 @@ const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${
 // One line when something is due; NOTHING on an empty list or a failed read
 // (failure ≠ empty: a 5xx must never paint "nothing is due"). Resend opens the
 // deal's billing tab, where the invoice's own Resend lives. ──
+// ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
+// mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
+// one case table against the module and every page's copy). Today runs it
+// against the studio's LOCAL day, exactly as crm.html does, so the band and
+// the record never disagree about the same invoice. ──
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
 function alertBandHtml(rcv){
   const items=(rcv&&Array.isArray(rcv.items))?rcv.items.filter(i=>i&&i.id):[];
   if(!items.length)return'';
-  const total=items.reduce((a,i)=>a+(Number(i.amount_cents)||0),0);
-  const late=items.filter(i=>i.overdue).length;
+  const today=localYmd();
+  const st=(i)=>moneyState(i,today);
+  // what still WAITS on a client (upcoming + overdue) vs what is on its way
+  const due=items.filter(i=>st(i)==='upcoming'||st(i)==='overdue');
+  const proc=items.filter(i=>st(i)==='processing');
+  // the Paid bucket rides along only when the read carried it (an older function
+  // build ships no `paid` — the bucket is omitted, never a fake $0)
+  const paidRows=(rcv&&Array.isArray(rcv.paid))?rcv.paid.filter(i=>i&&i.id):null;
+  const b=moneyBuckets(items.concat(paidRows||[]),today);
+  const total=b.upcoming.cents+b.overdue.cents;
+  const late=b.overdue.count;
   let text,acts;
-  if(items.length===1){
-    const i=items[0];const p=ymdParts(i.due_date);
-    text=`<b>${esc(money(i.amount_cents))} is ${i.overdue?'overdue':'due now'}</b> — ${i.deal?esc(i.deal)+'’s invoice':'An invoice'}${i.title?` “${esc(i.title)}”`:''}${i.overdue&&p?` was due ${esc(p.mon+' '+p.day)} and`:''} hasn’t been paid yet.`;
+  if(due.length===1){
+    const i=due[0];const p=ymdParts(i.due_date);const over=st(i)==='overdue';
+    text=`<b>${esc(money(i.amount_cents))} is ${over?'overdue':'due now'}</b> — ${i.deal?esc(i.deal)+'’s invoice':'An invoice'}${i.title?` “${esc(i.title)}”`:''}${over&&p?` was due ${esc(p.mon+' '+p.day)} and`:''} hasn’t been paid yet.`;
     acts=i.deal_id
       ?`<a class="abtn" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)+'&tab=billing'))}">Resend invoice</a><a class="abtn ghost" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)))}">Open record</a>`
       :`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
-  }else{
-    text=`<b>${esc(money(total))} is due now</b> — ${items.length} invoices are waiting on payment${late?`, ${late} of them overdue`:''}.`;
+  }else if(due.length){
+    text=`<b>${esc(money(total))} is due now</b> — ${due.length} invoices are waiting on payment${late?`, ${late} of them overdue`:''}.`;
     acts=`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
+  }else{
+    // only processing money: nothing to chase, say so
+    text=`<b>${esc(money(b.processing.cents))} is on its way</b> — ${proc.length===1?'a payment is':proc.length+' payments are'} processing; nothing to chase.`;
+    acts=`<a class="abtn ghost" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
   }
-  return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}</div><div class="aacts">${acts}</div></div>`;
+  if(due.length&&proc.length)text+=` ${esc(money(b.processing.cents))} more is processing.`;
+  const keys=['paid','processing','upcoming','overdue'].filter(k=>k!=='paid'||paidRows);
+  const buckets=keys.map(k=>`<span class="mb ${MONEY_TONE[k]||''}" data-bucket="${k}"><b>${esc(money(b[k].cents))}</b> ${esc(MONEY_WORD[k])}${k==='paid'?` <i>(${esc(String(rcv.paid_window_days||30))} days)</i>`:''}</span>`).join('');
+  return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}<div class="mbuckets" aria-label="Money by state">${buckets}</div></div><div class="aacts">${acts}</div></div>`;
 }
 function statStripHtml(tiles){
   if(!tiles.length)return'';
@@ -512,6 +558,9 @@ const NOTICE_ID_RE = /^[0-9a-f-]{36}$/;
 // acknowledging affordance, never an imperative CTA.
 const NOTICE_FYI_KINDS = ['invoice_paid'];
 
+// ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
+const SI={mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',heart:'<path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"/>',alert:'<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 18h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>'};
+const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers){
   $('greeting').textContent = greet();
   // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
@@ -545,7 +594,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // ── the Needs-you action feed: one card, one row per item (icon · headline +
   //    meta · one CTA). Rows keep the .moment.todo identity — the attention
   //    math (cards === bell badge) is pinned on that class. ──
-  const NICON = { lead_followup:'✉️', message:'💬', support:'💬', invoice_paid:'💚', invoice_void_paid:'⚠️' };   // 0119: money on a WITHDRAWN invoice is not the green tick
+  const NICON = { lead_followup:si('mail'), message:si('message'), support:si('message'), invoice_paid:si('heart'), invoice_void_paid:si('alert') };   // 0119: money on a WITHDRAWN invoice is not the green tick
   let feedRows = '';
   for(const n of notices){
     // Most rows now tear themselves down when the work is done. What's left gets
@@ -565,7 +614,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
     const label = fyi ? 'Got it' : 'Done';
     feedRows += `<div class="moment attn todo">
       <a class="frow" href="${esc(scopeHref(n.href||'/today.html'))}">
-      <span class="fico" aria-hidden="true">${NICON[n.kind]||'🔔'}</span>
+      <span class="fico" aria-hidden="true">${NICON[n.kind]||si('bell')}</span>
       <div class="fmain"><h3 class="fhead">${esc(n.headline||'Something needs a look')}</h3>${n.body?`<span class="fmeta">${esc(n.body)}</span>`:''}</div>
       ${canDone && fyi ? '' : `<span class="fcta">${fyi?'Got it':'Take care of it →'}</span>`}</a>${
       canDone ? `<button type="button" class="fdone" data-dismiss-notice="${esc(n.id)}" aria-label="${esc(label+' — '+(n.headline||'this item'))}">${label}</button>` : ''}</div>`;
@@ -573,7 +622,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   for(const p of approvals){
     const _base = p.href ? p.href : p.kind==='connected' ? '/connections.html' : '/presence.html#foundations';
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref(_base))}">
-      <span class="fico ap" aria-hidden="true">👍</span>
+      <span class="fico ap" aria-hidden="true">${si('thumbsup')}</span>
       <div class="fmain"><h3 class="fhead">${esc(p.title||'A change is ready')}</h3><span class="fmeta">Waiting for your approval${p.summary?` · ${esc(p.summary)}`:''}</span></div>
       <span class="fcta">Review &amp; approve →</span></a>`;
   }
@@ -582,7 +631,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // through to "all clear" — point to the Inbox where those items actually live.
   if(shown === 0 && bellCount > 0){
     feedRows += `<a class="moment attn todo" href="${esc(scopeHref('/inbox.html'))}">
-      <span class="fico" aria-hidden="true">📥</span>
+      <span class="fico" aria-hidden="true">${si('inbox')}</span>
       <div class="fmain"><h3 class="fhead">${bellCount === 1 ? 'One thing needs you' : `${bellCount} things need you`}</h3><span class="fmeta">Messages, approvals and updates that are waiting on you — all in one place.</span></div>
       <span class="fcta">Open your Inbox →</span></a>`;
   }
@@ -637,7 +686,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // column (right under the day) — asking a question is a primary action.
   main += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
-    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
+    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="ghost" id="askBtn" style="border-color:var(--line);color:var(--ink);padding-left:16px;padding-right:16px">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
 
   // ── the rail: This month · Recent records · Waiting on clients. When every

@@ -152,7 +152,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(tiles.locator('.hl-k', { hasText: 'Waiting on you' })).toBeVisible();
     await expect(tiles.locator('.hl-v', { hasText: '1 of 3' })).toBeVisible();
     await expect(tiles.locator('.hl-k', { hasText: 'Files shared' })).toBeVisible();
-    await expect(tiles.locator('.hl-v', { hasText: '2026-08-01' })).toBeVisible();
+    await expect(tiles.locator('.hl-v', { hasText: 'Aug 1, 2026' })).toBeVisible();
   });
 
   test('drill-in: the milestone Path shows done ✓ / current ("You’re here") / upcoming', async ({ page }) => {
@@ -221,13 +221,13 @@ test.describe('Client portal — Home queue + project record page', () => {
     await page.route('**/functions/v1/presence/client/approvals/a1/decide', (route) =>
       route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'version_mismatch', message: 'This item was updated — reload the latest version before deciding.' }) }));
     await page.goto(`/client.html?project=${PID}`);
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
     expect(bundleGets).toBe(1);
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('This item was updated');
     // on 409 the record reloads from the bundle rather than retrying the stale hash
     await expect.poll(() => bundleGets).toBe(2);
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
   test('context bar (≥720px): studio identity, nav landmark, bell + account chip', async ({ page }, testInfo) => {
@@ -354,7 +354,7 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await page.goto('/client.html');
     await page.getByRole('button', { name: 'See it first — Homepage design' }).click();
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
   test('mobile: the strip stacks its tiles with no horizontal overflow', async ({ page }, testInfo) => {
@@ -2111,7 +2111,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const rows = page.locator('#main .frow');
     await expect(rows).toHaveCount(3);
     // anatomy: every row leads with the 🧾 type icon and a REAL heading name
-    await expect(rows.nth(0).locator('.fico')).toHaveText('🧾');
+    await expect(rows.nth(0).locator('.fico svg.si')).toHaveCount(1);   // one SVG icon set, never emoji (Oct 2026 experience review)
     await expect(page.locator('#main .frow h3.fname')).toHaveCount(3);
     // paid: green chip, formatted amount, thank-you action — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
@@ -2123,10 +2123,11 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const over = rows.filter({ hasText: 'Design phase' });
     await expect(over.locator('.fst.od')).toHaveText('Overdue');
     await expect(over.locator('.fmeta').first()).toHaveText(`$1,234.50 · due ${dueLabel(-1)}`);
-    // due-tomorrow unpaid: NOT overdue — the server's own word ('open' is the
-    // real third status; the 0086 schema allows exactly open|paid|void)
+    // due-tomorrow unpaid: NOT overdue — Oct 2026 (item 2): the chip prints the
+    // one formula's word for an open invoice that is not late, "Upcoming"
+    // (the 0086 schema still stores exactly open|paid|void underneath)
     const sent = rows.filter({ hasText: 'Build phase' });
-    await expect(sent.locator('.fst')).toHaveText('open');
+    await expect(sent.locator('.fst')).toHaveText('Upcoming');
     await expect(sent.locator('.fst.od')).toHaveCount(0);
     await expect(sent.locator('.fst.sig')).toHaveCount(0);
     await expect(sent.getByText('Your studio will send payment details.')).toBeVisible();
@@ -2239,6 +2240,153 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(page.locator('#main header h1')).toHaveText(/^Good (morning|afternoon|evening)/);
     await expect(page.locator('#main .frow')).toHaveCount(0);
     await expect(page.locator('#inv-unpaid')).toHaveCount(0);
+  });
+
+  // ── Oct 2026 benchmark, item 2: money in four states, one formula ──────────
+  // Paid · Processing · Upcoming · Overdue — the chip prints the one word, in
+  // its one colour family, from the SAME moneyState the server, Today and the
+  // record run (lib/money_state.ts, mirrored; the Deno pin holds the copies
+  // together). A voided row is "Voided" and counts nowhere. A PROCESSING row
+  // (Stripe settling an ACH payment: processing_since) never offers Pay, even
+  // when the payload carried a pay_url — a second charge is a double-pay.
+  const FOUR = [
+    { id: 'f1', name: 'Kickoff deposit', description: null, amount: 1200, status: 'paid', state: 'paid', due_date: ymd(-30), paid_at: '2026-06-20T00:00:00Z', pay_url: null, created_at: '2026-06-01T00:00:00Z' },
+    { id: 'f2', name: 'Design phase', description: null, amount: 900, status: 'open', state: 'processing', due_date: ymd(-1), paid_at: null, processing_since: '2026-07-10T00:00:00Z', pay_url: 'https://pay.example/f2', created_at: '2026-06-20T00:00:00Z' },
+    { id: 'f3', name: 'Build phase', description: null, amount: 800, status: 'open', state: 'upcoming', due_date: ymd(3), paid_at: null, pay_url: 'https://pay.example/f3', created_at: '2026-07-01T00:00:00Z' },
+    { id: 'f4', name: 'Launch', description: null, amount: 500, status: 'open', state: 'overdue', due_date: ymd(-2), paid_at: null, pay_url: 'https://pay.example/f4', created_at: '2026-07-02T00:00:00Z' },
+    { id: 'f5', name: 'Old draft', description: null, amount: 99, status: 'void', state: '', due_date: null, paid_at: null, pay_url: null, created_at: '2026-07-03T00:00:00Z' },
+  ];
+  const FOUR_API = { ...CLIENT_API,
+    '/client/billing': { data: { billing_type: 'service', invoices: FOUR, summary: { open_count: 2, paid_count: 1, processing_count: 1, overdue_count: 1, upcoming_count: 1 } } } };
+
+  test('four states, one word each: Paid · Processing · Upcoming · Overdue chips in four distinct colours; Voided counts nowhere; a processing row offers no Pay', async ({ page }) => {
+    await installApp(page, { api: FOUR_API });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const rows = page.locator('#main .frow');
+    await expect(rows).toHaveCount(5);
+    await expect(rows.filter({ hasText: 'Kickoff deposit' }).locator('.fst.sig')).toHaveText('Paid');
+    const proc = rows.filter({ hasText: 'Design phase' });
+    await expect(proc.locator('.fst.pr')).toHaveText('Processing');
+    await expect(proc.getByText('Payment on its way — nothing more to do.')).toBeVisible();
+    await expect(proc.locator('a')).toHaveCount(0);   // never a second Pay on a settling payment
+    const up = rows.filter({ hasText: 'Build phase' });
+    await expect(up.locator('.fst')).toHaveText('Upcoming');
+    await expect(up.locator('.fst')).not.toHaveClass(/sig|od|pr/);
+    await expect(up.getByRole('link', { name: 'Pay — Build phase' })).toBeVisible();
+    const over = rows.filter({ hasText: 'Launch' });
+    await expect(over.locator('.fst.od')).toHaveText('Overdue');
+    await expect(over.getByRole('link', { name: 'Pay — Launch' })).toBeVisible();
+    await expect(rows.filter({ hasText: 'Old draft' }).locator('.fst')).toHaveText('Voided');
+    // one colour per state — the four chips are four DIFFERENT colours
+    const colours = await Promise.all(['Kickoff deposit', 'Design phase', 'Build phase', 'Launch'].map((n) => rows.filter({ hasText: n }).locator('.fst').evaluate((el) => getComputedStyle(el).color)));
+    expect(new Set(colours).size).toBe(4);
+    // the unpaid total counts only what still WAITS on the client: 800 + 500
+    await expect(page.locator('#inv-unpaid strong')).toHaveText('$1,300');
+  });
+
+  test('Home agrees: the to-pay tile and the Needs-you queue skip the processing invoice, and a queue row prints the SAME state word as the chip', async ({ page }) => {
+    await installApp(page, { api: FOUR_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#glance-due .gn')).toHaveText('$1,300');
+    const body = page.locator('#needs-body');
+    await expect(body.locator('.qrow').filter({ hasText: 'Build phase' })).toContainText('$800 · upcoming');
+    await expect(body.locator('.qrow').filter({ hasText: 'Launch' })).toContainText('$500 · overdue');
+    await expect(body.locator('.qrow').filter({ hasText: 'Design phase' })).toHaveCount(0);   // processing: nothing for them to do
+    await expect(body.locator('.qrow').filter({ hasText: 'Kickoff deposit' })).toHaveCount(0);
+    await expect(body.locator('.qrow').filter({ hasText: 'Old draft' })).toHaveCount(0);
+  });
+
+  // ── Oct 2026 benchmark, item 1: the moment after a client pays ──────────────
+  // Stripe's Payment Link returns the payer to /client.html?paid=<invoice id>.
+  // The server still says open until the webhook lands, so the page says
+  // Processing + "✓ Paid — confirming your payment." (NEVER Paid — the server
+  // has not said so), toasts a thank-you, and re-reads /client/billing every
+  // 5s for up to a minute. page.clock drives the timers, so a minute takes no
+  // minute; the real fetch still runs through the route below.
+  const paidFlow = async (page: import('@playwright/test').Page, flipAfterReads: number) => {
+    let reads = 0;
+    await page.route('**/functions/v1/presence/client/billing', (route) => {
+      reads++;
+      const paid = reads > flipAfterReads;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { billing_type: 'service', invoices: [
+        { ...INVOICES[1], status: paid ? 'paid' : 'open', state: paid ? 'paid' : 'overdue', pay_url: paid ? null : 'https://pay.example/v2', paid_at: paid ? '2026-07-11T00:00:00Z' : null },
+        INVOICES[2],
+      ], summary: { open_count: paid ? 1 : 2, paid_count: paid ? 1 : 0 } } }) });
+    });
+    return () => reads;
+  };
+  const settle = (page: import('@playwright/test').Page) => page.waitForTimeout(80);   // let the fetched read land and re-arm the timer
+
+  test('back from Stripe (?paid=<id>): the Invoices tab opens, a toast says thank you, the row is Processing + "✓ Paid — confirming your payment." with no Pay link, the URL is cleaned, and /client/billing is re-read every 5s until the server says paid', async ({ page }) => {
+    await page.clock.install();
+    await installApp(page, { api: INV_API });
+    const reads = await paidFlow(page, 3);   // the load + two polls still say open; the third poll says paid
+    await page.goto('/client.html?paid=v2');
+    await expect(page.locator('#tabnav [data-tab="invoices"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(/\/client\.html#invoices$/);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Thank you — we’re confirming your payment.' }).first()).toBeVisible();
+    const row = () => page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    await expect(row().locator('.fst.pr')).toHaveText('Processing');
+    await expect(row().locator('.fconf')).toContainText('Paid — confirming your payment.');
+    await expect(row().locator('.fconf .fchk')).toBeVisible();   // the check mark
+    await expect(row().locator('a')).toHaveCount(0);              // no Pay for an invoice they just paid
+    await expect(row().locator('.fst.sig')).toHaveCount(0);       // and never "Paid" before the server says so
+    await expect(page.locator('#inv-unpaid strong')).toHaveText('$800');   // the total counts only Build phase now
+    expect(reads()).toBe(1);
+    await page.clock.runFor(5_000); await expect.poll(reads).toBe(2); await settle(page);
+    await expect(row().locator('.fst.pr')).toHaveText('Processing');   // still open server-side → still confirming
+    await page.clock.runFor(5_000); await expect.poll(reads).toBe(3); await settle(page);
+    await page.clock.runFor(5_000); await expect.poll(reads).toBe(4);   // this read says paid
+    await expect(row().locator('.fst.sig')).toHaveText('Paid');
+    await expect(row().getByText('Paid — thank you.')).toBeVisible();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Paid — thank you.' }).first()).toBeVisible();
+    await settle(page);
+    await page.clock.runFor(60_000); await settle(page);
+    expect(reads()).toBe(4);   // settled: the polling stops
+  });
+
+  test('a slow webhook: after a minute the row says "Still confirming — it can take a few minutes, you don’t need to do anything." — still Processing, never Paid, never a dead row with a Pay link — and a slower re-read carries on', async ({ page }) => {
+    await page.clock.install();
+    await installApp(page, { api: INV_API });
+    const reads = await paidFlow(page, 1_000_000);   // the server never says paid
+    await page.goto('/client.html?paid=v2');
+    const row = () => page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    await expect(row().locator('.fst.pr')).toHaveText('Processing');
+    await expect(row().locator('.fconf')).not.toHaveClass(/stale/);
+    for (let i = 0; i < 12; i++) { await page.clock.runFor(5_000); await settle(page); }
+    await expect.poll(reads).toBeGreaterThanOrEqual(12);   // every five seconds for the minute
+    await expect(row().locator('.fconf.stale')).toContainText('Still confirming — it can take a few minutes, you don’t need to do anything.');
+    await expect(row().locator('.fst.pr')).toHaveText('Processing');
+    await expect(row().locator('.fst.sig')).toHaveCount(0);
+    await expect(row().locator('a')).toHaveCount(0);
+    const before = reads();
+    await page.clock.runFor(30_000); await settle(page);
+    await expect.poll(reads).toBeGreaterThan(before);   // never dead: a slower eye stays on it
+  });
+
+  test('back from Stripe with no sign-in: forwarded to the branded thank-you (payment-success.html?paid=…), never a sign-in wall, and the id is remembered', async ({ page }) => {
+    await installApp(page, { session: null, api: INV_API });
+    await page.goto('/client.html?paid=v2');
+    await expect(page).toHaveURL(/\/payment-success\.html\?paid=v2$/);
+    await expect(page.getByRole('link', { name: 'Sign in to see your invoice →' })).toBeVisible();
+    const remembered = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('dds-paid-pending') || 'null'); } catch { return null; } });
+    expect(remembered?.id).toBe('v2');
+  });
+
+  test('the ten-minute memory: a payer who signed in (or reloaded) on the way back still sees Processing — no Pay link for an invoice they just paid — quietly: no toast, no tab jump', async ({ page }) => {
+    await installApp(page, { api: INV_API });
+    await page.addInitScript(() => { try { localStorage.setItem('dds-paid-pending', JSON.stringify({ id: 'v2', at: Date.now() })); } catch { /* storage may be denied */ } });
+    await page.goto('/client.html');
+    await expect(page.locator('#tabnav [data-tab="home"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#glance-due .gn')).toHaveText('$800');   // Design phase is no longer "to pay"
+    await expect(page.locator('#needs-body .qrow').filter({ hasText: 'Design phase' })).toHaveCount(0);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'confirming' })).toHaveCount(0);
+    await openInvoices(page);
+    const row = page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    await expect(row.locator('.fst.pr')).toHaveText('Processing');
+    await expect(row.locator('.fconf')).toContainText('Paid — confirming your payment.');
+    await expect(row.locator('a')).toHaveCount(0);
   });
 
   test('mobile: invoice rows wrap their action under the meta — no horizontal overflow', async ({ page }, testInfo) => {
@@ -2882,7 +3030,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(rail.getByText('say hello', { exact: false })).toHaveCount(0);
     // …the composer still works, and the other sections all survive
     await expect(rail.locator('#msg')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
     await expect(page.locator('#sec-files')).toContainText('Homepage mockup');
     await expect(page.locator('#sec-support')).toBeVisible();
   });

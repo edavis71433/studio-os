@@ -328,7 +328,7 @@
         '<a href="' + esc(rec) + '" data-noscope="1">Open record</a>' +
         '<a href="' + esc(withScope('/today.html')) + '">Their Today</a>' +
         '<a href="' + esc(withScope('/presence.html')) + '">Their website</a>' +
-        '<a href="/customers.html" class="exit" data-noscope="1">Switch client</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Switch client</a>' +
         '<a href="/agency.html" class="exit" data-noscope="1">Exit to Studio</a>' +
       '</span></div>');
     // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
@@ -976,7 +976,7 @@
     } catch (_) { /* a11y enhancement is best-effort */ }
   }
   function minimalShell() {
-    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">P</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
+    root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────

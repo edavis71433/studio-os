@@ -667,8 +667,8 @@ test.describe('Deal drawer Path', () => {
     const guide = page.locator('#pathHost .path-guide');
     await expect(guide).toContainText('Your proposal is with them — a gentle nudge often seals it.');   // tip
     await expect(guide).toContainText('Follow up, then send the agreement once they say yes');          // action
-    // forward is the brand "Mark Stage as Complete" button
-    await expect(page.locator('#markComplete')).toContainText('Mark Stage as Complete');
+    // forward is the brand "Mark stage complete" button (sentence case, Oct 2026 experience review)
+    await expect(page.locator('#markComplete')).toContainText('Mark stage complete');
     // "Mark as lost" stays the separate quiet action, outside the Path
     await expect(page.locator('#markLost')).toContainText('Mark as lost');
   });
@@ -687,7 +687,7 @@ test.describe('Deal drawer Path', () => {
     await expect(page.locator('#pathHost .path-confirm')).toHaveCount(0);
   });
 
-  test('Mark Stage as Complete advances via the existing stage POST', async ({ page }) => {
+  test('Mark stage complete advances via the existing stage POST', async ({ page }) => {
     let stagePost = '';
     await installApp(page, { api: API });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, async (route) => {
@@ -1473,6 +1473,105 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
   });
 });
 
+// ── ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ──────────
+// With BOTH a proposal and an agreement drafted on an open deal, the drawer's
+// Billing shows ONE "Send proposal & agreement" (POST /sales/deals/:id/send —
+// one email, one page: accept → sign → pay). The row sends and Request a
+// deposit move under More ▾; the agreement's blanks guards still run.
+const DEAL8 = '88888888-8888-4888-8888-888888888888';
+const bothDeal = (over: Record<string, unknown> = {}) => ({ data: {
+  deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'qualified', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [{ id: 'p-b', title: 'Website build', status: 'draft', version: 1, line_items: [{ label: 'Build', qty: 1, unit_cents: 500000 }], first_viewed_at: null, expires_at: null }],
+  contracts: [{ id: 'k-b', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'A non-refundable deposit of 50% of the total project fee is due before work begins.' }],
+  events: [], timeline: [], invoices: [], last_contacted_at: null, ...over,
+} });
+const bothApi = (over: Record<string, unknown> = {}) => ({ ...API, [`/sales/deals/${DEAL8}`]: bothDeal(over), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } });
+
+test.describe('deal drawer — one "Send proposal & agreement"', () => {
+  test('both drafted: one filled send, the row sends under More ▾, the rows keep their chips and other actions', async ({ page }) => {
+    await installApp(page, { api: bothApi() });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    const band = page.locator('#sendBoth');
+    await expect(band).toBeVisible();
+    await expect(band).toContainText('Sam Rivera accepts, signs, then pays the deposit on one page.');
+    await expect(page.locator('#sendBothBtn')).toHaveText('Send proposal & agreement to Sam Rivera →');
+    // the rows: chip + View / print + Delete stay; their own Send is gone
+    await expect(page.locator('.lr [data-send-proposal="p-b"]')).toHaveCount(0);
+    await expect(page.locator('.lr [data-send-contract="k-b"]')).toHaveCount(0);
+    await expect(page.locator('.lr .stage', { hasText: 'Draft — not sent yet' })).toHaveCount(2);
+    await expect(page.locator('[data-doc-prop="p-b"]')).toBeVisible();
+    await expect(page.locator('[data-del-con="k-b"]')).toBeVisible();
+    // More ▾ — the per-document sends + Request a deposit, with the menu-button contract
+    const more = page.locator('#sendMore');
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#sendMoreMenu')).toBeHidden();
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    const menu = page.locator('#sendMoreMenu');
+    await expect(menu.locator('[data-send-proposal="p-b"]')).toHaveText('Send the proposal only');
+    await expect(menu.locator('[data-send-contract="k-b"]')).toHaveText('Send the agreement only');
+    await expect(menu.locator('#moreDeposit')).toHaveText('Request a deposit');
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(more).toBeFocused();
+    // Request a deposit from More opens the deposit mini-form in the invoice section
+    await more.click();
+    await menu.locator('#moreDeposit').click();
+    await expect(page.locator('#invForm #mf-amount')).toBeVisible();
+  });
+
+  test('the one button POSTs /sales/deals/:id/send with both ids; the toast names the client and the minted deposit', async ({ page }) => {
+    let dialogs = 0;
+    await installApp(page, { api: bothApi() });
+    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { proposal: { id: 'p-b', status: 'sent' }, contract: { id: 'k-b', status: 'sent' }, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }, url: 'https://example.test/sign.html?t=flow', emailed: true, sent: { proposal: true, contract: true } }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/sales/deals/${DEAL8}/send`));
+    await page.locator('#sendBothBtn').click();
+    expect(JSON.parse((await posted).postData() || '{}')).toEqual({ proposal_id: 'p-b', contract_id: 'k-b' });
+    // one toast carries both facts (it is brief — read it in one go)
+    await expect(page.locator('.dds-toast')).toContainText('Proposal and agreement sent — emailed to Sam Rivera. A $2,500 deposit request is ready — they can pay the moment they sign.');
+    expect(dialogs).toBe(0);                                                     // a complete, valued agreement warns about nothing
+  });
+
+  test('the agreement’s blanks guard runs on the combined send too — declining sends nothing at all', async ({ page }) => {
+    const calls: string[] = [];
+    await installApp(page, { api: bothApi({ contracts: [{ id: 'k-bl', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'Pages: [LIST THE FIVE CORE PAGES]. A deposit is due at signing.' }] }) });
+    await page.route('**/functions/v1/presence/sales/**', async (route) => {
+      if (route.request().method() === 'GET') return route.fallback();
+      calls.push(new URL(route.request().url()).pathname);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    let msg = '';
+    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await page.locator('#sendBothBtn').click();
+    await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks, then send it.');
+    expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
+    expect(calls).toHaveLength(0);
+  });
+
+  test('with no client email the combined send says exactly why, and copies the link', async ({ page }) => {
+    await installApp(page, { api: bothApi({ contact: null, deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'qualified', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: null, converted_client_id: null, retainer: null } }) });
+    await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { deposit: { minted: false } }, url: 'https://example.test/sign.html?t=flow', emailed: false, sent: { proposal: true, contract: true } }) }));
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await page.locator('#sendBothBtn').click();
+    const toast = page.locator('.dds-toast');
+    await expect(toast).toContainText('Proposal and agreement prepared — there’s no client email on this deal, so nothing was sent.');
+    await expect(toast).toContainText('Add their email in Details');
+  });
+
+  test('a won deal, or only one document drafted, never shows the combined send', async ({ page }) => {
+    await installApp(page, { api: bothApi({ proposals: [] }) });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(page.locator('#sendBoth')).toHaveCount(0);
+    await expect(page.locator('.lr [data-send-contract="k-b"]')).toBeVisible();   // the agreement's own Send stands
+  });
+});
+
 // ── Voiding an invoice raised in error ───────────────────────────────────────
 // `presence_invoices.status` has allowed 'void' since migration 0086 and this
 // page has always rendered a "Voided" row — but nothing in the platform ever
@@ -1828,5 +1927,57 @@ test.describe('deal page — Overview · Billing · Activity tabs', () => {
     await page.locator('#dpanel-overview [data-goto-tab="billing"]').click();
     await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toBeFocused();
     await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
+  });
+});
+
+// ── "Manage their access →" drills sharing.html into the CUSTOMER (studio audit
+// 2026-10, change 1). The converted deal's customer site is on the deal read
+// (presence_deals.converted_site_id, select=*); the link carries it as ?client=
+// so Sharing & access acts on the new customer's site, not the studio's own.
+// Unknown (older rows, a convert that made no site) → the bare link, as before.
+const CUSTOMER_SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
+const DEAL9 = '99999999-9999-4999-8999-999999999999';
+const wonDeal = (dealExtras: Record<string, unknown>) => ({ data: {
+  deal: { id: DEAL9, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [SIGNED_NO_TERM], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} });
+const accessLink = (page: import('@playwright/test').Page) => page.getByRole('link', { name: 'Manage their access →' });
+
+test.describe('deal page — "Manage their access" carries the customer', () => {
+  test('a converted deal with a customer site links /sharing.html?client=<that site>', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+
+  test('no customer site on the deal → the bare link; a non-uuid value is not trusted', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({}), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+  });
+
+  test('right after convert, the re-read deal’s customer site lands on the link', async ({ page }) => {
+    // the deal read flips from "signed, not yet converted" to "converted" once
+    // the convert POST has answered — exactly what the server does.
+    let converted = false;
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') {
+        converted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { converted: true, client_id: 'c-marlow', site_id: CUSTOMER_SITE, project_id: null, invited: true } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(converted
+        ? { data: { ...contractDeal(SIGNED_NO_TERM).data, deal: { ...contractDeal(SIGNED_NO_TERM).data.deal, stage: 'won', converted_client_id: 'c-marlow', converted_site_id: CUSTOMER_SITE } } }
+        : contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await expect(accessLink(page)).toHaveCount(0);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 });

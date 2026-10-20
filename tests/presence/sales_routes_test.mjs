@@ -214,6 +214,27 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('ui: connect mode hides provision-only fields (no workspace set-up)', /id="cu-provision-only"/.test(contacts) && /po\.style\.display=connect\?'none':''/.test(contacts));
 }
 
+// ── Oct 2026 studio audit, change 4 — the dialog is honest and needs no password,
+//    on all THREE hand-synced copies (agency.html is the home; the rosters keep theirs)
+for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
+  const h = read(p);
+  const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di) + 9);
+  const prov = dlg.slice(dlg.indexOf('id="cu-provision-only"'), dlg.indexOf('id="cu-connect-only"'));
+  const conn = dlg.slice(dlg.indexOf('id="cu-connect-only"'));
+  ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Create their workspace and email them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
+  ok(`${p}: provision mode says what provisioning does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(prov));
+  ok(`${p}: the pricing box lives in CONNECT mode only (nothing is bought when the studio provisions)`, !/id="cu-signup"/.test(prov) && /id="cu-signup"/.test(conn) && /send them this to sign up/.test(conn));
+  ok(`${p}: "Start from" kit select in provision mode (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(prov) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(prov));
+  ok(`${p}: kits come from GET /agency/kits and apply to the NEW site via POST /agency/kits/:id/apply {site_id}`, /api\('\/agency\/kits'\)/.test(h) && /'\/agency\/kits\/'\+encodeURIComponent\(kitId\)\+'\/apply'/.test(h) && /\{site_id:d\.site_id\}/.test(h));
+  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=k\.ok\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\)kitLine=/.test(h));
+  ok(`${p}: ${p === 'agency.html' ? 'the home always offers kits' : 'the kit field shows only for an agency (ddsContext.is_agency)'}`, p === 'agency.html' ? /async function cuIsAgency\(\)\{return true;\}/.test(h) : /return !!\(c&&c\.is_agency\)/.test(h));
+}
+{
+  const ag = read('agency.html');
+  ok('agency.html: ⌘K lands on #add → the dialog opens and the hash is cleared (boot + hashchange)', /function openFromHash\(\)\{\s*if\(location\.hash!=='#add'\)return;/.test(ag) && /history\.replaceState\(null,'',location\.pathname\+location\.search\)/.test(ag) && /window\.addEventListener\('hashchange',openFromHash\)/.test(ag) && /renderTop\(\);\s*openFromHash\(\);/.test(ag));
+  ok('add-customer: the response carries the new site id the dialog applies the kit to', /return json\(\{ data: \{ created: true, client_id: clientId, site_id: acct\.siteId/.test(sales));
+}
+
 // ── STUDIO SERVICES CATALOG (/sales/services) — manageable catalog + proposal dropdown ──
 {
   const pipe = read('pipeline.html');
@@ -249,6 +270,23 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('doc-viewer: the raw GET /sales/doc render route STAYS (the viewer fetches it)', /handleSalesDocument\(req, m\[1\], cors\)/.test(idx));
   ok('doc-viewer: doc.html fetches /sales/doc/<token> bare (public token-gated GET) and document.writes the render', /\/sales\/doc\/'\+encodeURIComponent\(t\)/.test(doc) && /document\.open\(\);document\.write\(html\);document\.close\(\)/.test(doc));
   ok('doc-viewer: doc.html is unindexable and shows a friendly expiry message on failure', /noindex,nofollow/.test(doc) && /ask your studio for a fresh copy/.test(doc));
+}
+
+// ── ONE LINK (benchmark 2026-10, item 5): the deal-bound `flow` token ──
+{
+  ok('flow: the token kind set is proposal | contract | flow, and verify still fails closed on anything else', /p\.t !== 'proposal' && p\.t !== 'contract' && p\.t !== 'flow'/.test(sales) && /export type SalesTokenKind = 'proposal' \| 'contract' \| 'flow'/.test(sales));
+  ok('flow: flowLink mints sign.html?t=<flow token> bound to the DEAL id, 30 days, null without a secret', /async function flowLink\(siteId: string, dealId: string\)/.test(sales) && /signSalesToken\(\{ t: 'flow', id: dealId, site_id: siteId, exp: Math\.floor\(Date\.now\(\) \/ 1000\) \+ FLOW_TTL_SEC \}/.test(sales) && /const FLOW_TTL_SEC = 30 \* 86400/.test(sales) && /if \(!secret \|\| !UUID_RE\.test\(dealId \|\| ''\)\) return null/.test(sales));
+  ok('flow: every send mints the ONE link (proposal send, contract send, the combined deal send)', (sales.match(/flowLink\(site\.id, (?:p|c)\.deal_id\)/g) || []).length >= 3 && /const url = await flowLink\(site\.id, dealId\)/.test(sales) && !/signSalesToken\(\{ t: 'proposal'/.test(sales) && !/signSalesToken\(\{ t: 'contract'/.test(sales));
+  ok('flow: the reminder sweep mints the same deal link (no second page for the client)', /signSalesToken\(\{ t: 'flow', id: doc\.deal_id, site_id: doc\.site_id/.test(read('supabase/functions/presence/commerce/lifecycle.ts')));
+  // the public actions accept a flow token ONLY for a document on that deal
+  ok('flow: decide accepts a proposal token naming the proposal OR a flow token — then checks the deal (tokenCovers)', /if \(!tok \|\| !\(tok\.t === 'proposal' \? tok\.id === id : tok\.t === 'flow'\)\)/.test(sales) && /if \(!tokenCovers\(tok, 'proposal', id, p\.deal_id\)\) return json\(\{ error: 'invalid_link'/.test(sales));
+  ok('flow: sign accepts a contract token naming the agreement OR a flow token — then checks the deal (tokenCovers)', /if \(!tok \|\| !\(tok\.t === 'contract' \? tok\.id === id : tok\.t === 'flow'\)\)/.test(sales) && /if \(!tokenCovers\(tok, 'contract', id, c\.deal_id\)\) return json\(\{ error: 'invalid_link'/.test(sales));
+  ok('flow: tokenCovers — a document token must name the document, a flow token must name its deal, anything else is no', /if \(tok\.t === kind\) return tok\.id === docId;\s*\n\s*if \(tok\.t === 'flow'\) return typeof dealId === 'string' && tok\.id === dealId;\s*\n\s*return false;/.test(sales));
+  ok('flow: FORCED ORDER server-side — a flow-token sign goes through the pure flowSignGate (409 while unaccepted, declined, or between versions)', /if \(tok\.t === 'flow'\) \{\s*\n\s*const \{ proposal, proposal_pending \} = await flowDocuments\(tok\.site_id, tok\.id\);\s*\n\s*const gate = flowSignGate\(\{ proposal, pending: proposal_pending \}\);[^\n]*\n\s*if \(gate\) return json\(gate, 409, cors\);/.test(sales));
+  ok('flow: the public view resolves a flow token to the deal, scoped by tok.site_id, 404 when the deal is gone', /presence_deals\?id=eq\.\$\{tok\.id\}&site_id=eq\.\$\{tok\.site_id\}&deleted_at=is\.null&select=id,title&limit=1/.test(sales));
+  ok('flow: the client never sees a draft — currentProposal() picks only sent/accepted/declined, non-superseded rows; agreements sent/signed only', /const sentOnce = live\.filter\(\(r\) => !superseded\(r\) && \(r\.status === 'sent' \|\| r\.status === 'accepted' \|\| r\.status === 'declined'\)\)/.test(read('supabase/functions/presence/lib/sales_lifecycle.ts')) && /cons\.find\(\(c\) => c\.status === 'signed'\) \|\| cons\.find\(\(c\) => c\.status === 'sent'\) \|\| null/.test(sales));
+  ok('flow: between versions (Revise → v1 superseded, v2 draft) the deal reads as proposal_pending, never as "no proposal"', /pending: !proposal && live\.some\(superseded\)/.test(read('supabase/functions/presence/lib/sales_lifecycle.ts')) && /proposal_pending: pending/.test(sales));
+  ok('wiring: POST /sales/deals/:id/send is an AUTHED route (after site resolution), not a public one', /\\\/sales\\\/deals\\\/\(\[0-9a-f-\]\{36\}\)\\\/send\$/.test(idx) && idx.indexOf('handleSalesDealSend(req, site, principal') > idx.indexOf('handleSalesProposalSend(req, site, principal'));
 }
 
 // ── dispatch wired (authed + public) ──

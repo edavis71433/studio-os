@@ -125,7 +125,7 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 {
   const extractDlg = (t) => { const i = t.indexOf('<dialog id="custDlg"'); return t.slice(i, t.indexOf('</dialog>', i) + 9); };
   const extractJs = (t) => {
-    const i = t.indexOf('function cuHostedHere');
+    const i = t.indexOf('function cuPlan');   // the first dialog helper (cuHostedHere went with the pricing box — audit change 4)
     const endMark = "Refresh will catch it up.'));";
     const j = t.indexOf(endMark, i);
     return t.slice(i, t.indexOf('};', j) + 2);
@@ -162,7 +162,7 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   //    on one page but not the other.
   ok('the Add-a-customer DIALOG MARKUP is byte-identical between contacts.html and customers.html',
     extractDlg(c) === extractDlg(k));
-  ok('the Add-a-customer DIALOG SCRIPT (cuHostedHere → submit handler) is byte-identical between the two pages',
+  ok('the Add-a-customer DIALOG SCRIPT (cuPlan → submit handler) is byte-identical between the two pages',
     extractJs(c) === extractJs(k));
   ok('the pinned script region is non-trivial (the extractor found the real block)',
     extractJs(c).length > 3000 && extractJs(c).includes("api('/sales/customers','POST',body)"));
