@@ -440,12 +440,15 @@ h5.rune .whisper.ok{color:var(--sage)}
    literals, not tokens, so it never flips. ── */
 .stage{position:fixed;inset:0;background:#171320;z-index:95;display:none;flex-direction:column}
 .stage.on{display:flex}
-/* the shell bar (and an agency's client context bar) sit above every page layer, so
-   the stage starts BELOW them — otherwise they cover "← Back" and the Draft/Live and
-   page tabs, and a new owner has no way out. Phones also keep the bottom bar: end
-   the stage where it begins (the same 72px + safe-area the shell reserves). */
+/* the shell (z 2147483000) sits above every page layer, so the stage starts clear of
+   it — otherwise it covers "← Back" and the Draft/Live and page tabs, and a new owner
+   has no way out. ≥761px the shell is the left sidebar (html.dds-side, which also
+   holds an agency's client card); below that it is the top bar (plus the client
+   context bar), and phones keep the bottom bar: end the stage where it begins (the
+   same 72px + safe-area the shell reserves). */
 html.dds-has-shell .stage{top:var(--dds-shell-h)}
 html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds-ctxbar-h))}
+@media (min-width:761px){html.dds-side.dds-has-shell .stage,html.dds-side.dds-has-shell.dds-has-ctxbar .stage{top:0;left:var(--dds-side-w)}}
 @media (max-width:760.98px){html.dds-has-shell .stage{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:22px;padding:16px 26px 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
@@ -4192,6 +4195,13 @@ async function openPublishPreview(publishId) {
 function openStage() { lastFocus = document.activeElement; $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("btnStageClose").focus(); }
 function closePreview() { $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
 $("btnStageClose").addEventListener("click", closePreview);
+// Escape closes the stage and nothing beneath it: it is the topmost layer, but the Design
+// panels' capture handler and the shell's (an expanded sidebar section reads as an open
+// menu and grabs focus) would otherwise eat the key or pull focus off the opener.
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !$("stage").classList.contains("on")) return;
+  e.stopPropagation(); closePreview();
+}, true);
 $("btnPreview").addEventListener("click", () => openPreview("draft"));
 function syncStageChrome() {
   const press = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); };
@@ -8358,7 +8368,6 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if ($("stage").classList.contains("on")) return;   // the preview stage covers the design panels — let Escape close the stage
     const t = $("trayPanel"), s = $("settingsPanel"), cm = $("commentsPanel");
     if ((t && t.classList.contains("on")) || (s && s.classList.contains("on")) || (cm && cm.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
   }, true);
