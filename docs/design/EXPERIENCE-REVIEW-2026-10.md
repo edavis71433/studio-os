@@ -11,10 +11,11 @@ The [workflow audit](WORKFLOW-AUDIT-2026-10.md) counted clicks. This review look
 - **Today's filled button was "Ask".** The first thing that needs you now wears the filled button; Ask steps back.
 - **Dates and codes leaked through.** Deals said "closes 2026-08-01" and "manual"; bookings said "2026-10-20T14:30 · Strategy call"; a broadcast said "11/19/2026, 6:00:00 PM"; a deal that could not be read printed a JavaScript error. All fixed.
 - **Five places had two names for one idea** (Customers' "People" tab vs the menu's "Contacts"; "+ Contact" next to "+ Add a customer"; "Domains & email" vs "Domain & email"; "Waiting for your OK" vs "Needs your OK"; "What needs you today" vs "Needs you"). Fixed.
+- **Emoji as icons are gone** from the five screens that used them as controls (the benchmark's item 3); the shell's 2px SVG set now draws them.
 - **Three dead ends:** Settings → Domain & email sent an owner to a page that said "Operators only."; the get-started checklist promised an "Approve it" step that never happens; Connections said "coming soon". Fixed.
 - **What's left for you is structural:** screens with two to four filled buttons (Design, the customer record, the deal page, the project record, the client's Requests tab), the phone's giant stat tiles, and what the client sees after paying in Stripe (nothing, until the webhook lands).
 
-Counts: 48 rows — 30 S (29 fixed here; the Try-again buttons in #42 are left), 16 M, 2 L, and one note (#48).
+Counts: 49 rows — 31 S (30 fixed here; the Try-again buttons in #42 are left), 16 M, 2 L, and one note (#49).
 
 ## How to read the table
 
@@ -30,7 +31,7 @@ Counts: 48 rows — 30 S (29 fixed here; the Try-again buttons in #42 are left),
 | 3 | Website › Design | Four filled buttons: Publish, "Home ⋯", two "+ Add section". | [screen](experience/03-design-four-filled.png) | Keep Publish filled; make the page pill and the Add-section buttons outlined (the pill is a selector, not an action). | M | |
 | 4 | Customer record (crm) | Three filled buttons: Send invoice, Mark stage complete, Send. The deal page has two (Open customer record, Mark stage complete); the project record two (Mark milestone complete, Send). | [screen](experience/04-customer-record-three-filled.png) · [record](experience/20-client-record.png) | One filled button per record: the Path's next step. Send invoice and the composer's Send become outlined. | M | |
 | 5 | Today, Website overview, Pipeline, customer record, client Home — phone | Stat tiles stack one per row at ~260px each, so the first phone screen is three numbers and "Needs you" is below the fold. | [screen](experience/05-phone-today-tiles.png) | Below 600px, lay the strip out as a 2-column grid of compact tiles (icon left, 2 lines) in each page's own CSS. | M | |
-| 6 | Client › Invoices | After paying in Stripe (new tab) the invoice still says "open" and the page says nothing until the webhook lands. | [before](experience/06-client-invoices-before.png) | On return (`visibilitychange`/`focus`), refetch `/client/billing` for ~60s and show "Checking with Stripe…" on the row until it flips to Paid; then a toast "Paid — thank you." | M | |
+| 6 | Client › Invoices | After paying in Stripe (new tab) the invoice still says "open" and the page says nothing until the webhook lands. This is also the market benchmark's item 1 ([BENCHMARK-2026-10.md](BENCHMARK-2026-10.md) §7), proposed there as its own session. | [before](experience/06-client-invoices-before.png) | Stripe returns to the Invoices tab with `?paid=<id>`; the row shows "Paid — confirming" until the webhook flips it, with a thank-you toast; refetch `/client/billing` on return as the fallback. Ranked here, not built. | M | |
 | 7 | Client › Invoices | "Pay →" was outlined; the tab had no filled button. | [after](experience/06-client-invoices-after.png) | Pay is the Invoices tab's filled button. | S | ✓ |
 | 8 | Pipeline › a deal that cannot be read | The page printed "Cannot read properties of undefined (reading 'stage')". Projects had the same leak. | [before](experience/07-deal-raw-error-before.png) · [after](experience/07-deal-raw-error-after.png) | The error prettifier rejects JavaScript errors; the user sees "Something went wrong on our side — please try again." | S | ✓ |
 | 9 | Website › Bookings | Upcoming appointments printed the raw timestamp: "2026-10-20T14:30 · Strategy call". | [before](experience/08-bookings-raw-dates-before.png) · [after](experience/08-bookings-raw-dates-after.png) | "Tue, Oct 20 · 2:30 PM · Strategy call". | S | ✓ |
@@ -72,7 +73,8 @@ Counts: 48 rows — 30 S (29 fixed here; the Try-again buttons in #42 are left),
 | 45 | Enquiry reply | The reply is written and sent in-app (good), but the Inbox row and the Today nudge keep "waiting for a reply" until the next load. | — | Clear the notice locally after a successful send. | M | |
 | 46 | Website overview | The Today page says "1 new enquiry · waiting for a reply" while the overview's tile says "Enquiries this month · 0 · None yet" (different windows, same word). | — | Make the tile "Enquiries waiting" or name the window on Today too. | L (needs the count route) | |
 | 47 | Today | The sub-line count ("2 things need you") comes from the context while the list comes from the feed; when the feed fails the two disagree. | — | Count the rendered rows, or hide the number when the feed failed. | L (server contract) | |
-| 48 | Whole product | "Enquiries" is one word now, but the Inbox calls the view "Enquiries", Analytics "New enquiries", Broadcasts "All website enquiries", the client's Help "Where do enquiries go?". Fine. Listed so nobody renames one of them. | — | Keep. | — | |
+| 48 | Client portal, Inbox, Today, customer record, Pipeline | Emoji as a control's icon (the portal's tabs and bell, the Needs-you rows, the Inbox's row and thread icons, the record's composer chips, the pipeline's header and badges) — the market benchmark's item 3 ([BENCHMARK-2026-10.md](BENCHMARK-2026-10.md)): the leaders use one SVG set at 2px stroke. | [before](experience/32-icons-before.png) · [after](experience/32-icons-after.png) · [phone](experience/32-icons-inbox-phone-after.png) | One local `si()` helper per page with the shell's 2px-stroke SVG set; emoji stays only where it is content (a celebration moment, "You're booked 🎉", the empty-state art). | S | ✓ |
+| 49 | Whole product | "Enquiries" is one word now, but the Inbox calls the view "Enquiries", Analytics "New enquiries", Broadcasts "All website enquiries", the client's Help "Where do enquiries go?". Fine. Listed so nobody renames one of them. | — | Keep. | — | |
 
 ## 2. By the seven questions
 
@@ -94,6 +96,7 @@ Counts: 48 rows — 30 S (29 fixed here; the Try-again buttons in #42 are left),
 
 - `shell.css` (one line): the hint's width. `shell.js` (one line): the signed-out mark.
 - `today.html`, `presence.html`, `pipeline.html`, `projects.html`, `crm.html`, `inbox.html`, `customers.html`, `contacts.html`, `settings.html`, `broadcasts.html`, `connections.html`, `get-started.html`, `agency.html`, `client.html`, `developer.html`: the S rows marked ✓ above. No endpoint changed; no page was restructured.
+- `client.html`, `inbox.html`, `today.html`, `crm.html`, `pipeline.html`: the emoji-as-icon swap (#48) — a local `si()` SVG helper per page.
 - Tests updated to the new words: `tests/e2e/{pipeline,projects,portal,broadcasts,connections,agency}.spec.ts`; Deno pins `tests/presence/{projects_ui,pipeline_detail_ui,client_record,billing_surfaces}_test.mjs`.
 - `docs/design/experience/`: the screenshots above (before/after pairs where a fix landed).
 

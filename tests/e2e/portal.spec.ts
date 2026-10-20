@@ -2111,7 +2111,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const rows = page.locator('#main .frow');
     await expect(rows).toHaveCount(3);
     // anatomy: every row leads with the 🧾 type icon and a REAL heading name
-    await expect(rows.nth(0).locator('.fico')).toHaveText('🧾');
+    await expect(rows.nth(0).locator('.fico svg.si')).toHaveCount(1);   // one SVG icon set, never emoji (Oct 2026 experience review)
     await expect(page.locator('#main .frow h3.fname')).toHaveCount(3);
     // paid: green chip, formatted amount, thank-you action — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
