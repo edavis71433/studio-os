@@ -41,13 +41,15 @@ test('C2 client reads an update', async ({ page }) => {
   await quiet(page); await installApp(page, { session: SESSION, api: CLIENT_API });
   const w = new Walk(page, 'c2-read-update');
   await w.start('/client.html');
-  const recentTop = await page.getByRole('heading', { name: 'Recent updates' }).boundingBox().catch(() => null);
-  w.note(`"Recent updates" heading at y=${recentTop ? Math.round(recentTop.y) : 'not found'} (fold = 800)`);
-  await w.shot('1-home');
-  await w.click(page.locator('button[aria-label*="otification" i], #bell, .bell').first(), 'the bell');
-  await w.shot('2-bell');
+  const y1 = await page.getByRole('heading', { name: 'Recent updates' }).boundingBox().then((b) => b && Math.round(b.y));
+  w.note(`first visit (welcome card shown once): "Recent updates" heading at y=${y1} (fold = 800)`);
+  await w.shot('1-home-first-visit');
+  await page.reload(); await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  const y2 = await page.getByRole('heading', { name: 'Recent updates' }).boundingBox().then((b) => b && Math.round(b.y));
+  w.note(`every later visit: "Recent updates" at y=${y2} — ${y2 && y2 < 800 ? 'above' : 'below'} the fold, 0 clicks`);
+  await w.shot('2-home-later-visit');
+  await w.click(page.locator('button[aria-label*="otification" i], #bell, .bell').first(), 'the bell (alternative route)');
   await w.click(page.getByText('Your approval is requested').first(), 'the notification');
-  await w.shot('3-landed');
   w.finish();
 });
 
@@ -56,10 +58,10 @@ test('C3 client approves a change', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   const w = new Walk(page, 'c3-approve');
   await w.start('/client.html');
-  await w.click(page.getByRole('button', { name: /Review & approve/ }).or(page.getByRole('link', { name: /Review & approve/ })), 'Review & approve (Home, Needs you)');
-  await w.shot('1-record');
-  await w.click(page.getByRole('button', { name: 'Approve', exact: true }), 'Approve');
+  await w.shot('1-home');
+  await w.click(page.getByRole('button', { name: 'Approve — Homepage design' }), 'Approve (Home, top Needs-you row — the one filled button)');
   await w.shot('2-approved');
+  w.note('"See it first" beside it opens the project record for a look before deciding (the old 2-click route)');
   w.finish();
 });
 
@@ -83,13 +85,14 @@ test('C5 client pays an invoice', async ({ page }) => {
   await quiet(page); await installApp(page, { session: SESSION, api: CLIENT_API });
   const w = new Walk(page, 'c5-pay');
   await w.start('/client.html');
-  const homePay = await page.getByRole('link', { name: /Pay/ }).count();
-  w.note(`Pay links on Home: ${homePay}`);
-  await w.click(page.locator('#tabnav [data-tab="invoices"], .cb-tabs [data-tab="invoices"]').first(), 'Invoices tab');
-  await w.shot('1-invoices');
-  const pay = page.getByRole('link', { name: /Pay — Design phase/ });
-  w.note(`Pay → ${await pay.getAttribute('href')} target=${await pay.getAttribute('target')} — Stripe in a new tab; nothing in Studio OS confirms payment until the webhook lands`);
-  w.clicks++; w.steps.push(`${w.clicks}. click "Pay — Design phase" → new tab (Stripe)`);
+  const pay = page.getByRole('link', { name: 'View & pay — Design phase' });
+  const y1 = await pay.boundingBox().then((b) => b && Math.round(b.y));
+  await page.reload(); await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  const y2 = await pay.boundingBox().then((b) => b && Math.round(b.y));
+  w.note(`Pay link on Home: first visit y=${y1}, later visits y=${y2} (fold = 800) → ${await pay.getAttribute('href')} target=${await pay.getAttribute('target')}`);
+  await w.shot('1-home');
+  w.clicks++; w.steps.push(`${w.clicks}. click "View & pay — Design phase" → new tab (Stripe)`);
+  w.note('the "$1,200 to pay" tile is also a door: it focuses this link');
   w.finish();
 });
 
@@ -115,10 +118,9 @@ test('N onboarding: sign up to first publish', async ({ page }) => {
   await w.shot('3-built');
   await w.click(page.locator('#review, #go').first(), 'Review & preview your website → / Open my workspace →');
   await w.shot('4-preview');
-  const cover = await page.evaluate(() => { const b = document.getElementById('btnStageClose')!; const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], topmost: top ? (top.id || top.className || top.tagName) : null, isSelf: top === b || b.contains(top) }; });
-  w.note(`preview stage "← Back": ${JSON.stringify(cover)}`); console.log('COVER', JSON.stringify(cover));
-  w.clicks++; w.steps.push(`${w.clicks}. "← Back" is under the shell's top bar (z 95 vs 2147483000) and Escape does not close the preview — the walk scripts the click; a real user must use a nav link instead`);
-  await page.evaluate(() => (document.getElementById('btnStageClose') as HTMLButtonElement).click()); await page.waitForTimeout(500);
+  const cover = await page.evaluate(() => { const b = document.getElementById('btnStageClose')!; const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { topmost: top ? (top.id || top.className || top.tagName) : null, isSelf: top === b || b.contains(top) }; });
+  w.note(`preview stage "← Back": ${JSON.stringify(cover)} (PR #19)`);
+  await w.click(page.locator('#btnStageClose'), '← Back (leave the preview)');
   await w.click(page.locator('#btnPublish'), 'Publish');
   await w.shot('5-ritual');
   w.note(`ritual buttons: ${JSON.stringify(await page.locator('#ritActions button').allInnerTexts())}`);

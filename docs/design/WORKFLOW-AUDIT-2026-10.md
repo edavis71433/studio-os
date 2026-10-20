@@ -1,7 +1,7 @@
 # Whole-site workflow audit — October 2026
 
 **For:** Eric, to decide. **Status:** proposal. Nothing here has been built or changed.
-**Measured on:** `main` at b94fdf0, with the e2e fixtures (`tests/e2e/helpers/app.ts`, `installApp`), desktop Chromium at 1280×800. The walks use the real `buildNav` menu for a business owner with every feature switched on.
+**Measured on:** `main` at b94fdf0 (sections 1–5; section 6 re-measures on `ed14a1e`, after the changes), with the e2e fixtures (`tests/e2e/helpers/app.ts`, `installApp`), desktop Chromium at 1280×800. The walks use the real `buildNav` menu for a business owner with every feature switched on.
 **Not included:** the open visual-refresh PRs (#10, #11, #14–#17). Where one of them changes a finding, the finding says so.
 
 [WORKFLOW-MAP.md](WORKFLOW-MAP.md) covers six CRM jobs: invoice, enquiry → customer, chase payment, kick off a project, approve a change as the owner, and reply to a client. This audit covers what that map leaves out:
@@ -322,9 +322,43 @@ These are not part of the ranking. They are cheap and each is worth its own smal
 
 ---
 
+---
+
+## 6. After the five changes: the same walks, re-run on main (Oct 20)
+
+Eric approved all five changes on Oct 20. They shipped as PRs #20–#24 (plus the preview fix, #19), and this section re-runs the walks from section 3 against main at `ed14a1e`, with the same fixtures, the same desktop size and the real menu as it is now. The scripts in [`audit/walks/`](audit/walks/) were updated to the new screens; the new screenshots are in [`audit/after/`](audit/after/), with [`after/walks.jsonl`](audit/after/walks.jsonl) as the step log. The Oct 19 screenshots stay where they were, for comparison.
+
+| # | Job | Before | After | What changed |
+| --- | --- | --- | --- | --- |
+| 1 | Publish a change | 4 | **4** | Not in scope; unchanged. |
+| 2 | Schedule a change | 4 (ritual) / 3 (schedule page) | **4** from the menu; **1** from an old Scheduled-changes bookmark | One door instead of three. **Schedule it** is now the filled button while the panel is open, and publish-now steps back. The menu route did not drop to 3 (see gaps). |
+| 3 | Connect a domain | 5 | **3** | **Domain & email** is in the menu and ⌘K finds "domain". The desk opens on "type your domain" with the field already focused. The overview's *Your domain* card is a 4-click route to the same place. |
+| 4 | Add a page | 5 | **4** | **Add a page** is in the menu and ⌘K finds "page". It opens the name dialog straight away. |
+| 5 | Reply to an enquiry | 2, then your mail app | **3**, all inside Studio OS | The reply is written and sent from the enquiry, kept under it, and marked Replied. The Enquiries page is gone; its nudge lands on the Inbox's Enquiries view. |
+| 6 | Client signs in | 2 | **2** | Unchanged. |
+| 7 | Read an update | a scroll (y = 1216) | **0 clicks**, above the fold (y = 686) on every visit after the first | The welcome card shows once; Recent updates sits under Needs you. On the very first visit it is still at y = 1001. |
+| 8 | Approve a change | 2 | **1** | **Approve** is on the Home row, the page's one filled button. *See it first* keeps the old route. |
+| 9 | Reply to the studio | 3 | **3** | Unchanged. |
+| 10 | Pay an invoice | 2 | **1** | *View & pay* on the Home row (y = 562 on a return visit; y = 876 on the first visit, under the welcome card). The *$ to pay* tile is a door to it. Stripe still opens in a new tab. |
+| N | Sign up → first publish | 7, with a trap | **7**, no trap | *← Back* on the preview is the topmost element and Escape closes the preview (#19). |
+
+**Pages and menu:** 38 → **28** signed-in pages (the ten retired ones forward to their homes, `?client=` kept), and 30 → **22** menu destinations, exactly as section 5 predicted. ⌘K: "history" → 1 result (was 2); "approv" and "enquir" → Inbox; "domain" and "page" → 1 each (were 0).
+
+### Gaps the re-walk found
+
+These are honest misses against section 5, each small, none blocking.
+
+1. **Schedule from the menu is still 4 clicks, not 3.** The *Scheduled publishes* menu item went away, so the route is Website → Publish → Publish later → Schedule it. One fix: open the ritual with the schedule panel already visible (date field shown, *Schedule it* outlined until it has focus), which drops it to 3 and keeps one filled button. Touches `presence.html` `loadRitual`.
+2. **Reply to an enquiry is 3 clicks, not 2.** Today's nudge lands on the Enquiries *list*, and the row is the second click. A deep link that selects the row (`/inbox.html#enquiries?sel=lead:<id>` from `workspace.ts`'s `lead_followup` notice) would make it 2. Touches `workspace.ts` NOTICE_HREF and `inbox.html`'s boot.
+3. **⌘K no longer finds "health".** Website health is a card on the overview, so the word is gone from the menu. A `desc` on the Website menu item ("…your pages, health check and recent activity") would bring it back without a new entry. Touches `lib/navigation.ts`.
+4. **First visit for a client:** the welcome card still pushes Recent updates (y = 1001) and the Pay link (y = 876) under the fold once. From the second visit both are above it. Acceptable by design; noted so nobody re-measures it as a regression.
+5. **Overview cards depend on `/health` carrying `facts`.** `hbLoadBoardExtras()` runs at the end of `renderFactsProse()`, which returns early without them. Production `/health` always includes them; a fixture without them hid the Domain and Health cards during the re-walk. A one-line move into `loadToday()` would make it unconditional. Touches `presence.html`.
+
+Everything else in section 5's ranked table is delivered as written.
+
 ## Appendix: how to re-run the walks
 
-The scripts are in [`audit/walks/`](audit/walks/). They write screenshots to `docs/design/audit/` and one JSON line per job to `AUDIT_LOG` (default `/tmp/audit-walks.jsonl`).
+The scripts are in [`audit/walks/`](audit/walks/). They write screenshots to `docs/design/audit/after/` (set `AUDIT_SHOTS` to change that) and one JSON line per job to `AUDIT_LOG` (default `/tmp/audit-walks.jsonl`). The Oct 19 screenshots in `docs/design/audit/` are the originals from before the changes.
 
 ```bash
 npx playwright test -c docs/design/audit/walks/playwright.walks.config.ts

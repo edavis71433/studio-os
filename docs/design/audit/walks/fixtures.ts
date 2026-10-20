@@ -1,6 +1,7 @@
 import { ALL_FEATURES } from '../../../../tests/e2e/helpers/app';
 
-// buildNav (supabase/functions/presence/lib/navigation.ts) for a non-agency business_owner, every feature + capability.
+// buildNav (supabase/functions/presence/lib/navigation.ts) for a non-agency business_owner, every feature + capability —
+// as of main ed14a1e (after the Oct 2026 audit changes: no lens groups, no Enquiries/Scheduled publishes; Add a page + Domain & email).
 const one = (key: string, label: string, href: string, utility = false) => ({ key, label, items: [{ key, label, href }], ...(utility ? { utility: true } : {}) });
 export const REAL_NAV = [
   one('today', 'Today', '/today.html'),
@@ -8,36 +9,24 @@ export const REAL_NAV = [
     { key: 'content', label: 'Website', href: '/presence.html' },
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
-    { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
-    { key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' },
+    { key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', desc: 'A new page on your site — pick a layout or start blank.' },
+    { key: 'domain', label: 'Domain & email', href: '/presence.html#domain', desc: 'Put your site on your own domain (yourbusiness.com); email records and the padlock.' },
+    { key: 'publish', label: 'Publish', href: '/presence.html#publish', desc: 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.' },
     { key: 'history', label: 'History', href: '/presence.html#history' },
   ] },
   { key: 'customers', label: 'Customers', items: [
     { key: 'customers', label: 'Customers', href: '/customers.html' },
     { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
-    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
   one('pipeline', 'Pipeline', '/pipeline.html'),
   one('projects', 'Projects', '/projects.html'),
-  one('inbox', 'Inbox', '/inbox.html'),
+  { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html', desc: 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.' }] },
   { key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }, { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' }] },
   one('analytics', 'Analytics', '/analytics.html'),
-  { key: 'focus_views', label: 'Focused views', utility: true, items: [
-    { key: 'attention', label: 'Website attention', href: '/attention.html' },
-    { key: 'approval_center', label: 'Approvals', href: '/approval-center.html' },
-  ] },
-  { key: 'views', label: 'Understand your site', utility: true, items: [
-    { key: 'view_content_tree', label: 'Website map', href: '/content-tree.html' },
-    { key: 'view_site_health', label: 'Website health', href: '/website-health.html' },
-    { key: 'view_timeline', label: 'Website story', href: '/timeline.html' },
-    { key: 'view_snapshots', label: 'Version history', href: '/snapshot-history.html' },
-    { key: 'view_upcoming', label: 'What’s coming next', href: '/upcoming.html' },
-    { key: 'view_insights', label: 'Business insights', href: '/business-insights.html' },
-  ] },
   one('connections', 'Connections', '/connections.html', true),
   { key: 'settings', label: 'Settings', utility: true, items: [
-    { key: 'settings', label: 'Settings', href: '/presence.html#settings' },
+    { key: 'settings', label: 'Settings', href: '/settings.html' },
     { key: 'sharing', label: 'Sharing & access', href: '/sharing.html' },
     { key: 'developer', label: 'Developer Mode', href: '/developer.html' },
   ] },
@@ -56,7 +45,9 @@ export const PRESENCE_API = {
   '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', tagline: 'Neighbourhood kitchen' }, location: {} } },
   '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
   '/media': { data: [] }, '/settings': { data: { pages: [] } }, '/notes': { data: [] },
-  '/health': { data: { state: 'healthy', sentence: 'Marlow’s Kitchen is live and healthy.' } },
+  '/health': { data: { state: 'healthy', sentence: 'Marlow’s Kitchen is live and healthy.', detail: '', first_run: false, facts: {
+    website: { state: 'live', label: 'Live', detail: 'presence-abc.netlify.app' }, draft: { state: 'changes', label: '2 changes', detail: 'ready to publish' },
+    last_publish: { label: 'Sun, Oct 5', detail: 'published by you' }, domain: { label: '—', state: 'none', detail: '' } } } },
   '/changes': { data: { count: 2, first_publish: false, changes: [{ section: 'hours', sentence: 'Your hours changed' }, { section: 'about', sentence: 'Your tagline changed' }], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
   '/moments': { data: [] },
   '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, updated_at: null, updated_by: null } },
