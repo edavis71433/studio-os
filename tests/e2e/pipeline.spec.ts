@@ -1849,7 +1849,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
 // 409s. Now both wear the one chip in its one tone, "overdue" is judged on the
 // studio's local day, and a processing row has no Send/Resend · Copy link · Void
 // — the client already paid; the money is on its way.
-const DEAL9 = '99999999-9999-4999-8999-999999999999';
+const DEAL10 = '10101010-1010-4010-8010-101010101010';
 const M_PAID = 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbbb';
 const M_PROC = 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbbb';
 const M_UP = 'bbbbbbb3-3333-4333-8333-bbbbbbbbbbbb';
@@ -1868,16 +1868,16 @@ const MONEY_INVOICES = [
 // processing_since, its UTC `state`) — the page re-runs the mirror on its own day
 const MONEY_RCV = MONEY_INVOICES.filter((i) => i.status === 'open').map((i) => ({
   id: i.id, title: i.title, amount_cents: i.amount_cents, due_date: i.due_date, status: 'open', processing_since: i.processing_since,
-  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL9, deal: 'Harbor Dental', stripe_url: i.stripe_url,
+  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL10, deal: 'Harbor Dental', stripe_url: i.stripe_url,
 }));
 const MONEY_API = {
   ...API,
-  [`/sales/deals/${DEAL9}`]: { data: {
-    deal: { id: DEAL9, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
+  [`/sales/deals/${DEAL10}`]: { data: {
+    deal: { id: DEAL10, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
     contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Harbor Dental', notes: '' },
     proposals: [], contracts: [], events: [], timeline: [], invoices: MONEY_INVOICES, last_contacted_at: past(1),
   } },
-  [`/sales/deals/${DEAL9}/tasks`]: { data: [] },
+  [`/sales/deals/${DEAL10}/tasks`]: { data: [] },
   '/sales/summary': { data: {
     total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
     by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
@@ -1889,7 +1889,7 @@ const MONEY_API = {
 test.describe('money in four states — the drawer rows and the "Who owes you" list', () => {
   test('every row wears Paid · Processing · Upcoming · Overdue from the one formula, and a processing row has no Resend / Copy link / Void', async ({ page }) => {
     await installApp(page, { api: MONEY_API });
-    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await page.goto(`/pipeline.html?deal=${DEAL10}&dtab=billing`);
     const row = (t: string) => page.locator('#detailInner .lr').filter({ hasText: t });
     // the chip is the state word in its one tone — never the raw status word
     await expect(row('Discovery').locator('.stage')).toHaveText('Paid');
@@ -1950,7 +1950,7 @@ test.describe('money in four states — the drawer rows and the "Who owes you" l
     // the processing row: Open deal only
     await expect(rc('Deposit')).toContainText('payment on its way');
     await expect(rc('Deposit').locator('[data-send-inv], [data-copy-pay], [data-void-inv]')).toHaveCount(0);
-    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL9}"]`)).toBeVisible();
+    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL10}"]`)).toBeVisible();
     // the waiting rows keep chasing
     await expect(rc('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
     await expect(rc('Balance').locator('[data-copy-pay]')).toHaveCount(1);
