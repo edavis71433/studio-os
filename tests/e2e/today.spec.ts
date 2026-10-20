@@ -822,11 +822,7 @@ test.describe('Today — the studio home (mockup)', () => {
     expect(await rows.first().evaluate((el) => Array.from(el.children).map((c) => c.tagName).join(','))).toBe('A,BUTTON');
   });
 
-  test('This week: Done clears the step on the deal (the existing per-deal PATCH) and removes the row; the last one takes the section', async ({ page }, testInfo) => {
-    // the mobile project runs WebKit, where the harness does not route a
-    // cross-origin write (the POST/PATCH preflight reaches the network) — the
-    // feed row's own "clicking Done" test above has the same gap
-    test.skip(testInfo.project.name === 'mobile', 'cross-origin writes are not routed under the WebKit mobile project');
+  test('This week: Done clears the step on the deal (the existing per-deal PATCH) and removes the row; the last one takes the section', async ({ page }) => {
     const patched: Array<{ url: string; body: string }> = [];
     await installApp(page, { api: { '/sales/deals': NEXT_STEPS() } });
     await page.route('**/functions/v1/presence/sales/deals/*', async (route) => {
@@ -866,8 +862,7 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(week.getByText('Nothing overdue.')).toHaveCount(0);
   });
 
-  test('This week: a failed Done keeps the row and brings the button back', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'cross-origin writes are not routed under the WebKit mobile project');
+  test('This week: a failed Done keeps the row and brings the button back', async ({ page }) => {
     await installApp(page, { api: { '/sales/deals': { data: [
       { id: 'd9', title: 'Late one', stage: 'lead', expected_value_cents: 1000, next_step: 'Call them back', next_step_at: '2026-01-05' },
     ] } } });
