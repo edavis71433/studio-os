@@ -22,7 +22,7 @@ test.describe('Accessibility', () => {
     '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
     '/commerce/first-run': { data: { dismissed: false, complete: false, done: 1, total: 2, steps: [{ key: 'details', title: 'Add your business details', done: true, hint: '' }, { key: 'publish', title: 'Publish your website', done: false, hint: 'One calm ritual — preview, then publish.' }] } },
   };
-  for (const path of ['/today.html', '/leads.html', '/client.html', '/presence.html', '/help.html']) {
+  for (const path of ['/today.html', '/inbox.html#enquiries', '/client.html', '/presence.html', '/help.html']) {
     test(`no serious/critical axe violations on ${path}`, async ({ page }) => {
       // client.html needs a reviewer context to render its feed
       const api = path === '/presence.html' ? PRESENCE : path === '/client.html' ? {
@@ -40,9 +40,9 @@ test.describe('Accessibility', () => {
 
   // Slice 7 surfaces get scanned OPEN — a closed popover is display:none and
   // invisible to axe, so these are the only scans that actually cover them.
-  test('no serious/critical axe violations with the App Launcher panel open (leads.html)', async ({ page }) => {
+  test('no serious/critical axe violations with the App Launcher panel open (inbox.html)', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
+    await page.goto('/inbox.html#enquiries');
     await page.waitForLoadState('networkidle');
     await page.locator('#dds-waffle').click();
     await expect(page.locator('#dds-drawer')).toBeVisible();
@@ -51,14 +51,13 @@ test.describe('Accessibility', () => {
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
   });
 
-  test('no serious/critical axe violations with the Customers dropdown open (leads.html)', async ({ page }) => {
+  test('no serious/critical axe violations with the Customers dropdown open (contacts.html)', async ({ page }) => {
     // a multi-item Customers section (the real buildNav shape) so the context
     // bar renders the caret dropdown under test
     const nav = [
       { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
       { key: 'customers', label: 'Customers', items: [
         { key: 'customers', label: 'Customers', href: '/customers.html' },
-        { key: 'leads', label: 'Enquiries', href: '/leads.html' },
         { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
         { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
       ] },
@@ -70,15 +69,15 @@ test.describe('Accessibility', () => {
       sees_full_workspace: true, capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html',
       attention_count: 0, nav,
     } } } });
-    await page.goto('/leads.html');
+    await page.goto('/contacts.html');
     await page.waitForLoadState('networkidle');
     // visual refresh: in the sidebar the section you are in (Customers, on
-    // leads.html) is already expanded inline — the scan covers it open as-is;
+    // contacts.html) is already expanded inline — the scan covers it open as-is;
     // clicking its trigger would FOLD it
     const customers = page.locator('.dds-nav .sec:has(> button[data-sec="customers"])');
     await expect(customers).toHaveClass(/\bopen\b/);
     await expect(customers.locator('.menu')).toBeVisible();
-    await expect(customers.locator('.menu a.here')).toHaveText('Enquiries');
+    await expect(customers.locator('.menu a.here')).toHaveText('Contacts');
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);

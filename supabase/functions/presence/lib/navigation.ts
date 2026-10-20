@@ -91,13 +91,14 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasWebsite && !studioLevel) sections.push({ key: 'website', label: 'Website', items: websiteItems() });
 
   // Customers — the relationship area (internally: the CRM): the roster, the
-  // people, the enquiries, broadcasts. FIX 6: the primary "Customers" item opens
+  // people, broadcasts. FIX 6: the primary "Customers" item opens
   // the ROSTER (customers.html), not the single-client record. Opening a customer
   // from the roster lands on the record hub (crm.html).
   if (f.hasRelationship) {
     const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html', desc: 'The people — one may belong to a customer.' });
-    customers.push({ key: 'leads', label: 'Enquiries', href: '/leads.html', desc: 'New messages from your website, waiting to become contacts or deals.' });
+    // Enquiries folded into the Inbox (Oct 2026 workflow audit, change 5) — the
+    // Inbox's desc says "new enquiries", so ⌘K still finds them there.
     customers.push({ key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' });
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }

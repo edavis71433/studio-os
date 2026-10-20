@@ -81,14 +81,14 @@ function defaults(): Record<string, Json> {
       moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
       // a REAL notice row: a database uuid + the period/dismissible pair the feed
       // now ships, so Today can decide whether to offer a manual "Done" at all.
-      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html' }],
+      notices: [{ id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true, headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries' }],
       pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
       last_published: { created_at: '2026-07-05T00:00:00Z', completed_at: '2026-07-05T00:05:00Z' },
     } },
     '/moments': { data: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', tone: 'reminder', dismissable: true }] },
     '/marketplace/features': { data: { features: ['Online menu', 'Booking link'], note: 'These come with your kind of business.' } },
     '/search/health': { data: { verification: { ok: true }, seo_fields: { title: 'Set', description: 'Set' }, links: [] } },
-    '/coach/health': { data: { status: 'attention', headline: 'One thing could help.', suggestions: [{ text: 'Someone’s waiting for a reply.', href: '/leads.html' }] } },
+    '/coach/health': { data: { status: 'attention', headline: 'One thing could help.', suggestions: [{ text: 'Someone’s waiting for a reply.', href: '/inbox.html#enquiries' }] } },
     '/coach/journey': { data: { milestones: [
       { key: 'created', label: 'Your presence began', achieved: true, at: '2026-01-01T00:00:00Z', note: 'Your workspace was created — the journey starts here.' },
       { key: 'published', label: 'First published', achieved: true, at: '2026-02-01T00:00:00Z', note: 'Your website went live for the first time. 🎉' },

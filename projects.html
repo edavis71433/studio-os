@@ -328,7 +328,7 @@ async function api(path,method,body){
 
 // ── roster state: items · per-project report cache · customer-name map ───────
 let ITEMS=[],LOADED_AT=0,Q="";
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+// SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once

@@ -75,6 +75,19 @@
   .lfilters select{flex:1 1 45%;min-width:0;font-size:13px;padding:6px 9px;border-radius:999px;background:var(--bg)}
   .lfilters select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
   .lclear{margin-top:12px}
+  /* ── the Enquiries view's triage toolbar (Oct 2026 audit, change 5: the old
+     Enquiries page folded in here). Open · New · All are an honest role=group
+     with aria-pressed; kind + sort are native selects; New enquiry logs a
+     phone or walk-in enquiry. ── */
+  .efilt{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .efilt button{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border-radius:999px;padding:4px 11px;color:var(--soft)}
+  .efilt button.on{background:var(--p-soft);color:var(--p);border-color:transparent}
+  .efilt .n{font-size:11px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
+  .efilt button.on .n{background:var(--p);color:#fff}
+  .ebar{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+  .ebar select{flex:1 1 30%;min-width:0;font-size:13px;padding:6px 9px;border-radius:999px;background:var(--bg)}
+  .ebar select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
+  .ebar #newEnq{flex:0 0 auto;font-size:12.5px;border-radius:999px;padding:6px 12px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── two-line rows (SLDS split-view listbox idiom) ── */
@@ -134,7 +147,27 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .card .who{font-weight:600;font-size:15.5px}
   .card .body{margin-top:8px;font-size:14.5px;color:var(--soft);white-space:pre-wrap}
-  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  /* Phase 4 (triage): Spam is a quiet text button at the row's far end */
+  .acts button.quiet{border-color:transparent;color:var(--faint);margin-left:auto}
+  .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
+  .pchip.stchip.not_a_fit,.pchip.stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  /* ── dialogs: Make customer (Phase 2) and Log an enquiry ── */
+  /* margin:auto puts the modal back in the middle (the page's *{margin:0} reset pins it top-left) */
+  dialog{margin:auto;border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:460px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:var(--dds-shadow-pop,0 20px 60px rgba(0,0,0,.25))}
+  dialog::backdrop{background:rgba(21,20,26,.4)}
+  #convForm,#newForm{padding:18px 20px}
+  #convForm h3,#newForm h3{margin:0 0 4px;font-size:16px;font-weight:600}
+  #convForm label,#newForm label{display:block;font-size:12.5px;color:var(--soft);margin:12px 0 4px}
+  #convForm label.check,#newForm label.check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13.5px;margin-top:14px}
+  #convForm input[type=text],#convForm input[type=email],#newForm input[type=text],#newForm input[type=email],#newForm input[type=tel],#newForm textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
+  #newForm textarea{min-height:76px;resize:vertical}
+  #convForm input:focus,#newForm input:focus,#newForm textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  #convForm .small,#newForm .small{font-size:12.5px;margin-top:10px}
+  #convForm .row2,#newForm .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #convForm button.primary,:root:not([data-theme="light"]) #newForm button.primary,:root:not([data-theme="light"]) #newEnq{color:#171320}}
+  :root[data-theme="dark"] #convForm button.primary,:root[data-theme="dark"] #newForm button.primary,:root[data-theme="dark"] #newEnq{color:#171320}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
   .allclear{background:var(--good-soft);border:1px solid transparent;border-radius:var(--dds-r-lg,10px);color:var(--good);text-align:center;padding:22px;margin:0 auto;max-width:420px}
@@ -212,6 +245,41 @@
 <body>
 <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 <div id="sheet-host"></div>
+<!-- Phase 2 (one customer model): Make customer — contact + customer (+ a deal)
+     from ONE enquiry. Moved here with the rest of the old Enquiries page. -->
+<dialog id="convDlg" aria-labelledby="convTitle">
+  <form method="dialog" id="convForm">
+    <h3 id="convTitle">Make them a customer</h3>
+    <p class="muted" id="convWho"></p>
+    <label for="conv-biz">Business name</label>
+    <input id="conv-biz" type="text" maxlength="120" placeholder="e.g. Bacchus Kitchen + Wine Bar">
+    <label for="conv-email">Email <span class="muted">(their sign-in invitation goes here)</span></label>
+    <input id="conv-email" type="email" maxlength="160">
+    <label class="check"><input id="conv-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
+    <p class="muted small">This sets up their workspace and emails them a sign-in link. They land in Customers with the whole relationship in one record.</p>
+    <div class="row2"><button type="button" id="conv-cancel">Not now</button><button type="submit" class="primary" id="conv-go">Make customer</button></div>
+  </form>
+</dialog>
+<!-- "New enquiry" — log someone who reached out by phone or in person. Reuses
+     the existing contact + deal routes (POST /sales/contacts, POST /sales/deals
+     with source:'manual'); the website form stays the only source of rows in
+     the Enquiries queue. -->
+<dialog id="newDlg" aria-labelledby="newTitle">
+  <form method="dialog" id="newForm">
+    <h3 id="newTitle">Log an enquiry</h3>
+    <p class="muted">Someone reached out by phone or in person? Put them in Customers so nothing slips.</p>
+    <label for="ne-name">Name</label>
+    <input id="ne-name" type="text" maxlength="120" autocomplete="off">
+    <label for="ne-email">Email</label>
+    <input id="ne-email" type="email" maxlength="160" autocomplete="off">
+    <label for="ne-phone">Phone <span class="muted">(optional)</span></label>
+    <input id="ne-phone" type="tel" maxlength="40" autocomplete="off">
+    <label for="ne-msg">What did they ask? <span class="muted">(optional)</span></label>
+    <textarea id="ne-msg" maxlength="2000" placeholder="e.g. Wants a quote for a patio before spring"></textarea>
+    <label class="check"><input id="ne-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
+    <div class="row2"><button type="button" id="ne-cancel">Not now</button><button type="submit" class="primary" id="ne-go">Log enquiry</button></div>
+  </form>
+</dialog>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The studio Inbox — a split-view console (Salesforce Split View anatomy,  ──
@@ -223,9 +291,12 @@
 // your OK · Enquiries · Support. RIGHT: the reading pane renders the selected
 // conversation IN PLACE — the client's activity timeline + a Message composer
 // (same anatomy as the record page), the approval card with inline Approve/Not
-// yet, the enquiry card with Reply/→Deal/Mark read/Archive, or the support
-// thread with a status control + reply. <760px the panes stack (D5): list
-// first, picking a row pushes the pane in with a back button.
+// yet, the enquiry card with Reply/→Deal/Make customer/Mark read/Not a fit/Spam,
+// or the support thread with a status control + reply. <760px the panes stack
+// (D5): list first, picking a row pushes the pane in with a back button.
+// Oct 2026 workflow audit, change 5: the Enquiries view IS the old Enquiries page
+// (leads.html, now a forwarding stub) — every enquiry, one row each, with its
+// Open · New · All chips, the kind filter, Newest/Oldest and "New enquiry".
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -252,6 +323,10 @@ let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest
 // Approvals (approval-center.html) and Website attention (attention.html) pages
 // redirect here as #ok and #website (Oct 2026 workflow audit, change 1).
 let VIEW=(()=>{const h=String(location.hash||'').slice(1);return ['messages','ok','enquiries','website','support'].indexOf(h)>=0?h:'everything';})(),SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// the Enquiries view's own narrowing (the old Enquiries page's controls):
+// status chip · kind · order. Open = still in play (new, read, replied,
+// converted); Not a fit / archived only under All.
+let EFILTER='open',KIND_F='all',SORT='newest';
 // ── the client · project lenses (D-filter) ───────────────────────────────────
 // Eric: "messages still cant be filtered by project/contact unless i go through
 // their profile". This is a LENS, not a relocation. Every option is derived from
@@ -278,7 +353,7 @@ function inboxUrl(){
   const q=p.toString();return location.pathname+(q?'?'+q:'');
 }
 function readFiltersFromUrl(){const q=QP();FCLIENT=q.get('client_id')||'';FPROJECT=q.get('project')||'';}
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html/customers.html
+// SS6 shared ~150ms debounce — kept in sync by hand with contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 // one delegated closer for both header menus (attached ONCE — renderConsole may
 // rebuild the header many times; per-render document listeners would pile up)
@@ -289,7 +364,16 @@ document.addEventListener('click',(e)=>{
 });
 const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['website','Website'],['support','Support & requests']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
-const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='website'&&(it.kind==='approval'||it.kind==='lead'))||(VIEW==='support'&&it.kind==='support');
+// The Enquiries view lists the QUEUE rows (every enquiry from /forms/inbox, one
+// row each, any status); every other view lists the feed's per-person rows. If
+// the /forms/inbox read failed, Enquiries falls back to the feed's rows.
+const viewMatch=(it)=>{
+  if(VIEW==='enquiries')return it.kind==='lead'&&(LEADS_FAILED?!it.queue:!!it.queue);
+  if(it.queue)return false;
+  return VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='website'&&(it.kind==='approval'||it.kind==='lead'))||(VIEW==='support'&&it.kind==='support');
+};
+// what the Everything view counts — the queue's rows are the Enquiries view's own
+const inboxCount=()=>ITEMS.filter(x=>!x.queue).length+SYSROWS.length;
 
 // ── build the conversation items from the ONE feed (+ enquiry fallback) ──────
 // Messages from your clients — feed.client_messages, grouped ONE row per client
@@ -346,8 +430,13 @@ function buildItems(feed,leads,notifs){
   // enquiries: the feed's per-lead rows (slice 2 — the server serves status=new
   // only). An older function build without feed.enquiries degrades to the page's
   // own /forms/inbox read, counting NON-ARCHIVED (C7: the same arithmetic as
-  // leads.html's Open — one queue, one count; heuristic dots for 'new' only).
-  const enq=Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit');
+  // the Enquiries view's Open — one queue, one count; heuristic dots for 'new' only).
+  // A feed row and a queue row for the same enquiry SHARE one lead object, so a
+  // mark made from either view (read, replied, in pipeline) shows in both.
+  const leadById=new Map((leads||[]).map(l=>[String(l.id),l]));
+  // (the feed's fields win where both carry one — it is the per-thread read)
+  const shared=(l)=>{const q=leadById.get(String(l.id));return (q&&q!==l)?Object.assign(q,l):l;};
+  const enq=(Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit')).map(shared);
   // Phase 4 (triage): one row per PERSON. The same visitor submitting four forms
   // showed as four rows ("Eddie ×4"); they group under the newest, with a count.
   const byPerson=new Map();
@@ -361,6 +450,13 @@ function buildItems(feed,leads,notifs){
   for(const {lead:l,count} of byPerson.values()){
     items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
       name:(l.name||l.email||'Someone')+(count>1?` · ${count} messages`:''),when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
+  }
+  // the Enquiries queue (the old Enquiries page): EVERY enquiry, one row each,
+  // whatever its status — the view's chips decide which ones show
+  for(const l of (leads||[])){
+    items.push({kind:'lead',queue:true,id:'enq:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
+      name:l.name||l.email||l.phone||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
       chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
   }
   // sorted by newest first; undated items (approvals) stay on top — they're waiting
@@ -415,6 +511,7 @@ function renderConsole(){
         </div>
         <input class="search" id="q" type="search" aria-label="Search conversations" placeholder="Search conversations…" value="${esc(Q)}">
         <div class="lfilters" id="lfilters" hidden></div>
+        ${VIEW==='enquiries'?enqToolbar():''}
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -462,6 +559,47 @@ function renderConsole(){
     else if(e.key==='Enter'&&ACTIVE>=0&&vis[ACTIVE]){e.preventDefault();activateRow(vis[ACTIVE]);}
   });
   renderLenses();
+  wireEnqToolbar();
+}
+
+// ── the Enquiries view's toolbar (the old Enquiries page's controls) ─────────
+// Built once per view change; a chip, kind or sort change repaints the LIST
+// only, so the controls (and the search input) keep their nodes and focus.
+function enqToolbar(){
+  const chip=(f,label)=>`<button type="button" data-ef="${f}" aria-pressed="${EFILTER===f?'true':'false'}" class="${EFILTER===f?'on':''}">${label}${f==='all'?'':' <span class="n" hidden></span>'}</button>`;
+  const opt=(v,label,cur)=>`<option value="${v}"${cur===v?' selected':''}>${label}</option>`;
+  return `<div class="efilt" id="efilt" role="group" aria-label="Filter enquiries">${chip('open','Open')}${chip('new','New')}${chip('all','All')}</div>
+    <div class="ebar">
+      <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
+      <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
+      <button type="button" class="primary" id="newEnq">+ New enquiry</button>
+    </div>`;
+}
+function wireEnqToolbar(){
+  const ef=$('efilt');if(!ef)return;
+  ef.querySelectorAll('[data-ef]').forEach(b=>b.addEventListener('click',()=>{
+    EFILTER=b.getAttribute('data-ef');
+    ef.querySelectorAll('[data-ef]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});
+    narrowed();
+  }));
+  const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
+  const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
+  $('newEnq').addEventListener('click',openNew);
+}
+// the queue's counts on the Open / New chips — every enquiry, before search
+function paintEnqCounts(){
+  const ef=$('efilt');if(!ef)return;
+  const q=ITEMS.filter(x=>x.kind==='lead'&&viewMatch(x)).map(x=>String((x.lead&&x.lead.status)||'new'));
+  const n={open:q.filter(s=>s!=='archived'&&s!=='not_a_fit').length,new:q.filter(s=>s==='new').length};
+  ef.querySelectorAll('[data-ef] .n').forEach(s=>{const v=n[s.parentNode.getAttribute('data-ef')]||0;s.textContent=String(v);s.hidden=!v;});
+}
+// a narrower list: the roving index resets, and a selection the list no longer
+// shows is let go (never strand the pane on a hidden row)
+function narrowed(){
+  ACTIVE=-1;
+  const lost=SEL&&!visibleRows().some(r=>r.id===SEL);
+  if(lost)SEL='';
+  renderList();if(lost)renderPane();
 }
 
 // ── the client · project lenses ───────────────────────────────────────────────
@@ -530,8 +668,27 @@ window.addEventListener('popstate',()=>{
 // preview · chip) and system rows (label · tag) alike.
 function rowMatch(r){
   const q=Q.trim().toLowerCase();if(!q)return true;
-  const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+(r.chip||''));
+  // an enquiry also answers to its email and phone (the old Enquiries search)
+  const l=r.lead||{};
+  const hay=r.sys?((r.label||'')+' '+(r.tag||'')):((r.name||'')+' '+(r.preview||'')+' '+rowChip(r)+' '+(l.email||'')+' '+(l.phone||''));
   return hay.toLowerCase().includes(q);
+}
+// the Enquiries view's status chip + kind filter (other views: no-op)
+function enqMatch(r){
+  if(VIEW!=='enquiries'||r.kind!=='lead')return true;
+  const l=r.lead||{},st=String(l.status||'new');
+  if(EFILTER==='open'&&(st==='archived'||st==='not_a_fit'))return false;
+  if(EFILTER==='new'&&st!=='new')return false;
+  return KIND_F==='all'||(l.form_kind||'contact')===KIND_F;
+}
+// Phase 4 (triage): where an enquiry went, in plain words. `new` and `read`
+// show nothing (the dot says "new"); in the pipeline shows the deal link.
+const STATUS_LABEL={replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit'};
+// a queue row's chip says the kind AND where it went, so All reads at a glance
+function rowChip(r){
+  if(!(r.queue&&r.lead))return r.chip||'';
+  const st=r.lead.converted?'In pipeline':STATUS_LABEL[r.lead.status];
+  return (KIND[r.lead.form_kind]||'Message')+(st?' · '+st:'');
 }
 // The lenses narrow by IDENTITY, not by text — a client row answers to its own
 // client_id (0115's durable link, resolved server-side), a conversation to every
@@ -547,7 +704,11 @@ function lensMatch(r){
   return true;
 }
 // the Website view = what your site needs: approvals, its enquiries, and the site's own notices
-function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch);}
+function visibleRows(){
+  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch);
+  // the Enquiries view can flip to oldest first (ITEMS are newest first)
+  return (VIEW==='enquiries'&&SORT==='oldest')?v.sort((a,b)=>String(a.when).localeCompare(String(b.when))):v;
+}
 // Every narrowing that is actually in force, in plain words. The VIEW is left
 // out on purpose — it has its own visible control and its own older copy.
 function activeLens(){
@@ -575,10 +736,11 @@ function renderList(){
   const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
   if(VIEW==='enquiries'){
-    // C7: the Enquiries count speaks leads.html's vocabulary — non-archived
-    // total with the "M new" qualifier (one queue, one arithmetic).
+    // C7: "N enquiries · M new" — what the queue SHOWS (chip, kind and search
+    // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
-    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by newest`;
+    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
+    paintEnqCounts();
   }else{
     $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
   }
@@ -594,6 +756,14 @@ function renderList(){
   // this codebase's recurring defect is the empty state that won't say why.
   if(!vis.length){
     const bits=activeLens();
+    // the Enquiries view's own narrowing names itself (the old page's copy)
+    if(VIEW==='enquiries'&&!FCLIENT&&!FPROJECT){
+      const msg=(Q.trim()||KIND_F!=='all')?`No enquiries match${Q.trim()?` “${esc(Q.trim())}”`:' that filter'}.`
+        :EFILTER==='new'?'No new enquiries — you’re caught up.'
+        :'Nothing yet. When someone fills in your website’s contact form, it lands here — and in Customers.';
+      rows.innerHTML=`<li class="lempty" role="presentation">${msg}${bits.length?`<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`:''}</li>`;
+      renderPane();return;
+    }
     rows.innerHTML=`<li class="lempty" role="presentation">${bits.length
       ?`Nothing here matches ${joinBits(bits)}.<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`
       :VIEW==='everything'&&!TOTAL?((FEED_FAILED||LEADS_FAILED)?'Nothing we could load just now.':'✓ You’re all caught up.'):'Nothing here — this view is all clear.'}</li>`;
@@ -613,7 +783,7 @@ function renderList(){
       <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
       <span class="rmain">
         <span class="rtop"><span class="rname">${esc(it.name)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
-        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(it.chip)}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
+        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(rowChip(it))}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
       </span></li>`;
   }
   rows.innerHTML=h;
@@ -625,6 +795,8 @@ function openItem(id){
   const it=ITEMS.find(x=>x.id===id);if(!it)return;
   SEL=id;
   it.unread=false;   // the dot clears the moment the conversation opens (optimistic)
+  // …and on its twin: an enquiry's feed row and queue row are one thread
+  if(it.thread_key)ITEMS.forEach(x=>{if(x.thread_key===it.thread_key)x.unread=false;});
   if(it.thread_key)api('/threads/read','POST',{thread_key:it.thread_key}).catch(()=>{});
   renderList();
   renderPane();
@@ -663,7 +835,7 @@ function renderPane(){
       ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Pick a conversation</h2><p class="muted">Choose a row on the left — it opens right here.</p></div>`
       :bits.length
       ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing matches this filter</h2><p class="muted">Nothing here matches ${joinBits(bits)}.</p><p class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></p></div>`
-      :ITEMS.length
+      :ITEMS.some(x=>!x.queue)
         ?`<div class="center" style="margin:auto"><div class="allart" aria-hidden="true">🗂</div><h2>Nothing in this view</h2><p class="muted">Nothing in this view — check Everything.</p></div>`
         :`<div class="center" style="margin:auto"><div class="allclear"><div class="allart" aria-hidden="true">🌤</div>✓ Nothing needs you right now — the platform is watching the rest.<p style="margin-top:12px"><a class="link" href="${esc(scoped('/today.html'))}">See how the business is doing →</a></p></div></div>`;
     return;
@@ -923,30 +1095,36 @@ function paneApproval(host,it){
   // pane — list scroll and console state survive — then re-run the loaders so
   // the feed-derived counts catch up. Never location.reload(), which nuked the
   // whole console (view, collapse, scroll, drafts).
-  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=ITEMS.length+SYSROWS.length;SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
+  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=inboxCount();SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
   host.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
   host.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
 }
 
-// ── An enquiry row → the lead card: a reply composer (sent from Studio OS) · → Deal · Mark read · Archive ─
+// ── An enquiry row → the lead card: a reply composer (sent from Studio OS) ·
+//    → Deal · Make customer · Mark read · Not a fit · Spam ─────────────────────
 // Oct 2026 workflow audit, change 5: the reply is written and sent HERE
 // (POST /forms/inbox/:id/reply) — it used to be a mailto: that left the app and
 // recorded nothing. The person's email reply comes back to this Inbox; the
-// mail-app link stays as a quiet fallback.
+// mail-app link stays as a quiet fallback. The triage that lived on the old
+// Enquiries page (leads.html) moved here with it: Make customer, Not a fit,
+// Spam, and the "✓ In pipeline — view deal" state of a converted enquiry.
 function leadGreeting(l){return (l.name?`Hi ${String(l.name).split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';}
 function paneLead(host,it){
   const l=it.lead||{};
   const sent=Array.isArray(l.replies)?l.replies:[];
+  const st=String(l.status||'new');
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
-  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${STATUS_LABEL[st]?`<span class="pchip plain stchip ${esc(st)}">${STATUS_LABEL[st]}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
       <div class="acts">
-        <button id="leadDeal" title="Start a deal in your pipeline from this enquiry">→ Deal</button>
-        ${String(l.status||'new')==='new'?`<button id="leadRead">Mark read</button>`:''}
-        <button id="leadArch">Archive</button>
+        ${l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
+        ${(l.converted||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
+        ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
+        ${(l.converted||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
+        ${l.converted?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">⚑ Spam</button>`}
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
@@ -954,11 +1132,6 @@ function paneLead(host,it){
       <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
-  const done=(status,removeRow)=>{
-    if(it.lead)it.lead.status=status;
-    if(removeRow){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderPane();}
-    renderList();
-  };
   // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
   const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
   const lf=$('leadForm');
@@ -973,7 +1146,7 @@ function paneLead(host,it){
         ta.value='';
         l.replies=sent.concat([{body,at:new Date().toISOString()}]);
         toast(`Sent to ${l.email} — their reply comes back here.`);
-        done('replied',false);paneLead(host,it);
+        leadMarked(it,'replied');   // the server marked it Replied; every row that shows it agrees
       }else{
         toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
         btn.disabled=false;btn.textContent='Send reply';
@@ -982,42 +1155,145 @@ function paneLead(host,it){
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
     restoreComposer(it);
   }
-  const mr=$('leadRead');if(mr)mr.addEventListener('click',async()=>{mr.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'});if(r.ok){toast('Marked read.');done('read',false);paneLead(host,it);}else{toast('That didn’t update.');mr.disabled=false;}});
-  const ar=$('leadArch');if(ar)ar.addEventListener('click',async()=>{ar.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'archived'});if(r.ok){toast('Archived.');done('archived',true);}else{toast('That didn’t update.');ar.disabled=false;}});
+  const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));
+  // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
+  const nf=$('leadNotFit');if(nf)nf.addEventListener('click',()=>setLeadStatus(it,'not_a_fit',nf));
+  const sp=$('leadSpam');if(sp)sp.addEventListener('click',()=>markSpam(it,sp));
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
+  const cv=$('leadConvert');if(cv)cv.addEventListener('click',()=>openConvert(it));
 }
-// Prefill the reply so responding is one tap — kept in sync with leads.html by hand
+// ONE path for every enquiry mark. The lead object is shared by the enquiry's
+// feed row and its queue row, so the new status shows in every view at once;
+// rows that can no longer show it drop out (Everything lists only what's still
+// waiting; spam leaves everywhere), and the pane lets go of a row the list no
+// longer shows. Focus never drops to <body>: it stays in the pane when the row
+// stays, else returns to the list.
+function leadMarked(it,status){
+  const id=it.lead_id;
+  if(status!=='spam'&&it.lead)it.lead.status=status;
+  const leaves=(x)=>status==='spam'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
+  ITEMS=ITEMS.filter(x=>!(x.kind==='lead'&&x.lead_id===id&&leaves(x)));
+  ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id&&status!=='new')x.unread=false;});
+  TOTAL=inboxCount();
+  if(SEL&&!visibleRows().some(r=>r.id===SEL))SEL='';
+  renderList();renderPane();
+  if(!SEL){const r=$('rows');if(r)r.focus();return;}
+  const h=document.querySelector('#rpane .pname');
+  const f=(status==='read'||status==='not_a_fit')&&$('leadNotFit')||h;
+  if(f){if(f===h)h.setAttribute('tabindex','-1');f.focus();}
+}
+async function setLeadStatus(it,status,btn){
+  if(btn)btn.disabled=true;
+  const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status});
+  if(!r.ok){toast('That didn’t update.');if(btn)btn.disabled=false;return;}
+  toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='replied'?'Marked replied.':'Marked read.');
+  leadMarked(it,status);
+}
+async function markSpam(it,btn){
+  btn.disabled=true;
+  const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:true});
+  if(!r.ok){toast('That didn’t update.');btn.disabled=false;return;}
+  toast('Marked as spam — it won’t show again.');
+  leadMarked(it,'spam');
+}
+// Phase 2 (one customer model): Make customer = contact + customer (+ deal) from
+// ONE enquiry, no re-typing. The customer route (POST /sales/customers)
+// provisions the workspace and links the contact; the deal rides on the same
+// contact. Then their record opens.
+function openConvert(it){
+  const l=it.lead||{},id=it.lead_id;
+  $('convWho').textContent=(l.name||l.email)+(l.message?' — “'+l.message.slice(0,80)+(l.message.length>80?'…':'')+'”':'');
+  $('conv-biz').value=l.name||''; $('conv-email').value=l.email||''; $('conv-deal').checked=true;
+  const dlg=$('convDlg'); if(!dlg.open)dlg.showModal();
+  $('conv-cancel').onclick=()=>dlg.close();
+  $('convForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const go=$('conv-go'); go.disabled=true; go.textContent='Setting up…';
+    const email=$('conv-email').value.trim(); const biz=$('conv-biz').value.trim()||l.name||'';
+    try{
+      const r=await api('/sales/customers','POST',{email,name:l.name||'',business_name:biz,source_submission_id:id});
+      if(!r.ok){go.disabled=false;go.textContent='Make customer';toast((r.body&&r.body.message)||'Couldn’t set them up just now.');return;}
+      const d=r.body&&r.body.data||{};
+      let dealId=null;
+      if($('conv-deal').checked){
+        let contactId=null;
+        const c=await api('/sales/contacts','POST',{name:l.name||'',email,phone:l.phone||''}); if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;
+        const dd=await api('/sales/deals','POST',{title:biz||l.name||email,contact_id:contactId,source:'website_form',source_submission_id:id});
+        if(dd.ok)dealId=dd.body&&dd.body.data&&dd.body.data.id;
+      }
+      l.converted=true; l.status='converted'; if(dealId)l.deal_id=dealId;
+      go.disabled=false; go.textContent='Make customer';
+      dlg.close(); toast(d.already_exists?'They already had a workspace — opening their record.':'They’re a customer now. Opening their record.');
+      leadMarked(it,'converted');
+      const href=d.site_id?('/crm.html?client='+encodeURIComponent(d.site_id)):(d.client_id?('/crm.html?client_id='+encodeURIComponent(d.client_id)):'/customers.html');
+      setTimeout(()=>{location.href=href;},800);
+    }catch(_){go.disabled=false;go.textContent='Make customer';toast('Couldn’t set them up just now.');}
+  };
+}
+// "New enquiry" — a phone or walk-in enquiry becomes a contact (+ a manual deal)
+// through the routes the page already uses; nothing new server-side.
+function openNew(){
+  const dlg=$('newDlg'); if(!dlg)return;
+  $('ne-name').value='';$('ne-email').value='';$('ne-phone').value='';$('ne-msg').value='';$('ne-deal').checked=true;
+  if(!dlg.open)dlg.showModal();   // showModal() focuses the first field (Name) itself — no timer, no WebKit focus race
+  $('ne-cancel').onclick=()=>dlg.close();
+  $('newForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const name=$('ne-name').value.trim(),email=$('ne-email').value.trim(),phone=$('ne-phone').value.trim(),msg=$('ne-msg').value.trim();
+    if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.');return;}
+    const go=$('ne-go'); go.disabled=true; go.textContent='Logging…';
+    try{
+      const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):''});
+      if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.');return;}
+      const contactId=c.body&&c.body.data&&c.body.data.id;
+      let dealId=null;
+      if($('ne-deal').checked){
+        const d=await api('/sales/deals','POST',{title:name||email||phone,contact_id:contactId,source:'manual',notes:msg?('Enquiry: '+msg):''});
+        if(d.ok)dealId=d.body&&d.body.data&&d.body.data.id;
+      }
+      dlg.close(); go.disabled=false; go.textContent='Log enquiry';
+      toast(dealId?'Logged — they’re in your pipeline.':'Logged — they’re in Customers.');
+      const href=dealId?('/crm.html?deal='+encodeURIComponent(dealId)+'&tab=deal'):(contactId?('/crm.html?contact='+encodeURIComponent(contactId)):'/contacts.html');
+      setTimeout(()=>{location.href=scoped(href);},800);
+    }catch(_){go.disabled=false;go.textContent='Log enquiry';toast('Couldn’t log that just now.');}
+  };
+}
+// Prefill the reply so responding is one tap
 function leadReplyHref(l){
   const kind=l.form_kind==='quote'?'quote request':l.form_kind==='booking'?'booking request':'message';
   const hi=l.name?`Hi ${l.name.split(' ')[0]},`:'Hi,';
   const quoted=l.message?`\n\n> ${String(l.message).replace(/\n/g,'\n> ')}`:'';
   return `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent('Re: your '+kind)}&body=${encodeURIComponent(hi+'\n\nThanks for reaching out.'+quoted+'\n\n')}`;
 }
-// P2-C (Seam 3): promote a captured enquiry into a pipeline deal — no re-typing.
-// Kept in sync with leads.html createDeal by hand; navigates to the new Record.
+// P2-C (Seam 3): promote a captured enquiry into a pipeline deal — no re-typing
+// (source_submission_id carries the enquiry; the server copies its text).
+// Navigates to the new Record.
 async function createDeal(it,btn){
-  const l=it.lead||{};btn.disabled=true;
+  const l=it.lead||{},id=it.lead_id;btn.disabled=true;
   const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
   try{
     let contactId=null;
     if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
-    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:it.lead_id});
+    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
     if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));btn.disabled=false;return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     // reflect converted state locally + suppress navigation on already_converted
-    // (idempotent: the server returns the existing deal on a repeat) — mirrors
-    // leads.html createDeal, this function's declared sync source.
-    l.converted=true;l.deal_id=dealId;if(String(l.status||'new')==='new')l.status='read';
-    it.unread=false;
+    // (idempotent: the server returns the existing deal on a repeat)
+    l.converted=true;l.deal_id=dealId;
     toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.');
-    renderList();renderPane();
+    leadMarked(it,String(l.status||'new')==='new'?'read':String(l.status));
     if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
   }catch(_){toast('Couldn’t start that deal.');btn.disabled=false;}
 }
 
 // ── data load / refresh ───────────────────────────────────────────────────────
+// REQ_SEQ (SS6, from the old Enquiries page): a superseded load never paints —
+// two quick refreshes whose first response lands last keep the newest rows.
+let REQ_SEQ=0;
 async function loadData(){
+  const seq=++REQ_SEQ;
   const [feed,leads,notifs]=await Promise.all([api('/portal/feed'),api('/forms/inbox'),api('/notifications?limit=25').catch(()=>({ok:false,body:{}}))]);
+  if(seq!==REQ_SEQ)return 'stale';
   if(!feed.ok&&!leads.ok)return false;
   // exactly one of feed/leads failing still renders the surviving half — but
   // WITH a notice (renderList), never as a quietly complete inbox
@@ -1030,12 +1306,13 @@ async function loadData(){
   // the meta line's honesty: TOTAL counts what the Everything view actually
   // RENDERS (conversation items + system rows) — never raw feed rows, which
   // group and fold differently (one row per client; moments stay counted).
-  TOTAL=ITEMS.length+SYSROWS.length;
+  TOTAL=inboxCount();
   return true;
 }
 async function refresh(){
   let ok=false;
   try{ok=await loadData();}catch(_){ok=false;}   // a network-level reject must still fire the toast
+  if(ok==='stale')return;   // a newer refresh owns the page
   if(!ok){toast('Couldn’t refresh just now.');return;}
   DRAFT=snapComposer();   // an in-progress reply survives the pane rebuild (restored by the pane loaders)
   if(SEL&&!ITEMS.some(x=>x.id===SEL))SEL='';
@@ -1140,6 +1417,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 async function load(){
   readFiltersFromUrl();   // a linked ?client_id=/?project= view lands already narrowed
   const ok=await loadData();
+  if(ok==='stale')return;
   if(!ok){trouble();return;}
   renderConsole();renderList();renderPane();
   api('/notifications/read','POST',{}).catch(()=>{});   // opening the Inbox marks activity seen (clears the bell)

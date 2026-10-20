@@ -7,7 +7,6 @@ const R = await import('../../supabase/functions/presence/routes/commercial.ts')
 const route = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/commercial.ts', import.meta.url));
 const index = await Deno.readTextFile(new URL('../../supabase/functions/presence/index.ts', import.meta.url));
 const inbox = await Deno.readTextFile(new URL('../../inbox.html', import.meta.url));
-const leads = await Deno.readTextFile(new URL('../../leads.html', import.meta.url));
 
 const results = [];
 const ok = (n, p) => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -33,7 +32,6 @@ ok('the inbox read returns replies, never the raw form fields', /rows\.map\(\(\{
 
 // ── the two surfaces ──
 ok('inbox.html: the enquiry pane composes and POSTs …/reply; mailto is only the quiet fallback', /\/reply','POST',\{body\}/.test(inbox) && /id="leadMailto"[^>]*>Use your email app instead/.test(inbox) && !/id="leadReply"/.test(inbox));
-ok('leads.html: Reply opens the in-card composer and POSTs …/reply', /data-compose=/.test(leads) && /'\/forms\/inbox\/'\+id\+'\/reply','POST',\{body\}/.test(leads));
 
 const failed = results.filter((p) => !p).length;
 console.log(`\n════ LEAD REPLY (audit change 5): ${results.length - failed}/${results.length} ${failed ? 'FAILED' : 'PASSED'} ════`);

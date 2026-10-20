@@ -217,7 +217,7 @@ const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
 let TOKEN="",CUSTOMERS=[],LOADED_AT=0;
 function toast(m){if(window.ddsToast)ddsToast(m);}
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/contacts.html
+// SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 
 // ONE delegated closer for the view menu (attached ONCE — render() rebuilds the

@@ -12,7 +12,6 @@ const CRM_NAV = [
   ] },
   { key: 'customers', label: 'Customers', items: [
     { key: 'customers', label: 'Customers', href: '/customers.html' },
-    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
     { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
@@ -36,7 +35,6 @@ const LONG_NAV = [
     { key: 'schedule', label: 'Schedule', href: '/presence.html#schedule' },
     { key: 'projects', label: 'Projects', href: '/projects.html' },
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
-    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
   STUDIO_NAV[STUDIO_NAV.length - 1],       // Help stays last
@@ -254,8 +252,8 @@ test.describe('Context bar (slice 7)', () => {
     // a single-link section: Inbox is the active flat item on inbox.html
     await page.goto('/inbox.html');
     await expect(page.locator('.dds-nav .sec.active > a[data-href="/inbox.html"]')).toHaveAttribute('aria-current', 'page');
-    // a multi-item section: leads.html lights the Customers item (child match)
-    await page.goto('/leads.html');
+    // a multi-item section: contacts.html lights the Customers item (child match)
+    await page.goto('/contacts.html');
     await expect(page.locator('.dds-nav .sec.active > button[data-sec="customers"]')).toHaveAttribute('aria-current', 'true');
     // the record page is never IN the nav — it still lights Customers
     await page.goto('/crm.html?client_id=c-1');
@@ -856,7 +854,6 @@ const SIDE_NAV = [
   { key: 'customers', label: 'Customers', items: [
     { key: 'customers', label: 'Customers', href: '/customers.html' },
     { key: 'contacts', label: 'Contacts', href: '/contacts.html' },
-    { key: 'leads', label: 'Enquiries', href: '/leads.html' },
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
   { key: 'pipeline', label: 'Pipeline', items: [{ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' }] },
@@ -883,11 +880,11 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
     await expect(secOf(page, 'customers')).not.toHaveClass(/\bopen\b/);
     await expect(secOf(page, 'customers').locator('.menu')).toBeHidden();
     await expect(page.locator('.dds-nav .sec.open')).toHaveCount(1);
-    // the enquiries board: Customers open, Enquiries lit, Website folded
-    await page.goto('/leads.html');
+    // the contacts roster: Customers open, Contacts lit, Website folded
+    await page.goto('/contacts.html');
     const customers = secOf(page, 'customers');
     await expect(customers).toHaveClass(/\bopen\b/);
-    await expect(customers.locator('.menu a.here')).toHaveText('Enquiries');
+    await expect(customers.locator('.menu a.here')).toHaveText('Contacts');
     await expect(secOf(page, 'website')).not.toHaveClass(/\bopen\b/);
     await expect(secOf(page, 'website').locator('> button')).toHaveAttribute('aria-expanded', 'false');
     // Today: nothing to expand — every multi-item section folded
@@ -897,7 +894,7 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
 
   test('the expanded list sits INSIDE the column under its trigger — an inline list, not a flyout', async ({ page }) => {
     await installApp(page, { api: { '/portal/context': sideCtx() } });
-    await page.goto('/leads.html');
+    await page.goto('/contacts.html');
     const customers = secOf(page, 'customers');
     const shell = (await page.locator('#dds-shell').boundingBox())!;
     const btn = (await customers.locator('> button').boundingBox())!;
@@ -911,7 +908,7 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
 
   test('a pinned section survives outside clicks and Tab-out; its trigger and Escape fold it; another section can open beside it', async ({ page }) => {
     await installApp(page, { api: { '/portal/context': sideCtx() } });
-    await page.goto('/leads.html');
+    await page.goto('/contacts.html');
     const customers = secOf(page, 'customers');
     const btn = customers.locator('> button');
     await page.evaluate(() => document.body.click());        // outside click: the section you are in stays
@@ -951,10 +948,10 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
     test.skip(testInfo.project.name !== 'tablet', 'iPads show the sidebar and have touch');
     await installApp(page, { api: { '/portal/context': sideCtx() } });
     await installIosFocusSemantics(page);
-    await page.goto('/leads.html');
+    await page.goto('/contacts.html');
     const customers = secOf(page, 'customers');
     await expect(customers).toHaveClass(/\bopen\b/);
-    await customers.locator('.menu').getByRole('link', { name: 'Contacts', exact: true }).tap();
-    await page.waitForURL(/\/contacts\.html/, { timeout: 7_000 });
+    await customers.locator('.menu').getByRole('link', { name: 'Broadcasts', exact: true }).tap();
+    await page.waitForURL(/\/broadcasts\.html/, { timeout: 7_000 });
   });
 });

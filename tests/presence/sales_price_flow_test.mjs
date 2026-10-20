@@ -170,9 +170,10 @@ const pipe = read('pipeline.html');
   ok('the enquiry also rides the immutable created event (survives a notes rewrite)', /detail: \{ source_submission_id: srcSub, \.\.\.\(enquiry \? \{ enquiry: enquiry\.slice\(0, 500\) \} : \{\}\) \}/.test(h));
   ok('ADJACENT FIX: the created event no longer posts source_submission_id as a top-level column (presence_deal_events has no such column — the insert 400’d silently and NO created event was ever written)', !/dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: 'lead', source_submission_id/.test(sales));
   ok('the enquiry text is control-char-cleaned and bounded like every operator string', /enquiry = clean\(sub\.message, 2000\)/.test(h));
-  // leads.html still promotes with the submission link (the server does the rest)
-  const leads = read('leads.html');
-  ok('leads.html still links the submission (source_submission_id) — the server carries the text', /source_submission_id:id/.test(leads));
+  // the Inbox enquiry pane (where the Enquiries page folded in) still promotes
+  // with the submission link (the server does the rest)
+  const inbox = read('inbox.html');
+  ok('inbox.html still links the submission (source_submission_id) — the server carries the text', /source_submission_id:id/.test(inbox));
 }
 
 const passed = results.filter((r) => r.p).length;

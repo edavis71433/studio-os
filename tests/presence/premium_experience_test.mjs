@@ -17,7 +17,7 @@ const NOW = '2026-07-08T12:00:00Z';
   const healthy = coachRead({ live: true, lastPublishedAt: '2026-01-01T00:00:00Z', pendingApprovals: 0, connectedNeedingAttention: 0, searchIssues: 0, leadsWaiting: 0, unpublishedChanges: false, domainExpiringDays: null }, NOW);
   ok('coach: all clear → "Everything looks healthy." + no suggestions', healthy.status === 'healthy' && healthy.headline === 'Everything looks healthy.' && healthy.suggestions.length === 0);
   const one = coachRead({ live: true, lastPublishedAt: '2026-01-01T00:00:00Z', pendingApprovals: 0, connectedNeedingAttention: 0, searchIssues: 0, leadsWaiting: 1, unpublishedChanges: false, domainExpiringDays: null }, NOW);
-  ok('coach: one issue → "One thing could help." + a lead suggestion to /leads.html', one.status === 'attention' && one.headline === 'One thing could help.' && one.suggestions[0].href === '/leads.html');
+  ok('coach: one issue → "One thing could help." + a lead suggestion to the Inbox\'s Enquiries view', one.status === 'attention' && one.headline === 'One thing could help.' && one.suggestions[0].href === '/inbox.html#enquiries');
   const many = coachRead({ live: true, lastPublishedAt: '2026-01-01T00:00:00Z', pendingApprovals: 2, connectedNeedingAttention: 1, searchIssues: 3, leadsWaiting: 2, unpublishedChanges: true, domainExpiringDays: 5 }, NOW);
   ok('coach: many issues → "A couple of things could help." capped at 3 suggestions', many.headline === 'A couple of things could help.' && many.suggestions.length === 3);
   const fresh = coachRead({ live: false, lastPublishedAt: null, pendingApprovals: 0, connectedNeedingAttention: 0, searchIssues: 0, leadsWaiting: 0, unpublishedChanges: false, domainExpiringDays: null }, NOW);

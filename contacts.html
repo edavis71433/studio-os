@@ -294,7 +294,7 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",ALL=[],Q="",LOADED_AT=0;
-// SS6 shared ~150ms debounce — kept in sync by hand with leads.html/customers.html
+// SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 // ONE delegated closer for the view menu (attached ONCE — render() rebuilds the

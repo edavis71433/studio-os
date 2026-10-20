@@ -416,7 +416,7 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
       // emailOperator, not `presence_identity.email || silence` — see the note at
       // the top of this file's operator-mail section (and lib/service_bridge.ts).
       const brand = await loadEmailBrand(lead.site_id);   // BR-1: on the owner's brand
-      emailOperator(lead.site_id, copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/leads.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, 'lead_followup').catch(() => {});
+      emailOperator(lead.site_id, copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/inbox.html#enquiries" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, 'lead_followup').catch(() => {});
     }
   }
   return { nudged };

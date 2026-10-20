@@ -30,7 +30,7 @@ test.describe('Responsive layout', () => {
   const TIERED = [
     '/get-started.html', '/sharing.html',           // form
     '/help.html', '/visual-studio.html', '/broadcasts.html',          // focused
-    '/connections.html', '/leads.html',
+    '/connections.html',
     '/today.html', '/crm.html', '/pipeline.html', '/developer.html',  // working
     '/contacts.html', '/customers.html', '/projects.html',            // data
     '/files.html', '/admin-health.html', '/agency.html', '/analytics.html',

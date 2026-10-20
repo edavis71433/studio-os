@@ -212,7 +212,7 @@ test.describe('CMS workspace', () => {
     await expect(strip.locator('#statVisitors')).toHaveAttribute('href', '/analytics.html');
     await expect(strip.locator('#statEnquiries .v')).toHaveText('2');        // this month only
     await expect(strip.locator('#statEnquiries .s')).toHaveText('1 still new');
-    await expect(strip.locator('#statEnquiries')).toHaveAttribute('href', '/leads.html');
+    await expect(strip.locator('#statEnquiries')).toHaveAttribute('href', '/inbox.html#enquiries');
   });
 
   test('overview: a CMS edition without reports/forms drops those two tiles (no empty cells)', async ({ page }) => {

@@ -241,8 +241,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
 // Phase FLOW: where each notice kind sends the owner when tapped in the bell —
 // straight to the page that resolves it, not a generic landing (one fewer hop).
 const NOTICE_HREF: Record<string, string> = {
-  lead_followup: '/leads.html',
-  website_enquiry: '/leads.html',      // FIX 1: a brand-new website enquiry → the leads inbox
+  lead_followup: '/inbox.html#enquiries',
+  website_enquiry: '/inbox.html#enquiries',   // FIX 1: a brand-new website enquiry → the Inbox's Enquiries view
   connection_expired: '/connections.html', // FIX 2: a degraded connection → reconnect
   missing_required: '/presence.html#pages',  // FIX 4: a section blocking publish → the overview's Pages (content-tree.html retired, Oct 2026)
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline

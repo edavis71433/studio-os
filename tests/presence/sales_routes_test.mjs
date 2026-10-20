@@ -60,12 +60,12 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
 
 // ── cohesion seams + refinements (deep-sweep follow-ups) ──
 {
-  const leads = read('leads.html');
+  const inbox = read('inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
   const pipe = read('pipeline.html');
   const sp = read('set-password.html');
   ok('Seam1: convert links an agency operator’s new customer into their portfolio', /resolveAgencyMember\(principal\.jwt\)/.test(sales) && /presence_agency_clients\?on_conflict=site_id/.test(sales));
   ok('Seam2: the invite lands in the client portal (?next=/client.html) + set-password honors it', /set-password\.html\?next=\/client\.html/.test(sales) && /params\.get\("next"\)/.test(sp));
-  ok('Seam3: leads.html promotes an inquiry into a deal (source_submission_id, no re-typing)', /function createDeal\(/.test(leads) && /source_submission_id:id/.test(leads) && /data-deal=/.test(leads));
+  ok('Seam3: the Inbox enquiry pane promotes an inquiry into a deal (source_submission_id, no re-typing)', /function createDeal\(/.test(inbox) && /source_submission_id:id/.test(inbox) && /id="leadDeal"/.test(inbox));
   ok('refine: expected_close is date-validated (422, not a 502)', /DATE_RE\.test\(closeDate\)/.test(sales) && /DATE_RE = \//.test(sales));
   ok('refine: convert edition is selectable (whitelist, default presence)', /pickPlan\(cb\.plan\)/.test(sales) && /CONVERT_PLANS = new Set/.test(sales));
   ok('refine: pipeline shows ONLY valid next stages (bounded transitions mirror)', /const NEXT=\{lead:\['qualified','lost'\]/.test(pipe));

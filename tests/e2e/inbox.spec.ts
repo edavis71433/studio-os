@@ -10,7 +10,7 @@ import { installApp } from './helpers/app';
 const FEED = { data: {
   role: 'business_owner',
   moments: [{ id: 'm1', headline: 'Add your holiday hours', summary: 'Customers check before they visit.', moment_type: 'reminder', created_at: '2026-07-01T00:00:00Z' }],
-  notices: [{ id: 'n1', kind: 'lead_followup', headline: 'A quote request is waiting for a reply', body: '', href: '/leads.html' }],
+  notices: [{ id: 'n1', kind: 'lead_followup', headline: 'A quote request is waiting for a reply', body: '', href: '/inbox.html#enquiries' }],
   pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: 'Add email authentication.', decide_path: '/foundations/plans/p1/decide' }],
   last_published: null,
   client_messages: [
@@ -24,6 +24,11 @@ const FEED = { data: {
 
 const API = {
   '/portal/feed': FEED,
+  // the Enquiries view's queue (GET /forms/inbox) — the same enquiry the feed
+  // carries, so a row picked in either view is the same enquiry (l-9)
+  '/forms/inbox': { data: { submissions: [
+    { id: 'l-9', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'new', created_at: '2026-07-13T00:00:00Z' },
+  ], unread: 1 } },
   '/notifications': { data: [
     { kind: 'milestone_done', label: 'Milestone reached — Design', href: '/projects/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', created_at: '2026-07-10T00:00:00Z', read: false },
   ], unread_count: 1 },
@@ -281,7 +286,7 @@ test.describe('Inbox — split-view console', () => {
     const misc = rows.getByRole('option').filter({ hasText: 'Other clients' });
     await expect(misc).toBeVisible();
     // F11/C7: no enquiries key → leads come from the page's own /forms/inbox read,
-    // counting NON-ARCHIVED (new + read — the same arithmetic as leads.html Open);
+    // counting NON-ARCHIVED (new + read — the same arithmetic as the Enquiries view's Open);
     // archived stays out
     await expect(rows.getByRole('option').filter({ hasText: 'Sam Rivera' })).toBeVisible();
     await expect(rows.getByRole('option').filter({ hasText: 'Dana Lee' })).toBeVisible();
@@ -457,7 +462,7 @@ test.describe('SS6 — inbox console quick wins', () => {
     await page.locator('#viewMenu [data-view="enquiries"]').click();
     const rows = page.locator('#rows');
     await expect(rows.getByRole('option')).toHaveCount(2);   // non-archived: new + read
-    // one queue, one vocabulary: "N enquiries · M new" — leads.html's arithmetic
+    // one queue, one vocabulary: "N enquiries · M new" (Open hides archived)
     await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new');
   });
 
