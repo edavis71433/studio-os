@@ -215,7 +215,7 @@ html.dds-embed .dds-waffle{display:none!important}
 /* The pill is an INVERTED surface (ink fill), so its text/chips use --dds-bg,
    which flips with the theme — in dark mode the pill is light and the text dark.
    Hardcoded #fff here was white-on-white in dark mode (fixed 2026-07-16). */
-.dds-hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(8px);max-width:min(560px,92vw);
+.dds-hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(8px);width:max-content;max-width:min(560px,92vw);
   background:var(--dds-ink,#1b1525);color:var(--dds-bg,#fff);padding:12px 16px;border-radius:12px;box-shadow:var(--dds-shadow,0 8px 30px rgba(0,0,0,.2));
   font-family:var(--dds-sans,system-ui,sans-serif);font-size:14px;line-height:1.45;display:flex;align-items:center;gap:14px;
   opacity:0;transition:opacity .2s ease,transform .2s ease;z-index:60}

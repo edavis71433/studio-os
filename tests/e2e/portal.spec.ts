@@ -152,7 +152,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(tiles.locator('.hl-k', { hasText: 'Waiting on you' })).toBeVisible();
     await expect(tiles.locator('.hl-v', { hasText: '1 of 3' })).toBeVisible();
     await expect(tiles.locator('.hl-k', { hasText: 'Files shared' })).toBeVisible();
-    await expect(tiles.locator('.hl-v', { hasText: '2026-08-01' })).toBeVisible();
+    await expect(tiles.locator('.hl-v', { hasText: 'Aug 1, 2026' })).toBeVisible();
   });
 
   test('drill-in: the milestone Path shows done ✓ / current ("You’re here") / upcoming', async ({ page }) => {
@@ -221,13 +221,13 @@ test.describe('Client portal — Home queue + project record page', () => {
     await page.route('**/functions/v1/presence/client/approvals/a1/decide', (route) =>
       route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'version_mismatch', message: 'This item was updated — reload the latest version before deciding.' }) }));
     await page.goto(`/client.html?project=${PID}`);
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
     expect(bundleGets).toBe(1);
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('This item was updated');
     // on 409 the record reloads from the bundle rather than retrying the stale hash
     await expect.poll(() => bundleGets).toBe(2);
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
   test('context bar (≥720px): studio identity, nav landmark, bell + account chip', async ({ page }, testInfo) => {
@@ -354,7 +354,7 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await page.goto('/client.html');
     await page.getByRole('button', { name: 'See it first — Homepage design' }).click();
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
   test('mobile: the strip stacks its tiles with no horizontal overflow', async ({ page }, testInfo) => {
@@ -2111,7 +2111,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const rows = page.locator('#main .frow');
     await expect(rows).toHaveCount(3);
     // anatomy: every row leads with the 🧾 type icon and a REAL heading name
-    await expect(rows.nth(0).locator('.fico')).toHaveText('🧾');
+    await expect(rows.nth(0).locator('.fico svg.si')).toHaveCount(1);   // one SVG icon set, never emoji (Oct 2026 experience review)
     await expect(page.locator('#main .frow h3.fname')).toHaveCount(3);
     // paid: green chip, formatted amount, thank-you action — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
@@ -2882,7 +2882,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(rail.getByText('say hello', { exact: false })).toHaveCount(0);
     // …the composer still works, and the other sections all survive
     await expect(rail.locator('#msg')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
     await expect(page.locator('#sec-files')).toContainText('Homepage mockup');
     await expect(page.locator('#sec-support')).toBeVisible();
   });

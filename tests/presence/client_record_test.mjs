@@ -51,7 +51,7 @@ ok('PATH: STAGE_LABEL is byte-identical to pipeline.html', stageLabelMap(crm) !=
 const guidanceMap = (src) => (src.match(/const PIPELINE_GUIDANCE=\{[\s\S]*?\n\};/) || [''])[0];
 ok('PATH: PIPELINE_GUIDANCE is byte-identical to pipeline.html', guidanceMap(crm) !== '' && guidanceMap(crm) === guidanceMap(pipeline));
 ok('PATH: guidance renders BOTH tip and action (the pipeline.html:694 bug, fixed here)', /esc\(g\.tip\)/.test(crm) && /esc\(g\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
-ok('PATH: Mark Stage as Complete advances via the stage route', /Mark Stage as Complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
+ok('PATH: Mark stage complete advances via the stage route', /Mark stage complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
 ok('PATH: won is convert-only — the button becomes a pipeline link', /Convert to customer →/.test(crm) && /signed/.test(crm));
 
 // ═══ Embed mode on the panel pages (still supported for other hosts) ═══

@@ -124,13 +124,15 @@ const CARDS = [
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected' },
   { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.' },
-  { key: 'domains', href: '/admin-health.html', title: 'Domains & email', desc: 'Your domain and every client domain — DNS, renewals, the sending domain.', feature: 'website' },
+  // an owner lands on the Domain & email desk; only an operator gets the platform-wide domains view (admin-health said "Operators only" to everyone else — Oct 2026 experience review)
+  { key: 'domains', href: '/presence.html#domain', hrefOperator: '/admin-health.html', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website' },
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', feature: 'developer', cap: 'use_developer_mode' },
 ];
 let CTX = null;   // /portal/context — the shell already has it; fall back to our own read
 function hasFeature(f) { const list = CTX && CTX.edition_features; return !Array.isArray(list) || list.includes(f); }
 function hasCap(c) { const list = CTX && CTX.capabilities; return !Array.isArray(list) || list.includes(c); }
 function cardHtml(c, status) {
+  if (c.hrefOperator && CTX && CTX.is_operator) c = { ...c, href: c.hrefOperator };
   return `<a class="setcard" href="${esc(c.href)}" data-card="${esc(c.key)}"${/^#/.test(c.href) ? '' : (c.href.indexOf('/presence.html') === 0 || c.href.indexOf('/pipeline.html') === 0 ? '' : ' data-noscope="1"')}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.key]}</svg></span>` +
     `<span class="t"><b>${esc(c.title)}</b><span>${esc(c.desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span></a>`;
@@ -179,7 +181,6 @@ function renderSubline() {
   const bits = [];
   if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
   if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name) + (CTX.plan_key ? '' : ''));
-  bits.push('Loads in one go');
   $('subline').innerHTML = bits.map((x, i) => (i ? '<span class="dot">·</span>' : '') + '<span>' + x + '</span>').join('');
 }
 function signedOut() {

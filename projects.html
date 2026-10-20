@@ -316,7 +316,9 @@ let TOKEN="",FILTER="",STUDIO=true;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
-const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
+// "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
+const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
 const statusLabel=(s)=>String(s||'').replace('_',' ');
 
 async function api(path,method,body){
@@ -333,7 +335,7 @@ const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
 let CUSTTRIED=false;
-const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
+const updatedLabel=()=>{if(!LOADED_AT)return 'Couldn’t load just now';const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 // Table ⇄ Cards display choice, persisted; small screens default to Cards
 // (customers.html's list-view mobile pattern, kept in sync by hand).
@@ -440,7 +442,7 @@ function tableHtml(list){
       <td>${cust==='Internal'?'<span class="mutcell">Internal</span>':(cust==='—'?'<span class="mutcell">—</span>':esc(cust))}</td>
       <td><span class="pill ${esc(st)}">${esc(statusLabel(st))}</span></td>
       <td>${progressCell(p)}</td>
-      <td class="num">${p.target_date?esc(p.target_date):'<span class="mutcell">—</span>'}</td>
+      <td class="num">${p.target_date?esc(niceDay(p.target_date)):'<span class="mutcell">—</span>'}</td>
       <td class="num">${approvalsCell(p)}</td>
     </tr>`;
   }).join('');
@@ -452,7 +454,7 @@ function cardsHtml(list){
     const r=REPORTS[p.id];
     const cust=customerName(p);
     const prog=(r&&r.progress&&r.progress.total>0)?`<div class="cprog"><div class="prog"><i style="width:${Number(r.progress.pct||0)}%"></i></div><span class="pnum mut" style="font-size:11.5px">${Number(r.progress.done||0)}/${Number(r.progress.total||0)} tasks</span></div>`:'';
-    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(p.target_date)):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
+    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(niceDay(p.target_date))):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
   }).join('');
 }
 
@@ -547,6 +549,7 @@ async function load(soft){
     ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();});
   }catch(e){
     if(soft)throw e;
+    if(!$('lhead').innerHTML.trim())$('lhead').innerHTML=headerHtml([]);   // the page keeps its name even when the list could not load
     if(window.ddsError) window.ddsError($('list'),nice(e),load); else $('list').innerHTML='<p class="mut">'+esc(nice(e))+'</p>';
   }
 }
@@ -711,7 +714,7 @@ function pathHtml(milestones){
   }).join('');
   let side='';
   if(curIdx===-1)side='<span class="terminal-chip won">All milestones complete ✓</span>';
-  else if(STUDIO)side=`<button class="btn sm" id="msComplete" data-ms="${esc(milestones[curIdx].id)}">Mark Milestone Complete</button>`;
+  else if(STUDIO)side=`<button class="btn sm" id="msComplete" data-ms="${esc(milestones[curIdx].id)}">Mark milestone complete</button>`;
   return `<div class="pathcard"><div class="pathrow"><ol class="path" aria-label="Milestones">${steps}</ol><div class="path-side">${side}</div></div></div>`;
 }
 
@@ -747,7 +750,7 @@ async function openProject(id){
     //    exist, CSAT when the report carries ratings — omitted honestly otherwise) ──
     const hl=[
       ['Customer',esc(cust)],
-      ['Target date',p.target_date?esc(p.target_date):'—'],
+      ['Target date',p.target_date?esc(niceDay(p.target_date)):'—'],
       ['Progress',rp&&rp.progress?`${Number(rp.progress.pct||0)}% <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">· ${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)} tasks</span>`:'—'],
       ['Waiting on client',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
       ['Files',rp?String(Number(rp.shared_files||0))+' shared':'—'],
@@ -768,13 +771,13 @@ async function openProject(id){
     const hlHtml=`<div class="hl-panel">${hl.map(t=>{const ic=HLI[t[0]]||['','<circle cx="12" cy="12" r="9"/>'];return `<div class="hl"><span class="ico ${ic[0]}" aria-hidden="true"><svg viewBox="0 0 24 24">${ic[1]}</svg></span><div class="hl-main"><div class="hl-k">${t[0]}</div><div class="hl-v">${t[1]}</div></div></div>`;}).join('')}</div>`;
 
     // ── related lists ──
-    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(m.due_date)}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';
+    const ms=(data.milestones||[]).map(m=>`<div class="item"><div class="t">${esc(m.title)}${m.client_visible?'':'<span class="tag">internal</span>'}${m.due_date?`<span class="s">due ${esc(niceDay(m.due_date))}</span>`:''}</div><div class="row2" style="margin-top:0">${m.status==='complete'?'<span class="pill complete">done</span>':(STUDIO?`<button class="btn ghost sm" data-mdone="${m.id}">Mark complete</button>`:'<span class="mut">open</span>')}</div></div>`).join('')||'<div class="empty">No milestones yet — map the journey with + Add.</div>';
     const ts=(data.tasks||[]).map(t=>{
       const d=t.derived||{}; const done=t.status==='done';
       const canBox=done||(T_NEXT[t.status]||[]).includes('done');
       const box=STUDIO?`<input type="checkbox" data-tdone="${t.id}"${done?' checked':''}${canBox?'':' disabled'} aria-label="${canBox?(done?'Reopen':'Mark done')+': '+esc(t.title):esc(t.title)+' is blocked — move it to to-do or in progress first'}">`:'';
       const others=STUDIO?(T_NEXT[t.status]||[]).filter(s=>s!=='done'&&!(done&&s==='todo')).map(s=>`<button class="btn ghost sm" data-task="${t.id}" data-to="${s}">${esc(statusLabel(s))}</button>`).join(''):'';
-      return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">your action</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
+      return `<div class="titem">${box}<div class="tmain"><div class="t${done?' donetext':''}">${esc(t.title)}${t.client_visible?'<span class="tag client">shared</span>':''}${t.client_action_required?'<span class="tag action">needs the client</span>':''}${d.overdue?'<span class="tag overdue">overdue</span>':''}</div><div class="row2"><span class="mut">${esc(statusLabel(t.status))}${t.due_date?' · due '+esc(t.due_date):''}</span>${others}</div></div></div>`;
     }).join('')||'<div class="empty">No tasks yet — add the first one.</div>';
     // the ten standard delivery steps, as the SERVER sees them for this project
     // (absent on the client side, and on any response that predates the field)

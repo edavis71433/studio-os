@@ -161,7 +161,7 @@ test.describe('Projects list view', () => {
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
     await expect(page.locator('tbody tr').first()).toContainText('3/6 tasks');
     await expect(page.locator('tbody tr').first().locator('.badge.wait')).toHaveText('2 waiting');
-    await expect(page.locator('tbody tr').first()).toContainText('2026-08-01');
+    await expect(page.locator('tbody tr').first()).toContainText('Aug 1, 2026');   // dates read as words, never as database strings
     // p3 = internal project with NO report fixture → honest degradation
     const p3row = page.locator('tbody tr[data-id="p3"]');
     await expect(p3row).toContainText('Internal');
@@ -388,7 +388,7 @@ test.describe('Project record page', () => {
     // highlights: Customer · Target date · Progress · Waiting on client · Files
     const hl = page.locator('.hl-panel');
     await expect(hl).toContainText('Acme Bakery');
-    await expect(hl).toContainText('2026-08-01');
+    await expect(hl).toContainText('Aug 1, 2026');   // dates read as words (Oct 2026 experience review)
     await expect(hl).toContainText('50%');
     await expect(hl).toContainText('3/6 tasks');
     await expect(hl).toContainText('2 approvals');
@@ -418,7 +418,7 @@ test.describe('Project record page', () => {
     await expect(page.locator('#tsList .titem')).toHaveCount(2);
     // visibility tags survive the redesign
     await expect(page.locator('#tsList .tag.client')).toHaveText('shared');
-    await expect(page.locator('#tsList .tag.action')).toHaveText('your action');
+    await expect(page.locator('#tsList .tag.action')).toHaveText('needs the client');
     // done task: checked + struck; open task: unchecked
     await expect(page.locator('[data-tdone="t2"]')).toBeChecked();
     await expect(page.locator('[data-tdone="t1"]')).not.toBeChecked();

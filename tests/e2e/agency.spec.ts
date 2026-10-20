@@ -358,7 +358,7 @@ test.describe('Agency portfolio', () => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
     const q = page.locator('#queues');
-    await expect(q.locator('.qhead')).toContainText('What needs you today');
+    await expect(q.locator('.qhead')).toContainText('Needs you');
     await expect(q.locator('.rcard .rh')).toContainText('High priority');
     const link = q.locator('.rrows a').first();
     await expect(link).toContainText('SSL certificate is missing');
