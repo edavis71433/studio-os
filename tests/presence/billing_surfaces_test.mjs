@@ -27,7 +27,10 @@ ok('service: scoped to the caller\'s own customer (tenant-safe, multi-tenant pre
 // Allow-list, not a not-paid test: `status !== 'paid'` was harmless only while
 // 'void' was unreachable. POST /sales/invoices/:id/void now makes it reachable,
 // and a WITHDRAWN invoice must never come with a live pay button.
-ok('service: exposes a pay link ONLY for an OPEN invoice (never paid, never voided)', /i\.status === 'open' && i\.stripe_url\) \? i\.stripe_url : null/.test(client));
+// Oct 2026 (item 2): the allow-list is now the two states that still WAIT on
+// the client — upcoming + overdue — so a PROCESSING (settling ACH) payment
+// never gets a second Pay button either.
+ok('service: exposes a pay link ONLY for an invoice still waiting on the client (never paid, voided or processing)', /\(state === 'upcoming' \|\| state === 'overdue'\) && i\.stripe_url\) \? i\.stripe_url : null/.test(client));
 
 // ── Studio surface: sees the customer's SaaS status, read-only, distinguished ──
 ok('studio: project view surfaces the customer SaaS status (read-only)', /customer_saas/.test(projects) && /managed_by_customer: true/.test(projects));
@@ -46,10 +49,13 @@ ok('client app: states the software subscription is billed separately', /billed 
 // the Pay action exists ONLY past the paid and void/canceled guards, opens the
 // server's pay_url in a new tab with rel=noopener, and is named per invoice
 ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, https-only, noopener)',
-  /const act=i\.status==='paid'\?/.test(clientHtml) && /:dead\?''/.test(clientHtml)
+  // Oct 2026 (item 2): the guards read the one money formula's state — paid,
+  // then void/canceled (dead), then PROCESSING (the client already paid) — and
+  // only then the pay link
+  /const act=st==='paid'\?/.test(clientHtml) && /:dead\?''/.test(clientHtml) && /:st==='processing'\?paidConfirmNote\(i\)/.test(clientHtml)
   // the anchor renders ONLY through the https-allowlisted `pay` value (the
   // scheme gate is the review's defense-in-depth on the money surface)
-  && /const pay=i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
+  && /const pay=st!=='processing'&&i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
   && /:pay\?`<a class="fbtn pay" href="\$\{esc\(pay\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;

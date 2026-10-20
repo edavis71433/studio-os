@@ -306,7 +306,10 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     if (dealId || conv.clientId) {
       try {
         const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${conv.clientId}`;
-        invoices = arr(await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`));
+        // processing_since lands with migration 0132 (tolerant: pre-0132 shape second)
+        let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
+        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
+        invoices = arr(ir);
       } catch { invoices = []; }
     }
     // site-ops events (publishes, approvals, notes, connected, moments) — only

@@ -123,6 +123,7 @@
   .schip.good{background:var(--good-soft);color:var(--good)}
   .schip.warn{background:var(--warn-soft);color:var(--warn)}
   .schip.bad{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+  .schip.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}   /* Oct 2026: the Processing money state */
   .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:14.5px}
   .kv .k{color:var(--faint);font-weight:600}
   .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
@@ -365,6 +366,31 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const fmtC=(c)=>'$'+Math.round((Number(c)||0)/100).toLocaleString();
 const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)+'T12:00:00Z');if(isNaN(t))return'';return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+// ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
+// mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
+// one case table against the module and every page's copy). The record runs
+// it against the studio's LOCAL day, exactly as today.html does, so the band
+// and the record never disagree about the same invoice. ──
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
+function recTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+const invState=(v)=>moneyState(v,recTodayYmd());
+// still WAITING on the client (upcoming + overdue) — a processing payment is on its way, not owed
+const invWaiting=(list)=>(list||[]).filter(v=>{const s=invState(v);return s==='upcoming'||s==='overdue';});
 
 // ── stage maps — kept in sync with pipeline.html by hand (its STAGES /
 // PIPELINE_GUIDANCE / BOARD_NEXT blocks, which mirror lib/pipeline_guidance.ts
@@ -640,13 +666,16 @@ function renderHighlights(){
   // live in the rail's details card, and only fill in here when there's no deal.
   const tiles=[];
   const inv=(DEAL&&DEAL.invoices)||[];
-  const paid=inv.filter(v=>v.status==='paid'); const openInv=inv.filter(v=>v.status==='open');
+  const paid=inv.filter(v=>invState(v)==='paid'); const openInv=invWaiting(inv);
   const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
   const owed=DEAL&&DEAL.deal?openInv.reduce((a,b)=>a+(b.amount_cents||0),0):(hl.owed_cents||0);
+  // the four states, one formula (item 2): the tile's sub-line names them
+  const mb=moneyBuckets(inv,recTodayYmd());
   const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.title&&d.title!==((REC.header||{}).name||'')?d.title:'')});
   if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
     tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
-  if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':'',s:owed?esc((openInv.length||1)+(openInv.length===1||!openInv.length?' invoice':' invoices')+' · due now'):'All paid up'});
+  const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
+  if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':(mb.processing.count?'info':''),s:esc(owedSub)});
   const ns=(d.id?d.next_step:hl.next_step)||'';
   // Phase 3 (stage-aware): with no next step set, the tile suggests the stage's
   // own "do next" (a won deal says "open their project", never a blank dash)
@@ -882,7 +911,6 @@ function renderDealTab(host){
   const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
   const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
   const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
-  const invChip=(s)=>s==='paid'?'good':s==='open'?'warn':'';
   let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(d.title||'Deal')}</span><a class="link" href="${esc(link)}">Open in pipeline →</a></div><div class="kv">`;
   const rows=[];
   if(d.expected_value_cents)rows.push(['Value',fmtC(d.expected_value_cents)]);
@@ -894,7 +922,7 @@ function renderDealTab(host){
   html+=`</div></div></section>`;
   // Stage-aware "what now": one honest line + the one button that matters.
   // A won deal points at billing and the project, never at an unsent draft.
-  const inv=DEAL.invoices||[]; const open=inv.filter(v=>v.status==='open'); const paid=inv.filter(v=>v.status==='paid');
+  const inv=DEAL.invoices||[]; const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
   const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0);
   const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
   let now='';
@@ -930,7 +958,7 @@ function renderBillingTab(host){
   const c=DEAL.contact||REC.header||{}; const noEmail=!(c&&c.email);
   const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
   const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
-  const inv=(DEAL.invoices||[]); const open=inv.filter(v=>v.status==='open'); const paid=inv.filter(v=>v.status==='paid');
+  const inv=(DEAL.invoices||[]); const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
   const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0); const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
   const act=(attrs,label,title)=>`<button type="button" class="rbtn" ${attrs}${title?` title="${esc(title)}"`:''}>${label}</button>`;
   let html='';
@@ -948,12 +976,17 @@ function renderBillingTab(host){
     <div id="bform"></div>`;
   html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
     const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
-    const sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
+    // Oct 2026 (item 2): the chip is the money state word — Paid · Processing ·
+    // Upcoming · Overdue — in its one colour; sent-ness moves to the sub-line.
+    const st=invState(v);
+    let sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
     let state, acts='', due='', dueCls='';
-    if(v.status==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(dueLabel(v.paid_at)):'';}
-    else if(v.status==='void'){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
-    else{state=`<span class="schip warn">${v.stripe_url?'Awaiting payment':'Not sent yet'}</span>`;
-      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls='due';
+    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(dueLabel(v.paid_at)):'';}
+    else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
+    else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
+    else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
+      if(!v.stripe_url)sub=(sub?sub+' · ':'')+'Not sent yet';
+      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
       acts+=act(`data-void-inv="${esc(v.id)}"`,'Void','Withdraw this invoice — the payment link stops working');}
@@ -1237,7 +1270,9 @@ async function loadActivityFallback(q,seq){
   for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),href:dealHref});
   const d=DEAL&&DEAL.deal;
   if(d&&d.next_step)upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),href:dealHref});
-  for(const iv of (DEAL&&DEAL.invoices)||[])if(iv.status==='open')upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:!!(iv.due_date&&String(iv.due_date).slice(0,10)<today),href:dealHref});
+  // item 2: only an invoice still WAITING on the client belongs here, and its
+  // overdue flag is the one formula's word (a processing payment is on its way)
+  for(const iv of invWaiting((DEAL&&DEAL.invoices)||[]))upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:invState(iv)==='overdue',href:dealHref});
   upcoming.sort((a,b)=>{if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:a.due>b.due?1:0;});
   ACT={items,upcoming,reply_to:md.reply_to||null,reply_support_to:md.reply_support_to||null,failed:false};
 }
