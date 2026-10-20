@@ -291,6 +291,29 @@ h5.rune .whisper.ok{color:var(--sage)}
 .field textarea{width:100%;font-family:var(--sans);font-size:14px;line-height:1.6;background:var(--sheet);border:1px solid var(--hair);padding:9px 11px;min-height:84px;resize:vertical;caret-color:var(--plum);border-radius:var(--r)}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--plum)}
 .field .hint{font-size:12px;color:var(--ink-2);margin-top:6px}
+/* How the page reads on Google — the search-result preview (benchmark item 4) */
+.srp{max-width:560px;border:1px solid var(--hair);border-radius:10px;padding:14px 16px;background:var(--sheet);margin:8px 0 10px;font-family:arial,sans-serif}
+.srp-site{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.srp-fav{width:26px;height:26px;border-radius:50%;background:var(--plum-soft);color:var(--plum);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.srp-name{font-size:14px;color:var(--ink);line-height:1.25}
+.srp-url{font-size:12px;color:var(--ink-2);line-height:1.25;word-break:break-all}
+.srp-url.muted{font-style:italic}
+.srp-title{font-size:20px;line-height:1.3;color:#1a0dab;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srp-desc{font-size:14px;line-height:1.5;color:#4d5156;margin:3px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.srp-title.empty,.srp-desc.empty{font-style:italic;opacity:.72}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .srp-title{color:#8ab4f8}:root:not([data-theme="light"]) .srp-desc{color:#bdc1c6}}
+:root[data-theme="dark"] .srp-title{color:#8ab4f8}:root[data-theme="dark"] .srp-desc{color:#bdc1c6}
+.cnt{font-size:12px;color:var(--ink-2);margin-top:6px}
+.cnt.good{color:var(--sage)}
+.cnt.warn{color:#a05a2c}
+.seo-setup{max-width:560px;border:1px solid var(--hair);border-radius:12px;padding:16px 18px;margin:0 0 22px;background:var(--sheet)}
+.seo-setup h3{font-size:15px;font-weight:600;margin:0 0 4px}
+.seo-setup .field{margin-bottom:14px}
+.seo-setup .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.seo-tasks{list-style:none;margin:0;padding:0}
+.seo-tasks li{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px}
+.seo-tasks li::before{content:"•";color:#a05a2c;font-weight:700}
+.seo-tasks a{color:var(--plum)}
 .consequence{font-size:13px;color:var(--amber-text);margin-top:6px;max-width:56ch}
 /* ── rich-text formatting toolbar (writes plain markdown into the field) ── */
 .rtbar{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
@@ -1022,15 +1045,42 @@ body.pd-dragging *{cursor:grabbing !important}
           <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
           <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
         </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
+        <div class="field" id="searchPreviewWrap">
+          <label id="srpLabel">How you show up on Google</label>
+          <div class="srp" id="srp" aria-labelledby="srpLabel">
+            <div class="srp-site"><span class="srp-fav" id="srpFav" aria-hidden="true">?</span><div><div class="srp-name" id="srpName"></div><div class="srp-url" id="srpUrl"></div></div></div>
+            <p class="srp-title" id="srpTitle"></p>
+            <p class="srp-desc" id="srpDesc"></p>
+          </div>
+          <div class="hint">What Google shows for your home page. It changes as you type below; the wording reaches Google when you publish.</div>
+          <button type="button" class="quietact" id="btnSeoSetup" style="margin-top:8px;color:var(--plum);font-weight:600;background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:12.5px">Set it up in three questions</button>
+        </div>
+        <div class="seo-setup" id="seoSetup" hidden>
+          <h3>Three questions, then Google has what it needs</h3>
+          <p class="hint" style="margin:0 0 12px">Your answers write a search headline, a description and your “Where you work” line. Nothing goes live until you publish.</p>
+          <div class="field"><label for="sw-name">What is your business called?</label><input type="text" id="sw-name" maxlength="120"></div>
+          <div class="field"><label for="sw-places">Where do you serve customers?</label><input type="text" id="sw-places" maxlength="200" placeholder="Burbank, Glendale"><div class="hint">One or more places, separated by commas.</div></div>
+          <div class="field"><label for="sw-words">Which words would a customer search for?</label><input type="text" id="sw-words" maxlength="200" placeholder="Italian restaurant, catering, private events"><div class="hint">Up to three, separated by commas.</div></div>
+          <div class="hint" style="margin-top:0">This is what Save writes:</div>
+          <div class="srp" id="swOut" aria-live="polite">
+            <div class="srp-site"><span class="srp-fav" id="swFav" aria-hidden="true">?</span><div><div class="srp-name" id="swName"></div><div class="srp-url" id="swUrl"></div></div></div>
+            <p class="srp-title" id="swTitle"></p>
+            <p class="srp-desc" id="swDesc"></p>
+          </div>
+          <div class="hint" id="swArea"></div>
+          <label id="swReplaceWrap" hidden style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" id="swReplace"> Replace the headline and description you already have</label>
+          <div class="actions"><button type="button" class="pillbtn inked" id="swSave">Save</button><button type="button" class="pillbtn" id="swCancel">Not now</button></div>
+        </div>
+        <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="120"><div class="cnt" id="cnt-seo_title"></div><div class="hint">What Google shows as your page title.</div></div>
+        <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="320"><div class="cnt" id="cnt-seo_description"></div><div class="hint">The line under the headline in search results.</div></div>
         <details style="margin:14px 0;border:1px solid var(--hair,#eee9e0);border-radius:12px;padding:12px 16px">
-          <summary style="cursor:pointer;font-weight:600;font-size:14px">For search engines — optional, we handle the rest</summary>
+          <summary style="cursor:pointer;font-weight:600;font-size:14px">Verification codes — optional, we handle the rest</summary>
           <div style="margin-top:12px">
-        <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="60"><div class="hint">What Google shows as your page title. Empty = your business name.</div></div>
-        <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="160"><div class="hint">The line under the headline in search results. Empty = your description.</div></div>
         <div class="field"><label for="f-gsv">Google Search Console code</label><input type="text" id="f-gsv" maxlength="100" placeholder='paste the content="…" value'><div class="hint">Search Console → Settings → Ownership verification → HTML tag. Paste just the code, publish, then click Verify at Google — unlocks indexing reports and sitemap submission.</div></div>
         <div class="field"><label for="f-bsv">Bing Webmaster code</label><input type="text" id="f-bsv" maxlength="100" placeholder="optional"><div class="hint">Same idea for Bing (also powers Copilot search).</div></div>
           </div>
         </details>
+        <div id="searchCardSlot"></div>
         <h2 class="hb-sub-h">Links &amp; booking</h2>
         <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
         <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
@@ -1708,6 +1758,11 @@ function routeHash() {
   if (h === "pages") { hbScrollTo("pagesSec"); return; }        // content-tree.html retired
   if (h === "activity") { hbScrollTo("activitySec"); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
+  if (h === "search") {   // the Today card's "Add one" → the search preview itself
+    go("business");
+    setTimeout(() => { const n = $("searchPreviewWrap"); if (n) n.scrollIntoView({ behavior: "smooth", block: "start" }); }, 350);
+    return;
+  }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
   // record_href). The card lives far down the Business view; without the scroll,
@@ -5524,6 +5579,7 @@ function fillSingles() {
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
   renderHours();
+  renderSearchPreview();
 }
 async function refreshAll() {
   // The website-content reads are TOLERANT: a plan without the website feature
@@ -5666,8 +5722,8 @@ function seoFieldsBox(key, label, showLabel) {
   const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
   const box = el("div"); box.style.cssText = "margin:8px 0 12px";
   if (showLabel !== false) box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
-  const ti = el("input"); ti.type = "text"; ti.maxLength = 60; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
-  const di = el("input"); di.type = "text"; di.maxLength = 160; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
+  const ti = el("input"); ti.type = "text"; ti.maxLength = 120; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
+  const di = el("input"); di.type = "text"; di.maxLength = 320; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
   const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Share headline — when texted or posted (blank = the search headline)"; sti.value = cur.share_title || "";
   const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Share description (blank = the search description)"; sdi.value = cur.share_description || "";
   const sim = el("select"); sim.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--bg,#fff);color:inherit";
@@ -5677,6 +5733,21 @@ function seoFieldsBox(key, label, showLabel) {
   sim.value = cur.share_image || "";
   if (sim.value !== (cur.share_image || "")) sim.value = "";   // the stored photo is gone → fall back
   [ti, di, sti, sdi].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
+  ti.setAttribute("aria-label", "Search headline for " + label); di.setAttribute("aria-label", "Search description for " + label);
+  // How THIS page reads on Google — blank fields show the default the template
+  // renders (seoPageDefault mirrors the templates' seoOv shapes).
+  const safe = key.replace(/[^a-z0-9_-]/gi, "-");
+  const prev = srpBuild("srp-" + safe); prev.root.classList.add("srp-page");
+  const cntT = el("div", "cnt"), cntD = el("div", "cnt"); cntT.id = "cnt-" + safe + "-title"; cntD.id = "cnt-" + safe + "-description";
+  const paint = () => {
+    const w = seoHomeWords();
+    const def = seoPageDefault(key, { name: w.name, siteDescription: w.description, offeringLabel: VOCAB.label, pageTitle: label });
+    const path = key.indexOf("page:") === 0 ? "/" + key.slice(5) + "/" : ({ offerings: VOCAB.path, about: "/about/", faq: "/faq/", updates: "/updates/", contact: "/contact/" })[key] || "/";
+    srpFill(prev, { name: w.name, host: seoCrumb(seoHost(), path), hostMuted: !siteLiveUrl(), title: ti.value.trim() || def.title, description: di.value.trim() || def.description });
+    seoCounterInto(cntT, "title", ti.value, "Empty — Google shows “" + seoCut(def.title, SEO_TITLE_MAX) + "”");
+    seoCounterInto(cntD, "description", di.value, def.description ? "Empty — Google shows “" + seoCut(def.description, 70) + "”" : "Empty — and so is your description, so add one");
+  };
+  [ti, di].forEach((inp) => inp.addEventListener("input", paint));
   const save = async () => {
     const map = { ...((S.settings && S.settings.page_seo) || {}) };
     const entry = {};
@@ -5690,12 +5761,249 @@ function seoFieldsBox(key, label, showLabel) {
     catch (err) { toast(nice(err), true); }
   };
   [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
-  box.append(ti, di, sti, sdi, sim); return box;
+  box.append(ti, cntT, di, cntD, prev.root, sti, sdi, sim); paint(); return box;
 }
+// ── Benchmark item 4 (docs/design/BENCHMARK-2026-10.md): how the page reads on
+// Google. The helpers from here to seoPageDefault are PURE (no DOM, no S) and
+// pinned 1:1 by tests/presence/seo_setup_test.mjs, which extracts them from
+// this file by name — keep them free of page state. ──
+const SEO_TITLE_MAX = 60, SEO_DESC_MIN = 50, SEO_DESC_MAX = 160;
+// "Burbank, Glendale; Pasadena" → ["Burbank", "Glendale", "Pasadena"] (deduped, case-insensitive)
+function seoSplit(s) {
+  return String(s || "").split(/[,;\n]+/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean)
+    .filter((x, i, a) => a.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
+}
+// ["a"] → "a" · ["a","b"] → "a and b" · ["a","b","c"] → "a, b and c"
+function seoList(items) {
+  const a = (items || []).filter(Boolean);
+  if (!a.length) return "";
+  if (a.length === 1) return a[0];
+  return a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+}
+// Cut the way Google cuts: at a word, then " ..." — only when over the cap.
+function seoCut(s, max) {
+  const t = String(s || "").replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  let cut = t.slice(0, max - 4);
+  const sp = cut.lastIndexOf(" ");
+  if (sp > max * 0.6) cut = cut.slice(0, sp);
+  return cut.replace(/[\s,;:—–-]+$/, "") + " ...";
+}
+// The counter under a field: title ≤60 is fine (green), over is amber ("may be
+// cut off"); a description reads best at 50–160, short is amber, over is amber.
+function seoCounter(kind, value, emptyText) {
+  const n = String(value || "").length;
+  if (!n) return { n: 0, state: "", text: emptyText || "Empty" };
+  if (kind === "title") {
+    if (n > SEO_TITLE_MAX) return { n, state: "warn", text: n + " of " + SEO_TITLE_MAX + " — may be cut off" };
+    return { n, state: "good", text: n + " of " + SEO_TITLE_MAX };
+  }
+  if (n > SEO_DESC_MAX) return { n, state: "warn", text: n + " of " + SEO_DESC_MAX + " — may be cut off" };
+  if (n < SEO_DESC_MIN) return { n, state: "warn", text: n + " of " + SEO_DESC_MAX + " — a little short, " + SEO_DESC_MIN + "–" + SEO_DESC_MAX + " reads best" };
+  return { n, state: "good", text: n + " of " + SEO_DESC_MAX };
+}
+// The three questions → a headline, a description and a "where you work" line.
+// Headline shapes, longest first; the first that fits Google's 60 wins:
+//   "Name — word in Place" · "Name — word" · "Name — Place" · "Name"
+// Description: "Name: word, word and word in Place and Place." + the tagline when
+// there is one, + a plain closing line only when it would otherwise read short.
+function seoSuggest(a) {
+  const name = String((a && a.name) || "").replace(/\s+/g, " ").trim();
+  const places = seoSplit(a && a.places).slice(0, 3);
+  const words = seoSplit(a && a.words).slice(0, 3);
+  const tagline = String((a && a.tagline) || "").replace(/\s+/g, " ").trim();
+  const w1 = words[0] || "", p1 = places[0] || "";
+  const shapes = [];
+  if (name && w1 && p1) shapes.push(name + " — " + w1 + " in " + p1);
+  if (name && w1) shapes.push(name + " — " + w1);
+  if (name && p1) shapes.push(name + " — " + p1);
+  if (name) shapes.push(name);
+  const title = shapes.find((t) => t.length <= SEO_TITLE_MAX) || seoCut(name, SEO_TITLE_MAX);
+  let description = "";
+  if (name && words.length && places.length) description = name + ": " + seoList(words) + " in " + seoList(places) + ".";
+  else if (name && words.length) description = name + ": " + seoList(words) + ".";
+  else if (name && places.length) description = name + " serves " + seoList(places) + ".";
+  else if (name) description = name + ".";
+  if (description && tagline) description += " " + tagline.replace(/[.!?]*$/, ".");
+  if (description && description.length < SEO_DESC_MIN) description += " Get in touch to find out more.";
+  if (description.length > SEO_DESC_MAX) description = seoCut(description, SEO_DESC_MAX);
+  const service_area = places.length ? "Serving " + seoList(places) : "";
+  return { title, description, service_area, places, words };
+}
+// What a built-in or owner-made page reads like when its own wording is blank —
+// the shapes every template renders (templates/*/render.ts, the seoOv calls).
+function seoPageDefault(key, c) {
+  const name = (c && c.name) || "", site = (c && c.siteDescription) || "";
+  const label = (c && c.offeringLabel) || "Services";
+  const map = {
+    offerings: [label + " — " + name, label + " from " + name + "."],
+    about: ["About — " + name, site],
+    faq: ["FAQ — " + name, "Answers to common questions about " + name + "."],
+    updates: ["Updates — " + name, "News and updates from " + name + "."],
+    contact: ["Contact & Hours — " + name, "Address, phone, and hours for " + name + "."],
+  };
+  const d = map[key] || [((c && c.pageTitle) || "Page") + " — " + name, site];
+  return { title: d[0], description: d[1] };
+}
+// "marlows.example" + "/about/" → "marlows.example › about" (how Google writes the address line)
+function seoCrumb(host, path) {
+  const segs = String(path || "").split("/").filter(Boolean);
+  return [host].concat(segs).join(" › ");
+}
+// ── the DOM half: preview nodes, the live home preview, the setup, the task list ──
+function seoHost() { const u = siteLiveUrl(); return u ? u.replace(/^https?:\/\//, "").replace(/\/$/, "") : "yourdomain.com"; }
+function srpBuild(id) {
+  const root = el("div", "srp"); if (id) root.id = id;
+  const site = el("div", "srp-site"); const fav = el("span", "srp-fav", "?"); fav.setAttribute("aria-hidden", "true");
+  const col = el("div"); const name = el("div", "srp-name"); const url = el("div", "srp-url"); col.append(name, url); site.append(fav, col);
+  const title = el("p", "srp-title"); const desc = el("p", "srp-desc");
+  root.append(site, title, desc);
+  return { root, fav, name, url, title, desc };
+}
+function srpFill(n, v) {
+  const name = String(v.name || "").trim();
+  n.fav.textContent = (name.charAt(0) || "?").toUpperCase();
+  n.name.textContent = name || "Your business";
+  n.url.textContent = v.host || ""; n.url.classList.toggle("muted", !!v.hostMuted);
+  n.title.textContent = v.title ? seoCut(v.title, SEO_TITLE_MAX) : "Your page title"; n.title.classList.toggle("empty", !v.title);
+  n.desc.textContent = v.description ? seoCut(v.description, SEO_DESC_MAX) : "Add a description so Google has something to show here."; n.desc.classList.toggle("empty", !v.description);
+}
+function seoCounterInto(node, kind, value, emptyText) {
+  const n = typeof node === "string" ? $(node) : node; if (!n) return;
+  const c = seoCounter(kind, value, emptyText);
+  n.textContent = c.text; n.className = "cnt" + (c.state ? " " + c.state : "");
+}
+// The words the home page carries right now — typed values first, so the
+// preview follows the keyboard, not the last save.
+function seoHomeWords() {
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  const i = S.identity || {};
+  const name = val("f-business_name") || i.business_name || "";
+  const t = val("f-seo_title"), d = val("f-seo_description"), bizDesc = val("f-description") || i.description || "";
+  return { name, title: t || name, description: d || bizDesc, titleOwn: !!t, descOwn: !!d };
+}
+let SRP_HOME = null;
+function renderSearchPreview() {
+  if (!$("srp")) return;
+  if (!SRP_HOME) SRP_HOME = { fav: $("srpFav"), name: $("srpName"), url: $("srpUrl"), title: $("srpTitle"), desc: $("srpDesc") };
+  const w = seoHomeWords();
+  srpFill(SRP_HOME, { name: w.name, host: seoHost(), hostMuted: !siteLiveUrl(), title: w.title, description: w.description });
+  seoCounterInto("cnt-seo_title", "title", $("f-seo_title").value, "Empty — Google shows your business name");
+  seoCounterInto("cnt-seo_description", "description", $("f-seo_description").value, w.description ? "Empty — Google shows your description" : "Empty — and so is your description, so add one here");
+  if (!$("seoSetup").hidden) renderSeoSetupOut();
+  renderSeoTasks();
+}
+// ── the three-question setup ──
+function seoSetupAnswers() {
+  const val = (id) => { const n = $(id); return n ? n.value : ""; };
+  return { name: val("sw-name"), places: val("sw-places"), words: val("sw-words"), tagline: val("f-tagline") };
+}
+function openSeoSetup() {
+  const p = $("seoSetup"); if (!p) return;
+  const i = S.identity || {}, loc = S.location || {};
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  $("sw-name").value = val("f-business_name") || i.business_name || "";
+  const area = val("f-service_area").replace(/^serving\s+/i, "").replace(/\s+and\s+/gi, ", ");
+  $("sw-places").value = area || loc.city || "";
+  $("sw-words").value = "";
+  const own = !!(val("f-seo_title") || val("f-seo_description"));
+  $("swReplaceWrap").hidden = !own; $("swReplace").checked = false;
+  p.hidden = false; renderSeoSetupOut();
+  $("sw-name").focus();
+}
+function closeSeoSetup() { const p = $("seoSetup"); if (p) p.hidden = true; const b = $("btnSeoSetup"); if (b) b.focus(); }
+let SRP_SETUP = null;
+// What Save will write, shown as the search result it becomes.
+function renderSeoSetupOut() {
+  if (!$("swOut")) return;
+  if (!SRP_SETUP) SRP_SETUP = { fav: $("swFav"), name: $("swName"), url: $("swUrl"), title: $("swTitle"), desc: $("swDesc") };
+  const s = seoSuggest(seoSetupAnswers());
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  const replace = $("swReplace").checked;
+  const title = (val("f-seo_title") && !replace) ? val("f-seo_title") : s.title;
+  const description = (val("f-seo_description") && !replace) ? val("f-seo_description") : s.description;
+  srpFill(SRP_SETUP, { name: val("sw-name") || s.title, host: seoHost(), hostMuted: !siteLiveUrl(), title, description });
+  const area = val("f-service_area");
+  $("swArea").textContent = area ? "Where you work stays “" + area + "”." : s.service_area ? "Where you work becomes “" + s.service_area + "”." : "Add a place and your “Where you work” line is written too.";
+}
+async function saveSeoSetup() {
+  const btn = $("swSave"); const a = seoSetupAnswers(); const s = seoSuggest(a);
+  const name = String(a.name || "").replace(/\s+/g, " ").trim();
+  if (!name) { toast("Give your business a name first.", true); $("sw-name").focus(); return; }
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  const replace = $("swReplace").checked;
+  const i = S.identity || {};
+  const body = {};
+  if (name !== String(i.business_name || "")) body.business_name = name;
+  if ((replace || !val("f-seo_title")) && s.title) body.seo_title = s.title;
+  if ((replace || !val("f-seo_description")) && s.description) body.seo_description = s.description;
+  if (s.service_area && !val("f-service_area")) body.service_area = s.service_area;
+  if (!Object.keys(body).length) { toast("Nothing to change — your search setup already says this."); closeSeoSetup(); return; }
+  btn.disabled = true; btn.textContent = "Saving…"; whisper("save-identity", "saving"); whisper("topWhisper", "saving");
+  try {
+    const r = await api("PUT", "/identity", body);
+    const saved = (r && r.data && typeof r.data.business_name === "string") ? r.data : {};
+    S.identity = { ...i, ...body, ...saved };
+    const ids = { business_name: "f-business_name", seo_title: "f-seo_title", seo_description: "f-seo_description", service_area: "f-service_area" };
+    Object.keys(body).forEach((k) => { const n = $(ids[k]); if (n) n.value = S.identity[k] || body[k]; });
+    if (body.business_name && $("siteTitle")) $("siteTitle").textContent = S.identity.business_name;
+    whisper("save-identity", "saved"); whisper("topWhisper", "saved");
+    toast("Saved — publish to apply"); scheduleChangesRefresh();
+    closeSeoSetup(); renderSearchPreview();
+  } catch (err) { whisper("save-identity", ""); whisper("topWhisper", ""); toast(nice(err), true); }
+  btn.disabled = false; btn.textContent = "Save";
+}
+// ── what's left: the tasks, each a door ──
+let SEO_CONN = null;   // Search Console connection status from GET /connections, null = not known
+function seoConnStatus(d) {
+  const groups = (d && d.groups) || {};
+  for (const k of Object.keys(groups)) for (const row of (groups[k] || [])) if (row && row.key === "google_search_console") return (row.connection && row.connection.status) || "disconnected";
+  return null;
+}
+function seoTaskRows() {
+  const w = seoHomeWords();
+  const f = S.health && S.health.facts;
+  const rows = [
+    { done: w.titleOwn, label: "Add a search headline", focus: "f-seo_title" },
+    { done: w.descOwn, label: "Add a search description", focus: "f-seo_description" },
+  ];
+  if (f && f.domain) rows.push({ done: f.domain.state === "ok", label: f.domain.state === "attention" ? "Finish connecting your domain" : "Connect your domain", href: "#domain" });
+  if (hasFeature("connected")) rows.push({ done: SEO_CONN === "connected", label: SEO_CONN === "pending" ? "Finish connecting Google Search Console" : "Connect Google Search Console", href: "/connections.html" });
+  const draft = !!(f && f.website && f.website.state === "none");
+  const n = (S.changes && S.changes.count) || 0;
+  rows.push({ done: !draft && !n, label: draft ? "Publish your website" : "Publish your changes", href: "#publish" });
+  return rows;
+}
+function renderSeoTasks() {
+  const host = $("seoTasks"); if (!host) return;
+  host.innerHTML = "";
+  const left = seoTaskRows().filter((r) => !r.done);
+  host.appendChild(Object.assign(el("div", null, left.length ? "What’s left" : "Nothing left to set up"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
+  if (!left.length) { host.appendChild(el("div", "hint", "Google has your headline, your description and your pages.")); return; }
+  const ul = el("ul", "seo-tasks");
+  left.forEach((r) => {
+    const li = el("li"); const a = el("a", null, r.label); a.href = r.href || "#search";
+    if (r.focus) a.addEventListener("click", (e) => { e.preventDefault(); const n = $(r.focus); if (n) { n.scrollIntoView({ behavior: "smooth", block: "center" }); n.focus({ preventScroll: true }); } });
+    li.appendChild(a); ul.appendChild(li);
+  });
+  host.appendChild(ul);
+}
+(function wireSeoPreview() {
+  ["f-seo_title", "f-seo_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSearchPreview); });
+  ["sw-name", "sw-places", "sw-words"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSeoSetupOut); });
+  const rp = $("swReplace"); if (rp) rp.addEventListener("change", renderSeoSetupOut);
+  const open = $("btnSeoSetup"); if (open) open.addEventListener("click", openSeoSetup);
+  const save = $("swSave"); if (save) save.addEventListener("click", saveSeoSetup);
+  const cancel = $("swCancel"); if (cancel) cancel.addEventListener("click", closeSeoSetup);
+})();
 async function mountSearchCard() {
-  const host = $("view-business"); if (!host || $("searchCard")) return;
+  const host = $("searchCardSlot") || $("view-business"); if (!host || $("searchCard")) return;
   const card = el("div", "field"); card.id = "searchCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Search & visibility"));
+  // what's left — from what the page already knows (fields, health, changes) plus
+  // the Search Console connection, read softly: unknown is shown as a door, never as done
+  const tasks = el("div"); tasks.id = "seoTasks"; tasks.style.marginBottom = "12px"; card.appendChild(tasks); renderSeoTasks();
+  if (hasFeature("connected")) api("GET", "/connections").then((r) => { SEO_CONN = seoConnStatus(r.data); renderSeoTasks(); }).catch(() => {});
   const status = el("div", "hint", "Checking your search setup…"); card.appendChild(status);
   host.appendChild(card);
   let h = null;
@@ -5709,7 +6017,8 @@ async function mountSearchCard() {
     card.appendChild(p);
   };
   line(true, "Google can read your site — sitemap, page details, and your " + (h.schema && h.schema.type ? h.schema.type : "business") + " listing info are built in automatically.");
-  line(h.seo_fields.title && h.seo_fields.description, "Your search headline and description are set.", "Add a search headline and description above — until then Google shows your name and description.");
+  // the not-yet case is a task above (with the door); the sentence speaks when it is true
+  if (h.seo_fields.title && h.seo_fields.description) line(true, "Your search headline and description are set.");
   // This reads presence_settings.google_site_verification (routes/search.ts:41) —
   // the HTML meta ownership tag, which is a DIFFERENT thing from a Search Console
   // connection. Saying "connected" here claimed something untrue and contradicted

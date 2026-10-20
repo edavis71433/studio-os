@@ -353,6 +353,224 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#designGallery')).toContainText('Editorial');
     await expect(page.locator('#designGallery')).toContainText('print serif'); // the family's swatch tag
   });
+
+  // ── Benchmark item 4 (docs/design/BENCHMARK-2026-10.md): how the page reads on
+  // Google. A live search-result preview with the 60/160 counters under the two
+  // search fields, a three-question setup that writes them when they are empty,
+  // and a "what's left" list in the search card where each task is a door. ──
+  test.describe('Search preview and setup', () => {
+    // the Search Console surface, disconnected — the task shows as a door to /connections.html
+    const CONNECTIONS = (status: string) => ({ data: { groups: { 'Being found': [
+      { key: 'google_search_console', label: 'how you show up in Google Search', availability: 'Read-only', connection: { status, health: 'unknown' } },
+    ] } } });
+    const SEO_API = { ...BOARD_API, '/connections': CONNECTIONS('disconnected') };
+
+    test('the preview reads the fixtures: name, address, the headline falls back to the name, the empty description says so', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      const srp = page.locator('#srp');
+      await expect(srp.locator('#srpName')).toHaveText('Marlow’s Kitchen');
+      await expect(srp.locator('#srpUrl')).toHaveText('marlows.example');   // /site custom_domain
+      await expect(srp.locator('#srpTitle')).toHaveText('Marlow’s Kitchen');  // seo_title empty → the business name
+      await expect(srp.locator('#srpTitle')).toHaveCSS('color', 'rgb(26, 13, 171)');   // Google's blue
+      await expect(srp.locator('#srpDesc')).toHaveClass(/empty/);
+      await expect(page.locator('#cnt-seo_title')).toHaveText('Empty — Google shows your business name');
+      await expect(page.locator('#cnt-seo_description')).toContainText('Empty — and so is your description');
+    });
+
+    test('the preview and the counters follow the keyboard: green up to 60, amber over with "may be cut off", and the title is cut the way Google cuts it', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      const title = page.locator('#f-seo_title');
+      await title.fill('Marlow’s Kitchen — Italian restaurant in Burbank');   // 48 chars
+      await expect(page.locator('#srpTitle')).toHaveText('Marlow’s Kitchen — Italian restaurant in Burbank');
+      await expect(page.locator('#cnt-seo_title')).toHaveText('48 of 60');
+      await expect(page.locator('#cnt-seo_title')).toHaveClass(/good/);
+      await title.fill('Marlow’s Kitchen — Italian restaurant, catering and private events in Burbank');   // 77 chars
+      await expect(page.locator('#cnt-seo_title')).toHaveText('77 of 60 — may be cut off');
+      await expect(page.locator('#cnt-seo_title')).toHaveClass(/warn/);
+      await expect(page.locator('#srpTitle')).toHaveText(/ \.\.\.$/);   // the preview shows the cut, not the full line
+      const desc = page.locator('#f-seo_description');
+      await desc.fill('Seasonal plates in Burbank.');   // 27 — a little short
+      await expect(page.locator('#srpDesc')).toHaveText('Seasonal plates in Burbank.');
+      await expect(page.locator('#cnt-seo_description')).toContainText('27 of 160 — a little short');
+      await expect(page.locator('#cnt-seo_description')).toHaveClass(/warn/);
+      await desc.fill('Seasonal Italian plates, natural wine and a sunny patio in Burbank. Walk-ins welcome, private events by request.');   // 112
+      await expect(page.locator('#cnt-seo_description')).toHaveText('112 of 160');
+      await expect(page.locator('#cnt-seo_description')).toHaveClass(/good/);
+      // the field is no longer hard-capped at 60 — the counter guides instead
+      expect(await title.getAttribute('maxlength')).not.toBe('60');
+    });
+
+    test('the business name typed above changes the preview too (it is the fallback headline)', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      await page.locator('#f-business_name').fill('Marlow’s');
+      await expect(page.locator('#srpName')).toHaveText('Marlow’s');
+      await expect(page.locator('#srpTitle')).toHaveText('Marlow’s');
+      await expect(page.locator('#srpFav')).toHaveText('M');
+    });
+
+    test('three questions → one PUT /identity with the headline, the description and where you work; the fields and the preview follow', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      await page.locator('#btnSeoSetup').click();
+      const panel = page.locator('#seoSetup');
+      await expect(panel).toBeVisible();
+      await expect(page.locator('#sw-name')).toHaveValue('Marlow’s Kitchen');   // prefilled
+      await expect(page.locator('#sw-name')).toBeFocused();
+      await expect(page.locator('#swReplaceWrap')).toBeHidden();   // nothing to replace yet
+      await page.locator('#sw-places').fill('Burbank, Glendale');
+      await page.locator('#sw-words').fill('Italian restaurant, catering, private events');
+      // the panel shows what Save writes, as the search result it becomes
+      await expect(page.locator('#swTitle')).toHaveText('Marlow’s Kitchen — Italian restaurant in Burbank');
+      await expect(page.locator('#swDesc')).toHaveText('Marlow’s Kitchen: Italian restaurant, catering and private events in Burbank and Glendale.');
+      await expect(page.locator('#swArea')).toHaveText('Where you work becomes “Serving Burbank and Glendale”.');
+      const put = page.waitForRequest((r) => r.method() === 'PUT' && /\/presence\/identity$/.test(r.url()));
+      await page.locator('#swSave').click();
+      const body = (await put).postDataJSON();
+      expect(body).toEqual({
+        seo_title: 'Marlow’s Kitchen — Italian restaurant in Burbank',
+        seo_description: 'Marlow’s Kitchen: Italian restaurant, catering and private events in Burbank and Glendale.',
+        service_area: 'Serving Burbank and Glendale',
+      });
+      await expect(panel).toBeHidden();
+      await expect(page.locator('#f-seo_title')).toHaveValue('Marlow’s Kitchen — Italian restaurant in Burbank');
+      await expect(page.locator('#f-seo_description')).toHaveValue(/private events in Burbank and Glendale\.$/);
+      await expect(page.locator('#f-service_area')).toHaveValue('Serving Burbank and Glendale');
+      await expect(page.locator('#srpTitle')).toHaveText('Marlow’s Kitchen — Italian restaurant in Burbank');
+      await expect(page.locator('#cnt-seo_title')).toHaveText('48 of 60');
+      await expect(page.locator('#topWhisper')).toHaveText(/Saving…|Saved just now/);
+    });
+
+    test('a headline that is already there is kept unless "Replace" is ticked; a changed name is saved as the business name', async ({ page }) => {
+      await installApp(page, { api: { ...SEO_API,
+        '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen | Burbank', seo_description: '', service_area: 'Serving Burbank' } } },
+      } });
+      await page.goto('/presence.html#business');
+      await page.locator('#btnSeoSetup').click();
+      await expect(page.locator('#sw-places')).toHaveValue('Burbank');   // "Serving Burbank" → the place
+      await expect(page.locator('#swReplaceWrap')).toBeVisible();
+      await page.locator('#sw-name').fill('Marlow’s Kitchen & Bar');
+      await page.locator('#sw-words').fill('wine bar');
+      await expect(page.locator('#swTitle')).toHaveText('Marlow’s Kitchen | Burbank');   // kept
+      await expect(page.locator('#swArea')).toHaveText('Where you work stays “Serving Burbank”.');
+      const put = page.waitForRequest((r) => r.method() === 'PUT' && /\/presence\/identity$/.test(r.url()));
+      await page.locator('#swSave').click();
+      const body = (await put).postDataJSON();
+      expect(body).toEqual({ business_name: 'Marlow’s Kitchen & Bar', seo_description: 'Marlow’s Kitchen & Bar: wine bar in Burbank. Get in touch to find out more.' });
+      await expect(page.locator('h1#siteTitle')).toHaveText('Marlow’s Kitchen & Bar');
+      // now replace
+      await page.locator('#btnSeoSetup').click();
+      await page.locator('#sw-words').fill('wine bar');
+      await page.locator('#swReplace').check();
+      await expect(page.locator('#swTitle')).toHaveText('Marlow’s Kitchen & Bar — wine bar in Burbank');
+      const put2 = page.waitForRequest((r) => r.method() === 'PUT' && /\/presence\/identity$/.test(r.url()));
+      await page.locator('#swSave').click();
+      expect((await put2).postDataJSON()).toEqual({ seo_title: 'Marlow’s Kitchen & Bar — wine bar in Burbank', seo_description: 'Marlow’s Kitchen & Bar: wine bar in Burbank. Get in touch to find out more.' });
+    });
+
+    test('"Not now" closes the setup without a save and returns focus to the opener', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      let puts = 0; page.on('request', (r) => { if (r.method() === 'PUT') puts++; });
+      await page.locator('#btnSeoSetup').click();
+      await page.locator('#swCancel').click();
+      await expect(page.locator('#seoSetup')).toBeHidden();
+      await expect(page.locator('#btnSeoSetup')).toBeFocused();
+      expect(puts).toBe(0);
+    });
+
+    test('the search card lists what is left, each task a door; the setup clears the first two', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      const tasks = page.locator('#searchCard #seoTasks');
+      await expect(tasks).toContainText('What’s left');
+      const links = tasks.locator('.seo-tasks a');
+      await expect(links).toHaveText(['Add a search headline', 'Add a search description', 'Connect Google Search Console', 'Publish your changes']);
+      await expect(links.nth(2)).toHaveAttribute('href', '/connections.html');
+      await expect(links.nth(3)).toHaveAttribute('href', '#publish');   // the publish ritual
+      // the card sits with the search fields, not at the end of the view
+      await expect(page.locator('#searchCardSlot #searchCard')).toBeVisible();
+      // the headline task is a door to the field
+      await links.nth(0).click();
+      await expect(page.locator('#f-seo_title')).toBeFocused();
+      // the setup clears the first two tasks
+      await page.locator('#btnSeoSetup').click();
+      await page.locator('#sw-places').fill('Burbank');
+      await page.locator('#sw-words').fill('Italian restaurant');
+      await page.locator('#swSave').click();
+      await expect(links).toHaveText(['Connect Google Search Console', 'Publish your changes']);
+    });
+
+    test('every state is honest: connected Search Console drops off the list, a never-published site says "Publish your website", a draft with nothing to do says so', async ({ page }) => {
+      await installApp(page, { api: { ...SEO_API,
+        '/connections': CONNECTIONS('connected'),
+        '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen — Burbank', seo_description: 'Seasonal Italian plates, natural wine and a sunny patio in Burbank.' } } },
+        '/health': { data: { ...BOARD_API['/health'].data, facts: { ...BOARD_API['/health'].data.facts, website: { state: 'none', label: 'Not published yet', detail: '' } } } },
+      } });
+      await page.goto('/presence.html#business');
+      const links = page.locator('#searchCard .seo-tasks a');
+      await expect(links).toHaveText(['Publish your website']);
+      // and the card's own sentence speaks now that it is true
+      await expect(page.locator('#searchCard')).toContainText('Your search headline and description are set.');
+    });
+
+    test('nothing left: the list says so', async ({ page }) => {
+      await installApp(page, { api: { ...SEO_API,
+        '/connections': CONNECTIONS('connected'),
+        '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen — Burbank', seo_description: 'Seasonal Italian plates, natural wine and a sunny patio in Burbank.' } } },
+        '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
+      } });
+      await page.goto('/presence.html#business');
+      await expect(page.locator('#searchCard #seoTasks')).toContainText('Nothing left to set up');
+      await expect(page.locator('#searchCard .seo-tasks')).toHaveCount(0);
+    });
+
+    test('no domain yet: the address line is a placeholder and "Connect your domain" is a task', async ({ page }) => {
+      await installApp(page, { api: { ...SEO_API,
+        '/site': { data: { ...BOARD_API['/site'].data, site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'restaurant-classic', template_version: 1 } } },
+        '/health': { data: { ...BOARD_API['/health'].data, facts: { ...BOARD_API['/health'].data.facts, domain: { label: 'No custom domain', state: 'none', detail: '' } } } },
+      } });
+      await page.goto('/presence.html#business');
+      await expect(page.locator('#srpUrl')).toHaveText('yourdomain.com');
+      await expect(page.locator('#srpUrl')).toHaveClass(/muted/);
+      const dom = page.locator('#searchCard .seo-tasks a', { hasText: 'Connect your domain' });
+      await expect(dom).toHaveAttribute('href', '#domain');
+    });
+
+    test('a plan without search insights keeps its message, and the task list still stands', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.route('**/functions/v1/presence/search/health', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'feature_locked' }) }));
+      await page.goto('/presence.html#business');
+      await expect(page.locator('#searchCard')).toContainText('Search insights aren’t part of your plan yet');
+      await expect(page.locator('#searchCard .seo-tasks a').first()).toHaveText('Add a search headline');
+    });
+
+    test('per-page previews: each built-in page shows the default it renders with, and follows its own fields', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#business');
+      const fine = page.locator('#searchCard details', { hasText: 'Fine-tune how each built-in page reads' });
+      await fine.locator('summary').click();
+      const about = page.locator('#srp-about');
+      await expect(about.locator('.srp-title')).toHaveText('About — Marlow’s Kitchen');
+      await expect(about.locator('.srp-url')).toHaveText('marlows.example › about');
+      await expect(page.locator('#srp-contact .srp-title')).toHaveText('Contact & Hours — Marlow’s Kitchen');
+      await expect(page.locator('#srp-contact .srp-desc')).toHaveText('Address, phone, and hours for Marlow’s Kitchen.');
+      await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Services — Marlow’s Kitchen');   // the vocabulary word (generic here: no site.template, no industry_key in the fixtures)
+      await page.getByLabel('Search headline for About').fill('Our story — Marlow’s Kitchen, Burbank');
+      await expect(about.locator('.srp-title')).toHaveText('Our story — Marlow’s Kitchen, Burbank');
+      await expect(page.locator('#cnt-about-title')).toHaveText('37 of 60');
+      await expect(page.locator('#cnt-about-description')).toHaveText('Empty — and so is your description, so add one');   // the fixture's identity has no description either
+    });
+
+    test('#search deep-links to the preview itself (the Today card’s "Add one")', async ({ page }) => {
+      await installApp(page, { api: SEO_API });
+      await page.goto('/presence.html#search');
+      await expect(page.locator('#view-business')).toBeVisible();
+      await expect(page.locator('#srp')).toBeInViewport();
+    });
+  });
 });
 
 // The full-screen preview ("See your site", ?view=preview from get-started, History
