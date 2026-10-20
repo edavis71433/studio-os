@@ -991,6 +991,7 @@ test.describe('Projects — a client context lists that client’s projects', ()
 
   test('exactly one project for the client → it opens directly, read agency-side, scope kept in the URL', async ({ page }) => {
     const scopes: Record<string, string> = {};
+    await pinTable(page);   // phones default the roster to cards — this test reads table rows
     await installApp(page, { api: API });
     await page.route('**/functions/v1/presence/**', async (route) => {
       const path = new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');

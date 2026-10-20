@@ -863,7 +863,9 @@ test.describe('Files — client-private files (0131)', () => {
     await expect(page.locator('.dds-toast')).toContainText('Private to this client');
     expect(patched).toEqual({ path: '/assets/' + POOLE.id, body: { client_private: true } });
     await expect(page.locator('#panel #f-private-note')).toContainText('Only shows under Poole Dental');
-    await page.locator('#panel .x').click();
+    // Escape closes the panel (the × can sit under the phone's top bar once the
+    // switch has scrolled the panel — the close path is the same closeDetail())
+    await page.keyboard.press('Escape');
     // the studio's own logo — no client, no switch
     await page.locator('tr[data-open="' + LOGO.id + '"]').click();
     await expect(page.locator('#panel #f-name')).toHaveValue(LOGO.name);
@@ -880,7 +882,9 @@ test.describe('Files — client-private files (0131)', () => {
     await page.goto('/files.html');
     await page.locator('tr[data-open="' + POOLE.id + '"]').click();
     const sw = page.locator('#panel #f-private');
-    await sw.check();
+    // click, not check(): the page reverts the switch as soon as the 503 lands,
+    // which under WebKit can beat check()'s own "did it change?" verification
+    await sw.click();
     await expect(page.locator('.dds-toast')).toContainText('0131 database update');
     await expect(sw).not.toBeChecked();   // the switch falls back — nothing was changed
   });
