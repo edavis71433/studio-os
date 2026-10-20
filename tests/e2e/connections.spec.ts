@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // ── connections.html + connections-callback.html ─────────────────────────────
 // The "Search Console circle": Eric pressed Connect Search Console and came
@@ -376,5 +376,42 @@ test.describe('Connections — the operator connects FOR a client', () => {
     await expect(page.getByText('the approval screen was left open too long')).toBeVisible();
     // the message the page used to show for all four distinct server errors
     await expect(page.getByText('Please try connecting again from your presence.')).toHaveCount(0);
+  });
+});
+
+// ── Speak as the studio when acting for a client (studio audit Oct 2026, change 2) ──
+// The row's "About" panel told a scoped operator "Who owns it: you do. It's your
+// account and your permission" — the owner's sentence, in the studio's hands.
+// Scoped in, the row now says who is connecting for whom; the owner's own page
+// keeps its words.
+test.describe('Connections — the row speaks as the studio when scoped into a client', () => {
+  const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+  const SCOPED_CTX = { data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+    edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true,
+    capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+    scope: { site_id: CLIENT, name: 'Joe’s Plumbing' },
+  } };
+
+  test('scoped: "You connect this for <client> with a Google account that has access to their property."', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE(), '/portal/context': SCOPED_CTX } });
+    await page.goto(`/connections.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-ctxbar')).toContainText('Joe’s Plumbing');
+    const row = page.locator('#svc-google_search_console');
+    await row.getByRole('button', { name: 'About' }).click();
+    const more = row.locator('#more-google_search_console');
+    await expect(more).toBeVisible();
+    await expect(more).toContainText('You connect this for Joe’s Plumbing with a Google account that has access to their property.');
+    await expect(more).not.toContainText('Who owns it: you do');
+  });
+
+  test('un-scoped: the owner still reads "Who owns it: you do"', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE() } });
+    await page.goto('/connections.html');
+    const row = page.locator('#svc-google_search_console');
+    await row.getByRole('button', { name: 'About' }).click();
+    const more = row.locator('#more-google_search_console');
+    await expect(more).toContainText('Who owns it: you do. It’s your account and your permission');
+    await expect(more).not.toContainText('You connect this for');
   });
 });
