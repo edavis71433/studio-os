@@ -122,7 +122,9 @@ test.describe('Client portal — Home queue + project record page', () => {
     // verbs — "Review & approve" / "View & pay" — and the accessible names follow
     // (label-in-name intact: the visible text starts each name).
     await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toBeVisible();
-    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toBeVisible();
+    // Oct 2026 audit change 4: a project approval approves right on Home; "See it first" opens the record
+    await expect(body.getByRole('button', { name: 'Approve — Homepage design' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toBeVisible();
     // the unread row carries an sr-only "New — " text alternative for its dot
     await expect(body.locator('.qrow.unread .sr-only')).toHaveText('New — ');
     // the unread notification for approval a1 marks its row as new
@@ -342,15 +344,15 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await expect(body.locator('.qcard')).toBeVisible();
     await expect(body.locator('.qico')).toHaveCount(3); // approval · to-do · invoice
     await expect(body.locator('.qico').first()).toHaveAttribute('aria-hidden', 'true');
-    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toHaveText('Review & approve');
+    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toHaveText('See it first');
     await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toHaveText('Open to-dos');
     await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toHaveText('View & pay');
   });
 
-  test('the Review & approve CTA still round-trips into the project record', async ({ page }) => {
+  test('the See it first CTA still round-trips into the project record', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await page.getByRole('button', { name: 'Review & approve — Homepage design' }).click();
+    await page.getByRole('button', { name: 'See it first — Homepage design' }).click();
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Waiting for your OK' })).toBeVisible();
   });
@@ -714,8 +716,9 @@ test.describe('Client portal — the "Your website" card', () => {
   test('renders between "Needs you" and the projects: sentence numbers, sparkline, three tiles', async ({ page }) => {
     await installApp(page, { api: WS_API });
     await page.goto('/client.html');
-    // placement: the card slot is the very next section after the needs queue
-    const card = page.locator('#home-needs + #home-website .wscard');
+    // placement: after the needs queue and its Recent updates (Oct 2026 audit change 4
+    // moved the updates up under Needs you), before the projects
+    const card = page.locator('#home-needs + #home-updates + #home-website .wscard');
     await expect(card).toBeVisible();
     await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
     // the lead sentence carries the real numbers, bolded
@@ -1973,7 +1976,9 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await page.goto('/client.html');
     const body = page.locator('#needs-body');
     // the OTHER sources' rows survive the billing failure…
-    await expect(body.getByRole('button', { name: 'Review & approve — Homepage design' })).toBeVisible();
+    // Oct 2026 audit change 4: a project approval approves right on Home; "See it first" opens the record
+    await expect(body.getByRole('button', { name: 'Approve — Homepage design' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toBeVisible();
     await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toBeVisible();
     // …with billing's one calm per-source line under them — never "caught up"
     await expect(body.getByText('We couldn’t check on invoices just now — please try again in a moment.')).toBeVisible();
@@ -3393,5 +3398,66 @@ test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
     await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
     await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('sr-need');
+  });
+});
+
+// ── Oct 2026 workflow audit, change 4: the client's Home leads with the one thing ──
+test.describe('Client Home — one filled button, approve and pay in one click', () => {
+  test('only the top Needs-you row wears the filled button', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    const body = page.locator('#needs-body');
+    await expect(body.locator('.qcard')).toBeVisible();
+    await expect(body.locator('.approve')).toHaveCount(1);
+    await expect(body.locator('.qrow').first().locator('.approve')).toHaveText('Approve');
+    // the Pay further down is a plain link, not a second filled button
+    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).not.toHaveClass(/approve/);
+  });
+
+  test('Approve on Home decides the project approval in place (same call as the record)', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/approvals\/a1\/decide$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Approve — Homepage design' }).click();
+    expect((await post).postDataJSON()).toEqual({ decision: 'approved', presented_hash: 'h1', note: '' });
+    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+  });
+
+  test('the "to pay" tile is a door: it lands on the Pay link', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await page.locator('#glance-due').click();
+    await expect(page.getByRole('link', { name: 'View & pay — Deposit' })).toBeFocused();
+  });
+
+  test('Recent updates sits right under Needs you', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#home-updates')).toBeVisible();
+    const order = (await page.locator('#main h2').allTextContents()).map((t) => t.trim());
+    expect(order.indexOf('Recent updates')).toBe(order.indexOf('Needs you') + 1);
+  });
+
+  test('the welcome card shows on the first visit only', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto('/client.html');
+    await expect(page.locator('#welcome')).toBeVisible();
+    // switching tabs and back within the visit keeps it
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await expect(page.locator('#welcome')).toBeVisible();
+    // the next visit opens on the work
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await expect(page.locator('#welcome')).toHaveCount(0);
+  });
+
+  test('the project record has one filled button: Approve', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await expect(page.locator('#main button.approve')).toHaveCount(1);
+    await expect(page.locator('#main button.approve')).toHaveText('Approve');
+    await expect(page.getByRole('button', { name: 'Mark done' })).not.toHaveClass(/approve/);
   });
 });
