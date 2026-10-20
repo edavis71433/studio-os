@@ -1685,8 +1685,9 @@ test.describe('invoice — the Void control', () => {
     page.once('dialog', (d) => d.accept());
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
-    // Nothing was hidden on a refusal — the invoice is still there and still sendable.
-    await expect(page.locator('.lr').filter({ hasText: 'Website build' })).toContainText('Awaiting payment');
+    // Nothing was hidden on a refusal — the invoice is still there, still waiting
+    // (its chip is the money state word now, not "Awaiting payment"), still sendable.
+    await expect(page.locator('.lr').filter({ hasText: 'Website build' }).locator('.stage')).toHaveText('Upcoming');
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeEnabled();
   });
 });
@@ -1835,6 +1836,128 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await expect.poll(() => calls).toContain(`/sales/invoices/${RINV1}/send`);
     // The re-read leaves both rows — a resend changes nothing to hide.
     await expect(page.locator('.rcv-row')).toHaveCount(2);
+  });
+});
+
+// ── Oct 2026 benchmark (item 2): money in four states on this page too ───────
+// PR #31 gave client.html / today.html / crm.html ONE formula (lib/money_state.ts,
+// mirrored verbatim, pinned byte-identical by tests/presence/money_state_test.mjs)
+// for Paid · Processing · Upcoming · Overdue. This page's two invoice surfaces —
+// the drawer's "Invoice & deposit" rows and the "Who owes you" list — still
+// printed the raw status word ("Awaiting payment", a lowercase "overdue" pill)
+// and offered Resend / Copy link / Void on a settling payment the server already
+// 409s. Now both wear the one chip in its one tone, "overdue" is judged on the
+// studio's local day, and a processing row has no Send/Resend · Copy link · Void
+// — the client already paid; the money is on its way.
+const DEAL10 = '10101010-1010-4010-8010-101010101010';
+const M_PAID = 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbbb';
+const M_PROC = 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbbb';
+const M_UP = 'bbbbbbb3-3333-4333-8333-bbbbbbbbbbbb';
+const M_OVER = 'bbbbbbb4-4444-4444-8444-bbbbbbbbbbbb';
+const M_VOID = 'bbbbbbb5-5555-4555-8555-bbbbbbbbbbbb';
+const futureDay = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+const MONEY_INVOICES = [
+  { id: M_PAID, title: 'Discovery', amount_cents: 90000, purpose: 'service', status: 'paid', stripe_url: 'https://pay.example/p', due_date: null, paid_at: past(2), processing_since: null },
+  // due three days ago, but the client paid on Stripe and the ACH is settling — settling beats late
+  { id: M_PROC, title: 'Deposit', amount_cents: 160000, purpose: 'deposit', status: 'open', stripe_url: 'https://pay.example/d', due_date: pastDay(3), paid_at: null, processing_since: past(0) },
+  { id: M_UP, title: 'Balance', amount_cents: 160000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/b', due_date: futureDay(5), paid_at: null, processing_since: null },
+  { id: M_OVER, title: 'Hosting', amount_cents: 12000, purpose: 'service', status: 'open', stripe_url: null, due_date: pastDay(1), paid_at: null, processing_since: null },
+  { id: M_VOID, title: 'Duplicate', amount_cents: 12000, purpose: 'service', status: 'void', stripe_url: null, due_date: null, paid_at: null, processing_since: null },
+];
+// the receivables read ships the open rows as the server composes them (status,
+// processing_since, its UTC `state`) — the page re-runs the mirror on its own day
+const MONEY_RCV = MONEY_INVOICES.filter((i) => i.status === 'open').map((i) => ({
+  id: i.id, title: i.title, amount_cents: i.amount_cents, due_date: i.due_date, status: 'open', processing_since: i.processing_since,
+  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL10, deal: 'Harbor Dental', stripe_url: i.stripe_url,
+}));
+const MONEY_API = {
+  ...API,
+  [`/sales/deals/${DEAL10}`]: { data: {
+    deal: { id: DEAL10, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
+    contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Harbor Dental', notes: '' },
+    proposals: [], contracts: [], events: [], timeline: [], invoices: MONEY_INVOICES, last_contacted_at: past(1),
+  } },
+  [`/sales/deals/${DEAL10}/tasks`]: { data: [] },
+  '/sales/summary': { data: {
+    total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
+    by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
+    ar: { outstanding_cents: 172000, count: 2, overdue_cents: 12000, overdue_count: 1, processing_cents: 160000, processing_count: 1 },
+  } },
+  '/sales/receivables': { data: { items: MONEY_RCV, total_cents: 172000, overdue_cents: 12000, processing_cents: 160000 } },
+};
+
+test.describe('money in four states — the drawer rows and the "Who owes you" list', () => {
+  test('every row wears Paid · Processing · Upcoming · Overdue from the one formula, and a processing row has no Resend / Copy link / Void', async ({ page }) => {
+    await installApp(page, { api: MONEY_API });
+    await page.goto(`/pipeline.html?deal=${DEAL10}&dtab=billing`);
+    const row = (t: string) => page.locator('#detailInner .lr').filter({ hasText: t });
+    // the chip is the state word in its one tone — never the raw status word
+    await expect(row('Discovery').locator('.stage')).toHaveText('Paid');
+    await expect(row('Discovery').locator('.stage')).toHaveClass(/\bgood\b/);
+    await expect(row('Deposit').locator('.stage')).toHaveText('Processing');
+    await expect(row('Deposit').locator('.stage')).toHaveClass(/\binfo\b/);
+    await expect(row('Balance').locator('.stage')).toHaveText('Upcoming');
+    await expect(row('Balance').locator('.stage')).not.toHaveClass(/\b(good|info|bad)\b/);
+    await expect(row('Hosting').locator('.stage')).toHaveText('Overdue');
+    await expect(row('Hosting').locator('.stage')).toHaveClass(/\bbad\b/);
+    await expect(row('Duplicate').locator('.stage')).toHaveText('Voided');
+    await expect(page.locator('#detailInner')).not.toContainText('Awaiting payment');
+    // the processing row: the client paid — nothing to resend, copy or void (the
+    // server 409s all three); the printable copy stays, and no "due now" nag
+    const proc = row('Deposit');
+    await expect(proc).toContainText('payment on its way');
+    await expect(proc).not.toContainText('due');
+    await expect(proc.locator(`[data-send-inv="${M_PROC}"]`)).toHaveCount(0);
+    await expect(proc.locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(proc.locator(`[data-void-inv="${M_PROC}"]`)).toHaveCount(0);
+    await expect(proc.locator(`[data-doc-inv="${M_PROC}"]`)).toBeVisible();
+    // the waiting rows keep the drawer's rules: sent → Resend + Copy link + Void;
+    // never sent (and overdue) → Send + Void, no link to copy
+    await expect(row('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
+    await expect(row('Balance').locator('[data-copy-pay]')).toHaveAttribute('data-copy-pay', 'https://pay.example/b');
+    await expect(row('Balance').locator(`[data-void-inv="${M_UP}"]`)).toBeVisible();
+    await expect(row('Hosting').locator(`[data-send-inv="${M_OVER}"]`)).toHaveText('Send');
+    await expect(row('Hosting')).toContainText('not sent yet');
+    await expect(row('Hosting').locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(row('Hosting').locator(`[data-void-inv="${M_OVER}"]`)).toBeVisible();
+    // paid and void rows: no chase controls either (as before)
+    await expect(row('Discovery').locator('[data-void-inv], [data-send-inv]')).toHaveCount(0);
+    await expect(row('Duplicate').locator('[data-void-inv], [data-send-inv]')).toHaveCount(0);
+    // the Overview Money card: Outstanding is what still WAITS (upcoming + overdue);
+    // the settling payment rides along as processing, never inside the total
+    await page.locator('#detailInner .tabs [data-dtab="overview"]').click();
+    const money = page.locator('#dpanel-overview .dkv');
+    await expect(money).toContainText('Outstanding $1,720 · 2 invoices');
+    await expect(money).toContainText('$1,600 processing');
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"] .n')).toHaveText('3 open');
+
+    // "Who owes you": the same chips by the same rule, and the header says what's settling.
+    // (The Outstanding tile's one-line sub — "2 invoices · $120 overdue · $1,600 processing
+    // · see who →" — ellipsises on the tablet/phone tile and clips the link, so a real
+    // tap can't land there; that tile is PR #31's and a follow-up. The list is what's
+    // under test here, so open it the way the link does.)
+    await page.goto('/pipeline.html');
+    await page.locator('#arOpen').dispatchEvent('click');
+    await expect(page.locator('#detailInner')).toContainText('Who owes you');
+    await expect(page.locator('#detailInner .dhead')).toContainText('Outstanding: $1,720 · $120 overdue · $1,600 processing');
+    const rc = (t: string) => page.locator('.rcv-row').filter({ hasText: t });
+    await expect(rc('Deposit').locator('.stage')).toHaveText('Processing');
+    await expect(rc('Deposit').locator('.stage')).toHaveClass(/\binfo\b/);
+    await expect(rc('Balance').locator('.stage')).toHaveText('Upcoming');
+    await expect(rc('Hosting').locator('.stage')).toHaveText('Overdue');
+    await expect(rc('Hosting').locator('.stage')).toHaveClass(/\bbad\b/);
+    await expect(page.locator('.rcv-row .pill')).toHaveCount(0);   // the old lowercase "overdue" pill is gone
+    // the processing row: Open deal only
+    await expect(rc('Deposit')).toContainText('payment on its way');
+    await expect(rc('Deposit').locator('[data-send-inv], [data-copy-pay], [data-void-inv]')).toHaveCount(0);
+    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL10}"]`)).toBeVisible();
+    // the waiting rows keep chasing
+    await expect(rc('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
+    await expect(rc('Balance').locator('[data-copy-pay]')).toHaveCount(1);
+    await expect(rc('Balance').locator(`[data-void-inv="${M_UP}"]`)).toBeVisible();
+    await expect(rc('Hosting').locator(`[data-send-inv="${M_OVER}"]`)).toHaveText('Send');
+    await expect(rc('Hosting').locator('[data-copy-pay]')).toHaveCount(0);
+    await expect(rc('Hosting').locator(`[data-void-inv="${M_OVER}"]`)).toBeVisible();
   });
 });
 
