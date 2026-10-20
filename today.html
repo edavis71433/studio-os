@@ -115,6 +115,8 @@
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap}
+  /* Oct 2026 experience review: the FIRST thing that needs you wears the page's one filled button */
+  .feedcard > .moment:first-child .fcta{background:var(--accent);color:#fff}
   /* the manual "Done" — quiet by design: the row usually clears itself, this is
      only for the residue. Never shown on money or legal obligations. */
   .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap;cursor:pointer}
@@ -637,7 +639,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // column (right under the day) — asking a question is a primary action.
   main += `<div class="ask"><h3>Have a question about your website?</h3>
     <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
-    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="primary" id="askBtn">Ask</button></div>
+    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="ghost" id="askBtn" style="border-color:var(--line);color:var(--ink);padding-left:16px;padding-right:16px">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
 
   // ── the rail: This month · Recent records · Waiting on clients. When every

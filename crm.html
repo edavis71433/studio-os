@@ -693,7 +693,7 @@ function renderPath(){
   if(stage==='won')side='';   // the lifecycle bar already shows Won — no second badge
   else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
   else if(stage==='contract'&&signed)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Convert to customer →</a>`;
-  else if(fwdOk)side=`<button class="primary" id="markComplete">Mark Stage as Complete</button>`;
+  else if(fwdOk)side=`<button class="primary" id="markComplete">Mark stage complete</button>`;
   else side=`<span class="muted" style="font-size:13px">Get the agreement signed to convert</span>`;
   host.innerHTML=`<div class="pathcard">
     <div class="pathrow">

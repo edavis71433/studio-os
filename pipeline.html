@@ -531,7 +531,10 @@ function showDealTab(tab,opts){
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
-const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres/i.test(m)?m:'Something went wrong on our side — please try again.';};
+const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
+// "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
+const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
+const sourceWord=(s)=>({manual:'Added by you',enquiry:'From an enquiry',form:'From your website',import:'Imported'}[String(s||'').toLowerCase()]||String(s||''));
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -1595,7 +1598,7 @@ function renderList(){
   host.innerHTML=list.map(d=>{
     const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
-    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(d.source||'')}${d.expected_close?' · closes '+esc(d.expected_close):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
@@ -2027,7 +2030,7 @@ async function openDeal(id){
           <div class="dh-sub">${stageBadge(d.stage,signedNow)}
             <span>${c?(c.name?esc(c.name):(c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Contact')):'No contact'}${(c&&c.name&&c.email)?` · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span>
             ${d.expected_value_cents?`<span class="fact"><strong>${money(d.expected_value_cents)}</strong> value</span>`:''}
-            ${d.expected_close?`<span class="fact">Closes <strong>${esc(d.expected_close)}</strong></span>`:''}
+            ${d.expected_close?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
             ${data.last_contacted_at?`<span>Last contacted ${esc(ago(data.last_contacted_at))}</span>`:''}
           </div></div></div>
@@ -2154,7 +2157,7 @@ async function openDeal(id){
       if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
       else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
       else if(stage==='contract'&&signedNow)side=`<button type="button" class="btn" id="pathConvert">Convert to customer ↓</button>`;
-      else if(fwdOk)side=`<button type="button" class="btn" id="markComplete">Mark Stage as Complete</button>`;
+      else if(fwdOk)side=`<button type="button" class="btn" id="markComplete">Mark stage complete</button>`;
       else side=`<span class="mut" style="font-size:13px">Get the agreement signed to convert</span>`;
       host.innerHTML=`<div class="pathrow"><div class="path" role="group" aria-label="Deal stages">${steps}</div><div class="path-side">${side}</div></div>
         ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button type="button" class="btn" id="backGo">Move back</button><button type="button" class="btn ghost" id="backNo">Cancel</button></div>`:''}

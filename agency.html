@@ -531,7 +531,7 @@ async function mountQueues(){
   if(gen!==QSEQ)return;   // a newer queues read started — drop this one
   if(!r.ok||!r.body.data){
     host.hidden=false;
-    host.innerHTML=`<h2 class="qhead">What needs you today</h2>
+    host.innerHTML=`<h2 class="qhead">Needs you</h2>
       <div class="qfail">Your queues wouldn’t load just now.<button id="qretry" type="button">Try again</button></div>`;
     const qr=$('qretry');if(qr)qr.addEventListener('click',()=>mountQueues());
     return;
@@ -539,7 +539,7 @@ async function mountQueues(){
   const queues=((r.body.data.queues)||[]).filter(q=>q.items&&q.items.length);
   if(!queues.length){host.hidden=true;host.innerHTML='';return;}   // genuinely nothing waiting — absence is truth
   host.hidden=false;
-  host.innerHTML=`<h2 class="qhead">What needs you today</h2>`+
+  host.innerHTML=`<h2 class="qhead">Needs you</h2>`+
     queues.map(q=>`<div class="rcard">
       <p class="rh">${esc(q.title)} · ${q.items.length}</p>
       <div class="rrows">${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}"><span><strong>${esc(it.name)}</strong> — ${esc(it.why)}</span><span class="rn" aria-hidden="true">→</span></a>`).join('')}</div>

@@ -174,6 +174,7 @@
     .frow.inv .finote,.frow.inv a.fbtn{margin-left:46px} /* stacked under the name, aligned past the 34px icon + 12px gap */
   }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+  a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff} /* paying is the Invoices tab's one next action (Oct 2026 experience review) */
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
   .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
@@ -748,7 +749,7 @@ function pathSteps(ms){
 // and in the aria narration ('Design — done Jul 1' / 'Build — current, due 2026-07-20').
 function pathStepText(s){
   if(s.state==='done'){const t=Date.parse(s.m.completed_at||'');return'done'+(isFinite(t)?' '+new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'');}
-  return s.state+(s.m.due_date?', due '+s.m.due_date:'');
+  return s.state+(s.m.due_date?', due '+niceDay(s.m.due_date):'');
 }
 // Concise progress phrase for a project card's accessible name (F15): the card
 // is a role="button", so anything not aria-hidden inside it joins its name —
@@ -769,7 +770,7 @@ function milestonePathHtml(ms){
   const steps=pathSteps(ms);if(!steps.length)return'';
   const cur=steps.find(s=>s.state==='current');
   const meta=cur
-    ?`<span class="tl-here">You’re here</span> <b>${esc(cur.m.title)}</b>${cur.m.due_date?` · due ${esc(cur.m.due_date)}`:''}`
+    ?`<span class="tl-here">You’re here</span> <b>${esc(cur.m.title)}</b>${cur.m.due_date?` · due ${esc(niceDay(cur.m.due_date))}`:''}`
     :`✓ All milestones complete`;
   return `<section id="sec-milestones"><h2>Milestones</h2><div class="card pathcard">${pathChevrons(steps,false)}<p class="path-meta">${meta}</p></div></section>`;
 }
@@ -779,7 +780,7 @@ async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api
 function projectCardsHtml(projects){
   if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.','🚀');
   let h='';
-  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(p.target_date)}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(niceDay(p.target_date))}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   return h;
 }
 // Which Home queue rows deserve an unread dot — derived purely from the EXISTING
@@ -1622,6 +1623,10 @@ async function renderFiles(){
 // derived here, client-side: unpaid && due_date < today; the server has no
 // overdue status of its own).
 function invYmd(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?m[0]:'';}
+// "2026-11-19" → "Nov 19, 2026" — the portal never shows a database date
+function niceDay(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');}
+// "2026-11-19" → "Nov 19, 2026" — the portal never shows a database date
+function niceDay(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');}
 function invDueLabel(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'long',day:'numeric'}):'';}
 function portalTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function invOverdue(i,todayYmd){if(!i||i.status==='paid'||i.status==='void'||i.status==='canceled')return false;const d=invYmd(i.due_date);return !!d&&d<todayYmd;}
@@ -1643,7 +1648,7 @@ function invoiceRowHtml(i,todayYmd){
   const pay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
   const act=i.status==='paid'?`<span class="finote">Paid — thank you.</span>`
     :dead?''
-    :pay?`<a class="fbtn" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
+    :pay?`<a class="fbtn pay" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
     :`<span class="finote">Your studio will send payment details.</span>`;
   return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">🧾</span>`+
     `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
@@ -2155,7 +2160,7 @@ async function openProject(id,focusSection){
   tiles.push(['Waiting on you',String(waiting)]);
   if(msTotals.total>0)tiles.push(['Milestones',`${msTotals.complete} of ${msTotals.total}`]);
   if(files>0)tiles.push(['Files shared',String(files)]);
-  if(p.target_date)tiles.push(['Target date',String(p.target_date)]);
+  if(p.target_date)tiles.push(['Target date',niceDay(p.target_date)]);
   html+=`<div class="hl-panel" id="sec-overview" role="group" aria-label="Project highlights">${tiles.map(t=>`<div class="hl"><div class="hl-k">${esc(t[0])}</div><div class="hl-v">${esc(t[1])}</div></div>`).join('')}</div>`;
   // milestone Path — read-only chevrons (replaces the old vertical list)
   html+=milestonePathHtml(data.milestones);
@@ -2164,7 +2169,7 @@ async function openProject(id,focusSection){
   // approvals that need the client — per-kind tag, per-card id (notification
   // anchors emit #approval-<id>), and a helper line so "request changes" is
   // clearly safe. Decided ones form a paper-trail section below.
-  if(aps.length){html+=`<section id="sec-approvals"><h2>Waiting for your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}

@@ -129,6 +129,8 @@ function fileList(){
       h+=`<button class="file${on}" data-path="${esc(f.path)}"><span class="ic">${iconFor(f.kind)}</span>${esc(f.path)}${f.editable?'':'<span class="lock">read-only</span>'}</button>`;
     }
   }
+  if(!STATE.files.length)h+='<p class="mut" style="padding:10px 12px;margin:0">No files to show yet.</p>';
+  if(!STATE.files.length)h+='<p class="mut" style="padding:10px 12px;margin:0">No files to show yet.</p>';
   h+='</div>';return h;
 }
 

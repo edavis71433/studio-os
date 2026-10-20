@@ -293,7 +293,7 @@ function row(e){
   if(s.connected){
     actions = `<button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">Manage</button>`;
   } else if(s.unavailable){
-    actions = `<span class="note">This one’s coming soon.</span><button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">About</button>`;
+    actions = `<span class="note">Nothing to connect yet.</span><button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">About</button>`;
   } else {
     actions = `<button type="button" class="btn sm" data-connect="${esc(e.key)}" data-label="${esc(e.label)}">${s.reconnect?'Reconnect':'Connect'}</button><button type="button" class="btn sm ghost" data-more="${esc(e.key)}" aria-expanded="false" aria-controls="more-${esc(e.key)}">About</button>`;
   }

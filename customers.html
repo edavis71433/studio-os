@@ -355,7 +355,7 @@ async function loadPeople(){
   if(TAB==='people')render();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
+  return `<div class="seg tabs2" role="tablist" aria-label="Customers or contacts"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">Contacts${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
 }
 function peopleHtml(){
   if(PEOPLE===null)return'<div class="spin" role="status" aria-label="Loading people"></div>';

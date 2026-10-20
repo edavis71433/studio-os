@@ -263,6 +263,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 /* the writing desk (M9.5A) — ✦ marks drafted words, per the AI language freeze */
 .deskopt{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--paper);padding:14px 16px;margin-bottom:10px}
 .deskopt .dol{font-size:12px;letter-spacing:0;text-transform:none;color:var(--plum);font-weight:600;margin-bottom:6px}
+.deskopt .dol::first-letter{text-transform:uppercase}
 .deskopt .dop{font-family:var(--sans);font-size:14px;line-height:1.6;white-space:pre-line;max-height:220px;overflow:auto}
 .deskopt .doa{display:flex;gap:18px;margin-top:12px;align-items:baseline}
 .aihint{font-size:12px;color:var(--ink-2);font-style:normal;font-family:var(--sans)}
@@ -1280,7 +1281,7 @@ body.pd-dragging *{cursor:grabbing !important}
 <!-- publish ritual (full page) -->
 <div class="ritualwrap" id="ritualWrap" role="dialog" aria-modal="true" aria-labelledby="ritTitle">
   <div class="ritual">
-    <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your room</button></div>
+    <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your website</button></div>
     <h1 id="ritTitle" role="heading" aria-level="2">Here’s what changes.</h1>
     <p class="rsub" id="ritSub" aria-live="polite"></p>
     <div id="ritBody" aria-live="polite"></div>
@@ -2490,7 +2491,7 @@ async function openFoundationsDesk(opts) {
   DESK_DOMAIN_INTENT = !!(opts && opts.domain);
   if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "The technical side — domain, email, security — is handled with plans you approve. Nothing changes on its own."), 400);
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
-  $("deskTitle").textContent = "The technical side, handled";
+  $("deskTitle").textContent = "Domain & email";
   $("deskSub").textContent = "Your domain, its records, the padlock, email, and hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
   $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading the foundations…</div><div class="shimmer"></div></div>`;
@@ -3258,10 +3259,18 @@ function bkServiceAdd() {
   add.addEventListener("click", () => { if (holder.firstChild) { holder.innerHTML = ""; add.textContent = "＋ Add a service"; } else { holder.appendChild(bkServiceForm(null)); add.textContent = "Close"; } });
   const box = el("div"); box.append(add, holder); return box;
 }
+// "2026-10-20T14:30" → "Tue, Oct 20 · 2:30 PM" (the row used to print the raw timestamp)
+function bkWhenLabel(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(s || ""));
+  if (!m) return String(s || "");
+  const d = new Date(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0);
+  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return m[4] ? day + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : day;
+}
 function bkApptRow(a) {
   const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line,#eee);border-radius:10px";
   const info = el("div"); info.style.cssText = "flex:1;min-width:200px";
-  info.appendChild(el("div", null, (a.when || a.slot_start_local || "") + " · " + a.type_name)).style.cssText = "font-weight:600";
+  info.appendChild(el("div", null, bkWhenLabel(a.when || a.slot_start_local) + " · " + a.type_name)).style.cssText = "font-weight:600";
   const who = [a.customer_name, a.customer_email, a.customer_phone].filter(Boolean).join(" · ");
   info.appendChild(el("div", "hint", who)).style.margin = "2px 0 0";
   if (a.note) info.appendChild(el("div", "hint", "“" + a.note + "”")).style.margin = "2px 0 0";
@@ -3363,7 +3372,7 @@ function rvRow(r) {
   head.appendChild(rvStars(r.rating));
   const who = el("span", null, r.reviewer_name || "A customer"); who.style.cssText = "font-weight:600";
   head.appendChild(who);
-  if (r.created_at) { const d = el("span", "hint", String(r.created_at).slice(0, 10)); d.style.cssText = "font-size:12px;color:var(--soft,#888)"; head.appendChild(d); }
+  if (r.created_at) { const d = el("span", "hint", bkWhenLabel(String(r.created_at).slice(0, 10))); d.style.cssText = "font-size:12px;color:var(--soft,#888)"; head.appendChild(d); }
   row.appendChild(head);
   if (r.body) { const q = el("p", null, "“" + r.body + "”"); q.style.cssText = "margin:8px 0 0;color:var(--ink,#3d3646);font-size:14px;line-height:1.5"; row.appendChild(q); }
   if (r.owner_reply) { const rp = el("p", null, "You replied: " + r.owner_reply); rp.style.cssText = "margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--plum,#5b3fa0);color:var(--soft,#6b6478);font-size:13px;background:var(--bg,#faf9fc)"; row.appendChild(rp); }
@@ -4201,6 +4210,8 @@ function renderPublishButton() {
   const c = S.changes;
   const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
   $("btnPublish").textContent = label;
+  // nothing to publish → the button steps back to quiet; the filled style is for a real next action
+  $("btnPublish").classList.toggle("inked", !!(c && (c.count > 0 || c.first_publish)));
   $("dockPublish").textContent = c && c.count > 0 ? `Publish·${c.count}` : "Publish";
 }
 function scheduleChangesRefresh() {
@@ -4608,7 +4619,7 @@ async function loadRitual(toSchedule) {
       const j = el("div", "journal");
       c.changes.forEach((ch) => {
         const row = el("div", "jrow");
-        row.appendChild(el("span", "jsec", sectionWord(ch.section)));
+        row.appendChild(el("span", "jsec", hbCap(sectionWord(ch.section))));
         row.appendChild(el("span", null, ch.sentence));
         j.appendChild(row);
       });
@@ -4665,7 +4676,7 @@ async function runPublish(btn, firstPublish) {
     const retry = el("button", "pubbtn", "Try again");
     retry.addEventListener("click", () => loadRitual());
     $("ritActions").appendChild(retry);
-    const ny = el("button", "notyet", "Back to your room");
+    const ny = el("button", "notyet", "Back to your website");
     ny.addEventListener("click", closeRitual);
     $("ritActions").appendChild(ny);
   }
@@ -4719,7 +4730,7 @@ function showReceipt(firstPublish) {
     cp.addEventListener("click", () => { try { navigator.clipboard.writeText(liveUrl).then(() => toast("Link copied — share it anywhere.")); } catch (_) { toast(liveUrl); } });
     $("ritActions").appendChild(cp);
   }
-  const done = el("button", "notyet", "Back to your room");
+  const done = el("button", "notyet", "Back to your website");
   done.style.marginTop = "26px";
   done.addEventListener("click", closeRitual);
   $("ritActions").appendChild(done);
@@ -5178,6 +5189,7 @@ async function renderLaunches() {
   const box = $("launchBox"); if (!box) return;
   let launches = [];
   try { launches = (await api("GET", "/launches")).data || []; } catch (_) { box.innerHTML = ""; return; }
+  if (!Array.isArray(launches)) launches = [];
   box.innerHTML = "";
   const card = el("div", "field"); card.style.marginBottom = "18px";
   card.appendChild(el("label", null, "Launches"));
@@ -5234,6 +5246,7 @@ async function renderPreviewPanel() {
   const box = $("previewBox"); if (!box) return;
   let st = null;
   try { st = (await api("GET", "/preview/status")).data; } catch (_) { box.innerHTML = ""; return; }
+  if (!st || !st.draft) { box.innerHTML = ""; return; }   // an unexpected shape must not break the whole History view
   S.previewStatus = st;   // shared cache — the Page ▾ menu renders its offline item from this
   box.innerHTML = "";
   const card = el("div", "field"); card.style.marginBottom = "18px";
@@ -5579,7 +5592,7 @@ async function mountBillingCard() {
   if (!s) return;
   const card = el("div", "field"); card.id = "billingCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Your plan & billing"));
-  const statusWord = { active: "Active", paused: "Paused — payment needs attention", lapsed: "Ended — update payment to reactivate", deleted: "Closed" }[s.status] || s.status;
+  const statusWord = { active: "Active", paused: "Paused — payment needs attention", lapsed: "Ended — update payment to reactivate", deleted: "Closed" }[s.status] || hbCap(String(s.status || "").replace(/_/g, " ")) || "Active";
   const line = el("div", "hint", `${s.plan_name || s.plan || "Your plan"} · ${statusWord}${s.current_period_end ? " · renews " + new Date(s.current_period_end).toLocaleDateString() : ""}${s.in_grace ? " · a payment didn’t go through — your site stays up while you fix it" : ""}`);
   card.appendChild(line);
   if (s.can_manage_billing) {

@@ -1,0 +1,102 @@
+# Experience review — October 2026
+
+**For:** Eric, to decide the M and L items. **Status:** the S items are fixed in this PR; everything else is ranked for you.
+**Reviewed on:** `main` at 5081188 (after the workflow audit's five changes), with the e2e fixtures (`tests/e2e/helpers/app.ts` `installApp`, the owner and client fixtures in `docs/design/audit/walks/fixtures.ts`), at desktop 1280×800 and iPhone 13. Every signed-in screen was opened three ways: with data, with every read returning nothing, and with every read failing (HTTP 500). The screenshots are in [`experience/`](experience/).
+
+The [workflow audit](WORKFLOW-AUDIT-2026-10.md) counted clicks. This review looks at what the screens say and do once you are there: the words, which button is filled, what happens after you press it, what shows when there is nothing or when something breaks, and how it all reads on a phone.
+
+## The short version
+
+- **The phone was the biggest miss.** Every one-time hint ("The 🔔 at the top shows…", "Publishing goes live all at once…") rendered as a half-width column of one word per line and sat on top of the one filled button. One line in `shell.css` fixes all of them.
+- **Today's filled button was "Ask".** The first thing that needs you now wears the filled button; Ask steps back.
+- **Dates and codes leaked through.** Deals said "closes 2026-08-01" and "manual"; bookings said "2026-10-20T14:30 · Strategy call"; a broadcast said "11/19/2026, 6:00:00 PM"; a deal that could not be read printed a JavaScript error. All fixed.
+- **Five places had two names for one idea** (Customers' "People" tab vs the menu's "Contacts"; "+ Contact" next to "+ Add a customer"; "Domains & email" vs "Domain & email"; "Waiting for your OK" vs "Needs your OK"; "What needs you today" vs "Needs you"). Fixed.
+- **Three dead ends:** Settings → Domain & email sent an owner to a page that said "Operators only."; the get-started checklist promised an "Approve it" step that never happens; Connections said "coming soon". Fixed.
+- **What's left for you is structural:** screens with two to four filled buttons (Design, the customer record, the deal page, the project record, the client's Requests tab), the phone's giant stat tiles, and what the client sees after paying in Stripe (nothing, until the webhook lands).
+
+Counts: 48 rows — 30 S (29 fixed here; the Try-again buttons in #42 are left), 16 M, 2 L, and one note (#48).
+
+## How to read the table
+
+- **Screen** is where you see it. **Fix** is one sentence. **Size** is S (wording, a button weight, a toast, an empty-state sentence, a link), M (a page's structure or a shared pattern), L (a new backend contract or a product decision).
+- **Done** means fixed in this PR with its tests updated. The others are ranked for Eric.
+
+## 1. Ranked findings
+
+| # | Screen | Finding | Screenshot | Fix | Size | Done |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Every page, phone | The one-time hints are a half-width column (one word per line) and cover the filled button: Publish in the ritual, the stat tiles on Today, the domain field on the desk. Cause: a fixed element with `left:50%` and no width shrinks to half the viewport. | [before](experience/02-phone-hint-before.png) · [after](experience/02-phone-hint-after.png) | `shell.css`: give `.dds-hint` `width:max-content` (one line). | S | ✓ |
+| 2 | Today | The page's only filled button is the concierge "Ask"; the thing that needs you is outlined. | [before](experience/01-today-before.png) · [after](experience/01-today-after.png) | The first Needs-you action wears the filled style; Ask becomes an outlined button. | S | ✓ |
+| 3 | Website › Design | Four filled buttons: Publish, "Home ⋯", two "+ Add section". | [screen](experience/03-design-four-filled.png) | Keep Publish filled; make the page pill and the Add-section buttons outlined (the pill is a selector, not an action). | M | |
+| 4 | Customer record (crm) | Three filled buttons: Send invoice, Mark stage complete, Send. The deal page has two (Open customer record, Mark stage complete); the project record two (Mark milestone complete, Send). | [screen](experience/04-customer-record-three-filled.png) · [record](experience/20-client-record.png) | One filled button per record: the Path's next step. Send invoice and the composer's Send become outlined. | M | |
+| 5 | Today, Website overview, Pipeline, customer record, client Home — phone | Stat tiles stack one per row at ~260px each, so the first phone screen is three numbers and "Needs you" is below the fold. | [screen](experience/05-phone-today-tiles.png) | Below 600px, lay the strip out as a 2-column grid of compact tiles (icon left, 2 lines) in each page's own CSS. | M | |
+| 6 | Client › Invoices | After paying in Stripe (new tab) the invoice still says "open" and the page says nothing until the webhook lands. | [before](experience/06-client-invoices-before.png) | On return (`visibilitychange`/`focus`), refetch `/client/billing` for ~60s and show "Checking with Stripe…" on the row until it flips to Paid; then a toast "Paid — thank you." | M | |
+| 7 | Client › Invoices | "Pay →" was outlined; the tab had no filled button. | [after](experience/06-client-invoices-after.png) | Pay is the Invoices tab's filled button. | S | ✓ |
+| 8 | Pipeline › a deal that cannot be read | The page printed "Cannot read properties of undefined (reading 'stage')". Projects had the same leak. | [before](experience/07-deal-raw-error-before.png) · [after](experience/07-deal-raw-error-after.png) | The error prettifier rejects JavaScript errors; the user sees "Something went wrong on our side — please try again." | S | ✓ |
+| 9 | Website › Bookings | Upcoming appointments printed the raw timestamp: "2026-10-20T14:30 · Strategy call". | [before](experience/08-bookings-raw-dates-before.png) · [after](experience/08-bookings-raw-dates-after.png) | "Tue, Oct 20 · 2:30 PM · Strategy call". | S | ✓ |
+| 10 | Pipeline, Projects, client Home and record | Dates as database strings ("closes 2026-08-01", "Target 2026-08-01", "due 2026-07-25", "target 2026-11-19") and the deal source as a code ("manual", "enquiry"). | [before](experience/23-pipeline-before.png) · [after](experience/23-pipeline-after.png) | "closes Aug 1, 2026"; "Added by you" / "From an enquiry". | S | ✓ |
+| 11 | Website › Reviews | The review date was "2026-07-02". | [screen](experience/24-reviews-raw-date.png) | "Thu, Jul 2". | S | ✓ |
+| 12 | Broadcasts | "Scheduled for 11/19/2026, 6:00:00 PM" — seconds on a send time. | [screen](experience/22-broadcasts-crumb-seconds.png) | "Nov 19, 2026, 6:00 PM". | S | ✓ |
+| 13 | Website › preview | When the render reply is not HTML the proof shows the raw reply (`{"data":{}}`) on desktop and "Proofing your draft…" forever on a phone. | [screen](experience/11-preview-raw-json.png) | Check the content type / `ok` before `srcdoc`; otherwise show the "couldn't draw it" line with Try again. | M | |
+| 14 | Website › History | Two page errors when `/launches` or `/preview/status` come back in an unexpected shape; the view went quiet with no message. | [screen](experience/25-history.png) | Guard both reads (array check, `st.draft` check) so the rest of History still renders. | S | ✓ |
+| 15 | Website › Domain & email desk | Titled "The technical side, handled" though the menu, the overview card and the Settings card all say "Domain & email"; its labels were lowercase ("launched", "your domain", "email"). | [before](experience/09-domain-desk-before.png) · [after](experience/09-domain-desk-after.png) | Title "Domain & email"; labels in sentence case. | S | ✓ |
+| 16 | Website › publish ritual | "← Back to your room" (room is not a word used anywhere else); change rows showed the raw section key ("hours", "about"). | [after](experience/02-phone-hint-after.png) | "← Back to your website"; "Hours", "About". | S | ✓ |
+| 17 | Website (every view) | "Publish" stays filled when there is nothing to publish. | [screen](experience/21-business-publish-zero.png) | At zero changes the button steps back to the quiet style. | S | ✓ |
+| 18 | Website › Business | "Your plan · undefined" when the subscription carries no status word. | — | Fall back to "Active". | S | ✓ |
+| 19 | Inbox | Chips in Title Case: "Needs Your OK", "Quote Request", "Worth A Look", "Project Activity" — while the view is called "Needs your OK". | [before](experience/10-inbox-chips-before.png) · [after](experience/10-inbox-chips-after.png) | Drop `text-transform:capitalize`; labels are already sentence case. | S | ✓ |
+| 20 | Inbox, failed | "We couldn't load your inbox just now — refresh in a moment." with nothing to press, while Customers, Files and Projects offer Try again. | — | A Try again button that reloads in place. | S | ✓ |
+| 21 | Inbox › Enquiries | Two filled buttons: "+ New enquiry" in the toolbar and "Send reply" in the pane. | — | "+ New enquiry" becomes outlined; Send reply is the one. | S | ✓ |
+| 22 | Inbox › a support request | Four ways to end one request: Resolve, Close, a Status dropdown and "Reply and resolve". | [screen](experience/15-support-resolve-close.png) | One "Resolve" (with "Reply and resolve" beside the composer); drop Close and the dropdown. | M | |
+| 23 | Customers | The second tab said "People" while the menu says "Contacts". | — | The tab says "Contacts". | S | ✓ |
+| 24 | Contacts | The filled button was "+ Add a customer"; the page's own action was a quiet "+ Contact". | [before](experience/16-contacts-before.png) · [after](experience/16-contacts-after.png) | "+ Add a contact" is filled; "+ Add a customer" outlined. | S | ✓ |
+| 25 | Contacts, phone (cards) | Every card has a filled "Email", so a phone screen shows three filled buttons plus the toolbar's. | [screen](experience/27-phone-contacts-cards.png) | Card actions outlined; the toolbar's add button stays the one. | M | |
+| 26 | Settings | A developer note in the sub-line ("Loads in one go"); the card said "Domains & email". | [screen](experience/17-settings-loads-in-one-go.png) | Note removed; "Domain & email". | S | ✓ |
+| 27 | Settings › Domain & email | The card sent an owner to `admin-health.html`, which answers "Operators only." | — | Owners go to the Domain & email desk; operators keep the platform view. | S | ✓ |
+| 28 | Broadcasts | Breadcrumb "Website › Send an update", but the page lives under Customers in the menu; the page title ("Send an update") and the menu ("Broadcasts") disagree. | [screen](experience/22-broadcasts-crumb-seconds.png) | Breadcrumb now "Customers › Send an update". Renaming the h1 to "Broadcasts" is a one-name decision for Eric. | S / M | ✓ / |
+| 29 | Connections | A planned provider said "This one's coming soon." next to a chip that already says "Not available yet". | [screen](experience/29-connections-coming-soon.png) | "Nothing to connect yet." | S | ✓ |
+| 30 | Get started (after drafting) | The checklist lists "Approve it", a step that never happens. | [before](experience/14-get-started-approve-it-before.png) · [after](experience/14-get-started-after.png) | Drafted → Preview it → Publish. | S | ✓ |
+| 31 | Agency | "What needs you today" over the queue; everywhere else it is "Needs you". | [screen](experience/28-agency.png) | "Needs you". | S | ✓ |
+| 32 | Client › project record | "Waiting for your OK" over the approvals, "Needs you" on Home, "Needs your OK" in the studio's Inbox; the tile says "Waiting on you". | [screen](experience/20-client-record.png) | Heading now "Needs your OK". The tile word is pinned by the portal spec and left for the M pass. | S | ✓ |
+| 33 | Projects, failed | The page lost its name (no heading) and the meta line read "Updated 29875318 min ago". | [before](experience/12-projects-failed-before.png) · [after](experience/12-projects-failed-after.png) | The header renders on failure; the meta says "Couldn't load just now". | S | ✓ |
+| 34 | Pipeline, customer record, project record | "Mark Stage as Complete" / "Mark Milestone Complete" in Title Case. | — | "Mark stage complete" / "Mark milestone complete". | S | ✓ |
+| 35 | Projects › record | A task chip read "your Action". | — | "needs the client". | S | ✓ |
+| 36 | Developer | An empty file list was a blank white box; two filled buttons (Save, Save changes). | [screen](experience/18-developer-two-saves.png) | "No files to show yet." (done). One Save is an M. | S / M | ✓ / |
+| 37 | Client › Requests | Three filled: two "Request this" and the "Open" filter chip. | [screen](experience/19-client-requests-three-filled.png) | Service cards outlined; the filter chip uses the quiet pressed style. | M | |
+| 38 | Website › Bookings, Reviews | A second filled button on the page (Save booking settings; Send request) beside Publish. | [screen](experience/08-bookings-raw-dates-after.png) | Form submits outlined; Publish stays the one. | M | |
+| 39 | Signed-out shell, studio.html | The signed-out mark was "P" (the old Presence mark) while every signed-in page shows "S". | [screen](experience/13-door-studio.png) | "S". | S | ✓ |
+| 40 | studio.html vs portal.html | The two doors read as two products: "Studio OS" with a sans mark vs "Davis Digital Studio · Client portal" in a serif wordmark, different sub-copy, and the client door never says Studio OS. | [studio](experience/13-door-studio.png) · [portal](experience/13-door-portal.png) | One door design: the same mark and wordmark, one sentence each ("Run your studio" / "See your project"), each linking to the other. | M | |
+| 41 | Website, failed | The whole builder is replaced by "Nothing was lost" with one filled button, "Go to your account", that leads to the sign-in page even though you are signed in; the details line is jargon ("500 — [site] Something went wrong."). | [screen](experience/30-website-failed.png) | The button becomes "Try again" (reload) and the details line is dropped. | M | |
+| 42 | Analytics, Visual Studio, Developer — failed | "refresh in a moment" with nothing to press. | [screen](experience/26-analytics-failed.png) | A Try again button on each, like Customers and Files. | S (not in this PR's scope list; left) | |
+| 43 | Phone, several pages | Tap targets under 28px: the preview's "Desk / Phone" toggles, "Use your email app instead", "Open the builder", the Table/Cards toggles, the analytics "View" pills. | — | A 36px minimum on those controls at phone width. | M | |
+| 44 | Client › Messages | After sending, the thread does not show the sent message until the list is refetched (the row preview updates, the pane does not). | [screen](experience/31-client-message-sent.png) | Append the returned message to the open thread. | M | |
+| 45 | Enquiry reply | The reply is written and sent in-app (good), but the Inbox row and the Today nudge keep "waiting for a reply" until the next load. | — | Clear the notice locally after a successful send. | M | |
+| 46 | Website overview | The Today page says "1 new enquiry · waiting for a reply" while the overview's tile says "Enquiries this month · 0 · None yet" (different windows, same word). | — | Make the tile "Enquiries waiting" or name the window on Today too. | L (needs the count route) | |
+| 47 | Today | The sub-line count ("2 things need you") comes from the context while the list comes from the feed; when the feed fails the two disagree. | — | Count the rendered rows, or hide the number when the feed failed. | L (server contract) | |
+| 48 | Whole product | "Enquiries" is one word now, but the Inbox calls the view "Enquiries", Analytics "New enquiries", Broadcasts "All website enquiries", the client's Help "Where do enquiries go?". Fine. Listed so nobody renames one of them. | — | Keep. | — | |
+
+## 2. By the seven questions
+
+**Wording.** One name per idea now holds for Needs you / Needs your OK (Today, Inbox, client Home, client record, Agency), Contacts (menu, tab, button), Domain & email (menu, overview card, desk, Settings). Sentence case holds on every button we found (Mark stage complete, Mark milestone complete) and on the Inbox chips. Left for Eric: "Send an update" vs "Broadcasts" (#28), and the support request's four verbs (#22).
+
+**One filled button.** Fixed where it was a weight (Today #2, Contacts #24, Invoices #7, Enquiries #21, Publish at zero #17). Left where it is a layout decision: Design (4), the customer record (3), the deal page (2), the project record (2), Bookings and Reviews (2), client Requests (3), Developer (2), the phone contact cards. The filled-button probe from the audit (`docs/design/audit/walks/probe.ts`) counts these; the numbers are in the step log the walk writes.
+
+**After an action.** Toasts exist and say the right thing where we pressed: "Sent to sam@example.com — their reply comes back here", "Approved — thank you.", "Marked read.", "Back online." The gaps are what the page shows *afterwards*: the paid invoice (#6), the sent client message (#44), the answered enquiry's nudge (#45).
+
+**Empty, loading, failed.** Every page has an honest empty sentence and a failed sentence; none showed a fake zero. The misses were the raw error text (#8), the lost heading (#33), "Your plan · undefined" (#18), the blank developer list (#36), the History page errors (#14), the preview's raw reply (#13), and three pages whose failure has no button (#42). The builder's "Nothing was lost" card (#41) is honest but its button goes to the wrong place.
+
+**Dead ends and promises.** Settings → Domain & email → "Operators only." (#27), "Approve it" (#30), "coming soon" (#29). No link to a retired page was found in any signed-in page (the forwarding stubs still answer for old bookmarks).
+
+**Phone.** No page scrolls sideways. Nothing stays under the bottom bar once you scroll to the end (checked on every screen). The hint (#1) was the real problem; the stat tiles (#5) and the small targets (#43) are the next two.
+
+**Two doors.** Fixed the mark (#39); the rest is a design decision (#40).
+
+## 3. What this PR changes
+
+- `shell.css` (one line): the hint's width. `shell.js` (one line): the signed-out mark.
+- `today.html`, `presence.html`, `pipeline.html`, `projects.html`, `crm.html`, `inbox.html`, `customers.html`, `contacts.html`, `settings.html`, `broadcasts.html`, `connections.html`, `get-started.html`, `agency.html`, `client.html`, `developer.html`: the S rows marked ✓ above. No endpoint changed; no page was restructured.
+- Tests updated to the new words: `tests/e2e/{pipeline,projects,portal,broadcasts,connections,agency}.spec.ts`; Deno pins `tests/presence/{projects_ui,pipeline_detail_ui,client_record,billing_surfaces}_test.mjs`.
+- `docs/design/experience/`: the screenshots above (before/after pairs where a fix landed).
+
+## Appendix: how the screens were walked
+
+A throwaway Playwright spec (not committed; it lives in the session's scratch folder) opened every screen in the list below with the fixtures, in three modes (data / nothing / 500), at desktop and iPhone 13, took a viewport and a full-page screenshot, and recorded per screen: the h1, the filled buttons (the audit's probe), console and page errors, horizontal overflow, tap targets under 28px, controls under the phone bar (before and after scrolling to the end), open dialogs without a close control, and the words "undefined", "NaN", "null", "Invalid Date" and "coming soon" in the page text. Screens: today (signed in and out), presence (overview, Business, Design, Files, Bookings, Reviews, Domain & email, History, publish ritual, schedule panel, add-page dialog, preview, after publishing), customers, crm (picker and record), contacts, pipeline (and a deal), projects (and a record), inbox (six views, the enquiry / message / approval / support panes, a sent reply), files (and the detail panel), visual-studio, analytics (and Insights), broadcasts, connections, sharing, settings, developer, help, get-started (and after drafting), agency, client.html (Home first and later visits, after approving, Messages, a thread, after sending, Files, Invoices, Requests, Help, the project record, the booking flow, a new request, the reviewer persona), portal.html (and the code step), studio.html, signup.html, welcome.html (with and without a checkout session), set-password.html. 326 screens, two failed to capture (the broadcast draft editor timed out under the walker, not in the suite).
