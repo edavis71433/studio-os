@@ -8,6 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
+import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
@@ -2111,10 +2112,10 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
 
-/** Re-send the welcome / set-password email to an already-converted customer —
+/** Re-send the welcome / sign-in email to an already-converted customer —
  *  the "they never got it / it expired" recovery. Reuses the ONE invite helper
- *  (sendCustomerInvite → a fresh signed set-password link), so a resend is byte-
- *  identical to the original. Only for a converted deal with an email on file;
+ *  (sendCustomerInvite → a fresh magic link, set-password as the fallback), so a
+ *  resend is byte-identical to the original. Only for a converted deal with an email on file;
  *  logged as an email activity on the deal timeline. Idempotent to re-tap. */
 export async function handleSalesResendInvite(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
@@ -2256,9 +2257,13 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
   } catch { return false; } // portfolio link is best-effort
 }
 
-/** The one-tap sign-in invite. A brand-new login gets a signed set-password link
- *  (they never chose a password) that lands them straight in the EXISTING guided
- *  first-run (via ?next=); an existing login gets a welcome. Best-effort.
+/** The one-tap sign-in invite: a GoTrue magic link (invite for a new login,
+ *  magiclink for an existing one — the same minter the reviewer invite uses, so
+ *  a client and a reviewer get the same kind of door) that signs them straight
+ *  in at the portal, which routes them to their client landing. No password to
+ *  set; they can add one later from "Forgot your password?". If no magic link
+ *  can be minted, a signed set-password link is the fallback; if neither can, the
+ *  plain portal door (one-time code). Best-effort — never blocks the set-up.
  *
  *  ON THE STUDIO'S BRAND, in the studio's voice — never the platform's. The
  *  client just signed with THEIR studio; a "welcome to Studio OS" from an
@@ -2281,16 +2286,19 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
   // brand name; the subject then stays bare rather than greeting the client from
   // a product they've never heard of.
   const studioName = brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name : '';
-  // Every provisioned customer needs to CREATE their password. Always send a signed
-  // set-password link that lands them in the guided first-run; if it can't be generated
-  // they can still get in passwordlessly (one-time email code) at the portal.
   // Converted customers are CLIENTS — they land in their client portal (client.html),
   // where they work WITH the studio (files, approvals, messages, invoices), NOT the
-  // Studio OS operator surfaces. (/client.html is whitelisted in set-password.html's
-  // NEXT_OK.) Self-running workspaces are a different persona (self-serve signup).
-  const link = await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
+  // Studio OS operator surfaces. The magic link lands on the portal door, which asks
+  // /portal/context and sends a client to their landing (client.html) — the same
+  // leg the reviewer invite (lib/workspace.ts sendSiteInvite) takes. The set-
+  // password fallback keeps ?next=/client.html (whitelisted in set-password.html's
+  // NEXT_OK). Self-running workspaces are a different persona (self-serve signup).
+  const magic = await mintSignInLink(email, '/portal.html').catch(() => '');
+  const link = magic ? '' : await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
   const btnStyle = `display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none`;
-  const cta = link
+  const cta = magic
+    ? `<p class="cta"><a href="${magic}" style="${btnStyle}">Sign in to your client portal →</a></p><p style="font-size:13px;color:#6b6478">No password to set — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`
+    : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
   sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,

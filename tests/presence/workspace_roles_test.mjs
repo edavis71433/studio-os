@@ -125,6 +125,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // drilled INTO a client the bar is the client's: Today and Website come back, Customers is the roster page
   const drilled = buildNav(ctx({ isAgency:true, scoped:true, capabilities: caps('business_owner') }));
   ok('nav: agency member drilled into a client keeps Today + Website; Customers → customers.html', drilled.some(s=>s.key==='today') && drilled.some(s=>s.key==='website' && !s.utility) && drilled.find(s=>s.key==='customers').items[0].href==='/customers.html');
+  // Oct 2026 studio audit, change 4: onboarding is findable from ⌘K at studio level ("add", "client")
+  const addItem = agency.find(s=>s.key==='customers').items.find(i=>i.key==='add_client');
+  ok('nav: agency member at studio level has "Add a customer" → /agency.html#add in the Customers group (⌘K finds "add"/"client")', !!addItem && addItem.label==='Add a customer' && addItem.href==='/agency.html#add' && /client/i.test(addItem.desc||''));
+  ok('nav: the add_client entry is studio-level only (not drilled into a client, not for a plain owner)', !drilled.find(s=>s.key==='customers').items.some(i=>i.key==='add_client') && !owner.find(s=>s.key==='customers').items.some(i=>i.key==='add_client'));
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));

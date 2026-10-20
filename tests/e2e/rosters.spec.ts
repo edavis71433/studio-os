@@ -541,6 +541,38 @@ test.describe('Customers — the agency member is forwarded to the one roster', 
     await page.goto('/customers.html');
     await page.waitForURL(/\/agency\.html$/);
   });
+  // Oct 2026 studio audit, change 4: the rosters' copies of the dialog offer "Start
+  // from" a kit only when the caller IS an agency (ddsContext.is_agency) — a plain
+  // studio owner has no kits and never sees the field.
+  const KITS = { data: [{ id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', name: 'Restaurant starter' }] };
+  test('customers (drilled agency) — the Start-from kit select lists /agency/kits; a plain owner never sees it', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
+    await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
+    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
+    await expect(page.locator('#cu-signup')).toBeHidden();      // provision mode: no pricing box
+    // the owner's copy: no agency, no field — even with kits fixtured
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+  });
+  test('contacts — the same gate on its copy: agency sees the kit field, owner does not', async ({ page }) => {
+    await pinTable('dds-display:contacts')(page);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
+    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS } });
+    await page.goto('/contacts.html');
+    await page.locator('#addCust').click();
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+  });
   test('drilled into a client (?client=) it stays, as the way UP to the roster', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
