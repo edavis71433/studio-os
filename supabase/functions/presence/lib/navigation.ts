@@ -161,7 +161,9 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasConnected) utility('connections', 'Connections', '/connections.html');
 
   // Settings — account, sharing/access, developer (Billing lives here, per the constitution)
-  const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }];
+  // Oct 2026 review: Settings is its own page (one load, eight cards) — the old
+  // /presence.html#settings deep link still routes to the builder's Business view.
+  const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/settings.html' }];
   if (f.hasClientPortal && has(c, 'invite')) settings.push({ key: 'sharing', label: 'Sharing & access', href: '/sharing.html' });
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push({ key: 'developer', label: 'Developer Mode', href: '/developer.html' });
   sections.push({ key: 'settings', label: 'Settings', items: settings, utility: true });

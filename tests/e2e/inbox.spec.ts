@@ -870,3 +870,94 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fClient')).toBeInViewport();
   });
 });
+
+// ── Oct 2026 review: support triage from the reading pane ────────────────────
+// Resolve · Close (· Make it a task when the request sits on a project) live in
+// the pane header for open / in_progress requests; "Reply and resolve" sits
+// beside Send. Every status change goes through the ONE existing route
+// (PATCH /support/:id), and a resolved or closed request leaves the list — the
+// server already keeps it out of the feed and the bell (status filters in
+// routes/workspace.ts), so the next refresh agrees.
+test.describe('Inbox — support triage in the pane', () => {
+  const PROJ = 'bbbbbbbb-3333-4333-8333-bbbbbbbbbbbb';
+  const WITH_PROJECT = { data: { ...API['/portal/feed'].data, client_messages: [
+    { type: 'support', id: 's-1', subject: 'Logo tweak', status: 'open', project: 'Rebrand', project_id: PROJ, client_id: 'c-1', client: 'Marlow’s Kitchen', created_at: '2026-07-14T00:00:00Z', thread_key: 'support:s-1', unread: true, href: '' },
+  ] } };
+
+  test('Resolve in the header PATCHes status=resolved and the row leaves the list', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await expect(pane.locator('#paneStatusChip')).toHaveText('Open');
+    await expect(pane.locator('#supResolve')).toBeVisible();
+    await expect(pane.locator('#supClose')).toBeVisible();
+    await expect(pane.locator('#supTask')).toHaveCount(0);   // no project → nothing to file it on
+    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
+    await pane.locator('#supResolve').click();
+    expect((await patchReq).postDataJSON()).toEqual({ status: 'resolved' });
+    await expect(page.locator('.dds-toast')).toContainText('Resolved');
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+    await expect(pane.locator('#supResolve')).toHaveCount(0);
+  });
+
+  test('Close PATCHes status=closed', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
+    await page.locator('#rpane #supClose').click();
+    expect((await patchReq).postDataJSON()).toEqual({ status: 'closed' });
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+  });
+
+  test('"Reply and resolve" posts the reply first, then resolves', async ({ page }) => {
+    const calls: Array<{ method: string; path: string; body: unknown }> = [];
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/support/**', async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') return route.fallback();
+      calls.push({ method: req.method(), path: new URL(req.url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body: req.postDataJSON() });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await pane.locator('#supBody').fill('Done — bigger logo is live.');
+    await pane.locator('#supReplyResolve').click();
+    await expect(page.locator('.dds-toast')).toContainText('Resolved');
+    expect(calls).toEqual([
+      { method: 'POST', path: '/support/s-1/messages', body: { body: 'Done — bigger logo is live.' } },
+      { method: 'PATCH', path: '/support/s-1', body: { status: 'resolved' } },
+    ]);
+    await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' })).toHaveCount(0);
+  });
+
+  test('"Make it a task" files the request on its project through POST /projects/:id/tasks', async ({ page }) => {
+    let posted: { path: string; body: unknown } | null = null;
+    await installApp(page, { api: { ...API, '/portal/feed': WITH_PROJECT } });
+    await page.route('**/functions/v1/presence/projects/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      posted = { path: new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body: route.request().postDataJSON() };
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'tk-9' } }) });
+    });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const btn = page.locator('#rpane #supTask');
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(btn).toHaveText('Task added ✓');
+    expect(posted!.path).toBe(`/projects/${PROJ}/tasks`);
+    expect(posted!.body).toEqual({ title: 'Logo tweak', client_visible: false });
+  });
+
+  test('a request already resolved shows no triage buttons', async ({ page }) => {
+    const RESOLVED = { data: { ...API['/support/s-1'].data, request: { ...API['/support/s-1'].data.request, status: 'resolved' } } };
+    await installApp(page, { api: { ...API, '/support/s-1': RESOLVED } });
+    await page.goto('/inbox.html');
+    await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
+    const pane = page.locator('#rpane');
+    await expect(pane.locator('#paneStatusChip')).toHaveText('Resolved');   // the server's status wins over the feed's
+    await expect(pane.locator('#supReplyResolve')).toHaveCount(0);
+  });
+});
