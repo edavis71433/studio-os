@@ -85,6 +85,21 @@ test.describe('App shell', () => {
     await expect(pal.locator('.res.sel')).toHaveAttribute('href', '/presence.html#design');
   });
 
+  // Oct 2026 audit, gap 3: website-health.html is retired and the Health check is
+  // a card on the Website overview — the Website item's desc keeps the word
+  // findable without a new menu entry.
+  test('⌘K "health" finds Website (its desc names the health check)', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-search')).toBeVisible();
+    await page.keyboard.press('Control+k');
+    const pal = page.locator('.dds-palette');
+    await pal.locator('input').fill('health');
+    await expect(pal.locator('.res')).toHaveCount(1);
+    await expect(pal.locator('.res.sel')).toHaveAttribute('href', '/presence.html');
+    await expect(pal.locator('.res.sel')).toContainText('Website');
+  });
+
   test('profile menu exposes sign out', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');

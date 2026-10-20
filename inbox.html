@@ -322,7 +322,11 @@ let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest
 // A view can be deep-linked by hash (#ok, #website, #enquiries…): the retired
 // Approvals (approval-center.html) and Website attention (attention.html) pages
 // redirect here as #ok and #website (Oct 2026 workflow audit, change 1).
-let VIEW=(()=>{const h=String(location.hash||'').slice(1);return ['messages','ok','enquiries','website','support'].indexOf(h)>=0?h:'everything';})(),SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// The hash may also name the row to open — #enquiries?sel=lead:<id> is the
+// lead_followup notice's href (Oct 2026 audit, gap 2): the reply is one click
+// from the nudge, not two. Read once at boot; openLinkedRow() acts on it.
+const HASH_LINK=(()=>{const raw=String(location.hash||'').slice(1);const i=raw.indexOf('?');return {view:i<0?raw:raw.slice(0,i),sel:i<0?'':(new URLSearchParams(raw.slice(i+1)).get('sel')||'')};})();
+let VIEW=['messages','ok','enquiries','website','support'].indexOf(HASH_LINK.view)>=0?HASH_LINK.view:'everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
 // the Enquiries view's own narrowing (the old Enquiries page's controls):
 // status chip · kind · order. Open = still in play (new, read, replied,
 // converted); Not a fit / archived only under All.
@@ -1420,7 +1424,20 @@ async function load(){
   if(ok==='stale')return;
   if(!ok){trouble();return;}
   renderConsole();renderList();renderPane();
+  openLinkedRow();
   api('/notifications/read','POST',{}).catch(()=>{});   // opening the Inbox marks activity seen (clears the bell)
+}
+// the deep-linked row (?sel=lead:<id>, or a row id): opened exactly as a click
+// would — selected, its dot cleared, the pane in (and slid in on phones). A row
+// the view shows is preferred; one it does not is still opened, never invented.
+function openLinkedRow(){
+  const want=HASH_LINK.sel;if(!want)return;
+  const m=/^lead:(.+)$/.exec(want);
+  const byLead=(r)=>r.kind==='lead'&&r.lead_id===m[1];
+  const it=m?(visibleRows().find(byLead)||ITEMS.find(byLead)):ITEMS.find(r=>r.id===want);
+  if(!it)return;
+  openItem(it.id);
+  const row=document.getElementById('row-'+cssId(it.id));if(row&&row.scrollIntoView)row.scrollIntoView({block:'nearest'});
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

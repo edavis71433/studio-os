@@ -75,7 +75,9 @@ export function buildNav(c: NavContext): NavSection[] {
   // site moves to the overflow menu as "Your website". Drilled into a client, or
   // for any non-agency owner, the Website stays primary — it is their product.
   const websiteItems = (): NavItem[] => {
-    const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
+    // the desc keeps "health" findable from ⌘K (website-health.html retired; the
+    // Health check is a card on this overview — Oct 2026 audit, gap 3).
+    const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' }];
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
     // the two jobs the audit found unfindable (⌘K "domain"/"page" → nothing): named, one click away

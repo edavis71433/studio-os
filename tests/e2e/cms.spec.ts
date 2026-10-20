@@ -179,6 +179,17 @@ test.describe('CMS workspace', () => {
     expect((await post).postDataJSON()).toEqual({ domain: 'marlowskitchen.com' });
   });
 
+  // Oct 2026 audit, gap 5: the rail cards used to be asked for at the end of
+  // renderFactsProse(), which returns early when /health carries no `facts` —
+  // a fixture without them hid the Domain and Health cards. loadToday() asks now.
+  test('overview: the Domain, Health check and Recent activity cards render even when /health has no facts', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.' } } } });
+    await page.goto('/presence.html');
+    await expect(page.locator('#healthCard').getByRole('heading', { name: 'Health check' })).toBeVisible();
+    await expect(page.locator('#domainCard')).toContainText('temporary address');
+    await expect(page.locator('#activitySec').getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+  });
+
   test('overview: a connected, healthy domain says so — no Connect button', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } } } });
     await page.goto('/presence.html');

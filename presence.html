@@ -449,6 +449,10 @@ h5.rune .whisper.ok{color:var(--sage)}
 /* the schedule panel is open: "Schedule it" is the one filled button, publish-now steps back */
 .pubbtn.quiet{background:transparent;color:var(--plum);border:1px solid var(--line)}
 .pubbtn.quiet:hover{background:var(--plum-tint,#faf7ff)}
+/* the schedule panel rests outlined; it is the filled button only while the panel holds focus */
+.schedgo{font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;font-weight:600;border:2px solid var(--plum);background:transparent;color:var(--plum)}
+.sched-panel.armed .schedgo{background:var(--plum);color:var(--fill-ink)}
+.schedgo:disabled{opacity:.7;cursor:default}
 .notyet{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--ink-2)}
 .notyet:hover{color:var(--ink)}
 .pipe{margin-top:30px;display:flex;flex-direction:column;gap:9px}
@@ -4048,6 +4052,10 @@ async function loadToday() {
     S.health = h.data; S.changes = c.data; S.moments = mo.data || [];
     if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash;   // M9: seed the optimistic-lock version
     renderStatement(); renderFactsProse();
+    // the Domain · Health check · Recent activity cards and the page map do not
+    // depend on /health carrying `facts` (renderFactsProse returns early without
+    // them) — ask for them here, once, whatever /health said (Oct 2026 audit, gap 5)
+    hbLoadBoardExtras();
     if (showMoments && S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
     renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
   } catch (err) { toast(nice(err), true); }
@@ -4180,7 +4188,6 @@ function renderFactsProse() {
   if (parts.length) w.insertBefore(el("span", "dot", "·"), whisperNode);
   renderStatTiles();
   renderPagesList();
-  hbLoadBoardExtras();
 }
 function renderNotes(notes) {
   $("notesWrap").hidden = !notes.length;
@@ -4827,73 +4834,79 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
     if (toSchedule) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} }
     return;
   }
-  const open = el("button", "textact", "Publish later — pick a time…"); open.type = "button";
-  wrap.appendChild(open);
-  open.addEventListener("click", () => {
-    if (wrap.querySelector(".sched-panel")) { const f = wrap.querySelector(".sched-panel input"); if (f) f.focus(); return; }
-    const panel = el("div", "sched-panel"); panel.style.cssText = "margin:14px auto 0;max-width:440px;text-align:left;border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:14px 16px";
-    const mkRow = (labelText, defValue, withToggle) => {
-      const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
-      const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
-      const inp = el("input"); inp.type = "datetime-local"; inp.value = defValue;
-      inp.id = withToggle ? "schedOffAt" : "schedAt"; lab.htmlFor = inp.id;   // a real label↔field pair (screen readers name the field)
-      inp.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
-      r.appendChild(lab); r.appendChild(inp); panel.appendChild(r);
-      return { row: r, inp };
-    };
-    const pub = mkRow("Publish these changes at", dtLocalDefault(24), false);
-    panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
-    // the optional "unpublish at" leg — same table, same cron, kind=offline
-    const offWrap = el("div"); offWrap.style.marginTop = "12px";
-    const offToggle = el("label"); offToggle.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer";
-    const offCb = el("input"); offCb.type = "checkbox";
-    offToggle.appendChild(offCb); offToggle.appendChild(document.createTextNode("Also take the site offline later (optional)"));
-    offWrap.appendChild(offToggle); panel.appendChild(offWrap);
-    let off = null;
-    offCb.addEventListener("change", () => {
-      if (offCb.checked && !off) {
-        off = mkRow("Take the site offline at", dtLocalDefault(24 * 8), true);
-        off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
-      } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
-    });
-    // optional note (it was on the retired Scheduled page) — POST /schedule takes it as before
-    const noteRow = el("div"); noteRow.style.marginTop = "12px";
-    const noteLab = el("label", null, "A note for yourself (optional)"); noteLab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
-    const noteIn = el("input"); noteIn.type = "text"; noteIn.maxLength = 200; noteIn.placeholder = "e.g. Holiday hours"; noteIn.id = "schedNote";
-    noteIn.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
-    noteLab.htmlFor = "schedNote"; noteRow.appendChild(noteLab); noteRow.appendChild(noteIn); panel.appendChild(noteRow);
-    const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
-    const okb = el("button", "schedgo", "Schedule it"); okb.type = "button";
-    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-weight:600";
-    // one filled button per screen: while you are scheduling, publish-now is the quiet option
-    const pubNow = document.querySelector("#ritActions .pubbtn"); if (pubNow) pubNow.classList.add("quiet");
-    const nob = el("button", null, "Never mind"); nob.type = "button";
-    nob.style.cssText = "font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
-    nob.addEventListener("click", () => { panel.remove(); if (pubNow) pubNow.classList.remove("quiet"); open.focus(); });
-    okb.addEventListener("click", async () => {
-      const when = parseDtLocal(pub.inp.value);
-      if (!when) { toast("Pick a date and time.", true); return; }
-      if (when.getTime() <= Date.now()) { toast("Pick a time in the future.", true); return; }
-      let offWhen = null;
-      if (offCb.checked && off && off.row.style.display !== "none") {
-        offWhen = parseDtLocal(off.inp.value);
-        if (!offWhen) { toast("Pick a time for going offline, or untick it.", true); return; }
-        if (offWhen.getTime() <= when.getTime()) { toast("The offline time needs to be after the publish time.", true); return; }
-      }
-      okb.disabled = true; okb.textContent = "Scheduling…";
-      try {
-        await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish", note: noteIn.value.trim() });
-        if (offWhen) await api("POST", "/schedule", { scheduled_for: offWhen.toISOString(), kind: "offline" });
-        toast(offWhen ? "Scheduled — it publishes, then comes down, on its own." : "Scheduled — it publishes on its own.");
-        loadRitual();
-      } catch (err) { okb.disabled = false; okb.textContent = "Schedule it"; toast(nice(err), true); }
-    });
-    btns.appendChild(okb); btns.appendChild(nob); panel.appendChild(btns);
-    wrap.appendChild(panel);
-    pub.inp.focus();
+  // The schedule panel is always on the page (Oct 2026 audit, gap 1): from the
+  // menu, Website → Publish → Schedule it is three clicks. It RESTS until it
+  // holds focus (Schedule it outlined, publish-now the filled button) and ARMS
+  // while it does (Schedule it filled, publish-now steps back) — one filled
+  // button at every moment. #schedule / "Publish later" open it armed, with
+  // the date field focused.
+  const panel = el("div", "sched-panel"); panel.style.cssText = "margin:18px auto 0;max-width:440px;text-align:left;border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:14px 16px";
+  panel.appendChild(Object.assign(el("div", null, "Or publish later"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:10px" }));
+  const mkRow = (labelText, defValue, withToggle) => {
+    const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
+    const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
+    const inp = el("input"); inp.type = "datetime-local"; inp.value = defValue;
+    inp.id = withToggle ? "schedOffAt" : "schedAt"; lab.htmlFor = inp.id;   // a real label↔field pair (screen readers name the field)
+    inp.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
+    r.appendChild(lab); r.appendChild(inp); panel.appendChild(r);
+    return { row: r, inp };
+  };
+  const pub = mkRow("Publish these changes at", dtLocalDefault(24), false);
+  panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
+  // the optional "unpublish at" leg — same table, same cron, kind=offline
+  const offWrap = el("div"); offWrap.style.marginTop = "12px";
+  const offToggle = el("label"); offToggle.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer";
+  const offCb = el("input"); offCb.type = "checkbox";
+  offToggle.appendChild(offCb); offToggle.appendChild(document.createTextNode("Also take the site offline later (optional)"));
+  offWrap.appendChild(offToggle); panel.appendChild(offWrap);
+  let off = null;
+  offCb.addEventListener("change", () => {
+    if (offCb.checked && !off) {
+      off = mkRow("Take the site offline at", dtLocalDefault(24 * 8), true);
+      off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
+    } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
   });
-  // Page ▾ → "Publish later": land ON the schedule block, panel open, ready to pick
-  if (toSchedule) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} open.click(); }
+  // optional note (it was on the retired Scheduled page) — POST /schedule takes it as before
+  const noteRow = el("div"); noteRow.style.marginTop = "12px";
+  const noteLab = el("label", null, "A note for yourself (optional)"); noteLab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
+  const noteIn = el("input"); noteIn.type = "text"; noteIn.maxLength = 200; noteIn.placeholder = "e.g. Holiday hours"; noteIn.id = "schedNote";
+  noteIn.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
+  noteLab.htmlFor = "schedNote"; noteRow.appendChild(noteLab); noteRow.appendChild(noteIn); panel.appendChild(noteRow);
+  const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
+  const okb = el("button", "schedgo", "Schedule it"); okb.type = "button";
+  // one filled button per screen: while the panel holds focus, scheduling is the
+  // job on screen (Schedule it filled, publish-now quiet); when focus leaves it
+  // for something else, publish-now is the filled button again. pointerdown
+  // covers WebKit, which does not focus a clicked button.
+  const pubNow = document.querySelector("#ritActions .pubbtn");
+  const arm = () => { panel.classList.add("armed"); if (pubNow) pubNow.classList.add("quiet"); };
+  const rest = () => { panel.classList.remove("armed"); if (pubNow) pubNow.classList.remove("quiet"); };
+  panel.addEventListener("focusin", arm);
+  panel.addEventListener("pointerdown", arm);
+  panel.addEventListener("focusout", (e) => { if (e.relatedTarget && !panel.contains(e.relatedTarget)) rest(); });
+  if (pubNow) pubNow.addEventListener("pointerdown", rest);
+  okb.addEventListener("click", async () => {
+    const when = parseDtLocal(pub.inp.value);
+    if (!when) { toast("Pick a date and time.", true); return; }
+    if (when.getTime() <= Date.now()) { toast("Pick a time in the future.", true); return; }
+    let offWhen = null;
+    if (offCb.checked && off && off.row.style.display !== "none") {
+      offWhen = parseDtLocal(off.inp.value);
+      if (!offWhen) { toast("Pick a time for going offline, or untick it.", true); return; }
+      if (offWhen.getTime() <= when.getTime()) { toast("The offline time needs to be after the publish time.", true); return; }
+    }
+    okb.disabled = true; okb.textContent = "Scheduling…";
+    try {
+      await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish", note: noteIn.value.trim() });
+      if (offWhen) await api("POST", "/schedule", { scheduled_for: offWhen.toISOString(), kind: "offline" });
+      toast(offWhen ? "Scheduled — it publishes, then comes down, on its own." : "Scheduled — it publishes on its own.");
+      loadRitual();
+    } catch (err) { okb.disabled = false; okb.textContent = "Schedule it"; toast(nice(err), true); }
+  });
+  btns.appendChild(okb); panel.appendChild(btns);
+  wrap.appendChild(panel);
+  // #schedule / Page ▾ → "Publish later": land ON the panel, armed, ready to pick
+  if (toSchedule) { try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} arm(); pub.inp.focus(); }
 }
 
 /* ── G6: share the draft — one tap mints a signed, expiring, read-only link to
