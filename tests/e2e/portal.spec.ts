@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp, OWNER_SESSION } from './helpers/app';
+import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
 // you" (Phase PP Section 4), then approve what's theirs to approve.
@@ -548,9 +548,12 @@ test.describe('Client portal — Messages split view', () => {
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
     await pane.getByRole('button', { name: 'Send' }).click();
     expect((await post).postDataJSON()).toEqual({ subject: 'One more thing', body: 'One more thing\nAbout the logo' });
-    // the EXISTING conversation opened — still 2 rows, no third ticket
+    // the EXISTING conversation opened — still 2 rows, no third ticket. The
+    // list itself is behind "← Messages" at phone widths (the split view shows
+    // one pane there), so the proof is the row count + meta, not visibility.
     await expect(page.locator('#mpane .mpname')).toHaveText('Logo tweak');
-    await expect(page.getByText('2 conversations')).toBeVisible();
+    await expect(page.locator('#mrows [data-mrow]')).toHaveCount(2);
+    await expect(page.locator('#mlmeta')).toHaveText(/^2 conversations/);
   });
 
   test('compose failure: a 500 keeps the composer usable (toast + re-enabled button)', async ({ page }) => {
@@ -1414,6 +1417,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
 
   test('share flow end-to-end (one project): auto-selected, title defaults to the filename, 3-step send, re-render shows the You-shared file', async ({ page }) => {
     await installApp(page, { api: FILES_API });
+    await spyRequestBodies(page);   // WebKit hides File bodies from postDataBuffer — read them at the fetch boundary
     await routeUploadBackend(page, { afterUpload: [...FILES_DELIVERABLES,
       { id: 'nd1', title: 'Team photos.png', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] });
     await page.goto('/client.html');
@@ -1436,7 +1440,10 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     // step 2: the bytes go to the URL the server returned, typed as the file —
     // and the PUT body IS the picked file's bytes, byte for byte
     expect((await put).headers()['content-type']).toBe('image/png');
-    expect((await put).postDataBuffer()).toEqual(SHARE_FILE.buffer);
+    const sent = (await sentBodies(page)).filter((b) => b.method === 'PUT');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe('https://storage.example/up/1');
+    expect(sent[0].body).toEqual(SHARE_FILE.buffer);
     // step 3: the recording POST ties the media id back
     expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
@@ -1475,6 +1482,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
       recorded = true;
       return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd2' } }) });
     });
+    await spyRequestBodies(page);   // WebKit hides File bodies from postDataBuffer — read them at the fetch boundary
     await page.goto('/client.html');
     await openFilesTab(page);
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
@@ -1491,7 +1499,10 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await upUrl;
     // step 2 rides the PICKED project's signed URL and carries the real bytes
     expect((await put).url()).toBe('https://storage.example/up/p2');
-    expect((await put).postDataBuffer()).toEqual(SHARE_FILE.buffer);
+    const sent = (await sentBodies(page)).filter((b) => b.method === 'PUT');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe('https://storage.example/up/p2');
+    expect(sent[0].body).toEqual(SHARE_FILE.buffer);
     // step 3 ties the PICKED project's media id back
     expect((await rec).postDataJSON()).toEqual({ media_id: 'm-p2', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');

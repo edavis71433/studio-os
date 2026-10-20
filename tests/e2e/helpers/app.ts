@@ -152,3 +152,40 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
   });
 }
+
+// ── request-body spy for binary uploads ──────────────────────────────────────
+// Playwright's WebKit does not expose a Blob/File request body to the
+// interception layer: `request.postDataBuffer()` is null for a `fetch(url,
+// { method: 'PUT', body: file })` that Chromium reports byte for byte. The
+// bytes are still observable at the fetch boundary, so a spec that must prove
+// "the PUT body IS the picked file" installs this before goto and reads the
+// recorded bodies back with `sentBodies(page)`. The real fetch still runs —
+// the spy only reads the body it was handed.
+export interface SentBody { url: string; method: string; type: string; bytes: number[] }
+
+export async function spyRequestBodies(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __E2E_BODIES: SentBody[]; fetch: typeof fetch };
+    w.__E2E_BODIES = [];
+    const orig = w.fetch.bind(window);
+    w.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init && init.body;
+      if (body && typeof (body as Blob).arrayBuffer === 'function') {
+        const buf = await (body as Blob).arrayBuffer();
+        w.__E2E_BODIES.push({
+          url: String(input instanceof Request ? input.url : input),
+          method: String((init && init.method) || 'GET').toUpperCase(),
+          type: (body as Blob).type || '',
+          bytes: Array.from(new Uint8Array(buf)),
+        });
+      }
+      return orig(input, init);
+    };
+  });
+}
+
+/** The bodies recorded by spyRequestBodies, oldest first (bytes as a Buffer). */
+export async function sentBodies(page: Page): Promise<Array<{ url: string; method: string; type: string; body: Buffer }>> {
+  const raw = await page.evaluate(() => (window as unknown as { __E2E_BODIES?: SentBody[] }).__E2E_BODIES || []);
+  return raw.map((b) => ({ url: b.url, method: b.method, type: b.type, body: Buffer.from(b.bytes) }));
+}

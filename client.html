@@ -988,6 +988,9 @@ async function loadWebsiteCard(){
     full.hidden=open;
     btn.setAttribute('aria-expanded',open?'false':'true');
     btn.textContent=open?'See the full picture →':'Show less';
+    // Safari does not focus a <button> on click (focus lands on the nearest
+    // focusable ancestor instead), so keep the disclosure's focus explicitly
+    btn.focus();
   });
 }
 // ── MESSAGES — the split-view console (redesign slice 5; inbox.html's contract
