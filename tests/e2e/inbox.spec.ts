@@ -205,7 +205,8 @@ test.describe('Inbox — split-view console', () => {
     await page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' }).click();
     const pane = page.locator('#rpane');
     await expect(pane).toContainText('Can I get a quote for a patio?');
-    await expect(pane.getByRole('link', { name: 'Reply' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
+    await expect(pane.getByRole('button', { name: 'Send reply' })).toBeVisible();   // the reply is sent from here (audit change 5)
+    await expect(pane.getByRole('link', { name: 'Use your email app instead' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
     await expect(pane.getByRole('button', { name: '→ Deal' })).toBeVisible();
     const readReq = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/forms/inbox/l-9'));
     await pane.getByRole('button', { name: 'Mark read' }).click();
@@ -988,6 +989,23 @@ test.describe('Inbox — views by hash', () => {
     await page.goto('/inbox.html');
     await page.locator('#viewBtn').click();
     await expect(page.locator('#viewMenu [data-view="website"]')).toHaveText('Website');
+  });
+});
+
+// ── Oct 2026 workflow audit, change 5: an enquiry is answered from the Inbox itself ──
+test.describe('Inbox — reply to an enquiry in place', () => {
+  test('the enquiry pane has a composer; Send reply POSTs to /forms/inbox/:id/reply', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/forms/inbox/l-9/reply': { data: { sent: true, status: 'replied' } } } });
+    await page.goto('/inbox.html#enquiries');
+    await page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' }).click();
+    const ta = page.getByRole('textbox', { name: 'Reply to Sam Rivera' });
+    await expect(ta).toHaveValue(/^Hi Sam,/);
+    await expect(page.getByRole('link', { name: 'Use your email app instead' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
+    await ta.fill('Hi Sam — yes, we do patios. Can you send a photo?');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l-9\/reply$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send reply' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Hi Sam — yes, we do patios. Can you send a photo?' });
+    await expect(page.locator('.lreply')).toContainText('Can you send a photo?');
   });
 });
 
