@@ -597,7 +597,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
     const _lnk = (href, label) => `<a class="link" href="${scopeHref(href)}">${label}</a>`;
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
-      ? [['/inbox.html','What needs you'],['/website-health.html','Website health'],['/presence.html','Open your website'],['/content-tree.html','Website map'],['/presence.html#history','History'],['/presence.html#schedule','What’s next'],['/analytics.html#insights','Insights'],['/leads.html','Website enquiries']]
+      ? [['/inbox.html','What needs you'],['/presence.html#health','Website health'],['/presence.html','Open your website'],['/presence.html#pages','Your pages'],['/presence.html#history','History'],['/presence.html#schedule','What’s next'],['/analytics.html#insights','Insights'],['/leads.html','Website enquiries']]
       : [['/customers.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     main += `<div class="moment calm"><span class="tag">All clear</span>

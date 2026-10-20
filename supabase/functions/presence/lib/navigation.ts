@@ -78,6 +78,9 @@ export function buildNav(c: NavContext): NavSection[] {
     const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
+    // the two jobs the audit found unfindable (⌘K "domain"/"page" → nothing): named, one click away
+    if (canDraft(c)) website.push({ key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', desc: 'A new page on your site — pick a layout or start blank.' });
+    if (canPublish(c)) website.push({ key: 'domain', label: 'Domain & email', href: '/presence.html#domain', desc: 'Put your site on your own domain (yourbusiness.com); email records and the padlock.' });
     // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
     // the desc keeps "schedule" findable from ⌘K, which matches on desc).
     if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish', desc: 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.' });
@@ -132,21 +135,12 @@ export function buildNav(c: NavContext): NavSection[] {
   // The agency's OWN website, out of the primary bar (overflow menu + ⌘K).
   if (f.hasWebsite && studioLevel) sections.push({ key: 'website', label: 'Your website', items: websiteItems(), utility: true });
 
-  // ── Deeper views (profile/overflow menu + ⌘K, never the primary bar) ─────────
-  // Every capability stays reachable. Calm read-outs you look at on purpose
-  // (history / understanding), never a to-do — nothing here competes with the Inbox.
-  if (has(c, 'view_all')) {
-    // Oct 2026 audit change 1: the "Focused views" group is gone. Website attention
-    // and Approvals were cuts of the Inbox — they are now its #website and #ok views,
-    // and the old pages redirect there. Version history, What's coming next and
-    // Business insights moved home too (Website › History, Today's Coming up,
-    // Analytics › Insights).
-    const lenses: NavItem[] = [];
-    if (f.hasWebsite) lenses.push({ key: 'view_content_tree', label: 'Website map', href: '/content-tree.html', desc: 'Every page and section of your site, laid out as one simple tree.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html', desc: 'A plain-English check-up of your live site.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_timeline', label: 'Website story', href: '/timeline.html', desc: 'A plain-English history of everything that’s happened to your site.' });
-    if (lenses.length) sections.push({ key: 'views', label: 'Understand your site', items: lenses, utility: true });
-  }
+  // Oct 2026 workflow audit, changes 1–2: the overflow's "Focused views" and
+  // "Understand your site" lens pages are gone — each showed data that already
+  // had a home. Website attention / Approvals → Inbox #website / #ok; Version
+  // history → Website › History; What's coming next → Today; Business insights
+  // → Analytics; Website health, Website map and Website story → cards on the
+  // Website overview (#health, #pages, #activity). The old URLs forward there.
 
   // Connections — integrations (the connected services)
   if (f.hasConnected) utility('connections', 'Connections', '/connections.html');

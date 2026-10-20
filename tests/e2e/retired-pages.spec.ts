@@ -10,6 +10,10 @@ const CASES: [string, RegExp][] = [
   ['/snapshot-history.html', /\/presence\.html#history$/],
   ['/upcoming.html', /\/today\.html#coming-up$/],
   ['/business-insights.html?period=last_30', /\/analytics\.html\?period=last_30#insights$/],
+  // change 2: the Website overview took in health, the map and the story
+  ['/website-health.html', /\/presence\.html#health$/],
+  ['/content-tree.html?client=marlows', /\/presence\.html\?client=marlows#pages$/],
+  ['/timeline.html', /\/presence\.html#activity$/],
 ];
 
 test.describe('Retired lens pages', () => {

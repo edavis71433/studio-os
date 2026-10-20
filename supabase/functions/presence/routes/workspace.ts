@@ -244,7 +244,7 @@ const NOTICE_HREF: Record<string, string> = {
   lead_followup: '/leads.html',
   website_enquiry: '/leads.html',      // FIX 1: a brand-new website enquiry → the leads inbox
   connection_expired: '/connections.html', // FIX 2: a degraded connection → reconnect
-  missing_required: '/content-tree.html',  // FIX 4: a section blocking publish → the website map
+  missing_required: '/presence.html#pages',  // FIX 4: a section blocking publish → the overview's Pages (content-tree.html retired, Oct 2026)
   deal_signed: '/pipeline.html',   // W1: a client accepted/signed → convert them from Pipeline
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   support_aging: '/projects.html', // service edge #3: an aging support request needs a reply (support lives in the project view)
@@ -260,7 +260,7 @@ const NOTICE_HREF: Record<string, string> = {
   capacity: '/presence.html#settings', trial_ending: '/presence.html#settings', trial_ended: '/presence.html#settings',
   payment_trouble: '/presence.html#settings', account_lapsed: '/presence.html#settings',
   winddown_reminder: '/presence.html#settings', win_back: '/presence.html#settings', deletion_requested: '/presence.html#settings',
-  approval_decided: '/timeline.html',   // a reviewer/client decided something — the story lives on the timeline
+  approval_decided: '/presence.html#activity',   // a reviewer/client decided something — the overview's Recent activity (timeline.html retired)
   new_booking: '/presence.html#bookings',   // a customer booked online → the Bookings desk (confirm/cancel)
   booking_followup: '/presence.html#bookings', // #164: a past appointment needs marking done / no-show
   booking_reminder: '/presence.html#bookings', // #164: silent send-once ledger (dismissed; never shown) — mapped for completeness
@@ -274,7 +274,7 @@ const NOTICE_HREF: Record<string, string> = {
   client_message: '/inbox.html',      // a client wrote (portal or emailed in) → the Inbox conversation list
   client_request: '/inbox.html',      // a support/service request opened or replied → same list (support rows live there)
   client_upload: '/projects.html',    // a client sent a file → project Files
-  client_approval: '/timeline.html',  // a client decided an approval → the story lives on the timeline (matches approval_decided)
+  client_approval: '/presence.html#activity',  // a client decided an approval → Recent activity (matches approval_decided)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 

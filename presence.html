@@ -184,6 +184,13 @@ a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
 .hb-card-h .meta{font-size:12.5px;color:var(--ink-3)}
 .hb-card .note{font-size:12.5px;color:var(--ink-3);margin-top:10px;line-height:1.5}
 .hb-card .note a{color:var(--plum)}
+/* Oct 2026 audit change 2: health checks + recent activity on the overview */
+.hb-checks{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.hb-checks li{font-size:12.5px;line-height:1.45}
+.hb-checks li b{display:block;font-weight:600;font-size:13px}
+.hb-checks li a{color:var(--plum)}
+.hb-card .hb-act{margin-top:10px}
+.hb-row.act .ic{font-size:15px}
 .hb-progress{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
 .hb-progress i{display:block;height:100%;background:var(--plum);border-radius:3px;transition:width var(--dur) var(--ease)}
 .hb-tasks{margin-top:12px;display:flex;flex-direction:column}
@@ -927,7 +934,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div id="notesList"></div>
             </div>
 
-            <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH">
+            <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
               <div class="hb-sec-h"><h2 id="pagesH">Pages</h2><a href="#design" onclick="go('design');return false">Open the builder</a></div>
               <div class="hb-list" id="pagesList"></div>
             </section>
@@ -936,10 +943,22 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="hb-sec-h"><h2 id="recentH">Waiting to publish</h2><a href="#history" onclick="go('history');return false">History</a></div>
               <div class="hb-list" id="recentList"></div>
             </section>
+
+            <!-- what happened to the site, newest first (was its own page: timeline.html) -->
+            <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
+              <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
+              <div class="hb-list" id="activityList"></div>
+            </section>
           </div>
 
           <div class="hb-rail">
             <div class="hb-card" id="setupCard" hidden></div>
+
+            <!-- your address on the internet (was only inside the Domain & email desk) -->
+            <div class="hb-card" id="domainCard" hidden></div>
+
+            <!-- the plain-English check-up (was its own page: website-health.html) -->
+            <div class="hb-card" id="healthCard" tabindex="-1" hidden></div>
 
             <div class="hb-card" id="designRailCard">
               <div class="hb-card-h"><h2>Design</h2><a href="#design" onclick="go('design');return false">Change</a></div>
@@ -1673,6 +1692,11 @@ function routeHash() {
   if (!h) return;
   if (h === "publish") { openRitual(); return; }
   if (h === "schedule") { openRitual({ schedule: true }); return; }   // the one place to schedule (schedule.html retired)
+  if (h === "domain") { openFoundationsDesk({ domain: true }); return; }   // nav "Domain & email" → straight to "type your domain"
+  if (h === "addpage") { go("design"); setTimeout(() => dcAddPage(), 300); return; }   // nav "Add a page"
+  if (h === "health") { hbScrollTo("healthCard"); return; }     // website-health.html retired
+  if (h === "pages") { hbScrollTo("pagesSec"); return; }        // content-tree.html retired
+  if (h === "activity") { hbScrollTo("activitySec"); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
@@ -2451,7 +2475,9 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
     catch (err) { toast(nice(err), true); }
   }, "Keep this answer"));
 // ── M12: Platform Services — the technical side, in plain words ──
-async function openFoundationsDesk() {
+let DESK_DOMAIN_INTENT = false;   // open the desk with the "I already have a domain" field ready (overview card, nav, setup step)
+async function openFoundationsDesk(opts) {
+  DESK_DOMAIN_INTENT = !!(opts && opts.domain);
   if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "The technical side — domain, email, security — is handled with plans you approve. Nothing changes on its own."), 400);
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
   $("deskTitle").textContent = "The technical side, handled";
@@ -2550,6 +2576,7 @@ function renderFoundations(f, plans, launch, dom) {
     });
     row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row); domCard.appendChild(havePanel);
 
+    if (DESK_DOMAIN_INTENT) { DESK_DOMAIN_INTENT = false; setTimeout(() => { haveBtn.click(); inp.focus(); }, 0); }
     const needPanel = el("div"); needPanel.style.cssText = "display:none;margin-top:10px";
     needPanel.appendChild(stepLine("No problem — getting one takes a couple of minutes:"));
     needPanel.appendChild(stepLine("1. Go to a domain company — Namecheap, Porkbun, or GoDaddy (about $12 a year)."));
@@ -3726,6 +3753,11 @@ function hbPageRows() {
 }
 function hbPageChip(pg, changes, live, firstPublish) {
   const chip = el("span", "hb-chip"); chip.appendChild(el("i", "d"));
+  const tp = hbTreePage(pg);
+  if (tp && HB_TREE_FLAG[tp.status]) {   // the website map's word: something here blocks publishing or deserves a look
+    chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(document.createTextNode(tp.status_label)); chip.title = tp.issue_count ? `${tp.issue_count} item${tp.issue_count === 1 ? "" : "s"} on this page` : "";
+    return chip;
+  }
   const n = firstPublish ? 0 : changes.filter((ch) => pg.sections.indexOf(ch.section) >= 0).length;
   if (n) { chip.classList.add("warn"); chip.appendChild(document.createTextNode(`${n} change${n === 1 ? "" : "s"} waiting`)); }
   else if (live) { chip.classList.add("good"); chip.appendChild(document.createTextNode("Published")); }
@@ -3753,6 +3785,97 @@ function renderPagesList() {
     acts.appendChild(edit); row.appendChild(acts);
     list.appendChild(row);
   });
+}
+// ── Oct 2026 workflow audit, change 2: the overview is the site's one home ──
+// Health (website-health.html), the page map (content-tree.html) and the site's
+// story (timeline.html) were separate pages showing this site's data a second
+// way; they are cards on this board now, and those URLs forward here. Each read
+// is best-effort and after the board paints: a failure hides its card, never
+// the board.
+let HB_TREE = null, HB_HEALTH = null, HB_TIMELINE = null, HB_DOMAIN, HB_ACTIVITY_ALL = false;
+const HB_TREE_FLAG = { publish_failed: "bad", missing_required: "warn", needs_review: "warn" };
+function hbTreePage(pg) {
+  if (!HB_TREE || !Array.isArray(HB_TREE.pages)) return null;
+  return HB_TREE.pages.find((t) => t.path === pg.path) || null;
+}
+function hbLoadBoardExtras() {
+  if (HB_ASKED.extras) return; HB_ASKED.extras = true;
+  api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
+  api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); renderStatTiles(); }).catch(() => {});
+  api("GET", "/website-timeline").then((r) => { HB_TIMELINE = r.data || null; renderActivity(); }).catch(() => {});
+  api("GET", "/foundations/domain").then((r) => { HB_DOMAIN = (r && r.data) || null; renderDomainCard(); }).catch(() => { HB_DOMAIN = undefined; });
+}
+function renderDomainCard() {
+  const card = $("domainCard"); if (!card) return;
+  if (HB_DOMAIN === undefined) { card.hidden = true; return; }
+  const d = HB_DOMAIN && HB_DOMAIN.custom_domain ? HB_DOMAIN : null;
+  card.innerHTML = ""; card.hidden = false;
+  const head = el("div", "hb-card-h"); head.appendChild(el("h2", null, "Your domain")); card.appendChild(head);
+  const temp = siteLiveUrl ? siteLiveUrl() : null;
+  const btn = el("button", "pillbtn sm hb-act"); btn.type = "button";
+  if (!d) {
+    card.appendChild(el("div", "note", "Your site is on a temporary address" + (temp ? " (" + temp.replace(/^https:\/\//, "") + ")" : "") + ". Put it on your own name, like yourbusiness.com."));
+    btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
+  } else if (d.health === "ok") {
+    card.appendChild(el("div", "note", "✓ " + d.custom_domain + " is live and secure."));
+    btn.textContent = "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
+  } else {
+    card.appendChild(el("div", "note", d.health === "ssl_pending"
+      ? d.custom_domain + " is connected — the security certificate is switching on. Nothing for you to do."
+      : d.custom_domain + " — almost there: two records to add where you bought it."));
+    btn.textContent = d.health === "ssl_pending" ? "Check on it" : "See the two records"; btn.addEventListener("click", () => openFoundationsDesk());
+  }
+  card.appendChild(btn);
+}
+function renderHealthCard() {
+  const card = $("healthCard"); if (!card) return;
+  const h = HB_HEALTH; if (!h || !Array.isArray(h.categories)) { card.hidden = true; return; }
+  card.innerHTML = ""; card.hidden = false;
+  const head = el("div", "hb-card-h"); head.appendChild(el("h2", null, "Health check"));
+  const chip = el("span", "hb-chip " + (h.overall === "healthy" ? "good" : h.overall === "attention" ? "warn" : "")); chip.appendChild(el("i", "d"));
+  chip.appendChild(document.createTextNode(h.overall === "healthy" ? "All good" : h.overall === "attention" ? (h.attention_count + " to look at") : "Getting started"));
+  head.appendChild(chip); card.appendChild(head);
+  card.appendChild(el("div", "note", h.summary || h.headline || ""));
+  const needs = [];
+  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }));
+  if (needs.length) {
+    const ul = el("ul", "hb-checks");
+    needs.slice(0, 3).forEach((k) => {
+      const li = el("li"); li.appendChild(el("b", null, k.title)); li.appendChild(document.createTextNode(k.why || ""));
+      if (k.action_label && k.action_href) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, k.action_label); a.href = k.action_href; li.appendChild(a); }
+      ul.appendChild(li);
+    });
+    card.appendChild(ul);
+  } else if (h.ok_count) {
+    card.appendChild(el("div", "note", `✓ ${h.ok_count} check${h.ok_count === 1 ? "" : "s"} pass.`));
+  }
+}
+function renderActivity() {
+  const sec = $("activitySec"), list = $("activityList"), more = $("activityMore"); if (!sec || !list) return;
+  const t = HB_TIMELINE;
+  const evs = t && Array.isArray(t.groups) ? t.groups.filter((g) => g.key !== "upcoming").reduce((a, g) => a.concat(g.events || []), []) : [];
+  if (!evs.length) { sec.hidden = true; return; }
+  sec.hidden = false; list.innerHTML = "";
+  evs.slice(0, HB_ACTIVITY_ALL ? 30 : 5).forEach((e) => {
+    const row = el("div", "hb-row act");
+    row.appendChild(el("span", "ic", e.icon || "•"));
+    const tx = el("div", "t"); tx.appendChild(el("b", null, e.title));
+    tx.appendChild(el("span", null, [e.actor, e.when].filter(Boolean).join(" · ") + (e.description ? " — " + e.description : "")));
+    row.appendChild(tx);
+    if (e.href) { const acts = el("div", "acts"); const a = el("a", "pillbtn sm", "Open"); a.href = e.href; a.setAttribute("aria-label", "Open — " + e.title); acts.appendChild(a); row.appendChild(acts); }
+    list.appendChild(row);
+  });
+  if (more) {
+    more.hidden = evs.length <= 5;
+    more.textContent = HB_ACTIVITY_ALL ? "Show less" : "See all";
+    more.setAttribute("aria-expanded", HB_ACTIVITY_ALL ? "true" : "false");
+    more.onclick = () => { HB_ACTIVITY_ALL = !HB_ACTIVITY_ALL; renderActivity(); more.focus(); };
+  }
+}
+// #health · #pages · #activity land on the overview card that replaced a retired page
+function hbScrollTo(id) {
+  go("today");
+  setTimeout(() => { const n = $(id); if (n && !n.hidden) { n.scrollIntoView({ behavior: "smooth", block: "start" }); if (n.hasAttribute("tabindex")) n.focus({ preventScroll: true }); } }, 400);
 }
 // the four tiles — each one a door to where the number is dealt with
 function hbStat(id, v, s, ico) {
@@ -3785,7 +3908,9 @@ function renderStatTiles() {
   const bits = [];
   if (f) bits.push(f.domain.state === "ok" ? "Domain connected" : f.domain.state === "attention" ? "Domain needs a look" : "No custom domain");
   if (HB_SEARCH) { const sf = HB_SEARCH.seo_fields || {}; if (HB_SEARCH.verification && HB_SEARCH.verification.ok) bits.push("verified"); else if (sf.title === "Set" && sf.description === "Set") bits.push("search fields set"); }
-  hbStat("statHealth", word, bits.join(" · "), h.state === "healthy" ? "good" : h.state === "needs_attention" ? "warn" : "info");
+  // one answer on one screen: when the Health check card has found something, the tile says so too
+  if (HB_HEALTH && HB_HEALTH.overall === "attention" && HB_HEALTH.attention_count) hbStat("statHealth", "Needs a look", `${HB_HEALTH.attention_count} to look at · see Health check`, "warn");
+  else hbStat("statHealth", word, bits.join(" · "), h.state === "healthy" ? "good" : h.state === "needs_attention" ? "warn" : "info");
   if (!HB_ASKED.search) { HB_ASKED.search = true; api("GET", "/search/health").then((r) => { HB_SEARCH = r.data || null; if (HB_SEARCH) renderStatTiles(); }).catch(() => {}); }
   // visitors (reports) and enquiries (forms) — only for plans that have them
   const vis = $("statVisitors"), enq = $("statEnquiries");
@@ -3990,6 +4115,7 @@ function renderFactsProse() {
   if (parts.length) w.insertBefore(el("span", "dot", "·"), whisperNode);
   renderStatTiles();
   renderPagesList();
+  hbLoadBoardExtras();
 }
 function renderNotes(notes) {
   $("notesWrap").hidden = !notes.length;
@@ -4440,6 +4566,8 @@ function openRitual(opts) {
 function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
+$("statWaiting").addEventListener("click", () => openRitual());
+$("statHealth").addEventListener("click", () => hbScrollTo(HB_HEALTH ? "healthCard" : "pagesSec"));
 async function loadRitual(toSchedule) {
   $("ritTitle").textContent = "One moment.";
   $("ritSub").textContent = "Reading over your draft…";
@@ -10601,7 +10729,7 @@ async function renderFirstRun() {
   bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", String(fr.total)); bar.setAttribute("aria-valuenow", String(fr.done)); bar.setAttribute("aria-label", "Setup progress");
   wrap.appendChild(bar);
   const tasks = el("div", "hb-tasks");
-  const viewFor = { details: "business", brand: "business", domain: "business", connect: "today", observe: "today" };
+  const viewFor = { details: "business", brand: "business", connect: "today", observe: "today" };
   for (const s of (fr.steps || [])) {
     const row = el(s.done ? "div" : "button", "hb-task" + (s.done ? " done" : ""));
     if (!s.done) row.type = "button";
@@ -10612,6 +10740,7 @@ async function renderFirstRun() {
     if (!s.done) {
       row.addEventListener("click", () => {
         if (s.key === "publish") { openRitual(); return; }
+        if (s.key === "domain") { openFoundationsDesk({ domain: true }); return; }   // was Business info — the step's job is the domain
         const v = viewFor[s.key];
         if (v && typeof go === "function") go(v);
       });
