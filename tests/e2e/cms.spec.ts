@@ -170,7 +170,7 @@ test.describe('CMS workspace', () => {
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Preview' })).toBeVisible();
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Edit' })).toBeVisible();
     await expect(list.locator('.hb-row.quiet')).toContainText('Nothing goes live until you press Publish');
-    await expect(list.locator('.hb-row.quiet a')).toHaveAttribute('href', '/schedule.html');
+    await expect(list.locator('.hb-row.quiet a')).toHaveAttribute('href', '#schedule');
     // Preview opens the proofing desk on the page the change touches
     await list.locator('.hb-row').nth(0).getByRole('button', { name: 'Preview' }).click();
     await expect(page.locator('#stage')).toHaveClass(/on/);

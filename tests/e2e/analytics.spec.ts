@@ -315,12 +315,11 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(tileOf(page, '#salesStats', 'Won this month').getByRole('link', { name: 'View' }))
       .toHaveAttribute('href', `/pipeline.html?stage=won&client=${CLIENT}`);
     await expect(page.getByRole('link', { name: 'Won deals' })).toHaveAttribute('href', `/pipeline.html?stage=won&client=${CLIENT}`);
-    // D1 + scope together: windows-aware targets carry period AND client
-    await expect(page.getByRole('link', { name: 'View website insights' }).first())
-      .toHaveAttribute('href', `/business-insights.html?period=this_month&client=${CLIENT}`);
+    // the insights drills stay ON this page (business-insights.html retired, Oct 2026)
+    await expect(page.getByRole('link', { name: 'View website insights' }).first()).toHaveAttribute('href', '#insights');
   });
 
-  test('D1: business-insights drills carry the ACTIVE period; won-deals footers land on ?stage=won', async ({ page }) => {
+  test('D1: insights drills land on the Insights section; won-deals footers land on ?stage=won', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
       const period = new URL(route.request().url()).searchParams.get('period');
@@ -328,10 +327,8 @@ test.describe('Analytics (Business dashboard)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View website insights' }).first())
-      .toHaveAttribute('href', '/business-insights.html?period=this_month');
-    await expect(page.getByRole('link', { name: 'View search insights' }).first())
-      .toHaveAttribute('href', '/business-insights.html?period=this_month');
+    await expect(page.getByRole('link', { name: 'View website insights' }).first()).toHaveAttribute('href', '#insights');
+    await expect(page.getByRole('link', { name: 'View search insights' }).first()).toHaveAttribute('href', '#insights');
     // SS5's D1 landing is live: BOTH won-deals drills (the Won-this-month tile's
     // View + Recent wins' "Won deals") target /pipeline.html?stage=won — the view
     // that provably renders won deals. No period: the pipeline's won view isn't
@@ -343,11 +340,10 @@ test.describe('Analytics (Business dashboard)', () => {
     const wonCard = page.getByRole('link', { name: 'Won deals' });
     await expect(wonTile).toHaveAttribute('href', '/pipeline.html?stage=won');
     await expect(wonCard).toHaveAttribute('href', '/pipeline.html?stage=won');
-    // switching the period re-labels every windows-aware drill
+    // switching the period keeps the drills on this page
     await seg(page).locator('[data-period="last_30"]').click();
     await expect(page.getByText('$99,900', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View website insights' }).first())
-      .toHaveAttribute('href', '/business-insights.html?period=last_30');
+    await expect(page.getByRole('link', { name: 'View website insights' }).first()).toHaveAttribute('href', '#insights');
     await expect(page.getByRole('link', { name: 'View pipeline' }).first()).toHaveAttribute('href', '/pipeline.html');
     // …while the stage=won targets stay stable across periods (not windowed)
     await expect(wonTile).toHaveAttribute('href', '/pipeline.html?stage=won');
@@ -1032,5 +1028,36 @@ test.describe('External website door (existing client)', () => {
     await expect(page.locator('#monitorStatus')).toContainText('https://acmebakery.com/');
     await expect(page.locator('#monitorStatus')).toContainText('waiting on verification');
     await expect(page.locator('#btnMonitorConnect')).toBeHidden();
+  });
+});
+
+// ── Insights: business-insights.html folded into Analytics (Oct 2026 workflow audit, change 1) ──
+test.describe('Analytics — Insights section', () => {
+  const INS = { data: { groups: [{ label: 'Your website', observations: [
+    { icon: '🌐', observation: 'Your website was last updated 90 days ago.', detail: 'Fresh pages help people trust you.', why: 'Visitors notice stale hours.', should_i: 'A quick check of your hours is enough.', action_label: 'Open your website', action_href: '/presence.html' },
+  ] }] } };
+  test('renders the observations under the boards, with their one action', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH, '/business-insights': INS } });
+    await page.goto('/analytics.html');
+    const sec = page.locator('#insights');
+    await expect(sec.getByRole('heading', { name: 'Insights' })).toBeVisible();
+    await expect(sec.getByText('Your website was last updated 90 days ago.')).toBeVisible();
+    await expect(sec.getByText('A quick check of your hours is enough.')).toBeVisible();
+    await expect(sec.getByRole('link', { name: 'Open your website' })).toHaveAttribute('href', '/presence.html');
+  });
+  test('an empty read says so calmly; a failed read keeps the board standing', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH, '/business-insights': { data: { groups: [] } } } });
+    await page.goto('/analytics.html');
+    await expect(page.locator('#insights')).toContainText('Nothing to report just yet.');
+    await page.route('**/functions/v1/presence/business-insights**', (r) => r.fulfill({ status: 500, body: '{}' }));
+    await page.reload();
+    await expect(page.locator('#insights')).toContainText('We couldn’t read your insights just now');
+    await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
+  });
+  test('the retired page forwards here, keeping the client scope', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH, '/business-insights': INS } });
+    await page.goto('/business-insights.html?client=marlows');
+    await expect(page).toHaveURL(/\/analytics\.html\?client=marlows#insights$/);
+    await expect(page.locator('#insights')).toContainText('Your website was last updated 90 days ago.');
   });
 });

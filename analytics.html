@@ -169,6 +169,16 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* print: the chrome hides, cards never break mid-page, "Print this summary" offers the path */
   .print{margin-top:26px;text-align:center}
+  /* Insights — the plain observations that used to be their own page (business-insights.html) */
+  .ins-group{margin-top:10px}
+  .ins-label{font-size:12px;font-weight:600;color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px}
+  .ins{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:12px 14px;margin-top:8px}
+  .ins .lead{font-weight:600;margin:0}
+  .ins .detail{color:var(--soft);font-size:13.5px;margin:4px 0 0}
+  .ins dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:10px 0 0;font-size:13px}
+  .ins dt{color:var(--soft)} .ins dd{margin:0}
+  .ins .act{display:inline-block;margin-top:8px;font-size:13px}
+  .ins-foot{color:var(--soft);font-size:12.5px;margin-top:10px}
   @media print{.seg,.print,.noprint,#dds-shell,#refreshBtn{display:none!important}.wrap{max-width:100%}.card,.tscroll,.stats{box-shadow:none;break-inside:avoid}}
   /* tablet and phone: tiles pair up, then stack; cards go to one column */
   @media (max-width:1000px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(3){border-left:none}.stat:nth-child(n+3){border-top:1px solid var(--line)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -201,7 +211,7 @@ const num=(n)=>(Number(n)||0).toLocaleString();
 // hash-aware, matching shell.js — a fragment target like /presence.html#publish
 // must become /presence.html?client=X#publish, never /presence.html#publish?client=X
 const withScope=(href)=>{
-  if(!scope()||!href)return href;
+  if(!scope()||!href||href.charAt(0)==='#')return href;   // an in-page anchor (#insights) stays on this, already-scoped page
   const hi=href.indexOf('#'),hash=hi>=0?href.slice(hi):'',base=hi>=0?href.slice(0,hi):href;
   return base+(base.includes('?')?'&':'?')+'client='+encodeURIComponent(scope())+hash;
 };
@@ -451,7 +461,8 @@ function websiteBand(d){
   const ga=(w&&w.ga)||null;
   const gaOk=!!(ga&&ga.has_data);
   // D1: every business-insights drill carries the active period; the connections CTA never does.
-  const BI=withPeriod('/business-insights.html');
+  // the drills land on the Insights section of this page (business-insights.html retired, Oct 2026)
+  const BI='#insights';
   // the one place the "what now?" for a non-measuring search card is decided.
   const searchCta=gOk||gDown?[BI,'View search insights']
     :gNoDom?[(g&&g.record_href)||'/presence.html#monitor','Add their website address']
@@ -556,8 +567,31 @@ function renderDash(d){
   let h=headRow('Analytics',`<span>Your business at a glance. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span>`,true);
   h+=salesBand(d);
   h+=websiteBand(d);
+  h+=`<section id="insights" tabindex="-1" aria-labelledby="insightsH"><h2 class="band" id="insightsH">Insights</h2><div id="insightsBody"><p class="muted">Reading what we can see…</p></div></section>`;
   $('main').innerHTML=h;
   wireDash();
+  loadInsights();
+}
+// ── Insights: the platform's own evidence-backed observations (GET /business-insights),
+//    read once per visit. A failed read says so in this section only; the board stands.
+let INSIGHTS=null;
+const scopedHref=(link)=>{if(!link)return null;const c=scope();if(!c||link.charAt(0)!=='/')return link;const [b,h]=String(link).split('#');return b+(b.includes('?')?'&':'?')+'client='+encodeURIComponent(c)+(h?'#'+h:'');};
+function insightsHtml(b){
+  const groups=(b&&b.groups)||[];
+  if(!groups.length)return `<p class="muted">Nothing to report just yet. Once the website is published and getting visits and enquiries, calm observations appear here — only things we can measure.</p>`;
+  return groups.map(g=>`<div class="ins-group"><p class="ins-label">${esc(g.label||'')}</p>${(g.observations||[]).map(o=>{const l=scopedHref(o.action_href);return `<article class="ins">
+      <p class="lead">${esc(o.observation)}</p>${o.detail?`<p class="detail">${esc(o.detail)}</p>`:''}
+      <dl><dt>Why it matters</dt><dd>${esc(o.why||'')}</dd><dt>Anything to do?</dt><dd>${esc(o.should_i||'')}</dd></dl>
+      ${o.action_label&&l?`<a class="link act" href="${esc(l)}">${esc(o.action_label)}</a>`:''}</article>`;}).join('')}</div>`).join('')
+    +`<p class="ins-foot">These are observations, not advice — nothing here is estimated.</p>`;
+}
+async function loadInsights(){
+  const host=$('insightsBody');if(!host)return;
+  if(!INSIGHTS){let r;try{r=await api('/business-insights');}catch(_){r={ok:false};}
+    if(!r.ok){const h2=$('insightsBody');if(h2)h2.innerHTML=`<p class="muted">We couldn’t read your insights just now — the numbers above are unaffected.</p>`;return;}
+    INSIGHTS=(r.body&&r.body.data)||{};}
+  const h=$('insightsBody');if(!h)return;h.innerHTML=insightsHtml(INSIGHTS);
+  if(location.hash==='#insights'){const s=$('insights');if(s){s.scrollIntoView({block:'start'});}}
 }
 function wireDash(){
   $('refreshBtn').addEventListener('click',()=>loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));

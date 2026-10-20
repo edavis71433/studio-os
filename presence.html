@@ -416,6 +416,9 @@ h5.rune .whisper.ok{color:var(--sage)}
 .ritual .blockprose a{font-style:normal}
 .pubbtn{width:100%;padding:12px;border-radius:var(--r);background:var(--plum);color:var(--fill-ink);font-size:14px;font-weight:600;border:none;margin-top:30px;transition:background var(--dur) var(--ease)}
 .pubbtn:hover{background:color-mix(in srgb,var(--plum) 86%,#000)}
+/* the schedule panel is open: "Schedule it" is the one filled button, publish-now steps back */
+.pubbtn.quiet{background:transparent;color:var(--plum);border:1px solid var(--line)}
+.pubbtn.quiet:hover{background:var(--plum-tint,#faf7ff)}
 .notyet{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--ink-2)}
 .notyet:hover{color:var(--ink)}
 .pipe{margin-top:30px;display:flex;flex-direction:column;gap:9px}
@@ -1669,6 +1672,7 @@ function routeHash() {
   const h = (location.hash || "").replace("#", "").toLowerCase();
   if (!h) return;
   if (h === "publish") { openRitual(); return; }
+  if (h === "schedule") { openRitual({ schedule: true }); return; }   // the one place to schedule (schedule.html retired)
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
@@ -4053,7 +4057,7 @@ function renderRecent() {
   if (rows.length > 8) { const r = el("div", "hb-row quiet"); const t = el("div", "t"); t.appendChild(el("span", null, `…and ${rows.length - 8} more — the publish page reads out everything.`)); r.appendChild(t); list.appendChild(r); }
   const q = el("div", "hb-row quiet"); const qt = el("div", "t");
   qt.appendChild(el("span", null, "Nothing goes live until you press Publish. "));
-  const sch = el("a", null, "Schedule it for later"); sch.href = "/schedule.html"; qt.appendChild(sch); qt.appendChild(el("span", null, " from the Scheduled page."));
+  const sch = el("a", null, "Schedule it for later"); sch.href = "#schedule"; sch.addEventListener("click", (e) => { e.preventDefault(); openRitual({ schedule: true }); }); qt.appendChild(sch); qt.appendChild(el("span", null, " — pick a time and it goes live on its own."));
   q.appendChild(qt); list.appendChild(q);
 }
 const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "kind words", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
@@ -4632,6 +4636,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
       const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
       const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
       const inp = el("input"); inp.type = "datetime-local"; inp.value = defValue;
+      inp.id = withToggle ? "schedOffAt" : "schedAt"; lab.htmlFor = inp.id;   // a real label↔field pair (screen readers name the field)
       inp.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
       r.appendChild(lab); r.appendChild(inp); panel.appendChild(r);
       return { row: r, inp };
@@ -4651,12 +4656,20 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
         off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
       } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
     });
+    // optional note (it was on the retired Scheduled page) — POST /schedule takes it as before
+    const noteRow = el("div"); noteRow.style.marginTop = "12px";
+    const noteLab = el("label", null, "A note for yourself (optional)"); noteLab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
+    const noteIn = el("input"); noteIn.type = "text"; noteIn.maxLength = 200; noteIn.placeholder = "e.g. Holiday hours"; noteIn.id = "schedNote";
+    noteIn.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line,#ddd);width:100%;box-sizing:border-box";
+    noteLab.htmlFor = "schedNote"; noteRow.appendChild(noteLab); noteRow.appendChild(noteIn); panel.appendChild(noteRow);
     const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
-    const okb = el("button", null, "Schedule it"); okb.type = "button";
-    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);font-weight:600";
+    const okb = el("button", "schedgo", "Schedule it"); okb.type = "button";
+    okb.style.cssText = "font:inherit;font-size:12.5px;padding:7px 16px;border-radius:999px;cursor:pointer;border:2px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-weight:600";
+    // one filled button per screen: while you are scheduling, publish-now is the quiet option
+    const pubNow = document.querySelector("#ritActions .pubbtn"); if (pubNow) pubNow.classList.add("quiet");
     const nob = el("button", null, "Never mind"); nob.type = "button";
     nob.style.cssText = "font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
-    nob.addEventListener("click", () => panel.remove());
+    nob.addEventListener("click", () => { panel.remove(); if (pubNow) pubNow.classList.remove("quiet"); open.focus(); });
     okb.addEventListener("click", async () => {
       const when = parseDtLocal(pub.inp.value);
       if (!when) { toast("Pick a date and time.", true); return; }
@@ -4669,7 +4682,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
       }
       okb.disabled = true; okb.textContent = "Scheduling…";
       try {
-        await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish" });
+        await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish", note: noteIn.value.trim() });
         if (offWhen) await api("POST", "/schedule", { scheduled_for: offWhen.toISOString(), kind: "offline" });
         toast(offWhen ? "Scheduled — it publishes, then comes down, on its own." : "Scheduled — it publishes on its own.");
         loadRitual();

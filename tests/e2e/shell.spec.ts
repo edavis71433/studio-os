@@ -33,7 +33,7 @@ const crmCtx = () => ({ data: {
 const LONG_NAV = [
   ...STUDIO_NAV.slice(0, -1),
   { key: 'work', label: 'Work', items: [
-    { key: 'schedule', label: 'Schedule', href: '/schedule.html' },
+    { key: 'schedule', label: 'Schedule', href: '/presence.html#schedule' },
     { key: 'projects', label: 'Projects', href: '/projects.html' },
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
     { key: 'leads', label: 'Enquiries', href: '/leads.html' },
@@ -851,7 +851,6 @@ const SIDE_NAV = [
     { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
     { key: 'design', label: 'Design', href: '/presence.html#design' },
     { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
-    { key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' },
     { key: 'history', label: 'History', href: '/presence.html#history' },
   ] },
   { key: 'customers', label: 'Customers', items: [
@@ -871,14 +870,15 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
 
   test('the section you are in starts expanded with its page lit; the others stay folded', async ({ page }) => {
     await installApp(page, { api: { '/portal/context': sideCtx(), '/schedule': { data: { scheduled: [] } } } });
-    // the scheduled-changes board: Website open, Scheduled lit
-    await page.goto('/schedule.html');
+    // the website builder: Website open, its overview lit (schedule.html, the old
+    // board for this, is retired — scheduling lives in the publish page)
+    await page.goto('/presence.html');
     const website = secOf(page, 'website');
     await expect(website).toHaveClass(/\bopen\b/);
     await expect(website.locator('> button')).toHaveAttribute('aria-expanded', 'true');
     await expect(website.locator('.menu')).toBeVisible();
-    await expect(website.locator('.menu a')).toHaveText(['Website', 'Business info', 'Design', 'Publish', 'Scheduled publishes', 'History']);
-    await expect(website.locator('.menu a.here')).toHaveText('Scheduled publishes');
+    await expect(website.locator('.menu a')).toHaveText(['Website', 'Business info', 'Design', 'Publish', 'History']);
+    await expect(website.locator('.menu a.here')).toHaveText('Website');
     await expect(website.locator('.menu a.here')).toHaveAttribute('aria-current', 'page');
     await expect(secOf(page, 'customers')).not.toHaveClass(/\bopen\b/);
     await expect(secOf(page, 'customers').locator('.menu')).toBeHidden();
