@@ -64,7 +64,7 @@ export function inquiriesInsight(createdAts: string[], byKind: { contact: number
   const detail = unread > 0
     ? `${plural(unread, 'inquiry is', 'inquiries are')} still waiting for a reply.`
     : (parts.length ? `This ${w}: ${parts.join(', ')}.` : '');
-  return { key: 'inquiries', title: 'Inquiries', sentence, number: current, detail, href: '/leads.html', tone };
+  return { key: 'inquiries', title: 'Inquiries', sentence, number: current, detail, href: '/inbox.html#enquiries', tone };
 }
 
 /** Publishing activity — from presence_publishes. AN-1/AN-2 (the real "website" signal). */

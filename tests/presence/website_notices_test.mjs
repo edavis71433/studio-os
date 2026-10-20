@@ -22,7 +22,7 @@ ok('publish: idempotent per publish id (no storm on retry)', /period: `pub:\$\{p
 ok('publish: a successful publish clears the lingering publish-failed notice', /if \(live && site\.client_id\) await clearNotice\(site\.client_id, 'publish_failed'\)/.test(publish));
 
 // frontend: no dead-ends — every kind has a deep-link action
-ok('UI: publish_failed / connection_expired / website_enquiry render with deep links', /publish_failed:\s*\{ label:[^}]*href:/.test(presence) && /connection_expired:\s*\{ label:[^}]*href: "connections\.html"/.test(presence) && /website_enquiry:\s*\{ label:[^}]*href: "leads\.html"/.test(presence));
+ok('UI: publish_failed / connection_expired / website_enquiry render with deep links', /publish_failed:\s*\{ label:[^}]*href:/.test(presence) && /connection_expired:\s*\{ label:[^}]*href: "connections\.html"/.test(presence) && /website_enquiry:\s*\{ label:[^}]*href: "inbox\.html#enquiries"/.test(presence));
 ok('UI: notices are prioritized (website-attention first) not limited to 5 kinds', /NOTICE_PRIORITY = \["publish_failed", "connection_expired", "website_enquiry"/.test(presence) && /for \(const k of NOTICE_PRIORITY\)/.test(presence));
 ok('UI: the action label + href come from the kind map (no hardcoded See plans only)', /const up = el\("a", "textact", act\.label\)/.test(presence) && /up\.href = act\.href/.test(presence));
 

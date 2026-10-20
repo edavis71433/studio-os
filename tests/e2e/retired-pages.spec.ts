@@ -14,6 +14,8 @@ const CASES: [string, RegExp][] = [
   ['/website-health.html', /\/presence\.html#health$/],
   ['/content-tree.html?client=marlows', /\/presence\.html\?client=marlows#pages$/],
   ['/timeline.html', /\/presence\.html#activity$/],
+  // change 5: the Enquiries page folded into the Inbox's Enquiries view
+  ['/leads.html?client=marlows', /\/inbox\.html\?client=marlows#enquiries$/],
 ];
 
 test.describe('Retired lens pages', () => {
@@ -29,5 +31,11 @@ test.describe('Retired lens pages', () => {
     const html = await res.text();
     expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
     expect(html).toContain('href="/inbox.html#website"');
+  });
+  test('the Enquiries stub is noindex and links to the Inbox Enquiries view', async ({ request }) => {
+    const html = await (await request.get('/leads.html')).text();
+    expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(html).toContain('href="/inbox.html#enquiries"');
+    expect(html).not.toContain('supabase');   // no app code left behind
   });
 });

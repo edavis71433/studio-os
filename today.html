@@ -302,7 +302,7 @@ function statTiles(s,enquiries){
     if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
     if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
   }
-  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/leads.html'});}
+  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/inbox.html#enquiries'});}
   return t;
 }
 // "This week" — the one next step on each OPEN deal (the same four-stage
@@ -597,7 +597,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
     const _lnk = (href, label) => `<a class="link" href="${scopeHref(href)}">${label}</a>`;
     const _sep = ' <span style="color:var(--soft)">·</span> ';
     const clearLinks = (hasWebsite
-      ? [['/inbox.html','What needs you'],['/presence.html#health','Website health'],['/presence.html','Open your website'],['/presence.html#pages','Your pages'],['/presence.html#history','History'],['/presence.html#schedule','What’s next'],['/analytics.html#insights','Insights'],['/leads.html','Website enquiries']]
+      ? [['/inbox.html','What needs you'],['/presence.html#health','Website health'],['/presence.html','Open your website'],['/presence.html#pages','Your pages'],['/presence.html#history','History'],['/presence.html#schedule','What’s next'],['/analytics.html#insights','Insights'],['/inbox.html#enquiries','Website enquiries']]
       : [['/customers.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     main += `<div class="moment calm"><span class="tag">All clear</span>

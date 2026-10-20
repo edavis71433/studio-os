@@ -55,7 +55,7 @@ function statTiles(s,enquiries){
     if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
     if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
   }
-  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/leads.html'});}
+  if(Array.isArray(enquiries)){const n=enquiries.length;t.push({id:'stat-enq',k:'New enquiries',v:String(n),s:n?'Waiting for a reply':'Nothing new',ico:'mail',tone:'info',href:'/inbox.html#enquiries'});}
   return t;
 }
 // "This week" — the one next step on each OPEN deal (the same four-stage

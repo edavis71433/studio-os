@@ -119,7 +119,7 @@ export function buildAttentionCenter(input: AttentionInput): AttentionCenter {
 
   // 6) new enquiries from the website
   if (input.new_enquiries > 0) {
-    needs.push({ tone: 'needs_attention', icon: '✉️', title: input.new_enquiries === 1 ? 'A new enquiry came in' : `${input.new_enquiries} new enquiries came in`, why: 'Someone reached out through your website and is waiting to hear back.', action_label: 'Read it', action_href: '/leads.html' });
+    needs.push({ tone: 'needs_attention', icon: '✉️', title: input.new_enquiries === 1 ? 'A new enquiry came in' : `${input.new_enquiries} new enquiries came in`, why: 'Someone reached out through your website and is waiting to hear back.', action_label: 'Read it', action_href: '/inbox.html#enquiries' });
   }
 
   // 7) unpublished changes that are otherwise ready to go

@@ -17,7 +17,9 @@ test.describe('Contextual onboarding hint', () => {
 
   test('a fresh visitor on a different page sees that page\'s hint', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    await expect(page.locator('.dds-hint[data-hint="leads-reply"]')).toBeVisible();
+    // (the Enquiries page's hint retired with it — the Inbox composer says the
+    // same thing in its label; the record page's notes hint stands in here)
+    await page.goto('/crm.html?client_id=c-1');
+    await expect(page.locator('.dds-hint[data-hint="crm-notes"]')).toBeVisible();
   });
 });

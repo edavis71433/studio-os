@@ -921,7 +921,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <span class="ico info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
             <span class="txt"><span class="k">Visitors this month</span><span class="v">—</span><span class="s">Not measured yet</span></span>
           </a>
-          <a class="hb-stat" id="statEnquiries" href="/leads.html">
+          <a class="hb-stat" id="statEnquiries" href="/inbox.html#enquiries">
             <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
             <span class="txt"><span class="k">Enquiries this month</span><span class="v">—</span><span class="s">None yet</span></span>
           </a>
@@ -3673,7 +3673,7 @@ function hasFeature(f) { return !S.features || S.features.indexOf(f) >= 0; }
 function carryScopeOnLinks() {
   const c = new URLSearchParams(location.search).get("client");
   if (!c) return;
-  document.querySelectorAll('a[href^="/today.html"], a[href^="/files.html"], a[href^="/inbox.html"], a[href^="/crm.html"], a[href^="/leads.html"], a[href^="/analytics.html"], a[href^="/schedule.html"]').forEach((a) => {
+  document.querySelectorAll('a[href^="/today.html"], a[href^="/files.html"], a[href^="/inbox.html"], a[href^="/crm.html"], a[href^="/analytics.html"], a[href^="/schedule.html"]').forEach((a) => {
     const h = a.getAttribute("href");
     if (h.indexOf("client=") >= 0) return;
     const [pathq, hash] = h.split("#");
@@ -10650,8 +10650,8 @@ function mountAnnouncementCard() {
 const NOTICE_ACTION = {
   publish_failed:   { label: "Open your website",       href: "presence.html#publish" },
   connection_expired:{ label: "Reconnect",              href: "connections.html" },
-  website_enquiry:  { label: "View enquiries",          href: "leads.html" },
-  lead_followup:    { label: "View enquiries",          href: "leads.html" },
+  website_enquiry:  { label: "View enquiries",          href: "inbox.html#enquiries" },
+  lead_followup:    { label: "View enquiries",          href: "inbox.html#enquiries" },
   domain_expiry:    { label: "Manage domain",           href: "presence.html#business" },
   search_setup:     { label: "Finish search setup",     href: "presence.html#search" },
   renewal_reminder: { label: "See plans",               href: "pricing.html" },

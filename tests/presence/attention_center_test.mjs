@@ -100,7 +100,7 @@ const grp = (t, key) => t.groups.find((g) => g.key === key);
 // 10. Notices split by kind — action-now vs approaching
 {
   const t = build({ notices: [
-    { kind: 'lead_followup', headline: 'A lead is waiting', body: 'Follow up soon', href: '/leads.html' },
+    { kind: 'lead_followup', headline: 'A lead is waiting', body: 'Follow up soon', href: '/inbox.html#enquiries' },
     { kind: 'domain_expiry', headline: 'Your domain renewal is approaching', body: 'Renews next month', href: '/presence.html#foundations' },
   ] });
   ok('10 lead → needs attention', grp(t, 'needs_attention').cards.some((c) => c.title === 'A lead is waiting'));

@@ -58,7 +58,7 @@ ok('FIX5: inbox renders a prominent "Messages from your clients" section', /Mess
 // (slice 2 review F2: the total now counts what the list actually RENDERS — the
 // per-client conversation items built from feed.client_messages, with keyless
 // rows bucketed instead of dropped — so client messages still count, grouped.)
-ok('FIX5: inbox counts client messages toward "needs you" total', /TOTAL=ITEMS\.length\+SYSROWS\.length/.test(inbox) && /clientMsgs\.filter\(x=>x\.type==='message'\)/.test(inbox));
+ok('FIX5: inbox counts client messages toward "needs you" total', /TOTAL=inboxCount\(\)/.test(inbox) && /const inboxCount=\(\)=>ITEMS\.filter\(x=>!x\.queue\)\.length\+SYSROWS\.length/.test(inbox) && /clientMsgs\.filter\(x=>x\.type==='message'\)/.test(inbox));
 ok('FIX5: projects.html can open + reply to a project-less request (full-screen)', /function openStudioSupportFull/.test(projects) && /params\.get\('support'\)/.test(projects));
 
 // ═══ BY-CLIENT — Inbox groups client messages by CLIENT (with a dropdown); the

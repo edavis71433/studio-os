@@ -27,7 +27,7 @@ export interface HealthCoachRead {
 export function coachRead(s: HealthSignals, _nowIso: string): HealthCoachRead {
   const suggestions: Array<{ text: string; href: string }> = [];
 
-  if (s.leadsWaiting > 0) suggestions.push({ text: s.leadsWaiting === 1 ? 'Someone’s waiting for a reply — a quick response keeps them warm.' : `${s.leadsWaiting} people are waiting for a reply.`, href: '/leads.html' });
+  if (s.leadsWaiting > 0) suggestions.push({ text: s.leadsWaiting === 1 ? 'Someone’s waiting for a reply — a quick response keeps them warm.' : `${s.leadsWaiting} people are waiting for a reply.`, href: '/inbox.html#enquiries' });
   if (s.pendingApprovals > 0) suggestions.push({ text: s.pendingApprovals === 1 ? 'A change is ready for your approval.' : `${s.pendingApprovals} changes are ready for your approval.`, href: '/presence.html#foundations' });
   if (s.domainExpiringDays !== null && s.domainExpiringDays <= 30) suggestions.push({ text: s.domainExpiringDays <= 0 ? 'Your web address has lapsed — renew it at your registrar.' : `Your web address renews in ${s.domainExpiringDays} day${s.domainExpiringDays === 1 ? '' : 's'} — auto-renew is the calm option.`, href: '/presence.html#business' });
   if (s.connectedNeedingAttention > 0) suggestions.push({ text: s.connectedNeedingAttention === 1 ? 'A connected service needs a quick look.' : `${s.connectedNeedingAttention} connected services need a look.`, href: '/connections.html' });

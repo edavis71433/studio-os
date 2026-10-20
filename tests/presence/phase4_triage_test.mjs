@@ -4,6 +4,8 @@ const C = await import('../../supabase/functions/presence/lib/commercial.ts');
 const R = await import('../../supabase/functions/presence/routes/commercial.ts');
 const migration = await Deno.readTextFile(new URL('../../supabase/migrations/0129_enquiry_triage.sql', import.meta.url));
 const route = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/commercial.ts', import.meta.url));
+// Oct 2026 audit change 5: the Enquiries page folded into the Inbox's Enquiries view
+const inbox = await Deno.readTextFile(new URL('../../inbox.html', import.meta.url));
 const leads = await Deno.readTextFile(new URL('../../leads.html', import.meta.url));
 const workspace = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/workspace.ts', import.meta.url));
 let pass = 0, fail = 0; const failed = [];
@@ -26,10 +28,13 @@ for (const s of ['new', 'read', 'replied', 'archived', 'not_a_fit', 'converted']
 // counting stays on status=new & spam=false — so every other mark drops off the bell
 ok('bell/feed still count status=new & spam=false only', /spam=eq\.false&status=eq\.new/.test(workspace));
 // the page offers the marks
-ok('leads.html: Not a fit sends not_a_fit', /setStatus\(b\.getAttribute\('data-arch'\),'not_a_fit'\)/.test(leads));
-ok('leads.html: Spam sends spam:true', /\{spam:true\}/.test(leads));
-ok('leads.html: a reply marks Replied', /setStatus\(id,'replied',true\)/.test(leads));
-ok('leads.html: Open hides not_a_fit', /l\.status!=='not_a_fit'/.test(leads));
+ok('inbox.html: Not a fit sends not_a_fit', /setLeadStatus\(it,'not_a_fit',nf\)/.test(inbox) && /api\('\/forms\/inbox\/'\+encodeURIComponent\(it\.lead_id\),'POST',\{status\}\)/.test(inbox));
+ok('inbox.html: Spam sends spam:true', /'POST',\{spam:true\}/.test(inbox));
+ok('inbox.html: a sent reply marks Replied', /leadMarked\(it,'replied'\)/.test(inbox));
+ok('inbox.html: Open hides not_a_fit', /EFILTER==='open'&&\(st==='archived'\|\|st==='not_a_fit'\)/.test(inbox));
+ok('inbox.html: the Enquiries view lists every enquiry, one row each (the queue)', /items\.push\(\{kind:'lead',queue:true,id:'enq:'\+l\.id/.test(inbox));
+ok('inbox.html: kind filter + Newest/Oldest', /id="kindf"/.test(inbox) && /id="sortf"/.test(inbox) && /SORT==='oldest'/.test(inbox));
+ok('leads.html is a stub that forwards to the Enquiries view', /location\.replace\('\/inbox\.html' \+ location\.search \+ '#enquiries'\)/.test(leads) && !/function setStatus/.test(leads));
 
 console.log(`\n${pass}/${pass + fail} passed`);
 if (fail) { console.log('FAILURES'); failed.forEach((f) => console.log(' -', f)); Deno.exit(1); }

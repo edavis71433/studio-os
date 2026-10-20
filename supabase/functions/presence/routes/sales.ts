@@ -552,7 +552,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       if (!rows(c)[0]) return json({ error: 'bad_contact', message: 'That contact isn’t in this workspace.' }, 422, cors);
     }
     let srcSub: string | null = UUID_RE.test(b.source_submission_id || '') ? b.source_submission_id : null;
-    // The enquiry TEXT travels with the deal. The one-tap "→ Deal" (leads.html)
+    // The enquiry TEXT travels with the deal. The one-tap "→ Deal" (the Inbox enquiry pane)
     // only ever carried name/email, so the message that started the whole
     // relationship — "we need a site before our March opening" — was lost the
     // moment the enquiry became a deal, and the drawer showed a bare "No notes".

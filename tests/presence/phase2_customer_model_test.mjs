@@ -7,7 +7,7 @@ const migration = await read('../../supabase/migrations/0130_contact_customer_li
 const sales = await read('../../supabase/functions/presence/routes/sales.ts');
 const crmRoute = await read('../../supabase/functions/presence/routes/crm.ts');
 const crm = await read('../../crm.html');
-const leads = await read('../../leads.html');
+const inbox = await read('../../inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
 const contacts = await read('../../contacts.html');
 const customers = await read('../../customers.html');
 let pass = 0, fail = 0; const failed = [];
@@ -39,8 +39,8 @@ ok('crm.html: ?act=invoice opens Billing once the deal is in', /if\(act==='invoi
 ok('crm.html: ?act=message brings the composer forward', /act==='message'\|\|act==='note'\|\|act==='task'\)setTimeout\(\(\)=>focusComposer\(act\)/.test(crm));
 
 // the enquiry's one-step convert
-ok('leads.html: Make customer posts /sales/customers with the enquiry id', /api\('\/sales\/customers','POST',\{email,name:l\.name\|\|'',business_name:biz,source_submission_id:id\}\)/.test(leads));
-ok('leads.html: the deal is optional', /\$\('conv-deal'\)\.checked/.test(leads));
+ok('inbox.html: Make customer posts /sales/customers with the enquiry id', /api\('\/sales\/customers','POST',\{email,name:l\.name\|\|'',business_name:biz,source_submission_id:id\}\)/.test(inbox) && /const l=it\.lead\|\|\{\},id=it\.lead_id;/.test(inbox));
+ok('inbox.html: the deal is optional', /\$\('conv-deal'\)\.checked/.test(inbox));
 // the person → customer link on both rosters
 ok('contacts.html: a linked person links to the customer record', /crm\.html\?client_id=\$\{esc\(c\.client_id\)\}/.test(contacts));
 ok('customers.html: People tab reads /sales/contacts', /api\('\/sales\/contacts\?limit=200'\)/.test(customers) && /id="tabPeople"/.test(customers));

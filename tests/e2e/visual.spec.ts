@@ -17,11 +17,11 @@ test.describe('Visual baselines', () => {
     await expect(page).toHaveScreenshot('today.png', { fullPage: true, animations: 'disabled' });
   });
 
-  test('Leads inbox — full page', async ({ page }) => {
+  test('Inbox, Enquiries view — full page', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
+    await page.goto('/inbox.html#enquiries');
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveScreenshot('leads.png', { fullPage: true, animations: 'disabled' });
+    await expect(page).toHaveScreenshot('inbox-enquiries.png', { fullPage: true, animations: 'disabled' });
   });
 
   test('Client portal — full page', async ({ page }) => {

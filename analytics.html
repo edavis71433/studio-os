@@ -386,7 +386,7 @@ function salesBand(d){
     h+=tile({icon:'money',tone:'good',title:'Won this month',link:['/pipeline.html?stage=won','View'],...t});
   }
   // new enquiries (D2: the count is period-windowed — the tile says its window)
-  h+=tile({icon:'mail',tone:'info',title:'New enquiries',window:periodLabel(),link:['/leads.html','View'],
+  h+=tile({icon:'mail',tone:'info',title:'New enquiries',window:periodLabel(),link:['/inbox.html#enquiries','View'],
     ...(s.enquiries?{value:num(s.enquiries.count),sub:(s.enquiries.unanswered?`${num(s.enquiries.unanswered)} not yet answered`:'all answered')+trunc(s.truncated_enquiries)}
       :{empty:['Nothing to count yet','Website enquiries will land here.']})});
   // open support
@@ -409,7 +409,7 @@ function salesBand(d){
   // enquiries over time
   h+=card('','Enquiries over time',based('Weekly, last 12 weeks',s.truncated_enquiries),
     (s.enquiries&&lineChart(s.enquiries.weekly,'var(--c1)','enquiries',d&&d.generated_at))||emptyState('No enquiries yet','When people reach out through your website, the trend shows here.'),
-    ['/leads.html','View enquiries']);
+    ['/inbox.html#enquiries','View enquiries']);
   // recent wins — spans the row when the invoices read isn't available (null)
   {
     const rows=(s.recent_wins||[]);

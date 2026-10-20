@@ -12,7 +12,7 @@ test.describe('Today', () => {
     await expect(todo).toHaveCount(2); // 1 notice + 1 approval
     await expect(page.locator('.moment.todo').first()).toContainText('A quote request is waiting for a reply');
     // a notice row is a CONTAINER (link + a sibling Done button); the link is inside it
-    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/leads.html');
+    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries');
     await expect(page.getByText('Protect your email')).toBeVisible();
     // the moment card + its dismiss affordance
     await expect(page.getByRole('heading', { name: 'Add your holiday hours' })).toBeVisible();
@@ -31,7 +31,7 @@ test.describe('Today', () => {
     await summary.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await summary.click();
     await expect(page.getByText('One thing could help.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/leads.html');
+    await expect(page.getByRole('link', { name: 'Take a look →' })).toHaveAttribute('href', '/inbox.html#enquiries');
   });
 
   test('the Customer Journey celebrates milestones, never a score', async ({ page }) => {
@@ -197,7 +197,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await installApp(page);
     await page.goto(`/today.html?client=${CLIENT}`);
     const rows = page.locator('.feedcard .moment.todo');
-    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/leads.html?client=${CLIENT}`);
+    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries`);
     await expect(rows.nth(1)).toHaveAttribute('href', `/presence.html?client=${CLIENT}#foundations`);
   });
 
@@ -508,7 +508,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   } } });
   const NOTICE = {
     id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'lead_followup', period: 'lead:l1', dismissible: true,
-    headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/leads.html',
+    headline: 'A quote request is waiting for a reply', body: 'Sam reached out about a day ago.', href: '/inbox.html#enquiries',
   };
   const UNPAID = {
     id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', kind: 'deal_followup', period: 'invremind:inv-1', dismissible: false,
@@ -516,7 +516,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
   };
   const SYNTHETIC = {
     id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
-    headline: '2 new enquiries came in', body: 'Someone reached out through your website.', href: '/leads.html',
+    headline: '2 new enquiries came in', body: 'Someone reached out through your website.', href: '/inbox.html#enquiries',
   };
 
   test('a dismissable row offers Done — an unpaid invoice never does', async ({ page }) => {
@@ -722,7 +722,7 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(enq).toContainText('New enquiries');
     await expect(enq.locator('.hl-v')).toHaveText('2');
     await expect(enq.locator('.hl-s')).toHaveText('Waiting for a reply');
-    await expect(enq).toHaveAttribute('href', '/leads.html');
+    await expect(enq).toHaveAttribute('href', '/inbox.html#enquiries');
     // the strip sits under the greeting, above the two columns
     expect(await strip.evaluate((el) => el.nextElementSibling?.id)).toBe('home-cols');
   });

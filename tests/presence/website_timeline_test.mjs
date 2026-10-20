@@ -102,7 +102,7 @@ const group = (t, key) => t.groups.find((g) => g.key === key);
   ok('8 lead title from mapLead', /Quote request from/.test(e.title));
   eq('8 category Communication', e.category, 'Communication');
   eq('8 actor A visitor', e.actor, 'A visitor');
-  eq('8 to messages', e.href, '/leads.html');
+  eq('8 to messages', e.href, '/inbox.html#enquiries');
 }
 
 // 9. Moment reuses mapMoment; System + Automatic

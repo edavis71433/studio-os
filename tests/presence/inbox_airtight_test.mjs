@@ -53,7 +53,7 @@ ok('FIX2: it rides the ONE notice model (reuses raiseNotice/clearNotice, no new 
   /import \{ raiseNotice, clearNotice, clearNoticePrefix, connExpiredPeriod, connExpiredPeriodPrefix, connExpiredLegacyPeriod \} from '\.\.\/lib\/notice\.ts'/.test(store));
 ok('FIX2: connection_expired has a NOTICE_HREF so its CTA lands on connections.html',
   /connection_expired: '\/connections\.html'/.test(workspace));
-ok('FIX1: website_enquiry has a NOTICE_HREF (leads.html)', /website_enquiry: '\/leads\.html'/.test(workspace));
+ok('FIX1: website_enquiry has a NOTICE_HREF (the Inbox\'s Enquiries view)', /website_enquiry: '\/inbox\.html#enquiries'/.test(workspace));
 
 // ── FIX 3: Today and the bell never disagree on the number ───────────────────
 ok('FIX3: Today sources its needs count from ctx.attention_count (the bell badge)',

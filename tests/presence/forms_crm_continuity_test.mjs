@@ -9,7 +9,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 const sales = read('supabase/functions/presence/routes/sales.ts');
 const commercial = read('supabase/functions/presence/routes/commercial.ts');
-const leads = read('leads.html');
+const inbox = read('inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
 const mig = read('supabase/migrations/0085_form_submission_converted.sql');
 
 // dedupe: one deal per website enquiry
@@ -28,10 +28,10 @@ ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /deal_id: 
 ok('inbox: the deal lookup is site-scoped + bounded to the shown ids', /presence_deals\?site_id=eq\.\$\{site\.id\}&deleted_at=is\.null&source_submission_id=in\.\(\$\{ids\.join\(','\)\}\)/.test(commercial));
 
 // frontend: converted state + deep link + no re-convert
-ok('leads UI: converted enquiry shows "in pipeline — view deal" deep link (opens the Client Record)', /l\.converted\?`<a class="reply" href="\/crm\.html\?deal=\$\{esc\(l\.deal_id\|\|''\)\}&tab=deal"/.test(leads));
-ok('leads UI: the "→ Deal" button is hidden once converted (no re-convert)', /l\.converted\?[\s\S]*?:`<button data-deal=/.test(leads));
-ok('leads UI: reflects idempotent server response ("already in your pipeline")', /already_converted\?'This enquiry is already in your pipeline\.'/.test(leads));
-ok('wording: "Website enquiry" terminology used consistently', /website enquiry/i.test(leads) && /website enquiry/i.test(commercial));
+ok('Inbox enquiry pane: converted enquiry shows "in pipeline — view deal" deep link (opens the Client Record)', /l\.converted\?`<a class="btnlink" href="\/crm\.html\?deal=\$\{esc\(l\.deal_id\|\|''\)\}&tab=deal"[^>]*>✓ In pipeline — view deal<\/a>`/.test(inbox));
+ok('Inbox enquiry pane: the "→ Deal" button is hidden once converted (no re-convert)', /l\.converted\?[\s\S]*?:`<button id="leadDeal"/.test(inbox));
+ok('Inbox enquiry pane: reflects idempotent server response ("already in your pipeline")', /already_converted\?'This enquiry is already in your pipeline\.'/.test(inbox));
+ok('wording: "Website enquiry" terminology used consistently', /website enquiry/i.test(inbox) && /website enquiry/i.test(commercial));
 
 // migration
 ok('migration: status widened with terminal converted + dedupe index', /check \(status in \('new','read','archived','converted'\)\)/.test(mig) && /presence_deals_source_submission_idx/.test(mig));

@@ -19,7 +19,7 @@ const pipeline = read('pipeline.html');
 const projects = read('projects.html');
 const customers = read('customers.html');
 const contacts = read('contacts.html');
-const leads = read('leads.html');
+const inbox = read('inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
 const agency = read('agency.html');
 
 // ═══ Resolver (backend) ═══
@@ -61,7 +61,7 @@ ok('EMBED: projects.html supports ?embed=1 (hides shell + list)', /dds-embed/.te
 // ═══ Every entry point opens the record ═══
 ok('ENTRY: customers roster opens the record', /crm\.html\?client='\+encodeURIComponent\(c\.customer_site_id\)/.test(customers));
 ok('ENTRY: contacts open the record (Details tab), not a here-only modal', /\/crm\.html\?contact='\+encodeURIComponent\(id\)\+'&tab=details'/.test(contacts));
-ok('ENTRY: leads "view deal" + convert open the record (Deal tab)', /\/crm\.html\?deal=/.test(leads));
+ok('ENTRY: the Inbox enquiry pane\'s "view deal" + convert open the record (Deal tab)', /\/crm\.html\?deal=/.test(inbox));
 ok('ENTRY: agency opens the record', /crm\.html\?project=/.test(agency));
 
 // ═══ Unified messaging → the ONE activity timeline (Salesforce anatomy) ═══

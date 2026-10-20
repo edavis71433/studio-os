@@ -1,21 +1,44 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
 
-// CRM surfaces: the leads inbox (leads.html) and the relationship view (crm.html).
-test.describe('Leads inbox', () => {
-  test('renders leads with kind + a Reply that opens a prefilled composer (mail app only as the fallback)', async ({ page }) => {
+// CRM surfaces: website enquiries (the Inbox's Enquiries view) and the
+// relationship view (crm.html).
+//
+// Oct 2026 workflow audit, change 5: the Enquiries page (leads.html) folded into
+// the Inbox. Every test that pinned it now pins the same behaviour in the
+// Inbox's Enquiries view: the queue lists every enquiry, one row each; picking
+// one opens its card in the reading pane with the reply composer and the
+// triage actions (→ Deal · Make customer · Mark read · Not a fit · Spam).
+// Default fixtures (helpers/app.ts): l1 Sam Rivera (quote, new, Jul 7) and
+// l2 Dana Lee (message, read, Jul 2).
+type Page = import('@playwright/test').Page;
+const ENQ = '/inbox.html#enquiries';
+const rowOf = (page: Page, name: string) => page.locator('#rows [role=option]').filter({ hasText: name });
+const queue = (page: Page) => page.locator('#rows [role=option]');
+// pick a row; the pane opens on it (on phones the list steps aside)
+async function pick(page: Page, name: string) {
+  await rowOf(page, name).click();
+  await expect(page.locator('#rpane .pname')).toContainText(name);
+  return page.locator('#rpane');
+}
+// back to the list — a no-op where both panes show
+async function backToList(page: Page) {
+  const back = page.locator('#paneBack');
+  if (await back.isVisible()) await back.click();
+}
+
+test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
+  test('lists every enquiry with its kind; picking one opens a prefilled reply (mail app only as the fallback)', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    const leads = page.locator('.lead');
-    await expect(leads).toHaveCount(2);                       // Open filter: both non-archived
-    await expect(page.getByText('Sam Rivera')).toBeVisible();
-    await expect(page.getByText('Quote request')).toBeVisible();
-    await leads.first().getByRole('button', { name: 'Reply' }).click();
-    const box = leads.first().locator('.lcompose');
-    await expect(box.locator('textarea')).toBeFocused();
-    await expect(box.locator('textarea')).toHaveValue(/^Hi Sam,/);
+    await page.goto(ENQ);
+    await expect(page.locator('#viewBtn')).toContainText('Enquiries');
+    await expect(queue(page)).toHaveCount(2);                     // Open: both non-archived
+    await expect(rowOf(page, 'Sam Rivera')).toContainText('Quote request');
+    const pane = await pick(page, 'Sam Rivera');
+    const ta = pane.locator('#leadBody');
+    await expect(ta).toHaveValue(/^Hi Sam,/);
     // the page URI-encodes the recipient (encodeURIComponent), so '@' → '%40'
-    const fb = box.getByRole('link', { name: 'Use your email app instead' });
+    const fb = pane.getByRole('link', { name: 'Use your email app instead' });
     await expect(fb).toHaveAttribute('href', /^mailto:sam%40example\.com/);
     await expect(fb).toHaveAttribute('href', /subject=/);  // prefilled subject
   });
@@ -23,142 +46,137 @@ test.describe('Leads inbox', () => {
   // ── Oct 2026 workflow audit, change 5: the reply is sent from Studio OS ──
   test('Send reply POSTs the text, marks the enquiry Replied, and shows what was sent', async ({ page }) => {
     await installApp(page, { api: { '/forms/inbox/l1/reply': { data: { sent: true, status: 'replied' } } } });
-    await page.goto('/leads.html');
-    const card = page.locator('.lead').first();
-    await card.getByRole('button', { name: 'Reply' }).click();
-    await card.locator('.lcompose textarea').fill('Hi Sam,\n\nHappy to quote — what size is the patio?');
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.locator('#leadBody').fill('Hi Sam,\n\nHappy to quote — what size is the patio?');
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1\/reply$/.test(new URL(r.url()).pathname));
-    await card.getByRole('button', { name: 'Send reply' }).click();
+    await pane.getByRole('button', { name: 'Send reply' }).click();
     expect((await post).postDataJSON()).toEqual({ body: 'Hi Sam,\n\nHappy to quote — what size is the patio?' });
     await expect(page.locator('.dds-toast')).toContainText('Sent to sam@example.com');
-    const sent = page.locator('.lead').first();
-    await expect(sent.locator('.lreply')).toContainText('what size is the patio?');
-    await expect(sent.locator('.stchip')).toHaveText(/Replied/);
+    await expect(pane.locator('.lreply')).toContainText('what size is the patio?');
+    await expect(pane.locator('.stchip')).toHaveText('Replied');
+    await expect(rowOf(page, 'Sam Rivera')).toContainText('Replied');   // the row says where it went
   });
 
   test('a send that fails keeps the words and says nothing went out', async ({ page }) => {
     await installApp(page);
     await page.route('**/functions/v1/presence/forms/inbox/l1/reply', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'not_sent', message: 'We couldn’t send that just now — nothing went out.' }) }));
-    await page.goto('/leads.html');
-    const card = page.locator('.lead').first();
-    await card.getByRole('button', { name: 'Reply' }).click();
-    await card.locator('.lcompose textarea').fill('Hi Sam, yes we can.');
-    await card.getByRole('button', { name: 'Send reply' }).click();
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.locator('#leadBody').fill('Hi Sam, yes we can.');
+    await pane.getByRole('button', { name: 'Send reply' }).click();
     await expect(page.locator('.dds-toast')).toContainText('nothing went out');
-    await expect(card.locator('.lcompose textarea')).toHaveValue('Hi Sam, yes we can.');
-    await expect(card.getByRole('button', { name: 'Send reply' })).toBeEnabled();
+    await expect(pane.locator('#leadBody')).toHaveValue('Hi Sam, yes we can.');
+    await expect(pane.getByRole('button', { name: 'Send reply' })).toBeEnabled();
   });
 
   test('an untouched greeting is not sent', async ({ page }) => {
     let posts = 0;
     await installApp(page);
     page.on('request', (r) => { if (r.method() === 'POST' && /\/reply$/.test(new URL(r.url()).pathname)) posts++; });
-    await page.goto('/leads.html');
-    const card = page.locator('.lead').first();
-    await card.getByRole('button', { name: 'Reply' }).click();
-    await card.getByRole('button', { name: 'Send reply' }).click();
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.getByRole('button', { name: 'Send reply' }).click();
     await expect(page.locator('.dds-toast')).toContainText('Write your reply first.');
     expect(posts).toBe(0);
   });
 
-  test('the new-lead filter shows only unread', async ({ page }) => {
+  test('the New chip shows only unread', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    await page.locator('[data-f="new"]').click();
-    await expect(page.locator('.lead')).toHaveCount(1);
-    await expect(page.getByText('Sam Rivera')).toBeVisible();
+    await page.goto(ENQ);
+    await page.locator('[data-ef="new"]').click();
+    await expect(queue(page)).toHaveCount(1);
+    await expect(queue(page).first()).toContainText('Sam Rivera');
   });
 
-  test('marking a lead read confirms with a toast', async ({ page }) => {
+  test('marking an enquiry read POSTs the status and confirms with a toast', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    await page.locator('[data-read]').first().click();
-    // the page prefers the shell's shared toast (window.ddsToast → .dds-toast)
-    // over its own #toast fallback
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1$/.test(new URL(r.url()).pathname));
+    await pane.getByRole('button', { name: 'Mark read' }).click();
+    expect((await req).postDataJSON()).toEqual({ status: 'read' });
     await expect(page.locator('.dds-toast')).toContainText('Marked read.');
+    await expect(pane.getByRole('button', { name: 'Mark read' })).toHaveCount(0);
   });
 
-  test('signed-out shows a sign-in prompt, not leads', async ({ page }) => {
+  test('signed-out shows a sign-in prompt, not enquiries', async ({ page }) => {
     await installApp(page, { session: null });
-    await page.goto('/leads.html');
+    await page.goto(ENQ);
     // scope to the page body — the signed-out shell also shows a "Sign in" icon link
     await expect(page.locator('#main').getByRole('link', { name: /Sign in/ })).toBeVisible();
-    await expect(page.locator('.lead')).toHaveCount(0);
+    await expect(queue(page)).toHaveCount(0);
   });
 
   // ── SS6 (C2/C5/C7): search · honest filter group · REQ_SEQ ────────────────
-  test('boots quiet: one h1, the search bar, zero console errors', async ({ page }) => {
+  test('boots quiet: one h1, the search bar, the counted chips, New enquiry, zero console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await installApp(page);
-    await page.goto('/leads.html');
-    await expect(page.getByRole('heading', { level: 1, name: 'Website enquiries' })).toBeVisible();
+    await page.goto(ENQ);
+    await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeAttached();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#q')).toBeVisible();
-    await expect(page.locator('.lmeta')).toContainText('2 enquiries · 1 new · Updated just now');
-    // visual refresh: the page sits under a Website › Enquiries breadcrumb, with
-    // the New enquiry action beside the title and counts on the Open/New chips
-    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
-    await expect(crumbs.getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
-    await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Enquiries');
+    await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new · Sorted by newest');
     await expect(page.getByRole('button', { name: 'New enquiry' })).toBeVisible();
-    await expect(page.locator('.filters [data-f="open"] .n')).toHaveText('2');
-    await expect(page.locator('.filters [data-f="new"] .n')).toHaveText('1');
-    await expect(page.locator('.filters [data-f="all"] .n')).toHaveCount(0);
+    await expect(page.locator('.efilt [data-ef="open"] .n')).toHaveText('2');
+    await expect(page.locator('.efilt [data-ef="new"] .n')).toHaveText('1');
+    await expect(page.locator('.efilt [data-ef="all"] .n')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test('a card carries the refreshed anatomy: initials avatar · kind chip · time · email · message · the action row', async ({ page }) => {
+  test('a row and its card carry the anatomy: avatar · kind · time · email · message · the action row', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    const sam = page.locator('.lead').filter({ hasText: 'Sam Rivera' });
-    await expect(sam).toHaveClass(/\bnew\b/);                       // unread rows keep the accent edge
-    await expect(sam.locator('.av')).toHaveText('SR');
-    await expect(sam.locator('.kindtag')).toHaveText('Quote request');
-    await expect(sam.locator('.when')).toContainText('ago');
-    await expect(sam.locator('.contact a')).toHaveAttribute('href', 'mailto:sam@example.com');
-    await expect(sam.locator('.msg')).toHaveText('Can I get a quote for a patio?');
-    // the action row, in the board's order; Spam is the quiet one at the end
-    const acts = sam.locator('.acts');
-    await expect(acts.locator('button.reply[data-compose]')).toHaveText(/Reply/);   // opens the in-card composer (audit change 5)
-    await expect(acts.locator('[data-deal]')).toHaveText('→ Deal');
-    await expect(acts.locator('[data-convert]')).toHaveText('Make customer');
-    await expect(acts.locator('[data-read]')).toHaveText('Mark read');
-    await expect(acts.locator('[data-arch]')).toHaveText('Not a fit');
-    await expect(acts.locator('button.quiet[data-spam]')).toHaveText(/Spam/);
-    // a read row (Dana) shows no Mark read and a one-letter-pair avatar of its own
-    const dana = page.locator('.lead').filter({ hasText: 'Dana Lee' });
-    await expect(dana).not.toHaveClass(/\bnew\b/);
-    await expect(dana.locator('[data-read]')).toHaveCount(0);
-    await expect(dana.locator('.av')).toHaveText('DL');
+    await page.goto(ENQ);
+    const sam = rowOf(page, 'Sam Rivera');
+    await expect(sam.locator('.unread-dot')).toHaveCount(1);         // unread rows keep their dot
+    await expect(sam.locator('.avatar')).toHaveText('SR');
+    await expect(sam.locator('.rchip')).toHaveText('Quote request');
+    await expect(sam.locator('.rwhen')).toContainText('ago');
+    await expect(sam.locator('.txt')).toHaveText('Can I get a quote for a patio?');
+    const pane = await pick(page, 'Sam Rivera');
+    await expect(pane.locator('.card a[href^="mailto:"]')).toHaveAttribute('href', 'mailto:sam@example.com');
+    await expect(pane.locator('.card .body').first()).toHaveText('Can I get a quote for a patio?');
+    // the action row, in the old board's order; Spam is the quiet one at the end
+    const acts = pane.locator('.acts');
+    await expect(acts.locator('button')).toHaveText(['→ Deal', 'Make customer', 'Mark read', 'Not a fit', /Spam/]);
+    await expect(acts.locator('button.quiet')).toHaveText(/Spam/);
+    // a read row (Dana) has no dot, its own initials, and no Mark read
+    await backToList(page);
+    const dana = rowOf(page, 'Dana Lee');
+    await expect(dana.locator('.unread-dot')).toHaveCount(0);
+    await expect(dana.locator('.avatar')).toHaveText('DL');
+    const dpane = await pick(page, 'Dana Lee');
+    await expect(dpane.getByRole('button', { name: 'Mark read' })).toHaveCount(0);
   });
 
   test('the kind filter and the sort re-render the list only — the search input node survives', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
+    await page.goto(ENQ);
     const q = page.locator('#q');
     await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
     // kind: only the quote request
     await page.locator('#kindf').selectOption('quote');
-    await expect(page.locator('.lead')).toHaveCount(1);
-    await expect(page.locator('.lead').first()).toContainText('Sam Rivera');
-    await expect(page.locator('.lmeta')).toContainText('1 enquiry');
+    await expect(queue(page)).toHaveCount(1);
+    await expect(queue(page).first()).toContainText('Sam Rivera');
+    await expect(page.locator('#lmeta')).toContainText('1 enquiry');
     // a kind nobody matches stays honest
     await page.locator('#kindf').selectOption('booking');
-    await expect(page.locator('#main')).toContainText('No enquiries match that filter');
+    await expect(page.locator('#rows')).toContainText('No enquiries match that filter');
     await page.locator('#kindf').selectOption('all');
-    await expect(page.locator('.lead')).toHaveCount(2);
+    await expect(queue(page)).toHaveCount(2);
     // sort: newest first by default (Sam, Jul 7), oldest flips it (Dana, Jul 2)
-    await expect(page.locator('.lead').first()).toContainText('Sam Rivera');
+    await expect(queue(page).first()).toContainText('Sam Rivera');
     await page.locator('#sortf').selectOption('oldest');
-    await expect(page.locator('.lead').first()).toContainText('Dana Lee');
+    await expect(queue(page).first()).toContainText('Dana Lee');
+    await expect(page.locator('#lmeta')).toContainText('Sorted by oldest');
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
   });
 
   test('New enquiry logs a phone/walk-in enquiry through the EXISTING contact + deal routes, then opens the deal', async ({ page }) => {
     await installApp(page, { api: { '/sales/contacts': { data: { id: 'ct-9' } }, '/sales/deals': { data: { id: 'd-9' } } } });
-    await page.goto('/leads.html');
+    await page.goto(ENQ);
     const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
     page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/presence/sales/')) posts.push({ path: new URL(r.url()).pathname.replace(/^.*\/presence/, ''), body: r.postDataJSON() }); });
     await page.getByRole('button', { name: 'New enquiry' }).click();
@@ -180,9 +198,9 @@ test.describe('Leads inbox', () => {
 
   test('New enquiry with nothing filled in asks for a name, email, or phone — and posts nothing', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
+    await page.goto(ENQ);
     let posts = 0;
-    page.on('request', (r) => { if (r.method() === 'POST') posts++; });
+    page.on('request', (r) => { if (r.method() === 'POST' && !/\/threads\/read$|\/notifications\/read$/.test(new URL(r.url()).pathname)) posts++; });
     await page.getByRole('button', { name: 'New enquiry' }).click();
     await page.locator('dialog#newDlg[open]').getByRole('button', { name: 'Log enquiry' }).click();
     await expect(page.locator('.dds-toast')).toContainText('A name, email, or phone is enough to start.');
@@ -190,42 +208,46 @@ test.describe('Leads inbox', () => {
     await expect(page.locator('dialog#newDlg[open]')).toBeVisible();   // still open to finish
   });
 
-  test('C2 — search filters the queue client-side without rebuilding the input', async ({ page }) => {
+  test('C2 — search filters the queue (name, email, message) without rebuilding the input', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    await expect(page.locator('.lead')).toHaveCount(2);
+    await page.goto(ENQ);
+    await expect(queue(page)).toHaveCount(2);
     const q = page.locator('#q');
     // mark the live input node: list-only re-renders must never replace it
     await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
     await q.pressSequentially('dana');
-    await expect(page.locator('.lead')).toHaveCount(1);
-    await expect(page.locator('.lead').first()).toContainText('Dana Lee');
+    await expect(queue(page)).toHaveCount(1);
+    await expect(queue(page).first()).toContainText('Dana Lee');
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
     // the meta line reflects what the queue shows (C7 vocabulary: count + new)
-    await expect(page.locator('.lmeta')).toContainText('1 enquiry');
+    await expect(page.locator('#lmeta')).toContainText('1 enquiry');
+    // an enquiry also answers to its email address
+    await q.fill('sam@example');
+    await expect(queue(page)).toHaveCount(1);
+    await expect(queue(page).first()).toContainText('Sam Rivera');
     await q.fill('');
-    await expect(page.locator('.lead')).toHaveCount(2);
-    // no-match stays honest, never a blank page
+    await expect(queue(page)).toHaveCount(2);
+    // no-match stays honest, never a blank list
     await q.fill('zzz-nobody');
-    await expect(page.locator('#main')).toContainText('No enquiries match');
+    await expect(page.locator('#rows')).toContainText('No enquiries match “zzz-nobody”');
   });
 
-  test('C5 — the status filters are an honest role=group with aria-pressed (no fake tablist)', async ({ page }) => {
+  test('C5 — the status chips are an honest role=group with aria-pressed (no fake tablist)', async ({ page }) => {
     await installApp(page);
-    await page.goto('/leads.html');
-    const filters = page.locator('.filters');
+    await page.goto(ENQ);
+    const filters = page.locator('.efilt');
     await expect(filters).toHaveAttribute('role', 'group');
     await expect(filters.locator('[role=tab]')).toHaveCount(0);
-    await expect(filters.locator('[data-f="open"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(filters.locator('[data-f="new"]')).toHaveAttribute('aria-pressed', 'false');
-    await filters.locator('[data-f="new"]').click();
-    await expect(filters.locator('[data-f="new"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(filters.locator('[data-f="open"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect(filters.locator('[data-ef="open"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(filters.locator('[data-ef="new"]')).toHaveAttribute('aria-pressed', 'false');
+    await filters.locator('[data-ef="new"]').click();
+    await expect(filters.locator('[data-ef="new"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(filters.locator('[data-ef="open"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('REQ_SEQ — a slow superseded load never paints over the newest one', async ({ page }) => {
     await installApp(page);
-    const sub = (id: string, name: string) => ({ id, form_kind: 'contact', name, email: 'x@example.com', phone: '', message: 'Hi', source_page: '/', status: 'new', created_at: '2026-07-07T00:00:00Z' });
+    const sub = (id: string, name: string) => ({ id, form_kind: 'contact', name, email: `${id}@example.com`, phone: '', message: 'Hi', source_page: '/', status: 'new', created_at: '2026-07-07T00:00:00Z' });
     let call = 0;
     // registered AFTER installApp so it wins for the list GET only (the POST
     // status routes carry an /:id segment and fall through to the harness)
@@ -237,16 +259,106 @@ test.describe('Leads inbox', () => {
       if (call === 2) { setTimeout(() => { fulfill([sub('l2', 'Stale Lead')]).catch(() => {}); }, 700); return; }
       return fulfill(call === 1 ? [sub('l1', 'Boot Lead')] : [sub('l3', 'Fresh Lead')]);
     });
-    await page.goto('/leads.html');
-    await expect(page.locator('.lead')).toContainText(['Boot Lead']);
+    await page.goto(ENQ);
+    await expect(queue(page)).toContainText(['Boot Lead']);
     // two refreshes in quick succession: the FIRST response is delayed and lands
     // last — the page must keep the newest request's rows, not the stale ones
     await page.locator('#refreshBtn').click();
     await page.locator('#refreshBtn').click();
-    await expect(page.locator('.lead')).toContainText(['Fresh Lead']);
+    await expect(queue(page)).toContainText(['Fresh Lead']);
     await page.waitForTimeout(900);   // let the stale response land
-    await expect(page.locator('.lead')).toContainText(['Fresh Lead']);
-    await expect(page.locator('#main')).not.toContainText('Stale Lead');
+    await expect(queue(page)).toContainText(['Fresh Lead']);
+    await expect(page.locator('#rows')).not.toContainText('Stale Lead');
+  });
+
+  // ── the triage that moved with the page (Phase 2 + Phase 4) ────────────────
+  test('Make customer sets them up from the enquiry (POST /sales/customers with its id) + an optional deal, then opens their record', async ({ page }) => {
+    await installApp(page, { api: {
+      '/sales/customers': { data: { site_id: 's-new', client_id: 'c-new' } },
+      '/sales/contacts': { data: { id: 'ct-1' } },
+      '/sales/deals': { data: { id: 'd-1' } },
+    } });
+    await page.goto(ENQ);
+    const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/presence/sales/')) posts.push({ path: new URL(r.url()).pathname.replace(/^.*\/presence/, ''), body: r.postDataJSON() }); });
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.getByRole('button', { name: 'Make customer' }).click();
+    const dlg = page.locator('dialog#convDlg[open]');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('#conv-biz')).toHaveValue('Sam Rivera');
+    await expect(dlg.locator('#conv-email')).toHaveValue('sam@example.com');
+    await expect(dlg.locator('#conv-deal')).toBeChecked();
+    await dlg.locator('#conv-biz').fill('Rivera Patios');
+    await dlg.getByRole('button', { name: 'Make customer' }).click();
+    await page.waitForURL(/crm\.html\?client=s-new/);
+    expect(posts.map((p) => p.path)).toEqual(['/sales/customers', '/sales/contacts', '/sales/deals']);
+    expect(posts[0].body).toEqual({ email: 'sam@example.com', name: 'Sam Rivera', business_name: 'Rivera Patios', source_submission_id: 'l1' });
+    expect(posts[2].body).toMatchObject({ title: 'Rivera Patios', contact_id: 'ct-1', source: 'website_form', source_submission_id: 'l1' });
+  });
+
+  test('Make customer without the deal posts only the customer', async ({ page }) => {
+    await installApp(page, { api: { '/sales/customers': { data: { site_id: 's-new' } } } });
+    await page.goto(ENQ);
+    const paths: string[] = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/presence/sales/')) paths.push(new URL(r.url()).pathname.replace(/^.*\/presence/, '')); });
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.getByRole('button', { name: 'Make customer' }).click();
+    const dlg = page.locator('dialog#convDlg[open]');
+    await dlg.locator('#conv-deal').uncheck();
+    await dlg.getByRole('button', { name: 'Make customer' }).click();
+    await page.waitForURL(/crm\.html\?client=s-new/);
+    expect(paths).toEqual(['/sales/customers']);
+  });
+
+  test('Not a fit POSTs not_a_fit: the enquiry leaves Open, and All still shows where it went', async ({ page }) => {
+    await installApp(page);
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1$/.test(new URL(r.url()).pathname));
+    await pane.getByRole('button', { name: 'Not a fit' }).click();
+    expect((await req).postDataJSON()).toEqual({ status: 'not_a_fit' });
+    await expect(page.locator('.dds-toast')).toContainText('Marked not a fit');
+    await expect(queue(page)).toHaveCount(1);                // off the Open list…
+    await expect(page.locator('#rows')).toBeFocused();       // …and focus is back on the list, never <body>
+    await page.locator('[data-ef="all"]').click();
+    await expect(rowOf(page, 'Sam Rivera')).toContainText('Not a fit');   // …but All shows it
+  });
+
+  test('Spam POSTs spam:true and the enquiry is gone everywhere', async ({ page }) => {
+    await installApp(page);
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Dana Lee');
+    const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l2$/.test(new URL(r.url()).pathname));
+    await pane.locator('button.quiet', { hasText: 'Spam' }).click();
+    expect((await req).postDataJSON()).toEqual({ spam: true });
+    await expect(page.locator('.dds-toast')).toContainText('Marked as spam');
+    await page.locator('[data-ef="all"]').click();
+    await expect(queue(page)).toHaveCount(1);
+    await expect(page.locator('#rows')).not.toContainText('Dana Lee');
+  });
+
+  test('a converted enquiry shows “✓ In pipeline — view deal” instead of the conversion actions', async ({ page }) => {
+    await installApp(page, { api: { '/forms/inbox': { data: { submissions: [
+      { id: 'l1', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'converted', converted: true, deal_id: 'd-7', created_at: '2026-07-07T00:00:00Z' },
+    ], unread: 0 } } } });
+    await page.goto(ENQ);
+    await expect(rowOf(page, 'Sam Rivera')).toContainText('In pipeline');
+    const pane = await pick(page, 'Sam Rivera');
+    await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toHaveAttribute('href', '/crm.html?deal=d-7&tab=deal');
+    for (const name of ['→ Deal', 'Make customer', 'Not a fit']) await expect(pane.getByRole('button', { name })).toHaveCount(0);
+    await expect(pane.locator('button.quiet')).toHaveCount(0);
+  });
+
+  test('→ Deal turns the enquiry into a deal and the card flips to “In pipeline”', async ({ page }) => {
+    await installApp(page, { api: { '/sales/contacts': { data: { id: 'ct-1' } }, '/sales/deals': { data: { id: 'd-5' }, already_converted: true } } });
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    const deal = page.waitForRequest((r) => r.method() === 'POST' && /\/sales\/deals$/.test(new URL(r.url()).pathname));
+    await pane.getByRole('button', { name: '→ Deal' }).click();
+    expect((await deal).postDataJSON()).toMatchObject({ contact_id: 'ct-1', source: 'website_form', source_submission_id: 'l1' });
+    // already_converted: no navigation, the card says where it is
+    await expect(page.locator('.dds-toast')).toContainText('This enquiry is already in your pipeline.');
+    await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toHaveAttribute('href', '/crm.html?deal=d-5&tab=deal');
   });
 });
 
