@@ -13,6 +13,7 @@ import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
+import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor } from '../lib/navigation.ts';
 import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
@@ -278,6 +279,15 @@ const NOTICE_HREF: Record<string, string> = {
   client_approval: '/presence.html#activity',  // a client decided an approval → Recent activity (matches approval_decided)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
+// A notice whose period names ONE row deep-links that row (Oct 2026 audit, gap 2):
+// lead_followup's period is `lead:<id>` (commercial.ts leadFollowupNoticeKey), so
+// its href selects that enquiry in the Inbox's Enquiries view — the reply is one
+// click away instead of two. Every other kind keeps its kind-only landing.
+export const noticeHrefFor = (n: { kind: string; period?: string | null }): string => {
+  const base = noticeHref(n.kind);
+  const id = n.kind === 'lead_followup' ? leadIdOfNoticePeriod(n.period) : null;
+  return id ? `${base}?sel=lead:${id}` : base;
+};
 
 /** The client portal's read: only what's shared with the reviewer — shared
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
@@ -373,7 +383,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
   // the server would refuse, and refuses one the client never drew. Synthetic rows
   // below carry no id/period at all; the client's UUID guard is what excludes them.
-  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHref(n.kind), dismissible: noticeDismissible(n.kind, n.period) }));
+  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing

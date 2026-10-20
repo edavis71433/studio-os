@@ -1012,5 +1012,26 @@ test.describe('Inbox — reply to an enquiry in place', () => {
     expect((await post).postDataJSON()).toEqual({ body: 'Hi Sam — yes, we do patios. Can you send a photo?' });
     await expect(page.locator('.lreply')).toContainText('Can you send a photo?');
   });
+
+  // Oct 2026 audit, gap 2: the lead_followup notice deep-links its row, so the
+  // reply is one click from the nudge (Take care of it → Send reply), not two.
+  test('#enquiries?sel=lead:<id> opens that enquiry on arrival — composer ready, row selected, no click', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#enquiries?sel=lead:l-9');
+    await expect(page.getByRole('textbox', { name: 'Reply to Sam Rivera' })).toHaveValue(/^Hi Sam,/);
+    // (a CSS locator: on phones the open pane hides the list, which drops its rows from the a11y tree)
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toHaveCount(1);
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toContainText('Sam Rivera');
+    await expect(page.locator('#viewBtn')).toContainText('Enquiries');   // the view part of the hash still lands
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeVisible();
+  });
+
+  test('a ?sel= that names no row is ignored — the view opens as before, nothing invented', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#enquiries?sel=lead:nope');
+    await expect(page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' })).toHaveAttribute('aria-selected', 'false');
+    await expect(page.locator('#rows .row[aria-selected="true"]')).toHaveCount(0);
+    await expect(page.locator('#viewBtn')).toContainText('Enquiries');
+  });
 });
 

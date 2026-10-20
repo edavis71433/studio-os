@@ -12,7 +12,7 @@ test.describe('Today', () => {
     await expect(todo).toHaveCount(2); // 1 notice + 1 approval
     await expect(page.locator('.moment.todo').first()).toContainText('A quote request is waiting for a reply');
     // a notice row is a CONTAINER (link + a sibling Done button); the link is inside it
-    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries');
+    await expect(page.locator('.moment.todo').first().locator('a.frow')).toHaveAttribute('href', '/inbox.html#enquiries?sel=lead:l1');   // the notice deep-links its row (audit gap 2)
     await expect(page.getByText('Protect your email')).toBeVisible();
     // the moment card + its dismiss affordance
     await expect(page.getByRole('heading', { name: 'Add your holiday hours' })).toBeVisible();
@@ -197,7 +197,7 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     await installApp(page);
     await page.goto(`/today.html?client=${CLIENT}`);
     const rows = page.locator('.feedcard .moment.todo');
-    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries`);
+    await expect(rows.first().locator('a.frow')).toHaveAttribute('href', `/inbox.html?client=${CLIENT}#enquiries?sel=lead:l1`);   // scope before the hash; the row deep link rides in the hash
     await expect(rows.nth(1)).toHaveAttribute('href', `/presence.html?client=${CLIENT}#foundations`);
   });
 

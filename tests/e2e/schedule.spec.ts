@@ -38,11 +38,36 @@ test.describe('Scheduling — one place, inside Publish', () => {
     await expect(rit.getByLabel('A note for yourself (optional)')).toBeVisible();
     // the job on screen is scheduling: publish-now steps back, Schedule it is filled
     await expect(rit.locator('#ritActions .pubbtn')).toHaveClass(/\bquiet\b/);
-    const bg = await rit.getByRole('button', { name: 'Schedule it' }).evaluate((b) => getComputedStyle(b).backgroundColor);
-    expect(bg).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
-    // Never mind puts publish-now back as the filled button
-    await rit.getByRole('button', { name: 'Never mind' }).click();
+    await expect.poll(() => rit.getByRole('button', { name: 'Schedule it' }).evaluate((b) => getComputedStyle(b).backgroundColor)).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+    // focus leaving the panel for something else puts publish-now back as the filled button
+    await rit.getByRole('button', { name: /Not yet/ }).focus();
     await expect(rit.locator('#ritActions .pubbtn')).not.toHaveClass(/\bquiet\b/);
+  });
+
+  // Oct 2026 audit, gap 1: from the menu, Website → Publish → Schedule it is three
+  // clicks. The panel is on the page the moment the ritual opens; it rests
+  // (Schedule it outlined, publish-now filled) until it holds focus.
+  test('the publish page opens with the schedule panel already on it — resting until the date field has focus', async ({ page }) => {
+    await installApp(page, { api: PRESENCE });
+    await page.goto('/presence.html#publish');
+    const rit = page.locator('#ritualWrap');
+    await expect(rit).toHaveClass(/\bon\b/);
+    const date = rit.getByLabel('Publish these changes at');
+    await expect(date).toBeVisible();   // no "Publish later" click in between
+    const go = rit.getByRole('button', { name: 'Schedule it' });
+    const transparent = /rgba\(0, 0, 0, 0\)|transparent/;
+    // resting: publish-now is the one filled button, Schedule it is outlined
+    await expect(rit.locator('#ritActions .pubbtn')).not.toHaveClass(/\bquiet\b/);
+    expect(await go.evaluate((b) => getComputedStyle(b).backgroundColor)).toMatch(transparent);
+    // armed: the panel holds focus → Schedule it is filled, publish-now steps back
+    // (a click, not focus(): WebKit's datetime field does not take programmatic focus)
+    await date.click();
+    await expect(rit.locator('#ritActions .pubbtn')).toHaveClass(/\bquiet\b/);
+    await expect.poll(() => go.evaluate((b) => getComputedStyle(b).backgroundColor)).not.toMatch(transparent);
+    // …and the third click schedules — no extra step between the menu and the POST
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/schedule$/.test(new URL(r.url()).pathname));
+    await go.click();
+    expect((await post).postDataJSON().kind).toBe('publish');
   });
 
   test('Schedule it POSTs the moment, kind publish and the note', async ({ page }) => {
