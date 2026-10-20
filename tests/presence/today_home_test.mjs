@@ -461,7 +461,7 @@ ok('portal: a failed website-stats read is never cached (false sentinel + cleare
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
 ok('portal: explicit CTAs whose accessible names keep the row title',
-  portal.includes('aria-label="Review &amp; approve — ') && portal.includes('aria-label="View &amp; pay — ')
+  portal.includes('aria-label="Approve — ') && portal.includes('aria-label="See it first — ') && portal.includes('aria-label="View &amp; pay — ')
   && portal.includes('aria-label="Open to-dos — '));
 ok('portal: opening the bell re-renders the messages tile WHOLE — number and pluralized label together',
   portal.includes("document.getElementById('glance-msgs')") && portal.includes('glanceTiles({newMsgs:0})[0]')
@@ -489,7 +489,7 @@ ok('portal: Recent-updates rows render momentIcon + the neutral Update chip + th
   portal.includes('momentIcon(m.moment_type)') && portal.includes('<span class="kchip">Update</span>')
   && portal.includes('<span class="qwhen">${esc(rel(m.created_at))}</span>'));
 ok('portal: the welcome tab-tour is gated on persona===client (reviewers are never toured)',
-  /function welcomeCardHtml\(\)\{\s*if\(welcomed\(\)\)return'';[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return'';/.test(portal));
+  /function welcomeCardHtml\(\)\{\s*if\(welcomed\(\)&&!WELCOME_THIS_VISIT\)return'';[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return'';/.test(portal));
 // PS3 (D4a + dead clicks): '#support-<rid>' hrefs land the Messages pane, and
 // navFromHref ends in the Home fallback — no notification click is ever dead.
 ok('portal: navFromHref routes #support-<rid> to the Messages pane and falls back to Home (no dead clicks)',
