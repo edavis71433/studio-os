@@ -127,6 +127,18 @@
   .badge{position:absolute;top:8px;left:8px;font-size:12px;font-weight:500;padding:2px 7px;border-radius:999px;background:var(--good-soft);color:var(--good);text-transform:capitalize}
   .badge.doc{background:var(--p-soft);color:var(--p)}
   .badge.pend{background:var(--warn-soft);color:var(--warn)}
+  /* Oct 2026 review: client-private files — the 🔒 chip on a row/tile, and the
+     "Private to this client" switch in the detail panel (the mock's .switch). */
+  .lock{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:500;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:1px 8px;margin-left:6px;white-space:nowrap;vertical-align:middle}
+  .tile .badge.lock{margin-left:0;background:var(--warn-soft);color:var(--warn)}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;font-weight:500;position:relative}
+  .switch input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .switch i{width:34px;height:20px;border-radius:999px;background:var(--p);position:relative;display:inline-block;transition:.15s;flex:0 0 auto}
+  .switch i:after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+  .switch.off i{background:var(--dds-line-strong,#d2d2db)} .switch.off i:after{right:auto;left:2px}
+  .switch input:focus-visible+i{outline:2px solid var(--p);outline-offset:2px}
+  .switch input:disabled+i{opacity:.5}
+  .privfield{margin-top:12px}
   .sbadge{display:inline-block;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;margin:4px 0;text-transform:capitalize}
   .sbadge.live{background:var(--good-soft);color:var(--good)} .sbadge.pending{background:var(--warn-soft);color:var(--warn)} .sbadge.approved{background:var(--p-soft);color:var(--p)} .sbadge.draft,.sbadge.archived{background:var(--line);color:var(--soft)}
   .sdash{color:var(--faint)}
@@ -248,7 +260,8 @@ const IC={
   person:'<circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.6"/>',
   studio:'<path d="M4 20V9.5L12 4l8 5.5V20z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 20v-6h5v6" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   people:'<circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 13.6a6.5 6.5 0 0 1 4 5.9" fill="none" stroke="currentColor" stroke-width="1.5"/>',
-  check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+  check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>'
 };
 const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
 
@@ -262,6 +275,7 @@ const COLS=[
   {key:'documents',label:'Documents',ic:'doc',f:{},kind:'document'},
   {key:'templates',label:'Templates',ic:'tpl',f:{collection:'Templates'}},
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
+  {key:'private',label:'Client-private',ic:'lock',f:{},priv:true},   // Oct 2026 review: files private to one client (0131)
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
 let S={col:'all',q:'',client:'',caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
@@ -320,11 +334,16 @@ let SORT={key:'added',dir:-1};   // newest first — the old "Recent" default
 //    → that rail row renders count-less rather than guessing. ──
 let RAILN={};
 function deriveRailCounts(rows,total){
-  RAILN.all=rows.length;
-  RAILN.fav=rows.filter(r=>r.favorite).length;
-  RAILN.photos=rows.filter(r=>r.kind==='image').length;
-  RAILN.documents=rows.filter(r=>r.kind==='document').length;
-  RAILN.brand=rows.filter(r=>r.brand).length;
+  // a client-private file is counted in ITS collection only — the shared views
+  // (All files, Favorites, Photos, Brand, Documents) never show it
+  const priv=rows.filter(r=>r.client_private);
+  RAILN.private=priv.length;
+  const shared=priv.length?rows.filter(r=>!r.client_private):rows;
+  RAILN.all=shared.length;
+  RAILN.fav=shared.filter(r=>r.favorite).length;
+  RAILN.photos=shared.filter(r=>r.kind==='image').length;
+  RAILN.documents=shared.filter(r=>r.kind==='document').length;
+  RAILN.brand=shared.filter(r=>r.brand).length;
   // /assets `total` counts every non-deleted row INCLUDING archived; the list
   // excludes archived — the difference is the Archive count. Exact only while
   // the library fits the read limit; beyond that stay honest and omit it.
@@ -446,6 +465,10 @@ function applyFilters(){
   const c=COLS.find(x=>x.key===S.col);
   if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
   if(c&&c.favs)rows=rows.filter(r=>r.favorite);
+  // Oct 2026 review (0131): a client-private file shows in the Client-private
+  // collection and under its own client's filter — never in a shared view
+  if(c&&c.priv)rows=rows.filter(r=>r.client_private);
+  else if(!S.client)rows=rows.filter(r=>!r.client_private);
   if(S.client==='studio')rows=rows.filter(r=>!r.client_id);
   else if(S.client)rows=rows.filter(r=>String(r.client_id||'')===S.client);
   S.assets=rows;
@@ -617,7 +640,7 @@ function lheadHtml(shown){
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${shown} file${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${shown} file${shown===1?'':'s'}${(()=>{const n=(S.full||[]).filter(r=>r.client_private).length;return n?` · ${n} private to a client`:'';})()} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </header>`;
 }
 function render(){
@@ -689,7 +712,7 @@ function tableHtml(rows){
     const ckTd=S.canEdit?`<td class="ck"><input type="checkbox" data-pick="${esc(a.id)}" aria-label="Select ${esc(a.name)}"${S.selected.has(a.id)?' checked':''}></td>`:'';
     return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
       ${ckTd}
-      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span></span></td>
+      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span>${a.client_private?`<span class="lock" title="Private to this client — not in the shared library or the site picker">🔒 Private${a.client_name?' to '+esc(a.client_name):''}</span>`:''}</span></td>
       ${RAILC.length?(()=>{const cl=clientLabel(a);return `<td class="cli" title="${esc(cl)}">${esc(cl)}</td>`;})():''}
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
@@ -739,7 +762,7 @@ function tile(a){
   // the Pending badge obeys the SAME honesty rule as the table's Status column
   // (stateShown) — otherwise Grid and Table would contradict each other about
   // the same file the moment a 'pending' row existed
-  const badge=(a.state==='pending'&&stateShown('pending'))?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
+  const badge=a.client_private?`<span class="badge lock" title="Private to this client">🔒 Private</span>`:(a.state==='pending'&&stateShown('pending'))?`<span class="badge pend">Pending</span>`:a.kind==='document'?`<span class="badge doc">PDF</span>`:'';
   const sel=S.selectMode&&S.selected.has(a.id);
   if(S.selectMode){
     return `<div class="tile ${sel?'sel':''}" data-pick="${a.id}" role="button" tabindex="0" aria-pressed="${sel?'true':'false'}" aria-label="${sel?'Deselect':'Select'} ${esc(a.name)}">
@@ -916,7 +939,8 @@ function renderDetail(){
     <button class="x" onclick="closeDetail()" aria-label="Close file details">×</button>
     <div class="pv" data-pvhost>${pv}</div>
     <div>${stateBadge}</div>${approvedLine}${approveCtrls}
-    <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}</div>
+    <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}${a.client_id?` · ${esc(clientLabel(a))}’s work`:''}</div>
+    ${a.client_id?`<div class="field privfield"><label class="switch${a.client_private?'':' off'}" for="f-private"><input type="checkbox" id="f-private"${a.client_private?' checked':''}${ed?'':' disabled'}><i aria-hidden="true"></i>Private to this client</label><div class="amuted" id="f-private-note">${a.client_private?`Only shows under ${esc(clientLabel(a))} and on their record. Never offered when you pick images for a site.`:'In the shared library and the site picker like any other file.'}</div></div>`:''}
     <div class="field"><label for="f-name">Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
     ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers.">${esc(a.alt_text||'')}</textarea></div>`:''}
     <div class="field"><label for="f-cap">Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
@@ -937,7 +961,23 @@ function renderDetail(){
       <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
   wirePreviews($('panel'));
+  const pv2=$('f-private'); if(pv2)pv2.onchange=()=>setPrivate(a.id,pv2.checked,pv2);
   if(a.kind==='image'){loadSocial(a.id);loadCards(a.id,'');}
+}
+// Oct 2026 review (0131): the switch writes straight away through the SAME
+// PATCH /assets/:id the details form uses; the panel stays open, the roster
+// re-reads so the rail counts and the shared views agree with the new flag.
+async function setPrivate(id,on,ctl){
+  if(ctl)ctl.disabled=true;
+  const r=await api('/assets/'+id,'PATCH',{client_private:on});
+  if(r.ok){
+    toast(on?'Private to this client — out of the shared library and the site picker.':'Back in the shared library.');
+    if(S.current&&S.current.asset.id===id){S.current.asset.client_private=on?true:undefined;renderDetail();}
+    load(true);
+  }else{
+    toast((r.body&&r.body.message)||'Could not change that');
+    if(ctl){ctl.checked=!on;ctl.disabled=false;}
+  }
 }
 // Focal-aware social crops (square / portrait / story / link-preview). The sizes are
 // the Visual Studio specs; each crop is a signed self-hosted transform. Set the

@@ -57,7 +57,7 @@ export const STUDIO_NAV = [
   { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
   // utilities — rendered in the profile/overflow menu, not the primary bar
   { key: 'connections', label: 'Connections', utility: true, items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
-  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/presence.html#settings' }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html' }] },
   { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
 ];
 

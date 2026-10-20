@@ -839,7 +839,7 @@ test.describe('deal page — Contact block (ask 2)', () => {
     await installApp(page, { api: CONTACT_API });
     await page.route(`**/functions/v1/presence/sales/contracts/k-1/send`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://example.test/sign/abc', emailed: false }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.goto(`/pipeline.html?deal=${DEAL3}&dtab=billing`);
     await page.locator('[data-send-contract="k-1"]').first().click();
     const toast = page.locator('.dds-toast');
     await expect(toast).toContainText('there’s no client email on this deal, so nothing was sent');
@@ -1002,11 +1002,16 @@ test.describe('services catalog — starter list (ask 1)', () => {
   });
 });
 
+// NOTE (Oct 2026 review): the deal page groups its sections under Overview ·
+// Billing · Activity tabs; every id/data-* hook below is unchanged, but the
+// proposal / agreement / invoice / convert controls live on the Billing tab, so
+// the tests that act on them open the deal at `&dtab=billing` (the deep link the
+// page's own openers use). Hidden-tab content still exists in the DOM.
 // ── CRM deal page (ask 4): the studio's real agreement is the default ────────
 test.describe('agreement form — the studio’s standard contract (ask 4)', () => {
   test('an empty agreement form opens with the real 19-section agreement, placeholders FILLED', async ({ page }) => {
     await installApp(page, { api: API });                                      // '/sales/templates': { data: [] } → no saved templates
-    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect(body).toBeVisible();
@@ -1041,7 +1046,7 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
     await installApp(page, { api: { ...API, '/sales/templates': saved } });
     await page.route('**/functions/v1/presence/sales/templates?with_body=contract', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: 'tpl-1', name: 'My agreement', title: 'My agreement', body: 'MY OWN WORDING for {{client_company}} — {{deal_value}}.' }] }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect.poll(async () => await body.inputValue(), { timeout: 7000 }).toContain('MY OWN WORDING');
@@ -1053,7 +1058,7 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
   test('a deal with no value and no contact degrades readably — no {{tokens}}, no misleading $0', async ({ page }) => {
     const BARE = { data: { ...CONTACTLESS.data, deal: { ...CONTACTLESS.data.deal, expected_value_cents: 0, title: '' }, contracts: [] } };
     await installApp(page, { api: { ...API, [`/sales/deals/${DEAL3}`]: BARE, [`/sales/deals/${DEAL3}/tasks`]: { data: [] } } });
-    await page.goto(`/pipeline.html?deal=${DEAL3}`);
+    await page.goto(`/pipeline.html?deal=${DEAL3}&dtab=billing`);
     await page.locator('#addCon').click();
     const body = page.locator('#conForm textarea');
     await expect.poll(async () => (await body.inputValue()).length, { timeout: 7000 }).toBeGreaterThan(10000);
@@ -1102,7 +1107,7 @@ test.describe('deal page — remove an unsent draft', () => {
       calls.push({ path, method: route.request().method() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
 
     // the draft row carries a Delete; the sent row carries none
     await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();
@@ -1132,7 +1137,7 @@ test.describe('deal page — remove an unsent draft', () => {
       calls.push({ path, method: route.request().method() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
 
     await expect(page.locator('[data-del-con="k-draft"]')).toBeVisible();
     await expect(page.locator('[data-del-con="k-signed"]')).toHaveCount(0);
@@ -1152,7 +1157,7 @@ test.describe('deal page — remove an unsent draft', () => {
       if (route.request().method() !== 'DELETE') return route.fallback();
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL4}`);
+    await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
     page.once('dialog', (d) => d.accept());
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('already sent');
@@ -1182,7 +1187,7 @@ const seeded = async (page: import('@playwright/test').Page) => {
 test.describe('agreement — one per package', () => {
   test('the form asks which package, defaults to the first, and seeds Growth with the deal’s fees', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
 
     // the chooser offers every shipped package, in order, and defaults sensibly
@@ -1214,7 +1219,7 @@ test.describe('agreement — one per package', () => {
 
   test('choosing Custom + Photography swaps to that agreement, scope and all', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await page.locator('#conPkg').selectOption('custom_photography');
@@ -1234,7 +1239,7 @@ test.describe('agreement — one per package', () => {
 
   test('choosing Template build seeds the published tier — SEO stays a bracketed option, never a promise', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await page.locator('#conPkg').selectOption('template_build');
@@ -1253,7 +1258,7 @@ test.describe('agreement — one per package', () => {
 
   test('the legal terms are byte-identical whichever package is chosen', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const growth = await seeded(page);
     await page.locator('#conPkg').selectOption('custom_photography');
@@ -1265,7 +1270,7 @@ test.describe('agreement — one per package', () => {
 
   test('switching away from words HE typed asks first; declining keeps them', async ({ page }) => {
     await installApp(page, { api: PKG_API });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     await conBody(page).fill('MY OWN WORDING, typed by hand.');
@@ -1293,7 +1298,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     let msg = '';
@@ -1310,7 +1315,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
     page.once('dialog', (d) => d.accept());
@@ -1325,7 +1330,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const text = await seeded(page);
     await conBody(page).fill(text.replace(/\[[A-Z]{2}[^\]\n]*\]/g, 'Squarespace'));
@@ -1341,7 +1346,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     const calls: string[] = [];
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: withBlanks } });
     await postsTo(page, calls);
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     let msg = '';
     page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
     await page.locator('[data-send-contract="k-blank"]').first().click();
@@ -1359,7 +1364,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: done } });
     await postsTo(page, calls);
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
-    await page.goto(`/pipeline.html?deal=${DEAL5}`);
+    await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('[data-send-contract="k-done"]').first().click();
     await expect.poll(() => calls).toContain('/sales/contracts/k-done/send');
     expect(dialogs).toBe(0);
@@ -1418,7 +1423,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
       saved = route.request().postData() || '';
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { term_end: '2027-07-15' } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     await expect(page.locator('#detailInner')).toContainText('reads as a 12-month term');
     await expect(page.locator('#con-term-k-sg')).toHaveValue('2027-07-15');      // signed 2026-07-15 + 12 months
     expect(saved).toBe('');                                                      // NOTHING was written yet — the default is only a prefill
@@ -1441,7 +1446,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     page.on('dialog', (d) => { dialogs++; d.dismiss(); });
     await page.route('**/functions/v1/presence/sales/contracts/k-dr/send', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-dr', status: 'sent' }, url: 'https://example.test/sign/x', emailed: true, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }) }));
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     await page.locator('[data-send-contract="k-dr"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('deposit request is ready — they can pay the moment they sign');
     expect(dialogs).toBe(0);                                                     // a valued deal warns about nothing
@@ -1457,7 +1462,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
       calls.push(new URL(route.request().url()).pathname);
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     let msg = '';
     page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
     await page.locator('[data-send-contract="k-bl"]').first().click();
@@ -1501,7 +1506,7 @@ test.describe('invoice — the Void control', () => {
 
   test('Void is offered on an OPEN invoice — sent or not — and never on a paid or already-voided one', async ({ page }) => {
     await installApp(page, { api: invApi([OPEN_SENT, OPEN_UNSENT, PAID, VOIDED]) });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     // The already-emailed invoice is exactly the one that needs withdrawing.
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
     await expect(page.locator(`[data-void-inv="${INV_UNSENT}"]`)).toBeVisible();
@@ -1516,7 +1521,7 @@ test.describe('invoice — the Void control', () => {
 
   test('the existing "Voided" render displays correctly now a row can reach that state', async ({ page }) => {
     await installApp(page, { api: invApi([VOIDED]) });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     const row = page.locator('.lr').filter({ hasText: 'Duplicate build' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('Voided');
@@ -1549,7 +1554,7 @@ test.describe('invoice — the Void control', () => {
       }
       return route.fallback();
     });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     // Destructive → confirms first, and declining sends nothing.
@@ -1577,7 +1582,7 @@ test.describe('invoice — the Void control', () => {
       if (route.request().method() !== 'POST') return route.fallback();
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
-    await page.goto(`/pipeline.html?deal=${DEAL6}`);
+    await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
     page.once('dialog', (d) => d.accept());
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
@@ -1731,5 +1736,97 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await expect.poll(() => calls).toContain(`/sales/invoices/${RINV1}/send`);
     // The re-read leaves both rows — a resend changes nothing to hide.
     await expect(page.locator('.rcv-row')).toHaveCount(2);
+  });
+});
+
+// ── Oct 2026 review: the deal page's tab strip ───────────────────────────────
+// Overview (details · to-dos · a Money card) · Billing (proposals, agreement,
+// invoices, retainer, convert) · Activity (quick-log + timeline). Every section
+// is still rendered — the tabs only toggle `hidden` — the URL mirrors the tab
+// (?dtab=), and the openers that live outside the strip switch tab first.
+const WON_DEAL = '88888888-8888-4888-8888-888888888888';
+const WON_DETAIL = { data: {
+  deal: { id: WON_DEAL, title: 'Bacchus rebuild', stage: 'won', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-bacchus', created_project_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Claud Beltran', email: 'claud@example.com', phone: '', company: 'Bacchus', notes: '' },
+  proposals: [], contracts: [{ id: 'k-w', title: 'Service agreement', status: 'signed', signer_name: 'Claud Beltran', signed_at: '2026-08-08T10:00:00.000Z', version: 1, terms_snapshot: { term_end: '2027-08-08' }, body: 'Agreed.' }],
+  events: [], timeline: [{ at: '2026-08-08T10:00:00.000Z', text: 'Agreement signed', icon: '✍️' }, { at: '2026-08-01T10:00:00.000Z', text: 'Proposal sent', icon: '📄' }],
+  invoices: [
+    { id: 'inv-paid', title: 'Deposit', amount_cents: 160000, purpose: 'deposit', status: 'paid', stripe_url: 'https://pay.example/d', due_date: null, paid_at: '2026-08-08T12:00:00.000Z' },
+    { id: 'inv-open', title: 'Balance', amount_cents: 160000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/b', due_date: null, paid_at: null },
+  ],
+  last_contacted_at: past(0),
+} };
+const TAB_API = { ...API, [`/sales/deals/${WON_DEAL}`]: WON_DETAIL, [`/sales/deals/${WON_DEAL}/tasks`]: { data: [] } };
+
+test.describe('deal page — Overview · Billing · Activity tabs', () => {
+  test('opens on Overview: details + to-dos + the Money card; Billing and Activity are rendered but hidden', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await expect(page.locator('#detailInner .tabs [data-dtab="overview"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#ed-cname')).toBeVisible();
+    await expect(page.locator('#dt-preset')).toBeVisible();
+    // the lifecycle bar sits above the tabs — visible on every tab
+    await expect(page.locator('#pathHost .pstep')).toHaveCount(4);
+    // the Money card reads the facts already on the deal read
+    const money = page.locator('#dpanel-overview .dkv');
+    await expect(money).toContainText('Paid $1,600');
+    await expect(money).toContainText('Outstanding $1,600');
+    await expect(money).toContainText('Agreement signed');
+    await expect(money).toContainText('No proposal yet');
+    // counts on the strip: one open invoice, two timeline items
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"] .n')).toHaveText('1 open');
+    await expect(page.locator('#detailInner .tabs [data-dtab="activity"] .n')).toHaveText('2');
+    // the other panels exist (every id keeps its home) but are hidden
+    await expect(page.locator('#sendInvoice')).toBeHidden();
+    await expect(page.locator('#sendInvoice')).toHaveCount(1);
+    await expect(page.locator('#qlSave')).toBeHidden();
+  });
+
+  test('a tab click shows that panel and mirrors it in the URL; the arrow keys move selection', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').click();
+    await expect(page.locator('#sendInvoice')).toBeVisible();
+    await expect(page.locator('#ed-cname')).toBeHidden();
+    await expect(page).toHaveURL(/dtab=billing/);
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').press('ArrowRight');
+    await expect(page.locator('#detailInner .tabs [data-dtab="activity"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#qlSave')).toBeVisible();
+    await expect(page).toHaveURL(/dtab=activity/);
+    await page.locator('#detailInner .tabs [data-dtab="activity"]').press('Home');
+    await expect(page.locator('#ed-cname')).toBeVisible();
+    await expect(page).not.toHaveURL(/dtab=/);
+  });
+
+  test('?dtab=billing deep-links straight to Billing', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
+    await expect(page.locator('#ed-cname')).toBeHidden();
+  });
+
+  test('the won deal’s "Send invoice" opener switches to Billing and opens the invoice form', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#wonInvoice').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#invForm form')).toBeVisible();
+  });
+
+  test('the signed guidance’s "Convert them" deep-link lands on the Billing tab’s convert button', async ({ page }) => {
+    await installApp(page, { api: conApi(SIGNED_NO_TERM) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await page.locator('#guideConvert').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#convert')).toBeFocused();
+  });
+
+  test('the Money card’s "Billing →" link opens the tab and focuses it', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await page.locator('#dpanel-overview [data-goto-tab="billing"]').click();
+    await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toBeFocused();
+    await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
   });
 });

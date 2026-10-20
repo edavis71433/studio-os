@@ -794,3 +794,94 @@ test.describe('Files — previews of a private object', () => {
     await expect(page.locator('#social-slot .pvfail')).toHaveText('Preview unavailable');
   });
 });
+
+// ── Oct 2026 review (0131): client-private files ──────────────────────────────
+// A file a client sent the studio can be private to that client: out of the
+// shared library views (All files, Photos, Documents…) and the site picker,
+// shown only under that client's filter, in the "Client-private" collection and
+// on their record. The switch in the detail panel writes PATCH /assets/:id
+// { client_private } — the same route the details form uses.
+const PRIVATE = { ...POOLE, id: 'ffffffff-6666-4666-8666-ffffffff0009', name: 'Login credentials', client_private: true, created_at: '2026-07-04T00:00:00Z' };
+const privApi = () => ({
+  ...byClientApi(),
+  '/assets': { data: { assets: [LOGO, CONTRACT, RIVERA, RIVERA2, POOLE, PRIVATE], total: 6, shown: 6, live_count: 1, policy: 'immediate' } },
+  ['/assets/' + PRIVATE.id]: { data: { asset: PRIVATE, usage: [], versions: { has_history: false }, summary: { headline: '' } } },
+  ['/assets/' + POOLE.id]: { data: { asset: POOLE, usage: [], versions: { has_history: false }, summary: { headline: '' } } },
+  ['/assets/' + LOGO.id]: { data: { asset: LOGO, usage: [], versions: { has_history: false }, summary: { headline: 'Used as your logo.' } } },
+});
+
+test.describe('Files — client-private files (0131)', () => {
+  test('a private file is out of All files and Photos, and in the Client-private collection', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: privApi() });
+    await page.goto('/files.html');
+    const body = page.locator('.tscroll tbody');
+    await expect(body.locator('tr')).toHaveCount(5);
+    await expect(body).not.toContainText('Login credentials');
+    await expect(page.locator('.lmeta')).toContainText('1 private to a client');
+    const rail = page.locator('.rail');
+    await expect(rail.locator('[data-col="all"] .n')).toHaveText('5');
+    await expect(rail.locator('[data-col="photos"] .n')).toHaveText('4');
+    await expect(rail.locator('[data-col="private"] .n')).toHaveText('1');
+    await page.locator('[data-col="private"]').click();
+    await expect(body.locator('tr')).toHaveCount(1);
+    await expect(body).toContainText('Login credentials');
+    await expect(body.locator('.lock')).toContainText('Private to Poole Dental');
+  });
+
+  test('under that client’s filter the private file is there, with the 🔒 chip; under another client it is not', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: privApi() });
+    await page.goto('/files.html');
+    const body = page.locator('.tscroll tbody');
+    await page.locator('[data-client="c2222222-2222-4222-8222-c22222222222"]').click();
+    await expect(body.locator('tr')).toHaveCount(2);
+    await expect(body).toContainText('Login credentials');
+    await expect(body).toContainText('Waiting room');
+    await expect(page.locator('.rail [data-client="c2222222-2222-4222-8222-c22222222222"] .n')).toHaveText('2');
+    await page.locator('[data-client="c1111111-1111-4111-8111-c11111111111"]').click();
+    await expect(body).not.toContainText('Login credentials');
+  });
+
+  test('the detail panel’s switch PATCHes client_private — and only a client’s file offers it', async ({ page }) => {
+    let patched: { path: string; body: unknown } | null = null;
+    await pinTable(page);
+    await installApp(page, { api: privApi() });
+    await page.route('**/functions/v1/presence/assets/**', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      patched = { path: new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body: route.request().postDataJSON() };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.goto('/files.html');
+    // Poole's "Waiting room" — a client's file: the switch is offered, off
+    await page.locator('tr[data-open="' + POOLE.id + '"]').click();
+    const sw = page.locator('#panel #f-private');
+    await expect(sw).toBeVisible();
+    await expect(sw).not.toBeChecked();
+    await expect(page.locator('#panel .switch')).toHaveClass(/off/);
+    await sw.check();
+    await expect(page.locator('.dds-toast')).toContainText('Private to this client');
+    expect(patched).toEqual({ path: '/assets/' + POOLE.id, body: { client_private: true } });
+    await expect(page.locator('#panel #f-private-note')).toContainText('Only shows under Poole Dental');
+    await page.locator('#panel .x').click();
+    // the studio's own logo — no client, no switch
+    await page.locator('tr[data-open="' + LOGO.id + '"]').click();
+    await expect(page.locator('#panel #f-name')).toHaveValue(LOGO.name);
+    await expect(page.locator('#panel #f-private')).toHaveCount(0);
+  });
+
+  test('a pre-0131 database answers the switch honestly', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: privApi() });
+    await page.route('**/functions/v1/presence/assets/**', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'needs_migration', message: 'Private files need the 0131 database update first — nothing was changed.' }) });
+    });
+    await page.goto('/files.html');
+    await page.locator('tr[data-open="' + POOLE.id + '"]').click();
+    const sw = page.locator('#panel #f-private');
+    await sw.check();
+    await expect(page.locator('.dds-toast')).toContainText('0131 database update');
+    await expect(sw).not.toBeChecked();   // the switch falls back — nothing was changed
+  });
+});

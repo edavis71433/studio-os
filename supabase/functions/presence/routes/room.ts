@@ -7,6 +7,7 @@
 //   GET  /media            — the library, with in-use flags
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
@@ -251,8 +252,17 @@ export async function handleRestoreToDraft(req: Request, site: SiteRow, principa
 
 /** GET /media — the photo library with in-use flags (which entities use each). */
 export async function handleMediaList(site: SiteRow, cors: Record<string, string>) {
+  // 0131: a file private to a client never reaches the site's picker. The filter
+  // 400s on a database that has not run the apply pack yet, so it retries bare on
+  // that precise missing-column signal only (the 0130 deploy-order idiom).
+  const mediaPath = (filter: string) => `presence_media?site_id=eq.${site.id}&deleted_at=is.null${filter}&select=id,storage_path,alt_text,mime,width,height,bytes,created_at&order=created_at.desc`;
+  const mediaRead = (async () => {
+    let r = await svc(mediaPath('&client_private=is.false'));
+    if (!r.ok && missingColumnSignal(r.json, r.text, 'client_private')) r = await svc(mediaPath(''));
+    return r;
+  })();
   const [media, offerings, posts, settings] = await Promise.all([
-    svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,bytes,created_at&order=created_at.desc`),
+    mediaRead,
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&media_id=not.is.null&select=media_id,name,is_visible`),
     svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&hero_media_id=not.is.null&select=hero_media_id,title`),
     svc(`presence_settings?site_id=eq.${site.id}&select=cover_media_id&limit=1`),
