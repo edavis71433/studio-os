@@ -111,7 +111,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // An agency operator scope-switched INTO a customer keeps operator tools: the
   // workspace guard yields isManagedClient=false for them, so buildNav is unchanged.
   const agencyScoped = buildNav(ctx({ capabilities: caps('business_owner'), isAgency:true, isManagedClient:false }));
-  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools + Studio', agencyScoped.some(s=>s.key==='customers') && agencyScoped.some(s=>s.key==='studio'));
+  // Oct 2026 studio audit (one home, one roster): at studio level the Customers item IS the studio home.
+  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools; Customers opens the studio home', agencyScoped.some(s=>s.key==='customers') && agencyScoped.find(s=>s.key==='customers').items[0].href==='/agency.html' && !agencyScoped.some(s=>s.key==='studio'));
 
   const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
   ok('nav: Monitor edition hides Publish (observe-only)', !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
@@ -120,7 +121,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: business_staff cannot invite (no Sharing in Settings)', !staff.find(s=>s.key==='settings').items.some(i=>i.key==='sharing'));
 
   const agency = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner') }));
-  ok('nav: agency member gets the Studio scope; landing = Studio', agency.some(s=>s.key==='studio') && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+  ok('nav: agency member: landing = Studio, Customers → the studio home, no Today in the primary bar', !agency.some(s=>s.key==='today') && agency.find(s=>s.key==='customers').items[0].href==='/agency.html' && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+  // drilled INTO a client the bar is the client's: Today and Website come back, Customers is the roster page
+  const drilled = buildNav(ctx({ isAgency:true, scoped:true, capabilities: caps('business_owner') }));
+  ok('nav: agency member drilled into a client keeps Today + Website; Customers → customers.html', drilled.some(s=>s.key==='today') && drilled.some(s=>s.key==='website' && !s.utility) && drilled.find(s=>s.key==='customers').items[0].href==='/customers.html');
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));

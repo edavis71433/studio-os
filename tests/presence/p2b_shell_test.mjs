@@ -48,7 +48,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: Client work surface (Today/Customers/Analytics/Inbox)', /'today', 'Today'/.test(nav) && /key: 'customers', label: 'Customers'/.test(nav) && /'analytics', 'Analytics'/.test(nav) && /'inbox', 'Inbox'/.test(nav));
   ok('nav: Website-management surface → presence.html', /key: 'website'/.test(nav) && /\/presence\.html/.test(nav));
   ok('nav: Account/Settings surface is utility (profile menu), billing lives here', /key: 'settings'.*utility: true|utility\('|settings.*Settings/.test(nav) && /Billing lives here/.test(nav));
-  ok('nav: Studio-operations surface gated to agency', /'studio', 'Studio'.*\/agency\.html/.test(nav) && /c\.isAgency/.test(nav));
+  ok('nav: Studio-operations surface gated to agency', /\/agency\.html/.test(nav) && /c\.isAgency/.test(nav));
   ok('nav: client reviewer gets the single calm surface', /reviewerNav/.test(nav) && /client_reviewer/.test(nav));
   ok('SECURITY: internal DDS console is NOT in buildNav (never exposed to clients)', !/dds-studio-manage/.test(nav));
 }
