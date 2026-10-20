@@ -4624,6 +4624,19 @@ function eeInjectChrome(doc, main) {
 // the single publish door) — openRitual({schedule:true}) scrolls to and opens the
 // G5 schedule block once it renders. Plain calls (and the button's click Event)
 // leave the flag off.
+// Studio audit change 2 — the ritual speaks AS THE STUDIO when an operator is
+// scoped into a client (?client= → the shell's context carries scope.name).
+// Returns the client's name, or "" for the owner's own room (whose copy stays
+// byte-identical — cms.spec pins it).
+function scopedClientName() {
+  try {
+    if (!new URLSearchParams(location.search).get("client")) return "";
+    const c = window.__ddsContext, sc = c && c.scope;
+    return (sc && sc.name) ? String(sc.name) : "";
+  } catch (_) { return ""; }
+}
+// "Marlow’s Kitchen’s" — a name already ending in s takes the bare apostrophe.
+function possessive(name) { return /s$/i.test(name) ? name + "’" : name + "’s"; }
 function openRitual(opts) {
   // threaded as a PARAMETER, not module state: a one-shot flag could be consumed
   // by a stale in-flight loadRitual (open → Escape → reopen) or leak armed when
@@ -4649,7 +4662,20 @@ async function loadRitual(toSchedule) {
     S.changes = c; if (c && c.draft_hash) S.draftHash = c.draft_hash;   // M9: publish exactly what you reviewed (If-Match)
     renderPublishButton();
     const body = $("ritBody"); body.innerHTML = "";
-    if (c.first_publish) {
+    const forClient = scopedClientName();
+    if (forClient) {
+      // the operator's voice: THEIR site, THEIR customers, YOUR decision
+      if (c.first_publish) {
+        $("ritTitle").textContent = `This is the moment ${possessive(forClient)} website goes live.`;
+        $("ritSub").textContent = "Here’s what goes up — read it the way their customers will:";
+      } else if (c.count === 0) {
+        $("ritTitle").textContent = `${forClient} is up to date.`;
+        $("ritSub").textContent = "Every word in the draft is already on their website. There’s nothing waiting.";
+      } else {
+        $("ritTitle").textContent = `Here’s what changes on ${possessive(forClient)} site`;
+        $("ritSub").textContent = `${c.count === 1 ? "One change" : c.count + " changes"}, read exactly as their customers will experience ${c.count === 1 ? "it" : "them"}. Their live site stays as it is until you decide.`;
+      }
+    } else if (c.first_publish) {
       $("ritTitle").textContent = "This is the moment your website goes live.";
       $("ritSub").textContent = "Here’s what goes up — read it the way customers will:";
     } else if (c.count === 0) {
@@ -4749,15 +4775,23 @@ function showReceipt(firstPublish) {
   const count = S.changes ? S.changes.count : 0;
   const now = new Date();
   const name = (S.identity && S.identity.business_name) || "Your business";
+  const forClient = scopedClientName();
   $("ritTitle").textContent = ""; $("ritSub").textContent = ""; $("ritBlockers").innerHTML = "";
+  // the receipt: the owner's own publish keeps its words ("every word came from
+  // you"); an operator's publish is honest about whose hand it was — published
+  // FOR the client, their words untouched by the claim.
+  const stampLine = forClient ? `Published for ${esc(forClient)}` : (firstPublish ? "You’re on the internet." : "Published");
+  const keptLine = forClient
+    ? (firstPublish ? esc(forClient) + " has a home now.<br>This first version is kept safe, always." : "This version is kept safe, always.")
+    : (firstPublish
+      ? esc(name) + " has a home now — and every word of it came from you.<br>This first version is kept safe, always."
+      : "Every word on your site came from you.<br>This version is kept safe, always.");
   $("ritBody").innerHTML = `
     <div class="receipt">
       <div class="stamp">✓</div>
-      <div class="rp">${firstPublish ? "You’re on the internet." : "Published"}</div>
+      <div class="rp">${stampLine}</div>
       <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count && !firstPublish ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
-      <div class="rl">${firstPublish
-        ? esc(name) + " has a home now — and every word of it came from you.<br>This first version is kept safe, always."
-        : "Every word on your site came from you.<br>This version is kept safe, always."}</div>
+      <div class="rl">${keptLine}</div>
     </div>`;
   $("ritActions").innerHTML = "";
   // The peak moment needs a DOOR: see the live site, share the link. Without

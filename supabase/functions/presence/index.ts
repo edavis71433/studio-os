@@ -355,6 +355,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     });
     if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
     site = sc.site; scopedName = sc.scoped.name;
+    // Studio audit change 2: the principal now KNOWS it is acting for a client,
+    // so every attribution downstream (publishes, snapshots, change events,
+    // connection events — lib/actor_kind.ts) says "the studio" without a second
+    // membership query. Set only here, only after the scope was authorised.
+    principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
   } else {
     site = await resolveSite(jwt);
     // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns

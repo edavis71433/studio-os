@@ -11,6 +11,7 @@
 //   POST /connections/:key/refresh       — pull fresh data now (on-demand read)
 //   POST /connections/:key/disconnect    — revoke + destroy; account + data untouched
 import { json } from '../../_shared/http.ts';
+import { connectionActorKind } from '../lib/actor_kind.ts';   // audit change 2: a scoped agency member is the 'operator', not a 'customer'
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -128,7 +129,7 @@ export async function handleConnectionConnect(req: Request, site: SiteRow, key: 
     if (!apiKey) return json({ error: 'bad_request', message: 'Paste your read-only key to connect.' }, 422, cors);
     const ok = await saveTokens(site.id, key, { access_token: apiKey }, p.scopes);
     if (!ok) return json({ error: 'storage', message: 'We couldn’t store that securely — please try again.' }, 502, cors);
-    await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'connect', detail: 'api key connected', actor_kind: principal.kind === 'staff' ? 'operator' : 'customer' }) });
+    await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'connect', detail: 'api key connected', actor_kind: connectionActorKind(principal) }) });
     readProvider(site.id, key, p.customerLabel).catch(() => {}); // an initial read, on-demand
     return json({ data: { mode: 'api_key', connected: true, message: `Connected ${p.customerLabel}.` } }, 200, cors);
   }
@@ -157,7 +158,7 @@ export async function handleConnectionCallback(req: Request, site: SiteRow, key:
     const tokens = await exchangeCode(key, code);
     const ok = await saveTokens(site.id, key, tokens, p.scopes);
     if (!ok) return json({ error: 'storage', message: 'We couldn’t store the connection securely — please try again.' }, 502, cors);
-    await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'connect', detail: 'oauth connected', actor_kind: principal.kind === 'staff' ? 'operator' : 'customer' }) });
+    await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'connect', detail: 'oauth connected', actor_kind: connectionActorKind(principal) }) });
     readProvider(site.id, key, p.customerLabel).catch(() => {});
     return json({ data: { connected: true, message: `Connected ${p.customerLabel}.` } }, 200, cors);
   } catch (_e) {
@@ -228,7 +229,7 @@ export async function handleConnectionPropertySelect(req: Request, site: SiteRow
   if (!match) return json({ error: 'bad_request', message: 'That property isn’t on the connected Google account. Pick one from the list — or reconnect with the account that owns it.' }, 422, cors);
   await setConnectionConfig(site.id, key, { property_id: match.id, property_name: match.name, auto_selected: false });
   await markStatus(site.id, key, 'connected', 'ok', '').catch(() => {});   // clears the "choose a property" attention
-  await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'configure', detail: `property selected: ${match.name} (${match.id})`, actor_kind: principal.kind === 'staff' ? 'operator' : 'customer' }) }).catch(() => {});
+  await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'configure', detail: `property selected: ${match.name} (${match.id})`, actor_kind: connectionActorKind(principal) }) }).catch(() => {});
   readProvider(site.id, key, p.customerLabel).catch(() => {});   // first read against the chosen property, on-demand
   return json({ data: { selected: { id: match.id, name: match.name }, message: `Reading ${match.name} from here on.` } }, 200, cors);
 }
@@ -246,7 +247,7 @@ export async function handleConnectionDisconnect(site: SiteRow, key: string, pri
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
   const tokens = await loadTokens(site.id, key);
   if (tokens?.access_token) revokeToken(key, tokens.access_token).catch(() => {}); // best-effort revoke at the provider
-  await storeDisconnect(site.id, key, principal.kind === 'staff' ? 'operator' : 'customer');
+  await storeDisconnect(site.id, key, connectionActorKind(principal));
   return json({ data: { disconnected: true, message: `Disconnected ${p.customerLabel}. Your account and everything in it are untouched.` } }, 200, cors);
 }
 
@@ -255,7 +256,7 @@ export async function handleConnectionDisconnect(site: SiteRow, key: string, pri
 // flow is identical for every provider: prepare → decide → execute → (rollback).
 // Nothing writes without an explicit recorded approval; handoffs never touch a
 // provider at all.
-const actorOf = (principal: Principal) => (principal.kind === 'staff' ? 'operator' : 'customer');
+const actorOf = (principal: Principal) => connectionActorKind(principal);   // audit change 2: the write audit speaks the same vocabulary
 
 /** Prepare a write plan (proposed). Traces to the recommendation it serves. */
 export async function handleWritePrepare(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
