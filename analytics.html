@@ -534,8 +534,19 @@ function wireDash(){
   const pb=$('periodBtn'),pm=$('periodMenu');
   pm.innerHTML=PERIODS.map(p=>`<button type="button" role="option" data-period="${p[0]}" aria-selected="${PERIOD===p[0]?'true':'false'}">${p[1]}${PERIOD===p[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
   const closeMenu=()=>{pm.hidden=true;pb.setAttribute('aria-expanded','false');};
-  const toggleMenu=()=>{const open=pm.hidden;pm.hidden=!open;pb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=pm.querySelector('button');if(f)f.focus();}};
+  // closing from the chip puts focus back on the chip explicitly: the pointer
+  // press below no longer focuses it, and the option that held focus is hidden
+  const toggleMenu=()=>{const open=pm.hidden;pm.hidden=!open;pb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=pm.querySelector('button');if(f)f.focus();}else pb.focus();};
   pb.addEventListener('click',toggleMenu);
+  const filters=pb.closest('.filters');
+  // A pointer press on the chip or an option must NOT move focus. Safari (and
+  // WebKit on iPad with a trackpad) does not focus a <button> on mousedown — it
+  // moves focus to the nearest focusable ANCESTOR, here #main — so the focused
+  // option blurred with relatedTarget=#main, the focusout guard below read that
+  // as "focus left the chip+menu", and the menu was hidden before mouseup: the
+  // click landed on the page and the period never switched. Keyboard focus is
+  // managed explicitly (open → first option, close → chip), so nothing is lost.
+  if(filters)filters.addEventListener('mousedown',(e)=>{if(e.target.closest('button'))e.preventDefault();});
   // the minimal popup keyboard contract (slice 2): focus first option on open;
   // arrows move; Home/End jump; Escape closes + returns focus; Enter activates
   // natively. Escape works from the CHIP too, and tabbing/clicking beyond the
@@ -550,7 +561,6 @@ function wireDash(){
     else if(e.key==='Home'){e.preventDefault();opts[0].focus();}
     else if(e.key==='End'){e.preventDefault();opts[opts.length-1].focus();}
   });
-  const filters=pb.closest('.filters');
   if(filters)filters.addEventListener('focusout',(e)=>{
     if(pm.hidden)return;
     const to=e.relatedTarget;
@@ -563,7 +573,7 @@ function wireDash(){
   // PERIOD is committed only on a successful render (loadDash) — a failed
   // switch leaves the chip, checkmarks and state exactly as they were.
   pm.querySelectorAll('[data-period]').forEach(b=>b.addEventListener('click',()=>{
-    closeMenu();
+    closeMenu();pb.focus();   // focus never sits on a hidden option while the read runs
     loadDash(true,b.getAttribute('data-period')).then(()=>{const nb=$('periodBtn');if(nb)nb.focus();});
   }));
 }
