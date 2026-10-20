@@ -108,7 +108,9 @@ const I_OTHER = '88888888-8888-4888-8888-888888888888';       // another tenant'
   ok('inbox_feed no longer claims nothing can void an invoice', !/no route ever writes status:'void'/.test(feed));
   ok('inbox_feed names the void route as the invremind teardown', /\/sales\/invoices\/:id\/void/.test(feed));
   // A withdrawn invoice must not still be payable from the client portal.
-  ok('client portal only offers a pay link on an OPEN invoice', /pay_url: \(i\.status === 'open' && i\.stripe_url\)/.test(delivery));
+  // Oct 2026 (item 2): the allow-list is the one money formula's two WAITING
+  // states — upcoming + overdue — which a voided invoice (state '') never is.
+  ok('client portal only offers a pay link on an invoice still waiting on the client (never void)', /pay_url: \(\(state === 'upcoming' \|\| state === 'overdue'\) && i\.stripe_url\)/.test(delivery));
 }
 
 // ═══ A fake PostgREST — the filter grammar this route speaks ═════════════════

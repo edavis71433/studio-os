@@ -159,6 +159,12 @@
   .alert .ico svg{width:15px;height:15px}
   .alert .t{flex:1 1 300px;font-size:13.5px;color:var(--ink)} .alert .t b{font-weight:600}
   .aacts{display:flex;gap:6px;flex-wrap:wrap}
+  /* Oct 2026 benchmark (item 2): the four money buckets under the band's line —
+     Paid green · Processing blue · Upcoming neutral · Overdue red, the same
+     families crm.html's .schip and client.html's .fst use. */
+  .mbuckets{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:5px;font-size:12.5px;color:var(--soft)}
+  .mbuckets .mb b{font-weight:600;color:var(--ink)} .mbuckets .mb i{font-style:normal;color:var(--faint)}
+  .mbuckets .mb.good b{color:var(--good)} .mbuckets .mb.bad b{color:var(--dds-bad,#c43c3c)} .mbuckets .mb.info b{color:var(--dds-info,#2a6fb5)}
   .abtn{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12.5px;font-weight:500;text-decoration:none;white-space:nowrap}
   .abtn:hover{border-color:var(--dds-line-strong,#d2d2db)}
   .abtn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .abtn.ghost:hover{color:var(--ink);background:var(--card)}
@@ -301,7 +307,7 @@ function statTiles(s,enquiries){
   const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   if(s&&typeof s==='object'){
     const ar=s.ar;
-    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',ico:'owed',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
+    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0,pc=Number(ar.processing_cents)||0;const proc=pc?money(pc)+' processing':'';t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':'')+(proc?' · '+proc:''):(proc||'All paid up'),ico:'owed',tone:ar.outstanding_cents>0?'warn':(pc?'info':''),href:'/pipeline.html'});}
     if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
     if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
   }
@@ -365,23 +371,60 @@ const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${
 // One line when something is due; NOTHING on an empty list or a failed read
 // (failure ≠ empty: a 5xx must never paint "nothing is due"). Resend opens the
 // deal's billing tab, where the invoice's own Resend lives. ──
+// ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
+// mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
+// one case table against the module and every page's copy). Today runs it
+// against the studio's LOCAL day, exactly as crm.html does, so the band and
+// the record never disagree about the same invoice. ──
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
 function alertBandHtml(rcv){
   const items=(rcv&&Array.isArray(rcv.items))?rcv.items.filter(i=>i&&i.id):[];
   if(!items.length)return'';
-  const total=items.reduce((a,i)=>a+(Number(i.amount_cents)||0),0);
-  const late=items.filter(i=>i.overdue).length;
+  const today=localYmd();
+  const st=(i)=>moneyState(i,today);
+  // what still WAITS on a client (upcoming + overdue) vs what is on its way
+  const due=items.filter(i=>st(i)==='upcoming'||st(i)==='overdue');
+  const proc=items.filter(i=>st(i)==='processing');
+  // the Paid bucket rides along only when the read carried it (an older function
+  // build ships no `paid` — the bucket is omitted, never a fake $0)
+  const paidRows=(rcv&&Array.isArray(rcv.paid))?rcv.paid.filter(i=>i&&i.id):null;
+  const b=moneyBuckets(items.concat(paidRows||[]),today);
+  const total=b.upcoming.cents+b.overdue.cents;
+  const late=b.overdue.count;
   let text,acts;
-  if(items.length===1){
-    const i=items[0];const p=ymdParts(i.due_date);
-    text=`<b>${esc(money(i.amount_cents))} is ${i.overdue?'overdue':'due now'}</b> — ${i.deal?esc(i.deal)+'’s invoice':'An invoice'}${i.title?` “${esc(i.title)}”`:''}${i.overdue&&p?` was due ${esc(p.mon+' '+p.day)} and`:''} hasn’t been paid yet.`;
+  if(due.length===1){
+    const i=due[0];const p=ymdParts(i.due_date);const over=st(i)==='overdue';
+    text=`<b>${esc(money(i.amount_cents))} is ${over?'overdue':'due now'}</b> — ${i.deal?esc(i.deal)+'’s invoice':'An invoice'}${i.title?` “${esc(i.title)}”`:''}${over&&p?` was due ${esc(p.mon+' '+p.day)} and`:''} hasn’t been paid yet.`;
     acts=i.deal_id
       ?`<a class="abtn" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)+'&tab=billing'))}">Resend invoice</a><a class="abtn ghost" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(i.deal_id)))}">Open record</a>`
       :`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
-  }else{
-    text=`<b>${esc(money(total))} is due now</b> — ${items.length} invoices are waiting on payment${late?`, ${late} of them overdue`:''}.`;
+  }else if(due.length){
+    text=`<b>${esc(money(total))} is due now</b> — ${due.length} invoices are waiting on payment${late?`, ${late} of them overdue`:''}.`;
     acts=`<a class="abtn" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
+  }else{
+    // only processing money: nothing to chase, say so
+    text=`<b>${esc(money(b.processing.cents))} is on its way</b> — ${proc.length===1?'a payment is':proc.length+' payments are'} processing; nothing to chase.`;
+    acts=`<a class="abtn ghost" href="${esc(scopeHref('/pipeline.html'))}">Who owes you</a>`;
   }
-  return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}</div><div class="aacts">${acts}</div></div>`;
+  if(due.length&&proc.length)text+=` ${esc(money(b.processing.cents))} more is processing.`;
+  const keys=['paid','processing','upcoming','overdue'].filter(k=>k!=='paid'||paidRows);
+  const buckets=keys.map(k=>`<span class="mb ${MONEY_TONE[k]||''}" data-bucket="${k}"><b>${esc(money(b[k].cents))}</b> ${esc(MONEY_WORD[k])}${k==='paid'?` <i>(${esc(String(rcv.paid_window_days||30))} days)</i>`:''}</span>`).join('');
+  return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}<div class="mbuckets" aria-label="Money by state">${buckets}</div></div><div class="aacts">${acts}</div></div>`;
 }
 function statStripHtml(tiles){
   if(!tiles.length)return'';

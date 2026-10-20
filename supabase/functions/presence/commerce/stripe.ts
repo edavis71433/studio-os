@@ -120,9 +120,19 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
     // ONE payment per invoice — after it completes, Stripe deactivates the link,
     // so a client double-clicking the email can never pay the same invoice twice.
     'restrictions[completed_sessions][limit]': '1',
-    // Land the payer back on OUR branded thank-you, not Stripe's generic screen.
+    // Oct 2026 benchmark (item 1): land the payer back on THEIR Invoices tab,
+    // naming the invoice, so the row can say "Paid — confirming" while the
+    // webhook catches up (client.html reads ?paid=). A payer with no portal
+    // sign-in is forwarded on by client.html to payment-success.html?paid=…,
+    // the branded thank-you this used to send everyone to. A Payment Link's
+    // after_completion redirect is the only return hook Stripe's hosted page
+    // offers — it fires once the session COMPLETES, which for a delayed method
+    // (ACH) is before the money settles; hence "confirming", never "paid".
+    // No #fragment here: Stripe validates the URL and client.html opens the
+    // tab itself from ?paid=. Links minted BEFORE this deploy keep their old
+    // redirect (Stripe does not re-read the function) — see the PR's steps.
     'after_completion[type]': 'redirect',
-    'after_completion[redirect][url]': `${SITE_URL}/payment-success.html`,
+    'after_completion[redirect][url]': `${SITE_URL}/client.html?paid=${encodeURIComponent(p.invoiceId)}`,
   }, `plink-${p.invoiceId}`);
   return { url: String(link.url), id: String(link.id) };
 }

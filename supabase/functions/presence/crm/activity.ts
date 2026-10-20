@@ -16,6 +16,7 @@
 // isolation (tests/presence/crm_activity_test.mjs).
 import type { TimelineItem } from './contract.ts';
 import { describeSystemEvent, isActivityRow } from './deal_activity.ts';
+import { moneyState } from '../lib/money_state.ts';
 
 // The six timeline types — each drives one icon + one connector color on the
 // record page. Everything must land in exactly one of these.
@@ -167,14 +168,18 @@ export function buildUpcoming(
     out.push({ kind: 'next_step', id: null, title: `Next step — ${ns}`, due, overdue: !!(due && dayOf(due) < today), href: dealHref });
   }
   for (const iv of (Array.isArray(inp.invoices) ? inp.invoices : [])) {
-    if (!iv || iv.status !== 'open') continue;
+    // Oct 2026 (item 2): the one money formula decides — only an invoice still
+    // WAITING on the client (upcoming/overdue) belongs on the band; a paid,
+    // voided or PROCESSING (settling ACH) one does not, and "overdue" is its word.
+    const st = iv ? moneyState(iv, today) : '';
+    if (st !== 'upcoming' && st !== 'overdue') continue;
     const due = iv.due_date ? str(iv.due_date) : null;
     const amt = Number(iv.amount_cents) || 0;
     const usd = amt ? '$' + Math.round(amt / 100).toLocaleString('en-US') : '';
     out.push({
       kind: 'invoice', id: null,
       title: `Unpaid invoice${iv.title ? ` — ${str(iv.title)}` : ''}${usd ? ` (${usd})` : ''}`,
-      due, overdue: !!(due && dayOf(due) < today),
+      due, overdue: st === 'overdue',
       href: iv.deal_id ? `/pipeline.html?deal=${str(iv.deal_id)}` : dealHref,
     });
   }

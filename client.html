@@ -165,8 +165,16 @@
      surface) restyled to the .fname line; Overdue chip = warn family; the
      non-link row action (thank-you / will-send) is a quiet trailing note. */
   .frow h3.fname{margin:0;font-size:14px}
-  .fst.od{background:var(--warn-soft);color:var(--warn)}
+  /* Oct 2026 benchmark (item 2): one colour per money state — Paid green (.sig),
+     Processing blue (.pr), Upcoming neutral, Overdue red (.od) — the same
+     families crm.html's .schip and today.html's band use. */
+  .fst.od{background:transparent;color:var(--dds-bad,#c43c3c);border:1px solid currentColor;padding:2px 8px}   /* outlined, like crm.html's .schip.bad — the filled red tint misses AA at this size */
+  .fst.pr{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
   .finote{flex:0 0 auto;color:var(--faint);font-size:12.5px}
+  /* item 1: the moment after paying — a check mark and a quiet confirming note */
+  .finote.fconf{color:var(--good);display:inline-flex;align-items:center;gap:6px}
+  .finote.fconf .fchk{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--good);color:#fff;font-size:10px;font-weight:700;flex:0 0 auto}
+  .finote.fconf.stale{color:var(--faint)} .finote.fconf.stale .fchk{background:var(--faint)}
   .invtotal{font-size:14px;color:var(--soft);margin:0 0 12px}
   .invtotal strong{color:var(--ink)}
   @media (max-width:719px){
@@ -707,7 +715,10 @@ async function ensureBilling(){
   PORTAL.billingFailed=false;   // B1's named flag — Home's queue + due tile consume it
   return PORTAL.billing;
 }
-function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>i&&i.status!=='paid'&&i.status!=='void'&&i.status!=='canceled');}
+// what still WAITS on the client — upcoming + overdue (item 2). A paid,
+// voided or PROCESSING invoice is nothing to pay: it leaves the to-pay tile and
+// the Needs-you queue together, by the one formula.
+function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invState(i);return s==='upcoming'||s==='overdue';});}
 // per-project snapshots (the full client bundle, capped) — shared by Home + Files
 async function ensureSnaps(){
   const fetchSnap=async(p)=>{
@@ -910,9 +921,9 @@ async function buildNeedsYou(){
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
         `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
     const i=it.i;
-    // the SAME derived state word the Invoices tab chips (PS2 D2) — the two
-    // surfaces must never disagree about whether the same invoice is overdue
-    const stWord=invOverdue(i,nyToday)?'overdue':(i.status||'').replace('_',' ');
+    // the SAME state word the Invoices tab chips print (one formula, item 2) —
+    // the two surfaces must never disagree about the same invoice
+    const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
       nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
@@ -1633,7 +1644,31 @@ function niceDay(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));retur
 function niceDay(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');}
 function invDueLabel(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'long',day:'numeric'}):'';}
 function portalTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
-function invOverdue(i,todayYmd){if(!i||i.status==='paid'||i.status==='void'||i.status==='canceled')return false;const d=invYmd(i.due_date);return !!d&&d<todayYmd;}
+// ── Oct 2026 benchmark (item 2): money in four states — ONE formula. These four
+// are a VERBATIM mirror of supabase/functions/presence/lib/money_state.ts
+// (tests/presence/money_state_test.mjs runs one case table against the module
+// and every page's copy). Paid · Processing · Upcoming · Overdue, with
+// "overdue" still derived in the client's LOCAL calendar (PS2's rule) and
+// "processing" covering both Stripe's settling payments (processing_since)
+// and the ids this browser just paid on Stripe (PAID_PENDING, item 1). ──
+function moneyState(i,todayYmd,pending){
+  if(!i)return'';
+  const s=String(i.status||'open');
+  if(s==='paid')return'paid';
+  if(s==='void'||s==='canceled')return'';
+  if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
+  return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
+}
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+function moneyBuckets(list,todayYmd,pending){
+  const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  return b;
+}
+// the portal's own state call: local today + the just-paid ids
+function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
 // One invoice row: 🧾 + name (a REAL h3 heading — screen readers navigate the
 // money surface by invoice name) + "amount · due <date>" meta + status chip +
 // the row action. Chip: Paid (green) / Overdue (derived, warn) / the server's
@@ -1642,22 +1677,68 @@ function invOverdue(i,todayYmd){if(!i||i.status==='paid'||i.status==='void'||i.s
 // an unpaid one without a link says the studio will send payment details;
 // void/canceled rows get no action at all (there is nothing to do or await).
 function invoiceRowHtml(i,todayYmd){
-  const dead=i.status==='void'||i.status==='canceled';
-  const over=invOverdue(i,todayYmd);
+  const st=moneyState(i,todayYmd,PAID_PENDING);
+  const dead=!st;   // void/canceled — no money state, nothing to do or await
   const due=invDueLabel(i.due_date)||String(i.due_date||'');
   const meta=[i.amount?fmtMoney(i.amount):'',due?'due '+due:''].filter(Boolean).join(' · ');
-  const chip=i.status==='paid'?'Paid':over?'Overdue':String(i.status||'open').replace(/_/g,' ');
+  const chip=dead?'Voided':MONEY_WORD[st];
+  const cls=st==='paid'?' sig':st==='overdue'?' od':st==='processing'?' pr':'';
   // https-only pay links (defense-in-depth on the money surface): the server
   // only ever writes Stripe https URLs, so anything else is treated as absent.
-  const pay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
-  const act=i.status==='paid'?`<span class="finote">Paid — thank you.</span>`
+  // A processing row never offers Pay, whatever the server shipped: the client
+  // already paid, and a second charge on a settling payment is a double-pay.
+  const pay=st!=='processing'&&i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
+  const act=st==='paid'?`<span class="finote">Paid — thank you.</span>`
     :dead?''
+    :st==='processing'?paidConfirmNote(i)
     :pay?`<a class="fbtn pay" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
     :`<span class="finote">Your studio will send payment details.</span>`;
   return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">${si('receipt')}</span>`+
     `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
     `${meta?`<span class="fmeta">${esc(meta)}</span>`:''}</div>`+
-    `<span class="fst${i.status==='paid'?' sig':over?' od':''}">${esc(chip)}</span>${act}</div>`;
+    `<span class="fst${cls}">${esc(chip)}</span>${act}</div>`;
+}
+// ── Oct 2026 benchmark (item 1): the moment after a client pays ──────────────
+// Stripe's Payment Link sends the payer back to /client.html?paid=<invoice id>.
+// Until the webhook flips the row the server still says open — so the row
+// says "Processing" + "✓ Paid — confirming your payment." (never "Paid": the
+// server has not said so), a toast says thank you, and /client/billing is
+// re-read every few seconds for up to a minute. Confirmed → "Paid — thank
+// you." A slow webhook → "Still confirming — it can take a few minutes, you
+// don't need to do anything." and a slower re-read until the ten-minute
+// memory runs out, so the row is never dead. The just-paid id is also kept in
+// localStorage for ten minutes: a payer who had to sign in first (or reloads)
+// still sees Processing, not a Pay button for an invoice they just paid.
+const PAID_POLL_MS=5000, PAID_POLL_LIMIT_MS=60000, PAID_SLOW_POLL_MS=30000, PAID_PENDING_TTL_MS=10*60000;
+let PAID_PENDING=[];   // invoice ids this browser paid on Stripe, not yet confirmed by the server
+let PAID_SINCE=0, PAID_STALE=false, PAID_TIMER=null;
+function paidStore(id){try{localStorage.setItem('dds-paid-pending',JSON.stringify({id:String(id),at:Date.now()}));}catch(_){}}
+function paidStored(){try{const v=JSON.parse(localStorage.getItem('dds-paid-pending')||'null');if(v&&v.id&&Date.now()-(+v.at||0)<PAID_PENDING_TTL_MS)return v;}catch(_){}return null;}
+function paidForget(){try{localStorage.removeItem('dds-paid-pending');}catch(_){}}
+function paidConfirmNote(i){
+  const mine=PAID_PENDING.indexOf(String(i.id))>=0;
+  if(!mine)return`<span class="finote fconf"><span class="fchk" aria-hidden="true">✓</span>Payment on its way — nothing more to do.</span>`;   // Stripe is settling it (ACH)
+  return PAID_STALE
+    ?`<span class="finote fconf stale"><span class="fchk" aria-hidden="true">✓</span>Still confirming — it can take a few minutes, you don’t need to do anything.</span>`
+    :`<span class="finote fconf"><span class="fchk" aria-hidden="true">✓</span>Paid — confirming your payment.</span>`;
+}
+function paidBegin(id,at){
+  if(PORTAL.persona!=='client')return;   // a reviewer has no invoices to confirm
+  PAID_PENDING=[String(id)];PAID_SINCE=at||Date.now();PAID_STALE=Date.now()-PAID_SINCE>=PAID_POLL_LIMIT_MS;
+  if(PAID_TIMER)clearTimeout(PAID_TIMER);PAID_TIMER=setTimeout(paidPoll,PAID_POLL_MS);
+}
+function paidRepaint(){if(CURRENT_TAB==='invoices')renderInvoices();else if(CURRENT_TAB==='home')renderHome();}
+async function paidPoll(){
+  PAID_TIMER=null;if(!PAID_PENDING.length)return;
+  PORTAL.billing=null;   // bypass the per-load cache — a fresh read is the whole point
+  const b=await ensureBilling();
+  if(!PAID_PENDING.length)return;
+  const row=((b&&b.invoices)||[]).find(i=>i&&String(i.id)===PAID_PENDING[0]);
+  if(row&&row.status==='paid'){PAID_PENDING=[];PAID_STALE=false;paidForget();toast('Paid — thank you.');paidRepaint();return;}   // the server said so — only now
+  const waited=Date.now()-PAID_SINCE;
+  if(waited>=PAID_PENDING_TTL_MS){PAID_PENDING=[];PAID_STALE=false;paidForget();paidRepaint();return;}   // the memory runs out — the row goes back to the server's own word
+  if(waited>=PAID_POLL_LIMIT_MS&&!PAID_STALE){PAID_STALE=true;paidRepaint();}
+  PAID_TIMER=setTimeout(paidPoll,PAID_STALE?PAID_SLOW_POLL_MS:PAID_POLL_MS);
 }
 async function renderInvoices(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
@@ -2460,9 +2541,12 @@ async function load(){
   PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
+  // item 1: back from Stripe — ?paid=<invoice id> (ids are uuids; anything else is ignored)
+  const paidId=/^[0-9a-zA-Z-]{1,64}$/.test(params.get('paid')||'')?params.get('paid'):'';
+  if(paidId)paidStore(paidId);
   // honor a deep link once, then drop it from the URL so any later re-load
   // (e.g. after approving something) lands on Home instead of re-opening it.
-  if(dsup||deep){try{history.replaceState(null,'','/client.html'+location.hash);}catch(_){}}
+  if(dsup||deep||paidId){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
   const ctx=await api('/portal/context');
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
@@ -2496,6 +2580,12 @@ async function load(){
   // ?support= now opens the Messages tab with that thread in the reading pane.
   if(dsup){await openMessagesTo(dsup);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}   // PS3: the mark-read POST is /client/* — client persona only
   if(deep){await openProject(deep);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
+  // item 1: the just-paid invoice — from the URL (the Stripe return: open the
+  // Invoices tab and say thank you) or from the ten-minute memory (a sign-in or
+  // reload on the way back: the row stays Processing, quietly)
+  const remembered=paidId?null:paidStored();
+  if(paidId){paidBegin(paidId,Date.now());showTab('invoices');toast('Thank you — we’re confirming your payment.');return;}
+  if(remembered)paidBegin(remembered.id,+remembered.at||Date.now());
   showTab(CURRENT_TAB||'home');
 }
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
@@ -2505,7 +2595,16 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await 
 (function(){var s=$('signout');if(s)s.addEventListener('click',doSignOut);})();
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";USER=(data&&data.session&&data.session.user)||null;
-    if(!TOKEN){signedOut();return;}await load();
+    if(!TOKEN){
+      // item 1: back from Stripe with no portal sign-in (a deposit paid before the
+      // workspace exists, or a signed-out browser) — the branded thank-you, not a
+      // sign-in wall; the id is remembered so a sign-in within ten minutes still
+      // shows the row as Processing.
+      const pp=new URLSearchParams(location.search).get('paid')||'';
+      if(/^[0-9a-zA-Z-]{1,64}$/.test(pp)){paidStore(pp);location.replace('/payment-success.html?paid='+encodeURIComponent(pp));return;}
+      signedOut();return;
+    }
+    await load();
   }catch(_){trouble();}
 })();
 </script>

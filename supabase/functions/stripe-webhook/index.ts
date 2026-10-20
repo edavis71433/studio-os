@@ -9,7 +9,11 @@
 //  Then in Stripe Dashboard → Developers → Webhooks → Add endpoint:
 //      URL:    https://<project-ref>.supabase.co/functions/v1/stripe-webhook
 //      Events: checkout.session.completed, payment_intent.succeeded,
-//              payment_intent.payment_failed
+//              payment_intent.payment_failed, payment_intent.processing,
+//              checkout.session.async_payment_succeeded,
+//              checkout.session.async_payment_failed
+//      (the last three carry the "Processing" money state for delayed
+//      methods such as ACH — see markPresenceInvoiceProcessing below)
 //  Copy the endpoint's signing secret (whsec_...) into this function's secrets
 //  as STRIPE_WEBHOOK_SECRET. SB_URL / SERVICE_ROLE_KEY / (optionally)
 //  STRIPE_SECRET must also be present, same values as the other functions.
@@ -405,6 +409,35 @@ Deno.serve(async (req: Request) => {
     }
   };
 
+  // ── PROCESSING (Oct 2026 benchmark, item 2) ─────────────────────────────
+  // A delayed payment method (ACH debit and the like) completes the Checkout
+  // session BEFORE the money settles: checkout.session.completed arrives with
+  // payment_status 'unpaid', then payment_intent.processing, and only days
+  // later payment_intent.succeeded / checkout.session.async_payment_succeeded.
+  // Flipping the invoice paid on the first of those was a lie the studio would
+  // act on ("the deposit is in — start the work"). Instead the row is stamped
+  // processing_since (migration 0132): the client sees "Processing", no Pay
+  // button; the studio sees "Processing" on Today and the record; the unpaid
+  // reminder skips it. The paid flip (below) clears the stamp; a failed async
+  // payment clears it too — the invoice is simply open again, and the failure
+  // is logged like every other payment failure. Deploy-order tolerant: before
+  // 0132 the column is missing, the PATCH 400s, and the row stays an ordinary
+  // open invoice — logged, acknowledged (never a 500: Stripe would retry a
+  // stamp that cannot land until the migration runs).
+  const markPresenceInvoiceProcessing = async (invoiceId: string, via: string): Promise<Response> => {
+    const inv = (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,status&limit=1`))[0];
+    if (!inv) { console.error(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} not found (via ${via}) — acking`); return new Response('ok (unknown invoice)', { status: 200 }); }
+    if (inv.status !== 'open') { console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} is '${inv.status}', not marking processing (via ${via})`); return new Response('ok (not open)', { status: 200 }); }
+    const ok = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, 'PATCH', { processing_since: eventTime, updated_at: eventTime });
+    if (ok) console.log(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} PROCESSING (via ${via})`);
+    else console.error(`[stripe-webhook] ${type} → could not stamp presence_invoice ${invoiceId} processing_since (migration 0132 applied?) — the invoice stays open/upcoming until the payment settles`);
+    return new Response('ok', { status: 200 });
+  };
+  const clearPresenceInvoiceProcessing = async (invoiceId: string, via: string): Promise<void> => {
+    const ok = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, 'PATCH', { processing_since: null, updated_at: eventTime });
+    console[ok ? 'log' : 'error'](`[stripe-webhook] ${type} → presence_invoice ${invoiceId} processing ${ok ? 'cleared' : 'NOT cleared (migration 0132 applied?)'} (via ${via}) — the invoice is open again`);
+  };
+
   // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
   // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
   const markPresenceInvoicePaid = async (invoiceId: string, via: string): Promise<Response> => {
@@ -434,11 +467,16 @@ Deno.serve(async (req: Request) => {
     }
     // return=representation so ONLY the write that actually flipped the row (the
     // race winner) emits the owner echo — a concurrent duplicate matches 0 rows.
-    const flipped = await fetch(`${SB_URL}/rest/v1/presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, {
+    // The flip also clears processing_since (0132). Before that migration the
+    // column is unknown and the PATCH 400s — retry the pre-0132 body rather than
+    // 500 (a 500 here makes Stripe retry a payment that can never land).
+    const flipWith = (body: Record<string, unknown>) => fetch(`${SB_URL}/rest/v1/presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, {
       method: 'PATCH',
       headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ status: 'paid', paid_at: eventTime, updated_at: eventTime }),
+      body: JSON.stringify(body),
     });
+    let flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime, processing_since: null });
+    if (!flipped.ok) flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime });
     if (!flipped.ok) {
       console.error(`[stripe-webhook] ${type} FAILED to mark presence_invoice ${invoiceId} paid (via ${via}) — returning 500 so Stripe retries`);
       return new Response('db write failed', { status: 500 });
@@ -527,8 +565,43 @@ Deno.serve(async (req: Request) => {
           console.log(`[stripe-webhook] ${type} → audit order ${md.order_id} paid`);
           return new Response('ok', { status: 200 });
         }
-        if (md.presence_invoice_id) return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'checkout.session metadata');
+        if (md.presence_invoice_id) {
+          // A session can COMPLETE before the money settles (payment_status
+          // 'unpaid' — ACH and other delayed methods). That is Processing, not
+          // Paid; the async_payment_succeeded / payment_intent.succeeded event
+          // flips it later. Only a 'paid' session flips the invoice here.
+          const ps = String(obj.payment_status || 'paid');
+          // 'no_payment_required' is Stripe's word for a settled $0 session — paid, not processing
+          if (ps !== 'paid' && ps !== 'no_payment_required') return await markPresenceInvoiceProcessing(String(md.presence_invoice_id), `checkout.session completed, payment_status ${ps}`);
+          return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'checkout.session metadata');
+        }
         console.log(`[stripe-webhook] ${type} with no invoice_id/order_id metadata (session ${obj.id || '?'}) — payment recorded, nothing to flip`);
+        return new Response('ok', { status: 200 });
+      }
+
+      // The settled end of a delayed payment (ACH cleared) — same flip as a card.
+      if (type === 'checkout.session.async_payment_succeeded') {
+        const md = obj.metadata || {};
+        await recordPayment(obj, md, 'paid');
+        if (md.presence_invoice_id) return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'async_payment_succeeded');
+        if (md.invoice_id) return await markInvoicePaid(String(md.invoice_id), 'async_payment_succeeded');
+        console.log(`[stripe-webhook] ${type} with no invoice metadata (session ${obj.id || '?'}) — acknowledged`);
+        return new Response('ok', { status: 200 });
+      }
+      // A delayed payment that FAILED after the session completed: the invoice
+      // goes back to plain open (the client can pay again), the failure is logged.
+      if (type === 'checkout.session.async_payment_failed') {
+        const md = obj.metadata || {};
+        await recordPayment(obj, md, 'failed');
+        if (md.presence_invoice_id) await clearPresenceInvoiceProcessing(String(md.presence_invoice_id), 'async_payment_failed');
+        console.error(`[stripe-webhook] delayed payment FAILED${md.presence_invoice_id ? ` for presence_invoice ${md.presence_invoice_id}` : ''} (session ${obj.id || '?'}) — invoice open again, nothing marked paid`);
+        return new Response('ok', { status: 200 });
+      }
+      // Stripe accepted the payment but the bank has not settled it yet.
+      if (type === 'payment_intent.processing') {
+        const md = obj.metadata || {};
+        if (md.presence_invoice_id) return await markPresenceInvoiceProcessing(String(md.presence_invoice_id), 'payment_intent.processing');
+        console.log(`[stripe-webhook] ${type} with no presence invoice metadata (${obj.id || '?'}) — acknowledged`);
         return new Response('ok', { status: 200 });
       }
 
@@ -543,6 +616,9 @@ Deno.serve(async (req: Request) => {
       if (type === 'payment_intent.payment_failed') {
         const md = obj.metadata || {};
         await recordPayment(obj, md, 'failed');
+        // A processing (ACH) payment that bounced: the stamp comes off so the
+        // invoice shows Upcoming/Overdue with its Pay button again.
+        if (md.presence_invoice_id) await clearPresenceInvoiceProcessing(String(md.presence_invoice_id), 'payment_intent.payment_failed');
         console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
         return new Response('ok', { status: 200 });
       }

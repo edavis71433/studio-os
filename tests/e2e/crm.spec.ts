@@ -467,7 +467,9 @@ test.describe('Relationship view', () => {
   test('P1 — Billing lists invoices with Resend · Copy link · Void · View / print, and a won deal demotes the unsent draft', async ({ page }) => {
     await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
-    await expect(page.locator('.brow .schip.warn', { hasText: 'Awaiting payment' })).toHaveCount(1);
+    // Oct 2026 (item 2): the chip is the money state word — an open, undated
+    // invoice is "Upcoming" (sent-ness lives on the sub-line and the Resend verb)
+    await expect(page.locator('.brow .schip', { hasText: 'Upcoming' })).toHaveCount(1);
     await expect(page.locator('[data-send-inv="i-2"]')).toHaveText('Resend');
     await expect(page.locator('[data-copy="https://pay.test/b"]')).toBeVisible();
     await expect(page.locator('[data-void-inv="i-2"]')).toBeVisible();
@@ -559,6 +561,54 @@ test.describe('Relationship view', () => {
     await expect(page.locator('#act-invoice')).toHaveClass(/primary/);
     await expect(page.locator('.rrow [data-send-prop="p-1"]')).toHaveText('Send to client');
     await expect(page.locator('h2 [data-bform="deposit"]')).toBeVisible();
+  });
+
+  // Oct 2026 benchmark (item 2): the record's Billing tab prints the SAME four
+  // words, in the same four colours, from the same formula as the client's
+  // Invoices tab and Today's band (moneyState, mirrored from lib/money_state.ts).
+  // A PROCESSING invoice (Stripe settling an ACH payment) gets no Resend / Copy
+  // link / Void — the client already paid; the Outstanding tile counts only what
+  // still WAITS and names the states; the Upcoming & overdue band agrees.
+  test('Billing — four money states: Paid · Processing · Upcoming · Overdue chips, one colour each; processing has no Resend/Void; the Outstanding tile and the record band run the same formula', async ({ page }) => {
+    const FOUR_DEAL = { data: { ...HUB_DEAL.data, invoices: [
+      { id: 'i-1', title: 'Deposit', purpose: 'deposit', amount_cents: 160000, status: 'paid', state: 'paid', paid_at: '2026-07-01T00:00:00Z', stripe_url: 'https://pay.test/a' },
+      { id: 'i-2', title: 'Invoice', purpose: 'service', amount_cents: 160000, status: 'open', state: 'upcoming', due_date: '2099-01-10', stripe_url: 'https://pay.test/b' },
+      { id: 'i-3', title: 'Photos', purpose: 'service', amount_cents: 40000, status: 'open', state: 'processing', processing_since: '2026-10-19T00:00:00Z', stripe_url: 'https://pay.test/c' },
+      { id: 'i-4', title: 'Launch', purpose: 'service', amount_cents: 50000, status: 'open', state: 'overdue', due_date: '2026-01-01', stripe_url: null },
+    ] } };
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: FOUR_DEAL, [`/sales/deals/${DEAL}/tasks`]: { data: [] }, [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    // the server composes the band on the primary path (crm/activity.ts
+    // buildUpcoming — pinned by the Deno suite); a failed activity read makes
+    // the page compose it from the deal's own invoices through the same formula
+    await page.route('**/functions/v1/presence/crm/activity**', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    // the Outstanding tile: what still WAITS (1,600 + 500), the states named — processing is on its way, not owed
+    const owed = page.locator('#hlpanel .hl').filter({ hasText: 'Outstanding' });
+    await expect(owed.locator('.hl-v')).toHaveText('$2,100');
+    await expect(owed.locator('.hl-s')).toHaveText('1 upcoming · 1 overdue · $400 processing');
+    await expect(page.locator('#hlpanel .hl').filter({ hasText: 'Paid' }).locator('.hl-v')).toHaveText('$1,600');
+    // the Upcoming & overdue band: the two waiting invoices, the late one marked — never the processing one
+    await expect(page.getByText('Upcoming & overdue')).toBeVisible();
+    await expect(page.locator('.uprow').filter({ hasText: 'Unpaid invoice — Launch' })).toHaveClass(/overdue/);
+    await expect(page.locator('.uprow').filter({ hasText: 'Unpaid invoice — Invoice' })).not.toHaveClass(/overdue/);
+    await expect(page.locator('.uprow').filter({ hasText: 'Photos' })).toHaveCount(0);
+    // the Billing tab's chips
+    await page.getByRole('tab', { name: 'Billing' }).click();
+    const row = (t: string) => page.locator('.btable tr.brow').filter({ hasText: t });
+    await expect(row('Deposit').locator('.schip.good')).toHaveText('Paid');
+    await expect(row('Invoice').locator('.schip')).toHaveText('Upcoming');
+    await expect(row('Invoice').locator('[data-send-inv="i-2"]')).toHaveText('Resend');
+    await expect(row('Photos').locator('.schip.info')).toHaveText('Processing');
+    await expect(row('Photos')).toContainText('Payment on its way');
+    await expect(row('Photos').locator('[data-send-inv], [data-void-inv], [data-copy]')).toHaveCount(0);
+    await expect(row('Photos').locator('[data-doc="invoices:i-3"]')).toBeVisible();
+    await expect(row('Launch').locator('.schip.bad')).toHaveText('Overdue');
+    await expect(row('Launch')).toContainText('Not sent yet');
+    await expect(row('Launch').locator('[data-send-inv="i-4"]')).toHaveText('Send');
+    await expect(row('Launch').locator('td.due')).toBeVisible();   // only the late date is red
+    await expect(row('Invoice').locator('td.due')).toHaveCount(0);
+    const colours = await Promise.all(['Deposit', 'Invoice', 'Photos', 'Launch'].map((n) => row(n).locator('.schip').evaluate((el) => getComputedStyle(el).color)));
+    expect(new Set(colours).size).toBe(4);   // one colour per state
   });
 
   // Comms routing pin (F1/F3): an EMAIL-landed client message is a plain
