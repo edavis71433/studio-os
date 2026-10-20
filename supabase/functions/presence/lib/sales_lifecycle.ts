@@ -181,6 +181,37 @@ export function canSignContract(current: ContractStatus, storedHash: string, pre
  *  and the follow-up sweep (commerce/lifecycle.ts) both read it, so the copy on
  *  screen and the copy in a nudge email can never disagree. A soft-deleted
  *  contract row doesn't count. Pure. */
+// ── The deal's CURRENT proposal, as the one-link page should see it ──────────
+// (benchmark 2026-10, item 5). Pure, so the revise window is unit-testable:
+// Revise marks v1 superseded and creates v2 as a DRAFT, so for a while the deal
+// has no sendable version at all. That window must read as PENDING ("your
+// studio is updating the proposal"), never as "no proposal → go straight to the
+// agreement" — the client could otherwise sign with nothing accepted, and the
+// accept-side value backfill and stage move would never run.
+//   proposal : the newest non-superseded proposal the client was actually sent
+//              (sent / accepted / declined; an accepted one wins); never a draft
+//   pending  : no current proposal, but one WAS in play (a superseded version
+//              exists) — the studio is between versions
+export interface CurrentProposal<T> { proposal: T | null; pending: boolean }
+export function currentProposal<T extends { status?: unknown; line_items?: unknown; deleted_at?: unknown }>(rows: unknown): CurrentProposal<T> {
+  const live = (Array.isArray(rows) ? rows : []).filter((r) => !!r && typeof r === 'object' && !(r as T).deleted_at) as T[];
+  const superseded = (r: T) => !!splitLineItems(r.line_items).meta.superseded_by;
+  const sentOnce = live.filter((r) => !superseded(r) && (r.status === 'sent' || r.status === 'accepted' || r.status === 'declined'));
+  const proposal = sentOnce.find((r) => r.status === 'accepted') || sentOnce[0] || null;
+  return { proposal, pending: !proposal && live.some(superseded) };
+}
+/** May a FLOW-token signature proceed, given the deal's current proposal? Null
+ *  when it may; otherwise the 409 the sign route answers with. The order is
+ *  choose → sign, so an unaccepted, declined or in-between proposal locks the
+ *  agreement. A deal that never had a proposal in play starts at the agreement. */
+export function flowSignGate(cur: CurrentProposal<{ status?: unknown }>): { error: string; message: string } | null {
+  if (cur.pending) return { error: 'accept_first', message: 'Your studio is updating the proposal — the agreement unlocks once you accept the new version.' };
+  if (!cur.proposal) return null;
+  if (cur.proposal.status === 'accepted') return null;
+  if (cur.proposal.status === 'declined') return { error: 'accept_first', message: 'This proposal was declined — ask your studio for an updated one before signing.' };
+  return { error: 'accept_first', message: 'Accept the proposal first — the agreement unlocks right after.' };
+}
+
 export function agreementSigned(contracts: unknown): boolean {
   return Array.isArray(contracts) && contracts.some((c) =>
     !!c && typeof c === 'object'

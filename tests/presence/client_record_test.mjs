@@ -88,6 +88,17 @@ ok('ACTIVITY: the reply composer keeps the honest no-target hint', /Replies open
 ok('ACTIVITY: Upcoming & Overdue band with done-checkbox on deal to-dos', /Upcoming &amp; overdue/.test(crm) && /\/sales\/deal-tasks\//.test(crm));
 ok('MESSAGES: inbox conversations open the record Messages tab', /tab=messages/.test(ws) && /\/crm\.html\?project=/.test(ws));
 
+// ═══ ONE LINK (benchmark 2026-10, item 5): the three sends collapse to one ═══
+// With a draft proposal AND a draft agreement on an open deal, the record and the
+// pipeline drawer show ONE "Send proposal & agreement" (POST /sales/deals/:id/
+// send); the per-document sends + Request deposit sit under More.
+ok('SEND: crm.html decides the pair in one place (sendBothDocs: draft proposal, not superseded + draft agreement, open deal)', /function sendBothDocs\(\)/.test(crm) && /if\(d\.stage==='won'\|\|d\.stage==='lost'\|\|d\.converted_client_id\)return null/.test(crm));
+ok('SEND: crm.html action bar headlines "Send proposal & agreement" as the ONE filled button when both exist', /id:'act-send-both',label:'Send proposal & agreement',primary:true/.test(crm) && /primary:!both,on:\(\)=>openBilling\('invoice'\)/.test(crm) && /const FRONT=\[both\?'act-send-both':'act-invoice'/.test(crm));
+ok('SEND: crm.html Billing shows the one button + More (proposal only · agreement only · deposit), and the rows lose their own Send', /id="sendBothBtn" data-send-both="1"/.test(crm) && /id="sendMoreMenu" hidden/.test(crm) && /Send the proposal only/.test(crm) && /Send the agreement only/.test(crm) && /p\.status==='draft'&&!closed&&!both/.test(crm) && /k\.status==='draft'&&!both/.test(crm));
+ok('SEND: crm.html posts the combined route with the pair it showed', /billingSend\('\/sales\/deals\/'\+d\.id\+'\/send','Proposal and agreement sent',\{proposal_id:sb\.getAttribute\('data-prop'\),contract_id:sb\.getAttribute\('data-con'\)\}\)/.test(crm));
+ok('SEND: pipeline.html mirrors it — SEND_BOTH hides the row sends and renders the band + More', /const SEND_BOTH=!!\(draftProp&&draftCon\)/.test(pipeline) && /SEND_BOTH\?'':`<button class="btn" data-send-proposal=/.test(pipeline) && /\(SEND_BOTH\?'':`<button class="btn" data-send-contract=/.test(pipeline) && /id="sendBothBtn" data-prop=/.test(pipeline) && /id="sendMoreMenu" hidden/.test(pipeline));
+ok('SEND: pipeline.html runs the agreement’s blanks guards before the combined send too', /const sb=\$\('sendBothBtn'\);[\s\S]*?confirmBlanks\(k\.body\)[\s\S]*?confirmMoneyBlanks\(k\.body\)[\s\S]*?api\('\/sales\/deals\/'\+id\+'\/send','POST',\{proposal_id:sb\.dataset\.prop,contract_id:sb\.dataset\.con\}\)/.test(pipeline));
+
 // ═══ "Won stays put" ═══
 ok('WON: convert posts to the parent record instead of navigating away', /window\.parent\.postMessage\(\{type:'dds-deal-converted'/.test(pipeline));
 // crm.html carries NO iframes anymore, so a message listener there could never
