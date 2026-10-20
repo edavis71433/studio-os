@@ -10,62 +10,107 @@
 <style>
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
      light/dark/data-theme all follow it automatically) — same aliasing pattern
-     as files.html / customers.html / inbox.html. */
+     as files.html / customers.html / inbox.html. Visual refresh (2026-10): the
+     page follows the approved "Send an update" board — breadcrumb · title +
+     explainer · Who-it-goes-to (the list picker) · Your-message (subject ·
+     message · formatting bar · Insert variable · Preview / Send update ·
+     Help me write it) · Recent broadcasts with a calm empty state. */
   :root{
-    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#6f677d);--line:var(--dds-line,#eee9e0);
-    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);
-    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.primary{color:#171320}}
+  :root[data-theme="dark"] button.primary{color:#171320}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:34px 20px 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:14px 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:15px;margin:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px;box-shadow:var(--shadow);margin-top:16px}
-  .card h2{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 4px}
-  .card .hint{color:var(--soft);font-size:13px;margin:0 0 12px}
-  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
-  input[type=text],textarea,select{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:26px 20px 90px}
+  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ── breadcrumb + page head ── */
+  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 14px;flex-wrap:wrap}
+  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 2px;border-radius:6px}
+  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
+  .crumbs .sep{color:var(--line-strong)}
+  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
+  header h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
+  header .sub{color:var(--soft);font-size:14.5px;margin:6px 0 0;max-width:62ch}
+
+  /* ── cards ── */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-top:16px}
+  .card-h{display:flex;align-items:center;gap:10px}
+  .card-h .cic{width:30px;height:30px;border-radius:var(--dds-r,8px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .card-h .cic svg{width:15px;height:15px}
+  .card h2{font-family:var(--sans);font-weight:600;font-size:15.5px;margin:0}
+  .card .hint{color:var(--faint);font-size:12.5px;margin:2px 0 12px 40px}
+  .card .hint.plain{margin-left:0}
+  label{display:block;font-size:13px;font-weight:500;color:var(--ink);margin:12px 0 5px}
+  input[type=text],textarea,select{width:100%;font-family:inherit;font-size:14.5px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 12px}
+  input[type=text]{height:40px}
+  input[type=text]:focus,textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
   textarea{min-height:150px;resize:vertical;line-height:1.5}
-  input[type=datetime-local]{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px}
-  .segs{display:flex;flex-wrap:wrap;gap:8px}
-  .seg{font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:var(--dds-r,8px);padding:7px 13px;cursor:pointer;text-align:left}
-  .seg.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
-  .seg .n{opacity:.75;font-weight:500}
-  .tokens{font-size:12.5px;color:var(--faint);margin-top:6px}
+  input[type=datetime-local]{font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px}
+  /* the list picker: one row per list, an honest aria-pressed button each */
+  .segs{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden}
+  .seg{display:flex;align-items:center;gap:10px;font-family:inherit;font-size:14px;font-weight:500;border:none;border-top:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 12px;cursor:pointer;text-align:left;width:100%}
+  .seg:first-child{border-top:none}
+  .seg:hover{background:var(--bg)}
+  .seg .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line-strong);flex:0 0 auto;display:grid;place-items:center}
+  .seg .dot::after{content:"";width:8px;height:8px;border-radius:50%;background:transparent}
+  .seg.on{background:var(--p-soft);color:var(--p)}
+  .seg.on .dot{border-color:var(--p)} .seg.on .dot::after{background:var(--p)}
+  .seg .n{margin-left:auto;font-weight:500;color:var(--faint);font-size:13px}
+  .seg.on .n{color:var(--p)}
+  .seg .d{display:block;font-size:12.5px;color:var(--faint);font-weight:400}
+  .nolists{font-size:12.5px;color:var(--faint);margin-top:8px}
+  /* formatting bar under the message */
+  .fmt{display:flex;align-items:center;gap:2px;margin-top:6px;flex-wrap:wrap}
+  .fmt button{font-family:inherit;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--soft);border-radius:6px;width:30px;height:30px;cursor:pointer;display:grid;place-items:center}
+  .fmt button:hover{background:var(--bg);color:var(--ink)}
+  .fmt .sp{width:1px;height:18px;background:var(--line);margin:0 4px}
+  .fmt .insvar{margin-left:auto;position:relative;display:inline-flex;align-items:center;height:30px;border:1px solid var(--line);border-radius:6px;padding:0 8px;font-size:12.5px;font-weight:500;color:var(--ink);background:var(--card);gap:6px}
+  .fmt .insvar select{appearance:none;-webkit-appearance:none;width:auto;font:inherit;font-weight:500;border:none;background:transparent;color:inherit;padding:0 16px 0 0;cursor:pointer;outline:none}
+  .fmt .insvar .car{position:absolute;right:7px;width:11px;height:11px;pointer-events:none;color:var(--soft)}
+  .tokens{font-size:12.5px;color:var(--faint);margin-top:12px}
   .tokens code{background:var(--p-soft);color:var(--p);border-radius:5px;padding:1px 6px;font-size:12px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
-  button.primary{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:10px 20px;cursor:pointer}
-  button.ghost{font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 15px;cursor:pointer}
-  button.ghost:hover{border-color:var(--p);color:var(--p)}
+  .row .grow{flex:1}
+  button.primary{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:0 18px;height:38px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  button.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  button.ghost{font-family:inherit;font-size:13.5px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:0 15px;height:38px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  button.ghost:hover{border-color:var(--line-strong);background:var(--bg)}
+  button.ghost.sm{height:32px;font-size:13px;padding:0 12px}
+  button.linkish{font-family:inherit;font-size:13px;font-weight:500;border:none;background:none;color:var(--p);padding:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px}
+  button.linkish:hover{text-decoration:underline}
   button:disabled{opacity:.5;cursor:default}
   .count{font-size:14px;color:var(--ink);font-weight:600}
   .count .sub{color:var(--soft);font-weight:400;font-size:13px}
-  .preview{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:12px;background:#f4f2ef}
+  .preview{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:12px;background:var(--bg)}
   .preview iframe{width:100%;height:420px;border:0;background:#f4f2ef}
   .preview .subj{padding:10px 14px;font-size:13.5px;color:var(--soft);border-bottom:1px solid var(--line);background:var(--card)}
   .preview .subj b{color:var(--ink)}
-  /* history — leads-style .lhead-lite header on the card */
+  /* history — the roster-style header (title · meta · ↻) */
   .hh{display:flex;align-items:center;gap:10px}
   .hh h2{flex:1;min-width:0}
-  .lbtn{flex:none;font-family:inherit;font-size:16px;line-height:1;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:var(--dds-r,8px);width:34px;height:34px;cursor:pointer}
-  .lbtn:hover{border-color:var(--p);color:var(--p)}
+  .lbtn{flex:none;font-family:inherit;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:var(--dds-r,8px);width:32px;height:32px;cursor:pointer;display:grid;place-items:center}
+  .lbtn:hover{border-color:var(--line-strong);color:var(--p)}
   .lmeta{font-size:12.5px;color:var(--faint);margin:2px 0 12px}
   .notice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--warn-soft);color:var(--warn);border-radius:var(--dds-r,8px);padding:10px 12px;font-size:13.5px;margin:2px 0 4px}
-  .bc{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  .bc{border-top:1px solid var(--line);padding:12px 0}
+  .bc:first-of-type{border-top:none}
   .bchead{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;border-radius:8px}
   .bc .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
-  .bc .subj{font-weight:600;font-size:15px}
+  .bc .subj{font-weight:600;font-size:14.5px}
   .bcdetail{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
   .bcdetail .kv{font-size:13.5px;color:var(--soft)}
   .bcdetail .kv b{color:var(--ink)}
   .bcdetail .preview iframe{height:320px}
   .failnote{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 10px;margin-top:8px}
-  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .bc .st{font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;text-transform:capitalize}
   .st.draft{color:var(--warn);background:var(--warn-soft)}
   .st.scheduled{color:var(--p);background:var(--p-soft)}
@@ -73,7 +118,11 @@
   .st.sending{color:var(--p);background:var(--p-soft)}
   .st.canceled{color:var(--faint);background:var(--line)}
   .bc .meta{font-size:13px;color:var(--soft);margin-top:4px}
-  .bc .acts{display:flex;gap:8px;margin-top:12px}
+  .bc .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .empty{text-align:center;padding:18px 10px 6px}
+  .empty .eic{width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--bg);border:1px solid var(--line);color:var(--soft);display:grid;place-items:center;margin:0 auto 10px}
+  .empty .eic svg{width:17px;height:17px}
+  .empty p{color:var(--faint);font-size:13.5px;margin:0}
   .muted{color:var(--soft);font-size:14.5px}
   .center{text-align:center;padding:50px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
@@ -165,30 +214,53 @@ function askPrompt(title, body, okLabel, placeholder){
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
+const IC={
+  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>',
+  users:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>',
+  pen:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>',
+  mail:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  send:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></svg>',
+  refresh:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>',
+  list:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>',
+  link:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  spark:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>',
+  car:'<svg class="ic car" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+  tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
+};
 function render(){
-  let h=`<div class="rolebadge">● Send an update</div>
+  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/presence.html">${IC.back}Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
     <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">Write one message and send it to your people. You preview it and press send — nothing ever goes out on its own.</p></header>
     <div class="card">
-      <h2>Who it goes to</h2>
+      <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
       <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
       <div class="segs" id="segs">${segsHtml()}</div>
     </div>
     <div class="card">
-      <h2>Your message</h2>
+      <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2>Your message</h2></div>
       <p class="hint">A subject line and your note. You can use simple formatting.</p>
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
       <textarea id="bodytx" placeholder="Hi {{first_name}},&#10;&#10;Write your update here…">${esc(DRAFT&&DRAFT.body||'')}</textarea>
-      <p class="tokens">Personalize with <code>{{first_name}}</code> and <code>{{business_name}}</code> — they fill in for each person.</p>
-      <div class="row">
-        <button class="ghost" id="assist" type="button" title="Ask for a first draft you can edit">✨ Help me write it</button>
-        <button class="ghost" id="preview" type="button">Preview →</button>
+      <div class="fmt" role="toolbar" aria-label="Formatting">
+        <button type="button" data-fmt="bold" aria-label="Bold" title="Bold">B</button>
+        <button type="button" data-fmt="italic" aria-label="Italic" title="Italic"><i>I</i></button>
+        <button type="button" data-fmt="list" aria-label="Bulleted list" title="Bulleted list">${IC.list}</button>
+        <span class="sp" aria-hidden="true"></span>
+        <button type="button" data-fmt="link" aria-label="Link" title="Link">${IC.link}</button>
+        <label class="insvar">${IC.tag}<select id="insvar" aria-label="Insert variable"><option value="">Insert variable</option><option value="{{first_name}}">First name</option><option value="{{business_name}}">Business name</option></select>${IC.car}</label>
       </div>
+      <div class="row">
+        <button class="ghost" id="preview" type="button">Preview →</button>
+        <span class="grow"></span>
+        <button class="primary" id="sendUpdate" type="button">${IC.send}Send update</button>
+      </div>
+      <p class="tokens">Personalize with <code>{{first_name}}</code> and <code>{{business_name}}</code> — they fill in for each person.</p>
+      <button class="linkish" id="assist" type="button" title="Ask for a first draft you can edit">${IC.spark}Help me write it</button>
     </div>
     <div id="stage"></div>
     <div class="card">
-      <div class="hh"><h2>Recent broadcasts</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh broadcasts" title="Refresh">↻</button></div>
+      <div class="hh"><h2>Recent broadcasts</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh broadcasts" title="Refresh">${IC.refresh}</button></div>
       ${histMeta()}
       ${histBody()}
     </div>`;
@@ -196,8 +268,8 @@ function render(){
 }
 // audience picker — or its honest failure notice when the segments read failed
 function segsHtml(){
-  if(!SEG_OK)return `<div class="notice" id="segNotice"><span>Your lists couldn’t load just now, so a send can’t be counted honestly yet.</span> <button class="ghost" id="segRetry" type="button">Try again</button></div>`;
-  return SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" data-seg="${esc(s.key)}" aria-pressed="${s.key===SEL?'true':'false'}"><span>${esc(s.label)}</span> <span class="n">· ${s.count}</span></button>`).join('')||'<span class="muted">No lists yet.</span>';
+  if(!SEG_OK)return `<div class="notice" id="segNotice"><span>Your lists couldn’t load just now, so a send can’t be counted honestly yet.</span> <button class="ghost sm" id="segRetry" type="button">Try again</button></div>`;
+  return SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" type="button" data-seg="${esc(s.key)}" aria-pressed="${s.key===SEL?'true':'false'}"><span class="dot" aria-hidden="true"></span><span><span>${esc(s.label)}</span>${s.description?`<span class="d">${esc(s.description)}</span>`:''}</span> <span class="n">${s.count}</span></button>`).join('')||'<span class="nolists" style="padding:10px 12px">No lists yet.</span>';
 }
 function histMeta(){
   if(!LIST_OK)return '';
@@ -206,7 +278,7 @@ function histMeta(){
 }
 function histBody(){
   if(!LIST_OK)return `<div class="notice" id="bcNotice"><span>Your broadcast history couldn’t load just now.</span> <button class="ghost" id="bcRetry" type="button">Try again</button></div>`;
-  return BROADCASTS.length?BROADCASTS.map(bcCard).join(''):'<p class="muted">Nothing sent yet — your first update will show up here.</p>';
+  return BROADCASTS.length?BROADCASTS.map(bcCard).join(''):`<div class="empty"><span class="eic" aria-hidden="true">${IC.mail}</span><p>Nothing sent yet — your first update will show up here.</p></div>`;
 }
 function bcCard(b){
   const cnt=b.status==='sent'?`${b.sent_count||0} sent${b.skipped_count?' · '+b.skipped_count+' skipped':''}${b.failed_count?' · '+b.failed_count+' failed':''}`
@@ -214,8 +286,8 @@ function bcCard(b){
     :b.status==='draft'?'Draft — not sent':b.status;
   const open=OPEN===b.id;
   const acts=[];
-  if(b.status==='draft')acts.push(`<button class="ghost" data-edit="${esc(b.id)}">Edit draft</button>`);
-  if(b.status==='scheduled'){acts.push(`<button class="ghost" data-cancel="${esc(b.id)}">Cancel</button>`);acts.push(`<button class="ghost" data-resched="${esc(b.id)}">Reschedule</button>`);}
+  if(b.status==='draft')acts.push(`<button class="ghost sm" data-edit="${esc(b.id)}">Edit draft</button>`);
+  if(b.status==='scheduled'){acts.push(`<button class="ghost sm" data-cancel="${esc(b.id)}">Cancel</button>`);acts.push(`<button class="ghost sm" data-resched="${esc(b.id)}">Reschedule</button>`);}
   return `<div class="bc" data-bc="${esc(b.id)}">
     <button class="bchead" type="button" data-open="${esc(b.id)}" aria-expanded="${open?'true':'false'}">
       <span class="top"><span class="subj">${esc(b.subject||'(no subject)')}</span><span class="st ${esc(b.status)}">${esc(b.status)}</span></span>
@@ -229,6 +301,12 @@ function wire(){
   document.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{SEL=b.getAttribute('data-seg');syncDraftFromForm();render();}));
   const a=$('assist');if(a)a.addEventListener('click',assist);
   const p=$('preview');if(p)p.addEventListener('click',doPreview);
+  // "Send update" takes the same road as Preview: the message is saved as a draft
+  // and the Preview & send stage opens — the owner still presses Send there.
+  // Nothing goes out from this button on its own (the page's one rule).
+  const su=$('sendUpdate');if(su)su.addEventListener('click',()=>doPreview().then(()=>{const b=$('send');if(b)b.focus();}));
+  document.querySelectorAll('[data-fmt]').forEach(b=>b.addEventListener('click',()=>applyFormat(b.getAttribute('data-fmt'))));
+  const iv=$('insvar');if(iv)iv.addEventListener('change',()=>{if(iv.value)insertAtCaret(iv.value);iv.value='';});
   document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelBc(b.getAttribute('data-cancel'))));
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>editDraft(b.getAttribute('data-edit'))));
   document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
@@ -266,7 +344,7 @@ async function loadDetail(id){
   let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
   if(gen!==DET_SEQ||OPEN!==id)return;   // a newer drill-in started, or the row was closed — never paint stale
   if(!r.ok||!r.body.data){
-    box.innerHTML='<p class="muted">Couldn’t open this one just now. <button class="ghost" data-dretry type="button">Try again</button></p>';
+    box.innerHTML='<p class="muted">Couldn’t open this one just now. <button class="ghost sm" data-dretry type="button">Try again</button></p>';
     const rt=box.querySelector('[data-dretry]');if(rt)rt.addEventListener('click',()=>loadDetail(id));
     return;
   }
@@ -305,6 +383,35 @@ async function reschedule(id){
   BUSY=false;
   if(!r.ok||!r.body.data){toast('Couldn’t open that one just now.');return;}
   stageFor(id,r.body.data,{scheduleFirst:true,laterLabel:'Reschedule'});
+}
+// ── the formatting bar: plain markdown the email renderer understands
+//    (lib/markdown.ts: **bold**, *italic*, "- " lists, [text](url)) ───────────
+function insertAtCaret(text){
+  const t=$('bodytx');if(!t)return;
+  const a=t.selectionStart||0,b=t.selectionEnd||0;
+  t.value=t.value.slice(0,a)+text+t.value.slice(b);
+  t.focus();t.selectionStart=t.selectionEnd=a+text.length;
+  t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function applyFormat(kind){
+  const t=$('bodytx');if(!t)return;
+  const a=t.selectionStart||0,b=t.selectionEnd||0,sel=t.value.slice(a,b);
+  let out='',cs=a,ce=b;
+  if(kind==='bold'){out='**'+(sel||'bold text')+'**';cs=a+2;ce=cs+(sel||'bold text').length;}
+  else if(kind==='italic'){out='*'+(sel||'italic text')+'*';cs=a+1;ce=cs+(sel||'italic text').length;}
+  else if(kind==='link'){const tx=sel||'link text';out='['+tx+'](https://)';cs=a+tx.length+3;ce=a+out.length-1;}
+  else if(kind==='list'){
+    // every line in the selection becomes a bullet; an empty selection starts one
+    const ls=t.value.lastIndexOf('\n',a-1)+1;
+    const block=t.value.slice(ls,b);
+    const lined=(block||'First item').split('\n').map(l=>l.replace(/^- /,'')).map(l=>'- '+l).join('\n');
+    t.value=t.value.slice(0,ls)+lined+t.value.slice(b);
+    t.focus();t.selectionStart=ls;t.selectionEnd=ls+lined.length;
+    t.dispatchEvent(new Event('input',{bubbles:true}));return;
+  }
+  t.value=t.value.slice(0,a)+out+t.value.slice(b);
+  t.focus();t.selectionStart=cs;t.selectionEnd=ce;
+  t.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=t.value;}}
 
@@ -359,7 +466,7 @@ function stageFor(id,d,opts){
   const sat=d.broadcast&&d.broadcast.scheduled_at;
   if(later&&sat){const dt=new Date(sat);const pad=(n)=>String(n).padStart(2,'0');pre=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;}
   $('stage').innerHTML=`<div class="card">
-    <h2>Preview & send</h2>
+    <div class="card-h"><span class="cic" aria-hidden="true">${IC.mail}</span><h2>Preview & send</h2></div>
     <p class="hint">This is exactly what lands in their inbox.</p>
     <div class="count">${cnt} ${cnt===1?'person':'people'} will get this${skip}</div>
     <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||'')}</b></div><iframe id="pvframe" title="Email preview" sandbox=""></iframe></div>
@@ -370,8 +477,8 @@ function stageFor(id,d,opts){
       <input type="datetime-local" id="when" value="${esc(pre)}" style="display:${later?'inline-block':'none'}">
     </div>
     <div class="row">
-      <button class="primary" id="send" ${cnt?'':'disabled'}>${later?laterLabel:(cnt?'Send now':'No one to send to')}</button>
-      <button class="ghost" id="reedit">${later?'Never mind':'Keep editing'}</button>
+      <button class="primary" id="send" type="button" ${cnt?'':'disabled'}>${later?laterLabel:(cnt?'Send now':'No one to send to')}</button>
+      <button class="ghost" id="reedit" type="button">${later?'Never mind':'Keep editing'}</button>
     </div>
   </div>`;
   // sandboxed preview via srcdoc (isolated, no scripts run)
@@ -422,7 +529,7 @@ async function cancelBc(id){
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to send an update.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 // Try again retries load() IN PLACE — never location.reload() (the leads.html contract).
-function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
+function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" type="button">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
 
 // ── Boot reads run in PARALLEL (D6) with per-read failure honesty ────────────
 // One read failing degrades ITS section with a visible notice (never a quietly

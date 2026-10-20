@@ -11,74 +11,116 @@
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
      light/dark/data-theme all follow it automatically) — same aliasing pattern
      as crm.html / contacts.html / inbox.html (SS6, C5: the hand-maintained
-     dark-theme copy is retired). */
+     dark-theme copy is retired). Visual refresh (2026-10): the page follows the
+     approved "Website enquiries" board — breadcrumb · icon tile · title + meta ·
+     New enquiry · chip filters · search/filter/sort · one card per enquiry. */
   :root{
-    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
-    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);
-    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lead .acts a.reply{color:#171320}}
-  :root[data-theme="dark"] .lead .acts a.reply{color:#171320}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lead .acts a.reply,:root:not([data-theme="light"]) .btn.primary,:root:not([data-theme="light"]) #convForm button.primary,:root:not([data-theme="light"]) #newForm button.primary{color:#171320}}
+  :root[data-theme="dark"] .lead .acts a.reply,:root[data-theme="dark"] .btn.primary,:root[data-theme="dark"] #convForm button.primary,:root[data-theme="dark"] #newForm button.primary{color:#171320}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:34px 20px 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:5px 12px}
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — slice 7 polish:
-        the same .lhead/.lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html/
-        contacts.html/inbox.html, header ONLY (the card feed stays — it's a
-        triage queue, not a roster). ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin:14px 0 0}
-  .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
-  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
-  .lbtn:hover{color:var(--p);background:var(--p-soft)}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .filters{display:flex;gap:8px;margin:16px 0 6px}
-  .filters button{font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--soft);border-radius:var(--dds-r,8px);padding:6px 13px;cursor:pointer}
-  .filters button.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
-  /* ── C2 search — the rosters' .search anatomy (contacts.html), kept in sync by hand ── */
-  .bar{display:flex;gap:8px;margin:0 0 10px;align-items:center}
-  .search{flex:1;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
-  .search:focus{border-color:var(--p)}
-  .lead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:26px 20px 90px}
+  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+  /* ── breadcrumb + page head (the refresh anatomy: crumbs · icon tile · serif title · meta · actions) ── */
+  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 14px;flex-wrap:wrap}
+  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 2px;border-radius:6px}
+  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
+  .crumbs .sep{color:var(--line-strong)}
+  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
+  .phead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .pic{width:40px;height:40px;border-radius:var(--dds-r-lg,10px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .pic svg{width:20px;height:20px}
+  .ptitle{flex:1;min-width:0}
+  .phead h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
+  .lmeta{font-size:13px;color:var(--faint);margin-top:4px}
+  .pacts{display:flex;gap:8px;align-items:center;flex:0 0 auto}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+  .btn:hover{border-color:var(--line-strong);background:var(--bg)}
+  .btn.primary{background:var(--p);border-color:var(--p);color:#fff}
+  .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  .btn.iconb{width:34px;padding:0;justify-content:center;color:var(--soft)}
+  .btn.iconb:hover{color:var(--p)}
+  .btn:disabled{opacity:.55;cursor:default}
+  /* the standalone-shell fallback (no sidebar): keep the old refresh control reachable */
+  .lbtn{display:none}
+
+  /* ── chip filters (an honest role=group with aria-pressed) ── */
+  .filters{display:flex;gap:6px;margin:18px 0 10px;flex-wrap:wrap}
+  .filters button{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:5px 12px;cursor:pointer;transition:.15s}
+  .filters button:hover{border-color:var(--line-strong);color:var(--ink)}
+  .filters button.on{background:var(--p-soft);color:var(--p);border-color:transparent}
+  .filters .n{font-size:11.5px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
+  .filters button.on .n{background:var(--p);color:#fff}
+  /* ── search · filter · sort (C2 search keeps its static-input contract) ── */
+  .bar{display:flex;gap:8px;margin:0 0 14px;align-items:center;flex-wrap:wrap}
+  .sbox{flex:1 1 240px;position:relative;min-width:0}
+  .sbox svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+  .search{width:100%;font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px 8px 36px;outline:none;height:38px}
+  .search:focus{border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .sel{position:relative;display:inline-flex;align-items:center;height:38px;border:1px solid var(--line);background:var(--card);border-radius:var(--dds-r,8px);color:var(--ink);padding:0 10px;gap:6px;font-size:13.5px;font-weight:500}
+  .sel:focus-within{border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .sel svg{color:var(--soft)}
+  .sel select{appearance:none;-webkit-appearance:none;font:inherit;font-weight:500;border:none;background:transparent;color:inherit;padding:0 18px 0 0;cursor:pointer;outline:none;max-width:160px}
+  .sel .car{position:absolute;right:9px;top:50%;transform:translateY(-50%);width:12px;height:12px;pointer-events:none}
+
+  /* ── one card per enquiry: avatar · name + kind + time · email · message · actions ── */
+  .lead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px;display:flex;gap:14px}
   .lead.new{border-left:3px solid var(--p)}
-  .lead .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .lead .who{font-weight:600;font-size:15.5px}
-  .lead .kindtag{font-size:12px;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;font-weight:500}
-  .lead .when{font-size:12.5px;color:var(--faint)}
-  .lead .contact{font-size:13.5px;color:var(--soft);margin-top:2px}
-  .lead .contact a{color:var(--p);text-decoration:none}
-  .lead .msg{margin-top:10px;font-size:14.5px;white-space:pre-wrap}
-  .lead .acts{display:flex;gap:8px;margin-top:14px}
-  .lead .acts button{font-family:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:var(--dds-r,8px);padding:6px 13px;cursor:pointer}
-  .lead .acts button:hover{border-color:var(--p);color:var(--p)}
-  /* Phase 4 (triage): Spam is a quiet text button; the shelf chip says where a row went */
-  .lead .acts button.quiet{border-color:transparent;color:var(--faint)}
-  .lead .acts button.quiet:hover{border-color:var(--line);color:var(--ink)}
-  .lead .acts .stchip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p);margin-left:auto}
+  .av{width:38px;height:38px;border-radius:50%;background:var(--p-soft);color:var(--p);font-size:13px;font-weight:600;display:grid;place-items:center;flex:0 0 auto;letter-spacing:.02em}
+  .lbody{flex:1;min-width:0}
+  .lead .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .lead .who{font-weight:600;font-size:15px}
+  .lead .kindtag{font-size:12px;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 9px;font-weight:500}
+  .lead .when{font-size:12.5px;color:var(--faint);margin-left:auto;white-space:nowrap}
+  .lead .contact{font-size:13.5px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}
+  .lead .contact a{color:var(--soft);text-decoration:none}
+  .lead .contact a:hover{color:var(--p);text-decoration:underline}
+  .lead .msg{margin-top:10px;font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .lead .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .lead .acts button,.lead .acts a.reply{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:7px 13px;cursor:pointer;text-decoration:none;transition:.15s}
+  .lead .acts button:hover{border-color:var(--line-strong);background:var(--bg)}
+  .lead .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
+  .lead .acts a.reply:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  /* Phase 4 (triage): Spam is a quiet text button at the row's far end; the shelf chip says where a row went */
+  .lead .acts button.quiet{border-color:transparent;background:transparent;color:var(--faint);margin-left:auto}
+  .lead .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
+  .lead .acts .stchip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--p-soft);color:var(--p)}
   .lead .acts .stchip.not_a_fit,.lead .acts .stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
-  /* Phase 2: the Make-customer dialog */
-  dialog#convDlg{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:460px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:var(--dds-shadow-pop,0 20px 60px rgba(0,0,0,.25))}
-  dialog#convDlg::backdrop{background:rgba(21,20,26,.4)}
-  #convForm{padding:18px 20px}
-  #convForm h3{margin:0 0 4px;font-size:16px;font-weight:600}
-  #convForm label{display:block;font-size:12.5px;color:var(--soft);margin:12px 0 4px}
-  #convForm label.check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13.5px;margin-top:14px}
-  #convForm input[type=text],#convForm input[type=email]{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
-  #convForm .small{font-size:12.5px;margin-top:10px}
-  #convForm .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
-  #convForm button{font:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer}
-  #convForm button.primary{background:var(--p);border-color:var(--p);color:#fff}
-  #convForm button:disabled{opacity:.6;cursor:default}
-  .lead .acts a.reply{background:var(--p);color:#fff;border:1px solid var(--p);border-radius:var(--dds-r,8px);padding:6px 14px;text-decoration:none;font-size:12.5px;font-weight:500}
+  @media (max-width:600px){.phead{gap:10px}.phead h1{font-size:24px}.pacts{flex-basis:100%;justify-content:flex-end}.lead{padding:14px}.lead .when{margin-left:0;flex-basis:100%}.lead .acts button.quiet{margin-left:0}}
+
+  /* ── dialogs: Make-customer (Phase 2) and Log-an-enquiry (the board's New enquiry) ── */
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:460px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:var(--dds-shadow-pop,0 20px 60px rgba(0,0,0,.25))}
+  dialog::backdrop{background:rgba(21,20,26,.4)}
+  #convForm,#newForm{padding:18px 20px}
+  #convForm h3,#newForm h3{margin:0 0 4px;font-size:16px;font-weight:600}
+  #convForm label,#newForm label{display:block;font-size:12.5px;color:var(--soft);margin:12px 0 4px}
+  #convForm label.check,#newForm label.check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13.5px;margin-top:14px}
+  #convForm input[type=text],#convForm input[type=email],#newForm input[type=text],#newForm input[type=email],#newForm input[type=tel],#newForm textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
+  #newForm textarea{min-height:76px;resize:vertical}
+  #convForm input:focus,#newForm input:focus,#newForm textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  #convForm .small,#newForm .small{font-size:12.5px;margin-top:10px}
+  #convForm .row2,#newForm .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  #convForm button,#newForm button{font:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;cursor:pointer}
+  #convForm button.primary,#newForm button.primary{background:var(--p);border-color:var(--p);color:#fff}
+  #convForm button:disabled,#newForm button:disabled{opacity:.6;cursor:default}
+
   .muted{color:var(--soft);font-size:14.5px}
   .center{text-align:center;padding:56px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .empty{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:44px 20px;text-align:center;box-shadow:var(--shadow)}
+  .empty .eic{width:40px;height:40px;border-radius:var(--dds-r-lg,10px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;margin:0 auto 12px}
+  .empty .eic svg{width:20px;height:20px}
+  .empty h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 6px}
+  .empty p{color:var(--soft);font-size:14px;max-width:38ch;margin:0 auto}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
@@ -109,6 +151,26 @@
     <div class="row2"><button type="button" id="conv-cancel">Not now</button><button type="submit" class="primary" id="conv-go">Make customer</button></div>
   </form>
 </dialog>
+<!-- Visual refresh: "New enquiry" — log someone who reached out by phone or in
+     person. Reuses the existing contact + deal routes (POST /sales/contacts,
+     POST /sales/deals with source:'manual'); the website form stays the only
+     source of rows in THIS queue. -->
+<dialog id="newDlg" aria-labelledby="newTitle">
+  <form method="dialog" id="newForm">
+    <h3 id="newTitle">Log an enquiry</h3>
+    <p class="muted">Someone reached out by phone or in person? Put them in Customers so nothing slips.</p>
+    <label for="ne-name">Name</label>
+    <input id="ne-name" type="text" maxlength="120" autocomplete="off">
+    <label for="ne-email">Email</label>
+    <input id="ne-email" type="email" maxlength="160" autocomplete="off">
+    <label for="ne-phone">Phone <span class="muted">(optional)</span></label>
+    <input id="ne-phone" type="tel" maxlength="40" autocomplete="off">
+    <label for="ne-msg">What did they ask? <span class="muted">(optional)</span></label>
+    <textarea id="ne-msg" maxlength="2000" placeholder="e.g. Wants a quote for a patio before spring"></textarea>
+    <label class="check"><input id="ne-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
+    <div class="row2"><button type="button" id="ne-cancel">Not now</button><button type="submit" class="primary" id="ne-go">Log enquiry</button></div>
+  </form>
+</dialog>
 <!-- PT-5: one-time contextual tip -->
 <div class="dds-hint" data-hint="leads-reply" hidden>Replying to someone here marks their message as handled — no extra step.</div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -119,7 +181,7 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",ALL=[],FILTER='open',Q="",LOADED_AT=Date.now();
+let TOKEN="",ALL=[],FILTER='open',Q="",KIND_F='all',SORT='newest',LOADED_AT=Date.now();
 // SS6 shared ~150ms debounce — kept in sync by hand with contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
@@ -132,32 +194,62 @@ function when(iso){const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(
 // only rewrites <a href> anchors) — the same idiom as contacts.html openDetail.
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
+// the avatar's two letters — first + last name initials, else the first letter of whatever we have
+function initials(l){const n=String(l.name||'').trim();if(n){const p=n.split(/\s+/);return((p[0][0]||'')+(p.length>1?p[p.length-1][0]:'')).toUpperCase();}const e=String(l.email||l.phone||'').trim();return e?e[0].toUpperCase():'?';}
+// inline icons (stroke = currentColor; aria-hidden — the text beside them is the name)
+const IC={
+  inbox:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M4 14h4l2 3h4l2-3h4"/></svg>',
+  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>',
+  plus:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  refresh:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>',
+  search:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  funnel:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg>',
+  car:'<svg class="ic car" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+  arrow:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  flag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/></svg>',
+};
 
-// the rows the queue shows: status filter first, then the C2 search across
-// everything a row displays (name · email · phone · message)
+// the rows the queue shows: status filter first, then the kind filter and the
+// C2 search across everything a row displays (name · email · phone · message),
+// in the chosen order (newest first by default)
 function leadRows(){
   const q=Q.trim().toLowerCase();
   // Open = still in play (new, read, replied, converted); Not a fit / archived only under All
-  return ALL.filter(l=>FILTER==='open'?(l.status!=='archived'&&l.status!=='not_a_fit'):FILTER==='new'?l.status==='new':true)
+  const rows=ALL.filter(l=>FILTER==='open'?(l.status!=='archived'&&l.status!=='not_a_fit'):FILTER==='new'?l.status==='new':true)
+    .filter(l=>KIND_F==='all'||(l.form_kind||'contact')===KIND_F)
     .filter(l=>!q||((l.name||'')+' '+(l.email||'')+' '+(l.phone||'')+' '+(l.message||'')).toLowerCase().includes(q));
+  const t=(l)=>Date.parse(l.created_at)||0;
+  return rows.slice().sort((a,b)=>SORT==='oldest'?t(a)-t(b):t(b)-t(a));
 }
 function render(){
   const unread=ALL.filter(l=>l.status==='new').length;
-  let h=`<div class="rolebadge">● Website enquiries</div>
-    <header class="lhead">
-      <div class="lrow1">
-        <span class="obj-ic" aria-hidden="true">📥</span>
-        <h1 id="pagehead" tabindex="-1">Website enquiries</h1>
-        <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+  const open=ALL.filter(l=>l.status!=='archived'&&l.status!=='not_a_fit').length;
+  const chip=(f,label,n)=>`<button aria-pressed="${FILTER===f?'true':'false'}" data-f="${f}" class="${FILTER===f?'on':''}">${label}${n?` <span class="n">${n}</span>`:''}</button>`;
+  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/presence.html">${IC.back}Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Enquiries</span></nav>
+    <header class="phead">
+      <span class="pic" aria-hidden="true">${IC.inbox}</span>
+      <div class="ptitle"><h1 id="pagehead" tabindex="-1">Website enquiries</h1><div class="lmeta" id="lmeta"></div></div>
+      <div class="pacts">
+        <button class="btn iconb" id="refreshBtn" aria-label="Refresh" title="Refresh">${IC.refresh}</button>
+        <button class="btn primary" id="newEnq" type="button">${IC.plus}New enquiry</button>
       </div>
-      <div class="lmeta" id="lmeta"></div>
     </header>
     <div class="filters" role="group" aria-label="Filter enquiries">
-      <button aria-pressed="${FILTER==='open'?'true':'false'}" data-f="open" class="${FILTER==='open'?'on':''}">Open</button>
-      <button aria-pressed="${FILTER==='new'?'true':'false'}" data-f="new" class="${FILTER==='new'?'on':''}">New${unread?' ('+unread+')':''}</button>
-      <button aria-pressed="${FILTER==='all'?'true':'false'}" data-f="all" class="${FILTER==='all'?'on':''}">All</button>
+      ${chip('open','Open',open)}${chip('new','New',unread)}${chip('all','All',0)}
     </div>
-    <div class="bar"><input class="search" id="q" type="search" aria-label="Search enquiries" placeholder="Search name, email, or message…" value="${esc(Q)}"></div>
+    <div class="bar">
+      <div class="sbox">${IC.search}<input class="search" id="q" type="search" aria-label="Search enquiries" placeholder="Search name, email, or message…" value="${esc(Q)}"></div>
+      <label class="sel">${IC.funnel}<select id="kindf" aria-label="Filter by kind">
+        <option value="all"${KIND_F==='all'?' selected':''}>Filter</option>
+        <option value="quote"${KIND_F==='quote'?' selected':''}>Quotes</option>
+        <option value="booking"${KIND_F==='booking'?' selected':''}>Bookings</option>
+        <option value="contact"${KIND_F==='contact'?' selected':''}>Messages</option>
+      </select>${IC.car}</label>
+      <label class="sel"><select id="sortf" aria-label="Sort enquiries">
+        <option value="newest"${SORT==='newest'?' selected':''}>Newest</option>
+        <option value="oldest"${SORT==='oldest'?' selected':''}>Oldest</option>
+      </select>${IC.car}</label>
+    </div>
     <div id="leadlist"></div>`;
   $('main').innerHTML=h;wire();renderLeadList();
 }
@@ -172,23 +264,24 @@ function renderLeadList(){
   const lm=$('lmeta');if(lm)lm.textContent=`${rows.length} enquir${rows.length===1?'y':'ies'}${unread?` · ${unread} new`:''} · ${updatedLabel()}`;
   let h='';
   if(!rows.length){
-    h=Q.trim()?`<p class="muted" style="text-align:center;padding:30px">No enquiries match “${esc(Q)}”.</p>`
-      :`<div class="center"><h2>Nothing yet.</h2><p class="muted">When someone fills in your website's contact form, it lands here — and in Customers.</p><p style="margin-top:16px"><a class="link" href="/crm.html">Open Customers →</a></p></div>`;
+    h=(Q.trim()||KIND_F!=='all')?`<p class="muted" style="text-align:center;padding:30px">No enquiries match${Q.trim()?` “${esc(Q)}”`:' that filter'}.</p>`
+      :`<div class="empty"><span class="eic" aria-hidden="true">${IC.inbox}</span><h2>Nothing yet.</h2><p>When someone fills in your website's contact form, it lands here — and in Customers.</p><p style="margin-top:14px"><a class="link" href="/crm.html">Open Customers →</a></p></div>`;
   }else for(const l of rows){
     const who=esc(l.name||l.email||l.phone||'Someone');
     h+=`<div class="lead ${l.status==='new'?'new':''}">
-      <div class="top"><span class="who">${who}</span><span class="when">${esc(when(l.created_at))}</span></div>
-      <div class="top"><span class="kindtag">${esc(KIND[l.form_kind]||'Message')}</span></div>
+      <span class="av" aria-hidden="true">${esc(initials(l))}</span>
+      <div class="lbody">
+      <div class="top"><span class="who">${who}</span><span class="kindtag">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>
       <div class="contact">${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}${l.email&&l.phone?' · ':''}${l.phone?`<a href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''}</div>
       ${l.message?`<div class="msg">${esc(l.message)}</div>`:''}
       <div class="acts">
-        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">Call</a>`:'')}
+        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">${IC.arrow}Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">${IC.arrow}Call</a>`:'')}
         ${l.converted?`<a class="reply" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${(l.converted||!l.email)?'':`<button data-convert="${esc(l.id)}" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
         ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
-        ${l.converted?'':`<button data-arch="${esc(l.id)}" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button><button class="quiet" data-spam="${esc(l.id)}" title="A bot or a vendor pitch — hidden for good">Spam</button>`}
+        ${l.converted?'':`<button data-arch="${esc(l.id)}" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button><button class="quiet" data-spam="${esc(l.id)}" title="A bot or a vendor pitch — hidden for good">${IC.flag}Spam</button>`}
         ${STATUS_LABEL[l.status]?`<span class="stchip ${esc(l.status)}">${STATUS_LABEL[l.status]}</span>`:''}
-      </div></div>`;
+      </div></div></div>`;
   }
   host.innerHTML=h;wireList();
 }
@@ -205,12 +298,16 @@ function wire(){
   document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{FILTER=b.getAttribute('data-f');render();}));
   // C2 search — debounced (~150ms), list-only re-render: no keystroke rebuilds
   const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderLeadList();}));
+  // kind filter + sort: list-only re-renders too (the controls keep their own state)
+  const kf=$('kindf');if(kf)kf.addEventListener('change',()=>{KIND_F=kf.value;renderLeadList();});
+  const sf=$('sortf');if(sf)sf.addEventListener('change',()=>{SORT=sf.value;renderLeadList();});
   // list-view refresh (slice 7 header polish) — re-load in SOFT mode (a failed
   // refresh toasts and keeps the current list — never the full-page error that
   // would destroy the list and the button), then return focus to the control
   // (the rosters' pattern). NOTE: load must be wrapped, never passed as the
   // handler — the click event would become its soft flag.
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.')));
+  const ne=$('newEnq');if(ne)ne.addEventListener('click',openNew);
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
 }
 // row-level actions live in the list zone (re-wired on every list re-render)
@@ -223,6 +320,34 @@ function wireList(){
   document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&(l.status==='new'||l.status==='read'))setStatus(id,'replied',true);}));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));
   document.querySelectorAll('[data-convert]').forEach(b=>b.addEventListener('click',()=>openConvert(b.getAttribute('data-convert'))));
+}
+// Visual refresh: "New enquiry" — a phone or walk-in enquiry becomes a contact
+// (+ a manual deal) through the routes the page already uses; nothing new server-side.
+function openNew(){
+  const dlg=$('newDlg'); if(!dlg)return;
+  $('ne-name').value='';$('ne-email').value='';$('ne-phone').value='';$('ne-msg').value='';$('ne-deal').checked=true;
+  if(!dlg.open)dlg.showModal();   // showModal() focuses the first field (Name) itself — no timer, no WebKit focus race
+  $('ne-cancel').onclick=()=>dlg.close();
+  $('newForm').onsubmit=async(e)=>{
+    e.preventDefault();
+    const name=$('ne-name').value.trim(),email=$('ne-email').value.trim(),phone=$('ne-phone').value.trim(),msg=$('ne-msg').value.trim();
+    if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.');return;}
+    const go=$('ne-go'); go.disabled=true; go.textContent='Logging…';
+    try{
+      const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):''});
+      if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.');return;}
+      const contactId=c.body&&c.body.data&&c.body.data.id;
+      let dealId=null;
+      if($('ne-deal').checked){
+        const d=await api('/sales/deals','POST',{title:name||email||phone,contact_id:contactId,source:'manual',notes:msg?('Enquiry: '+msg):''});
+        if(d.ok)dealId=d.body&&d.body.data&&d.body.data.id;
+      }
+      dlg.close(); go.disabled=false; go.textContent='Log enquiry';
+      toast(dealId?'Logged — they’re in your pipeline.':'Logged — they’re in Customers.');
+      const href=dealId?('/crm.html?deal='+encodeURIComponent(dealId)+'&tab=deal'):(contactId?('/crm.html?contact='+encodeURIComponent(contactId)):'/contacts.html');
+      setTimeout(()=>{location.href=scoped(href);},800);
+    }catch(_){go.disabled=false;go.textContent='Log enquiry';toast('Couldn’t log that just now.');}
+  };
 }
 // Phase 2 (one customer model): Convert = contact + customer (+ deal) from ONE
 // enquiry, no re-typing. The customer route (POST /sales/customers) provisions
@@ -285,7 +410,7 @@ async function createDeal(id){
   }catch(_){toast('Couldn’t start that deal.');}
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your enquiries.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" style="font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your enquiries just now.</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="btn primary" type="button">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
 // soft=true (the refresh button): any failure keeps the current list and toasts —
 // the full-page error screens are for the initial load only.
 // REQ_SEQ (SS6): a superseded load must never paint — only the newest request's

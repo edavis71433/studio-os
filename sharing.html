@@ -7,45 +7,90 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
+     light/dark/data-theme all follow it automatically) — the hand-maintained
+     four-block copy this page carried is retired. Visual refresh (2026-10): the
+     page follows the approved "Sharing & access" board — breadcrumb · title +
+     explainer with the two-avatar illustration · Invite-a-client card (email ·
+     role · Send invite) · "What clients see" rows with a switch + Visible/Hidden. */
+  :root{
+    --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#f1edfa);
+    --good:var(--dds-good,#15713d);--good-soft:var(--dds-good-soft,#e6f5ec);--warn:var(--dds-warn,#975208);--warn-soft:var(--dds-warn-soft,#fdf2e2);
+    --info:var(--dds-info,#2a6fb5);--info-soft:var(--dds-info-soft,#e8f1fb);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(21,20,26,.04));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
   /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.pri{color:#171320}}
   :root[data-theme="dark"] button.pri{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:38px 20px 90px}
-  a.back{font-size:13px;color:var(--soft);text-decoration:none}a.back:hover{color:var(--p)}
-  h1{font-family:var(--serif);font-weight:500;font-size:30px;margin:14px 0 .1em}
-  .sub{color:var(--soft);font-size:15px;margin:0 0 26px;max-width:54ch}
-  h2{font-size:12.5px;color:var(--faint);font-weight:500;margin:30px 0 12px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:8px 6px;box-shadow:var(--shadow)}
-  .rowitem{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)}
+  .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:26px 20px 90px}
+  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+  /* ── breadcrumb + page head ── */
+  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 14px;flex-wrap:wrap}
+  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 2px;border-radius:6px}
+  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
+  .crumbs .sep{color:var(--line-strong)}
+  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
+  header.phead{display:flex;align-items:flex-start;gap:18px}
+  .ptitle{flex:1;min-width:0}
+  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
+  .sub{color:var(--soft);font-size:14px;margin:6px 0 0;max-width:54ch}
+  .illo{width:112px;height:64px;flex:0 0 auto}
+  @media (max-width:480px){.illo{display:none}}
+
+  /* ── cards ── */
+  .seclab{font-size:13px;font-weight:500;color:var(--soft);margin:22px 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
+  .card.pad{padding:18px 20px;margin-top:20px}
+  h2{font-family:var(--sans);font-size:15.5px;font-weight:600;color:var(--ink);margin:0 0 12px}
+  .invite{display:flex;gap:9px;flex-wrap:wrap}
+  .invite input{flex:1 1 180px;min-width:0;font-family:inherit;font-size:14px;padding:0 12px;height:38px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
+  .invite input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .sel{position:relative;display:inline-flex;align-items:center;height:38px;border:1px solid var(--line);background:var(--card);border-radius:var(--dds-r,8px);color:var(--ink);padding:0 10px;font-size:13.5px;font-weight:500;flex:0 0 auto}
+  .sel:focus-within{border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .sel select{appearance:none;-webkit-appearance:none;font:inherit;font-weight:500;border:none;background:transparent;color:inherit;padding:0 18px 0 0;cursor:pointer;outline:none}
+  .sel .car{position:absolute;right:9px;top:50%;transform:translateY(-50%);width:12px;height:12px;pointer-events:none;color:var(--soft)}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:10px}
+  button{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 14px;height:38px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  button:hover{border-color:var(--line-strong);background:var(--bg)} button:disabled{opacity:.55;cursor:default}
+  button.pri{background:var(--p);color:#fff;border-color:var(--p)} button.pri:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  button.sm{height:30px;font-size:12.5px;padding:0 10px}
+  /* people rows (inside the invite card, once someone has access) */
+  .people{margin-top:14px;border-top:1px solid var(--line)}
+  .rowitem{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
   .rowitem:last-child{border-bottom:none}
-  .rowitem .t{font-weight:600;font-size:14.5px} .rowitem .d{font-size:12.5px;color:var(--faint)}
-  .rowitem .grow{flex:1;min-width:0}
-  .invite{display:flex;gap:9px;flex-wrap:wrap;padding:14px 15px}
-  .invite input{flex:1;min-width:180px;font-family:inherit;font-size:14px;padding:10px 13px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);color:var(--ink)}
-  button{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 15px;cursor:pointer}
-  button:hover{border-color:var(--p);color:var(--p)} button.pri{background:var(--p);color:#fff;border-color:var(--p)} button.pri:hover{background:var(--p-deep);color:#fff}
-  .sw{position:relative;width:44px;height:25px;border-radius:999px;background:var(--line);cursor:pointer;flex:0 0 auto;border:none;transition:.15s}
+  .people .rowitem{padding:11px 0}
+  .rowitem .t{font-weight:500;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap} .rowitem .d{font-size:12.5px;color:var(--faint)}
+  .rowitem .grow{flex:1;min-width:0;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:1px}
+  .rowitem .acts{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
+  /* surface rows: icon tile · title + description · switch · Visible/Hidden */
+  .tile{width:34px;height:34px;border-radius:var(--dds-r,8px);display:grid;place-items:center;flex:0 0 auto;background:var(--bg);color:var(--soft)}
+  .tile svg{width:16px;height:16px}
+  .tile.p{background:var(--p-soft);color:var(--p)} .tile.good{background:var(--good-soft);color:var(--good)} .tile.info{background:var(--info-soft);color:var(--info)} .tile.warn{background:var(--warn-soft);color:var(--warn)}
+  .sw{position:relative;width:40px;height:22px;border-radius:999px;background:var(--line-strong);cursor:pointer;flex:0 0 auto;border:none;padding:0;transition:.15s}
   .sw[aria-checked="true"]{background:var(--p)}
-  .sw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.15s}
-  .sw[aria-checked="true"]::after{transform:translateX(19px)}
-  .locked{opacity:.6} .pill{font-size:11px;font-weight:600;color:var(--soft);background:var(--line);border-radius:999px;padding:3px 9px}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:.15s}
+  .sw[aria-checked="true"]::after{transform:translateX(18px)}
+  .state{font-size:12.5px;color:var(--faint);width:46px;text-align:right;flex:0 0 auto}
+  .state.on{color:var(--p);font-weight:500}
+  .locked .t,.locked .d{opacity:.85}
+  .pill{font-size:11px;font-weight:500;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:2px 8px}
   .center{text-align:center;padding:50px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
   .muted{color:var(--soft);font-size:14px}a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}.toast.show{opacity:1}
-  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}.sw,.sw::after{transition:none}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="/presence.html">← Workspace</a>
+  <nav class="crumbs" aria-label="Breadcrumb"><a class="back" href="/presence.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>Workspace</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Sharing &amp; access</span></nav>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -70,30 +115,45 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 
 // surfaces the owner can share with a client reviewer + their default posture
 const SURFACES=[
-  {k:'business_moments',t:'Today',d:'Your calm daily updates',def:true},
-  {k:'reports',t:'Analytics',d:'Reviews & findings',def:true},
-  {k:'media',t:'Photos',d:'Your photos & media',def:true},
-  {k:'connected',t:'Connected data',d:'Your review/visitor numbers',def:true},
-  {k:'drafts',t:'Drafts',d:'Work in progress',def:false},
-  {k:'visual_assets',t:'Visual Studio assets',d:'AI-made images',def:false},
-  {k:'files',t:'Documents',d:'Documents & deliverables',def:false},
-  {k:'internal_notes',t:'Internal notes',d:'Private to your studio',def:false,internal:true},
+  {k:'business_moments',t:'Today',d:'Your calm daily updates',def:true,ic:'home',tone:'p'},
+  {k:'reports',t:'Analytics',d:'Reviews & findings',def:true,ic:'chart',tone:'info'},
+  {k:'media',t:'Photos',d:'Your photos & media',def:true,ic:'image',tone:'good'},
+  {k:'connected',t:'Connected data',d:'Your review/visitor numbers',def:true,ic:'link',tone:'info'},
+  {k:'drafts',t:'Drafts',d:'Work in progress',def:false,ic:'edit',tone:'warn'},
+  {k:'visual_assets',t:'Visual Studio assets',d:'AI-made images',def:false,ic:'spark',tone:'p'},
+  {k:'files',t:'Documents',d:'Documents & deliverables',def:false,ic:'doc',tone:''},
+  {k:'internal_notes',t:'Internal notes',d:'Private to your studio',def:false,internal:true,ic:'lock',tone:'warn'},
 ];
+const IC={
+  home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  edit:'<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/>',
+  spark:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/>',
+  doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+};
+const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" style="stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round">${IC[k]}</svg>`;
+// the two-avatar illustration beside the title (decorative)
+const ILLO=`<svg class="illo" viewBox="0 0 112 64" aria-hidden="true"><circle cx="36" cy="32" r="24" fill="var(--p-soft)"/><circle cx="36" cy="26" r="8" fill="var(--p)" opacity=".55"/><path d="M20 48a16 12 0 0 1 32 0" fill="var(--p)" opacity=".55"/><circle cx="76" cy="32" r="24" fill="var(--p)"/><path d="M70 36a5 5 0 0 0 7 0l4-4a5 5 0 0 0-7-7l-1 1M82 28a5 5 0 0 0-7 0l-4 4a5 5 0 0 0 7 7l1-1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>`;
 let SHARES={};
 
 function render(members){
-  let html=`<h1>Sharing & access</h1><p class="sub">Invite a client to review, and choose exactly what they see. They can review and approve — never edit, publish, or connect. Internal notes stay private unless you share them.</p>`;
-  // members
-  html+=`<h2>People with access</h2><div class="card">
-    <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email"><button class="pri" id="add">Invite as reviewer</button></div>`;
-  if(members.length){for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><br><span class="d">${esc(m.role.replace('_',' '))} · ${esc(m.status)}</span></span>${m.role!=='business_owner'?`<button data-resend="${esc(m.email)}" data-role="${esc(m.role)}">Resend invite</button> <button data-revoke="${esc(m.id)}">Remove</button>`:''}</div>`;}}
-  else html+=`<div class="rowitem"><span class="d">No one else yet — invite a client above to give them a review-only portal.</span></div>`;
-  html+=`</div>`;
+  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access</h1><p class="sub">Invite a client to review, and choose exactly what they see. They can review and approve — never edit, publish, or connect. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
+  // invite + members
+  html+=`<section class="card pad" aria-labelledby="inviteH"><h2 id="inviteH">Invite a client</h2>
+    <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email" autocomplete="off">
+      <label class="sel"><select id="role" aria-label="Role"><option value="client_reviewer">Reviewer (view only)</option></select><svg class="car" viewBox="0 0 24 24" aria-hidden="true" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M6 9l6 6 6-6"/></svg></label>
+      <button class="pri" id="add" type="button">Send invite</button></div>
+    <p class="hint">They’ll get an email with a secure link to review your site.</p>`;
+  if(members.length){html+=`<div class="people">`;for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><span class="d">${esc(String(m.role||'').replace('_',' '))} · ${esc(m.status||'')}</span></span>${m.role!=='business_owner'?`<span class="acts"><button class="sm" data-resend="${esc(m.email)}" data-role="${esc(m.role)}">Resend invite</button> <button class="sm" data-revoke="${esc(m.id)}">Remove</button></span>`:''}</div>`;}html+=`</div>`;}
+  html+=`</section>`;
   // shares
-  html+=`<h2>What clients see</h2><div class="card">`;
+  html+=`<h2 class="seclab" id="seesH">What clients see</h2><div class="card" role="group" aria-labelledby="seesH">`;
   for(const s of SURFACES){const on=(SHARES[s.k+':*']!=null)?SHARES[s.k+':*']:s.def;/* switch gets an accessible name below */
-    html+=`<div class="rowitem${s.internal?' locked':''}"><span class="grow"><span class="t">${esc(s.t)}${s.internal?' <span class="pill">private by default</span>':''}</span><br><span class="d">${esc(s.d)}</span></span>
-      <button class="sw" role="switch" aria-label="Share ${esc(s.t)} with clients" aria-checked="${on}" data-surface="${esc(s.k)}"></button></div>`;}
+    html+=`<div class="rowitem${s.internal?' locked':''}"><span class="tile ${s.tone}" aria-hidden="true">${svg(s.ic)}</span><span class="grow"><span class="t">${esc(s.t)}${s.internal?' <span class="pill">Private by default</span>':''}</span><span class="d">${esc(s.d)}</span></span>
+      <button class="sw" role="switch" aria-label="Share ${esc(s.t)} with clients" aria-checked="${on}" data-surface="${esc(s.k)}"></button><span class="state${on?' on':''}" data-state="${esc(s.k)}">${on?'Visible':'Hidden'}</span></div>`;}
   html+=`</div>`;
   // (Developer Mode is fully built and appears under Settings when the account has
   //  that capability — no "coming soon" placeholder belongs here.)
@@ -101,19 +161,23 @@ function render(members){
 }
 function wire(){
   const add=$('add');if(add)add.addEventListener('click',invite);
+  const em=$('email');if(em)em.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();invite();}});
   document.querySelectorAll('[data-revoke]').forEach(b=>b.addEventListener('click',()=>revoke(b.getAttribute('data-revoke'))));
   document.querySelectorAll('[data-resend]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/portal/members','POST',{email:b.getAttribute('data-resend'),role:b.getAttribute('data-role')||'client_reviewer'});toast((r.ok&&r.body.data&&r.body.data.message)||'Invite re-sent.');b.disabled=false;}));
   document.querySelectorAll('[data-surface]').forEach(b=>b.addEventListener('click',()=>toggle(b)));
 }
 async function invite(){const e=($('email').value||'').trim();if(!e){toast('Enter their email.');return;}
-  const r=await api('/portal/members','POST',{email:e,role:'client_reviewer'});
+  const role=($('role')&&$('role').value)||'client_reviewer';
+  const r=await api('/portal/members','POST',{email:e,role});
   if(r.ok){toast((r.body&&r.body.data&&r.body.data.message)||'Invited.');return load();}toast((r.body&&r.body.message)||'That didn’t save.');}
 async function revoke(id){if(!confirm('Remove their access?'))return;const r=await api('/portal/members/'+id+'/revoke','POST',{});if(r.ok){toast('Removed.');return load();}toast('That didn’t work.');}
+// the Visible/Hidden word beside a switch follows its aria-checked state
+function paintState(surface,on){const el=document.querySelector('[data-state="'+surface+'"]');if(!el)return;el.textContent=on?'Visible':'Hidden';el.classList.toggle('on',!!on);}
 async function toggle(btn){const surface=btn.getAttribute('data-surface');const next=btn.getAttribute('aria-checked')!=='true';
-  btn.setAttribute('aria-checked',String(next));
+  btn.setAttribute('aria-checked',String(next));paintState(surface,next);
   const r=await api('/portal/shares','POST',{surface,shared:next});
   if(r.ok){SHARES[surface+':*']=next;toast(next?'Shared with clients.':'Kept internal.');}
-  else{btn.setAttribute('aria-checked',String(!next));toast('That didn’t save.');}
+  else{btn.setAttribute('aria-checked',String(!next));paintState(surface,!next);toast('That didn’t save.');}
 }
 function notOwner(){$('main').innerHTML=`<div class="center"><h2>Only the account owner can manage sharing.</h2><p class="muted">Ask your studio if you need access changed.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to manage sharing.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
@@ -129,7 +193,7 @@ async function load(){
   const [mem,sh]=await Promise.all([api('/portal/members'),api('/portal/shares')]);
   if(mem.status===403){notOwner();return;}
   SHARES={};if(sh.ok&&sh.body.data&&sh.body.data.shares)for(const s of sh.body.data.shares)SHARES[s.surface+':'+(s.item_id||'*')]=s.shared;
-  render((mem.ok&&mem.body.data)||[]);
+  render((mem.ok&&Array.isArray(mem.body.data)&&mem.body.data)||[]);
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>
