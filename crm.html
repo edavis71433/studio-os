@@ -550,13 +550,20 @@ function renderActions(){
   const host=$('actbar'); if(!host)return;
   const ids=idParams(); const d=(DEAL&&DEAL.deal)||null;
   const btns=[];
+  // ONE LINK (benchmark 2026-10, item 5): with BOTH a proposal and an agreement
+  // drafted on an open deal, the headline act is "Send proposal & agreement" —
+  // one email, one page. The per-document sends sit under More.
+  const both=!!(d&&sendBothDocs());
   if(ids.deal){
-    btns.push({id:'act-invoice',label:'Send invoice',primary:true,on:()=>openBilling('invoice')});
+    if(both)btns.push({id:'act-send-both',label:'Send proposal & agreement',primary:true,on:()=>openBilling('both')});
+    btns.push({id:'act-invoice',label:'Send invoice',primary:!both,on:()=>openBilling('invoice')});
     btns.push({id:'act-deposit',label:'Request deposit',on:()=>openBilling('deposit')});
     const draft=d&&(DEAL.proposals||[]).find(p=>p.status==='draft');
     const stage=d&&d.stage;
     // stage-aware: a won deal never pushes an unsent proposal as the headline act
     if(draft&&stage!=='won'&&stage!=='lost')btns.push({id:'act-proposal',label:'Send proposal',on:()=>openBilling('proposal:'+draft.id)});
+    const draftCon=d&&(DEAL.contracts||[]).find(k=>k.status==='draft');
+    if(draftCon&&stage!=='won'&&stage!=='lost')btns.push({id:'act-agreement',label:'Send agreement',on:()=>openBilling('contract:'+draftCon.id)});
     btns.push({id:'act-log',label:'Log activity',on:()=>focusComposer('logcall')});
     btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});
   }
@@ -569,7 +576,7 @@ function renderActions(){
   const render=(b)=>b.href
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
     :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
-  const FRONT=['act-invoice','act-message','act-log','act-project'];
+  const FRONT=[both?'act-send-both':'act-invoice','act-message','act-log','act-project'];
   const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
   const rest=btns.filter(b=>!FRONT.includes(b.id));
   host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
@@ -580,8 +587,19 @@ function renderActions(){
 function closeMore(){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}}
 document.addEventListener('click',closeMore);
 document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore();});
+// The pair the one "Send proposal & agreement" button sends: the newest draft
+// proposal (not superseded) AND the newest draft agreement, on an open deal.
+// Null when either is missing — then the per-document sends stand on their own.
+function sendBothDocs(){
+  const d=DEAL&&DEAL.deal; if(!d)return null;
+  if(d.stage==='won'||d.stage==='lost'||d.converted_client_id)return null;
+  const isSup=(p)=>Array.isArray(p.line_items)&&p.line_items.some(el=>el&&typeof el==='object'&&el.__meta__&&el.__meta__.superseded_by);
+  const prop=(DEAL.proposals||[]).find(p=>p.status==='draft'&&!isSup(p));
+  const con=(DEAL.contracts||[]).find(k=>k.status==='draft');
+  return (prop&&con)?{prop,con}:null;
+}
 // Switch to Billing and open one of its inline forms (invoice · deposit ·
-// proposal:<id>). The form opens once the tab has rendered.
+// proposal:<id> · contract:<id> · both). The form opens once the tab has rendered.
 let BILLING_OPEN='';
 function openBilling(which){
   BILLING_OPEN=which||'';
@@ -918,8 +936,14 @@ function renderBillingTab(host){
   // visual refresh: the money facts live in the header tiles now (value · paid ·
   // outstanding) — the tab opens straight on the invoices.
   if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
+  // ONE LINK (benchmark 2026-10, item 5): both drafted → one filled "Send
+  // proposal & agreement"; the per-document sends and Request deposit go under
+  // More, and "+ Invoice" steps back to a quiet button (one filled per screen).
+  const both=sendBothDocs();
+  if(both)html+=`<section id="sendBoth"><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">The proposal and the agreement are drafted. Send them together — one email, one link: they accept, sign, then pay the deposit on one page.</p>
+    <span class="racts" style="display:inline-flex;gap:6px;align-items:center"><button type="button" class="rbtn primary" id="sendBothBtn" data-send-both="1" data-prop="${esc(both.prop.id)}" data-con="${esc(both.con.id)}">Send proposal &amp; agreement</button><span class="more"><button type="button" class="rbtn" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button type="button" class="abtn" data-send-prop="${esc(both.prop.id)}">Send the proposal only</button><button type="button" class="abtn" data-send-con="${esc(both.con.id)}">Send the agreement only</button><button type="button" class="abtn" data-bform="deposit">Request deposit</button></div></span></span></div></section>`;
   // invoices + the new-invoice / deposit forms
-  html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px"><button type="button" class="rbtn" data-bform="deposit">Request deposit</button><a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn primary" data-bform="invoice">+ Invoice</button></span></h2>
+  html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px">${both?'':'<button type="button" class="rbtn" data-bform="deposit">Request deposit</button>'}<a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn${both?'':' primary'}" data-bform="invoice">+ Invoice</button></span></h2>
     <div id="bform"></div>`;
   html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
     const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
@@ -943,7 +967,7 @@ function renderBillingTab(host){
     let acts='';
     // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft
     const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
-    if(p.status==='draft'&&!closed)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
+    if(p.status==='draft'&&!closed&&!both)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
     else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
     acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
     return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
@@ -954,7 +978,7 @@ function renderBillingTab(host){
   const cons=DEAL.contracts||[];
   html+=cons.length?cons.map(k=>{
     let acts='';
-    if(k.status==='draft')acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
+    if(k.status==='draft'&&!both)acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
     else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
     acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
     return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(dueLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
@@ -975,12 +999,16 @@ function renderBillingTab(host){
   if(BILLING_OPEN){const w=BILLING_OPEN;BILLING_OPEN='';
     if(w==='invoice'||w==='deposit')billingForm(w);
     else if(w==='retainer')billingForm('retainer');
-    else if(w.indexOf('proposal:')===0){const b=host.querySelector(`[data-send-prop="${w.slice(9)}"]`);if(b){b.scrollIntoView({block:'center'});b.focus();}}
+    else if(w.indexOf('proposal:')===0){const b=host.querySelector(`[data-send-prop="${w.slice(9)}"]`);if(b){reveal(b);}}
+    else if(w.indexOf('contract:')===0){const b=host.querySelector(`[data-send-con="${w.slice(9)}"]`);if(b){reveal(b);}}
+    else if(w==='both'){const b=host.querySelector('#sendBothBtn');if(b){b.scrollIntoView({block:'center'});b.focus();}}
   }
+  // a per-document send that lives under More: open the menu so the focus lands
+  function reveal(b){const m=b.closest('.more-menu');if(m){m.hidden=false;const t=host.querySelector('#sendMore');if(t)t.setAttribute('aria-expanded','true');}b.scrollIntoView({block:'center'});b.focus();}
 }
 // one send path per document kind — same routes pipeline.html uses
-async function billingSend(path,okLabel){
-  const r=await apiAg(path,'POST',{});
+async function billingSend(path,okLabel,body){
+  const r=await apiAg(path,'POST',body||{});
   if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return null;}
   const b=r.body||{}; const url=b.url||(b.data&&b.data.url)||'';
   if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
@@ -1005,6 +1033,17 @@ function wireBilling(host,d){
     const k=(DEAL.contracts||[]).find(x=>x.id===b.getAttribute('data-send-con'));
     if(k&&k.status==='draft'&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
     b.disabled=true;const r=await billingSend('/sales/contracts/'+b.getAttribute('data-send-con')+'/send',b.hasAttribute('data-resend')?'Signing link copied':'Agreement sent');if(r)reloadDeal();else b.disabled=false;}));
+  // ONE LINK: both drafts in one go (POST /sales/deals/:id/send) — the same
+  // blanks confirm the agreement's own Send runs, then one email, one page.
+  const sb=host.querySelector('[data-send-both]'); if(sb)sb.addEventListener('click',async()=>{
+    const k=(DEAL.contracts||[]).find(x=>x.id===sb.getAttribute('data-con'));
+    if(k&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    sb.disabled=true;const r=await billingSend('/sales/deals/'+d.id+'/send','Proposal and agreement sent',{proposal_id:sb.getAttribute('data-prop'),contract_id:sb.getAttribute('data-con')});if(r)reloadDeal();else sb.disabled=false;});
+  const sm=host.querySelector('#sendMore'); if(sm){const menu=host.querySelector('#sendMoreMenu');
+    sm.addEventListener('click',(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}});
+    const close=()=>{if(menu.hidden)return;menu.hidden=true;sm.setAttribute('aria-expanded','false');};
+    document.addEventListener('click',close);
+    menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});}
   const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
 }
 // the small inline forms: invoice · deposit · retainer

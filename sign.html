@@ -41,6 +41,28 @@
   .cert .kv span:first-child{color:var(--soft);white-space:nowrap}
   .cert .kv:last-of-type{border-bottom:none}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;overflow-wrap:anywhere;text-align:right}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  /* the one-page flow (choose → sign → pay): a three-step strip, the done steps
+     collapsed above, the next step open, the ones after it locked */
+  .steps{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 20px}
+  .steps li{flex:1;display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:13.5px;font-weight:600;color:var(--soft)}
+  .steps .n{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;border:1.5px solid currentColor;flex:none}
+  .steps li.done{color:var(--good);background:var(--good-soft);border-color:var(--good-soft)}
+  .steps li.now{color:var(--p);border-color:var(--p)}
+  .steps li.now .n{background:var(--p);color:var(--btn-ink);border-color:var(--p)}
+  h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:22px 0 8px}
+  h2 .k{color:var(--soft);font-family:var(--sans);font-size:13px;font-weight:600;margin-right:6px}
+  .card.locked{border-style:dashed;box-shadow:none;background:transparent}
+  .card.locked h2{margin-top:0;color:var(--soft)}
+  details.done{padding:0}
+  details.done summary{cursor:pointer;list-style:none;padding:16px 22px;font-weight:600;color:var(--good);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  details.done summary::-webkit-details-marker{display:none}
+  details.done summary .tog{color:var(--soft);font-weight:500;font-size:13px;margin-left:auto}
+  details.done summary .tog::after{content:'Show details'}
+  details.done[open] summary .tog::after{content:'Hide details'}
+  details.done summary:focus-visible{outline:2px solid var(--p);outline-offset:-2px;border-radius:15px}
+  details.done .inner{padding:0 22px 20px}
+  @media print{details.done .inner{display:block}.steps,.card.locked{display:none!important}}
   /* print: the certificate + the agreement, cleanly — no buttons, no celebration */
   @media print{
     body{background:#fff}
@@ -57,6 +79,14 @@
 // The public review & sign page. The email's "Review & sign" link lands here with
 // ?t=<signed token>. Reads the proposal/contract via the token-gated public view,
 // then accepts or signs — nothing final until the client acts.
+//
+// Two shapes of link land here:
+//   • a deal-bound `flow` token (every send since Oct 2026): ONE page that walks
+//     choose → sign → pay — the proposal, then the agreement unlocks, then the
+//     deposit. Done steps collapse above; the next step is open; the rest are
+//     locked (the server locks them too — see handleSalesPublicView).
+//   • a per-document `proposal`/`contract` token (links sent before): the single
+//     document, exactly as before, so an old email keeps working.
 const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
 const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const $=(id)=>document.getElementById(id);
@@ -67,14 +97,16 @@ async function api(path,method,body){const r=await fetch(FN+path,{method:method|
 function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p><p class="muted">Stuck? Just reply to the email this link came from.</p></div>`;}
 // A RECOVERABLE problem (version changed, too many tries) keeps the page — the
 // person shouldn't lose the document they just read over a retryable hiccup.
-function softFail(msg){
+function softFail(msg,near){
   const m=msg||'That didn’t go through — give it another try in a moment.';
   let n=$('softErr');
-  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='var(--err,#a3423a)';$('main').appendChild(n);}
+  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='var(--err,#a3423a)';}
+  // the message lands next to the control that failed (the flow page has several rows)
+  if(near&&near.parentNode)near.parentNode.insertBefore(n,near.nextSibling);else if(!n.parentNode)$('main').appendChild(n);
   n.textContent=m;
   // A version change can NEVER succeed on retry — swap the actions for a reload.
   if(/reload|updated/i.test(m)){
-    const row=document.querySelector('.row');
+    const row=near||document.querySelector('.row');
     if(row)row.innerHTML='<button id="reloadBtn">Load the latest version</button>';
     const rb=$('reloadBtn'); if(rb)rb.onclick=()=>location.reload();
     return;
@@ -85,10 +117,19 @@ function softFail(msg){
 }
 function announce(t){try{$('sr-status').textContent=t;}catch(_){/* */}}
 function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;announce(t);}
-async function load(){
+// `after` is what just happened on the one-page flow (an accept, a signature):
+// the page re-reads the deal so the next step unlocks from the server's truth,
+// then scrolls to it. Null on a plain visit.
+async function load(after){
   if(!TOKEN){fail();return;}
   const r=await api('/sales/p/'+encodeURIComponent(TOKEN));
-  if(!r.ok||!r.body.data){fail(r.body&&r.body.message);return;}
+  if(!r.ok||!r.body.data){
+    // The action already stood (the server said so). If the re-read hiccups,
+    // say what happened rather than "this link isn't working".
+    if(after&&after.kind==='accepted'){thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign — reload this page to open it.');return;}
+    if(after&&after.kind==='signed'){thanks('Signed — welcome aboard! 🎉','Your studio has been told. Reload this page for your deposit link and your signature certificate.');return;}
+    fail(r.body&&r.body.message);return;
+  }
   const d=r.body.data;
   // The studio's own identity, not a generic page.
   if(d.brand){
@@ -99,7 +140,112 @@ async function load(){
     if(d.brand.name)document.title=`Review & sign — ${d.brand.name}`;
     window.__brandName=d.brand.name||'';
   }
-  if(d.kind==='proposal')renderProposal(d);else renderContract(d);
+  if(d.kind==='flow')renderFlow(d,after||null);
+  else if(d.kind==='proposal')renderProposal(d);else renderContract(d);
+}
+// ── The one-page flow: choose → sign → pay ──────────────────────────────────
+function renderFlow(d,after){
+  const p=d.proposal,c=d.contract,dep=d.deposit;
+  const chosen=!p||p.status==='accepted';           // no proposal on the deal → the agreement is the first step
+  const signed=!!(c&&c.status==='signed');
+  const paid=!!(dep&&dep.status==='paid');
+  const T=p?proposalTotals(p.line_items):null;
+  // the strip: every step the deal has, with its state
+  const steps=[];
+  if(p)steps.push({key:'choose',label:'Choose',state:p.status==='accepted'?'done':'now'});
+  steps.push({key:'sign',label:'Sign',state:signed?'done':chosen?'now':'locked'});
+  steps.push({key:'pay',label:'Pay',state:paid?'done':signed?'now':'locked'});
+  // only the FIRST open step is "now" — the ones after it wait their turn
+  let seenNow=false;steps.forEach(s=>{if(s.state==='now'){if(seenNow)s.state='locked';seenNow=true;}});
+  const strip=`<ol class="steps" aria-label="Your steps">${steps.map((s,i)=>`<li class="${s.state}"${s.state==='now'?' aria-current="step"':''}><span class="n" aria-hidden="true">${s.state==='done'?'✓':i+1}</span><span>${s.label}</span><span class="sr">${s.state==='done'?' — done':s.state==='locked'?' — not yet':' — this step'}</span></li>`).join('')}</ol>`;
+  const title=(d.deal&&d.deal.title)||'Your proposal and agreement';
+  const sub=signed?(paid?'All signed and paid — thank you.':'All signed.'):(chosen&&c&&!c.locked)?'One typed name signs the agreement — nothing is final until you do.':!chosen?'Take your time — nothing is final until you accept.':'';
+  let h=`<h1>${esc(title)}</h1>${preparedBy()}${sub?`<p class="sub">${sub}</p>`:''}${strip}`;
+  let k=0;
+  // ── 1 · Choose ──
+  if(p){
+    k++;
+    const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+    const hasB=T.discount>0||T.tax>0;
+    const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
+    const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
+    const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
+    const table=`<table>${items}${bd}<tr class="total"><td>Total</td><td>${money(T.total)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}`;
+    if(p.status==='accepted'){
+      h+=`<details class="card done" id="step-choose"><summary>✓ Proposal accepted — ${money(T.total)} total<span class="tog"></span></summary><div class="inner">${table}</div></details>`;
+    }else{
+      h+=`<section id="step-choose"><h2><span class="k">Step ${k}</span>${esc(p.title||'Your proposal')}</h2><div class="card">${table}</div>`;
+      if(p.status==='declined')h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;
+      else if(p.expired)h+=`<p class="muted">This proposal has expired — ask your studio to send an updated one. Nothing is lost.</p>`;
+      else h+=`<div class="row" id="chooseRow"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Decline this proposal</button></div><p class="muted">Accepting unlocks the agreement to sign, right here.</p>`;
+      h+=`</section>`;
+    }
+  }
+  // ── 2 · Sign ──
+  k++;
+  if(!chosen){
+    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">Unlocks once you accept the proposal above.</p></div>`;
+  }else if(!c){
+    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>`;
+  }else if(signed){
+    const fresh=after&&after.kind==='signed';
+    const when=c.signed_at?new Date(c.signed_at):new Date();
+    const copyLine=fresh?(after.copy_emailed?'A copy of your signed agreement is on its way to your email.':'Your signed agreement stays on this page — use “Print / save a copy” to keep your record, or ask your studio any time.'):'';
+    h+=`${fresh?`<div class="center no-print" style="padding:8px 0 4px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${esc(copyLine)}</p></div>`:''}
+      <details class="card done" id="step-sign"${fresh?' open':''}><summary>✓ Signed by ${esc(c.signer_name||'you')} on ${esc(when.toLocaleDateString(undefined,{dateStyle:'long'}))}<span class="tog"></span></summary><div class="inner">
+      <p style="font-weight:600;margin-bottom:8px">${esc(c.title||'Your agreement')}</p><div class="body">${esc(c.body)}</div>
+      <div class="cert" style="margin-top:18px"><p style="font-weight:600;margin-bottom:8px">Signature certificate</p>
+        <div class="kv"><span>Signed by</span><span>${esc(c.signer_name||'')}</span></div>
+        <div class="kv"><span>Signed at</span><span>${esc(when.toLocaleString(undefined,{dateStyle:'long',timeStyle:'short'}))}</span></div>
+        <div class="kv"><span>Document fingerprint</span><span class="mono">${esc(c.content_hash||'')}</span></div>
+        <p class="muted">The fingerprint identifies the exact text you signed — it changes if even one character does.</p>
+        <div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div></div></div></details>`;
+  }else{
+    h+=`<section id="step-sign"><h2><span class="k">Step ${k}</span>${esc(c.title||'Your agreement')}</h2><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
+      <div class="card"><div class="body">${esc(c.body)}</div></div>
+      <div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
+      <label for="em">Your email (optional)</label><input id="em" type="email" autocomplete="email" placeholder="you@business.com">
+      <div class="row" id="signRow"><button id="sign">Sign the agreement</button></div>
+      <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div></section>`;
+  }
+  // ── 3 · Pay ──
+  k++;
+  if(!signed){
+    h+=`<div class="card locked" id="step-pay"><h2><span class="k">Step ${k}</span>${dep?`Pay the ${money(dep.amount_cents)} deposit`:'Pay the deposit'}</h2><p class="muted" style="margin-top:0">Unlocks once you’ve signed.</p></div>`;
+  }else if(paid){
+    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><div class="ok" style="margin-top:0">✓ Deposit paid — thank you. Your studio has been told and will kick things off.</div></div>`;
+  }else if(dep&&dep.url){
+    h+=`<div class="card no-print" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>One more step to lock in your start</h2>
+      <p class="muted" style="margin-top:0">Your ${money(dep.amount_cents)} deposit is ready — paying it now locks in your start.</p>
+      <div class="row"><a class="paybtn" id="pay" href="${esc(dep.url)}">Pay the ${money(dep.amount_cents)} deposit →</a></div>
+      <p class="muted">Prefer later? This page keeps the link — come back any time.</p></div>`;
+  }else if(dep){
+    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><p class="muted" style="margin-top:0">Your ${money(dep.amount_cents)} deposit is being set up — your studio will send the payment link. Nothing to do now.</p></div>`;
+  }else{
+    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><p class="muted" style="margin-top:0">Nothing to pay right now — your studio has been told you signed and will send an invoice when it’s time.</p></div>`;
+  }
+  $('main').innerHTML=h;
+  // ── actions ──
+  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});
+    if(r.ok){announce('Accepted — thank you. Next: sign the agreement.');await load({kind:'accepted'});}
+    else softFail(r.body&&r.body.message,$('chooseRow'));};
+  // Declining is final (a fresh proposal needs a fresh link) — so it takes two
+  // deliberate taps, and the label says exactly what it does.
+  const dd=$('decline');if(dd)dd.onclick=async()=>{
+    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';announce('Tap again to confirm declining — this is final');return;}
+    dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
+    if(r.ok){announce('Declined. Your studio has been told.');await load({kind:'declined'});}else softFail(r.body&&r.body.message,$('chooseRow'));};
+  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
+    if(!nm){softFail('Type your full name in the box above — that’s your signature.',$('signRow'));$('nm').focus();return;}
+    s.disabled=true;
+    const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
+    if(r.ok){announce('Signed — welcome aboard.');await load({kind:'signed',copy_emailed:!!(r.body&&r.body.data&&r.body.data.copy_emailed)});}
+    else softFail(r.body&&r.body.message,$('signRow'));};
+  // after a step, land on the next one
+  if(after){
+    const next=after.kind==='accepted'?$('step-sign'):after.kind==='signed'?$('step-pay'):null;
+    if(next){next.scrollIntoView({block:'start',behavior:'smooth'});const f=next.querySelector('input,a.paybtn');if(f&&after.kind==='accepted')f.focus({preventScroll:true});}
+  }
 }
 function preparedBy(){return window.__brandName?`<p class="muted" style="margin-top:2px">Prepared by ${esc(window.__brandName)}</p>`:'';}
 // The proposal's discount/tax + trail ride ONE reserved element in line_items

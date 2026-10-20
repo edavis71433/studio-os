@@ -770,7 +770,9 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
       if (!fresh) continue;
       if (!email) continue;
       try {
-        const token = await signSalesToken({ t: kind, id: doc.id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
+        // The deal's ONE link (a `flow` token, benchmark 2026-10 item 5): the same
+        // page the send email pointed at — proposal, agreement and deposit in order.
+        const token = await signSalesToken({ t: 'flow', id: doc.deal_id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
         const brand = await loadEmailBrand(doc.site_id);
         const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : 'Review the proposal'} →</a>`;
         sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`,

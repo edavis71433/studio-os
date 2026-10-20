@@ -39,7 +39,7 @@ const propId = prop.body?.data?.id;
 const sent = await call(`/sales/proposals/${propId}/send`, 'POST', {});
 ok('5a. proposal sent', sent.ok);
 if (sent.body?.url) {
-  const token = sent.body.url.split('/sales/p/')[1];
+  const token = decodeURIComponent(String(sent.body.url).split('?t=')[1] || '');   // sign.html?t=<token> (a deal-bound flow token since Oct 2026)
   const dec = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
   ok('5b. proposal accepted via signed link (public)', dec.ok);
   const decAgain = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
@@ -53,7 +53,7 @@ const conId = con.body?.data?.id, hash = con.body?.data?.content_hash;
 const conSent = await call(`/sales/contracts/${conId}/send`, 'POST', {});
 ok('6b. contract sent', conSent.ok);
 if (conSent.body?.url) {
-  const token = conSent.body.url.split('/sales/c/')[1];
+  const token = decodeURIComponent(String(conSent.body.url).split('?t=')[1] || '');
   const badSign = await call(`/sales/contracts/${conId}/sign`, 'POST', { token, presented_hash: 'deadbeef', signer_name: 'X' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
   ok('6c. signing a MISMATCHED version is rejected (integrity)', !badSign.ok && badSign.status === 409);
   const sign = await call(`/sales/contracts/${conId}/sign`, 'POST', { token, presented_hash: hash, signer_name: 'E2E Buyer' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });

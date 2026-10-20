@@ -98,6 +98,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .dbody{padding:18px 20px;max-height:64vh;overflow:auto}
   .sec{margin-top:16px}.sec h3{font-size:12px;color:var(--faint);margin-bottom:8px}
   .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  /* the "More ▾" beside the one send button (same shape as crm.html's action bar menu) */
+  .more{position:relative;display:inline-block}
+  .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:220px;background:var(--card,var(--bg));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:4px;display:flex;flex-direction:column;gap:2px}
+  .more-menu[hidden]{display:none}
+  .more-menu .btn{border:none;background:transparent;color:var(--ink);text-align:left;border-radius:var(--dds-r-sm,6px);width:100%}
+  .more-menu .btn:hover{background:var(--bg)}
   form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
   form.mini .grid{display:flex;gap:8px;flex-wrap:wrap}
   input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%}
@@ -1913,6 +1919,15 @@ async function openDeal(id){
     // (LINKS) so it's never silently stuck. `forWhom` personalises the CTA.
     const forWhom=(c&&c.name)?(' to '+esc(c.name)):'';
     const linkNote=(kind,docId,label)=>LINKS[docId]?`<div class="mut" style="flex-basis:100%;margin-top:4px">Prepared — <a href="${esc(LINKS[docId])}" target="_blank" rel="noopener">open the ${label}</a>, or use “Copy ${label}”. It wasn’t emailed, so share it yourself.</div>`:'';
+    // ONE LINK (benchmark 2026-10, item 5): when BOTH a proposal and an agreement
+    // are drafted on an open deal, the two sends collapse to one — "Send proposal
+    // & agreement" (one email, one page: accept → sign → pay). The per-document
+    // sends and "Request a deposit" move under More; every row keeps its chip
+    // and its other actions.
+    const dealOpen=!(d.stage==='won'||d.stage==='lost'||!!d.converted_client_id);
+    const draftProp=dealOpen?(data.proposals||[]).find(p=>p.status==='draft'&&!(propTotals(p.line_items).meta||{}).superseded_by):null;
+    const draftCon=dealOpen?(data.contracts||[]).find(k=>k.status==='draft'):null;
+    const SEND_BOTH=!!(draftProp&&draftCon);
     const props=(data.proposals||[]).map(p=>{
       const T=propTotals(p.line_items);
       const superseded=!!(T.meta&&T.meta.superseded_by);
@@ -1924,7 +1939,7 @@ async function openDeal(id){
       // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft —
       // the draft stays viewable, the Send button goes.
       const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
-      const act=superseded?'':p.status==='draft'?(closed?`<span class="mut">Never sent — the deal ${d.stage==='lost'?'closed':'was won'} without it</span> `:`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `):p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
+      const act=superseded?'':p.status==='draft'?(closed?`<span class="mut">Never sent — the deal ${d.stage==='lost'?'closed':'was won'} without it</span> `:SEND_BOTH?'':`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `):p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
       const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
       // A draft was never sent to anyone, so a mistaken one (the duplicate you
       // meant to overwrite) can simply go. The moment it IS sent it becomes part
@@ -1944,7 +1959,7 @@ async function openDeal(id){
       const signed=k.status==='signed';
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
-      const act=k.status==='draft'?`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `:k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
+      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone
       // holds a signing link, and a signature is permanent. Draft only.
@@ -2078,6 +2093,8 @@ async function openDeal(id){
           <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
         </aside></div></div>
         ${dpanel('billing')}
+        ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
+          <div class="row2" style="margin-top:8px"><button class="btn" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
@@ -2289,6 +2306,33 @@ async function openDeal(id){
         toast('Not sent — open it with View / print to check it first.');return;
       }
       b.disabled=true;try{await sendContractById(b.dataset.sendContract);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // ONE LINK: send the proposal AND the agreement in one go (POST /sales/deals/
+    // :id/send). The agreement's blanks guards run exactly as they do for its own
+    // Send — a client must never receive [LIST THE FIVE CORE PAGES] this way either.
+    const sb=$('sendBothBtn'); if(sb)sb.onclick=async()=>{
+      const k=(data.contracts||[]).find(x=>x.id===sb.dataset.con);
+      if(k&&typeof k.body==='string'){
+        if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
+        if(!confirmMoneyBlanks(k.body)){toast('Not sent — set the deal value in Details first.');return;}
+      }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
+        toast('Not sent — open it with View / print to check it first.');return;
+      }
+      sb.disabled=true;
+      try{
+        const r=await api('/sales/deals/'+id+'/send','POST',{proposal_id:sb.dataset.prop,contract_id:sb.dataset.con});
+        if(r.url&&!r.emailed){LINKS[sb.dataset.prop]=r.url;LINKS[sb.dataset.con]=r.url;}
+        const dep=(r.data&&r.data.deposit)||{};
+        const depNote=dep.minted?' A '+money(dep.amount_cents)+' deposit request is ready — they can pay the moment they sign.':'';
+        toast(r.emailed?('Proposal and agreement sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')+'.'+depNote):(NO_EMAIL?noEmailWhy('Proposal and agreement','link'):'Proposal and agreement prepared — nothing was emailed, so copy the link and send it yourself.'));
+        copyToClip(r.url);openDeal(id);
+      }catch(e){toast(nice(e),true);sb.disabled=false;}};
+    // the per-document sends live under More when the one button shows
+    const sm=$('sendMore'); if(sm){const menu=$('sendMoreMenu');
+      sm.onclick=(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}};
+      const close=()=>{if(!menu.hidden){menu.hidden=true;sm.setAttribute('aria-expanded','false');}};
+      document.addEventListener('click',close,{once:false});
+      menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});
+      const md=$('moreDeposit'); if(md)md.onclick=()=>{close();const b=$('sendDeposit');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};}
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
     $('detailInner').querySelectorAll('[data-doc-prop]').forEach(b=>b.onclick=()=>openDoc('proposals',b.dataset.docProp,b));

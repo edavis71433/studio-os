@@ -74,8 +74,13 @@ const pipe = read('pipeline.html');
   ok('Stripe-unconfigured environments skip the mint (a linkless invoice can’t land on pay)', /if \(!stripeConfigured\(\)\) return \{ minted: false \}/.test(h));
   ok('best-effort by construction — the whole helper is wrapped, a mint failure never blocks the send', /^async function ensureDepositForContractSend[\s\S]*?try \{[\s\S]*?\} catch \{ return \{ minted: false \}; \}\s*\}/m.test(h));
 
+  // Oct 2026 (one link): the draft → sent transition moved into markContractSent,
+  // which BOTH the per-document send and the combined deal send call — the mint
+  // lives there once, so neither door can forget it.
+  const mark = sales.slice(sales.indexOf('async function markContractSent'), sales.indexOf('export async function handleSalesProposalSend'));
   const send = sales.slice(sales.indexOf('export async function handleSalesContractSend'), sales.indexOf('export async function handleSalesContractDelete'));
-  ok('the FRESH send runs the mint and returns `deposit` to the drawer', /const deposit = await ensureDepositForContractSend\(site, principal, rows\(up\)\[0\]\)/.test(send) && /emailed, deposit \}/.test(send));
+  ok('markContractSent runs the mint on the fresh send and hands `deposit` back', /const deposit = await ensureDepositForContractSend\(site, principal, rows\(up\)\[0\]\)/.test(mark) && /return \{ row: rows\(up\)\[0\], deposit \}/.test(mark));
+  ok('the FRESH send goes through markContractSent and returns `deposit` to the drawer', /const \{ row, deposit \} = await markContractSent\(site, principal, c\)/.test(send) && /emailed, deposit \}/.test(send));
   ok('a RESEND runs the same idempotent ensure (an old send still lands its signer on pay; the guard means never twice)', /already_sent: true, deposit: dep/.test(send));
   // the sign→pay handoff this exists FOR is still in place
   ok('sign→pay: the sign route still hands back the open deposit’s pay link', /purpose=eq\.deposit&status=eq\.open&deleted_at=is\.null&select=stripe_url,amount_cents/.test(sales));
@@ -84,6 +89,34 @@ const pipe = read('pipeline.html');
   ok('pipeline.html warns BEFORE sending a valueless agreement (money-blank confirm, same shape as unfilledBlanks)', /const MONEY_BLANK_RE=\/\\\[\(\?:project fee\|50% deposit\|50% balance\)\\\]\//.test(pipe) && /function confirmMoneyBlanks\(/.test(pipe));
   ok('…wired into BOTH send paths (the list button and Save & send)', (pipe.match(/confirmMoneyBlanks\(/g) || []).length >= 3);
   ok('the send toast reports the minted deposit (and drops the stale "request it now" tip)', /dep\.minted\?'\. A '\+money\(dep\.amount_cents\)\+' deposit request is ready/.test(pipe));
+}
+
+// ═══ 2b. ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ═══
+// The deal's one page: a `flow` token bound to the DEAL carries choose → sign →
+// pay; the pay link leaves the server only once the agreement is signed, and the
+// agreement's text only once the proposal is accepted.
+{
+  const view = sales.slice(sales.indexOf('export async function handleSalesPublicView'), sales.indexOf('export async function handleSalesDocument'));
+  ok('flow view: the deposit’s pay URL rides back ONLY for a signed agreement with an open deposit', /url: \(contract\?\.status === 'signed' && dep\.status === 'open' && dep\.stripe_url\)/.test(view));
+  ok('flow view: a paid deposit still shows (status paid) so the page can say "deposit paid"', /purpose=eq\.deposit&status=in\.\(open,paid\)/.test(view));
+  ok('flow view: the agreement’s body + content_hash are withheld until the proposal is accepted (locked: true)', /chosen \? \{ id: contract\.id, title: contract\.title, body: contract\.body, content_hash: contract\.content_hash/.test(view) && /\{ id: contract\.id, title: contract\.title, status: contract\.status, locked: true \}/.test(view));
+  ok('flow view: a deal with no proposal starts at the agreement (chosen = no proposal OR accepted)', /const chosen = !proposal \|\| proposal\.status === 'accepted'/.test(view));
+  ok('flow view: a drafted-but-unsent agreement is reported as contract_pending (the page says "preparing")', /contract_pending: !contract && cons\.some\(\(c\) => c\.status === 'draft'\)/.test(sales));
+  const dealSend = sales.slice(sales.indexOf('export async function handleSalesDealSend'), sales.indexOf('export async function handleSalesProposalDecide'));
+  ok('deal send: each draft makes the SAME transition its own send makes (markProposalSent + markContractSent)', /await markProposalSent\(site, principal, proposal\)/.test(dealSend) && /await markContractSent\(site, principal, contract\)/.test(dealSend));
+  ok('deal send: an agreement already out still gets the idempotent deposit ensure', /else if \(contract && contract\.status === 'sent'\) deposit = await ensureDepositForContractSend\(site, principal, contract\)/.test(dealSend));
+  ok('deal send: nothing newly out → no second email (already_sent, link handed back)', /if \(!sent\.proposal && !sent\.contract\) return json\(\{ data: \{ proposal, contract, deposit \}, url, emailed: false, sent, already_sent: true \}/.test(dealSend));
+  ok('deal send: ONE email — "Your proposal and agreement from <studio>"', /async function emailSalesFlow\(/.test(sales) && /`Your \$\{what\} from \$\{brand\.name\}`/.test(sales) && /const what = has\.proposal && has\.contract \? 'proposal and agreement'/.test(sales));
+  ok('deal send: the deposit is NOT emailed here either (the pay link is on the page, after signing)', !/emailInvoice\(/.test(dealSend));
+  // the sign page
+  const sign = read('sign.html');
+  ok('sign.html: the three-step strip — Choose · Sign · Pay — with aria-current on the open step', /steps\.push\(\{key:'choose',label:'Choose'/.test(sign) && /steps\.push\(\{key:'sign',label:'Sign'/.test(sign) && /steps\.push\(\{key:'pay',label:'Pay'/.test(sign) && /aria-current="step"/.test(sign));
+  ok('sign.html: done steps collapse (details.done), the next is open, the rest are locked (.card.locked)', /<details class="card done" id="step-choose">/.test(sign) && /<details class="card done" id="step-sign"/.test(sign) && /class="card locked" id="step-pay"/.test(sign));
+  ok('sign.html: Pay is the Stripe link only once signed — "Pay the $X deposit →"', /Pay the \$\{money\(dep\.amount_cents\)\} deposit →/.test(sign) && /else if\(dep&&dep\.url\)\{/.test(sign));
+  ok('sign.html: accepted-but-no-agreement says the studio is preparing it (and the studio got the notice)', /your studio has been told and is preparing the agreement/.test(sign));
+  ok('sign.html: the certificate block and the consent line survive on the one page', /Signature certificate/.test(sign) && /Typing your name here counts as your signature/.test(sign) && /Document fingerprint/.test(sign));
+  ok('sign.html: a per-document (old) link still renders the single document', /if\(d\.kind==='flow'\)renderFlow\(d,after\|\|null\);/.test(sign) && /else if\(d\.kind==='proposal'\)renderProposal\(d\);else renderContract\(d\);/.test(sign));
+  ok('sign.html: a stale version (409) still swaps the actions for "Load the latest version"', /Load the latest version/.test(sign));
 }
 
 // ═══ 3. The drawer stops contradicting itself on signed deals ═══
