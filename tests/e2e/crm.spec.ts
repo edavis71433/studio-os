@@ -52,7 +52,97 @@ test.describe('Leads inbox', () => {
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#q')).toBeVisible();
     await expect(page.locator('.lmeta')).toContainText('2 enquiries · 1 new · Updated just now');
+    // visual refresh: the page sits under a Website › Enquiries breadcrumb, with
+    // the New enquiry action beside the title and counts on the Open/New chips
+    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
+    await expect(crumbs.getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
+    await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Enquiries');
+    await expect(page.getByRole('button', { name: 'New enquiry' })).toBeVisible();
+    await expect(page.locator('.filters [data-f="open"] .n')).toHaveText('2');
+    await expect(page.locator('.filters [data-f="new"] .n')).toHaveText('1');
+    await expect(page.locator('.filters [data-f="all"] .n')).toHaveCount(0);
     expect(errors).toEqual([]);
+  });
+
+  test('a card carries the refreshed anatomy: initials avatar · kind chip · time · email · message · the action row', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    const sam = page.locator('.lead').filter({ hasText: 'Sam Rivera' });
+    await expect(sam).toHaveClass(/\bnew\b/);                       // unread rows keep the accent edge
+    await expect(sam.locator('.av')).toHaveText('SR');
+    await expect(sam.locator('.kindtag')).toHaveText('Quote request');
+    await expect(sam.locator('.when')).toContainText('ago');
+    await expect(sam.locator('.contact a')).toHaveAttribute('href', 'mailto:sam@example.com');
+    await expect(sam.locator('.msg')).toHaveText('Can I get a quote for a patio?');
+    // the action row, in the board's order; Spam is the quiet one at the end
+    const acts = sam.locator('.acts');
+    await expect(acts.locator('a.reply')).toHaveText(/Reply/);
+    await expect(acts.locator('[data-deal]')).toHaveText('→ Deal');
+    await expect(acts.locator('[data-convert]')).toHaveText('Make customer');
+    await expect(acts.locator('[data-read]')).toHaveText('Mark read');
+    await expect(acts.locator('[data-arch]')).toHaveText('Not a fit');
+    await expect(acts.locator('button.quiet[data-spam]')).toHaveText(/Spam/);
+    // a read row (Dana) shows no Mark read and a one-letter-pair avatar of its own
+    const dana = page.locator('.lead').filter({ hasText: 'Dana Lee' });
+    await expect(dana).not.toHaveClass(/\bnew\b/);
+    await expect(dana.locator('[data-read]')).toHaveCount(0);
+    await expect(dana.locator('.av')).toHaveText('DL');
+  });
+
+  test('the kind filter and the sort re-render the list only — the search input node survives', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    const q = page.locator('#q');
+    await q.evaluate((el) => { (el as HTMLElement).dataset.marker = 'kept'; });
+    // kind: only the quote request
+    await page.locator('#kindf').selectOption('quote');
+    await expect(page.locator('.lead')).toHaveCount(1);
+    await expect(page.locator('.lead').first()).toContainText('Sam Rivera');
+    await expect(page.locator('.lmeta')).toContainText('1 enquiry');
+    // a kind nobody matches stays honest
+    await page.locator('#kindf').selectOption('booking');
+    await expect(page.locator('#main')).toContainText('No enquiries match that filter');
+    await page.locator('#kindf').selectOption('all');
+    await expect(page.locator('.lead')).toHaveCount(2);
+    // sort: newest first by default (Sam, Jul 7), oldest flips it (Dana, Jul 2)
+    await expect(page.locator('.lead').first()).toContainText('Sam Rivera');
+    await page.locator('#sortf').selectOption('oldest');
+    await expect(page.locator('.lead').first()).toContainText('Dana Lee');
+    expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
+  });
+
+  test('New enquiry logs a phone/walk-in enquiry through the EXISTING contact + deal routes, then opens the deal', async ({ page }) => {
+    await installApp(page, { api: { '/sales/contacts': { data: { id: 'ct-9' } }, '/sales/deals': { data: { id: 'd-9' } } } });
+    await page.goto('/leads.html');
+    const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/presence/sales/')) posts.push({ path: new URL(r.url()).pathname.replace(/^.*\/presence/, ''), body: r.postDataJSON() }); });
+    await page.getByRole('button', { name: 'New enquiry' }).click();
+    const dlg = page.locator('dialog#newDlg[open]');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('#ne-name')).toBeFocused();
+    await dlg.locator('#ne-name').fill('Pat Moreno');
+    await dlg.locator('#ne-email').fill('pat@example.com');
+    await dlg.locator('#ne-phone').fill('(818) 555-0101');
+    await dlg.locator('#ne-msg').fill('Wants a quote for a patio');
+    await dlg.getByRole('button', { name: 'Log enquiry' }).click();
+    await page.waitForURL(/crm\.html\?deal=d-9&tab=deal/);
+    // one contact, then one MANUAL deal on it — no new endpoint, no form submission id
+    expect(posts.map((p) => p.path)).toEqual(['/sales/contacts', '/sales/deals']);
+    expect(posts[0].body).toMatchObject({ name: 'Pat Moreno', email: 'pat@example.com', phone: '(818) 555-0101', notes: 'Enquiry: Wants a quote for a patio' });
+    expect(posts[1].body).toMatchObject({ title: 'Pat Moreno', contact_id: 'ct-9', source: 'manual' });
+    expect(posts[1].body).not.toHaveProperty('source_submission_id');
+  });
+
+  test('New enquiry with nothing filled in asks for a name, email, or phone — and posts nothing', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/leads.html');
+    let posts = 0;
+    page.on('request', (r) => { if (r.method() === 'POST') posts++; });
+    await page.getByRole('button', { name: 'New enquiry' }).click();
+    await page.locator('dialog#newDlg[open]').getByRole('button', { name: 'Log enquiry' }).click();
+    await expect(page.locator('.dds-toast')).toContainText('A name, email, or phone is enough to start.');
+    expect(posts).toBe(0);
+    await expect(page.locator('dialog#newDlg[open]')).toBeVisible();   // still open to finish
   });
 
   test('C2 — search filters the queue client-side without rebuilding the input', async ({ page }) => {
