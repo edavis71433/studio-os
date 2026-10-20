@@ -402,6 +402,77 @@ test.describe('SS4 — broadcasts console', () => {
     for (const seg of await page.locator('[data-seg]').all()) {
       expect(await seg.getAttribute('aria-pressed')).toMatch(/^(true|false)$/);
     }
+    // visual refresh: breadcrumb · the list picker shows label, description and
+    // count per row · the composer carries Preview, Send update and the toolbar
+    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
+    await expect(crumbs.getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
+    await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Send an update');
+    const contacts = page.locator('[data-seg="contacts"]');
+    await expect(contacts).toContainText('All contacts');
+    await expect(contacts.locator('.d')).toHaveText('Everyone saved in your contacts.');
+    await expect(contacts.locator('.n')).toHaveText('12');
+    await expect(contacts).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Preview/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send update' })).toBeVisible();
+    await expect(page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button')).toHaveCount(4);
+    await expect(page.locator('#insvar')).toBeVisible();
     expect(errors).toEqual([]);
+  });
+
+  test('Send update takes the composer to the SAME Preview & send stage — nothing goes out from the composer', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/broadcasts': { data: { id: D_ID } } } });
+    // the list GET must still answer with rows while the bare-path POST creates the draft
+    await page.route((u) => isListGet(u.href, 'GET'), (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(LIST) })
+        : route.fallback());
+    await page.goto('/broadcasts.html');
+    const sends: string[] = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/send$/.test(new URL(r.url()).pathname)) sends.push(r.url()); });
+    await page.locator('#subj').fill('Autumn hours');
+    await page.locator('#bodytx').fill('Hi {{first_name}}, we close early on Sundays now.');
+    const created = page.waitForRequest((r) => r.method() === 'POST' && /\/presence\/broadcasts$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Send update' }).click();
+    await created;
+    await expect(page.locator('#stage')).toContainText('Preview & send');
+    await expect(page.locator('#send')).toBeFocused();           // the next press is the real one
+    expect(sends).toHaveLength(0);                                // …and it has NOT happened
+  });
+
+  test('the formatting bar writes the markdown the email renderer understands, and Insert variable lands at the caret', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/broadcasts.html');
+    const body = page.locator('#bodytx');
+    await body.fill('open late');
+    await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });
+    await page.getByRole('button', { name: 'Bold' }).click();
+    await expect(body).toHaveValue('**open late**');
+    await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(t.value.length, t.value.length); });
+    await page.getByRole('button', { name: 'Italic' }).click();
+    await expect(body).toHaveValue('**open late***italic text*');
+    await body.fill('Hi ');
+    await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(3, 3); });
+    await page.locator('#insvar').selectOption('{{first_name}}');
+    await expect(body).toHaveValue('Hi {{first_name}}');
+    await expect(page.locator('#insvar')).toHaveValue('');          // the menu resets, ready for the next one
+    await body.fill('first\nsecond');
+    await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });
+    await page.getByRole('button', { name: 'Bulleted list' }).click();
+    await expect(body).toHaveValue('- first\n- second');
+    await body.fill('our menu');
+    await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });
+    await page.getByRole('button', { name: 'Link' }).click();
+    await expect(body).toHaveValue('[our menu](https://)');
+    // the toolbar edits reach the draft state the ✨/preview paths read (an input event fires)
+    await page.locator('[data-seg="enquiries"]').click();          // a re-render reads DRAFT back into the form
+    await expect(body).toHaveValue('[our menu](https://)');
+  });
+
+  test('no history yet → the calm empty state inside the Recent broadcasts card', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/broadcasts': { data: { broadcasts: [] } } } });
+    await page.goto('/broadcasts.html');
+    await expect(page.locator('#bcMeta')).toContainText('0 broadcasts');
+    await expect(page.locator('.empty')).toContainText('Nothing sent yet — your first update will show up here.');
+    await expect(page.locator('.bc')).toHaveCount(0);
   });
 });
