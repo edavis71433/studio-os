@@ -40,6 +40,8 @@
   button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 17px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
   button.approve{background:var(--p);color:var(--on-p);border-color:var(--p);box-shadow:0 2px 12px rgba(91,63,160,.22)} button.approve:hover{background:var(--p-deep);color:var(--on-p);border-color:var(--p-deep)}
+  /* Oct 2026 audit change 4: the top "Needs you" row's Pay is a link wearing the filled style */
+  a.approve{display:inline-flex;align-items:center;font-weight:600;font-size:12.5px;border-radius:999px;padding:6px 13px;background:var(--p);color:var(--on-p);border:1px solid var(--p);text-decoration:none;box-shadow:0 2px 12px rgba(91,63,160,.22)} a.approve:hover{background:var(--p-deep);border-color:var(--p-deep);color:var(--on-p)}
   .tag{display:inline-block;font-size:11px;font-family:var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 9px;font-weight:600;margin-bottom:9px}
   .center{text-align:center;padding:52px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
@@ -816,6 +818,17 @@ function renderHome(){
   // already loads; it stays hidden until at least one tile has a real datum.
   html+=`<div class="glance" id="home-glance" hidden></div>`;
   html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
+  // Oct 2026 audit change 4: what your studio just did sits right under what needs you
+  html+=`<section id="home-updates"><h2>Recent updates</h2>`;
+  const moments=(feed.moments||[]);
+  // a FAILED feed read says so — "Nothing new to share" is a claim only a
+  // successful read may make
+  if(P.feedFailed)html+=`<p class="muted fload">We couldn’t load recent updates just now — please try again in a moment.</p>`;
+  else if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
+  // PS3: queue-row anatomy for the updates too — moment_type icon (decorative),
+  // a neutral "Update" kind chip, and the row's own recency (rel created_at).
+  else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><span class="qico" aria-hidden="true">${momentIcon(m.moment_type)}</span><div class="qmain"><span class="kchip">Update</span><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>${m.created_at?`<span class="qwhen">${esc(rel(m.created_at))}</span>`:''}</div>`).join('')}</div>`;
+  html+=`</section>`;
   // slice 8b: the "Your website" slot — filled by loadWebsiteCard() only when
   // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
   html+=`<section id="home-website" hidden></section>`;
@@ -826,16 +839,6 @@ function renderHome(){
   html+=`<section><h2>Your projects</h2>${P.projectsFailed
     ?`<p class="muted fload">We couldn’t load your projects just now.</p>`
     :projectCardsHtml(projects)}</section>`;
-  html+=`<section><h2>Recent updates</h2>`;
-  const moments=(feed.moments||[]);
-  // a FAILED feed read says so — "Nothing new to share" is a claim only a
-  // successful read may make
-  if(P.feedFailed)html+=`<p class="muted fload">We couldn’t load recent updates just now — please try again in a moment.</p>`;
-  else if(!moments.length)html+=emptyCard('Nothing new to share right now — your studio will surface anything worth a look here.','✨');
-  // PS3: queue-row anatomy for the updates too — moment_type icon (decorative),
-  // a neutral "Update" kind chip, and the row's own recency (rel created_at).
-  else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><span class="qico" aria-hidden="true">${momentIcon(m.moment_type)}</span><div class="qmain"><span class="kchip">Update</span><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>${m.created_at?`<span class="qwhen">${esc(rel(m.created_at))}</span>`:''}</div>`).join('')}</div>`;
-  html+=`</section>`;
   $('main').innerHTML=html;
   wireWelcome();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
@@ -862,11 +865,15 @@ async function buildNeedsYou(){
     const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects,failed));
     // PS3 (D1a): the needs-you tile counts the queue below, so it IS a button
     // to that queue — labeled for the list it counts.
-    if(tiles.length){gl.innerHTML=tiles.map(t=>t.id==='glance-ok'
+    if(tiles.length){gl.innerHTML=tiles.map(t=>t.id==='glance-due'
+      ?`<button type="button" class="gt" id="glance-due" aria-label="${esc(t.n)} to pay — jump to it"><span class="gn">${esc(t.n)}</span><span class="gl">${esc(t.l)}</span></button>`
+      :t.id==='glance-ok'
       ?`<button type="button" class="gt" id="${esc(t.id)}" aria-label="${esc(t.n)} in the “Needs you” list — jump to it"><span class="gn">${esc(t.n)}</span><span class="gl">${esc(t.l)}</span></button>`
       :`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;
       const okT=document.getElementById('glance-ok');
-      if(okT&&okT.tagName==='BUTTON')okT.addEventListener('click',()=>scrollToSection('home-needs'));}
+      if(okT&&okT.tagName==='BUTTON')okT.addEventListener('click',()=>scrollToSection('home-needs'));
+      const dueT=document.getElementById('glance-due');
+      if(dueT)dueT.addEventListener('click',()=>{const pay=document.querySelector('#needs-body [data-pay]');if(pay){pay.scrollIntoView({block:'center'});pay.focus();}else showTab('invoices');});}
     else gl.hidden=true;
   }
   const body=document.getElementById('needs-body');if(!body)return;
@@ -880,26 +887,30 @@ async function buildNeedsYou(){
   // PS3 (D1a): the rows come from needsYouItems — the SAME array whose length
   // the glance tile shows, so the two numbers agree by construction.
   const nyToday=portalTodayYmd();
-  const items=needsYouItems(PORTAL.feed,snaps,billing).map(it=>{
+  // Oct 2026 audit change 4: one filled button on Home — the top row's own action
+  // (Approve, or Pay); every other row's actions are outlined.
+  const items=needsYouItems(PORTAL.feed,snaps,billing).map((it,ix)=>{
+    const top=ix===0?'approve':'';
     if(it.kind==='feed'){const p=it.p;
       return row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
-        `<button class="approve" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`);}
+        `<button class="${top}" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`);}
     if(it.kind==='approval'){const s=it.s,a=it.a;
+      // approve right here (the row names the change and its summary); "See it first" opens the record
       return row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="Review &amp; approve — ${esc(a.title||'A change is ready')}">Review &amp; approve</button>`);}
+        `<button class="${top}" data-qapr="${esc(a.id)}" data-qah="${esc(a.content_hash||'')}" data-qproj="${esc(s.id)}" aria-label="Approve — ${esc(a.title||'A change is ready')}">Approve</button><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="See it first — ${esc(a.title||'A change is ready')}">See it first</button>`);}
     if(it.kind==='todos'){const s=it.s;
       return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
-        `<button data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
+        `<button class="${top}" data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
     if(it.kind==='survey'){const s=it.s,sv=it.sv;
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
-        `<button data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
+        `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
     const i=it.i;
     // the SAME derived state word the Invoices tab chips (PS2 D2) — the two
     // surfaces must never disagree about whether the same invoice is overdue
     const stWord=invOverdue(i,nyToday)?'overdue':(i.status||'').replace('_',' ');
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      nyPay?`<a class="link" href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
+      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
   // Per-source failure honesty (the glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
@@ -917,6 +928,15 @@ async function buildNeedsYou(){
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
   body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
+  // inline approve of a project approval — the SAME decide call (and 409 honesty) as the record page
+  body.querySelectorAll('[data-qapr]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/client/approvals/'+b.getAttribute('data-qapr')+'/decide','POST',{decision:'approved',presented_hash:b.getAttribute('data-qah'),note:''});
+    if(r.ok){PORTAL.snaps=null;toast('Approved — thank you.');buildNeedsYou();return;}
+    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
+    if(r.status===409){PORTAL.snaps=null;buildNeedsYou();return;}
+    b.disabled=false;
+  }));
   body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b)));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
 }
@@ -1958,11 +1978,16 @@ async function renderHelp(){
 // First-run welcome — calm, one-time, dismissible (no modal, no tour).
 const WELCOME_KEY='dds-portal-welcomed';
 function welcomed(){try{return localStorage.getItem(WELCOME_KEY)==='1';}catch(_){return false;}}
+let WELCOME_THIS_VISIT=false;   // the first visit keeps the card across Home re-renders until it ends or × is pressed
 function welcomeCardHtml(){
-  if(welcomed())return'';
+  if(welcomed()&&!WELCOME_THIS_VISIT)return'';
   // PS3: the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
   // persona renders as calm empty states. Don't tour what they can't use.
   if(PORTAL.persona!=='client')return'';
+  // Oct 2026 audit change 4: shown on the first visit only — marked seen now, so
+  // the next visit opens on Needs you instead of the tour (× still dismisses now)
+  WELCOME_THIS_VISIT=true;
+  try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}
   const n=firstName(USER);
   const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
   // First-run orientation — names every destination, not just approve/download/message.
@@ -1977,7 +2002,7 @@ function welcomeCardHtml(){
 }
 function wireWelcome(){
   const x=$('welcomeX');
-  if(x)x.addEventListener('click',()=>{try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}const w=$('welcome');if(w)w.remove();});
+  if(x)x.addEventListener('click',()=>{WELCOME_THIS_VISIT=false;try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}const w=$('welcome');if(w)w.remove();});
   document.querySelectorAll('.wl-step[data-wtab]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-wtab'))));
 }
 // What's-new bell/panel over the ALREADY-BUILT /client/notifications (with
@@ -2176,6 +2201,10 @@ async function openProject(id,focusSection){
   // the activity rail — the project's client-visible timeline, composer below it
   html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
   $('main').innerHTML=html;
+  // Oct 2026 audit change 4: one filled button on the record — the first Approve,
+  // else the first Mark done; Send / Choose a file / the rest step back to outlined
+  {const jobSel=document.querySelector('#main [data-adec]')?'[data-adec]':document.querySelector('#main [data-taskdone]')?'[data-taskdone]':null;
+   if(jobSel){const keep=document.querySelector('#main '+jobSel);document.querySelectorAll('#main button.approve').forEach(b=>{if(b!==keep)b.classList.remove('approve');});}}
   renderProjTimeline();
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>scrollToSection(b.getAttribute('data-chip'))));
   // PS6 focus management: every paint of this view says where you are. A plain
