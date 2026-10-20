@@ -85,6 +85,29 @@ test.describe('App shell', () => {
     await expect(pal.locator('.res.sel')).toHaveAttribute('href', '/presence.html#design');
   });
 
+  // Oct 2026 studio audit, change 4: an agency at studio level can FIND onboarding —
+  // buildNav puts "Add a customer" (→ /agency.html#add) in the Customers group, and
+  // the palette matches its label ("add") and its description ("client").
+  test('⌘K finds "Add a customer" by "add" and by "client" and targets /agency.html#add', async ({ page }) => {
+    const nav = CRM_NAV.map((s) => s.key !== 'customers' ? s : { ...s, items: [
+      { key: 'customers', label: 'Customers', href: '/agency.html' },
+      { key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.' },
+      ...s.items.slice(1),
+    ] });
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav } } } });
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-search')).toBeVisible();
+    await page.keyboard.press('Control+k');
+    const pal = page.locator('.dds-palette');
+    await expect(pal).toBeVisible();
+    await pal.locator('input').fill('add');
+    const hit = pal.locator('.res', { hasText: 'Add a customer' });
+    await expect(hit).toHaveAttribute('href', '/agency.html#add');
+    await expect(hit).toContainText('Customers');                                      // the row shows label + group; the desc is for matching
+    await pal.locator('input').fill('client');                                         // …which is how "client" finds it
+    await expect(pal.locator('.res', { hasText: 'Add a customer' })).toHaveAttribute('href', '/agency.html#add');
+  });
+
   test('profile menu exposes sign out', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
