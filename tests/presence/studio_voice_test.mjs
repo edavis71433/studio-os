@@ -81,6 +81,13 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   const staging = read('supabase/functions/presence/lib/staging.ts'), dw = read('supabase/functions/presence/lib/draft_writer.ts');
   ok('staging.ts + draft_writer.ts: snapshots they write attribute the same way', /publishActorKind\(p\)/.test(staging) && /publishActorKind\(principal\)/.test(dw));
 
+  const bulk = read('supabase/functions/presence/agency/routes.ts');
+  ok('agency/routes.ts: the bulk publish hands handlePublish a principal scoped to EACH site (operator attribution + client notice)',
+    /const scoped: Principal = \{ \.\.\.principal, scope: \{ site_id: site\.id, name: names\.get\(site\.id\) \|\| 'Client' \} \};\s*\n\s*const resp = await handlePublish\(null, site, scoped, \{\}\)/.test(bulk) && !/handlePublish\(null, site, principal, \{\}\)/.test(bulk));
+  ok('agency/routes.ts: a scoped copy per site — the member\'s principal is never mutated', /\{ \.\.\.principal, scope:/.test(bulk) && !/principal\.scope = /.test(bulk));
+  // behavioural: the per-site copy attributes as operator for a member, staff for staff
+  ok('bulk: a member\'s per-site copy → operator; staff\'s → staff', publishActorKind({ ...operator, scope: null, ...{ kind: 'client' }, scope: CLIENT }) === 'operator' && publishActorKind({ kind: 'staff', scope: CLIENT }) === 'staff');
+
   const idx = read('supabase/functions/presence/index.ts');
   ok('index.ts: the principal is stamped with the scope ONLY after resolveScopedSite allowed it',
     /if \(!sc\.ok\) return json\(\{ error: 'scope_denied'[\s\S]{0,800}principal\.scope = \{ site_id: sc\.scoped\.site_id, name: sc\.scoped\.name \}/.test(idx));
