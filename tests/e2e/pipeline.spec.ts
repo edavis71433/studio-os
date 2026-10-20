@@ -1936,9 +1936,9 @@ test.describe('deal page — Overview · Billing · Activity tabs', () => {
 // so Sharing & access acts on the new customer's site, not the studio's own.
 // Unknown (older rows, a convert that made no site) → the bare link, as before.
 const CUSTOMER_SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
-const DEAL8 = '99999999-9999-4999-8999-999999999999';
+const DEAL9 = '99999999-9999-4999-8999-999999999999';
 const wonDeal = (dealExtras: Record<string, unknown>) => ({ data: {
-  deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
+  deal: { id: DEAL9, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
   contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
   proposals: [], contracts: [SIGNED_NO_TERM], events: [], timeline: [], invoices: [], last_contacted_at: null,
 } });
@@ -1946,17 +1946,17 @@ const accessLink = (page: import('@playwright/test').Page) => page.getByRole('li
 
 test.describe('deal page — "Manage their access" carries the customer', () => {
   test('a converted deal with a customer site links /sharing.html?client=<that site>', async ({ page }) => {
-    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
-    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
     await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 
   test('no customer site on the deal → the bare link; a non-uuid value is not trusted', async ({ page }) => {
-    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({}), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
-    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({}), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
     await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
-    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
-    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
     await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
   });
 
