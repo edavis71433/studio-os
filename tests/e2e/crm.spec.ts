@@ -3,17 +3,62 @@ import { installApp } from './helpers/app';
 
 // CRM surfaces: the leads inbox (leads.html) and the relationship view (crm.html).
 test.describe('Leads inbox', () => {
-  test('renders leads with kind + a one-tap prefilled reply', async ({ page }) => {
+  test('renders leads with kind + a Reply that opens a prefilled composer (mail app only as the fallback)', async ({ page }) => {
     await installApp(page);
     await page.goto('/leads.html');
     const leads = page.locator('.lead');
     await expect(leads).toHaveCount(2);                       // Open filter: both non-archived
     await expect(page.getByText('Sam Rivera')).toBeVisible();
     await expect(page.getByText('Quote request')).toBeVisible();
-    const reply = page.locator('a.reply').first();
+    await leads.first().getByRole('button', { name: 'Reply' }).click();
+    const box = leads.first().locator('.lcompose');
+    await expect(box.locator('textarea')).toBeFocused();
+    await expect(box.locator('textarea')).toHaveValue(/^Hi Sam,/);
     // the page URI-encodes the recipient (encodeURIComponent), so '@' → '%40'
-    await expect(reply).toHaveAttribute('href', /^mailto:sam%40example\.com/);
-    await expect(reply).toHaveAttribute('href', /subject=/);  // prefilled subject
+    const fb = box.getByRole('link', { name: 'Use your email app instead' });
+    await expect(fb).toHaveAttribute('href', /^mailto:sam%40example\.com/);
+    await expect(fb).toHaveAttribute('href', /subject=/);  // prefilled subject
+  });
+
+  // ── Oct 2026 workflow audit, change 5: the reply is sent from Studio OS ──
+  test('Send reply POSTs the text, marks the enquiry Replied, and shows what was sent', async ({ page }) => {
+    await installApp(page, { api: { '/forms/inbox/l1/reply': { data: { sent: true, status: 'replied' } } } });
+    await page.goto('/leads.html');
+    const card = page.locator('.lead').first();
+    await card.getByRole('button', { name: 'Reply' }).click();
+    await card.locator('.lcompose textarea').fill('Hi Sam,\n\nHappy to quote — what size is the patio?');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1\/reply$/.test(new URL(r.url()).pathname));
+    await card.getByRole('button', { name: 'Send reply' }).click();
+    expect((await post).postDataJSON()).toEqual({ body: 'Hi Sam,\n\nHappy to quote — what size is the patio?' });
+    await expect(page.locator('.dds-toast')).toContainText('Sent to sam@example.com');
+    const sent = page.locator('.lead').first();
+    await expect(sent.locator('.lreply')).toContainText('what size is the patio?');
+    await expect(sent.locator('.stchip')).toHaveText(/Replied/);
+  });
+
+  test('a send that fails keeps the words and says nothing went out', async ({ page }) => {
+    await installApp(page);
+    await page.route('**/functions/v1/presence/forms/inbox/l1/reply', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'not_sent', message: 'We couldn’t send that just now — nothing went out.' }) }));
+    await page.goto('/leads.html');
+    const card = page.locator('.lead').first();
+    await card.getByRole('button', { name: 'Reply' }).click();
+    await card.locator('.lcompose textarea').fill('Hi Sam, yes we can.');
+    await card.getByRole('button', { name: 'Send reply' }).click();
+    await expect(page.locator('.dds-toast')).toContainText('nothing went out');
+    await expect(card.locator('.lcompose textarea')).toHaveValue('Hi Sam, yes we can.');
+    await expect(card.getByRole('button', { name: 'Send reply' })).toBeEnabled();
+  });
+
+  test('an untouched greeting is not sent', async ({ page }) => {
+    let posts = 0;
+    await installApp(page);
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/reply$/.test(new URL(r.url()).pathname)) posts++; });
+    await page.goto('/leads.html');
+    const card = page.locator('.lead').first();
+    await card.getByRole('button', { name: 'Reply' }).click();
+    await card.getByRole('button', { name: 'Send reply' }).click();
+    await expect(page.locator('.dds-toast')).toContainText('Write your reply first.');
+    expect(posts).toBe(0);
   });
 
   test('the new-lead filter shows only unread', async ({ page }) => {
@@ -76,7 +121,7 @@ test.describe('Leads inbox', () => {
     await expect(sam.locator('.msg')).toHaveText('Can I get a quote for a patio?');
     // the action row, in the board's order; Spam is the quiet one at the end
     const acts = sam.locator('.acts');
-    await expect(acts.locator('a.reply')).toHaveText(/Reply/);
+    await expect(acts.locator('button.reply[data-compose]')).toHaveText(/Reply/);   // opens the in-card composer (audit change 5)
     await expect(acts.locator('[data-deal]')).toHaveText('→ Deal');
     await expect(acts.locator('[data-convert]')).toHaveText('Make customer');
     await expect(acts.locator('[data-read]')).toHaveText('Mark read');

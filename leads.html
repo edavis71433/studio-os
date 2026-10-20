@@ -88,8 +88,19 @@
   .lead .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
   .lead .acts button,.lead .acts a.reply{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:7px 13px;cursor:pointer;text-decoration:none;transition:.15s}
   .lead .acts button:hover{border-color:var(--line-strong);background:var(--bg)}
-  .lead .acts a.reply{background:var(--p);color:#fff;border-color:var(--p)}
-  .lead .acts a.reply:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  .lead .acts a.reply,.lead .acts button.reply{background:var(--p);color:#fff;border-color:var(--p)}
+  .lead .acts a.reply:hover,.lead .acts button.reply:hover{background:var(--p-deep);border-color:var(--p-deep)}
+  /* Oct 2026 audit change 5: the reply is written and sent here */
+  .lcompose{margin-top:12px;display:grid;gap:8px}
+  .lcompose textarea{width:100%;min-height:96px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px}
+  .lcompose textarea:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .lcompose .crow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .lcompose .crow .sp{flex:1}
+  .lcompose button.send{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:7px 16px;background:var(--p);color:#fff;border:1px solid var(--p);cursor:pointer}
+  .lcompose button.cancel{font:inherit;font-size:13px;border-radius:999px;padding:7px 14px;background:transparent;border:1px solid var(--line);color:var(--ink);cursor:pointer}
+  .lcompose a{font-size:12.5px;color:var(--p)}
+  .lreply{margin-top:10px;padding:8px 12px;border-left:3px solid var(--p);background:var(--p-soft);border-radius:0 8px 8px 0;font-size:13.5px;white-space:pre-wrap}
+  .lreply .wh{display:block;color:var(--soft);font-size:12px;white-space:normal}
   /* Phase 4 (triage): Spam is a quiet text button at the row's far end; the shelf chip says where a row went */
   .lead .acts button.quiet{border-color:transparent;background:transparent;color:var(--faint);margin-left:auto}
   .lead .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
@@ -274,8 +285,9 @@ function renderLeadList(){
       <div class="top"><span class="who">${who}</span><span class="kindtag">${esc(KIND[l.form_kind]||'Message')}</span><span class="when">${esc(when(l.created_at))}</span></div>
       <div class="contact">${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}${l.email&&l.phone?' · ':''}${l.phone?`<a href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''}</div>
       ${l.message?`<div class="msg">${esc(l.message)}</div>`:''}
+      ${(Array.isArray(l.replies)?l.replies:[]).map(r=>`<div class="lreply"><span class="wh">You replied${r.at?' · '+esc(when(r.at)):''}</span>${esc(r.body)}</div>`).join('')}
       <div class="acts">
-        ${l.email?`<a class="reply" href="${replyHref(l)}" data-reply="${esc(l.id)}">${IC.arrow}Reply</a>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">${IC.arrow}Call</a>`:'')}
+        ${l.email?`<button class="reply" data-compose="${esc(l.id)}" aria-expanded="false">${IC.arrow}Reply</button>`:(l.phone?`<a class="reply" href="tel:${esc(l.phone.replace(/[^0-9+]/g,''))}" data-reply="${esc(l.id)}">${IC.arrow}Call</a>`:'')}
         ${l.converted?`<a class="reply" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button data-deal="${esc(l.id)}" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${(l.converted||!l.email)?'':`<button data-convert="${esc(l.id)}" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
         ${l.status==='new'?`<button data-read="${esc(l.id)}">Mark read</button>`:''}
@@ -284,6 +296,33 @@ function renderLeadList(){
       </div></div></div>`;
   }
   host.innerHTML=h;wireList();
+}
+// The in-card reply: prefilled greeting, Send reply (the one filled button while
+// it is open), Cancel, and the mail-app link as a quiet fallback.
+function openCompose(id,btn){
+  const l=ALL.find(x=>x.id===id);if(!l||!l.email)return;
+  const card=btn.closest('.lbody');if(!card)return;
+  let f=card.querySelector('.lcompose');
+  if(f){const ta=f.querySelector('textarea');if(ta)ta.focus();return;}
+  const hi=(l.name?`Hi ${l.name.split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';
+  f=document.createElement('form');f.className='lcompose';
+  f.innerHTML=`<label for="lc-${esc(id)}" style="font-size:12.5px;color:var(--soft)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
+    <textarea id="lc-${esc(id)}">${esc(hi)}</textarea>
+    <div class="crow"><a href="${replyHref(l)}" data-reply="${esc(id)}">Use your email app instead</a><span class="sp"></span><button type="button" class="cancel">Cancel</button><button type="submit" class="send">Send reply</button></div>`;
+  card.appendChild(f);
+  btn.hidden=true;btn.setAttribute('aria-expanded','true');
+  const ta=f.querySelector('textarea');ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+  f.querySelector('[data-reply]').addEventListener('click',()=>{if(l.status==='new'||l.status==='read')setStatus(id,'replied',true);});
+  f.querySelector('.cancel').addEventListener('click',()=>{f.remove();btn.hidden=false;btn.setAttribute('aria-expanded','false');btn.focus();});
+  f.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const body=(ta.value||'').trim();
+    if(!body||body===hi.trim()){toast('Write your reply first.');ta.focus();return;}
+    const send=f.querySelector('.send');send.disabled=true;send.textContent='Sending…';
+    const r=await api('/forms/inbox/'+id+'/reply','POST',{body});
+    if(r.ok){l.status='replied';l.replies=(Array.isArray(l.replies)?l.replies:[]).concat([{body,at:new Date().toISOString()}]);toast(`Sent to ${l.email} — their reply comes back to your Inbox.`);renderLeadList();}
+    else{toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');send.disabled=false;send.textContent='Send reply';}
+  });
 }
 // Prefill the reply so responding to a customer is one tap, not a blank email.
 function replyHref(l){
@@ -316,6 +355,9 @@ function wireList(){
   // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
   document.querySelectorAll('[data-arch]').forEach(b=>b.addEventListener('click',()=>setStatus(b.getAttribute('data-arch'),'not_a_fit')));
   document.querySelectorAll('[data-spam]').forEach(b=>b.addEventListener('click',()=>markSpam(b.getAttribute('data-spam'))));
+  // Oct 2026 audit change 5: Reply opens a composer IN the card; the email goes out
+  // from Studio OS (POST /forms/inbox/:id/reply), which marks it Replied server-side
+  document.querySelectorAll('[data-compose]').forEach(b=>b.addEventListener('click',()=>openCompose(b.getAttribute('data-compose'),b)));
   // replying to a lead marks it Replied — no manual bookkeeping
   document.querySelectorAll('[data-reply]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-reply');const l=ALL.find(x=>x.id===id);if(l&&(l.status==='new'||l.status==='read'))setStatus(id,'replied',true);}));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',()=>createDeal(b.getAttribute('data-deal'))));

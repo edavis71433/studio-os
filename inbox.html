@@ -128,6 +128,8 @@
   a.btnlink{display:inline-block;font-size:13px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);color:var(--p);padding:6px 13px;text-decoration:none}
   a.btnlink:hover{background:var(--p-soft)}
   a.btnlink.primary{background:var(--p);color:#fff}
+  .lreply{margin-top:12px;padding:10px 12px;border-left:3px solid var(--p);background:var(--p-soft);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
+  .lreply .body{margin-top:4px;white-space:pre-wrap}
   select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 9px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .card .who{font-weight:600;font-size:15.5px}
@@ -689,7 +691,7 @@ let PANE_SEQ=0;   // a stale async pane render must never paint over a newer one
 // pane render lands (slice-1's snapComposer pattern, crm.html). The draft is
 // keyed to the SELECTED item so it can never leak into another conversation;
 // successful sends clear their field BEFORE re-rendering, so nothing resurrects.
-const COMPOSER_FIELDS=['msgBody','supBody'];
+const COMPOSER_FIELDS=['msgBody','supBody','leadBody'];
 let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by the pane loaders
 // ── C3 (SS6): insertSavedReplies(textareaId) — the shared saved-reply insert.
 // ONE lazy cached fetch of /service/saved-replies per page-load; a picker only
@@ -926,29 +928,60 @@ function paneApproval(host,it){
   host.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
 }
 
-// ── An enquiry row → the lead card: Reply (mailto) · → Deal · Mark read · Archive ─
+// ── An enquiry row → the lead card: a reply composer (sent from Studio OS) · → Deal · Mark read · Archive ─
+// Oct 2026 workflow audit, change 5: the reply is written and sent HERE
+// (POST /forms/inbox/:id/reply) — it used to be a mailto: that left the app and
+// recorded nothing. The person's email reply comes back to this Inbox; the
+// mail-app link stays as a quiet fallback.
+function leadGreeting(l){return (l.name?`Hi ${String(l.name).split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';}
 function paneLead(host,it){
   const l=it.lead||{};
+  const sent=Array.isArray(l.replies)?l.replies:[];
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
   host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
+      ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
       <div class="acts">
-        ${l.email?`<a class="btnlink primary" id="leadReply" href="${leadReplyHref(l)}">Reply</a>`:''}
         <button id="leadDeal" title="Start a deal in your pipeline from this enquiry">→ Deal</button>
         ${String(l.status||'new')==='new'?`<button id="leadRead">Mark read</button>`:''}
         <button id="leadArch">Archive</button>
       </div>
-      <p class="muted" style="margin-top:12px;font-size:12.5px">Replying opens your email app — sending a deal keeps them in your pipeline.</p>
-    </div></div>`;
+    </div></div>
+    ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
+      <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
+      <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
+    :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   const done=(status,removeRow)=>{
     if(it.lead)it.lead.status=status;
     if(removeRow){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderPane();}
     renderList();
   };
-  const lr=$('leadReply');if(lr)lr.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
+  // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
+  const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
+  const lf=$('leadForm');
+  if(lf){
+    lf.onsubmit=async(e)=>{
+      e.preventDefault();
+      const ta=$('leadBody');const body=(ta.value||'').trim();
+      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return;}
+      const btn=$('leadSend');btn.disabled=true;btn.textContent='Sending…';
+      const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/reply','POST',{body});
+      if(r.ok){
+        ta.value='';
+        l.replies=sent.concat([{body,at:new Date().toISOString()}]);
+        toast(`Sent to ${l.email} — their reply comes back here.`);
+        done('replied',false);paneLead(host,it);
+      }else{
+        toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
+        btn.disabled=false;btn.textContent='Send reply';
+      }
+    };
+    insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
+    restoreComposer(it);
+  }
   const mr=$('leadRead');if(mr)mr.addEventListener('click',async()=>{mr.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'});if(r.ok){toast('Marked read.');done('read',false);paneLead(host,it);}else{toast('That didn’t update.');mr.disabled=false;}});
   const ar=$('leadArch');if(ar)ar.addEventListener('click',async()=>{ar.disabled=true;const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'archived'});if(r.ok){toast('Archived.');done('archived',true);}else{toast('That didn’t update.');ar.disabled=false;}});
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
