@@ -14,8 +14,8 @@ const IDENTITY_FIELDS: Record<string, Rule> = {
   service_area:    { max: 200 },
   booking_url:     { max: 500, url: true },
   ordering_url:    { max: 500, url: true },
-  seo_title:       { max: 60 },
-  seo_description: { max: 160 },
+  seo_title:       { max: 120 },   // Google cuts near 60 — the field's counter says so; the cap only stops nonsense
+  seo_description: { max: 320 },   // same: 50–160 reads best, the counter guides, the cap only stops nonsense
   social:          { max: 0, social: true },
 };
 const SOCIAL_KEYS = new Set(['instagram', 'facebook', 'linkedin', 'x', 'youtube', 'tiktok', 'yelp', 'google_maps']);
