@@ -215,9 +215,10 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('the visitor cards state the cause instead of "not measured yet"',
     /offSite=\(what\)=>emptyState\('Not measured here'/.test(h));
   ok('every first-party visitor card uses that honest state when external',
-    (h.match(/external\?offSite\(/g) || []).length >= 4);
+    // PR #17: stat-strip tiles use offSiteTile (same sentence), chart cards offSite
+    ((h.match(/external\?offSite\(/g) || []).length + (h.match(/external\?\{empty:offSiteTile\(/g) || []).length) >= 4);
   ok('external visitor cards drop the "view website insights" link (it has nothing to show)',
-    (h.match(/external\?null:\[BI,'View website insights'\]/g) || []).length >= 3);
+    (h.match(/external\?null:\[BI,'View( website insights)?'\]/g) || []).length >= 3);
 }
 
 // ═══ 8. Google Business Profile — the honest verdict ═══════════════════════
