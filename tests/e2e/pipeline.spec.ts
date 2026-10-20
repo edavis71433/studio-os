@@ -1929,3 +1929,55 @@ test.describe('deal page — Overview · Billing · Activity tabs', () => {
     await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
   });
 });
+
+// ── "Manage their access →" drills sharing.html into the CUSTOMER (studio audit
+// 2026-10, change 1). The converted deal's customer site is on the deal read
+// (presence_deals.converted_site_id, select=*); the link carries it as ?client=
+// so Sharing & access acts on the new customer's site, not the studio's own.
+// Unknown (older rows, a convert that made no site) → the bare link, as before.
+const CUSTOMER_SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
+const DEAL8 = '99999999-9999-4999-8999-999999999999';
+const wonDeal = (dealExtras: Record<string, unknown>) => ({ data: {
+  deal: { id: DEAL8, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [SIGNED_NO_TERM], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} });
+const accessLink = (page: import('@playwright/test').Page) => page.getByRole('link', { name: 'Manage their access →' });
+
+test.describe('deal page — "Manage their access" carries the customer', () => {
+  test('a converted deal with a customer site links /sharing.html?client=<that site>', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+
+  test('no customer site on the deal → the bare link; a non-uuid value is not trusted', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({}), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL8}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL8}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+  });
+
+  test('right after convert, the re-read deal’s customer site lands on the link', async ({ page }) => {
+    // the deal read flips from "signed, not yet converted" to "converted" once
+    // the convert POST has answered — exactly what the server does.
+    let converted = false;
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') {
+        converted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { converted: true, client_id: 'c-marlow', site_id: CUSTOMER_SITE, project_id: null, invited: true } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(converted
+        ? { data: { ...contractDeal(SIGNED_NO_TERM).data, deal: { ...contractDeal(SIGNED_NO_TERM).data.deal, stage: 'won', converted_client_id: 'c-marlow', converted_site_id: CUSTOMER_SITE } } }
+        : contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await expect(accessLink(page)).toHaveCount(0);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+});
