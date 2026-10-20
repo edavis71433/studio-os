@@ -69,6 +69,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .stats .k{font-size:12px;color:var(--faint)}
   .stats .v{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink)}
   .stats .s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Oct 2026: the Outstanding tile's sub carries the "see who →" opener, and with both an
+     overdue and a processing amount it outgrows a phone/tablet tile — so that one sub wraps
+     instead of ellipsising (which clipped the link). The other three tiles keep the one line. */
+  .stats .s.multiline{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}
   .sum-stages{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .sum-stages .sc{display:flex;flex-direction:column;gap:1px;padding:6px 11px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);min-width:88px}
   .sum-stages .sc-l{font-size:12px;color:var(--faint)}
@@ -1406,7 +1410,7 @@ async function renderSummary(gen){
     won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
     rate:'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
     ar:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
-  const tile=(k,v,sub,ico,tone)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s">${sub}</div>`:''}</div></div>`;
+  const tile=(k,v,sub,ico,tone,subCls)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s${subCls?' '+subCls:''}">${sub}</div>`:''}</div></div>`;
   const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal'),'open',''):tile('Open','$0','no open deals yet','open','');
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','no closed deals yet','rate','info')
@@ -1417,7 +1421,7 @@ async function renderSummary(gen){
   // Oct 2026 (item 2): outstanding = what still waits (the server's ar runs the one
   // money formula); a processing payment is on its way and is named, not owed
   const arProc=(ar.processing_cents||0)>0?` · ${money(ar.processing_cents)} processing`:'';
-  if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+` · <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a>`,'ar','warn'); }
+  if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+`&nbsp;· <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600;white-space:nowrap">see who →</a>`,'ar','warn','multiline'); }
   host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
     +(open.count?`<div class="sum-stages">${cells}</div>`:'');
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};

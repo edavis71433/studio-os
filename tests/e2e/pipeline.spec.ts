@@ -1932,12 +1932,12 @@ test.describe('money in four states — the drawer rows and the "Who owes you" l
     await expect(page.locator('#detailInner .tabs [data-dtab="billing"] .n')).toHaveText('3 open');
 
     // "Who owes you": the same chips by the same rule, and the header says what's settling.
-    // (The Outstanding tile's one-line sub — "2 invoices · $120 overdue · $1,600 processing
-    // · see who →" — ellipsises on the tablet/phone tile and clips the link, so a real
-    // tap can't land there; that tile is PR #31's and a follow-up. The list is what's
-    // under test here, so open it the way the link does.)
+    // The Outstanding tile's sub is at its longest here — "2 invoices · $120 overdue ·
+    // $1,600 processing · see who →" — and it wraps rather than ellipsising, so a real
+    // tap lands on the link on the phone and tablet too (not just a dispatched click).
     await page.goto('/pipeline.html');
-    await page.locator('#arOpen').dispatchEvent('click');
+    await expect(page.locator('#arOpen')).toBeInViewport({ ratio: 1 });
+    await page.locator('#arOpen').click();
     await expect(page.locator('#detailInner')).toContainText('Who owes you');
     await expect(page.locator('#detailInner .dhead')).toContainText('Outstanding: $1,720 · $120 overdue · $1,600 processing');
     const rc = (t: string) => page.locator('.rcv-row').filter({ hasText: t });
