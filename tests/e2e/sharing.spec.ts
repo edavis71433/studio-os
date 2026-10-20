@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // ── Sharing & access (sharing.html) ──────────────────────────────────────────
 // Visual refresh (2026-10): the page follows the approved board — breadcrumb,
@@ -145,5 +145,91 @@ test.describe('Sharing & access', () => {
     await page.goto('/sharing.html');
     await expect(page.locator('#main').getByRole('link', { name: /Sign in/ })).toBeVisible();
     await expect(page.getByRole('switch')).toHaveCount(0);
+  });
+});
+
+// ── Client scope (studio audit 2026-10, change 1) ────────────────────────────
+// An agency operator drills into a client with ?client=<site uuid>. The shell
+// already sent x-dds-scope-site on ITS calls; this page built its own headers
+// without it, so "Viewing client Marlow’s Kitchen" on screen invited the
+// reviewer to the STUDIO's own site (audit walk S9b: members/shares scope
+// "(absent)"). Now every request the page makes — GET/POST /portal/members,
+// /portal/members/:id/revoke, GET/POST /portal/shares — carries the scope, the
+// heading names the client, and the breadcrumb's way back keeps ?client=.
+// Unscoped, nothing changes: no header, plain heading, bare link.
+const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const SCOPED_CTX = { data: {
+  site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+  edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true,
+  capabilities: ['edit', 'publish', 'invite', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+  scope: { site_id: CLIENT, name: 'Marlow’s Kitchen' },
+} };
+const REVIEWER = { id: 'm-1', email: 'pat@example.com', role: 'client_reviewer', status: 'invited' };
+
+/** Every presence call the page makes, as [method path, scope header or ''] — oldest first. */
+function spyScope(page: import('@playwright/test').Page): Array<[string, string]> {
+  const seen: Array<[string, string]> = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (!/\/functions\/v1\/presence\//.test(u.pathname)) return;
+    seen.push([r.method() + ' ' + u.pathname.replace(/^.*\/functions\/v1\/presence/, ''), r.headers()['x-dds-scope-site'] || '']);
+  });
+  return seen;
+}
+
+test.describe('Sharing & access — client scope', () => {
+  test('opened with ?client=, every members/shares request carries x-dds-scope-site, the heading names the client, the breadcrumb keeps the client', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': SCOPED_CTX, '/portal/members': { data: [REVIEWER] }, '/portal/shares': SHARES_NONE } });
+    const seen = spyScope(page);
+    page.on('dialog', (d) => d.accept());   // "Remove their access?"
+    await page.goto(`/sharing.html?client=${CLIENT}`);
+    // the page says whose site it is, and the way back stays in scope
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access — Marlow’s Kitchen');
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-ctxbar')).toContainText('Marlow’s Kitchen');
+    // the reads
+    expect(seen).toContainEqual(['GET /portal/members', CLIENT]);
+    expect(seen).toContainEqual(['GET /portal/shares', CLIENT]);
+    // the writes: invite · flip a share · remove
+    await page.locator('#email').fill('ana@example.com');
+    const invited = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members'));
+    await page.getByRole('button', { name: 'Send invite', exact: true }).click();
+    expect((await invited).headers()['x-dds-scope-site']).toBe(CLIENT);
+    const flipped = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/shares'));
+    await page.locator('.rowitem').filter({ hasText: 'Drafts' }).getByRole('switch').click();
+    expect((await flipped).headers()['x-dds-scope-site']).toBe(CLIENT);
+    const revoked = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/revoke'));
+    await page.locator('.people .rowitem').filter({ hasText: 'pat@example.com' }).getByRole('button', { name: 'Remove' }).click();
+    expect((await revoked).headers()['x-dds-scope-site']).toBe(CLIENT);
+    // and NOTHING this page sent went to the studio's own site
+    await expect.poll(() => seen.length).toBeGreaterThanOrEqual(6);
+    expect(seen.filter(([, scope]) => scope !== CLIENT)).toEqual([]);
+  });
+
+  test('without ?client= no request carries a scope; the heading and the breadcrumb are the plain ones', async ({ page }) => {
+    await installApp(page, { api: { '/portal/members': { data: [REVIEWER] }, '/portal/shares': SHARES_NONE } });
+    const seen = spyScope(page);
+    await page.goto('/sharing.html');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', '/presence.html');
+    await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
+    await page.locator('#email').fill('ana@example.com');
+    const invited = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members'));
+    await page.getByRole('button', { name: 'Send invite', exact: true }).click();
+    expect((await invited).headers()['x-dds-scope-site'] || '').toBe('');
+    const flipped = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/shares'));
+    await page.locator('.rowitem').filter({ hasText: 'Drafts' }).getByRole('switch').click();
+    expect((await flipped).headers()['x-dds-scope-site'] || '').toBe('');
+    expect(seen.map(([call]) => call)).toEqual(expect.arrayContaining(['GET /portal/members', 'GET /portal/shares', 'POST /portal/members', 'POST /portal/shares']));
+    expect(seen.filter(([, scope]) => scope !== '')).toEqual([]);
+  });
+
+  test('a ?client= that is not a site uuid is ignored — no scope is sent and the heading stays plain', async ({ page }) => {
+    await installApp(page, { api: { '/portal/members': MEMBERS_NONE, '/portal/shares': SHARES_NONE } });
+    const seen = spyScope(page);
+    await page.goto('/sharing.html?client=not-a-uuid');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
+    await expect.poll(() => seen.map(([call]) => call)).toEqual(expect.arrayContaining(['GET /portal/members', 'GET /portal/shares']));
+    expect(seen.filter(([, scope]) => scope !== '')).toEqual([]);
   });
 });

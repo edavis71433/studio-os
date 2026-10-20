@@ -66,8 +66,14 @@ export function buildNav(c: NavContext): NavSection[] {
   const single = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }] });
   const utility = (key: string, label: string, href: string, desc?: string) => sections.push({ key, label, items: [{ key, label, href, desc }], utility: true });
 
+  // Phase 1 overhaul / Oct 2026 studio audit: an AGENCY member at studio level
+  // (not drilled into a client) lands on agency.html, which is their home AND
+  // their one roster — so Today leaves their primary bar (it stays for a drilled-in
+  // client as "Their Today") and the Customers item opens the studio home.
+  const studioLevel = !!c.isAgency && !c.scoped;
+
   // Today — the calm home
-  if (f.hasBusinessOS) single('today', 'Today', '/today.html');
+  if (f.hasBusinessOS && !studioLevel) single('today', 'Today', '/today.html');
 
   // Website — one home; its contents are sub-items (internally: the CMS).
   // Phase 1 overhaul: for an AGENCY operator at studio level the primary bar is
@@ -87,7 +93,6 @@ export function buildNav(c: NavContext): NavSection[] {
     if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
     return website;
   };
-  const studioLevel = !!c.isAgency && !c.scoped;
   if (f.hasWebsite && !studioLevel) sections.push({ key: 'website', label: 'Website', items: websiteItems() });
 
   // Customers — the relationship area (internally: the CRM): the roster, the
@@ -95,7 +100,15 @@ export function buildNav(c: NavContext): NavSection[] {
   // the ROSTER (customers.html), not the single-client record. Opening a customer
   // from the roster lands on the record hub (crm.html).
   if (f.hasRelationship) {
-    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
+    // Oct 2026 studio audit, change 3 (one home, one roster): for an agency at
+    // studio level the Customers item IS the studio home — every client with what
+    // needs you today and your studio's money — and customers.html forwards there.
+    const customers: NavItem[] = [studioLevel
+      ? { key: 'customers', label: 'Customers', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, and your money.' }
+      : { key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
+    // Oct 2026 studio audit, change 4: onboarding a client is findable from ⌘K
+    // ("add", "client", "new") — agency.html opens its Add-a-customer dialog on #add.
+    if (studioLevel) customers.push({ key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html', desc: 'The people — one may belong to a customer.' });
     // Enquiries folded into the Inbox (Oct 2026 workflow audit, change 5) — the
     // Inbox's desc says "new enquiries", so ⌘K still finds them there.
@@ -128,10 +141,10 @@ export function buildNav(c: NavContext): NavSection[] {
   //  (internally: Analytics/reporting). Reserved home; the later phase enriches it.
   if (f.hasReports) single('analytics', 'Analytics', '/analytics.html');
 
-  // Studio — the agency scope (agency roles only); open a client to re-scope.
-  // Drilled into a client, the shell's context bar carries "Exit to Studio", so
-  // the primary bar does not repeat it (nine items no longer fit beside Search).
-  if (f.hasAgency && c.isAgency && !c.scoped) single('studio', 'Studio', '/agency.html');
+  // Studio — the agency scope. Since Oct 2026 (one home, one roster) the studio
+  // home is the Customers item above; an agency edition WITHOUT the relationship
+  // feature still needs a way to its portfolio, so only then does Studio render.
+  if (f.hasAgency && studioLevel && !f.hasRelationship) single('studio', 'Studio', '/agency.html');
 
   // The agency's OWN website, out of the primary bar (overflow menu + ⌘K).
   if (f.hasWebsite && studioLevel) sections.push({ key: 'website', label: 'Your website', items: websiteItems(), utility: true });

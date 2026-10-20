@@ -1849,7 +1849,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
 // 409s. Now both wear the one chip in its one tone, "overdue" is judged on the
 // studio's local day, and a processing row has no Send/Resend · Copy link · Void
 // — the client already paid; the money is on its way.
-const DEAL9 = '99999999-9999-4999-8999-999999999999';
+const DEAL10 = '10101010-1010-4010-8010-101010101010';
 const M_PAID = 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbbb';
 const M_PROC = 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbbb';
 const M_UP = 'bbbbbbb3-3333-4333-8333-bbbbbbbbbbbb';
@@ -1868,16 +1868,16 @@ const MONEY_INVOICES = [
 // processing_since, its UTC `state`) — the page re-runs the mirror on its own day
 const MONEY_RCV = MONEY_INVOICES.filter((i) => i.status === 'open').map((i) => ({
   id: i.id, title: i.title, amount_cents: i.amount_cents, due_date: i.due_date, status: 'open', processing_since: i.processing_since,
-  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL9, deal: 'Harbor Dental', stripe_url: i.stripe_url,
+  state: i.processing_since ? 'processing' : i.id === M_OVER ? 'overdue' : 'upcoming', overdue: i.id === M_OVER, deal_id: DEAL10, deal: 'Harbor Dental', stripe_url: i.stripe_url,
 }));
 const MONEY_API = {
   ...API,
-  [`/sales/deals/${DEAL9}`]: { data: {
-    deal: { id: DEAL9, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
+  [`/sales/deals/${DEAL10}`]: { data: {
+    deal: { id: DEAL10, title: 'Harbor Dental', stage: 'won', expected_value_cents: 420000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, created_project_id: null, retainer: null },
     contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Harbor Dental', notes: '' },
     proposals: [], contracts: [], events: [], timeline: [], invoices: MONEY_INVOICES, last_contacted_at: past(1),
   } },
-  [`/sales/deals/${DEAL9}/tasks`]: { data: [] },
+  [`/sales/deals/${DEAL10}/tasks`]: { data: [] },
   '/sales/summary': { data: {
     total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
     by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
@@ -1889,7 +1889,7 @@ const MONEY_API = {
 test.describe('money in four states — the drawer rows and the "Who owes you" list', () => {
   test('every row wears Paid · Processing · Upcoming · Overdue from the one formula, and a processing row has no Resend / Copy link / Void', async ({ page }) => {
     await installApp(page, { api: MONEY_API });
-    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await page.goto(`/pipeline.html?deal=${DEAL10}&dtab=billing`);
     const row = (t: string) => page.locator('#detailInner .lr').filter({ hasText: t });
     // the chip is the state word in its one tone — never the raw status word
     await expect(row('Discovery').locator('.stage')).toHaveText('Paid');
@@ -1950,7 +1950,7 @@ test.describe('money in four states — the drawer rows and the "Who owes you" l
     // the processing row: Open deal only
     await expect(rc('Deposit')).toContainText('payment on its way');
     await expect(rc('Deposit').locator('[data-send-inv], [data-copy-pay], [data-void-inv]')).toHaveCount(0);
-    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL9}"]`)).toBeVisible();
+    await expect(rc('Deposit').locator(`[data-rcdeal="${DEAL10}"]`)).toBeVisible();
     // the waiting rows keep chasing
     await expect(rc('Balance').locator(`[data-send-inv="${M_UP}"]`)).toHaveText('Resend');
     await expect(rc('Balance').locator('[data-copy-pay]')).toHaveCount(1);
@@ -2050,5 +2050,57 @@ test.describe('deal page — Overview · Billing · Activity tabs', () => {
     await page.locator('#dpanel-overview [data-goto-tab="billing"]').click();
     await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toBeFocused();
     await expect(page.locator('[data-void-inv="inv-open"]')).toBeVisible();
+  });
+});
+
+// ── "Manage their access →" drills sharing.html into the CUSTOMER (studio audit
+// 2026-10, change 1). The converted deal's customer site is on the deal read
+// (presence_deals.converted_site_id, select=*); the link carries it as ?client=
+// so Sharing & access acts on the new customer's site, not the studio's own.
+// Unknown (older rows, a convert that made no site) → the bare link, as before.
+const CUSTOMER_SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
+const DEAL9 = '99999999-9999-4999-8999-999999999999';
+const wonDeal = (dealExtras: Record<string, unknown>) => ({ data: {
+  deal: { id: DEAL9, title: 'Marlow rebuild', stage: 'won', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-marlow', created_project_id: null, retainer: null, ...dealExtras },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
+  proposals: [], contracts: [SIGNED_NO_TERM], events: [], timeline: [], invoices: [], last_contacted_at: null,
+} });
+const accessLink = (page: import('@playwright/test').Page) => page.getByRole('link', { name: 'Manage their access →' });
+
+test.describe('deal page — "Manage their access" carries the customer', () => {
+  test('a converted deal with a customer site links /sharing.html?client=<that site>', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: CUSTOMER_SITE }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+
+  test('no customer site on the deal → the bare link; a non-uuid value is not trusted', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({}), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL9}`]: wonDeal({ converted_site_id: 'javascript:alert(1)' }), [`/sales/deals/${DEAL9}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL9}&dtab=billing`);
+    await expect(accessLink(page)).toHaveAttribute('href', '/sharing.html');
+  });
+
+  test('right after convert, the re-read deal’s customer site lands on the link', async ({ page }) => {
+    // the deal read flips from "signed, not yet converted" to "converted" once
+    // the convert POST has answered — exactly what the server does.
+    let converted = false;
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') {
+        converted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { converted: true, client_id: 'c-marlow', site_id: CUSTOMER_SITE, project_id: null, invited: true } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(converted
+        ? { data: { ...contractDeal(SIGNED_NO_TERM).data, deal: { ...contractDeal(SIGNED_NO_TERM).data.deal, stage: 'won', converted_client_id: 'c-marlow', converted_site_id: CUSTOMER_SITE } } }
+        : contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await expect(accessLink(page)).toHaveCount(0);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 });

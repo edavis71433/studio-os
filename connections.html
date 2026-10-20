@@ -167,6 +167,27 @@ let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
 const SCOPE = (new URLSearchParams(location.search).get('client')||'');
+// Studio audit change 2: while an operator is scoped into a client, the rows
+// speak as the studio ("You connect this for Marlow’s Kitchen…"), never as the
+// owner ("Who owns it: you do"). The name comes from the shell's /portal/context
+// (scope.name — the same source the "Viewing client" bar paints); resolved once
+// before the first render, with a plain fallback if the shell has nothing.
+let CLIENT_NAME = '';
+// shell.js is deferred, so window.ddsContext may not exist yet when init() runs
+// — listen for the shell's own 'dds:context' event instead (2.5s cap, like it).
+function shellContext(){
+  return new Promise((resolve)=>{
+    if(window.__ddsContext) return resolve(window.__ddsContext);
+    let done=false; const fin=()=>{ if(done) return; done=true; resolve(window.__ddsContext||null); };
+    document.addEventListener('dds:context', fin, { once:true });
+    setTimeout(fin, 2500);
+  });
+}
+async function resolveClientName(){
+  if(!SCOPE) return '';
+  try { const c = await shellContext(); return (c && c.scope && c.scope.name) ? String(c.scope.name) : ''; }
+  catch(_e){ return ''; }
+}
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':SCOPE });
 async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
@@ -317,7 +338,9 @@ function row(e){
       <p><b>What we read:</b></p><ul>${reads || '<li>your public details</li>'}</ul>
       <p><b>What we never change:</b> nothing — this is read-only. We never post, edit, or remove anything on ${esc(e.label)}, and nothing on your own website changes.</p>
       <p><b>Approval:</b> ${esc(e.approval || 'You approve access on the service’s own screen, and can revoke it any time.')}</p>
-      <p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>
+      ${SCOPE
+        ? `<p><b>Whose account:</b> You connect this for ${esc(CLIENT_NAME || 'this client')} with a Google account that has access to their property. Studio OS only reads what that account allows, and either of you can disconnect any time with one tap. Their data at the service is untouched.</p>`
+        : `<p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>`}
       <p><b>If you don’t connect:</b> nothing changes. Studio OS keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
       ${manage}
     </div>
@@ -549,6 +572,7 @@ async function reload(){
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
+    CLIENT_NAME = await resolveClientName();
     await reload();
   }catch(_){ trouble(0); }
 })();

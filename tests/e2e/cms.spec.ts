@@ -608,3 +608,73 @@ test.describe('Website preview stage', () => {
     await expect(opener).toBeFocused();
   });
 });
+
+// ── Speak as the studio when acting for a client (studio audit Oct 2026, change 2) ──
+// The SAME ritual, two voices. The owner's own room keeps every word ("Here's what
+// changes." / "Your live site stays as it is until the moment you decide." /
+// "Every word on your site came from you") — pinned here so the scoped voice can
+// never leak into it. Scoped in (?client= + the shell's context carrying
+// scope.name), the ritual names the client, speaks of THEIR customers and THEIR
+// site, and the receipt says who it was published for.
+test.describe('Publish ritual — the owner\'s voice and the studio\'s voice', () => {
+  const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+  const SCOPED_CTX = { data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+    edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true,
+    capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+    scope: { site_id: CLIENT, name: 'Marlow’s Kitchen' },
+  } };
+  // the ONE publish door: the top-row button on desktop/tablet, the bottom dock's
+  // Publish on a phone (the top row is hidden there) — both call openRitual()
+  const openRitual = (page: import('@playwright/test').Page) => page.locator('#btnPublish:visible, #dockPublish:visible').first().click();
+  const RITUAL_API = { ...PRESENCE_API,
+    '/changes': { data: { count: 2, first_publish: false, changes: [
+      { section: 'offerings', sentence: '“Download menu (PDF)” joins Mains.', entity_id: 'o1' },
+      { section: 'business', sentence: 'Saturday hours change from 10–4 to 9–5.' },
+    ], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
+    '/publish': { data: { status: 'live', message: 'Your site is live.', summary: '2 changes' } },
+  };
+
+  test('the owner\'s own ritual + receipt keep their words (byte-identical pin)', async ({ page }) => {
+    await installApp(page, { api: { ...RITUAL_API, '/portal/context': ctx(ALL_FEATURES) } });
+    await page.goto('/presence.html');
+    await openRitual(page);
+    const rit = page.locator('#ritualWrap');
+    await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes.');
+    await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as customers will experience them. Your live site stays as it is until the moment you decide.');
+    // the change lines keep their section wording
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');   // sentence case since the experience review (#27)
+    const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
+    await expect(publish).toBeVisible();
+    await publish.click();
+    await expect(rit.locator('.receipt .rp')).toHaveText('Published');
+    await expect(rit.locator('.receipt .rl')).toContainText('Every word on your site came from you.');
+  });
+
+  test('scoped into a client, the ritual names them, speaks of THEIR site, and the receipt says "Published for"', async ({ page }) => {
+    await installApp(page, { api: { ...RITUAL_API, '/portal/context': SCOPED_CTX } });
+    await page.goto(`/presence.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-ctxbar')).toContainText('Marlow’s Kitchen');   // the shell knows whose room this is
+    await openRitual(page);
+    const rit = page.locator('#ritualWrap');
+    await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes on Marlow’s Kitchen’s site');
+    await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as their customers will experience them. Their live site stays as it is until you decide.');
+    // section wording unchanged; button unchanged
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');   // sentence case since the experience review (#27)
+    const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
+    await expect(publish).toBeVisible();
+    await publish.click();
+    await expect(rit.locator('.receipt .rp')).toHaveText('Published for Marlow’s Kitchen');
+    await expect(rit.locator('.receipt .rl')).toHaveText('This version is kept safe, always.');
+    await expect(rit.locator('.receipt')).not.toContainText('came from you');
+  });
+
+  test('scoped, nothing waiting: the up-to-date sentence is about THEIR website', async ({ page }) => {
+    await installApp(page, { api: { ...RITUAL_API, '/portal/context': SCOPED_CTX, '/changes': PRESENCE_API['/changes'] } });
+    await page.goto(`/presence.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-ctxbar')).toContainText('Marlow’s Kitchen');
+    await openRitual(page);
+    await expect(page.locator('#ritTitle')).toHaveText('Marlow’s Kitchen is up to date.');
+    await expect(page.locator('#ritSub')).toHaveText('Every word in the draft is already on their website. There’s nothing waiting.');
+  });
+});

@@ -109,7 +109,15 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; });
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+// SC-1: the client scope rides ?client=<site uuid> (the same UUID guard shell.js
+// uses — cosmetic; the server re-validates and fails closed). EVERY request this
+// page makes carries it as x-dds-scope-site, so an operator drilled into a
+// client invites to THAT client's site and flips THAT client's shares — not the
+// studio's own (studio audit 2026-10, change 1). Unscoped the header is empty,
+// exactly as the shell sends it.
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const scopeId=()=>{try{const v=new URLSearchParams(location.search).get('client')||'';return UUID_RE.test(v)?v:'';}catch(_){return '';}};
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scopeId()});
 async function api(p,m,b){const r=await fetch(FN+p,{method:m||'GET',headers:H(),body:b?JSON.stringify(b):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
@@ -138,9 +146,21 @@ const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" style="stroke:curren
 // the two-avatar illustration beside the title (decorative)
 const ILLO=`<svg class="illo" viewBox="0 0 112 64" aria-hidden="true"><circle cx="36" cy="32" r="24" fill="var(--p-soft)"/><circle cx="36" cy="26" r="8" fill="var(--p)" opacity=".55"/><path d="M20 48a16 12 0 0 1 32 0" fill="var(--p)" opacity=".55"/><circle cx="76" cy="32" r="24" fill="var(--p)"/><path d="M70 36a5 5 0 0 0 7 0l4-4a5 5 0 0 0-7-7l-1 1M82 28a5 5 0 0 0-7 0l-4 4a5 5 0 0 0 7 7l1-1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>`;
 let SHARES={};
+let CTX=null; // the /portal/context this page acted on (scoped → describes the client)
+// Scoped, the page says whose site it is: "Sharing & access — <client>", read from
+// the shell's context (its scope.name is what the "Viewing client" bar shows).
+// The shell may settle after our first paint, so the heading repaints on
+// dds:context too. Unscoped nothing changes.
+function scopeName(){if(!scopeId())return '';const c=CTX||window.__ddsContext;const sc=c&&c.scope;return (sc&&sc.name)?String(sc.name):'';}
+function paintScope(){const h=$('pagehead');if(!h)return;const who=scopeName();h.textContent='Sharing & access'+(who?' — '+who:'');document.title='Sharing & access'+(who?' — '+who:'')+' — Studio OS';}
+document.addEventListener('dds:context',paintScope);
+// the breadcrumb's way back keeps the client in scope (the shell rewrites app
+// anchors too; this makes the page honest on its own)
+(function(){const s=scopeId();if(!s)return;const a=document.querySelector('.crumbs a.back');if(a)a.setAttribute('href','/presence.html?client='+encodeURIComponent(s));})();
 
 function render(members){
-  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access</h1><p class="sub">Invite a client to review, and choose exactly what they see. They can review and approve — never edit, publish, or connect. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
+  const who=scopeName();
+  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access${who?' — '+esc(who):''}</h1><p class="sub">Invite a client to review, and choose exactly what they see. They can review and approve — never edit, publish, or connect. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
   // invite + members
   html+=`<section class="card pad" aria-labelledby="inviteH"><h2 id="inviteH">Invite a client</h2>
     <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email" autocomplete="off">
@@ -185,10 +205,11 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>Couldn’t load 
 
 async function load(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-  // Only when UNSCOPED: this page's api() carries no x-dds-scope-site, so under a
-  // drilled-in ?client= the shell's copy describes the CLIENT site, not ours.
-  const useShared=window.ddsContext&&!new URLSearchParams(location.search).get('client');
+  // Both carry the same x-dds-scope-site, so scoped or not the two copies describe
+  // the same site (the client's under a drilled-in ?client=, ours otherwise).
+  const useShared=!!window.ddsContext;
   const ctx=await (useShared?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));if(!ctx.ok){trouble();return;}
+  CTX=ctx.body.data||null;
   if(!(ctx.body.data&&ctx.body.data.sees_full_workspace)){notOwner();return;}
   const [mem,sh]=await Promise.all([api('/portal/members'),api('/portal/shares')]);
   if(mem.status===403){notOwner();return;}

@@ -19,6 +19,9 @@ import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/pub
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
+import { publishActorKind, actorKindCheckViolation, legacyActorKind } from '../lib/actor_kind.ts';
+import { describeChanges } from '../lib/diff.ts';
+import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { tickChecklistForCustomerSite, emailCustomerSiteLive } from '../lib/service_bridge.ts';
 import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
@@ -52,8 +55,11 @@ export async function changeSummary(siteId: string): Promise<string> {
 /** Core pipeline shared by publish and restore — ONE path, ever.
  *  Exported for the admin operations (force publish / retry / restore-snapshot),
  *  which are the SAME pipeline with a staff actor — never a second path. */
-export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>, idempotencyKey?: string) {
-  const actorKind = principal.kind === 'staff' ? 'staff' : 'client';
+export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>, idempotencyKey?: string, opts?: { changeCount?: number }) {
+  // Studio audit change 2: 'staff' (platform) · 'operator' (the client's studio,
+  // scoped in via ?client=) · 'client' (the owner). The client's room reads this
+  // back as "published by your studio" for the first two (lib/actor_kind.ts).
+  let actorKind: string = publishActorKind(principal);
   let snapshotId = snapshotArg.snapshotId;
 
   // ── M5: per-stage telemetry via structured logging (reuses the logging floor —
@@ -79,16 +85,20 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
 
   // persist snapshot (publish only; restore reuses the retained one)
   if (!snapshotId) {
-    const ins = await svc('presence_snapshots', {
+    const insertSnapshot = (byKind: string) => svc('presence_snapshots', {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         site_id: site.id, content: snapshotArg.snapshot.content, media_manifest: snapshotArg.mediaManifest,
         content_contract_version: snapshotArg.snapshot.content_contract_version,
         template_slug: snapshotArg.snapshot.template_slug, template_version: snapshotArg.snapshot.template_version,
         dev_customization: snapshotArg.snapshot.dev_customization ?? null,  // Phase B1: capture the dev layer with the snapshot
-        created_by: principal.userId, created_by_kind: actorKind,
+        created_by: principal.userId, created_by_kind: byKind,
       }),
     });
+    let ins = await insertSnapshot(actorKind);
+    // a database that predates migration 0133 rejects 'operator' (23514) — degrade
+    // to 'staff' for the WHOLE pipeline (snapshot + publish record agree), never 502
+    if (!ins.ok && actorKind === 'operator' && actorKindCheckViolation(ins.json, ins.text)) { actorKind = legacyActorKind(actorKind); ins = await insertSnapshot(actorKind); }
     if (!ins.ok || !ins.json?.[0]?.id) return json({ error: 'snapshot_failed', message: CALM }, 502, cors);
     snapshotId = ins.json[0].id as string;
   }
@@ -97,10 +107,12 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // publish record — the partial unique index IS the race-safe one-in-flight gate.
   // M4: when an idempotency key is present it is stored here, and a second partial
   // unique index on (site_id, idempotency_key) makes a racing same-key insert 409.
-  const rec = await svc('presence_publishes', {
+  const insertRecord = (byKind: string) => svc('presence_publishes', {
     method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, snapshot_id: snapshotId, kind, actor: principal.userId, actor_kind: actorKind, change_summary: summary, ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}) }),
+    body: JSON.stringify({ site_id: site.id, snapshot_id: snapshotId, kind, actor: principal.userId, actor_kind: byKind, change_summary: summary, ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}) }),
   });
+  let rec = await insertRecord(actorKind);
+  if (!rec.ok && rec.status !== 409 && actorKind === 'operator' && actorKindCheckViolation(rec.json, rec.text)) { actorKind = legacyActorKind(actorKind); rec = await insertRecord(actorKind); }   // pre-0133 degrade (see above)
   if (rec.status === 409) {
     // Distinguish the two per-site unique gates. With a key, a 409 is (almost
     // always) the idempotency index racing an identical retry → replay the
@@ -188,6 +200,21 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
   // G3 — a successful publish clears any lingering publish-failed attention notice.
   if (live && site.client_id) await clearNotice(site.client_id, 'publish_failed');
+  // Studio audit change 2 — the client is TOLD when their studio publishes for
+  // them. Operator publishes only (the owner's own publish needs no echo; a
+  // platform-staff repair is the admin's business, logged in History). One
+  // dismissible row per publish (`pub:<id>`, no teardown → never a once-per-
+  // lifetime trap), on the ONE notice model, so it reaches the bell, Today and
+  // the client's device like every other notice. Best-effort; never fails a publish.
+  if (actorKind === 'operator' && site.client_id) {
+    const n = opts?.changeCount;
+    const body = kind === 'restore'
+      ? 'Your studio brought back an earlier version of your website. Nothing is needed from you — open your website to see what changed.'
+      : typeof n === 'number' && n > 0
+        ? `Your studio published ${n} change${n === 1 ? '' : 's'} to your website. Nothing is needed from you — open your website to see what changed.`
+        : 'Your studio published a change to your website. Nothing is needed from you — open your website to see what changed.';
+    await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'studio_published', period: `pub:${pubId}`, headline: 'Your studio published a change', body }).catch(() => false);
+  }
   // "Site live" is step 9 of the studio's delivery checklist, and a live deploy
   // of the customer's site IS that step — so it ticks itself rather than waiting
   // for someone to remember. Resolved through the ACTIVE service link
@@ -291,7 +318,21 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
   if (!v.ok) return json({ error: 'validation_failed', message: 'A few things need fixing before your site can publish.', fields: v.blockers, warnings: v.warnings }, 422, cors);
 
   const summary = await changeSummary(site.id);
-  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest }, summary, cors, idemKey ?? undefined);
+  // the client-facing echo of an operator publish quotes the SAME count the
+  // ritual's button showed ("Publish these 2 changes" → "published 2 changes"):
+  // the diff engine's sentences against the last live snapshot. Read only when
+  // the publish is the studio's; the owner's own publish skips the two reads.
+  let changeCount: number | undefined;
+  if (publishActorKind(principal) === 'operator') {
+    try {
+      const lastLive = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id&order=created_at.desc&limit=1`);
+      const liveId = lastLive.json?.[0]?.snapshot_id;
+      const liveQ = liveId ? await svc(`presence_snapshots?id=eq.${liveId}&select=content&limit=1`) : null;
+      const liveContent = liveQ?.json?.[0]?.content ? normalizeSnapshotContent(liveQ.json[0].content) : null;
+      changeCount = describeChanges(snapshot.content, liveContent).count;
+    } catch { changeCount = undefined; }
+  }
+  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest }, summary, cors, idemKey ?? undefined, { changeCount });
 }
 
 export async function handleRestore(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
