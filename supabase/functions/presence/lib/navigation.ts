@@ -78,8 +78,9 @@ export function buildNav(c: NavContext): NavSection[] {
     const website: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html' }];
     website.push({ key: 'business_info', label: 'Business info', href: '/presence.html#business' });
     if (c.edition !== 'monitor') website.push({ key: 'design', label: 'Design', href: '/presence.html#design' });
-    if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish' });
-    if (canPublish(c)) website.push({ key: 'schedule', label: 'Scheduled publishes', href: '/schedule.html' });
+    // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
+    // the desc keeps "schedule" findable from ⌘K, which matches on desc).
+    if (canPublish(c)) website.push({ key: 'publish', label: 'Publish', href: '/presence.html#publish', desc: 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.' });
     if (canPublish(c)) website.push({ key: 'history', label: 'History', href: '/presence.html#history' });
     return website;
   };
@@ -132,28 +133,18 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasWebsite && studioLevel) sections.push({ key: 'website', label: 'Your website', items: websiteItems(), utility: true });
 
   // ── Deeper views (profile/overflow menu + ⌘K, never the primary bar) ─────────
-  // Every capability stays reachable — nothing is retired. The old single long
-  // "More views" list was the confusion, so it's split into two clearly-named,
-  // purpose-labelled groups. Nothing here competes with the Inbox: the first group
-  // is explicitly focused CUTS of the Inbox, the second is calm read-outs you look
-  // at on purpose (history / what's ahead / understanding), never a to-do.
+  // Every capability stays reachable. Calm read-outs you look at on purpose
+  // (history / understanding), never a to-do — nothing here competes with the Inbox.
   if (has(c, 'view_all')) {
-    // Group 1 — focused cuts of the Inbox (the same "needs you" data, one lens).
-    const focus: NavItem[] = [];
-    if (f.hasBusinessOS || f.hasWebsite) {
-      focus.push({ key: 'attention', label: 'Website attention', href: '/attention.html', desc: 'Just your website’s to-dos — the website-only slice of your Inbox.' });
-      focus.push({ key: 'approval_center', label: 'Approvals', href: '/approval-center.html', desc: 'Only the things waiting for your go-ahead before they go live.' });
-    }
-    if (focus.length) sections.push({ key: 'focus_views', label: 'Focused views', items: focus, utility: true });
-
-    // Group 2 — calm read-outs: understand the business, look back, look ahead.
+    // Oct 2026 audit change 1: the "Focused views" group is gone. Website attention
+    // and Approvals were cuts of the Inbox — they are now its #website and #ok views,
+    // and the old pages redirect there. Version history, What's coming next and
+    // Business insights moved home too (Website › History, Today's Coming up,
+    // Analytics › Insights).
     const lenses: NavItem[] = [];
     if (f.hasWebsite) lenses.push({ key: 'view_content_tree', label: 'Website map', href: '/content-tree.html', desc: 'Every page and section of your site, laid out as one simple tree.' });
     if (f.hasWebsite) lenses.push({ key: 'view_site_health', label: 'Website health', href: '/website-health.html', desc: 'A plain-English check-up of your live site.' });
     if (f.hasWebsite) lenses.push({ key: 'view_timeline', label: 'Website story', href: '/timeline.html', desc: 'A plain-English history of everything that’s happened to your site.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_snapshots', label: 'Version history', href: '/snapshot-history.html', desc: 'Past saved versions of your site you can look back on or restore.' });
-    if (f.hasWebsite) lenses.push({ key: 'view_upcoming', label: 'What’s coming next', href: '/upcoming.html', desc: 'Scheduled and expected changes — a calm look ahead, nothing guessed.' });
-    if (f.hasBusinessOS) lenses.push({ key: 'view_insights', label: 'Business insights', href: '/business-insights.html', desc: 'Plain observations about how your business is doing — only what we can measure.' });
     if (lenses.length) sections.push({ key: 'views', label: 'Understand your site', items: lenses, utility: true });
   }
 

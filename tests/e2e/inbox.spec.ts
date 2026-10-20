@@ -961,3 +961,33 @@ test.describe('Inbox — support triage in the pane', () => {
     await expect(pane.locator('#supReplyResolve')).toHaveCount(0);
   });
 });
+
+// ── the Website and Needs-your-OK views by hash: the retired Website attention and
+//    Approvals pages land here (Oct 2026 workflow audit, change 1) ─────────────────
+test.describe('Inbox — views by hash', () => {
+  test('#website shows what the site needs: approvals, its enquiries, its notices — not client messages', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#website');
+    await expect(page.locator('#viewBtn')).toContainText('Website');
+    const rows = page.locator('#rows');
+    await expect(rows).toContainText('Protect your email');
+    await expect(rows).toContainText('Sam Rivera');
+    await expect(rows).toContainText('A quote request is waiting for a reply');
+    await expect(rows).not.toContainText('Logo tweak');
+    await expect(rows).not.toContainText('Milestone reached');
+  });
+  test('#ok opens on Needs your OK', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html#ok');
+    await expect(page.locator('#viewBtn')).toContainText('Needs your OK');
+    await expect(page.locator('#rows').getByRole('option')).toHaveCount(1);
+    await expect(page.locator('#rows').getByRole('option').first()).toContainText('Protect your email');
+  });
+  test('the view menu lists Website', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/inbox.html');
+    await page.locator('#viewBtn').click();
+    await expect(page.locator('#viewMenu [data-view="website"]')).toHaveText('Website');
+  });
+});
+

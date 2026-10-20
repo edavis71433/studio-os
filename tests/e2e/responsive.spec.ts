@@ -28,7 +28,7 @@ test.describe('Responsive layout', () => {
   // regression this whole change is most able to cause, so it is asserted for
   // every page touched, in every project (390 / 810 / 1280).
   const TIERED = [
-    '/get-started.html', '/schedule.html', '/sharing.html',           // form
+    '/get-started.html', '/sharing.html',           // form
     '/help.html', '/visual-studio.html', '/broadcasts.html',          // focused
     '/connections.html', '/leads.html',
     '/today.html', '/crm.html', '/pipeline.html', '/developer.html',  // working

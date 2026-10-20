@@ -246,7 +246,10 @@ function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/(
 // ── state ─────────────────────────────────────────────────────────────────────
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
 let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest partial notice (both → the boot error)
-let VIEW='everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+// A view can be deep-linked by hash (#ok, #website, #enquiries…): the retired
+// Approvals (approval-center.html) and Website attention (attention.html) pages
+// redirect here as #ok and #website (Oct 2026 workflow audit, change 1).
+let VIEW=(()=>{const h=String(location.hash||'').slice(1);return ['messages','ok','enquiries','website','support'].indexOf(h)>=0?h:'everything';})(),SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
 // ── the client · project lenses (D-filter) ───────────────────────────────────
 // Eric: "messages still cant be filtered by project/contact unless i go through
 // their profile". This is a LENS, not a relocation. Every option is derived from
@@ -282,9 +285,9 @@ document.addEventListener('click',(e)=>{
   if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
   if(om&&ob&&!om.hidden&&!e.target.closest('.ovf')){om.hidden=true;ob.setAttribute('aria-expanded','false');}
 });
-const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['support','Support & requests']];
+const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['website','Website'],['support','Support & requests']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
-const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='support'&&it.kind==='support');
+const viewMatch=(it)=>VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='enquiries'&&it.kind==='lead')||(VIEW==='website'&&(it.kind==='approval'||it.kind==='lead'))||(VIEW==='support'&&it.kind==='support');
 
 // ── build the conversation items from the ONE feed (+ enquiry fallback) ──────
 // Messages from your clients — feed.client_messages, grouped ONE row per client
@@ -379,7 +382,7 @@ function buildSystem(feed,notifs){
   // (a notification carries no project name, and an unnamed dropdown entry is
   // exactly the dead affordance we're avoiding).
   activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:'⚙',label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,project_id:String(n.project_id||''),href:scoped(notifLink(n))}));
-  for(const n of notices)rows.push({sys:true,id:'sys:not:'+n.id,icon:'👀',label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
+  for(const n of notices)rows.push({sys:true,notice:true,id:'sys:not:'+n.id,icon:'👀',label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
   // moments render ACTIVE (undimmed, no ✓) — the feed only carries the still-open
   // ones, and the old page listed them as live items; they stay counted in TOTAL.
   for(const m of moments)rows.push({sys:true,id:'sys:mom:'+m.id,icon:'✨',label:m.headline||'A moment',tag:'Worth a look',when:String(m.created_at||''),read:false,href:scoped('/today.html')});
@@ -541,7 +544,8 @@ function lensMatch(r){
   if(FPROJECT&&itemProjects(r).indexOf(FPROJECT)<0)return false;
   return true;
 }
-function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:[])].filter(lensMatch).filter(rowMatch);}
+// the Website view = what your site needs: approvals, its enquiries, and the site's own notices
+function visibleRows(){return [...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch);}
 // Every narrowing that is actually in force, in plain words. The VIEW is left
 // out on purpose — it has its own visible control and its own older copy.
 function activeLens(){
