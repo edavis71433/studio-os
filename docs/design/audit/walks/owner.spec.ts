@@ -34,39 +34,48 @@ test('O2 schedule a change', async ({ page }) => {
   w.finish({ route: 'ritual' });
 });
 
-test('O2b schedule via Scheduled publishes page', async ({ page }) => {
+test('O2b schedule from an old Scheduled-changes bookmark', async ({ page }) => {
   await quiet(page); await installApp(page, { api: PRESENCE_API });
-  const w = new Walk(page, 'o2b-schedule-page');
-  await w.start('/today.html');
-  await w.click(shell(page).getByRole('button', { name: /^Website/ }), 'Website (sidebar section)');
-  await w.click(shell(page).getByRole('link', { name: 'Scheduled publishes' }), 'Scheduled publishes');
-  await w.shot('1-schedule-page');
-  const when = page.locator('input[type=datetime-local], input[type=date]').first();
-  if (await when.count()) { const d = new Date(Date.now() + 3 * 86400000); await w.type(when, d.toISOString().slice(0, 16), 'when'); }
-  await w.click(page.getByRole('button', { name: /Schedule publish/ }), 'Schedule publish');
+  const w = new Walk(page, 'o2b-schedule-bookmark');
+  w.note('schedule.html is retired — an old bookmark or email link lands on the publish page with the schedule block open');
+  await w.start('/schedule.html');
+  await w.shot('1-forwarded');
+  await w.click(page.getByRole('button', { name: 'Schedule it' }), 'Schedule it (date prefilled +24h)');
   await w.shot('2-scheduled');
-  w.finish({ route: 'schedule.html' });
+  w.finish({ route: 'forwarded to presence.html#schedule' });
 });
 
 test('O3 connect a domain', async ({ page }) => {
   await quiet(page); await installApp(page, { api: PRESENCE_API });
   const w = new Walk(page, 'o3-domain');
   await w.start('/today.html');
-  // is "domain" findable from ⌘K?
-  await page.keyboard.press('Meta+k'); await page.keyboard.press('Control+k').catch(() => {});
+  await page.locator('#dds-search').click();
   await page.locator('.dds-palette input').fill('domain');
   await page.waitForTimeout(600);
   const hits = await page.locator('.dds-palette .res').allInnerTexts();
-  w.note(`⌘K "domain" → ${hits.length} results ${JSON.stringify(hits)}`);
+  w.note(`⌘K "domain" → ${hits.length} result(s) ${JSON.stringify(hits.map((h) => h.replace(/\n/g, ' / ')))}`);
   await page.keyboard.press('Escape');
   await w.click(shell(page).getByRole('button', { name: /^Website/ }), 'Website (sidebar section)');
-  await w.click(shell(page).getByRole('link', { name: 'Website', exact: true }), 'Website');
-  await w.click(page.getByRole('link', { name: /Domain & email/ }).or(page.getByRole('button', { name: /Domain & email/ })), 'Domain & email (builder rail)');
+  await w.click(shell(page).getByRole('link', { name: 'Domain & email' }), 'Domain & email (menu)');
+  const focused = await page.getByPlaceholder('yourbusiness.com').evaluate((el) => el === document.activeElement);
+  w.note(`the desk opens on "type your domain", field ${focused ? 'already focused' : 'NOT focused'}`);
   await w.shot('1-desk');
-  await w.click(page.getByRole('button', { name: 'I already have a domain' }), 'I already have a domain');
   await w.type(page.getByPlaceholder('yourbusiness.com'), 'marlowskitchen.com', 'domain');
   await w.click(page.getByRole('button', { name: /Connect it/ }), 'Connect it →');
   await w.shot('2-connected');
+  w.finish();
+});
+
+test('O3b connect a domain from the Website overview card', async ({ page }) => {
+  await quiet(page); await installApp(page, { api: PRESENCE_API });
+  const w = new Walk(page, 'o3b-domain-card');
+  await w.start('/today.html');
+  await w.click(shell(page).getByRole('button', { name: /^Website/ }), 'Website (sidebar section)');
+  await w.click(shell(page).getByRole('link', { name: 'Website', exact: true }), 'Website');
+  await w.shot('1-overview');
+  await w.click(page.locator('#domainCard').getByRole('button', { name: 'Connect your domain' }), 'Connect your domain (overview card)');
+  await w.type(page.getByPlaceholder('yourbusiness.com'), 'marlowskitchen.com', 'domain');
+  await w.click(page.getByRole('button', { name: /Connect it/ }), 'Connect it →');
   w.finish();
 });
 
@@ -74,15 +83,18 @@ test('O4 add a page', async ({ page }) => {
   await quiet(page); await installApp(page, { api: PRESENCE_API });
   const w = new Walk(page, 'o4-add-page');
   await w.start('/today.html');
+  await page.locator('#dds-search').click();
+  await page.locator('.dds-palette input').fill('page');
+  await page.waitForTimeout(600);
+  w.note(`⌘K "page" → ${await page.locator('.dds-palette .res').count()} result(s)`);
+  await page.keyboard.press('Escape');
   await w.click(shell(page).getByRole('button', { name: /^Website/ }), 'Website (sidebar section)');
-  await w.click(shell(page).getByRole('link', { name: 'Design' }), 'Design');
-  await w.shot('1-design');
-  await w.click(page.getByRole('button', { name: /^\+\s*Page|＋\s*Page/ }), '+ Page');
+  await w.click(shell(page).getByRole('link', { name: 'Add a page' }), 'Add a page (menu)');
+  await w.shot('1-name');
   await w.type(page.getByPlaceholder(/Services, Gallery/), 'Catering', 'page name');
   await w.click(page.getByRole('button', { name: /Next: pick a layout/ }), 'Next: pick a layout');
-  await w.shot('2-layout');
   await w.click(page.getByRole('button', { name: /Blank page/ }), 'Blank page');
-  await w.shot('3-created');
+  await w.shot('2-created');
   w.note('then + Add section to put anything on it, then Publish · N → Publish these N changes (2 more clicks, see O1)');
   w.finish();
 });
@@ -92,10 +104,13 @@ test('O5 reply to an enquiry', async ({ page }) => {
   const w = new Walk(page, 'o5-reply-enquiry');
   await w.start('/today.html');
   await w.click(page.getByRole('link', { name: /Take care of it/ }), 'Take care of it → (Today, Needs you)');
-  await w.shot('1-enquiries');
-  const reply = page.locator('a.reply').first();
-  w.note(`Reply is a link: href=${(await reply.getAttribute('href'))?.slice(0, 60)}… — the reply is written in the mail app, not in Studio OS`);
-  w.clicks++; w.steps.push(`${w.clicks}. click "Reply" → leaves Studio OS (mailto:)`);
+  w.note('leads.html is retired — the nudge lands on the Inbox\'s Enquiries view');
+  await w.click(page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' }), 'the enquiry row');
+  await w.shot('1-composer');
+  await w.type(page.locator('#leadBody'), 'Hi Sam,\n\nHappy to quote — what size is the patio?', 'the reply');
+  await w.click(page.getByRole('button', { name: 'Send reply' }), 'Send reply');
+  await w.shot('2-sent');
+  w.note('sent by email from Studio OS (POST /forms/inbox/:id/reply); the reply shows under the enquiry; mailto stays as "Use your email app instead"');
   w.finish();
 });
 
@@ -104,9 +119,8 @@ test('O5b reply to an enquiry from the Inbox', async ({ page }) => {
   const w = new Walk(page, 'o5b-reply-enquiry-inbox');
   await w.start('/today.html');
   await w.click(shell(page).getByRole('link', { name: 'Inbox' }), 'Inbox');
-  await w.click(page.getByText('Sam Rivera').first(), 'the enquiry row');
-  await w.shot('1-inbox-enquiry');
-  const r = page.locator('#leadReply');
-  w.note(`Reply here is also mailto: ${(await r.getAttribute('href').catch(() => ''))?.slice(0, 40)}`);
+  await w.click(page.locator('#rows').getByRole('option').filter({ hasText: 'Sam Rivera' }), 'the enquiry row');
+  await w.type(page.locator('#leadBody'), 'Hi Sam,\n\nHappy to quote — what size is the patio?', 'the reply');
+  await w.click(page.getByRole('button', { name: 'Send reply' }), 'Send reply');
   w.finish();
 });

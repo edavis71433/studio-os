@@ -2,7 +2,7 @@ import { Page, Locator } from '@playwright/test';
 import * as fs from 'fs';
 import { filled } from './probe';
 
-export const SHOTS = process.env.AUDIT_SHOTS || 'docs/design/audit';
+export const SHOTS = process.env.AUDIT_SHOTS || 'docs/design/audit/after';   // the originals (Oct 19, before the changes) stay in docs/design/audit/
 export const LOG = process.env.AUDIT_LOG || '/tmp/audit-walks.jsonl';
 
 // Records every click, every page change and the filled button(s) at each step.
