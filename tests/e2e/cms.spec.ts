@@ -642,8 +642,8 @@ test.describe('Publish ritual — the owner\'s voice and the studio\'s voice', (
     const rit = page.locator('#ritualWrap');
     await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes.');
     await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as customers will experience them. Your live site stays as it is until the moment you decide.');
-    // the change lines keep their section wording
-    await expect(rit.locator('.jrow .jsec').first()).toHaveText('menu');
+    // the change lines keep their section wording (the ritual journal capitalises it: hbCap(sectionWord(...)))
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');
     const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
     await expect(publish).toBeVisible();
     await publish.click();
@@ -660,7 +660,7 @@ test.describe('Publish ritual — the owner\'s voice and the studio\'s voice', (
     await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes on Marlow’s Kitchen’s site');
     await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as their customers will experience them. Their live site stays as it is until you decide.');
     // section wording unchanged; button unchanged
-    await expect(rit.locator('.jrow .jsec').first()).toHaveText('menu');
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');
     const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
     await expect(publish).toBeVisible();
     await publish.click();
