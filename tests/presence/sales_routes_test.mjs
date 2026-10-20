@@ -214,6 +214,27 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('ui: connect mode hides provision-only fields (no workspace set-up)', /id="cu-provision-only"/.test(contacts) && /po\.style\.display=connect\?'none':''/.test(contacts));
 }
 
+// ── Oct 2026 studio audit, change 4 — the dialog is honest and needs no password,
+//    on all THREE hand-synced copies (agency.html is the home; the rosters keep theirs)
+for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
+  const h = read(p);
+  const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di) + 9);
+  const prov = dlg.slice(dlg.indexOf('id="cu-provision-only"'), dlg.indexOf('id="cu-connect-only"'));
+  const conn = dlg.slice(dlg.indexOf('id="cu-connect-only"'));
+  ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Create their workspace and email them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
+  ok(`${p}: provision mode says what provisioning does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(prov));
+  ok(`${p}: the pricing box lives in CONNECT mode only (nothing is bought when the studio provisions)`, !/id="cu-signup"/.test(prov) && /id="cu-signup"/.test(conn) && /send them this to sign up/.test(conn));
+  ok(`${p}: "Start from" kit select in provision mode (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(prov) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(prov));
+  ok(`${p}: kits come from GET /agency/kits and apply to the NEW site via POST /agency/kits/:id/apply {site_id}`, /api\('\/agency\/kits'\)/.test(h) && /'\/agency\/kits\/'\+encodeURIComponent\(kitId\)\+'\/apply'/.test(h) && /\{site_id:d\.site_id\}/.test(h));
+  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=k\.ok\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\)kitLine=/.test(h));
+  ok(`${p}: ${p === 'agency.html' ? 'the home always offers kits' : 'the kit field shows only for an agency (ddsContext.is_agency)'}`, p === 'agency.html' ? /async function cuIsAgency\(\)\{return true;\}/.test(h) : /return !!\(c&&c\.is_agency\)/.test(h));
+}
+{
+  const ag = read('agency.html');
+  ok('agency.html: ⌘K lands on #add → the dialog opens and the hash is cleared (boot + hashchange)', /function openFromHash\(\)\{\s*if\(location\.hash!=='#add'\)return;/.test(ag) && /history\.replaceState\(null,'',location\.pathname\+location\.search\)/.test(ag) && /window\.addEventListener\('hashchange',openFromHash\)/.test(ag) && /renderTop\(\);\s*openFromHash\(\);/.test(ag));
+  ok('add-customer: the response carries the new site id the dialog applies the kit to', /return json\(\{ data: \{ created: true, client_id: clientId, site_id: acct\.siteId/.test(sales));
+}
+
 // ── STUDIO SERVICES CATALOG (/sales/services) — manageable catalog + proposal dropdown ──
 {
   const pipe = read('pipeline.html');

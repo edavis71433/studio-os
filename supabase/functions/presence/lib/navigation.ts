@@ -106,6 +106,9 @@ export function buildNav(c: NavContext): NavSection[] {
     const customers: NavItem[] = [studioLevel
       ? { key: 'customers', label: 'Customers', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, and your money.' }
       : { key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer, with their deal, billing, project, files and messages on one record.' }];
+    // Oct 2026 studio audit, change 4: onboarding a client is findable from ⌘K
+    // ("add", "client", "new") — agency.html opens its Add-a-customer dialog on #add.
+    if (studioLevel) customers.push({ key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.' });
     customers.push({ key: 'contacts', label: 'Contacts', href: '/contacts.html', desc: 'The people — one may belong to a customer.' });
     // Enquiries folded into the Inbox (Oct 2026 workflow audit, change 5) — the
     // Inbox's desc says "new enquiries", so ⌘K still finds them there.
