@@ -436,15 +436,19 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const [r, invR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`),
     // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
-    // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only.
-    svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`),
+    // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only;
+    // processing_since (migration 0132) with the pre-0132 fallback.
+    (async () => { let q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date,processing_since&limit=1000`); if (!q.ok) q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`); return q; })(),
   ]);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
   const deals = rows(r);
   const today = nowIso().slice(0, 10);
-  let outstanding = 0, overdue = 0, overdueCount = 0;
-  for (const iv of rows(invR)) { const amt = Number(iv.amount_cents) || 0; outstanding += amt; if (iv.due_date && String(iv.due_date) < today) { overdue += amt; overdueCount++; } }
-  const ar = { outstanding_cents: outstanding, count: rows(invR).length, overdue_cents: overdue, overdue_count: overdueCount };
+  // Oct 2026 (item 2): the SAME formula as /sales/receivables' total — outstanding
+  // is what still WAITS on a client (upcoming + overdue); a processing payment is
+  // on its way and gets its own number, so the Outstanding tile and the money band
+  // can never disagree about the same invoice.
+  const b = moneyBuckets(rows(invR), today);
+  const ar = { outstanding_cents: b.upcoming.cents + b.overdue.cents, count: b.upcoming.count + b.overdue.count, overdue_cents: b.overdue.cents, overdue_count: b.overdue.count, processing_cents: b.processing.cents, processing_count: b.processing.count };
   // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
   // days — three won deals read "100% (1 of 1)" under the old window.
   return json({ data: { ...summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS), ar }, truncated: deals.length >= CAP }, 200, cors);
@@ -1136,6 +1140,8 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   const inv = rows(await svc(`presence_invoices?id=eq.${invoiceId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
   if (inv.status !== 'open') return json({ error: 'bad_state', message: inv.status === 'paid' ? 'That stage is already paid.' : 'That invoice isn’t open.' }, 409, cors);
+  // Oct 2026 (item 2): the client already paid — Stripe is settling it. Nothing to resend.
+  if (inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Nothing to resend.' }, 409, cors);
   const hadLink = !!inv.stripe_url;
   let payUrl: string | null = inv.stripe_url || null;
   let repaired = false;
@@ -1202,9 +1208,15 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
  *  stays visible as "Voided" — the withdrawal is part of the record, not a hole. */
 export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
-  const inv = rows(await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`))[0];
+  // processing_since lands with migration 0132 — tolerant read (pre-0132 shape second)
+  let invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id,processing_since&limit=1`);
+  if (!invR.ok) invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`);
+  const inv = rows(invR)[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
   if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back.' }, 409, cors);
+  // Oct 2026 (item 2): the client already paid and Stripe is settling it — voiding
+  // now would leave money landing on a withdrawn invoice. Wait for it to land.
+  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back.' }, 409, cors);
   if (inv.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
   const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'void', updated_at: nowIso() }) });
@@ -1754,7 +1766,11 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   // its payment link straight back — the moment of "yes" is the moment to pay.
   let pay: { url: string; amount_cents: number } | null = null;
   try {
-    const dep = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`))[0];
+    // Oct 2026 (item 2): a deposit whose payment is already settling is not
+    // waiting — its link is spent (tolerant: pre-0132 the filter 400s → fall back)
+    let depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&processing_since=is.null&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`);
+    if (!depR.ok) depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=eq.open&deleted_at=is.null&select=stripe_url,amount_cents&order=created_at.desc&limit=1`);
+    const dep = rows(depR)[0];
     if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
   } catch { /* optional */ }
   return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null, copy_emailed: copyEmailed } }, 200, cors);

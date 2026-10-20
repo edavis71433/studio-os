@@ -1365,7 +1365,10 @@ async function renderSummary(gen){
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
   // AR tile — "who owes me money" across all deals, in one glance (open invoices).
   const ar=s.ar||{}; let arT='';
-  if((ar.count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',plur(ar.count,'invoice')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+` · <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a>`,'ar','warn'); }
+  // Oct 2026 (item 2): outstanding = what still waits (the server's ar runs the one
+  // money formula); a processing payment is on its way and is named, not owed
+  const arProc=(ar.processing_cents||0)>0?` · ${money(ar.processing_cents)} processing`:'';
+  if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+` · <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600">see who →</a>`,'ar','warn'); }
   host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
     +(open.count?`<div class="sum-stages">${cells}</div>`:'');
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};

@@ -51,7 +51,7 @@ function statTiles(s,enquiries){
   const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   if(s&&typeof s==='object'){
     const ar=s.ar;
-    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',ico:'owed',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
+    if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0,pc=Number(ar.processing_cents)||0;const proc=pc?money(pc)+' processing':'';t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':'')+(proc?' · '+proc:''):(proc||'All paid up'),ico:'owed',tone:ar.outstanding_cents>0?'warn':(pc?'info':''),href:'/pipeline.html'});}
     if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',ico:'won',tone:'good',href:'/pipeline.html'});}
     if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',ico:'open',tone:'',href:'/pipeline.html'});}
   }
@@ -255,6 +255,12 @@ ok('greeting: morning <12, afternoon <18, evening after',
   portalGreeting(0,'')==='Good morning.' && portalGreeting(11,'')==='Good morning.'
   && portalGreeting(12,'')==='Good afternoon.' && portalGreeting(17,'')==='Good afternoon.'
   && portalGreeting(18,'')==='Good evening.' && portalGreeting(23,'')==='Good evening.');
+// Oct 2026 (item 2): the Outstanding tile names processing money (on its way, not owed)
+ok('statTiles: ar.processing_cents joins the sub-line; outstanding stays what waits',
+  statTiles({ar:{outstanding_cents:250000,count:2,overdue_cents:160000,overdue_count:1,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').s==='2 invoices · 1 overdue · $400 processing'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').s==='$400 processing'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0,processing_cents:40000,processing_count:1}}).find(t=>t.id==='stat-owed').tone==='info'
+  && statTiles({ar:{outstanding_cents:0,count:0,overdue_cents:0,overdue_count:0}}).find(t=>t.id==='stat-owed').s==='All paid up');
 ok('greeting: the first name joins only when we truly have one',
   portalGreeting(9,'Sam')==='Good morning, Sam.' && portalGreeting(9,'')==='Good morning.');
 

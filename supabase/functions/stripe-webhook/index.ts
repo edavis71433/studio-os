@@ -571,7 +571,8 @@ Deno.serve(async (req: Request) => {
           // Paid; the async_payment_succeeded / payment_intent.succeeded event
           // flips it later. Only a 'paid' session flips the invoice here.
           const ps = String(obj.payment_status || 'paid');
-          if (ps !== 'paid') return await markPresenceInvoiceProcessing(String(md.presence_invoice_id), `checkout.session completed, payment_status ${ps}`);
+          // 'no_payment_required' is Stripe's word for a settled $0 session — paid, not processing
+          if (ps !== 'paid' && ps !== 'no_payment_required') return await markPresenceInvoiceProcessing(String(md.presence_invoice_id), `checkout.session completed, payment_status ${ps}`);
           return await markPresenceInvoicePaid(String(md.presence_invoice_id), 'checkout.session metadata');
         }
         console.log(`[stripe-webhook] ${type} with no invoice_id/order_id metadata (session ${obj.id || '?'}) — payment recorded, nothing to flip`);
