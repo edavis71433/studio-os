@@ -4,6 +4,7 @@
 // used by both Launches (FD-T7) and the Preview Environment (FD-T20) — no
 // duplication. They reuse serializeDraft (the one serializer) + the snapshot store.
 import { svc } from './db.ts';
+import { publishActorKind } from './actor_kind.ts';
 import { getTemplate } from './render.ts';
 import { serializeDraft } from './serializer.ts';
 import { validateSnapshot } from './manifest_validate.ts';
@@ -11,7 +12,7 @@ import type { Snapshot } from './render_types.ts';
 import type { SiteRow } from './site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
-const actorKind = (p: Principal) => (p.kind === 'staff' ? 'staff' : 'client');
+const actorKind = (p: Principal) => publishActorKind(p);   // audit change 2: 'operator' when scoped into a client
 
 export type CaptureResult = { snapshotId: string; blockers: any[]; warnings: any[] } | { error: string; message: string; status: number };
 

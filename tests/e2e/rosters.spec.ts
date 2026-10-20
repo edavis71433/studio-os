@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
 
 // Rosters as Salesforce list views (redesign slice 3): customers.html and
 // contacts.html get a list-view header (object icon + fixed-view dropdown +
@@ -523,5 +523,29 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await expect(done).toContainText('the invitation email couldn’t be sent');
     await expect(done).not.toContainText('Invitation sent to');
     await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
+  });
+});
+
+// ── Oct 2026 studio audit, change 3 (one roster): an agency member at studio
+// level has their roster on agency.html (portfolio + this bridge list, merged) —
+// customers.html forwards them there. Drilled into a client it stays the escape
+// hatch UP to the full roster, and a plain studio owner never leaves.
+test.describe('Customers — the agency member is forwarded to the one roster', () => {
+  const agencyCtx = (scope?: { site_id: string; name: string }) => ({ data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+    is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'view_all'],
+    landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV, ...(scope ? { scope } : {}),
+  } });
+  test('studio level → /agency.html', async ({ page }) => {
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx(), '/agency/me': { data: { agency: 'Bright Studio', role: 'owner' } }, '/agency/portfolio': { data: [] }, '/agency/queues': { data: { queues: [] } }, '/agency/kits': { data: [] } } });
+    await page.goto('/customers.html');
+    await page.waitForURL(/\/agency\.html$/);
+  });
+  test('drilled into a client (?client=) it stays, as the way UP to the roster', async ({ page }) => {
+    await pinTable('dds-display:customers')(page);
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
+    await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await expect(page.locator('.tscroll table tbody tr', { hasText: 'Acme Bakery' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/customers.html');
   });
 });

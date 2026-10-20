@@ -148,6 +148,12 @@ export interface Principal {
   email: string | null;     // for the audit actor label
   jwt: string | null;       // the caller's token, for future RLS-scoped reads
   requestId: string;        // minted here; threads into logs + audit_log
+  /** SC-1 drill-in, stamped by presence/index.ts ONLY after lib/scope.ts has
+   *  authorised the x-dds-scope-site request: an agency member acting inside a
+   *  CLIENT's business. Attribution reads this (lib/actor_kind.ts) so a scoped
+   *  publish or connection is recorded as the studio's, never the client's.
+   *  Absent/undefined on every un-scoped call. */
+  scope?: { site_id: string; name: string } | null;
 }
 
 // Decode the iat (issued-at) claim from a JWT payload WITHOUT signature

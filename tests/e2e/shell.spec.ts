@@ -307,6 +307,7 @@ test.describe('Context bar (slice 7)', () => {
     await expect(bar.locator('a', { hasText: 'Open record' })).toHaveAttribute('href', `/crm.html?client=${CLIENT}`);
     await expect(bar.locator('a', { hasText: 'Their website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
     await expect(bar.locator('a', { hasText: 'Exit to Studio' })).toHaveAttribute('href', '/agency.html');
+    await expect(bar.locator('a', { hasText: 'Switch client' })).toHaveAttribute('href', '/agency.html');   // the ONE roster (Oct 2026), never the retired second list
     if (testInfo.project.name !== 'mobile') await expect(page.locator('#dds-settings')).toBeVisible();   // ≤420px: in the account menu, like Help
     // nothing hides under the chrome: on the sidebar layouts (≥761px) the body
     // is pushed RIGHT past the column the bar sits in; on the top-bar layouts
