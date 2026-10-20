@@ -2330,7 +2330,9 @@ async function openDeal(id){
     const sm=$('sendMore'); if(sm){const menu=$('sendMoreMenu');
       sm.onclick=(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}};
       const close=()=>{if(!menu.hidden){menu.hidden=true;sm.setAttribute('aria-expanded','false');}};
-      document.addEventListener('click',close,{once:false});
+      // ONE document listener across renders (openDeal re-renders the drawer after every send)
+      if(window.__sendMoreClose)document.removeEventListener('click',window.__sendMoreClose);
+      window.__sendMoreClose=close;document.addEventListener('click',close);
       menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});
       const md=$('moreDeposit'); if(md)md.onclick=()=>{close();const b=$('sendDeposit');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};}
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));

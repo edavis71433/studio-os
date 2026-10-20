@@ -146,13 +146,14 @@ async function load(after){
 // ── The one-page flow: choose → sign → pay ──────────────────────────────────
 function renderFlow(d,after){
   const p=d.proposal,c=d.contract,dep=d.deposit;
-  const chosen=!p||p.status==='accepted';           // no proposal on the deal → the agreement is the first step
+  const pending=!p&&!!d.proposal_pending;             // between versions: the studio is updating the proposal
+  const chosen=p?p.status==='accepted':!pending;     // no proposal ever in play → the agreement is the first step
   const signed=!!(c&&c.status==='signed');
   const paid=!!(dep&&dep.status==='paid');
   const T=p?proposalTotals(p.line_items):null;
   // the strip: every step the deal has, with its state
   const steps=[];
-  if(p)steps.push({key:'choose',label:'Choose',state:p.status==='accepted'?'done':'now'});
+  if(p||pending)steps.push({key:'choose',label:'Choose',state:(p&&p.status==='accepted')?'done':'now'});
   steps.push({key:'sign',label:'Sign',state:signed?'done':chosen?'now':'locked'});
   steps.push({key:'pay',label:'Pay',state:paid?'done':signed?'now':'locked'});
   // only the FIRST open step is "now" — the ones after it wait their turn
@@ -181,10 +182,14 @@ function renderFlow(d,after){
       h+=`</section>`;
     }
   }
+  else if(pending){
+    k++;
+    h+=`<div class="card locked" id="step-choose"><h2><span class="k">Step ${k}</span>Your proposal</h2><p class="muted" style="margin-top:0">Your studio is updating the proposal — you’ll get an email when the new version is ready. Nothing to do now.</p></div>`;
+  }
   // ── 2 · Sign ──
   k++;
   if(!chosen){
-    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">Unlocks once you accept the proposal above.</p></div>`;
+    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">${pending?'Unlocks once you accept the updated proposal.':'Unlocks once you accept the proposal above.'}</p></div>`;
   }else if(!c){
     h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>`;
   }else if(signed){

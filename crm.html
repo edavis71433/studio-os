@@ -1042,7 +1042,9 @@ function wireBilling(host,d){
   const sm=host.querySelector('#sendMore'); if(sm){const menu=host.querySelector('#sendMoreMenu');
     sm.addEventListener('click',(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}});
     const close=()=>{if(menu.hidden)return;menu.hidden=true;sm.setAttribute('aria-expanded','false');};
-    document.addEventListener('click',close);
+    // ONE document listener across renders (the tab re-renders on every reload)
+    if(window.__sendMoreClose)document.removeEventListener('click',window.__sendMoreClose);
+    window.__sendMoreClose=close;document.addEventListener('click',close);
     menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});}
   const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
 }

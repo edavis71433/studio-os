@@ -208,6 +208,20 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await expect(page.locator('#step-pay')).toContainText('Pay the deposit');
   });
 
+  test('between versions (the studio revised the proposal and hasn’t sent v2): Choose waits, Sign stays locked, nothing is readable', async ({ page }) => {
+    const served = await serve(page, { view: () => flow({ proposal: null, proposal_pending: true, contract: AGREEMENT_LOCKED }) });
+    await open(page);
+    await expect(steps(page)).toHaveText(['1Choose — this step', '2Sign — not yet', '3Pay — not yet']);
+    await expect(page.locator('#step-choose')).toHaveClass(/locked/);
+    await expect(page.locator('#step-choose')).toContainText('Your studio is updating the proposal — you’ll get an email when the new version is ready. Nothing to do now.');
+    await expect(page.locator('#accept')).toHaveCount(0);
+    await expect(page.locator('#step-sign')).toHaveClass(/locked/);
+    await expect(page.locator('#step-sign')).toContainText('Unlocks once you accept the updated proposal.');
+    await expect(page.locator('#nm')).toHaveCount(0);
+    await expect(page.getByText('due at signing')).toHaveCount(0);
+    expect(served.posts).toEqual([]);
+  });
+
   test('all done: accepted, signed, deposit paid — three done steps, the documents collapsed, the certificate kept', async ({ page }) => {
     await serve(page, { view: () => flow({ proposal: { ...PROPOSAL, status: 'accepted' }, contract: AGREEMENT_SIGNED, deposit: { amount_cents: 250000, status: 'paid', paid_at: '2026-07-16T10:00:00.000Z', url: null } }) });
     await open(page);

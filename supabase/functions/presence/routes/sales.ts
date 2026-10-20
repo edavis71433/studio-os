@@ -27,6 +27,7 @@ import {
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
+  currentProposal, flowSignGate,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -121,15 +122,18 @@ function tokenCovers(tok: { t: string; id: string }, kind: 'proposal' | 'contrac
  *  and the newest agreement that is out or signed. Drafts never show — a client
  *  sees only what the studio sent. `contract_pending` says a draft exists, so the
  *  page can say "your studio is preparing the agreement" instead of nothing. */
-async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal: any | null; contract: any | null; contract_pending: boolean }> {
-  // first_viewed_at/expires_at land with migration 0107 — same tolerant read as the public view.
-  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&status=in.(sent,accepted,declined)&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
-  if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&status=in.(sent,accepted,declined)&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
-  const props = rows(pr).filter((p) => !splitLineItems(p.line_items).meta.superseded_by);
-  const proposal = props.find((p) => p.status === 'accepted') || props[0] || null;
+async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal: any | null; proposal_pending: boolean; contract: any | null; contract_pending: boolean }> {
+  // EVERY live proposal row (drafts and superseded versions included): the pure
+  // currentProposal() decides which one the client sees — and whether the deal
+  // is between versions (Revise → v1 superseded, v2 still a draft), which must
+  // read as PENDING, never as "no proposal". first_viewed_at/expires_at land
+  // with migration 0107 — same tolerant read as the public view.
+  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
+  if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
+  const { proposal, pending } = currentProposal<any>(rows(pr));
   const cons = rows(await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name&order=created_at.desc&limit=20`));
   const contract = cons.find((c) => c.status === 'signed') || cons.find((c) => c.status === 'sent') || null;
-  return { proposal, contract, contract_pending: !contract && cons.some((c) => c.status === 'draft') };
+  return { proposal, proposal_pending: pending, contract, contract_pending: !contract && cons.some((c) => c.status === 'draft') };
 }
 
 /** Mint a URL to the branded, printable Document of Record for an artifact. The
@@ -1507,9 +1511,12 @@ export async function handleSalesDealSend(req: Request, site: SiteRow, principal
   // Nothing newly out → nothing to announce (same rule as the per-document
   // resend): hand the link back for copying, email nobody twice.
   if (!sent.proposal && !sent.contract) return json({ data: { proposal, contract, deposit }, url, emailed: false, sent, already_sent: true }, 200, cors);
+  // the email describes what is WAITING on them: a proposal only while it is
+  // still open (an accepted or declined one is not a step to take), the
+  // agreement only while it is unsigned
   const emailed = await emailSalesFlow(site.id, dealId, url, {
-    proposal: !!proposal && proposal.status !== 'draft',
-    contract: !!contract && contract.status !== 'draft',
+    proposal: !!proposal && proposal.status === 'sent',
+    contract: !!contract && contract.status === 'sent',
   });
   return json({ data: { proposal, contract, deposit }, url, emailed, sent }, 200, cors);
 }
@@ -1758,8 +1765,9 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   // so a hand-built request can't skip the step. A per-document contract link
   // (sent on its own, no proposal in play) is not subject to it.
   if (tok.t === 'flow') {
-    const { proposal } = await flowDocuments(tok.site_id, tok.id);
-    if (proposal && proposal.status !== 'accepted') return json({ error: 'accept_first', message: 'Accept the proposal first — the agreement unlocks right after.' }, 409, cors);
+    const { proposal, proposal_pending } = await flowDocuments(tok.site_id, tok.id);
+    const gate = flowSignGate({ proposal, pending: proposal_pending });   // pure — tested on the revise window
+    if (gate) return json(gate, 409, cors);
   }
   const presented = clean(b.presented_hash, 64);
   const chk = canSignContract(c.status, c.content_hash, presented);
@@ -1876,9 +1884,11 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // only once the agreement is signed.
     const deal = rows(await svc(`presence_deals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title&limit=1`))[0];
     if (!deal) return json({ error: 'not_found' }, 404, cors);
-    const { proposal, contract, contract_pending } = await flowDocuments(tok.site_id, tok.id);
+    const { proposal, proposal_pending, contract, contract_pending } = await flowDocuments(tok.site_id, tok.id);
     if (proposal && !proposal.first_viewed_at) { svc(`presence_proposals?id=eq.${proposal.id}&site_id=eq.${tok.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ first_viewed_at: nowIso() }) }).catch(() => {}); }
-    const chosen = !proposal || proposal.status === 'accepted';   // no proposal on the deal → the agreement is the first step
+    // chosen = the agreement may be read: the proposal is accepted, or the deal
+    // never had one in play. Between versions (proposal_pending) it stays locked.
+    const chosen = proposal ? proposal.status === 'accepted' : !proposal_pending;
     const contractOut = !contract ? null
       : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
@@ -1888,7 +1898,7 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
       if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
     } catch { /* optional — the page says "nothing to pay right now" */ }
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
-    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, contract: contractOut, contract_pending, deposit } }, 200, cors);
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit } }, 200, cors);
   }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
