@@ -109,6 +109,93 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#nav')).toBeHidden();
   });
 
+  // ── Oct 2026 workflow audit, change 2: the overview took in health, the map, the story and the domain ──
+  const HEALTH = { data: { overall: 'attention', headline: 'One thing to look at', summary: 'Mostly good — one thing deserves a look.', ok_count: 5, attention_count: 1, categories: [
+    { key: 'found', label: 'Being found', checks: [
+      { title: 'Your site has a description for Google', why: 'It is the line under your name in search.', state: 'attention', status_label: 'Needs a look', action_label: 'Add one', action_href: '/presence.html#search' },
+      { title: 'Your site is live', why: 'People can visit.', state: 'ok', status_label: 'Working' },
+    ] },
+  ] } };
+  const TREE = { data: { site_status: 'draft_changes', has_unpublished_changes: true, last_published_at: null, attention_count: 1, pages: [
+    { key: 'about', label: 'About', path: '/about/', status: 'missing_required', status_label: 'Needs something before publishing', issue_count: 1, editor_link: '/presence.html#business', auto: false, sections: [] },
+  ] } };
+  const TIMELINE = { data: { total: 7, last_activity_at: null, last_activity_when: null, upcoming_count: 0, groups: [
+    { key: 'today', label: 'Today', events: [
+      { title: 'You published 2 changes', at: '2026-10-19T10:00:00Z', when: 'today', icon: '🚀', category: 'Publishing', actor: 'You', href: '/presence.html#history' },
+      { title: 'A quote request arrived', at: '2026-10-19T09:00:00Z', when: 'today', icon: '✉️', category: 'Communication', actor: 'A visitor' },
+    ] },
+    { key: 'earlier', label: 'Earlier', events: [1, 2, 3, 4, 5].map((i) => ({ title: `Older event ${i}`, at: '2026-10-01T00:00:00Z', when: '3 weeks ago', icon: '•', category: 'Website', actor: 'Automatic' })) },
+  ] } };
+  const EXTRAS = { '/website-health': HEALTH, '/content-tree': TREE, '/website-timeline': TIMELINE, '/foundations/domain': { data: null } };
+
+  test('overview: Health check card shows what needs a look, with its one action', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
+    await page.goto('/presence.html');
+    const card = page.locator('#healthCard');
+    await expect(card.getByRole('heading', { name: 'Health check' })).toBeVisible();
+    await expect(card).toContainText('1 to look at');
+    await expect(card).toContainText('Your site has a description for Google');
+    await expect(card.getByRole('link', { name: 'Add one' })).toHaveAttribute('href', '/presence.html#search');
+    // the Site health tile agrees with the card (one answer per screen)
+    await expect(page.locator('#statHealth .v')).toHaveText('Needs a look');
+    // the Site health tile is a door to this card (it used to do nothing)
+    await page.locator('#statHealth').click();
+    await expect(card).toBeFocused();
+  });
+
+  test('overview: a page the map says is blocked wears that word instead of "changes waiting"', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
+    await page.goto('/presence.html');
+    const about = page.locator('#pagesList .hb-row[data-page="about"] .hb-chip');
+    await expect(about).toHaveText('Needs something before publishing');
+    await expect(about).toHaveClass(/warn/);
+  });
+
+  test('overview: Recent activity lists the newest five, See all shows the rest in place', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
+    await page.goto('/presence.html');
+    const sec = page.locator('#activitySec');
+    await expect(sec.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+    await expect(sec.locator('.hb-row')).toHaveCount(5);
+    await expect(sec.locator('.hb-row').first()).toContainText('You published 2 changes');
+    await expect(sec.getByRole('link', { name: 'Open — You published 2 changes' })).toHaveAttribute('href', '/presence.html#history');
+    await sec.getByRole('button', { name: 'See all' }).click();
+    await expect(sec.locator('.hb-row')).toHaveCount(7);
+    await expect(sec.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('overview: no domain yet → Your domain card → the desk opens on "type your domain", ready', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS,
+      '/foundations': { data: { dns: { sentence: 'Temporary address.', records: [] }, ssl: { sentence: 'Padlock on.' }, email: { sentence: 'No email yet.', has_mail: false, spf: false, dmarc: false }, hosting: { sentence: 'Hosted.' } } },
+      '/foundations/plans': { data: [] }, '/launch': { data: { launched: true, sentence: 'Live.', items: [] } } } });
+    await page.goto('/presence.html');
+    const card = page.locator('#domainCard');
+    await expect(card).toContainText('temporary address');
+    await card.getByRole('button', { name: 'Connect your domain' }).click();
+    await expect(page.getByPlaceholder('yourbusiness.com')).toBeFocused();
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/foundations\/domain$/.test(new URL(r.url()).pathname));
+    await page.getByPlaceholder('yourbusiness.com').fill('marlowskitchen.com');
+    await page.getByRole('button', { name: /Connect it/ }).click();
+    expect((await post).postDataJSON()).toEqual({ domain: 'marlowskitchen.com' });
+  });
+
+  test('overview: a connected, healthy domain says so — no Connect button', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } } } });
+    await page.goto('/presence.html');
+    await expect(page.locator('#domainCard')).toContainText('marlows.example is live and secure.');
+    await expect(page.locator('#domainCard').getByRole('button', { name: 'Connect your domain' })).toHaveCount(0);
+  });
+
+  test('deep links: #domain opens the desk ready to type, #addpage opens the new-page dialog on Design', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS,
+      '/foundations': { data: { dns: { sentence: 'Temporary address.', records: [] }, ssl: { sentence: 'Padlock on.' }, email: { sentence: 'No email yet.', has_mail: false, spf: false, dmarc: false }, hosting: { sentence: 'Hosted.' } } },
+      '/foundations/plans': { data: [] }, '/launch': { data: { launched: true, sentence: 'Live.', items: [] } } } });
+    await page.goto('/presence.html#domain');
+    await expect(page.getByPlaceholder('yourbusiness.com')).toBeFocused();
+    await page.goto('/presence.html#addpage');
+    await expect(page.getByPlaceholder(/Services, Gallery/)).toBeVisible();
+  });
+
   test('overview: the stat strip reads changes, health, visitors and enquiries from the real routes', async ({ page }) => {
     await installApp(page, { api: BOARD_API });
     await page.goto('/presence.html');

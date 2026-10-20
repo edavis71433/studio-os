@@ -132,7 +132,7 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
     if (i.missing_count > 0) {
       c.push(check('Some content still needs completing',
         'A few required details are needed before your next update can go live.',
-        'attention', { label: 'Finish these items', href: i.missing_href || '/content-tree.html' }));
+        'attention', { label: 'Finish these items', href: i.missing_href || '/presence.html#pages' }));
     } else if (i.site_status !== 'never_published') {
       c.push(check('Your content is complete', 'Every required part of your site is filled in.', 'ok'));
     }

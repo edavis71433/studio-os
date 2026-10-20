@@ -66,7 +66,7 @@ ok('FIX3: when the bell rings but nothing is renderable inline, Today points to 
 ok('FIX4: the feed emits a missing_required row reusing the Content Tree signal',
   /siteContentTree/.test(workspace) && /kind: 'missing_required'/.test(workspace) &&
   /status === 'missing_required'/.test(workspace));
-ok('FIX4: missing_required has a NOTICE_HREF (content-tree.html)', /missing_required: '\/content-tree\.html'/.test(workspace));
+ok('FIX4: missing_required has a NOTICE_HREF (the overview\'s Pages — content-tree.html retired)', /missing_required: '\/presence\.html#pages'/.test(workspace));
 
 // ── moat: still ONE model — no new table/store/engine introduced here ────────
 ok('MOAT: no new notification table/store is created (reuses presence_plan_notices only)',

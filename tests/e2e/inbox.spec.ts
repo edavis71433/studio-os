@@ -489,7 +489,7 @@ test.describe('SS6 — inbox console quick wins', () => {
           ...FEED.data.notices,
           { id: 'n-up', kind: 'client_upload', headline: 'New file from Marlow’s Kitchen', body: 'menu-final.pdf', href: '/projects.html' },
           { id: 'n-req', kind: 'client_request', headline: 'New request from Marlow’s Kitchen', body: 'Can you refresh the gallery?', href: '/inbox.html' },
-          { id: 'n-ap', kind: 'client_approval', headline: 'Approval decision from Marlow’s Kitchen', body: 'Approved — Homepage copy', href: '/timeline.html' },
+          { id: 'n-ap', kind: 'client_approval', headline: 'Approval decision from Marlow’s Kitchen', body: 'Approved — Homepage copy', href: '/presence.html#activity' },
         ],
       } },
     };
