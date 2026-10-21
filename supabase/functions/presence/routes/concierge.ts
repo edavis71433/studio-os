@@ -29,7 +29,7 @@ export async function handleConciergeAsk(req: Request, site: SiteRow, cors: Reco
   // skip the polish and still answer, rather than deny. Same guard writer/coach/visual use.
   const ceil = await checkAiCeiling(site.client_id);
   if (!ceil.allowed) {
-    return json({ data: { verb: a.verb, answer: a.text, topic: a.topic, actions: a.actions, grounded: a.grounded, low_confidence: a.low_confidence, sources: a.sources } }, 200, cors);
+    return json({ data: { verb: a.verb, answer: a.text, topic: a.topic, actions: a.actions, grounded: a.grounded, low_confidence: a.low_confidence, sources: a.sources, source_labels: a.source_labels } }, 200, cors);
   }
 
   // optional language polish — facts already fixed; verifier guards; fallback always
@@ -48,6 +48,7 @@ export async function handleConciergeAsk(req: Request, site: SiteRow, cors: Reco
       grounded: a.grounded,
       low_confidence: a.low_confidence,
       sources: a.sources,           // ids only — auditability without internals
+      source_labels: a.source_labels,   // benchmark 7: the chips — what it drew on, in plain words
     },
   }, 200, cors);
 }
