@@ -38,8 +38,10 @@ const pageOf = (href) => {
   for (const ed of EDITIONS) {
     const siteEd = ed === 'monitor' ? 'monitor' : 'presence';
     for (const [role, capabilities] of Object.entries(roleCaps)) {
-      for (const isAgency of [false, true]) {
-        const ctx = { role, edition: siteEd, capabilities, isAgency, isOperator: false, editionKey: ed };
+      // Oct 2026 nav cut: three menus (owner · studio level · inside a client) and
+      // the not-yet-live variant, hidden (⌘K-only) items included
+      for (const [isAgency, scoped, siteLive] of [[false, false, true], [true, false, true], [true, true, true], [false, false, false], [true, false, false]]) {
+        const ctx = { role, edition: siteEd, capabilities, isAgency, isOperator: false, editionKey: ed, scoped, siteLive };
         for (const sec of buildNav(ctx)) for (const it of sec.items) {
           checked++;
           const pg = pageOf(it.href);

@@ -526,20 +526,24 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
   });
 });
 
-// ── Oct 2026 studio audit, change 3 (one roster): an agency member at studio
-// level has their roster on agency.html (portfolio + this bridge list, merged) —
-// customers.html forwards them there. Drilled into a client it stays the escape
-// hatch UP to the full roster, and a plain studio owner never leaves.
-test.describe('Customers — the agency member is forwarded to the one roster', () => {
+// ── Oct 2026 nav cut: Customers is its own place again (the roster with its
+// People tab and + Add a customer) and Home (agency.html) is the home — the
+// studio-audit forward from customers.html to agency.html is gone. An agency
+// member at studio level paints the roster like anyone else.
+test.describe('Customers — the agency member gets the roster (no forward since the nav cut)', () => {
   const agencyCtx = (scope?: { site_id: string; name: string }) => ({ data: {
     site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
     is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'view_all'],
     landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV, ...(scope ? { scope } : {}),
   } });
-  test('studio level → /agency.html', async ({ page }) => {
+  test('studio level → the roster paints here, with its tabs and + Add a customer; no forward', async ({ page }) => {
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/portal/context': agencyCtx(), '/agency/me': { data: { agency: 'Bright Studio', role: 'owner' } }, '/agency/portfolio': { data: [] }, '/agency/queues': { data: { queues: [] } }, '/agency/kits': { data: [] } } });
     await page.goto('/customers.html');
-    await page.waitForURL(/\/agency\.html$/);
+    await expect(page.locator('#tabCustomers')).toBeVisible();
+    await expect(page.locator('#tabPeople')).toBeVisible();
+    await expect(page.locator('#addCust')).toBeVisible();
+    await expect(page.locator('#main')).toContainText('Acme Bakery');
+    expect(new URL(page.url()).pathname).toBe('/customers.html');
   });
   // Oct 2026 studio audit, change 4: the rosters' copies of the dialog offer "Start
   // from" a kit only when the caller IS an agency (ddsContext.is_agency) — a plain

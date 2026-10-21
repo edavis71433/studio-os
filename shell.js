@@ -60,7 +60,11 @@
     });
     return best ? best.key : null;
   }
-  function flatten(nav) { var o = []; (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { o.push({ label: i.label, href: i.href, section: s.label, desc: i.desc || "" }); }); }); return o; }
+  // Oct 2026 nav cut: `hidden: true` items are ⌘K destinations the menu does not
+  // draw. flatten keeps them (the palette reaches every page); visibleItems is
+  // what the sidebar, the drawer and the account menu draw.
+  function flatten(nav) { var o = []; (nav || []).forEach(function (s) { (s.items || []).forEach(function (i) { o.push({ key: i.key, label: i.label, href: i.href, section: s.label, desc: i.desc || "", hidden: !!i.hidden }); }); }); return o; }
+  function visibleItems(sec) { return ((sec && sec.items) || []).filter(function (i) { return i && !i.hidden; }); }
 
   // ── recent records (slice 7): the last ~5 records the operator opened, cached
   // locally for the Customers caret's "Recent" group. Written from (1) a ⌘K
@@ -195,7 +199,7 @@
   // caret can REBUILD it each time it opens (recents re-read from localStorage —
   // the record you just opened shows up without a reload; cross-tab too).
   function sectionMenuHtml(sec, activeKey) {
-    var items = sec.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('');
+    var items = visibleItems(sec).map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('');
     // The Customers caret also lists RECENT RECORDS (⌘K/crm.html opens,
     // localStorage-cached — see pushRecent) + quick actions. Recents hrefs are
     // full record URLs (they already carry their identity params), so they are
@@ -225,6 +229,13 @@
   // section never renders without an icon slot (the sidebar aligns labels on it).
   var ICON = {
     today: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    overview: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    record: '<path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/>',
+    project: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    messages: '<path d="M4 5h16v11H9l-5 4z"/>',
+    get_started: '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
+    connections: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 10.8l7.4-3.6M8.3 13.2l7.4 3.6"/>',
     inbox: '<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',
     customers: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
     pipeline: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
@@ -257,8 +268,10 @@
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
-    var primary = nav.filter(function (s) { return !s.utility; });
-    UTILS = nav.filter(function (s) { return s.utility; });
+    // Oct 2026 nav cut: a section whose items are ALL hidden (⌘K-only) is not drawn.
+    var drawn = nav.filter(function (s) { return visibleItems(s).length > 0; });
+    var primary = drawn.filter(function (s) { return !s.utility; });
+    UTILS = drawn.filter(function (s) { return s.utility; });
     var ctxLabel = brandCtxLabel(nav, secKey);
     var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
 
@@ -267,12 +280,13 @@
     // marks the active page — nav landmark semantics, not a tablist); multi-item
     // sections render label + caret and open their dropdown on CLICK (never
     // hover), with the slice-2 popup contract (Escape/arrows/outside-click).
-    var navHtml = primary.map(function (sec) {
-      var single = sec.items.length === 1;
-      var isActive = sec.key === secKey;                                              // section-level: the underline
-      var hasItem = sec.items.some(function (i) { return i.key === activeKey; });     // item-level: a genuine href match
+    var secHtml = function (sec) {
+      var vis = visibleItems(sec);
+      var single = vis.length === 1;
+      var isActive = sec.key === secKey;                                              // section-level: the underline (a hidden child page counts — /broadcasts lights Inbox)
+      var hasItem = vis.some(function (i) { return i.key === activeKey; });           // item-level: a genuine, DRAWN href match
       if (single) {
-        var it = sec.items[0];
+        var it = vis[0];
         return '<div class="sec' + (isActive ? ' active' : '') + '"><a class="it" data-href="' + esc(it.href) + '" href="' + esc(withScope(it.href)) + '"' + (hasItem ? ' aria-current="page"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span></a></div>';
       }
       // Visual refresh (sidebar ≥761px): a multi-item section's menu is an INLINE
@@ -280,18 +294,18 @@
       // expanded (pinned: see pinnedSec), with the current page's row lit.
       var startOpen = isActive && sidebarMode();
       return '<div class="sec' + (isActive ? ' active' : '') + (startOpen ? ' open' : '') + '"><button class="it" data-sec="' + esc(sec.key) + '" aria-haspopup="true" aria-expanded="' + (startOpen ? 'true' : 'false') + '"' + (hasItem ? ' aria-current="true"' : '') + '>' + icon(sec.key) + '<span class="lbl">' + esc(sec.label) + '</span> <span class="car" aria-hidden="true">▾</span></button><div class="menu">' + sectionMenuHtml(sec, activeKey) + '</div></div>';
-    }).join('');
+    };
+    // Oct 2026 nav cut: the utilities (Your website · Settings · Get started until
+    // live) are drawn at the FOOT of the sidebar, under a rule; on the top-bar
+    // layout (phones, the website builder) shell.css hides the group and the
+    // account menu lists them, as before.
+    var navHtml = primary.map(secHtml).join('') + (UTILS.length ? '<div class="dds-util">' + UTILS.map(secHtml).join('') + '</div>' : '');
 
     // SC-1: the breadcrumb — "Studio › {client}" whenever an operator is scoped.
     var scope = CTX && CTX.scope;
     var brandHtml = scope && scope.name
       ? '<span class="dds-brand"><span class="mark">S</span><a href="/agency.html" id="dds-scope-exit" style="color:inherit;text-decoration:none">Studio</a> <span class="ctx">›</span> <span class="ctx" style="color:var(--dds-p);font-weight:600">' + esc(scope.name) + '</span></span>'
       : '<a class="dds-brand" href="' + esc((CTX && CTX.landing) || '/today.html') + '"><span class="mark">S</span>Studio OS' + (ctxLabel ? ' <span class="ctx">· ' + esc(ctxLabel) + '</span>' : '') + '</a>';
-    // Phase 1 overhaul: Settings gets its own gear in the bar (it was reachable
-    // only through the account menu / launcher). The href is the nav's own.
-    var settingsHref = '';
-    UTILS.forEach(function (sec) { if (sec.key === 'settings' && sec.items.length) settingsHref = sec.items[0].href; });
-
     root.innerHTML =
       // The App Launcher waffle (the burger's successor at EVERY width): CLICK-
       // invoked only (§11.5 — the one nav element that never opens on hover);
@@ -302,7 +316,6 @@
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
-        (settingsHref ? '<a class="dds-ic" href="' + esc(withScope(settingsHref)) + '" id="dds-settings" aria-label="Settings" title="Settings">' + icon('settings') + '</a>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
@@ -320,20 +333,20 @@
   function mountContextBar(scope) {
     var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
     if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
-    var sid = scope.site_id || scopeId();
-    var rec = '/crm.html?client=' + encodeURIComponent(sid);
+    // Oct 2026 nav cut: the card carries WHO (initials + name) and the two ways
+    // out — Switch client · Exit to studio. Their record, Today and website are
+    // the client's own menu items now (Record · Overview · Website), not links here.
+    var initials = String(scope.name).split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || 'C';
     var bar = el('<div id="dds-ctxbar" role="region" aria-label="Client context">' +
-      '<span class="lbl">Viewing client</span><strong>' + esc(scope.name) + '</strong>' +
+      '<span class="lbl">Viewing client</span>' +
+      '<span class="who"><span class="av" aria-hidden="true">' + esc(initials) + '</span><strong>' + esc(scope.name) + '</strong></span>' +
       '<span class="acts">' +
-        '<a href="' + esc(rec) + '" data-noscope="1">Open record</a>' +
-        '<a href="' + esc(withScope('/today.html')) + '">Their Today</a>' +
-        '<a href="' + esc(withScope('/presence.html')) + '">Their website</a>' +
         '<a href="/agency.html" class="exit" data-noscope="1">Switch client</a>' +
-        '<a href="/agency.html" class="exit" data-noscope="1">Exit to Studio</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Exit to studio</a>' +
       '</span></div>');
     // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
-    // lay it out as a card under the nav; on phones shell.css keeps it fixed
-    // under the top bar (a fixed child escapes the column's flow).
+    // lay it out as a card ABOVE the client's menu; on phones shell.css keeps it
+    // fixed under the top bar (a fixed child escapes the column's flow).
     root.appendChild(bar);
     document.documentElement.classList.add('dds-has-ctxbar');
   }
@@ -346,8 +359,20 @@
     var old = document.getElementById('dds-mbar'); if (old) old.remove();
     var bar = document.createElement('nav');
     bar.id = 'dds-mbar'; bar.setAttribute('aria-label', 'Quick navigation');
-    var home = isReviewer ? { href: '/client.html', label: 'Updates' } : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
-    var inbox = isReviewer ? null : { href: '/inbox.html', label: 'Inbox' };
+    // Oct 2026 nav cut: the bar follows the same list as the menu. Inside a
+    // client the first item is the client's (Overview) and the second is their
+    // Messages; at studio level / for an owner it is Home (the landing) · Inbox.
+    var scopedNow = !!(CTX && CTX.scope && CTX.scope.name && CTX.is_agency);
+    var firstPrimary = null, inboxItem = null;
+    (nav || []).forEach(function (s) {
+      var vis = visibleItems(s);
+      if (!s.utility && !firstPrimary && vis.length) firstPrimary = vis[0];
+      vis.forEach(function (i) { if (!inboxItem && (i.key === 'inbox' || i.key === 'messages')) inboxItem = i; });
+    });
+    var home = isReviewer ? { href: '/client.html', label: 'Updates' }
+      : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
+      : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
+    var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : { href: '/inbox.html', label: 'Inbox' };
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     bar.innerHTML =
@@ -562,7 +587,7 @@
       box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>';
     }
   }
-  function hasCrm() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'customers'; }); }
+  function hasCrm() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'customers' || s.key === 'record'; }); }
 
   // ── B4: the attention badge refreshes when the tab comes back ───────────────
   // CTX.attention_count used to be baked in at page load and only moved on
@@ -732,8 +757,9 @@
     // Architecture v1.0: utility destinations (Connections, Settings, Help) live here.
     // Multi-item groups get a quiet header so a long menu stays scannable.
     UTILS.forEach(function (sec) {
-      if (sec.items.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
-      sec.items.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + (i.desc ? '<span class="sub">' + esc(i.desc) + '</span>' : '') + '</a>'; });
+      var vis = visibleItems(sec);
+      if (vis.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
+      vis.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + (i.desc ? '<span class="sub">' + esc(i.desc) + '</span>' : '') + '</a>'; });
     });
     // Notifications toggle (Web Push) — reviewers don't get it (their world is
     // one calm page). Label reflects current permission/subscription state.
@@ -884,8 +910,14 @@
     // same split as the bar: the SECTION marks active (heading emphasis — covers
     // /crm.html record pages), item aria-current only on a genuine href match
     var secKey = activeSectionKey(nav, activeKey);
+    // Oct 2026 nav cut: the drawer follows the menu's lists — hidden (⌘K-only)
+    // items are not drawn, and a group with ONE item of the same name needs no
+    // heading over it (eight "Today / Today" pairs read as noise on a phone).
     var html = (nav || []).map(function (s) {
-      return '<div class="g' + (s.key === secKey ? ' active' : '') + '"><p class="t">' + esc(s.label) + '</p>' + s.items.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
+      var vis = visibleItems(s);
+      if (!vis.length) return '';
+      var heading = (vis.length === 1 && vis[0].label === s.label) ? '' : '<p class="t">' + esc(s.label) + '</p>';
+      return '<div class="g' + (s.key === secKey ? ' active' : '') + (s.utility ? ' util' : '') + '">' + heading + vis.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
     ensureDrawer();
     drawer.innerHTML = html; drawer.classList.add('open');
@@ -1042,9 +1074,9 @@
       ];
     }
     return [
-      { sel: ['.dds-nav .sec > [data-href^="/today"]', '#dds-mbar a[href^="/today"]'], title: 'Today', text: 'This is Today — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
-      { sel: ['.dds-nav .sec > button[data-sec="website"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives in this group — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
-      { sel: ['.dds-nav .sec > button[data-sec="customers"]'], title: 'Customers', text: 'Enquiries, contacts, and your pipeline — the people side of your business, all in one place.' },
+      { sel: ['.dds-nav .sec > [data-href^="/today"]', '.dds-nav .sec > [data-href^="/agency"]', '#dds-mbar a[href^="/today"]', '#dds-mbar a[href^="/agency"]'], title: 'Home', text: 'This is your home — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
+      { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
+      { sel: ['.dds-nav .sec > button[data-sec="customers"]', '.dds-nav .sec > [data-href^="/customers"]'], title: 'Customers', text: 'Your customers and the people behind them — their deal, billing, project, files and messages on one record.' },
       { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
       { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }

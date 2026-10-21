@@ -610,14 +610,10 @@ async function load(){
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
-    // Oct 2026 studio audit, change 3 (one roster): an AGENCY member at studio
-    // level has their roster on agency.html (the portfolio + this bridge list,
-    // merged) — forward there instead of painting the second list. Drilled into
-    // a client (?client=) this page stays the escape hatch UP to the full roster.
-    try{
-      const ctx=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;
-      if(ctx&&ctx.is_agency&&!scope()){location.replace('/agency.html');return;}
-    }catch(_){/* no context → paint the roster as before */}
+    // Oct 2026 nav cut: Customers is its own place again — the roster with its
+    // People tab and + Add a customer — and Home (agency.html) is the home. The
+    // studio-audit forward to agency.html is gone; this page paints the roster
+    // for everyone (unscoped: /studio/customers is asked without a drill-in).
     await load();
   }catch(_){trouble();}
 })();
