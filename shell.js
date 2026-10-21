@@ -509,7 +509,7 @@
   // Opening ANY of them closes all the others — never two at once. (The ⌘K
   // palette is a modal overlay above them; it closes them on open instead.)
   function closeAllLayers() {
-    closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer();
+    closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
   }
 
   // ── command palette ──
@@ -793,7 +793,7 @@
     });
   }
   function closeProfile() { if (prof) prof.classList.remove('open'); setExpanded('dds-profile', false); }
-  document.addEventListener('click', function () { closeNotifications(); closeProfile(); closeHelp(); });
+  document.addEventListener('click', function () { closeNotifications(); closeProfile(); closeHelp(); closeShortcuts(); });
   // Escape closes whatever shell popover is open (WCAG 1.4.13) and returns
   // focus to its trigger so a keyboard user isn't stranded.
   document.addEventListener('keydown', function (e) {
@@ -805,9 +805,75 @@
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
     if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
+    if (keys && keys.classList.contains('open')) closeShortcuts();
     // ⌘K palette too — its input handles Escape while focused, but the dialog must
     // also close when focus is elsewhere (closePalette returns focus to its trigger).
     if (pal && pal.classList.contains('open')) closePalette();
+  });
+
+  // ── Keyboard beyond ⌘K (benchmark item 10) ──────────────────────────────────
+  // Three plain keys on every signed-in page: `/` opens the search (the ⌘K
+  // input), `?` opens a small sheet listing what exists, `n` fires the page's
+  // own "New" action. Plain keys only — nothing while typing in a field,
+  // nothing with a modifier held, nothing while the palette or the tour is
+  // up. Pages need no change: `n` finds a [data-new] element, else the first
+  // visible "+ …" / "New …" / "Add …" button, a filled one first.
+  var keys;
+  function typingIn(t) {
+    if (!t || !t.tagName) return false;
+    var tag = t.tagName.toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!t.isContentEditable;
+  }
+  function modalOpen() { return !!((pal && pal.classList.contains('open')) || tour); }
+  var NEW_RE = /^(\+|new\b|add\b)/i;
+  function onScreen(n) { return !!(n && n.getClientRects && n.getClientRects().length); }
+  function findNewAction() {
+    var marked = document.querySelector('[data-new]');
+    if (marked && onScreen(marked)) return marked;
+    var all = document.querySelectorAll('button, a[href]'), first = null;
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (n.closest && n.closest('#dds-shell, .dds-pop, .dds-palette, .dds-drawer, #dds-mbar')) continue;
+      if (!onScreen(n) || n.disabled) continue;
+      if (!NEW_RE.test(String(n.textContent || '').trim())) continue;
+      if (/(^|\s)(primary|filled)(\s|$)/.test(String(n.className || ''))) return n;
+      if (!first) first = n;
+    }
+    return first;
+  }
+  window.ddsNewAction = findNewAction;   // read by tests; pages never need it
+  // The Inbox's own keys (inbox.html wires them) are LISTED here, not rebuilt.
+  var INBOX_KEYS = [['↑ ↓', 'Move between conversations'], ['Enter', 'Open the conversation'], ['Esc', 'Close a menu or sheet']];
+  function keyRow(r) { return '<div class="row krow"><kbd>' + esc(r[0]) + '</kbd><span>' + esc(r[1]) + '</span></div>'; }
+  function toggleShortcuts() {
+    if (keys && keys.classList.contains('open')) { closeShortcuts(); return; }
+    closeAllLayers();
+    if (!keys) {
+      keys = el('<div class="dds-pop dds-keys" role="dialog" aria-label="Keyboard shortcuts" tabindex="-1"><h4>Keyboard shortcuts</h4><div class="body"></div><button type="button" class="row kclose" id="dds-keys-close">Close</button></div>');
+      document.body.appendChild(keys);
+      keys.addEventListener('click', function (e) { e.stopPropagation(); });
+      keys.querySelector('#dds-keys-close').addEventListener('click', closeShortcuts);
+    }
+    var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button'], ['?', 'These shortcuts'], ['Esc', 'Close whatever is open']];
+    var html = rows.map(keyRow).join('');
+    if (normalizePath(location.pathname) === '/inbox') html += '<div class="grp">In the Inbox</div>' + INBOX_KEYS.map(keyRow).join('');
+    keys.querySelector('.body').innerHTML = html;
+    keys.classList.add('open');
+    try { keys.focus(); } catch (_) { /* */ }
+  }
+  function closeShortcuts() { if (keys) keys.classList.remove('open'); }
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || !CTX) return;   // signed out / minimal shell: no app keys
+    if (typingIn(e.target)) return;
+    if (e.key === '/') { if (modalOpen()) return; e.preventDefault(); openPalette(); }
+    else if (e.key === '?') { if (modalOpen()) return; e.preventDefault(); toggleShortcuts(); }
+    else if (e.key === 'n' && !e.shiftKey) {
+      if (modalOpen()) return;
+      var t = findNewAction();
+      if (!t) { if (window.ddsToast) window.ddsToast('Nothing to create on this page.'); return; }
+      e.preventDefault(); closeAllLayers();
+      t.click(); try { t.focus(); } catch (_) { /* */ }
+    }
   });
 
   // ── Web Push opt-in (notifications when the app is closed) ──────────────────

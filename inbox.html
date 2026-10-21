@@ -588,7 +588,7 @@ function enqToolbar(){
     <div class="ebar">
       <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
       <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
-      <button type="button" class="btnlink" id="newEnq">+ New enquiry</button>
+      <button type="button" class="btnlink" id="newEnq" data-new>+ New enquiry</button>
     </div>`;
 }
 function wireEnqToolbar(){
