@@ -621,7 +621,12 @@ function miniForm(host, fields, onSubmit){
   row.appendChild(cancel); row.appendChild(save); f.appendChild(row); host.appendChild(f);
   cancel.onclick=()=>host.innerHTML='';
   f.onsubmit=async(e)=>{e.preventDefault();save.disabled=true;try{const v={};for(const[k,el]of Object.entries(inputs))v[k]=el.type==='checkbox'?el.checked:el.value.trim();await onSubmit(v);}catch(err){toast(nice(err),true);save.disabled=false;}};
-  setTimeout(()=>{const first=f.querySelector('input,textarea,select'); if(first)first.focus();},20);
+  // Focus the first field NOW, not on a timer. The old setTimeout(…,20) fired
+  // after the user (or Playwright's fill) had already put the caret in a later
+  // field — the note typed into "A note for them" landed in the title instead
+  // ("Homepage mockThe hero and the menu…" reached the server). The host is
+  // already in the page when this runs, so a synchronous focus is enough.
+  const first=f.querySelector('input,textarea,select'); if(first)first.focus();
 }
 
 // ── the standard-step picker ────────────────────────────────────────────────

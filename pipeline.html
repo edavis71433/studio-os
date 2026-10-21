@@ -1943,7 +1943,9 @@ function miniForm(host, fields, onSubmit, opts){
   const runWith=async(fn)=>{setBusy(true);try{await fn(values());clearDrafts();}catch(err){toast(nice(err),true);setBusy(false);}};
   f.onsubmit=(e)=>{e.preventDefault();runWith(onSubmit);};
   if(altBtn)altBtn.onclick=()=>runWith(opts.alt.run);
-  setTimeout(()=>{const first=f.querySelector('input,textarea'); if(first)first.focus();},20);
+  // Synchronous, like the services editor below: a focus() landing 20ms after
+  // the paint steals the caret from a field the operator already tapped.
+  const first=f.querySelector('input,textarea'); if(first)first.focus();
 }
 
 // ── Manage services: the studio's own catalog of sellable services + prices.
