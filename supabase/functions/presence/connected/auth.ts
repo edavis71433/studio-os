@@ -84,6 +84,34 @@ export async function verifyState(state: string, siteId: string, providerKey: st
   } catch { return false; }
 }
 
+// ── Studio audit change 9: "ask the client to connect" — the same sealed-token
+// pattern as the OAuth state, with a week to act. The link in the email binds
+// the client's site + the moment of the ask; a re-ask moves that moment, so an
+// older link stops verifying. The client still signs into their own portal:
+// the token opens the door, their own session does the connecting.
+const ASK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export async function signAsk(siteId: string, askedAt: number): Promise<string> {
+  const sealed = await seal(JSON.stringify({ s: siteId, kind: 'ask', t: askedAt }));
+  if (!sealed) return `ask:${siteId}:${askedAt}`;   // dev-only (no CONNECTION_ENC_KEY) — mirrors signState's fallback
+  return `${urlsafe(sealed.ciphertext)}.${urlsafe(sealed.iv)}`;
+}
+/** The ask's timestamp when the token binds THIS site and is still fresh; null otherwise. */
+export async function verifyAsk(token: string, siteId: string): Promise<number | null> {
+  if (!encryptionConfigured()) {
+    const m = /^ask:([^:]+):(\d+)$/.exec(String(token || ''));
+    return m && m[1] === siteId ? Number(m[2]) : null;
+  }
+  if (!token || !token.includes('.')) return null;
+  const [ct, iv] = token.split('.');
+  const plain = await open({ ciphertext: unurlsafe(ct), iv: unurlsafe(iv) });
+  if (!plain) return null;
+  try {
+    const p = JSON.parse(plain);
+    const fresh = p.kind === 'ask' && p.s === siteId && typeof p.t === 'number' && (Date.now() - p.t) < ASK_TTL_MS;
+    return fresh ? p.t : null;
+  } catch { return null; }
+}
+
 // Build the provider's own consent URL. `state` ties the callback back to the
 // site + provider (signed by signState(), verified by verifyState()).
 export function authorizeUrl(providerKey: string, state: string): string | null {

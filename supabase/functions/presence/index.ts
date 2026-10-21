@@ -80,7 +80,7 @@ import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce } from './routes/commerce.ts';
 import { handleSystem } from './routes/system.ts';
-import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback } from './routes/connections.ts';
+import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } from './routes/connections.ts';
 import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
 import { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } from './routes/enterprise.ts';
 
@@ -1023,6 +1023,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/marketplace/features' && method === 'GET') return handleMarketplaceFeatures(site, cors);
   // ── L4.0/L4.1: Connected Platform reads (connect/refresh/disconnect) ──
   if (route === '/connections' && method === 'GET') return handleConnectionsList(site, cors);
+  // ── Studio audit change 9: the studio asks the client to connect their own Google
+  //    (POST, scoped operator); the client's portal reads the ask (GET, their session).
+  //    Before the /:key routes — "ask" is not a provider key.
+  if (route === '/connections/ask' && method === 'POST') return handleConnectionAsk(req, site, principal, cors);
+  if (route === '/connections/ask' && method === 'GET') return handleConnectionAskStatus(req, site, cors);
   // ── L4.3: Connected Platform WRITES — every write is an approval-gated plan ──
   {
     const m = route.match(/^\/connections\/([a-z0-9_]+)\/write(?:\/(prepare|[0-9a-f-]{36}))?(?:\/(decide|execute|rollback))?$/);

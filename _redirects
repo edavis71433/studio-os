@@ -30,6 +30,8 @@
 /styleguide.html        /404.html   404!
 /a11y                   /404.html   404!
 /a11y.html              /404.html   404!
+/provision              /404.html   404!
+/provision.html         /404.html   404!
 
 # Free Site Review maps to the real diagnostic tool specifically
 # (matches the nav label "Free site review" -> audit.html)

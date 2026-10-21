@@ -116,7 +116,11 @@ export function buildNav(c: NavContext): NavSection[] {
     // Website — their builder (one door; the sub-pages stay in ⌘K)
     if (f.hasWebsite) sections.push({ key: 'website', label: 'Website', items: [{ key: 'content', label: 'Website', href: '/presence.html', desc: WEBSITE_DESC }, ...websiteSubItems()] });
     // Record — deal · billing · details (the shell carries ?client=<site> onto every href)
-    if (f.hasRelationship) single('record', 'Record', '/crm.html', 'This client’s record — their deal, billing, details and activity on one page.');
+    if (f.hasRelationship) sections.push({ key: 'record', label: 'Record', items: [
+      { key: 'record', label: 'Record', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
+      // Oct 2026 audit bug 10: ⌘K "billing" lands on money (the record's Billing tab), never on Customers
+      hid('billing', 'Billing', '/crm.html?tab=billing', 'This client’s billing — invoices, deposits and the payment schedule.'),
+    ] });
     // Project — the work you do for them (projects.html opens the single project directly)
     if (f.hasRelationship) single('project', 'Project', '/projects.html', 'The work you’re doing for this client — tasks, milestones, approvals.');
     // Messages — their conversations
@@ -144,6 +148,8 @@ export function buildNav(c: NavContext): NavSection[] {
   if (studioLevel) {
     const home: NavItem[] = [{ key: 'home', label: 'Home', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, your money and your numbers.' }];
     if (f.hasReports) home.push(hid('analytics', 'Analytics', '/analytics.html', 'All your numbers — visitors, enquiries, money — in plain English.'));
+    // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits (a card on Home; agency.html scrolls to #kits)
+    home.push(hid('kits', 'Starter kits', '/agency.html#kits', 'Save one client’s setup as a kit and start the next client from it.'));
     sections.push({ key: 'home', label: 'Home', items: home });
   } else if (f.hasBusinessOS) {
     single('today', 'Today', '/today.html');
@@ -166,7 +172,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // People tab and its + Add button. FIX 6: the item opens the ROSTER
   // (customers.html), never the single-client record; a customer opens crm.html.
   if (f.hasRelationship) {
-    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer and the people behind them, with their deal, billing, project, files and messages on one record.' }];
+    const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer — each client and the people behind them — with their deal, project, files and messages on one record.' }];
     // Oct 2026 studio audit, change 4: onboarding stays findable from ⌘K ("add",
     // "client", "new") — agency.html opens its Add-a-customer dialog on #add.
     if (studioLevel) customers.push(hid('add_client', 'Add a customer', '/agency.html#add', 'Set up a new client — their workspace, their site and their invitation.'));
@@ -176,7 +182,11 @@ export function buildNav(c: NavContext): NavSection[] {
 
   // Pipeline — the sales deals, as its own top-level outcome (Phase 1 overhaul:
   // it was a sub-item under Customers, which hid where the money lived).
-  if (f.hasRelationship) single('pipeline', 'Pipeline', '/pipeline.html', 'Deals by stage — proposals, agreements and payments move through here.');
+  if (f.hasRelationship) sections.push({ key: 'pipeline', label: 'Pipeline', items: [
+    { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html', desc: 'Deals by stage — proposals, agreements and payments move through here.' },
+    // Oct 2026 audit bug 10: ⌘K "billing" lands on money — Pipeline's Outstanding ("who owes you"), never on Customers
+    hid('billing', 'Billing', '/pipeline.html#outstanding', 'Who owes you — outstanding invoices, deposits and payment schedules.'),
+  ] });
 
   // Projects — the service-delivery area (P2-D): the work you do FOR customers.
   if (f.hasRelationship) single('projects', 'Projects', '/projects.html');
@@ -208,8 +218,15 @@ export function buildNav(c: NavContext): NavSection[] {
   // Settings — one item; Sharing & access, Developer and Health are cards on the
   // page (Billing lives here, per the constitution) and ⌘K entries.
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/settings.html' }];
-  if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html'));
+  // Oct 2026 audit bug 10: ⌘K "plan" and "team" each find their card on Settings
+  // (Plan & billing is the owner's / the studio's own; Team is the studio's seats).
+  settings.push(hid('plan', 'Plan & billing', '/settings.html#billing', 'Your plan, when it renews, and how to change it.'));
+  if (studioLevel) settings.push(hid('team', 'Team', '/settings.html#team', 'Who is on your studio’s team, their roles, and the seats your plan covers.'));
+  if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
+  // Oct 2026 audit change 11: the Health Center's door — a status line on the studio's
+  // home for platform staff, and ⌘K "health" finds the page itself (staff only).
+  if (c.isOperator) settings.push(hid('health', 'Health Center', '/admin-health.html', 'Platform health — background jobs, domains, billing, email posture and errors, in ten areas.'));
   sections.push({ key: 'settings', label: 'Settings', items: settings, utility: true });
 
   // Get started — the guided first run, listed only until the site is live.

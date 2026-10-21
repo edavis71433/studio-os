@@ -73,8 +73,8 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   ok('room.ts: /health last_publish.detail is lastPublishDetail(actor_kind)', /detail: lastPublishDetail\(st\.lastLive\.actor_kind\)/.test(room) && !/actor_kind === 'staff' \? 'published by your studio'/.test(room));
 
   const conn = read('supabase/functions/presence/routes/connections.ts');
-  ok('connections.ts: every connection event uses connectionActorKind (3 event inserts + disconnect + the write audit)',
-    (conn.match(/actor_kind: connectionActorKind\(principal\)/g) || []).length === 3 && /storeDisconnect\(site\.id, key, connectionActorKind\(principal\)\)/.test(conn) && /const actorOf = \(principal: Principal\) => connectionActorKind\(principal\)/.test(conn) && !/principal\.kind === 'staff' \? 'operator' : 'customer'/.test(conn));
+  ok('connections.ts: every connection event uses connectionActorKind (4 event inserts incl. the ask + disconnect + the write audit)',
+    (conn.match(/actor_kind: connectionActorKind\(principal\)/g) || []).length === 4 && /storeDisconnect\(site\.id, key, connectionActorKind\(principal\)\)/.test(conn) && /const actorOf = \(principal: Principal\) => connectionActorKind\(principal\)/.test(conn) && !/principal\.kind === 'staff' \? 'operator' : 'customer'/.test(conn));
 
   const prov = read('supabase/functions/presence/lib/provenance.ts');
   ok('provenance.ts: change events use changeActorKind', /changeActorKind\(opts\.principal\)/.test(prov));

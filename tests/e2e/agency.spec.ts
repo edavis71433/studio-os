@@ -863,3 +863,27 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(page.getByRole('button', { name: /More for/ })).toHaveCount(0);
   });
 });
+
+// ── Wave 2 doors (Oct 2026 studio audit change 11 + bug 10) ───────────────────
+test.describe('Agency home — the Health Center door and the kits anchor', () => {
+  test('all areas fine → "Platform: all clear →", still a link to the Health Center', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/admin/health-center': { data: { overall: 'ok', areas: [
+      { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running.' }, { key: 'ai', label: 'AI', state: 'off', detail: 'Not configured.' },
+    ] } } } });
+    await page.goto('/agency.html');
+    const door = page.locator('#top #healthDoor');
+    await expect(door).toContainText('Platform: all clear');
+    await expect(door).toHaveAttribute('href', '/admin-health.html');
+    await expect(page.locator('#healthLine .warnw')).toHaveCount(0);
+  });
+
+  test('⌘K "Starter kits" lands on #kits: the card is in view and focused', async ({ page }) => {
+    await installApp(page, { api: homeApi });
+    await page.goto('/agency.html#kits');
+    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
+    const kits = page.locator('#kits');
+    await expect(kits).toBeVisible();
+    await expect(kits).toBeFocused();
+    await expect(page.locator('#custDlg')).not.toHaveAttribute('open', /./);   // #kits never opens the Add dialog
+  });
+});

@@ -146,6 +146,7 @@
       <h1 class="title">Connections</h1>
       <div class="subline"><span id="sub">The outside services your studio talks to.</span><span class="dot" id="subdot" hidden>·</span><span class="chips" id="counts"></span></div>
     </div>
+    <div id="topActs"></div>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
@@ -240,7 +241,8 @@ function statusOf(e){
   const c = e.connection || {}; const st = c.status, hl = c.health;
   if(st==='connected' && hl!=='down' && hl!=='attention') return { label:'Connected', cls:'ok', connected:true };
   if(st==='connected') return { label:'Needs attention', cls:'attn', connected:true };
-  if(st==='pending') return { label:'Waiting for your permission', cls:'wait', connected:false };
+  // studio audit change 9: while scoped, a pending row means the studio asked the client (their email is out)
+  if(st==='pending') return { label: SCOPE ? 'Asked the client' : 'Waiting for your permission', cls:'wait', connected:false };
   if(st==='expired'||st==='error'||hl==='attention'||hl==='down') return { label:'Needs a quick reconnect', cls:'attn', connected:false, reconnect:true };
   if(e.availability && e.availability!=='Read-only' && e.availability!=='Read/Write') return { label:'Not available yet', cls:'off', unavailable:true };
   return { label:'Not connected', cls:'off', connected:false };
@@ -427,6 +429,31 @@ function render(surface){
   html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();
+  paintAskClient(entries);
+}
+
+// ── Studio audit change 9: "Ask the client to connect their Google" ──────────
+// While scoped, the second door: one email with a signed link that opens the
+// client's portal, where THEIR Google account authorises Search Console and
+// Analytics. The Connect buttons on the rows stay — the operator path is the
+// fallback. Shown only while one of the two is still not connected.
+const ASKABLE = ['google_search_console','google_analytics'];
+function paintAskClient(entries){
+  const host = $('topActs'); if(!host) return;
+  const open = entries.filter(e=>ASKABLE.includes(e.key) && !statusOf(e).connected && !statusOf(e).unavailable);
+  if(!SCOPE || !open.length){ host.innerHTML=''; return; }
+  const asked = open.some(e=>(e.connection||{}).status==='pending');
+  host.innerHTML = `<button type="button" class="btn" id="askClient">${asked?'Ask again':'Ask '+esc(CLIENT_NAME||'the client')+' to connect their Google'}</button>`;
+  $('askClient').addEventListener('click', askClient);
+}
+async function askClient(){
+  const who = CLIENT_NAME || 'the client';
+  if(!(await askConfirm('Email ' + who + ' a link to connect their Google?', 'They sign in to their portal and approve it on Google’s own screen, with their own account — read-only, and theirs to disconnect any time. You can still connect it for them from here.', 'Send the email'))) return;
+  const btn = $('askClient'); if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  const r = await apiPost('/connections/ask', {});
+  if(r.ok){ toast((r.body && r.body.data && r.body.data.message) || ('Asked — we emailed ' + who + ' a link.')); return reload(); }
+  if(btn){ btn.disabled = false; btn.textContent = 'Ask ' + who + ' to connect their Google'; }
+  toast(serverMsg(r, 'That didn’t send, and nothing changed. Try again in a moment.'));
 }
 
 function wire(){

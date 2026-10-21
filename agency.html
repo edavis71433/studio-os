@@ -460,7 +460,7 @@ function cardsHtml(list){
 }
 // ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
 function kitCardHtml(){
-  return `<div class="kitcard"><h2>Starter kits</h2>
+  return `<div class="kitcard" id="kits" tabindex="-1"><h2>Starter kits</h2>
     <p class="muted">Save a client's setup (services, FAQs, voice, colors, industry — never their name, reviews, or photos) and start the next client from it. Applying only fills what's empty; it never overwrites work.</p>
     <div id="kitList" class="muted">Loading…</div>
     <div class="kitrow">
@@ -845,6 +845,8 @@ $('cu-cancel').onclick=()=>$('custDlg').close();
 // dialog and clear the hash, so Back or a reload never reopens it. Boot calls it once
 // the member is known; a hash change while already on the home opens it too.
 function openFromHash(){
+  // ⌘K's "Starter kits" lands on /agency.html#kits (audit bug 10): scroll the card into view
+  if(location.hash==='#kits'){const k=$('kits');if(k){k.scrollIntoView({block:'start'});k.focus({preventScroll:true});}return;}
   if(location.hash!=='#add')return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
   if(ME)openAddCustomer();
@@ -926,6 +928,7 @@ async function boot(){
     mountQueues();   // "what needs me today" — the cross-client morning cockpit
     mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
     mountHealthDoor();   // staff-only doorway to the platform Health Center
+    if(location.hash==='#kits')openFromHash();   // the kits card exists only now (⌘K → /agency.html#kits)
   }catch(_){trouble();}
 }
 boot();
@@ -942,7 +945,7 @@ async function mountHealthDoor(){
     // kits, below the fold): the count of areas needing a look, or "all good"
     const areas=(r.body&&r.body.data&&Array.isArray(r.body.data.areas))?r.body.data.areas:[];
     const n=areas.filter(a=>a&&a.state==='attention').length;
-    host.innerHTML='<a id="healthDoor" href="/admin-health.html">'+(n?'<span class="warnw">Platform: '+n+' area'+(n===1?'':'s')+' need'+(n===1?'s':'')+' a look</span>':'Platform: all good')+' →</a>';
+    host.innerHTML='<a id="healthDoor" href="/admin-health.html">'+(n?'<span class="warnw">Platform: '+n+' area'+(n===1?'':'s')+' need'+(n===1?'s':'')+' a look</span>':'Platform: all clear')+' →</a>';
   }catch(_){/* the door is a nicety, never a blocker */}
 }
 

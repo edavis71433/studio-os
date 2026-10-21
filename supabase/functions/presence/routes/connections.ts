@@ -20,8 +20,10 @@ import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
 import { connectionReason } from '../connected/contract.ts';
 import type { EditionKey } from '../connected/contract.ts';
-import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens } from '../connected/auth.ts';
-import { saveTokens, loadTokens, disconnect as storeDisconnect, getConnectionConfig, setConnectionConfig, markStatus } from '../connected/store.ts';
+import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens, signAsk, verifyAsk } from '../connected/auth.ts';
+import { saveTokens, loadTokens, disconnect as storeDisconnect, getConnectionConfig, setConnectionConfig, markStatus, setConnection } from '../connected/store.ts';
+import { sendEmail, validEmail } from '../commerce/account.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 import { readProvider, discoverGa4Properties } from '../connected/adapters.ts';
 import { ga4PropertyPath } from '../lib/ga4.ts';
 import { encryptionConfigured } from '../connected/crypto.ts';
@@ -99,6 +101,80 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
     note: 'Connect the services you already use — read-only, always with your approval, and yours to disconnect any time.',
     groups,
   } }, 200, cors);
+}
+
+// ── Studio audit change 9: "Ask the client to connect their Google" ──────────
+// The operator path (connect for the client with an account that can see their
+// property) stays as the fallback. This is the other door: the studio, drilled
+// into a client, asks; the client gets one email with a signed link that opens
+// their portal, where THEIR OWN Google account authorises Search Console and
+// Analytics. The pending ask lives on the client's presence_connections rows
+// (status 'pending', 0038 already allows it; the moment + who asked in the 0128
+// config) — one slot per client and provider, so a re-ask replaces the last one
+// and the earlier link stops verifying.
+export const ASKABLE_PROVIDERS = ['google_search_console', 'google_analytics'];
+const rowsOf = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
+const joinPlain = (xs: string[]) => xs.length <= 1 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+
+export async function handleConnectionAsk(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // only the studio, drilled into the client, asks — the client's own portal is where they connect
+  if (!principal.scope) return json({ error: 'not_scoped', message: 'Open the client first — the ask goes to the client you’re viewing.' }, 400, cors);
+  const plan = (await loadPlan(site.client_id)) as EditionKey;
+  const items = connectableFor(plan).filter((it) => ASKABLE_PROVIDERS.includes(it.key));
+  if (!items.length) return json({ error: 'not_available', message: 'Google isn’t part of this client’s plan, so there’s nothing to ask for.' }, 404, cors);
+  const connQ = await svc(`presence_connections?site_id=eq.${site.id}&provider_key=in.(${ASKABLE_PROVIDERS.join(',')})&select=provider_key,status`);
+  const connected = new Set(rowsOf(connQ).filter((c) => c.status === 'connected').map((c) => c.provider_key));
+  const toAsk = items.filter((it) => !connected.has(it.key));
+  if (!toAsk.length) return json({ error: 'already_connected', message: 'Their Google is already connected — nothing to ask for.' }, 409, cors);
+  const client = rowsOf(await svc(`clients?id=eq.${site.client_id}&select=email,name&limit=1`))[0];
+  const email = client?.email ? String(client.email).trim() : '';
+  if (!email || !validEmail(email)) return json({ error: 'no_email', message: 'This client has no email address on file — add one on their record first.' }, 422, cors);
+
+  const askedAt = Date.now();
+  for (const it of toAsk) {
+    await setConnection(site.id, it.key, { status: 'pending', health: 'unknown', last_error: '', config: { ask_at: askedAt, ask_by: principal.email || '' } });
+  }
+  // the studio's brand on the email (the bridge knows which studio this client belongs to)
+  const link = rowsOf(await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: null })))[0];
+  const agencySiteId = link?.agency_site_id ? String(link.agency_site_id) : '';
+  const brand = agencySiteId ? await loadEmailBrand(agencySiteId) : undefined;
+  const studio = (brand && brand.name && brand.name !== 'Studio OS') ? brand.name : 'Your studio';
+  const token = await signAsk(site.id, askedAt);
+  const url = `${SITE_URL}/client.html?connect=${encodeURIComponent(token)}`;
+  const what = joinPlain(toAsk.map((it) => it.label));
+  const first = client?.name ? String(client.name).trim().split(/\s+/)[0] : '';
+  const subject = `${studio} would like to connect your Google`;
+  const body = `<p>Hi${first ? ' ' + first : ''},</p>`
+    + `<p>${studio} would like to read ${what} — straight from your own Google account, so the numbers are yours and stay yours.</p>`
+    + `<p>It’s read-only: nothing on your website or your Google account changes, and you can disconnect any time with one tap. It takes about a minute — sign in to your portal and approve it on Google’s own screen.</p>`
+    + `<p class="cta"><a href="${url}" style="display:inline-block;margin-top:6px;background:${(brand && brand.accent) || '#5b3fa0'};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Connect your Google →</a></p>`
+    + `<p>This link works for a week. If it has expired, ask ${studio} to send a fresh one.</p>`;
+  const emailed = await sendEmail(email, subject, body, brand, { critical: true, siteId: agencySiteId || undefined }).catch(() => false);
+  await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: toAsk[0].key, action: 'ask', detail: emailed ? 'asked the client to connect' : 'asked the client to connect (email did not send)', actor_kind: connectionActorKind(principal) }) }).catch(() => {});
+  const masked = email.replace(/^(.).*(@.*)$/, '$1…$2');
+  return json({ data: { asked: toAsk.map((it) => it.key), emailed, to: masked, asked_at: new Date(askedAt).toISOString(),
+    message: emailed ? `Asked — we emailed ${masked} a link. They sign in to their portal and approve it on Google’s own screen.` : `The ask is saved, but the email didn’t send — ${masked} may be unsubscribed or unreachable. You can still connect it for them.` } }, 200, cors);
+}
+
+/** The client's side (their own session resolves their site): what their studio
+ *  asked them to connect. With ?token= the link must verify AND match the live
+ *  ask (a re-ask retires the earlier link); without it, the pending rows alone
+ *  (a sign-in on the way may have dropped the query string). */
+export async function handleConnectionAskStatus(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const token = new URL(req.url).searchParams.get('token') || '';
+  const pendingQ = await svc(`presence_connections?site_id=eq.${site.id}&status=eq.pending&provider_key=in.(${ASKABLE_PROVIDERS.join(',')})&select=provider_key,config`);
+  let pending = rowsOf(pendingQ);
+  let askedAt: number | null = null;
+  if (token) {
+    askedAt = await verifyAsk(token, site.id);
+    if (askedAt === null) return json({ error: 'bad_token', message: 'That link has expired or isn’t for this account — ask your studio to send a fresh one.' }, 400, cors);
+    const live = pending.filter((r) => Number(r.config?.ask_at) === askedAt);
+    if (pending.length && !live.length) return json({ error: 'bad_token', message: 'Your studio sent a newer link since this one — please use the latest email.' }, 400, cors);
+    pending = live;
+  }
+  const providers = pending.map((r) => { const p = providerByKey(r.provider_key); return p ? { key: p.key, name: p.name, label: p.customerLabel, purpose: p.purpose, reads: p.reads } : null; }).filter(Boolean);
+  const first = pending[0]?.config || {};
+  return json({ data: { providers, asked_at: first.ask_at ? new Date(Number(first.ask_at)).toISOString() : null, asked_by: first.ask_by ? String(first.ask_by) : '' } }, 200, cors);
 }
 
 export async function handleConnectionProfile(site: SiteRow, key: string, cors: Record<string, string>) {
