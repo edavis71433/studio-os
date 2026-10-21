@@ -240,6 +240,17 @@
   .hl .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   .hl .hl-main{min-width:0;flex:1}
   .hl-v{font-size:19px;letter-spacing:-.01em;line-height:1.2;margin-top:1px}
+  /* phones: a 2-column grid of compact tiles (experience review #5) */
+  @media (max-width:600px){
+    .hl-panel{grid-template-columns:1fr 1fr}
+    .hl{gap:9px;padding:10px 12px;border-left:none}
+    .hl:nth-child(even){border-left:1px solid var(--line)}
+    .hl:nth-child(n+3){border-top:1px solid var(--line)}
+    .hl .ico{width:28px;height:28px;border-radius:7px}
+    .hl .ico svg{width:14px;height:14px}
+    .hl-k,.hl-s{font-size:11.5px}
+    .hl-v{font-size:16px}
+  }
   .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hl-edit{font-size:11.5px}
   /* the action bar: one filled button, quiet secondaries, the rest under More */
@@ -583,7 +594,10 @@ function renderActions(){
   const both=!!(d&&sendBothDocs());
   if(ids.deal){
     if(both)btns.push({id:'act-send-both',label:'Send proposal & agreement',primary:true,on:()=>openBilling('both')});
-    btns.push({id:'act-invoice',label:'Send invoice',primary:!both,on:()=>openBilling('invoice')});
+    // One filled button per record (experience review #4): the Path's next step
+    // wears it, so Send invoice is outlined unless the Path has nothing to offer
+    // (no forward step — a won, lost or terminal deal).
+    btns.push({id:'act-invoice',label:'Send invoice',primary:!both&&!pathHasAction(d),on:()=>openBilling('invoice')});
     btns.push({id:'act-deposit',label:'Request deposit',on:()=>openBilling('deposit')});
     const draft=d&&(DEAL.proposals||[]).find(p=>p.status==='draft');
     const stage=d&&d.stage;
@@ -700,6 +714,18 @@ function renderHighlights(){
 }
 
 // ── Path: the chevron stage bar (only when the record has a deal) ───────────
+// Does the Path (renderPath) draw a filled action for this deal — Mark stage
+// complete, or Convert to customer at contract+signed? When it does, it is the
+// record's one filled button and the action bar's Send invoice steps back.
+function pathHasAction(d){
+  if(!d||!d.stage)return false;
+  const stage=String(d.stage);
+  if(stage==='won'||stage==='lost')return false;
+  const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
+  if(stage==='contract'&&signed)return true;
+  const fwd=(BOARD_NEXT[stage]||[])[0];
+  return !!(fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>PATH_STEPS.indexOf(stage));
+}
 function renderPath(){
   const host=$('pathwrap'); if(!host)return;
   const d=DEAL&&DEAL.deal; if(!d||!d.stage){host.innerHTML='';return;}
@@ -1357,7 +1383,7 @@ function renderComposer(){
   if(COMPOSER==='message'){
     const replyPath=ACT.reply_to||ACT.reply_support_to;
     if(replyPath){
-      html+=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">${ACT.reply_to?'Reply to the client':'Reply to the client (their open support thread)'}</label><textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea><div class="composer-row"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+      html+=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">${ACT.reply_to?'Reply to the client':'Reply to the client (their open support thread)'}</label><textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea><div class="composer-row"><span class="spacer"></span><button type="submit">Send</button></div></form>`;   // outlined — the Path's next step is the record's one filled button (experience review #4)
     }else{
       html+=`<p class="muted" style="font-size:13.5px">Replies open once this client has a project or an open support thread.</p>`;
     }

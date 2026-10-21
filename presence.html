@@ -145,10 +145,14 @@ a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
   .hb-stat:nth-child(odd){border-left:none}
   .hb-stat:nth-child(n+3){border-top:1px solid var(--hair)}
 }
-@media (max-width:480px){
-  .hb-stats{grid-template-columns:minmax(0,1fr)}
-  .hb-stat{border-left:none}
-  .hb-stat+.hb-stat{border-top:1px solid var(--hair)}
+/* phones keep the 2-column grid above, as compact tiles — never one tile per
+   row at ~260px each (experience review #5) */
+@media (max-width:600px){
+  .hb-stat{gap:9px;padding:10px 12px}
+  .hb-stat .ico{width:28px;height:28px;border-radius:7px}
+  .hb-stat .ico svg{width:14px;height:14px}
+  .hb-stat .k,.hb-stat .s{font-size:11.5px}
+  .hb-stat .v{font-size:16px}
 }
 .hb-band{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--hair);background:var(--sheet);border-radius:var(--r-lg);margin-top:16px;flex-wrap:wrap}
 .hb-band.needs_attention{border-color:color-mix(in srgb,var(--amber) 30%,transparent);background:var(--amber-soft)}
@@ -501,6 +505,13 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .deskseg{display:flex;gap:12px;font-size:12.5px;padding-bottom:10px}
 .deskseg button{color:rgba(239,234,247,.55)}
 .deskseg button.on{color:#efeaf7;font-weight:600}
+/* phone tap targets ≥ 44px on the small toggles and text actions (experience review #43) */
+@media (max-width:760.98px){
+  .deskseg{gap:4px;padding-bottom:0;align-items:center}
+  .deskseg button{min-height:44px;min-width:44px;padding:0 8px}
+  .dpdevseg button{min-height:44px;padding:6px 14px}
+  .hb-sec-h a,.hb-sec-h .quietact{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
+}
 .stagewrap{flex:1;display:grid;place-items:center;overflow:auto;padding:0 26px 26px;min-height:0}
 .proof{background:#fff;border-radius:0 6px 6px 6px;box-shadow:0 30px 80px rgba(0,0,0,.5);width:100%;height:100%;transition:width var(--dur) var(--ease)}
 .proof.phone{width:390px;max-width:100%}
@@ -595,10 +606,10 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .pages-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .page-pill{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:500;padding:0 12px;height:30px;border-radius:var(--r);border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink-2,#8a8172);cursor:pointer}
 .page-pill:hover{border-color:var(--plum,#5b3fa0)}
-.page-pill.on{background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-color:var(--plum,#5b3fa0)}
+.page-pill.on{background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0);border-color:var(--plum,#5b3fa0)}   /* a selector reads pressed, not filled — Publish is the page's one filled button (experience review #3) */
 .page-pill .pp-menu{opacity:.75;font-weight:700;line-height:1;padding:0 3px;border-radius:6px}
 .page-pill .pp-menu:hover{opacity:1;background:rgba(120,120,120,.18)}
-.page-pill.on .pp-menu:hover{background:rgba(255,255,255,.28)}
+.page-pill.on .pp-menu:hover{background:rgba(91,63,160,.14)}
 .page-add{font:inherit;font-size:13px;font-weight:500;padding:0 12px;height:30px;border-radius:var(--r);border:1px dashed var(--plum,#5b3fa0);background:transparent;color:var(--plum,#5b3fa0);cursor:pointer}
 .page-add:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item{font:inherit;font-size:13px;text-align:left;padding:9px 12px;border:none;background:none;cursor:pointer;border-radius:8px;color:var(--ink,#1b1525)}
@@ -630,11 +641,11 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .dc-modal-cancel{margin-top:16px;font:inherit;font-size:13px;font-weight:500;padding:7px 14px;border-radius:var(--r);border:1px solid var(--line,#ddd);background:transparent;cursor:pointer}
 @media(max-width:560px){.dc-layout-grid{grid-template-columns:1fr}}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
-.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff)}
+.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);font-weight:600}   /* outlined: Publish stays the one filled button (experience review #3) */
 /* the prominent floating "add section" affordance over the canvas */
-.dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:13.5px;font-weight:600;padding:10px 16px;border-radius:var(--r);border:none;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;box-shadow:0 6px 20px rgba(91,63,160,.28);display:inline-flex;align-items:center;gap:8px}
+.dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:13.5px;font-weight:600;padding:10px 16px;border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;box-shadow:0 6px 20px rgba(91,63,160,.18);display:inline-flex;align-items:center;gap:8px}
 .dc-fab:hover{filter:brightness(1.06)}
-.dc-fab:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px rgba(91,63,160,.4)}
+.dc-fab:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 
 /* on-demand slide-over panels (tray = left, settings = right). Kept in the DOM but
    parked off-screen when closed (visibility:hidden removes them from the tab order). */
@@ -1675,6 +1686,12 @@ async function apiHtml(route) {
   const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
   const text = await r.text();
   if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t draw that page just now."); e.status = r.status; throw e; }
+  // A 200 that is not a page (a JSON envelope, an empty body) must never land
+  // in a srcdoc as raw text — every caller shows its own "couldn't draw" line
+  // instead (experience review #13).
+  const type = String(r.headers.get("content-type") || "").toLowerCase();
+  const looksHtml = /^\s*<(!doctype|html|head|body|div|section|main|header|nav|p|span|svg)/i.test(text);
+  if (!looksHtml && !type.includes("text/html")) { const e = new Error("We couldn’t draw that page just now."); e.status = r.status; e.notHtml = true; throw e; }
   return text;
 }
 
@@ -1687,9 +1704,14 @@ const DAYS = [["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thu
 const changedIds = () => new Set((S.changes?.changes || []).map((c) => c.entity_id).filter(Boolean));
 
 /* ── gate ── */
-function showGate(title, msg, showBtn) {
+function showGate(title, msg, showBtn, retry) {
   $("app").hidden = true; $("dock").style.display = "none";
   $("gate").hidden = false;
+  // A signed-in owner whose page could not load gets Try again (a reload in
+  // place) — never the sign-in door they are already through (experience review #41).
+  const b0 = $("gateBtn");
+  if (retry) { b0.href = location.href; b0.textContent = "Try again"; b0.onclick = (e) => { e.preventDefault(); location.reload(); }; }
+  else { b0.href = "/studio.html"; b0.textContent = "Go to your account"; b0.onclick = null; }
   // A client reviewer who wandered in has their OWN page — honest title, and
   // send them there, never to the owner door.
   const forReviewer = /client view|shares with you/i.test(String(msg || ""));
@@ -3250,7 +3272,7 @@ function renderBookings(wrap, appts) {
   const ac = el("input"); ac.type = "checkbox"; ac.className = "bk-autoconfirm"; ac.checked = !!s.auto_confirm; ac.style.width = "auto";
   acWrap.append(ac, el("span", null, "Confirm bookings automatically (otherwise they wait for your OK)"));
   c2.appendChild(acWrap);
-  const saveBtn = el("button", null, "Save booking settings"); saveBtn.style.cssText = "margin-top:16px;padding:9px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font:inherit;font-size:14px;cursor:pointer";
+  const saveBtn = el("button", null, "Save booking settings"); saveBtn.className = "pillbtn"; saveBtn.style.cssText = "margin-top:16px;height:36px;padding:0 16px;font-size:14px";   // outlined: Publish is the page's one filled button (experience review #38)
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
     try { const payload = bkGatherSettings(wrap); await api("PUT", "/bookings/settings", payload); BK.settings = { ...BK.settings, ...payload }; toast("Booking settings saved"); }
@@ -3387,7 +3409,7 @@ function renderReviews(wrap, data) {
   const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
   const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
   const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
-  const ask = el("button", null, "Send request"); ask.style.cssText = "padding:10px 18px;border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font:inherit;font-size:14px;cursor:pointer;white-space:nowrap";
+  const ask = el("button", "pillbtn", "Send request"); ask.style.cssText = "height:38px;padding:0 16px;font-size:14px";   // outlined: Publish is the page's one filled button (experience review #38)
   ask.addEventListener("click", async () => {
     const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
     ask.disabled = true;
@@ -4418,6 +4440,7 @@ $("devSeg").addEventListener("click", (e) => { const b = e.target.closest("butto
 $("pageWords").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.page = b.dataset.page; syncStageChrome(); loadPreview(); });
 window.addEventListener("message", (e) => {
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
+  if (e.data && e.data.presenceRetry && $("stage").classList.contains("on")) loadPreview();   // the proof's own Try again (experience review #13)
 });
 async function loadPreview() {
   const frame = $("previewFrame");
@@ -4428,7 +4451,8 @@ async function loadPreview() {
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
     frame.srcdoc = html;
   } catch (err) {
-    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(nice(err))}</div>`;
+    // a plain line and one Try again — never raw JSON, never "Proofing…" forever
+    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px 24px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err && err.notHtml ? "We couldn’t draw that page just now." : nice(err))}<p style="margin-top:18px"><button type="button" onclick="parent.postMessage({presenceRetry:1},'*')" style="font:600 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-style:normal;color:#5b3fa0;background:#fff;border:1px solid #5b3fa0;border-radius:8px;padding:12px 18px;min-height:44px;cursor:pointer">Try again</button></p></div>`;
   }
 }
 
@@ -11165,7 +11189,7 @@ async function renderFirstRun() {
   } catch (err) {
     if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or write to support@davisdigitalstudio.com.", true);
     else if (err.status === 403) showGate("Paused for now", err.message, true);
-    else if (err.message !== "no-session") { try { console.error("[presence boot]", err.status, err.message, err.body); } catch (_) {} showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Refresh to try again, or write to support@davisdigitalstudio.com.  (Details: " + (err.status || "network error") + (err.message ? " — " + err.message : "") + ")", true); }
+    else if (err.message !== "no-session") { try { console.error("[presence boot]", err.status, err.message, err.body); } catch (_) {} showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Try again in a moment, or write to support@davisdigitalstudio.com.", true, true); }
   }
 })();
 </script>

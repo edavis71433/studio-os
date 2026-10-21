@@ -3,44 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Client sign in | Davis Digital Studio</title>
+<title>Studio OS — Client sign in</title>
 <meta name="theme-color" content="#5b3fa0">
 <link rel="manifest" href="/manifest.json">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--p:#5b3fa0;--ink:#1a1523;--muted:#5e5270;--cream:#faf8f5;--line:#e7e1d6;
-    --serif:'Fraunces',Georgia,serif;--sans:'Inter',-apple-system,sans-serif}
-  @media (prefers-color-scheme:dark){:root{--cream:#171320;--ink:#efeaf7;--muted:#a79ebc;--line:#2a2338;--p:#b79ceb}}
+  /* the same tokens as studio.html — the two doors are one product (experience review #40) */
+  :root{--p:#5b3fa0;--ink:#1b1525;--muted:#6b6478;--soft:#6b6478;--cream:#faf8f5;--card:#fff;--line:#eee9e0;
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--cream:#171320;--card:#1f1a2b;--ink:#efeaf7;--muted:#a79ebc;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}}
   *{box-sizing:border-box;margin:0}
   body{background:var(--cream);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:44px 40px;width:100%;max-width:420px;
-    box-shadow:0 10px 40px rgba(27,21,37,.06)}
-  @media (prefers-color-scheme:dark){.card{background:#1f1a2b}}
-  .brand{font-family:var(--serif);font-size:22px;margin-bottom:22px;display:block;color:var(--ink);text-decoration:none}
-  .brand .d{color:var(--p)}
-  .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:10px}
-  h1{font-family:var(--serif);font-size:30px;font-weight:400;line-height:1.1;margin-bottom:8px;letter-spacing:-.4px}
-  .sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 36px;width:100%;max-width:420px;
+    box-shadow:0 1px 2px rgba(27,21,37,.04),0 14px 40px rgba(27,21,37,.08)}
+  /* ── one door design, shared with portal.html (experience review #40): the same
+     mark + wordmark, an eyebrow naming the door, one sentence, the app's 8px corners ── */
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+  .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:var(--p);color:#fff;font-weight:700;
+    align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+  .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:8px}
+  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
+  .sub{color:var(--soft);font-size:14px;margin-bottom:22px}
   .sub .em{color:var(--ink);font-weight:600}
   label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 5px}
   input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--cream);color:var(--ink);
-    border-radius:10px;padding:11px 13px;outline:none}
+    border-radius:8px;padding:11px 13px;outline:none}
   input:focus{border-color:var(--p)}
   input.code{letter-spacing:8px;font-size:22px;text-align:center;font-weight:600}
-  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:8px;border:1px solid var(--p);
     background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
   button:disabled{opacity:.55;cursor:default}
   /* dark mode: --p lifts to #b79ceb, so the filled button needs dark ink (#fff on #b79ceb fails contrast).
      .linky buttons keep their own higher-specificity accent color. */
-  @media (prefers-color-scheme:dark){button{color:#171320}}
+  @media (prefers-color-scheme:dark){button{color:#171320} .mark{color:#171320}}
   .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
   .ok{background:#eef4ef;color:#2e6a44;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px}
   @media (prefers-color-scheme:dark){.ok{background:#1f2a24;color:#8bbf9f}}
   .muted{color:var(--muted);font-size:13px;margin-top:16px;text-align:center}
+  .muted a{color:var(--p);text-decoration:none}
   .muted button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
   .muted button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
   .muted button.linky:disabled{color:var(--muted);cursor:default}
@@ -52,13 +55,13 @@
 </head>
 <body>
 <div class="card">
-  <a class="brand" href="/">Davis<span class="d">Digital</span> Studio</a>
+  <div class="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
 
   <!-- SIGN IN · PASSWORDLESS (primary) -->
   <div id="emailPanel">
     <div class="eyebrow">Client portal</div>
-    <h1>Welcome</h1>
-    <p class="sub">Sign in to see your project, files, and what's next. No password needed — we'll email you a secure sign-in link.</p>
+    <h1>See your project</h1>
+    <p class="sub">Sign in with your email — we’ll send a secure link, no password needed.</p>
     <form id="fEmail" novalidate>
       <label for="em">Email</label>
       <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
@@ -67,6 +70,7 @@
     <div class="err" id="errEmail" role="alert"></div>
     <p class="muted"><button class="linky" id="toPw" type="button">Prefer a password? Sign in with a password instead</button></p>
     <p class="muted">First time here? Use the link in your invitation email to set things up.</p>
+    <p class="muted">Run a studio on Studio OS? <a href="/studio.html">Your sign-in is here</a>.</p>
   </div>
 
   <!-- CODE ENTRY (after a code is sent) -->
@@ -91,7 +95,7 @@
   <!-- SIGN IN · PASSWORD (preserved fallback) -->
   <div id="pwPanel" class="panel">
     <div class="eyebrow">Client portal</div>
-    <h1>Welcome</h1>
+    <h1>See your project</h1>
     <p class="sub">Sign in with your email and password.</p>
     <form id="f" novalidate>
       <label for="empw">Email</label>

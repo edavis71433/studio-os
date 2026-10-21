@@ -172,25 +172,25 @@ test.describe('Inbox — split-view console', () => {
     await expect(rows.getByRole('option').filter({ hasText: 'Anonymous ask' })).toContainText('Support request');
   });
 
-  test('support: reading pane changes status through PATCH /support/:id', async ({ page }) => {
+  test('support: reading pane ends a request through PATCH /support/:id — Resolve and Close, no Status dropdown (experience review #22)', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/inbox.html');
     await page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).click();
     const pane = page.locator('#rpane');
     await expect(pane).toContainText('Please tweak the logo');
     await expect(pane).toContainText('Can we make it bigger?');
-    // legal transitions only (open → in_progress/resolved/closed)
-    const select = pane.locator('#paneStatus');
-    await expect(select).toBeVisible();
-    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
-    await select.selectOption('in_progress');
-    const req = await patchReq;
-    expect(req.postDataJSON()).toEqual({ status: 'in_progress' });
     // reply composer posts to the existing support reply route
     const replyReq = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/support/s-1/messages'));
     await pane.locator('#supBody').fill('Done — take a look.');
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await replyReq).postDataJSON()).toEqual({ body: 'Done — take a look.' });
+    // one way to end it: the header's Resolve (and Close) — the Status dropdown is gone
+    await expect(pane.locator('#paneStatus')).toHaveCount(0);
+    await expect(pane.locator('#supResolve')).toBeVisible();
+    await expect(pane.locator('#supClose')).toBeVisible();
+    const patchReq = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/support/s-1'));
+    await pane.locator('#supResolve').click();
+    expect((await patchReq).postDataJSON()).toEqual({ status: 'resolved' });
   });
 
   test('approval row: inline Approve posts to its decide_path', async ({ page }) => {

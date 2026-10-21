@@ -80,6 +80,7 @@
   .stat .k .w{color:var(--faint)}
   .stat .k a{color:var(--faint);font-size:11px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:0 7px;line-height:16px;background:var(--bg)}
   .stat .k a:hover{color:var(--p);border-color:var(--p)}
+  @media (max-width:760.98px){.stat .k a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;justify-content:center;padding:0 10px}}   /* phone tap target on the View pills (experience review #43) */
   .stat .v{font-size:20px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
   .stat .v.warn{color:var(--warn)}
   .stat .v.word{font-size:16px;white-space:nowrap}
@@ -617,7 +618,7 @@ function renderStencil(title){
 
 // ── page states ──
 function warming(){$('main').innerHTML=`<div class="center"><h2>This dashboard is warming up.</h2><p class="muted">It’ll be ready in a moment — try again shortly.</p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted">A brief hiccup — refresh in a moment.</p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your analytics just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{load().catch(()=>trouble());});}   // Try again reloads in place (experience review #42)
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your analytics.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 
 // ── the agency portfolio lens (unscoped agency operators — SS7: the same

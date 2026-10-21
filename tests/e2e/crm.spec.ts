@@ -553,12 +553,14 @@ test.describe('Relationship view', () => {
     await page.locator('#sendMoreMenu [data-send-prop="p-1"]').click();
     await posted;
   });
-  test('ONE LINK — with only a proposal drafted, nothing collapses: the row keeps Send to client and Send invoice stays the headline', async ({ page }) => {
+  test('ONE LINK — with only a proposal drafted, nothing collapses: the row keeps Send to client; the Path’s next step is the one filled button (experience review #4)', async ({ page }) => {
     await installApp(page, { api: bothApi({ data: { ...BOTH_DEAL.data, contracts: [] } }) });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
     await expect(page.locator('#sendBothBtn')).toHaveCount(0);
     await expect(page.locator('#act-send-both')).toHaveCount(0);
-    await expect(page.locator('#act-invoice')).toHaveClass(/primary/);
+    await expect(page.locator('#act-invoice')).toBeVisible();
+    await expect(page.locator('#act-invoice')).not.toHaveClass(/primary/);   // the Path's "Mark stage complete" is the record's one filled button
+    await expect(page.locator('#markComplete')).toHaveClass(/primary/);
     await expect(page.locator('.rrow [data-send-prop="p-1"]')).toHaveText('Send to client');
     await expect(page.locator('h2 [data-bform="deposit"]')).toBeVisible();
   });

@@ -182,6 +182,18 @@
   .hl-k{font-size:12px;color:var(--faint);font-weight:500}
   .hl-v{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* phones: a 2-column grid of compact tiles, so the first screen is not three
+     numbers and Needs you sits above the fold (experience review #5) */
+  @media (max-width:600px){
+    .hl-panel{grid-template-columns:1fr 1fr;gap:0;background:var(--card)}   /* hairlines by border, so an odd tile count leaves no blank cell */
+    .hl{gap:9px;padding:10px 12px;border-left:1px solid var(--line)}
+    .hl:nth-child(odd){border-left:none}
+    .hl:nth-child(n+3){border-top:1px solid var(--line)}
+    .hl .ico{width:28px;height:28px;border-radius:7px}
+    .hl .ico svg{width:14px;height:14px}
+    .hl-k,.hl-s{font-size:11.5px}
+    .hl-v{font-size:16px}
+  }
   /* section label + a quiet right-hand link */
   .sech{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
   .seclink{font-size:12.5px;color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap}
@@ -574,7 +586,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // ── needs you now: the SAME items the top-bar bell counts (notices + pending
   //    approvals) so the home page and the bell tell one story — each taps
   //    straight through to the page that resolves it. ──────────────────────────
-  const notices = (feed && feed.notices) || [];
+  const notices = ((feed && feed.notices) || []).filter((n) => !repliedLocally(n));
   const approvals = (feed && feed.pending_approvals) || [];
   const shown = notices.length + approvals.length;   // needs-you rows we render inline
   // FIX 3: Today and the bell must never disagree on the number. The bell badge is
@@ -759,6 +771,15 @@ async function dismiss(id, btn){
     }
   }
   catch(_){ btn.disabled = false; }
+}
+// A lead_followup nudge the owner answered in the Inbox a moment ago clears here
+// at once (inbox.html leaves a 24-hour marker) — the server retires the notice on
+// its next pass (experience review #45).
+function repliedLocally(n){
+  if(!n||n.kind!=='lead_followup')return false;
+  const m=String(n.period||'').match(/^lead:(.+)$/)||String(n.href||'').match(/sel=lead:([^&#\s]+)/);
+  if(!m)return false;
+  try{const at=(JSON.parse(localStorage.getItem('dds-replied-leads')||'{}')||{})[decodeURIComponent(m[1])];return !!at&&(Date.now()-Number(at))<86400000;}catch(_){return false;}
 }
 // ── "Done" on a needs-you row ────────────────────────────────────────────────
 // The residue: rows whose obligation the owner has genuinely handled somewhere

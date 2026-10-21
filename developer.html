@@ -270,7 +270,7 @@ function notEnabled(){
     <p style="margin-top:22px"><a class="link" href="/today.html">Back to your workspace →</a></p></div>`;
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open Developer Mode.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load Developer Mode just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load Developer Mode just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{load().catch(()=>trouble());});}   // Try again reloads in place (experience review #42)
 
 async function load(){
   const f=await api('/dev/files');
