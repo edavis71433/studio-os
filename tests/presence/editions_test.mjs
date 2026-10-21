@@ -81,9 +81,9 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('cms_only: has website, NOT today/customers', keys('cms_only').includes('website') && !keys('cms_only').includes('today') && !keys('cms_only').includes('customers'));
   ok('business_os_only: has today+customers, NOT website/files', keys('business_os_only').includes('today') && keys('business_os_only').includes('customers') && !keys('business_os_only').includes('website') && !keys('business_os_only').includes('files'));
   ok('studio_os: has both website + today + customers', keys('studio_os').includes('website') && keys('studio_os').includes('today') && keys('studio_os').includes('customers'));
-  // Oct 2026 (one home): the agency edition's Customers item opens the studio home; the separate Studio item only renders for an agency edition without the relationship feature
+  // Oct 2026 nav cut: the agency edition's Home item IS the studio (agency.html) and Customers is the roster; the separate Studio item only renders for an agency edition without the relationship feature
   const agencyNav = buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, editionKey: 'agency' });
-  ok('agency edition + member: Customers opens the studio home (no separate Studio item, no Today)', agencyNav.find((s) => s.key === 'customers').items[0].href === '/agency.html' && !agencyNav.some((s) => s.key === 'studio') && !agencyNav.some((s) => s.key === 'today'));
+  ok('agency edition + member: Home opens the studio, Customers the roster (no separate Studio item, no Today)', agencyNav.find((s) => s.key === 'home').items[0].href === '/agency.html' && agencyNav.find((s) => s.key === 'customers').items[0].href === '/customers.html' && !agencyNav.some((s) => s.key === 'studio') && !agencyNav.some((s) => s.key === 'today'));
   ok('no editionKey → unchanged full nav (backward compatible)', keys('studio_os').join() === buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: false, isOperator: false }).map((s) => s.key).join());
 }
 

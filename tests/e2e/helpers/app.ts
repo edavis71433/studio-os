@@ -38,27 +38,103 @@ export const OWNER_SESSION = {
   user: { id: 'e2e-owner', email: 'owner@example.com', aud: 'authenticated', role: 'authenticated' },
 };
 
-// ── the ONE studio_os owner nav (mirrors lib/navigation.ts buildNav, v1.0) ───
+// ── the ONE studio_os owner nav (mirrors lib/navigation.ts buildNav after the
+//    Oct 2026 nav cut): the menu lists PLACES; `hidden: true` items are ⌘K-only
+//    destinations the shell never draws (the builder's pages, Contacts, Visual
+//    Studio, Broadcasts, Sharing, Connections, Help). ─────────────────────────
 export const STUDIO_NAV = [
   { key: 'today', label: 'Today', items: [{ key: 'today', label: 'Today', href: '/today.html' }] },
   { key: 'website', label: 'Website', items: [
     { key: 'content', label: 'Website', href: '/presence.html', desc: 'Your site at a glance: what’s live, the health check and recent activity.' },
-    { key: 'business_info', label: 'Business info', href: '/presence.html#business' },
-    { key: 'design', label: 'Design', href: '/presence.html#design' },
-    { key: 'publish', label: 'Publish', href: '/presence.html#publish' },
-    { key: 'history', label: 'History', href: '/presence.html#history' },
+    { key: 'business_info', label: 'Business info', href: '/presence.html#business', hidden: true },
+    { key: 'design', label: 'Design', href: '/presence.html#design', hidden: true },
+    { key: 'publish', label: 'Publish', href: '/presence.html#publish', hidden: true },
+    { key: 'history', label: 'History', href: '/presence.html#history', hidden: true },
   ] },
-  { key: 'customers', label: 'Customers', items: [{ key: 'customers', label: 'Customers', href: '/crm.html' }] },
+  { key: 'customers', label: 'Customers', items: [
+    { key: 'customers', label: 'Customers', href: '/customers.html' },
+    { key: 'contacts', label: 'Contacts', href: '/contacts.html', hidden: true },
+  ] },
+  { key: 'pipeline', label: 'Pipeline', items: [{ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' }] },
+  { key: 'projects', label: 'Projects', items: [{ key: 'projects', label: 'Projects', href: '/projects.html' }] },
+  { key: 'inbox', label: 'Inbox', items: [
+    { key: 'inbox', label: 'Inbox', href: '/inbox.html' },
+    { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html', hidden: true },
+  ] },
   { key: 'files', label: 'Files', items: [
     { key: 'files_all', label: 'Files', href: '/files.html' },
-    { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html' },
+    { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html', hidden: true },
   ] },
   { key: 'analytics', label: 'Analytics', items: [{ key: 'analytics', label: 'Analytics', href: '/analytics.html' }] },
-  { key: 'inbox', label: 'Inbox', items: [{ key: 'inbox', label: 'Inbox', href: '/inbox.html' }] },
-  // utilities — rendered in the profile/overflow menu, not the primary bar
-  { key: 'connections', label: 'Connections', utility: true, items: [{ key: 'connect', label: 'Connections', href: '/connections.html' }] },
-  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html' }] },
-  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html' }] },
+  // utilities — the foot of the sidebar / the account menu, never the primary bar
+  { key: 'connections', label: 'Connections', utility: true, items: [{ key: 'connections', label: 'Connections', href: '/connections.html', hidden: true }] },
+  { key: 'settings', label: 'Settings', utility: true, items: [
+    { key: 'settings', label: 'Settings', href: '/settings.html' },
+    { key: 'sharing', label: 'Sharing & access', href: '/sharing.html', hidden: true },
+  ] },
+  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html', hidden: true }] },
+];
+
+// ── an AGENCY member at studio level (buildNav studioLevel): the eight ───────
+export const STUDIO_LEVEL_NAV = [
+  { key: 'home', label: 'Home', items: [
+    { key: 'home', label: 'Home', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, your money and your numbers.' },
+    { key: 'analytics', label: 'Analytics', href: '/analytics.html', hidden: true },
+  ] },
+  { key: 'inbox', label: 'Inbox', items: [
+    { key: 'inbox', label: 'Inbox', href: '/inbox.html' },
+    { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html', hidden: true },
+  ] },
+  { key: 'customers', label: 'Customers', items: [
+    { key: 'customers', label: 'Customers', href: '/customers.html' },
+    { key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.', hidden: true },
+    { key: 'contacts', label: 'Contacts', href: '/contacts.html', hidden: true },
+  ] },
+  { key: 'pipeline', label: 'Pipeline', items: [{ key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' }] },
+  { key: 'projects', label: 'Projects', items: [{ key: 'projects', label: 'Projects', href: '/projects.html' }] },
+  { key: 'files', label: 'Files', items: [
+    { key: 'files_all', label: 'Files', href: '/files.html' },
+    { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html', hidden: true },
+  ] },
+  { key: 'website', label: 'Your website', utility: true, items: [
+    { key: 'content', label: 'Your website', href: '/presence.html' },
+    { key: 'business_info', label: 'Business info', href: '/presence.html#business', hidden: true },
+    { key: 'design', label: 'Design', href: '/presence.html#design', hidden: true },
+    { key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', hidden: true },
+    { key: 'domain', label: 'Domain & email', href: '/presence.html#domain', hidden: true },
+    { key: 'publish', label: 'Publish', href: '/presence.html#publish', hidden: true },
+    { key: 'history', label: 'History', href: '/presence.html#history', hidden: true },
+  ] },
+  { key: 'settings', label: 'Settings', utility: true, items: [
+    { key: 'settings', label: 'Settings', href: '/settings.html' },
+    { key: 'sharing', label: 'Sharing & access', href: '/sharing.html', hidden: true },
+  ] },
+  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html', hidden: true }] },
+];
+
+// ── an AGENCY member drilled INTO a client (buildNav clientScoped): the six ──
+export const CLIENT_NAV = [
+  { key: 'overview', label: 'Overview', items: [{ key: 'overview', label: 'Overview', href: '/today.html' }] },
+  { key: 'website', label: 'Website', items: [
+    { key: 'content', label: 'Website', href: '/presence.html' },
+    { key: 'business_info', label: 'Business info', href: '/presence.html#business', hidden: true },
+    { key: 'publish', label: 'Publish', href: '/presence.html#publish', hidden: true },
+  ] },
+  { key: 'record', label: 'Record', items: [{ key: 'record', label: 'Record', href: '/crm.html' }] },
+  { key: 'project', label: 'Project', items: [{ key: 'project', label: 'Project', href: '/projects.html' }] },
+  { key: 'messages', label: 'Messages', items: [{ key: 'messages', label: 'Messages', href: '/inbox.html' }] },
+  { key: 'files', label: 'Files', items: [
+    { key: 'files_all', label: 'Files', href: '/files.html' },
+    { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html', hidden: true },
+  ] },
+  { key: 'studio', label: 'Studio', items: [
+    { key: 'home', label: 'Studio home', href: '/agency.html', hidden: true },
+    { key: 'customers', label: 'All customers', href: '/customers.html', hidden: true },
+    { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html', hidden: true },
+    { key: 'analytics', label: 'Analytics', href: '/analytics.html', hidden: true },
+  ] },
+  { key: 'settings', label: 'Settings', utility: true, items: [{ key: 'settings', label: 'Settings', href: '/settings.html', hidden: true }] },
+  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html', hidden: true }] },
 ];
 
 export const ALL_FEATURES = ['website', 'developer', 'forms', 'business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];

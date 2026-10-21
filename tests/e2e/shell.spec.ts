@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, STUDIO_LEVEL_NAV, CLIENT_NAV, ALL_FEATURES } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // ── slice 7 fixtures: a nav whose Customers section is multi-item (the real
@@ -37,7 +37,7 @@ const LONG_NAV = [
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html' },
     { key: 'broadcasts', label: 'Broadcasts', href: '/broadcasts.html' },
   ] },
-  STUDIO_NAV[STUDIO_NAV.length - 1],       // Help stays last
+  { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html' }] },   // a drawn Help row stays last
 ];
 const longNavCtx = () => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
@@ -105,8 +105,8 @@ test.describe('App shell', () => {
   // the palette matches its label ("add") and its description ("client").
   test('⌘K finds "Add a customer" by "add" and by "client" and targets /agency.html#add', async ({ page }) => {
     const nav = CRM_NAV.map((s) => s.key !== 'customers' ? s : { ...s, items: [
-      { key: 'customers', label: 'Customers', href: '/agency.html' },
-      { key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.' },
+      { key: 'customers', label: 'Customers', href: '/customers.html' },
+      { key: 'add_client', label: 'Add a customer', href: '/agency.html#add', desc: 'Set up a new client — their workspace, their site and their invitation.', hidden: true },
       ...s.items.slice(1),
     ] });
     await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav } } } });
@@ -121,6 +121,9 @@ test.describe('App shell', () => {
     await expect(hit).toContainText('Customers');                                      // the row shows label + group; the desc is for matching
     await pal.locator('input').fill('client');                                         // …which is how "client" finds it
     await expect(pal.locator('.res', { hasText: 'Add a customer' })).toHaveAttribute('href', '/agency.html#add');
+    // Oct 2026 nav cut: a hidden entry is ⌘K-only — the menu never draws it (the button on Customers/Home owns it)
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.dds-nav')).not.toContainText('Add a customer');
   });
 
   test('profile menu exposes sign out', async ({ page }) => {
@@ -130,18 +133,99 @@ test.describe('App shell', () => {
     await expect(page.locator('.dds-pop')).toContainText('Sign out');
   });
 
-  test('Architecture v1.0: primary bar is outcomes; utilities live in the profile menu', async ({ page }) => {
+  test('Architecture v1.0 + the Oct 2026 cut: outcomes in the primary group; utilities at the foot of the sidebar and in the account menu; ⌘K-only items are never drawn', async ({ page }, testInfo) => {
     await installApp(page);
     await page.goto('/today.html');
-    const nav = page.locator('#dds-shell .dds-nav');
-    await expect(nav).toContainText('Analytics');            // Analytics is first-class
-    await expect(nav).not.toContainText('Settings');         // utilities are NOT in the primary bar
-    await expect(nav).not.toContainText('Connections');
+    const primary = page.locator('#dds-shell .dds-nav > .sec');
+    await expect(primary).toHaveText(['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics']);   // every outcome a PLAIN item
+    await expect(page.locator('#dds-shell .dds-nav > .sec', { hasText: 'Settings' })).toHaveCount(0);   // utilities are NOT in the primary group
+    const util = page.locator('#dds-shell .dds-nav .dds-util .sec');
+    await expect(util).toHaveText(['Settings']);                                                    // …they sit under the rule (Connections + Help are ⌘K-only)
+    if (testInfo.project.name !== 'mobile') await expect(util.first()).toBeVisible();              // drawn in the sidebar; the top-bar layout keeps them in the account menu
+    for (const gone of ['Contacts', 'Broadcasts', 'Visual Studio', 'Business info', 'Connections', 'Help']) {
+      await expect(page.locator('#dds-shell .dds-nav')).not.toContainText(gone);
+    }
+    await expect(page.locator('#dds-settings')).toHaveCount(0);                                   // the gear went with the cut
+    if (testInfo.project.name !== 'mobile') await expect(page.locator('#dds-help')).toBeVisible();   // Help is the ? icon (≤420px: in the account menu)
     await page.locator('#dds-profile').click();
     const pop = page.locator('.dds-pop');
-    await expect(pop).toContainText('Settings');             // …they live in the overflow menu
-    await expect(pop).toContainText('Connections');
-    await expect(pop).toContainText('Help');
+    await expect(pop).toContainText('Settings');             // the account menu lists the drawn utilities…
+    await expect(pop).not.toContainText('Connections');      // …never the ⌘K-only ones
+    await expect(pop.locator('a.row', { hasText: /^Help$/ })).toHaveCount(0);
+    // …and ⌘K reaches every one of them
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+k');
+    const pal = page.locator('.dds-palette');
+    for (const [q, href] of [['visual', '/visual-studio.html'], ['contacts', '/contacts.html'], ['broadcast', '/broadcasts.html'], ['connections', '/connections.html'], ['help', '/help.html'], ['sharing', '/sharing.html']]) {
+      await pal.locator('input').fill(q);
+      await expect(pal.locator('.res.sel')).toHaveAttribute('href', href);
+    }
+  });
+
+  // ── Oct 2026 nav cut: the three menus ──────────────────────────────────────
+  test('studio level: Home · Inbox · Customers · Pipeline · Projects · Files, then Your website · Settings — eight plain items', async ({ page }, testInfo) => {
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav: STUDIO_LEVEL_NAV } } } });
+    await page.goto('/agency.html');
+    await expect(page.locator('#dds-shell .dds-nav > .sec')).toHaveText(['Home', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files']);
+    await expect(page.locator('#dds-shell .dds-nav .dds-util .sec')).toHaveText(['Your website', 'Settings']);
+    await expect(page.locator('#dds-shell .dds-nav .sec > button[data-sec]')).toHaveCount(0);   // no carets anywhere — every item is a plain link
+    await expect(page.locator('.dds-nav .sec.active > a[data-href="/agency.html"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#dds-ctxbar')).toHaveCount(0);                                     // no client card at studio level
+    if (testInfo.project.name === 'mobile') {
+      const mbar = page.locator('#dds-mbar');
+      await expect(mbar.locator('a[href^="/agency"]')).toContainText('Home');
+      await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
+      await mbar.locator('#dds-mbar-menu').click();
+      await expect(page.locator('#dds-drawer .g a')).toHaveText(['Home', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
+    }
+    // a hidden child page still lights its owner: Analytics lives under Home, Visual Studio under Files
+    await page.goto('/analytics.html');
+    await expect(page.locator('.dds-nav .sec.active > a[data-href="/agency.html"]')).toHaveCount(1);
+    await expect(page.locator('.dds-nav .sec.active')).toHaveCount(1);
+    await expect(page.locator('.dds-nav .sec.active > a')).not.toHaveAttribute('aria-current', 'page');   // honest: you are not ON Home
+  });
+
+  test('inside a client: the card on top, then Overview · Website · Record · Project · Messages · Files; studio-wide items hide', async ({ page }, testInfo) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    const items = page.locator('#dds-shell .dds-nav > .sec');
+    await expect(items).toHaveText(['Overview', 'Website', 'Record', 'Project', 'Messages', 'Files']);
+    await expect(page.locator('#dds-shell .dds-nav .dds-util')).toHaveCount(0);                   // nothing under a rule while scoped
+    for (const gone of ['Pipeline', 'Customers', 'Analytics', 'Home', 'Settings']) await expect(page.locator('#dds-shell .dds-nav')).not.toContainText(gone);
+    // every item carries the client
+    expect(await items.locator('> a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))).toEqual([
+      `/today.html?client=${CLIENT}`, `/presence.html?client=${CLIENT}`, `/crm.html?client=${CLIENT}`,
+      `/projects.html?client=${CLIENT}`, `/inbox.html?client=${CLIENT}`, `/files.html?client=${CLIENT}`,
+    ]);
+    await expect(page.locator('.dds-nav .sec.active > a[data-href="/today.html"]')).toHaveAttribute('aria-current', 'page');
+    // the card: who, and the two ways out
+    const card = page.locator('#dds-ctxbar');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.av')).toHaveText('JP');
+    await expect(card).toContainText('Joe’s Plumbing');
+    await expect(card.locator('a')).toHaveText(['Switch client', 'Exit to studio']);
+    if (testInfo.project.name !== 'mobile') {
+      // ABOVE the client's menu in the sidebar
+      const cardBox = (await card.boundingBox())!;
+      const navBox = (await page.locator('#dds-shell .dds-nav').boundingBox())!;
+      expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(navBox.y + 1);
+    } else {
+      // the bottom bar follows the client's list too
+      const mbar = page.locator('#dds-mbar');
+      await expect(mbar.locator('a').first()).toHaveText('Overview');
+      await expect(mbar.locator('a').first()).toHaveAttribute('href', `/today.html?client=${CLIENT}`);
+      await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Messages');
+      await mbar.locator('#dds-mbar-menu').click();
+      await expect(page.locator('#dds-drawer .g a')).toHaveText(['Overview', 'Website', 'Record', 'Project', 'Messages', 'Files']);
+    }
+    // ⌘K still reaches the studio-wide places
+    await page.keyboard.press('Control+k');
+    const pal = page.locator('.dds-palette');
+    await pal.locator('input').fill('pipeline');
+    await expect(pal.locator('.res.sel')).toHaveAttribute('href', `/pipeline.html?client=${CLIENT}`);
+    await pal.locator('input').fill('all customers');
+    await expect(pal.locator('.res.sel')).toHaveAttribute('href', `/customers.html?client=${CLIENT}`);
   });
 
   test('no attention → no badge', async ({ page }) => {
@@ -180,14 +264,16 @@ test.describe('Context bar (slice 7)', () => {
     const panel = page.locator('#dds-drawer');
     await expect(panel).toBeVisible();
     await expect(waffle).toHaveAttribute('aria-expanded', 'true');
-    // EVERY destination is reachable here, grouped by section — primary AND utility
-    for (const label of ['Today', 'Website', 'Business info', 'Design', 'Publish', 'History', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Connections', 'Settings', 'Help']) {
-      await expect(panel).toContainText(label);
-    }
-    // …and each is a real LINK (anchor with an href), not just text in the panel
-    for (const label of ['Today', 'Website', 'Business info', 'Design', 'Publish', 'History', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Connections', 'Settings', 'Help']) {
+    // EVERY drawn destination is reachable here — primary AND utility — each a
+    // real LINK; the ⌘K-only entries (hidden) follow the menu's lists and stay out
+    await expect(panel.locator('.g a')).toHaveText(['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']);
+    for (const label of ['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']) {
       await expect(panel.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', /.+/);
     }
+    for (const gone of ['Business info', 'Design', 'Publish', 'History', 'Visual Studio', 'Contacts', 'Broadcasts', 'Connections', 'Help']) {
+      await expect(panel).not.toContainText(gone);
+    }
+    await expect(panel.locator('.g .t')).toHaveCount(0);   // one item of the same name needs no heading over it
     // slice-2 popup contract: Escape closes and returns focus to the trigger
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
@@ -330,10 +416,9 @@ test.describe('Context bar (slice 7)', () => {
     await expect(menu.locator('a.rec', { hasText: 'Lea Chan' })).toHaveAttribute('href', '/crm.html?client_id=c-lea');
   });
 
-  // Phase 1 overhaul: drilled into a client, a colored CONTEXT BAR sits under the
-  // top bar (record · their Today · their website · switch · exit). At studio
-  // level there is none. Settings has its own gear in the bar on every page.
-  test('P1 — the client context bar shows when scoped, never at studio level; Settings has a gear', async ({ page }, testInfo) => {
+  // Phase 1 overhaul: drilled into a client, a CONTEXT CARD says so (a colored
+  // band under the top bar on phones). At studio level there is none.
+  test('P1 — the client context bar shows when scoped, never at studio level', async ({ page }, testInfo) => {
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
     await installApp(page, { api: {
       '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } },
@@ -342,11 +427,11 @@ test.describe('Context bar (slice 7)', () => {
     const bar = page.locator('#dds-ctxbar');
     await expect(bar).toBeVisible();
     await expect(bar).toContainText('Joe’s Plumbing');
-    await expect(bar.locator('a', { hasText: 'Open record' })).toHaveAttribute('href', `/crm.html?client=${CLIENT}`);
-    await expect(bar.locator('a', { hasText: 'Their website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
-    await expect(bar.locator('a', { hasText: 'Exit to Studio' })).toHaveAttribute('href', '/agency.html');
-    await expect(bar.locator('a', { hasText: 'Switch client' })).toHaveAttribute('href', '/agency.html');   // the ONE roster (Oct 2026), never the retired second list
-    if (testInfo.project.name !== 'mobile') await expect(page.locator('#dds-settings')).toBeVisible();   // ≤420px: in the account menu, like Help
+    // Oct 2026 nav cut: the record, their Today and their website are the client's own menu items
+    // (Record · Overview · Website) — the card keeps WHO and the two ways out
+    await expect(bar.locator('a')).toHaveText(['Switch client', 'Exit to studio']);
+    await expect(bar.locator('a', { hasText: 'Exit to studio' })).toHaveAttribute('href', '/agency.html');
+    await expect(bar.locator('a', { hasText: 'Switch client' })).toHaveAttribute('href', '/agency.html');   // the studio home lists every client
     // nothing hides under the chrome: on the sidebar layouts (≥761px) the body
     // is pushed RIGHT past the column the bar sits in; on the top-bar layouts
     // it is pushed DOWN past BOTH bars
@@ -475,9 +560,10 @@ test.describe('Context bar (slice 7)', () => {
     await mbar.locator('#dds-mbar-menu').click();
     const panel = page.locator('#dds-drawer');
     await expect(panel).toBeVisible();
-    for (const label of ['Today', 'Website', 'Business info', 'Customers', 'Files', 'Visual Studio', 'Analytics', 'Inbox', 'Settings', 'Help']) {
+    for (const label of ['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']) {
       await expect(panel).toContainText(label);
     }
+    for (const gone of ['Business info', 'Visual Studio', 'Contacts', 'Help']) await expect(panel).not.toContainText(gone);   // ⌘K-only since the cut
     // Escape closes the sheet and hands focus back to the control that opened it
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
@@ -630,12 +716,14 @@ test.describe('B4 — attention badge freshness', () => {
   } });
 
   /** Route /portal/context through a counter whose payload the test can swap. */
-  async function contextProbe(page: import('@playwright/test').Page, initial: number) {
+  async function contextProbe(page: import('@playwright/test').Page, initial: number, nav?: unknown[]) {
     const state = { count: initial, hits: 0, status: 200 };
     await page.route('**/functions/v1/presence/portal/context**', (route) => {
       state.hits++;
       if (state.status !== 200) return route.fulfill({ status: state.status, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ctxWith(state.count)) });
+      const body = ctxWith(state.count);
+      if (nav) body.data.nav = nav as typeof body.data.nav;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
     return state;
   }
@@ -841,7 +929,8 @@ test.describe('B4 — attention badge freshness', () => {
   test('the refresh does not disturb an open layer', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'the flat bar is hidden on phones');
     await installApp(page);
-    const probe = await contextProbe(page, 2);
+    // a nav whose Website section is multi-item (the owner's is a plain item since the cut) — the caret is the layer under test
+    const probe = await contextProbe(page, 2, CRM_NAV);
     await page.clock.install();
     await page.goto('/today.html');
 

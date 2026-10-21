@@ -39,7 +39,8 @@ test.describe('Settings page', () => {
     await installApp(page, { api: API });
     await page.goto('/settings.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
-    await expect(page.locator('#dds-settings')).toHaveAttribute('href', '/settings.html');
+    // Oct 2026 nav cut: Settings is a plain item at the foot of the sidebar (the gear went with the cut)
+    await expect(page.locator('.dds-nav a[data-href="/settings.html"]')).toHaveAttribute('href', '/settings.html');
     // the nine areas (Automations joined in Oct 2026 — benchmark item 6), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
     await expect(cards).toHaveCount(9);

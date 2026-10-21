@@ -90,7 +90,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // Architecture v1.0 (frozen refinements): Analytics is first-class; utilities overflow.
   ok('nav: Analytics is a first-class outcome (not a utility)', owner.some(s=>s.key==='analytics' && !s.utility && s.items[0].href==='/analytics.html'));
   ok('nav: utilities (Connections/Settings/Help) live in the overflow (utility:true)', ['connections','settings','help'].every(k=>{const s=owner.find(x=>x.key===k);return !!s && s.utility===true;}));
-  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','website','customers','pipeline','projects','files','analytics','inbox','studio'].includes(s.key)));
+  ok('nav: the PRIMARY bar is outcomes only', owner.filter(s=>!s.utility).every(s=>['today','home','overview','website','customers','record','project','messages','pipeline','projects','files','analytics','inbox','studio'].includes(s.key)));
   // FIX 6: the primary "Customers" item opens the ROSTER (customers.html), not the
   // single-client CRM detail (which un-scoped showed the owner his OWN profile).
   ok('nav: Customers opens the roster (customers.html), not the single-client detail', owner.find(s=>s.key==='customers').items[0].href==='/customers.html');
@@ -111,8 +111,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // An agency operator scope-switched INTO a customer keeps operator tools: the
   // workspace guard yields isManagedClient=false for them, so buildNav is unchanged.
   const agencyScoped = buildNav(ctx({ capabilities: caps('business_owner'), isAgency:true, isManagedClient:false }));
-  // Oct 2026 studio audit (one home, one roster): at studio level the Customers item IS the studio home.
-  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools; Customers opens the studio home', agencyScoped.some(s=>s.key==='customers') && agencyScoped.find(s=>s.key==='customers').items[0].href==='/agency.html' && !agencyScoped.some(s=>s.key==='studio'));
+  // Oct 2026 nav cut: at studio level Home IS the studio (agency.html) and Customers is the roster.
+  ok('nav: agency-scoped operator (isManagedClient=false) keeps operator tools; Home opens the studio, Customers the roster', agencyScoped.some(s=>s.key==='customers') && agencyScoped.find(s=>s.key==='home').items[0].href==='/agency.html' && agencyScoped.find(s=>s.key==='customers').items[0].href==='/customers.html' && !agencyScoped.some(s=>s.key==='studio'));
 
   const monitor = buildNav(ctx({ edition:'monitor', capabilities: caps('business_owner') }));
   ok('nav: Monitor edition hides Publish (observe-only)', !monitor.find(s=>s.key==='website').items.some(i=>i.key==='publish'));
@@ -121,14 +121,34 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: business_staff cannot invite (no Sharing in Settings)', !staff.find(s=>s.key==='settings').items.some(i=>i.key==='sharing'));
 
   const agency = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner') }));
-  ok('nav: agency member: landing = Studio, Customers → the studio home, no Today in the primary bar', !agency.some(s=>s.key==='today') && agency.find(s=>s.key==='customers').items[0].href==='/agency.html' && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
-  // drilled INTO a client the bar is the client's: Today and Website come back, Customers is the roster page
+  ok('nav: agency member: landing = Studio, Home → agency.html, no Today in the primary bar', !agency.some(s=>s.key==='today') && agency.find(s=>s.key==='home').items[0].href==='/agency.html' && landingFor(ctx({isAgency:true,capabilities:caps('business_owner')}))==='/agency.html');
+
+  // ── Oct 2026 nav cut (the approved mockup): 8 drawn at studio level, 6 inside a client ──
+  const drawn = (nav) => nav.filter(s=>s.items.some(i=>!i.hidden));
+  const drawnKeys = (nav) => drawn(nav).map(s=>s.key);
+  const hiddenHrefs = (nav) => nav.flatMap(s=>s.items.filter(i=>i.hidden).map(i=>i.href));
+  const allHrefs = (nav) => nav.flatMap(s=>s.items.map(i=>i.href.split('#')[0]));
+  ok('nav cut: studio level draws exactly Home · Inbox · Customers · Pipeline · Projects · Files · Your website · Settings', drawnKeys(agency).join(',')==='home,inbox,customers,pipeline,projects,files,website,settings');
+  ok('nav cut: studio level — Your website and Settings are the utilities (foot of the sidebar), each a plain item', drawn(agency).filter(s=>s.utility).map(s=>s.label).join('·')==='Your website·Settings' && drawn(agency).every(s=>s.items.filter(i=>!i.hidden).length===1));
+  ok('nav cut: nothing is deleted — Contacts, Broadcasts, Visual Studio, Analytics, Add a customer, the builder pages, Sharing, Help stay as ⌘K entries', ['/contacts.html','/broadcasts.html','/visual-studio.html','/analytics.html','/agency.html#add','/presence.html#business','/presence.html#design','/presence.html#addpage','/presence.html#domain','/presence.html#publish','/presence.html#history','/sharing.html','/help.html'].every(h=>hiddenHrefs(agency).includes(h)));
+  ok('nav cut: no page is reachable from two menu entries (drawn hrefs are unique)', (()=>{const hs=drawn(agency).map(s=>s.items.find(i=>!i.hidden).href);return new Set(hs).size===hs.length;})());
+  ok('nav cut: Help is never a drawn item (the ? icon owns it)', !drawn(agency).some(s=>s.key==='help') && !drawn(owner).some(s=>s.key==='help'));
+  // drilled INTO a client the menu is the CLIENT's six; the studio-wide items hide (⌘K keeps them)
   const drilled = buildNav(ctx({ isAgency:true, scoped:true, capabilities: caps('business_owner') }));
-  ok('nav: agency member drilled into a client keeps Today + Website; Customers → customers.html', drilled.some(s=>s.key==='today') && drilled.some(s=>s.key==='website' && !s.utility) && drilled.find(s=>s.key==='customers').items[0].href==='/customers.html');
+  ok('nav cut: inside a client draws exactly Overview · Website · Record · Project · Messages · Files', drawnKeys(drilled).join(',')==='overview,website,record,project,messages,files');
+  ok('nav cut: the client menu points at their Today, builder, record, project, inbox and files', ['/today.html','/presence.html','/crm.html','/projects.html','/inbox.html','/files.html'].join()===drawn(drilled).map(s=>s.items.find(i=>!i.hidden).href).join());
+  ok('nav cut: inside a client the studio-wide items (Pipeline, all Customers, Analytics, the studio home) are hidden, not gone', ['/pipeline.html','/customers.html','/analytics.html','/agency.html'].every(h=>hiddenHrefs(drilled).includes(h)) && !drawnKeys(drilled).some(k=>['pipeline','customers','analytics','home'].includes(k)));
+  ok('nav cut: every studio-level page is still SOMEWHERE in the scoped nav (⌘K reaches it)', ['/customers.html','/pipeline.html','/analytics.html','/settings.html','/help.html','/visual-studio.html'].every(h=>allHrefs(drilled).includes(h)));
   // Oct 2026 studio audit, change 4: onboarding is findable from ⌘K at studio level ("add", "client")
   const addItem = agency.find(s=>s.key==='customers').items.find(i=>i.key==='add_client');
-  ok('nav: agency member at studio level has "Add a customer" → /agency.html#add in the Customers group (⌘K finds "add"/"client")', !!addItem && addItem.label==='Add a customer' && addItem.href==='/agency.html#add' && /client/i.test(addItem.desc||''));
-  ok('nav: the add_client entry is studio-level only (not drilled into a client, not for a plain owner)', !drilled.find(s=>s.key==='customers').items.some(i=>i.key==='add_client') && !owner.find(s=>s.key==='customers').items.some(i=>i.key==='add_client'));
+  ok('nav: agency member at studio level has "Add a customer" → /agency.html#add in the Customers group (⌘K finds "add"/"client")', !!addItem && addItem.label==='Add a customer' && addItem.href==='/agency.html#add' && /client/i.test(addItem.desc||'') && addItem.hidden===true);
+  ok('nav: the add_client entry is studio-level only (not drilled into a client, not for a plain owner)', !drilled.some(s=>s.items.some(i=>i.key==='add_client')) && !owner.find(s=>s.key==='customers').items.some(i=>i.key==='add_client'));
+  // Get started: listed only until the site is live
+  const notLive = buildNav(ctx({ isAgency:true, siteLive:false, capabilities: caps('business_owner') }));
+  const live = buildNav(ctx({ isAgency:true, siteLive:true, capabilities: caps('business_owner') }));
+  ok('nav cut: "Get started" is a drawn utility only while the site is not live', drawn(notLive).some(s=>s.key==='get_started' && s.utility && s.items[0].href==='/get-started.html') && !live.some(s=>s.key==='get_started') && !agency.some(s=>s.key==='get_started'));
+  // the plain owner keeps the outcome areas; the same merges apply (Contacts → Customers, Visual Studio → Files, Broadcasts → Inbox)
+  ok('nav cut: plain owner draws Today · Website · Customers · Pipeline · Projects · Inbox · Files · Analytics · Settings', drawnKeys(owner).join(',')==='today,website,customers,pipeline,projects,inbox,files,analytics,settings');
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));

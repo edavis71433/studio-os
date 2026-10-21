@@ -58,6 +58,10 @@
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  /* Oct 2026 nav cut: Broadcasts left the menu — "Send an update" lives here, on the Inbox */
+  a.lsend{font-size:12.5px;font-weight:600;color:var(--p);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+  a.lsend:hover{background:var(--p-soft);border-color:var(--p)}
+  @media (max-width:420px){a.lsend{display:none}}
   .ovf{position:relative}
   #ovfMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #ovfMenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
@@ -509,12 +513,14 @@ function renderConsole(){
             <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false">${esc(VIEW_LABEL[VIEW])} <span class="car" aria-hidden="true">▾</span></button>
             <div id="viewMenu" role="listbox" aria-label="Inbox views" hidden></div>
           </div>
+          <a class="lbtn lsend" id="sendUpdate" href="/broadcasts.html" title="Send an update to many customers at once (Broadcasts)">Send an update</a>
           <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
           <div class="ovf">
             <button class="lbtn" id="ovfBtn" aria-haspopup="true" aria-expanded="false" aria-label="More tools" title="More tools">⋯</button>
             <div id="ovfMenu" hidden>
               <button type="button" id="ovfSaved">Saved replies</button>
               <button type="button" id="ovfFaq">Customer FAQ</button>
+              <button type="button" id="ovfSend">Send an update</button>
             </div>
           </div>
         </div>
@@ -553,6 +559,7 @@ function renderConsole(){
   wireMenuKeys(om,ob);
   $('ovfSaved').addEventListener('click',()=>{closeMenu(om,ob);openSaved();});
   $('ovfFaq').addEventListener('click',()=>{closeMenu(om,ob);openFaq();});
+  $('ovfSend').addEventListener('click',()=>{closeMenu(om,ob);location.href=scoped('/broadcasts.html');});   // Oct 2026 nav cut: Broadcasts → the Inbox's "Send an update"
   $('refreshBtn').addEventListener('click',()=>refresh());
   // C2 search — debounced, list-only re-render: the input node is never rebuilt
   // while typing (renderConsole only re-runs on a view change), so caret + focus

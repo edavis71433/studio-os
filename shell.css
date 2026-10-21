@@ -87,6 +87,11 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
   background:var(--dds-p);color:#fff;border-bottom:1px solid color-mix(in srgb,var(--dds-p) 70%,#000)}
 #dds-ctxbar .lbl{opacity:.8;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
 #dds-ctxbar strong{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dds-ctxbar .who{display:flex;align-items:center;gap:8px;min-width:0}
+#dds-ctxbar .av{display:none;width:28px;height:28px;border-radius:50%;background:var(--dds-p);color:#fff;font-size:11px;font-weight:700;letter-spacing:.02em;place-items:center;flex:0 0 auto}
+/* Oct 2026 nav cut: the utility group (Your website · Settings · Get started) is
+   drawn inside .dds-nav; on the top-bar layout the account menu lists them. */
+.dds-nav .dds-util{display:none}
 #dds-ctxbar .acts{margin-left:auto;display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
 #dds-ctxbar .acts a{color:#fff;text-decoration:none;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
 #dds-ctxbar .acts a:hover{background:rgba(255,255,255,.14)}
@@ -189,6 +194,10 @@ html.dds-embed .dds-waffle{display:none!important}
 /* section-level active (same split as the bar): the group heading gets the
    emphasis on record pages (/crm.html), where no item earns aria-current */
 .dds-drawer .g.active .t{color:var(--dds-p)}
+/* Oct 2026 nav cut: a one-item group has no heading — rows sit close; the
+   utilities (Your website · Settings) start under a rule, as in the sidebar */
+.dds-drawer .g:not(:has(.t)){margin-bottom:2px}
+.dds-drawer .g:not(.util) + .g.util{border-top:1px solid var(--dds-line);margin-top:12px;padding-top:12px}
 @media (min-width:761px){
   .dds-drawer{inset:auto;top:calc(var(--dds-shell-h) + 6px);left:12px;width:min(720px,calc(100vw - 24px));
     max-height:calc(100vh - var(--dds-shell-h) - 18px);max-height:calc(100dvh - var(--dds-shell-h) - 18px);
@@ -423,6 +432,7 @@ html.dds-embed .dds-waffle{display:none!important}
   html.dds-side #dds-search span:first-child{display:inline-flex}
   html.dds-side #dds-search kbd{display:inline-block}
   html.dds-side .dds-nav{order:2;flex:0 0 auto;flex-direction:column;align-items:stretch;align-self:auto;gap:1px}
+  html.dds-side .dds-nav .dds-util{display:flex;flex-direction:column;gap:1px;margin-top:8px;padding-top:8px;border-top:1px solid var(--dds-line)}
   html.dds-side .dds-nav .sec{display:block}
   html.dds-side .dds-nav .sec > .it{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 10px;
     border:none;border-radius:var(--dds-r);font-size:13.5px;font-weight:500;color:var(--dds-soft);text-align:left}
@@ -447,11 +457,12 @@ html.dds-embed .dds-waffle{display:none!important}
      expanded with no current child (a record page under Customers) keeps the pill on the parent */
   html.dds-side .dds-nav .sec.active.open:has(.menu a.here) > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
   @media (prefers-reduced-motion:reduce){html.dds-side .dds-nav .sec > .it .car{transition:none}}
-  /* the client context card, inside the column under the nav */
-  html.dds-side #dds-ctxbar{order:3;position:static;height:auto;margin:10px 0 0;padding:10px;flex-direction:column;align-items:stretch;gap:6px;
+  /* the client context card, inside the column ABOVE the client's menu (Oct 2026 nav cut) */
+  html.dds-side #dds-ctxbar{order:1;position:static;height:auto;margin:0 0 10px;padding:10px;flex-direction:column;align-items:stretch;gap:6px;
     background:var(--dds-card);color:var(--dds-ink);border:1px solid var(--dds-line);border-radius:var(--dds-r-lg);font-size:13px}
   html.dds-side #dds-ctxbar .lbl{opacity:1;font-size:11px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--dds-faint)}
   html.dds-side #dds-ctxbar strong{font-size:13px;line-height:1.25;white-space:normal}
+  html.dds-side #dds-ctxbar .av{display:grid}
   html.dds-side #dds-ctxbar .acts{margin:4px 0 0;flex-wrap:wrap;gap:4px;overflow:visible}
   html.dds-side #dds-ctxbar .acts a{color:var(--dds-soft);font-size:12px;font-weight:500;padding:3px 8px;border-radius:var(--dds-r-sm);border:1px solid var(--dds-line);background:var(--dds-bg)}
   html.dds-side #dds-ctxbar .acts a:hover{background:var(--dds-card);color:var(--dds-ink);border-color:var(--dds-line-strong)}

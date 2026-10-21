@@ -217,7 +217,11 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     }
   } catch { /* best-effort */ }
 
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName };
+  // Oct 2026 nav cut: "Get started" is listed only until the site is live — the
+  // site row already in hand says so (deploy_reconcile stamps status 'live' +
+  // last_published_at on the first successful publish).
+  const siteLive = site.status === 'live' || !!site.last_published_at;
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive };
   return json({ data: {
     site_role: role,
     capabilities: caps,
