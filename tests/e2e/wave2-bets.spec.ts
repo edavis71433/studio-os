@@ -207,7 +207,13 @@ test.describe('Wave 2 bets', () => {
     await pane.locator('#msgBody').type(' Thanks!');
     await expect(pane.locator('.ai-note')).toHaveCount(0);       // the note leaves on the first edit
     await expect(pane.getByRole('button', { name: 'Send' })).toBeVisible();   // Send is still the operator's click
-    // the enquiry and support composers carry the same button
+    // the enquiry and support composers carry the same button. Under 760px the
+    // panes stack and the open conversation hides the list (inbox.html's D5:
+    // picking a row pushes the pane in), so a phone steps back to the list
+    // first — the same move an operator makes; on wider screens there is no
+    // back button and both panes already show.
+    const back = page.locator('#paneBack');
+    if (await back.isVisible()) await back.click();
     await page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' }).first().click();
     await expect(pane.getByRole('button', { name: 'Draft a reply' })).toBeVisible();
   });
