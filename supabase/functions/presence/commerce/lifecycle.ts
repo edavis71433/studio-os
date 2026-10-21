@@ -29,7 +29,8 @@ import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNotice
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
-import { emailOperator } from '../lib/service_bridge.ts';
+import { emailOperator, emailBridgedCustomer } from '../lib/service_bridge.ts';
+import { approvalReminderDue, approvalReminderCopy, approvalOverduePeriod, approvalOverdueCopy } from '../lib/approvals.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
@@ -731,6 +732,51 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
     }
   }
   return { reminded };
+}
+
+// ── APPROVAL REMINDERS: the client is chased so nobody has to remember to ─────
+// Studio audit (Oct 2026) change 8. An approval put to the client with a
+// due_date (migration 0134) gets a calm email the DAY BEFORE and then DAILY
+// once overdue, never twice in one UTC day — the gate is the row's own
+// last_reminded_at, stamped BEFORE the send with the previous value in the
+// WHERE, so two ticks racing the same approval cannot both send (one PATCH
+// matches, the other finds nothing). A send that fails after the stamp costs
+// one day, never a duplicate. The studio gets ONE dismissible notice per
+// approval the first time it goes overdue (kind approval_overdue, period
+// approval:<project>:<approval> — the bell deep-links the project). Approvals
+// without a due date are never reminded; internal (client_visible=false) ones
+// never reach the client. Pre-0134 the filter 400s on the missing column and
+// the sweep is a clean no-op. The decision rule itself is pure
+// (lib/approvals.ts approvalReminderDue) and pinned in
+// tests/presence/approval_reminders_test.mjs.
+export async function runApprovalReminders(limit = 50): Promise<{ reminded: number; overdue_notices: number; skipped_no_email: number }> {
+  const nowIso = new Date().toISOString();
+  const tomorrow = new Date(Date.parse(nowIso) + 86_400_000).toISOString().slice(0, 10);
+  const q = await svc(`presence_approvals?status=eq.pending&client_visible=is.true&deleted_at=is.null&due_date=not.is.null&due_date=lte.${tomorrow}&select=id,site_id,project_id,title,due_date,last_reminded_at,status,client_visible&order=due_date.asc&limit=${limit}`);
+  if (!q.ok) return { reminded: 0, overdue_notices: 0, skipped_no_email: 0 };   // pre-0134 → clean no-op
+  let reminded = 0, overdue_notices = 0, skipped_no_email = 0;
+  for (const a of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; project_id: string | null; title?: string; due_date: string; last_reminded_at: string | null; status: string; client_visible: boolean }>) {
+    const kind = approvalReminderDue(a, nowIso);
+    if (!kind || !a.project_id) continue;
+    // claim today's reminder FIRST — the previous stamp in the WHERE is the race guard
+    const prev = a.last_reminded_at ? `eq.${encodeURIComponent(a.last_reminded_at)}` : 'is.null';
+    const claim = await svc(`presence_approvals?id=eq.${a.id}&site_id=eq.${a.site_id}&status=eq.pending&last_reminded_at=${prev}&select=id`,
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ last_reminded_at: nowIso }) });
+    if (!claim.ok || !(Array.isArray(claim.json) && claim.json[0])) continue;   // another tick got it, or it was just decided
+    const copy = approvalReminderCopy(a.title || '', a.due_date, kind);
+    const sent = await emailBridgedCustomer(a.site_id, a.project_id, copy.subject, copy.html);
+    if (sent) reminded++; else skipped_no_email++;
+    if (kind === 'overdue') {
+      // the studio hears once per approval — send-once via the notices unique key
+      const siteQ = await svc(`presence_sites?id=eq.${a.site_id}&select=client_id&limit=1`);
+      const clientId = siteQ.json?.[0]?.client_id;
+      if (!clientId) continue;
+      const n = approvalOverdueCopy(a.title || '', a.due_date);
+      const fresh = await raiseNotice({ siteId: a.site_id, clientId, kind: 'approval_overdue', period: approvalOverduePeriod(a.project_id, a.id), headline: n.headline, body: n.body });
+      if (fresh) overdue_notices++;
+    }
+  }
+  return { reminded, overdue_notices, skipped_no_email };
 }
 
 // ── UNSIGNED-DOC REMINDERS: one fresh link to the CLIENT per sent doc ─────────

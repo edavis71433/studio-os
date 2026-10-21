@@ -1032,3 +1032,140 @@ test.describe('Projects — a client context lists that client’s projects', ()
     await expect(page.getByText('Projects live at the studio level')).toHaveCount(0);
   });
 });
+
+// ── Studio audit (Oct 2026) change 8: approval per deliverable ───────────────
+// The Files card asks the client to approve ONE file (subject_type
+// 'deliverable' + the file id, title defaulting to the file's, an optional
+// date the reminders chase); "+ Share" can ask in the same step; the row
+// reads the approval's state as a chip; "+ Request" carries a date too.
+test.describe('Project record — approval per deliverable (audit change 8)', () => {
+  const withApproval = (status: string, due: string | null = '2026-10-30') => {
+    const detail = JSON.parse(JSON.stringify(P1_DETAIL));
+    detail.data.approvals = [
+      { id: 'a2', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage mock', status, content_hash: 'h2', client_visible: true, due_date: due },
+      { id: 'a1', title: 'Homepage design', status: 'pending', content_hash: 'h1', client_visible: true },
+    ];
+    return detail;
+  };
+
+  test('"Ask them to approve" on a shared file posts a deliverable approval: the file id, its title, the date', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/projects.html?project=p1');
+    const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
+    await expect(row.locator('[data-ask="d1"]')).toHaveText('Ask them to approve');
+    await expect(row.locator('.tag.ap')).toHaveCount(0);   // no approval binds it yet (a1 is project-level)
+    await row.locator('[data-ask="d1"]').click();
+    // the form is prefilled with the file's title; the date is optional
+    await expect(page.locator('#dlForm #mf-title')).toHaveValue('Homepage mock');
+    await page.locator('#dlForm #mf-summary').fill('The hero and the menu — the rest is placeholder.');
+    await page.locator('#dlForm #mf-due_date').fill('2026-10-30');
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/approvals')),
+      page.locator('#dlForm button[type="submit"]').click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage mock', summary: 'The hero and the menu — the rest is placeholder.', due_date: '2026-10-30' });
+  });
+
+  test('no date → the POST carries no due_date (undated approvals are never reminded)', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/projects.html?project=p1');
+    await page.locator('[data-ask="d1"]').click();
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/approvals')),
+      page.locator('#dlForm button[type="submit"]').click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage mock' });
+  });
+
+  test('a PENDING approval on the file: "Awaiting approval · due …" chip, no ask button; the Approvals card shows the date', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/projects/p1': withApproval('pending') } });
+    await page.goto('/projects.html?project=p1');
+    const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
+    await expect(row.locator('.tag.ap.awaiting')).toHaveText('Awaiting approval · due Oct 30, 2026');
+    await expect(row.locator('[data-ask]')).toHaveCount(0);
+    await expect(row.locator('[data-dl="d1"]')).toBeVisible();   // Download stays
+    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage mock' })).toContainText('due Oct 30, 2026');
+    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage design' })).not.toContainText('due');
+  });
+
+  test('decided approvals: "Approved" / "Changes requested" chips, and the studio may ask again', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/projects/p1': withApproval('approved') } });
+    await page.goto('/projects.html?project=p1');
+    const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
+    await expect(row.locator('.tag.ap.approved')).toHaveText('Approved');
+    await expect(row.locator('[data-ask="d1"]')).toBeVisible();
+    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withApproval('changes_requested')) }));
+    await page.reload();
+    await expect(row.locator('.tag.ap.changes')).toHaveText('Changes requested');
+    await expect(row.locator('[data-ask="d1"]')).toBeVisible();
+  });
+
+  test('an undated pending approval reads "Awaiting approval" with no date', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/projects/p1': withApproval('pending', null) } });
+    await page.goto('/projects.html?project=p1');
+    await expect(page.locator('#dlList .tag.ap.awaiting')).toHaveText('Awaiting approval');
+  });
+
+  test('"+ Share" with "Ask them to approve it" ticked: the approval POST rides right behind the share, bound to the NEW file', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/projects/p1/deliverables/upload-url', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1', storage_path: 'sites/s/m-new' } }) }));
+    await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));
+    await page.route('**/functions/v1/presence/projects/p1/deliverables', (route) =>
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1', title: 'Team photos.png', status: 'shared', client_visible: true } }) }));
+    await page.goto('/projects.html?project=p1');
+    await page.locator('#addFile').click();
+    await page.locator('#dlForm #mf-file').setInputFiles({ name: 'Team photos.png', mimeType: 'image/png', buffer: Buffer.from('png-bytes') });
+    await page.locator('#dlForm #mf-ask').check();
+    await page.locator('#dlForm #mf-due_date').fill('2026-11-02');
+    const share = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/deliverables'));
+    const ask = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/approvals'));
+    await page.locator('#dlForm button[type="submit"]').click();
+    expect((await share).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.png', status: 'shared' });
+    expect((await ask).postDataJSON()).toEqual({ subject_type: 'deliverable', subject_id: 'nd1', title: 'Team photos.png', due_date: '2026-11-02' });
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'File shared — approval requested' }).first()).toBeVisible();
+  });
+
+  test('"+ Share" with the box unticked shares only — no approval POST', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/projects/p1/deliverables/upload-url', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { media_id: 'm-new', upload_url: 'https://storage.example/up/1' } }) }));
+    await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));
+    await page.route('**/functions/v1/presence/projects/p1/deliverables', (route) =>
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'nd1' } }) }));
+    let asks = 0;
+    await page.route('**/functions/v1/presence/projects/p1/approvals', (route) => { asks++; return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{}}' }); });
+    await page.goto('/projects.html?project=p1');
+    await page.locator('#addFile').click();
+    await page.locator('#dlForm #mf-file').setInputFiles({ name: 'Team photos.png', mimeType: 'image/png', buffer: Buffer.from('png-bytes') });
+    const share = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/deliverables'));
+    await page.locator('#dlForm button[type="submit"]').click();
+    await share;
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'File shared' }).first()).toBeVisible();
+    await expect(page.locator('#dtitle')).toHaveText('Acme website build');   // the record re-opened
+    expect(asks).toBe(0);
+  });
+
+  test('"+ Request" (project-level) stays as it was, plus the optional date', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/projects.html?project=p1');
+    await page.locator('#addAppr').click();
+    await page.locator('#apForm #mf-title').fill('Sign off the sitemap');
+    await page.locator('#apForm #mf-due_date').fill('2026-10-28');
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/projects/p1/approvals')),
+      page.locator('#apForm button[type="submit"]').click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ subject_type: 'project', subject_id: 'p1', title: 'Sign off the sitemap', summary: '', due_date: '2026-10-28' });
+  });
+
+  test('client persona: no ask button, but the chip still reads', async ({ page }) => {
+    const detail = withApproval('pending');
+    detail.data.is_studio_view = false;
+    await installApp(page, { api: { ...API, '/projects': { ...LIST, is_studio_view: false }, '/projects/p1': detail } });
+    await page.goto('/projects.html?project=p1');
+    await expect(page.locator('#dlList .tag.ap.awaiting')).toHaveText('Awaiting approval · due Oct 30, 2026');
+    await expect(page.locator('[data-ask]')).toHaveCount(0);
+  });
+});

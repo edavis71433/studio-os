@@ -10,6 +10,7 @@
 //   GET  /portal/shares                  — current overrides (owner/operator)
 //   POST /portal/shares                  — { surface, item_id?, shared } set (owner/operator)
 import { json } from '../../_shared/http.ts';
+import { projectIdOfApprovalPeriod } from '../lib/approvals.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, siteCan } from '../lib/site_roles.ts';
@@ -277,6 +278,7 @@ const NOTICE_HREF: Record<string, string> = {
   client_request: '/inbox.html',      // a support/service request opened or replied → same list (support rows live there)
   client_upload: '/projects.html',    // a client sent a file → project Files
   client_approval: '/presence.html#activity',  // a client decided an approval → Recent activity (matches approval_decided)
+  approval_overdue: '/projects.html',   // audit change 8: a client approval passed its due date → the project (noticeHrefFor deep-links it)
 };
 export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html';
 // A notice whose period names ONE row deep-links that row (Oct 2026 audit, gap 2):
@@ -285,6 +287,9 @@ export const noticeHref = (k: string): string => NOTICE_HREF[k] || '/today.html'
 // click away instead of two. Every other kind keeps its kind-only landing.
 export const noticeHrefFor = (n: { kind: string; period?: string | null }): string => {
   const base = noticeHref(n.kind);
+  // approval_overdue's period is approval:<project>:<approval> (lib/approvals.ts) → open that project's record
+  const project = n.kind === 'approval_overdue' ? projectIdOfApprovalPeriod(n.period) : null;
+  if (project) return `${base}?project=${project}`;
   const id = n.kind === 'lead_followup' ? leadIdOfNoticePeriod(n.period) : null;
   return id ? `${base}?sel=lead:${id}` : base;
 };

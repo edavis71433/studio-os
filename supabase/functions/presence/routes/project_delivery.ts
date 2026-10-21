@@ -7,8 +7,8 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload, createUpload } from '../lib/media.ts';
-import { isStudioSide, studioDenied, loadProject, projectEvent } from './projects.ts';
-import { isDecision, isSubjectType, canDecideApproval, approvalHash } from '../lib/approvals.ts';
+import { isStudioSide, studioDenied, loadProject, projectEvent, clearApprovalOverdue } from './projects.ts';
+import { isDecision, isSubjectType, canDecideApproval, approvalHash, cleanDueDate, dueDateText } from '../lib/approvals.ts';
 import { emailBridgedCustomer } from '../lib/service_bridge.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -105,14 +105,18 @@ export async function handleDeliverableDownload(req: Request, jwt: string, site:
 }
 
 // ═══ APPROVALS (one generic decision bound to the exact item + version) ═══
-async function subjectVersion(siteId: string, subjectType: string, subjectId: string | null, title: string, summary: string): Promise<{ ok: true; hash: string } | { ok: false }> {
+
+async function subjectVersion(siteId: string, projectId: string, subjectType: string, subjectId: string | null, title: string, summary: string): Promise<{ ok: true; hash: string; title?: string } | { ok: false }> {
   if (subjectType === 'custom') return { ok: true, hash: await approvalHash('custom', 'text', `${title}\n${summary}`) };
   if (!subjectId || !UUID_RE.test(subjectId)) return { ok: false };
   if (subjectType === 'deliverable') {
-    const d = rows(await svc(`presence_deliverables?id=eq.${subjectId}&site_id=eq.${siteId}&deleted_at=is.null&select=media_id,updated_at&limit=1`))[0];
+    // audit change 8: the file must belong to THIS project (not merely this
+    // site) — an approval on a project must never bind a file from another one.
+    // Its title rides back as the request's default title.
+    const d = rows(await svc(`presence_deliverables?id=eq.${subjectId}&project_id=eq.${projectId}&site_id=eq.${siteId}&deleted_at=is.null&select=media_id,title,updated_at&limit=1`))[0];
     if (!d) return { ok: false };
     const media = rows(await svc(`presence_media?id=eq.${d.media_id}&site_id=eq.${siteId}&select=storage_path&limit=1`))[0];
-    return { ok: true, hash: await approvalHash('deliverable', subjectId, `${d.media_id}:${media?.storage_path || ''}`) };
+    return { ok: true, hash: await approvalHash('deliverable', subjectId, `${d.media_id}:${media?.storage_path || ''}`), title: clean(d.title, 200) };
   }
   const table = subjectType === 'task' ? 'presence_tasks' : 'presence_projects';
   const row = rows(await svc(`${table}?id=eq.${subjectId}&site_id=eq.${siteId}&deleted_at=is.null&select=updated_at&limit=1`))[0];
@@ -127,26 +131,39 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
   if (!project) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   if (!isSubjectType(b.subject_type)) return json({ error: 'validation', message: 'Say what’s being approved (deliverable, task, project, or custom).' }, 422, cors);
-  const title = clean(b.title, 200);
-  if (!title) return json({ error: 'validation', message: 'An approval request needs a title.' }, 422, cors);
   const subjectId = UUID_RE.test(b.subject_id || '') ? b.subject_id : null;
-  const ver = await subjectVersion(site.id, b.subject_type, subjectId, title, clean(b.summary, 2000));
-  if (!ver.ok) return json({ error: 'bad_subject', message: 'That item isn’t in this workspace.' }, 422, cors);
+  const ver = await subjectVersion(site.id, projectId, b.subject_type, subjectId, clean(b.title, 200), clean(b.summary, 2000));
+  if (!ver.ok) return json({ error: 'bad_subject', message: b.subject_type === 'deliverable' ? 'That file isn’t in this project.' : 'That item isn’t in this workspace.' }, 422, cors);
+  // a deliverable approval defaults its title to the file's (the studio rarely has a better name for it)
+  const title = clean(b.title, 200) || ver.title || '';
+  if (!title) return json({ error: 'validation', message: 'An approval request needs a title.' }, 422, cors);
+  // audit change 8: an optional date for the answer (migration 0134). A bad
+  // date is refused outright rather than silently dropped — the studio would
+  // otherwise believe a reminder is coming.
+  if (b.due_date !== undefined && b.due_date !== null && String(b.due_date).trim() !== '' && !cleanDueDate(b.due_date)) return json({ error: 'validation', message: 'The due date needs to be a real date (YYYY-MM-DD).' }, 422, cors);
+  const dueDate = cleanDueDate(b.due_date);
   // supersede any prior PENDING approval for the same subject → only the latest is decidable
   if (subjectId) await svc(`presence_approvals?site_id=eq.${site.id}&subject_type=eq.${b.subject_type}&subject_id=eq.${subjectId}&status=eq.pending`, { method: 'PATCH', body: JSON.stringify({ status: 'superseded' }) }).catch(() => {});
   const { by, kind } = actor(principal);
-  const ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, project_id: projectId, subject_type: b.subject_type, subject_id: subjectId,
+  const row: Record<string, unknown> = { site_id: site.id, project_id: projectId, subject_type: b.subject_type, subject_id: subjectId,
       title, summary: clean(b.summary, 2000), content_hash: ver.hash, status: 'pending',
-      requested_by: by, requested_by_kind: kind, client_visible: b.client_visible === false ? false : true }) });
+      requested_by: by, requested_by_kind: kind, client_visible: b.client_visible === false ? false : true };
+  if (dueDate) row.due_date = dueDate;
+  let ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+  // pre-0134 degrade: the column is not there yet → the request still lands, undated
+  if (!ins.ok && dueDate && ins.status === 400 && /due_date/.test(ins.text || '')) {
+    delete row.due_date;
+    ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+  }
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That request didn’t save — please try again.' }, 502, cors);
   const a = rows(ins)[0];
   await projectEvent(site.id, projectId, 'approval_requested', principal, a.client_visible, { approval_id: a.id, title });
   // An approval that waits on the CLIENT must reach their email — otherwise it
   // can sit unseen until they happen to open the portal. Best-effort.
   if (a.client_visible) {
+    const when = a.due_date ? `<p>They’d like your answer by <strong>${dueDateText(String(a.due_date))}</strong>.</p>` : '';
     emailBridgedCustomer(site.id, projectId, `Needs your OK — ${title}`,
-      `<p>Your studio has something ready for your review: <strong>${title.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))}</strong>.</p><p>Nothing goes ahead without you — take a look when you have a minute.</p>`).catch(() => {});
+      `<p>Your studio has something ready for your review: <strong>${title.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))}</strong>.</p>${when}<p>Nothing goes ahead without you — take a look when you have a minute.</p>`).catch(() => {});
   }
   return json({ data: a }, 201, cors);
 }
@@ -169,5 +186,6 @@ export async function handleApprovalDecide(req: Request, jwt: string, site: Site
     body: JSON.stringify({ status: b.decision, decided_by: by, decided_by_kind: kind, decided_at: nowIso(), decision_note: clean(b.note, 1000) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'This request just changed — reload and try again.' }, 409, cors); // hash+status guard in WHERE
   await projectEvent(site.id, a.project_id, 'approval_decided', principal, true, { approval_id: id, decision: b.decision });
+  await clearApprovalOverdue(site.id, a.project_id, id);   // audit change 8: the studio's overdue row ends with the decision
   return json({ data: { status: b.decision } }, 200, cors);
 }

@@ -201,6 +201,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .tag.fromclient{background:var(--good-soft);color:var(--good)}
   .tag.action{background:var(--warn-soft);color:var(--warn)}
   .tag.overdue{background:var(--warn-soft);color:var(--bad)}
+  /* audit change 8: the approval state on a file row */
+  .tag.ap.awaiting{background:var(--warn-soft);color:var(--warn);text-transform:none}
+  .tag.ap.approved{background:var(--good-soft);color:var(--good);text-transform:none}
+  .tag.ap.changes{background:var(--warn-soft);color:var(--bad);text-transform:none}
   .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .empty{color:var(--soft);font-size:13.5px;padding:6px 0}
   .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:500;cursor:pointer;padding:0;text-decoration:none}
@@ -608,7 +612,7 @@ function miniForm(host, fields, onSubmit){
     const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor='mf-'+fl.name; f.appendChild(lab);
     const el=document.createElement(fl.type==='textarea'?'textarea':(fl.type==='select'?'select':'input')); el.id='mf-'+fl.name;
     if(fl.type==='select'){ (fl.options||[]).forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;el.appendChild(op);}); }
-    else { if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; }
+    else { if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; if(fl.value!==undefined)el.value=fl.value; }
     f.appendChild(el); inputs[fl.name]=el;
   });
   const row=document.createElement('div'); row.className='row2'; row.style.justifyContent='flex-end';
@@ -796,10 +800,17 @@ async function openProject(id){
     // `client_upload` boolean — a "From client" chip + a meta line, so the
     // studio can tell what the client sent from what it shared.
     const isClientUpload=(x)=>!!x&&(x.client_upload===true||String(x.note||'').startsWith('Uploaded by the client'));
-    const dl=(data.deliverables||[]).map(x=>{const fromClient=isClientUpload(x);
-      return `<div class="item"><div class="t">${esc(x.title)}${fromClient?'<span class="tag fromclient">From client</span>':''}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}${fromClient?'<span class="s">Uploaded by the client</span>':''}</div><button class="btn ghost sm" data-dl="${x.id}">Download</button></div>`;
+    // audit change 8: the approval that binds THIS file (approvals arrive newest
+    // first, so the first match is the one that counts). Pending → chip, no ask
+    // button; decided → the chip stays and the studio may ask again.
+    const apFor=(did)=>(data.approvals||[]).find(a=>a&&a.subject_type==='deliverable'&&a.subject_id===did)||null;
+    const AP_CHIP={pending:['Awaiting approval','awaiting'],approved:['Approved','approved'],changes_requested:['Changes requested','changes'],rejected:['Declined','changes']};
+    const dl=(data.deliverables||[]).map(x=>{const fromClient=isClientUpload(x);const a=apFor(x.id);const ch=a&&AP_CHIP[a.status];
+      const chip=ch?`<span class="tag ap ${ch[1]}" data-apchip="${x.id}">${ch[0]}${(a.status==='pending'&&a.due_date)?' · due '+esc(niceDay(a.due_date)):''}</span>`:'';
+      const ask=(STUDIO&&x.status==='shared'&&!(a&&a.status==='pending'))?`<button class="btn ghost sm" data-ask="${x.id}" data-asktitle="${esc(x.title)}">Ask them to approve</button>`:'';
+      return `<div class="item"><div class="t">${esc(x.title)}${fromClient?'<span class="tag fromclient">From client</span>':''}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}${chip}${fromClient?'<span class="s">Uploaded by the client</span>':''}</div><div class="row2" style="margin-top:0;flex-wrap:nowrap">${ask}<button class="btn ghost sm" data-dl="${x.id}">Download</button></div></div>`;
     }).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
-    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span></div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
+    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span>${(a.status==='pending'&&a.due_date)?`<span class="s">due ${esc(niceDay(a.due_date))}</span>`:''}</div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
 
     $('detailInner').innerHTML=`
       <nav class="crumbs" aria-label="Breadcrumb"><button class="crumb" id="closeDetail">Projects</button><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span></nav>
@@ -889,7 +900,11 @@ async function openProject(id){
     if($('addFile'))$('addFile').onclick=()=>shareFile(id);
     $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(nice(e),true);}});
     // approvals
-    if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary});openProject(id);});
+    if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary,due_date:v.due_date||undefined});openProject(id);});
+    // audit change 8: ask the client to approve ONE file — subject_type
+    // 'deliverable' binds the decision to that file's exact version; the title
+    // defaults to the file's; the date is what the reminders chase.
+    $('detailInner').querySelectorAll('[data-ask]').forEach(b=>b.onclick=()=>askApproval(id,b.dataset.ask,b.dataset.asktitle||''));
     $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(nice(e),true);}});
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
@@ -899,14 +914,35 @@ async function openProject(id){
   }catch(e){ $('detailInner').innerHTML='<div class="rsec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
 }
 
+// audit change 8: the per-file approval request (the Files card's "Ask them to
+// approve", and "+ Share" with its checkbox ticked). ONE POST shape:
+// subject_type 'deliverable' + the file id; the title defaults to the file's;
+// due_date only when given (the reminders key off it).
+function askApproval(id,did,title){
+  miniForm($('dlForm'),[{name:'title',label:'What needs approval?',value:title},{name:'summary',label:'A note for them (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{
+    await postDeliverableApproval(id,did,v.title||title,v.summary,v.due_date); toast('Approval requested'); openProject(id); });
+}
+function postDeliverableApproval(id,did,title,summary,due){
+  const body={subject_type:'deliverable',subject_id:did,title:title||undefined,summary:summary||undefined};
+  if(due)body.due_date=due;
+  return api('/projects/'+id+'/approvals','POST',body);
+}
 async function shareFile(id){
   const host=$('dlForm');
-  miniForm(host,[{name:'title',label:'File name'},{name:'file',label:'Choose a file',type:'file'}],async()=>{});
-  const fileInput=host.querySelector('#mf-file'); const titleInput=host.querySelector('#mf-title');
+  miniForm(host,[{name:'title',label:'File name'},{name:'file',label:'Choose a file',type:'file'},{name:'ask',label:'Ask them to approve it',type:'checkbox'},{name:'due_date',label:'Answer by (optional — only when asking)',type:'date'}],async()=>{});
+  const fileInput=host.querySelector('#mf-file'); const titleInput=host.querySelector('#mf-title'); const askBox=host.querySelector('#mf-ask'); const dueInput=host.querySelector('#mf-due_date');
   host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const file=fileInput.files&&fileInput.files[0];if(!file){toast('Pick a file first.',true);return;}
-    try{ const up=await api('/projects/'+id+'/deliverables/upload-url','POST',{mime:file.type,bytes:file.size,title:titleInput.value.trim()||file.name});
+    const title=titleInput.value.trim()||file.name;
+    try{ const up=await api('/projects/'+id+'/deliverables/upload-url','POST',{mime:file.type,bytes:file.size,title});
       const put=await fetch(up.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type,'x-upsert':'true'},body:file}); if(!put.ok)throw new Error('Upload failed.');
-      await api('/projects/'+id+'/deliverables','POST',{media_id:up.data.media_id,title:titleInput.value.trim()||file.name,status:'shared'}); toast('File shared'); openProject(id);
+      const made=await api('/projects/'+id+'/deliverables','POST',{media_id:up.data.media_id,title,status:'shared'});
+      // the approval rides right behind the share — same step, no second trip
+      // to the record. A failed ask leaves the file shared and says so.
+      if(askBox&&askBox.checked&&made&&made.data&&made.data.id){
+        try{ await postDeliverableApproval(id,made.data.id,title,'',dueInput?dueInput.value:''); toast('File shared — approval requested'); }
+        catch(err){ toast('File shared, but the approval request didn’t go through — ask from the file’s row.',true); }
+      } else toast('File shared');
+      openProject(id);
     }catch(err){ toast(nice(err),true); } };
 }
 
