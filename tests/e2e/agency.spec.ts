@@ -625,6 +625,70 @@ test.describe('Agency home — one home, one roster', () => {
   });
 });
 
+// ── Money on the roster (Oct 2026 studio audit, change 10) ───────────────────
+// An Outstanding column (sortable) and chip, from /sales/receivables grouped by
+// the invoice's customer — the deal's converted client / site. Best-effort: no
+// receivables → blank cells, never a fake $0.
+test.describe('Agency roster — Outstanding', () => {
+  const receivables = { data: { items: [
+    { id: 'i1', title: 'Deposit', amount_cents: 120000, due_date: ymd(5), status: 'open', state: 'upcoming', overdue: false, deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/1', client_id: 'c1', customer_site_id: 'a1' },
+    { id: 'i2', title: 'Balance', amount_cents: 80000, due_date: ymd(-3), status: 'open', state: 'overdue', overdue: true, deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/2', client_id: 'c1', customer_site_id: 'a1' },
+    { id: 'i3', title: 'Invoice', amount_cents: 30000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Park Florist site', stripe_url: null, client_id: 'c4', customer_site_id: null },   // bridged-only customer: grouped by client id
+    { id: 'i4', title: 'Invoice', amount_cents: 50000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd3', deal: 'Unconverted deal', stripe_url: null, client_id: null, customer_site_id: null },   // no customer yet → nowhere on the roster
+  ], paid: [], total_cents: 280000, overdue_cents: 80000, processing_cents: 0 } };
+
+  test('the column totals what each client owes, marks overdue, and sorts', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('thead')).toContainText('Outstanding');
+    const marlow = table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' });
+    await expect(marlow.locator('td.money .owed')).toHaveText('$2,000');
+    await expect(marlow.locator('td.money .owed')).toHaveClass(/late/);
+    await expect(marlow.locator('td.money .sub')).toHaveText('$800 overdue');
+    const park = table.locator('tbody tr', { hasText: 'Park Florist' });
+    await expect(park.locator('td.money .owed')).toHaveText('$300');
+    await expect(park.locator('td.money .owed')).not.toHaveClass(/late/);
+    await expect(table.locator('tbody tr', { hasText: 'Bright Dental' }).locator('td.money')).toHaveText('—');
+    await expect(marlow.locator('td.num')).toHaveText('2');   // the leads cell is still the one td.num
+    await page.locator('.thb[data-sort="owed"]').click();
+    await page.locator('.thb[data-sort="owed"]').click();      // descending
+    await expect(table.locator('tbody tr').first()).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('.lmeta')).toContainText('Sorted by Outstanding — descending');
+  });
+
+  test('the Outstanding chip shows only clients who owe; an overdue client is never "All clear"', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    await page.locator('[data-view="owed"]').click();
+    await expect(page.locator('[data-view="owed"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('tbody')).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('tbody')).toContainText('Park Florist');
+    await page.locator('[data-view="clear"]').click();
+    await expect(page.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);   // owes, but nothing overdue → still clear
+    await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' })).toHaveCount(0);
+  });
+
+  test('cards view says it under the name; no receivables at all → nothing invented', async ({ page }) => {
+    await pinDisplay(page, 'cards');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    await expect(page.locator('.client', { hasText: 'Marlow’s Kitchen' }).locator('.bitln')).toContainText('$2,000 outstanding · $800 overdue');
+    await expect(page.locator('.client', { hasText: 'Bright Dental' }).locator('.bitln')).toHaveCount(0);
+  });
+
+  test('a failed receivables read leaves the column blank — the roster still loads', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: homeApi });
+    await page.route(/\/functions\/v1\/presence\/sales\/receivables/, (route) => route.fulfill(boom(500)));
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr')).toHaveCount(4);
+    await expect(page.locator('tbody td.money')).toHaveText(['—', '—', '—', '—']);
+  });
+});
 // ── Oct 2026 studio audit, change 6: client housekeeping on the roster row ────
 // PATCH /agency/clients/:site (tags · owner · note · archive/restore) existed with
 // no page. Owners, admins and account managers get a ⋯ on each portfolio row that

@@ -29,7 +29,7 @@ import {
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
-  currentProposal, flowSignGate,
+  currentProposal, flowSignGate, stageAfterSignature,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -518,12 +518,20 @@ export async function handleSalesReceivables(_req: Request, site: SiteRow, _prin
   const paidRows = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since)}&select=id,title,amount_cents,status,paid_at,deal_id&order=paid_at.desc&limit=300`).catch(() => ({ json: [] })));
   const dealIds = [...new Set([...invs, ...paidRows].map((i: any) => i.deal_id).filter(Boolean))];
   const dealById: Record<string, string> = {};
-  if (dealIds.length) for (const d of rows(await svc(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&select=id,title`))) dealById[String(d.id)] = String(d.title || '');
+  // Oct 2026 studio audit (change 10): each item also names the deal's CUSTOMER
+  // (converted_client_id / converted_site_id) so the agency roster can total
+  // what each client owes. Both null on an unconverted deal.
+  const dealCustomer: Record<string, { client_id: string | null; site_id: string | null }> = {};
+  if (dealIds.length) for (const d of rows(await svc(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&select=id,title,converted_client_id,converted_site_id`))) {
+    dealById[String(d.id)] = String(d.title || '');
+    dealCustomer[String(d.id)] = { client_id: d.converted_client_id ? String(d.converted_client_id) : null, site_id: d.converted_site_id ? String(d.converted_site_id) : null };
+  }
+  const customerOf = (dealId: unknown) => dealCustomer[String(dealId || '')] || { client_id: null, site_id: null };
   const today = nowIso().slice(0, 10);
   // `state` is the one formula (lib/money_state.ts) against the server's UTC day;
   // `overdue` stays for older page builds. Today re-runs the same mirrored formula
   // against the studio's local day, so its chips and the record's agree.
-  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null }));
+  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
   const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: 'paid', paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
   const buckets = moneyBuckets([...items, ...paid], today);
   // total_cents = what is still WAITING on a client (upcoming + overdue) — a
@@ -1300,6 +1308,7 @@ export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal
   // HALF THE POINT: take down the undismissable "Still unpaid" row. Exact period,
   // so only THIS invoice's reminder goes — other deals' follow-ups are untouched.
   await clearNotice(site.client_id, 'deal_followup', `invremind:${id}`);
+  await clearNoticePrefix(site.client_id, 'deal_followup', `invremind:${id}:`);   // the Oct 2026 three-leg rows (−7 · due · +N)
   // A withdrawn invoice must not still be payable. Best-effort and deliberately
   // AFTER the status write: the row is the authority, and a Stripe hiccup must
   // not leave a void that didn't happen.
@@ -1823,6 +1832,22 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   await clearStaleNextStep(tok.site_id, dealId, 'signed');   // Phase 3: "Sign contract" is done now
+  // SIGNATURE MOVES THE DEAL (studio audit 2026-10, change 7). The leaders move
+  // the stage on signature; we used to raise "ready to convert" and leave the
+  // deal at Agreement out. Pure rule (stageAfterSignature): no deposit still
+  // waiting on the client → Won now; a deposit still open → stay at Agreement
+  // out and let its payment echo (routes/commerce.ts) finish the move. The
+  // "ready to convert" notice below is raised either way — convert is still the
+  // operator's step. Best-effort: a failed read simply leaves the stage.
+  try {
+    const curStage = String(rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=stage&limit=1`))[0]?.stage || 'contract');
+    let depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&deleted_at=is.null&select=status,purpose,processing_since,deleted_at&limit=20`);
+    if (!depR.ok) depR = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${tok.site_id}&purpose=eq.deposit&deleted_at=is.null&select=status,purpose,deleted_at&limit=20`);   // pre-0132
+    if (stageAfterSignature({ currentStage: curStage, deposits: rows(depR) }) === 'won') {
+      await advanceStage(tok.site_id, dealId, 'won', ['lead', 'qualified', 'proposal', 'contract'], sys);
+      await clearStaleNextStep(tok.site_id, dealId, 'won');
+    }
+  } catch { /* the signature stands; the stage move is best-effort */ }
   const signedIsNews = await raiseDealReady(tok.site_id, dealId, 'signed', id);   // W1: "ready to convert {name}" → operator Today/Attention/bell (and clear the agreement's reminder row)
 
   // ── TELL THE OPERATOR. A client signed a contract and the studio got NO email:

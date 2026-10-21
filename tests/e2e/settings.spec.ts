@@ -40,9 +40,10 @@ test.describe('Settings page', () => {
     await page.goto('/settings.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
     await expect(page.locator('#dds-settings')).toHaveAttribute('href', '/settings.html');
-    // the eight areas, each a link to where the thing lives
+    // the nine areas (Automations joined in Oct 2026 — benchmark item 6), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
-    await expect(cards).toHaveCount(8);
+    await expect(cards).toHaveCount(9);
+    await expect(page.locator('[data-card="auto"]')).toHaveAttribute('href', '#automations');
     await expect(page.locator('[data-card="team"]')).toHaveAttribute('href', '/sharing.html');
     await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', '/connections.html');
     await expect(page.locator('[data-card="dev"]')).toHaveAttribute('href', '/developer.html');
@@ -223,6 +224,89 @@ test.describe('Settings page', () => {
   });
 });
 
+// ── Three switches, not a workflow builder (benchmark 2026-10, item 6) ────────
+// Acknowledge new enquiries · remind unpaid invoices −7/due/+N · nudge me on a
+// quiet deal — each default off, each showing the exact sentence it sends, each
+// saving itself to /settings the moment it is flipped. Plus the per-stage
+// "stale after" (item 13). The studio's own; never shown while scoped.
+test.describe('Settings — automations', () => {
+  const SAVED = { industry_key: 'generic', auto_ack_enquiries: true, invoice_reminders: true, invoice_remind_after_days: 5, deal_nudges: false, deal_nudge_days: 7, stage_stale_days: { proposal: 7 } };
+  /** record every PUT and answer it the way the route does: the whole row, with the patch applied */
+  const puts = async (page: import('@playwright/test').Page, base: Record<string, unknown>) => {
+    const out: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const row = { ...base };
+    await page.route('**/functions/v1/presence/**', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      const body = route.request().postDataJSON();
+      out.push({ path: new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body });
+      Object.assign(row, body);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...row } }) });
+    });
+    return out;
+  };
+
+  test('the card opens the section: three switches, all off by default, each with the sentence it will send', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/settings.html');
+    await page.locator('[data-card="auto"]').click();
+    await expect(page.locator('#automations')).toBeVisible();
+    await expect(page.locator('#automations [role="switch"]')).toHaveCount(3);
+    for (const id of ['sw-ack', 'sw-inv', 'sw-deal']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#say-ack')).toHaveText('Thanks for getting in touch — we’ve got your message and will reply within one business day.');
+    await expect(page.locator('#say-inv')).toContainText('Just a friendly nudge: the invoice for $1,250.00 is still open.');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 3 days — a quick follow-up keeps it moving.');
+    await expect(page.locator('#n-inv')).toHaveValue('2');
+    await expect(page.locator('#n-deal')).toHaveValue('3');
+  });
+
+  test('a saved row paints on; flipping a switch PUTs just that field and the sentence follows N', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/settings': { data: SAVED } } });
+    const sent = await puts(page, SAVED);
+    await page.goto('/settings.html#automations');
+    await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#sw-inv')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#n-inv')).toHaveValue('5');
+    await expect(page.locator('#n-inv-echo')).toHaveText('5');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 7 days — a quick follow-up keeps it moving.');
+    await expect(page.locator('#st-proposal')).toHaveValue('7');
+    await expect(page.locator('#st-lead')).toHaveValue('');
+    await page.locator('#sw-deal').click();
+    await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    await page.locator('#sw-inv').click();
+    await expect.poll(() => sent.length).toBe(2);
+    await page.locator('#n-deal').fill('10');
+    await page.locator('#n-deal').press('Tab');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 10 days — a quick follow-up keeps it moving.');
+    await expect.poll(() => sent.length).toBe(3);
+    await page.locator('#st-lead').fill('21');
+    await page.locator('#st-lead').press('Tab');
+    await expect.poll(() => sent.map((p) => p.body)).toEqual([
+      { deal_nudges: true },
+      { invoice_reminders: false },
+      { deal_nudge_days: 10 },
+      { stage_stale_days: { proposal: 7, lead: 21 } },
+    ]);
+    expect(sent.every((p) => p.path === '/settings')).toBe(true);
+  });
+
+  test('a refused save flips the switch back and says so', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/settings', (route) => route.request().method() === 'PUT' ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed","message":"That didn’t save — nothing was changed. Please try again."}' }) : route.fallback());
+    await page.goto('/settings.html#automations');
+    await page.locator('#sw-ack').click();
+    await expect(page.locator('.dds-toast')).toContainText('didn’t save');
+    await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('drilled into a client the studio’s switches stay out of sight', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
+    await page.goto('/settings.html?client=' + CLIENT + '#automations');
+    await expect(page.locator('[data-card="auto"]')).toHaveCount(0);
+    await expect(page.locator('#automations')).toBeHidden();
+  });
+});
 // ── Oct 2026 studio audit, change 6: the agency's TEAM lives on Settings ──────
 // /agency/members existed with no page (the only way to add a seat was an
 // operator-only route). Agency members at studio level get a Team card and an

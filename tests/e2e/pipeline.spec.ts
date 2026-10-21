@@ -2104,3 +2104,168 @@ test.describe('deal page — "Manage their access" carries the customer', () => 
     await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 });
+
+// ── Money and signature (studio audit 2026-10 change 7 · benchmark item 13) ──
+// The deal page keeps ONE filled button per view: Overview's is the stage's
+// do-next (the Path side button), Billing's is the single most likely money
+// action, and the back bar's record link went quiet. The board's "Stalled"
+// badge now follows the per-stage "stale after N days" setting; ticking the
+// last open to-do asks "what's next?" with this stage's presets.
+const filledIn = (page: import('@playwright/test').Page, scope: string) =>
+  page.locator(`${scope} .btn:not(.ghost):visible`).filter({ hasNot: page.locator('.more-menu .btn') });
+
+test.describe('deal page — one filled button per view', () => {
+  test('an open deal with nothing drafted: Overview = Mark stage complete, Billing = + Proposal, the record link is quiet', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await expect(page.locator('#markComplete')).toBeVisible();
+    await expect(page.locator('.backbar a')).toHaveClass(/ghost/);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'markComplete');
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').click();
+    // the Path bar stays above the tabs — its do-next goes quiet here so Billing's one is the only one
+    await expect(page.locator('#markComplete')).toHaveClass(/ghost/);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'addProp');
+    await page.locator('#detailInner .tabs [data-dtab="activity"]').click();
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'qlSave');
+    await page.locator('#detailInner .tabs [data-dtab="overview"]').click();
+    await expect(page.locator('#markComplete')).not.toHaveClass(/ghost/);
+    await expect(page.locator('#sendInvoice')).toHaveClass(/ghost/);
+    await expect(page.locator('#sendDeposit')).toHaveClass(/ghost/);
+    await expect(page.locator('#setupPlan')).toHaveClass(/ghost/);
+    await expect(page.locator('#setupRetainer')).toHaveClass(/ghost/);
+  });
+
+  test('a SIGNED deal: Overview = Convert to customer, Billing = Convert — the agreement row and the Sign-first placeholder are quiet', async ({ page }) => {
+    await installApp(page, { api: conApi(SIGNED_NO_TERM) });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'pathConvert');
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').click();
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'convert');
+  });
+
+  test('a drafted agreement on an unsigned deal: its row Send is Billing’s one; the convert card’s duplicate send is quiet', async ({ page }) => {
+    const DRAFT = { id: 'k-dr', title: 'Service agreement', status: 'draft', signer_name: null, signed_at: null, version: 1, terms_snapshot: null, body: 'Agreed.' };
+    await installApp(page, { api: conApi(DRAFT, { stage: 'proposal' }) });   // not yet at Agreement out, so Convert is not on offer
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('data-send-contract', 'k-dr');
+    await expect(page.locator('#dpanel-billing [data-send-contract="k-dr"]')).toHaveCount(2);   // the row AND the convert card both still send it…
+    await expect(page.locator('#dpanel-billing [data-send-contract="k-dr"]').nth(1)).toHaveClass(/ghost/);   // …but only the row is filled
+  });
+
+  test('a WON deal that is not converted yet: Won is not terminal — Convert is the do-next, guidance says so, Send invoice is quiet', async ({ page }) => {
+    const WON_UNCONVERTED = { ...contractDeal(SIGNED_NO_TERM, { stage: 'won' }) };
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}`]: WON_UNCONVERTED, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.goto(`/pipeline.html?deal=${DEAL7}`);
+    await expect(page.locator('#pathConvert')).toBeVisible();
+    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(page.locator('#pathHost .pstep.done')).toHaveCount(4);   // every step done — but not terminal
+    await expect(page.locator('#dt-preset option')).toContainText(['Convert them to a customer']);   // the signed guidance's to-dos, not "Open their project"
+    await page.locator('#pathConvert').click();
+    await expect(page.locator('#convert')).toBeFocused();
+  });
+
+  test('a converted deal: the header’s Send invoice is the one filled button on Overview; Billing adds none', async ({ page }) => {
+    await installApp(page, { api: TAB_API });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}`);
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'wonInvoice');
+    await page.locator('#detailInner .tabs [data-dtab="billing"]').click();
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);   // still the header's Send invoice
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'wonInvoice');
+    await page.locator('#detailInner .tabs [data-dtab="activity"]').click();
+    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);   // Activity's one is Log it
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+  });
+});
+
+test.describe('pipeline hygiene — stale after N days per stage, and what’s next', () => {
+  const pinBoard = (page: import('@playwright/test').Page) =>
+    page.addInitScript(() => { try { localStorage.setItem('dds-display:pipeline', 'board'); } catch { /* denied */ } });
+  const quietDeals = { data: [
+    { id: DEAL, title: 'Acme website', stage: 'proposal', source: 'manual', expected_value_cents: 500000, expected_close: null, contact_id: 'ct-1', converted_client_id: null, updated_at: past(10), next_step: null, next_step_at: null, last_contacted_at: past(10), agreement_signed: false },
+    { id: DEAL2, title: 'Beta rebrand', stage: 'lead', source: 'enquiry', expected_value_cents: 250000, expected_close: null, contact_id: 'ct-2', converted_client_id: null, updated_at: past(10), next_step: null, next_step_at: null, last_contacted_at: null, agreement_signed: false },
+  ] };
+
+  test('the default (14 days): a deal quiet for 10 days is not stalled', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: { ...API, '/sales/deals': quietDeals, '/settings': { data: { stage_stale_days: {} } } } });
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#board .bcard')).toHaveCount(2);
+    await expect(page.locator('#board .bcard.is-stale')).toHaveCount(0);
+  });
+
+  test('Settings says proposal: 7 → the proposal deal is stalled (and names N); the lead deal keeps the default', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: { ...API, '/sales/deals': quietDeals, '/settings': { data: { stage_stale_days: { proposal: 7 } } } } });
+    await page.goto('/pipeline.html');
+    const stale = page.locator('#board .bcard.is-stale');
+    await expect(stale).toHaveCount(1);
+    await expect(stale).toContainText('Acme website');
+    await expect(stale.locator('.bc-stale')).toHaveAttribute('title', /No movement in 7\+ days/);
+    await expect(page.locator(`#board .bcard[data-id="${DEAL2}"]`)).not.toHaveClass(/is-stale/);
+  });
+
+  test('a failed /settings read leaves the default threshold — never an error', async ({ page }) => {
+    await pinBoard(page);
+    await installApp(page, { api: { ...API, '/sales/deals': quietDeals } });
+    await page.route(/\/functions\/v1\/presence\/settings$/, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
+    await page.goto('/pipeline.html');
+    await expect(page.locator('#board .bcard')).toHaveCount(2);
+    await expect(page.locator('#board .bcard.is-stale')).toHaveCount(0);
+  });
+
+  test('ticking the LAST open to-do asks what’s next with this stage’s presets; a chip adds the to-do', async ({ page }) => {
+    const tasks: Array<{ id: string; title: string; due_date: string | null; status: string }> = [
+      { id: 't1', title: 'Follow up on the proposal', due_date: null, status: 'open' },
+      { id: 't2', title: 'Answer their questions', due_date: null, status: 'done' },
+    ];
+    const posted: string[] = [];
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/(deals\/[^/]+\/tasks|deal-tasks\/[^/]+)$/, async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: tasks }) });
+      if (req.method() === 'PATCH') { const id = new URL(req.url()).pathname.split('/').pop()!; const t = tasks.find((x) => x.id === id); if (t) t.status = req.postDataJSON().status; return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{"ok":true}}' }); }
+      if (req.method() === 'POST') { const b = req.postDataJSON(); posted.push(b.title); tasks.push({ id: 't' + (tasks.length + 1), title: b.title, due_date: null, status: 'open' }); return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{"ok":true}}' }); }
+      return route.fallback();
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await expect(page.locator('#dealTasks [data-tk]')).toHaveCount(2);
+    await expect(page.locator('#whatsNext')).toHaveCount(0);           // a plain load never prompts
+    await page.locator('#dealTasks [data-tk="t1"]').check();
+    await expect(page.locator('#whatsNext')).toBeVisible();
+    await expect(page.locator('#whatsNext')).toContainText('what’s next?');
+    await expect(page.locator('#whatsNext [data-next-todo]').first()).toContainText('Follow up on the proposal');   // the proposal stage's presets
+    await page.locator('#whatsNext [data-next-todo="Send the agreement once they say yes"]').click();
+    await expect.poll(() => posted).toEqual(['Send the agreement once they say yes']);
+    await expect(page.locator('#dealTasks [data-tk]')).toHaveCount(3);
+    await expect(page.locator('#whatsNext')).toHaveCount(0);           // there is an open to-do again
+  });
+
+  test('ticking a to-do while others stay open does not prompt; un-ticking never prompts', async ({ page }) => {
+    const tasks = [
+      { id: 't1', title: 'Call them', due_date: null, status: 'open' },
+      { id: 't2', title: 'Send an intro email', due_date: null, status: 'open' },
+    ];
+    await installApp(page, { api: API });
+    await page.route(/\/functions\/v1\/presence\/sales\/(deals\/[^/]+\/tasks|deal-tasks\/[^/]+)$/, async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: tasks }) });
+      if (req.method() === 'PATCH') { const id = new URL(req.url()).pathname.split('/').pop()!; const t = tasks.find((x) => x.id === id); if (t) t.status = req.postDataJSON().status; }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{"ok":true}}' });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.locator('#dealTasks [data-tk="t1"]').check();
+    await expect(page.locator('#dealTasks [data-tk="t1"]')).toBeChecked();
+    await expect(page.locator('#whatsNext')).toHaveCount(0);
+    await page.locator('#dealTasks [data-tk="t1"]').uncheck();
+    await expect(page.locator('#dealTasks [data-tk="t1"]')).not.toBeChecked();
+    await expect(page.locator('#whatsNext')).toHaveCount(0);
+  });
+});
