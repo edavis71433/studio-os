@@ -211,6 +211,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .bc-v{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;margin-top:3px}
   .bc-m{color:var(--faint);font-size:12px;margin-top:3px}
   .bcard.is-stale{border-left:2px solid var(--warn,#775d31)}
+  .whats-next{border:1px solid var(--line);border-left:3px solid var(--p);border-radius:var(--dds-r,8px);padding:10px 12px;margin:0 0 10px;background:var(--p-soft,rgba(91,63,160,.06))}
+  .btn.sm{padding:5px 10px;font-size:12.5px}
   .bc-stale{display:inline-block;font-size:12px;font-weight:500;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px 7px;margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:3px}
   .bc-actions{margin-top:8px;position:relative}
@@ -461,6 +463,7 @@ const CONTRACT_SIGNED_GUIDANCE={tip:'They’ve signed — convert them to open t
   todos:['Convert them to a customer','Request the deposit','Book the kickoff call']};
 const guidanceFor=(s,facts)=>{
   if(s==='contract'&&facts&&facts.signed&&!facts.converted)return CONTRACT_SIGNED_GUIDANCE;
+  if(s==='won'&&facts&&!facts.converted)return CONTRACT_SIGNED_GUIDANCE;   // signature moved it to Won; convert is still the step
   return PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
 };
 // ── Renewal-term detection — the client mirror of impliedTermMonths in
@@ -571,6 +574,12 @@ let GUIDE_OPEN=true,PENDING_BACK='';
 // "Convert them") switch to the right tab before they act.
 const DTAB_KEYS=['overview','billing','activity'];
 let DTAB='overview';
+// ONE filled button per view (studio audit 2026-10, change 7): a control above
+// the tabs names the tabs it is primary for; on any other tab it goes quiet.
+function applyTabPrimaries(tab){
+  const root=$('detailInner'); if(!root)return;
+  root.querySelectorAll('[data-primary-for]').forEach(el=>{el.classList.toggle('ghost',!String(el.getAttribute('data-primary-for')||'').split(/\s+/).includes(tab));});
+}
 function showDealTab(tab,opts){
   opts=opts||{};
   if(!DTAB_KEYS.includes(tab))tab='overview';
@@ -578,6 +587,7 @@ function showDealTab(tab,opts){
   const root=$('detailInner'); if(!root)return;
   root.querySelectorAll('.tabs [data-dtab]').forEach(b=>{const on=b.dataset.dtab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.setAttribute('tabindex',on?'0':'-1');});
   root.querySelectorAll('[data-dtab-panel]').forEach(p=>{p.hidden=p.dataset.dtabPanel!==tab;});
+  applyTabPrimaries(tab);
   // ?dtab= mirrors the tab; Overview is the bare deal URL
   try{const q=new URLSearchParams(location.search);if(tab==='overview')q.delete('dtab');else q.set('dtab',tab);history.replaceState(null,'',location.pathname+'?'+q.toString());}catch(_){}
   if(opts.focus){const b=root.querySelector('.tabs [data-dtab="'+tab+'"]');if(b)b.focus();}
@@ -1433,15 +1443,33 @@ async function renderSummary(gen){
 
 // First-class deal to-dos (#203) — multiple, each with a due date + done-state.
 // Degrades to a calm empty state if migration 0108 isn't applied yet.
-async function loadDealTasks(id){
+// "What's next?" (benchmark 2026-10, item 13): the moment the LAST open to-do is
+// ticked, the box offers this stage's next to-dos instead of going quiet. Only on
+// that transition — never on a plain load with nothing open. DEAL_FACTS is set by
+// openDeal (stage · signed · converted) so the presets match the stage.
+let DEAL_FACTS=null;
+function whatsNextHtml(){
+  const f=DEAL_FACTS||{};const g=guidanceFor(f.stage,{signed:!!f.signed,converted:!!f.converted});
+  const chips=(g.todos||[]).map(t=>`<button type="button" class="btn ghost sm" data-next-todo="${esc(t)}">+ ${esc(t)}</button>`).join('');
+  return `<div class="whats-next" id="whatsNext" role="status"><div style="font-weight:600;margin-bottom:4px">That was the last one — what’s next?</div><div class="mut" style="margin-bottom:8px">${esc(g.action)}.</div><div class="row2" style="flex-wrap:wrap;gap:6px">${chips}<button type="button" class="btn ghost sm" id="nextCustom">Something else…</button></div></div>`;
+}
+async function loadDealTasks(id,opts){
+  opts=opts||{};
   const host=$('dealTasks'); if(!host)return;
   let items=[];try{const r=await api('/sales/deals/'+id+'/tasks');items=(r&&r.data)||[];}catch(_){}
   if(CURRENT_DEAL!==id||host!==$('dealTasks'))return;   // the drawer moved on while this read was in flight
-  if(!items.length){host.innerHTML='<span class="mut">No to-dos yet.</span>';return;}
+  const openNow=items.filter(t=>t.status!=='done').length;
+  const prompt=(opts.justTicked&&openNow===0)?whatsNextHtml():'';
+  if(!items.length){host.innerHTML='<span class="mut">No to-dos yet.</span>'+prompt;wireWhatsNext(host,id);return;}
   const today=new Date().toISOString().slice(0,10);
-  host.innerHTML=items.map(t=>{const done=t.status==='done';const overdue=!done&&t.due_date&&t.due_date<=today;return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut" style="${overdue?'color:var(--warn,#775d31);font-weight:600':''}">· ${overdue?'due ':''}${esc(t.due_date)}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
-  host.querySelectorAll('[data-tk]').forEach(c=>c.onchange=async()=>{try{await api('/sales/deal-tasks/'+c.getAttribute('data-tk'),'PATCH',{status:c.checked?'done':'open'});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
+  host.innerHTML=prompt+items.map(t=>{const done=t.status==='done';const overdue=!done&&t.due_date&&t.due_date<=today;return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut" style="${overdue?'color:var(--warn,#775d31);font-weight:600':''}">· ${overdue?'due ':''}${esc(t.due_date)}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
+  host.querySelectorAll('[data-tk]').forEach(c=>c.onchange=async()=>{try{await api('/sales/deal-tasks/'+c.getAttribute('data-tk'),'PATCH',{status:c.checked?'done':'open'});loadDealTasks(id,{justTicked:c.checked});}catch(e){toast(nice(e),true);}});
   host.querySelectorAll('[data-tkdel]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deal-tasks/'+b.getAttribute('data-tkdel'),'PATCH',{delete:true});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
+  wireWhatsNext(host,id);
+}
+function wireWhatsNext(host,id){
+  host.querySelectorAll('[data-next-todo]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:b.getAttribute('data-next-todo')});toast('To-do added');loadDealTasks(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+  const nc=$('nextCustom'); if(nc)nc.onclick=()=>{const p=$('whatsNext');if(p)p.remove();const t=$('dt-title');if(t)t.focus();};
 }
 // ── Shared per-invoice actions: Send/Resend · Copy link · Void ───────────────
 // ONE wiring for every surface that renders invoice rows with these controls —
@@ -1539,7 +1567,7 @@ async function load(soft){
     // limit = the server's MAX_PAGE (see FETCH_LIMIT) — never the 25-row default.
     const qs=new URLSearchParams({limit:String(FETCH_LIMIT)});
     if(!board&&FILTER)qs.set('stage',FILTER);
-    const res=await api('/sales/deals?'+qs.toString());
+    const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays()]);   // the board's stale threshold rides the same wave (best-effort)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];
     LOADED_AT=Date.now();
@@ -1725,6 +1753,18 @@ function renderTable(){
   });
 }
 
+// ── Stale after N days per stage — VERBATIM mirror of lib/sales_lifecycle.ts
+//    staleDaysFor / dealQuietDays / dealStaleAfter (no bundler; pinned by
+//    tests/presence/money_signature_test.mjs). STALE_DAYS is the site's
+//    presence_settings.stage_stale_days (migration 0134), read once, best-effort.
+const DEFAULT_STALE_DAYS=14;
+const OPEN_STAGES_LIST=['lead','qualified','proposal','contract'];
+function staleDaysFor(stage,setting){const s=(setting&&typeof setting==='object')?setting[String(stage)]:undefined;const n=Math.trunc(Number(s));return(Number.isFinite(n)&&n>=1&&n<=365)?n:DEFAULT_STALE_DAYS;}
+function dealQuietDays(d,nowMs){const ts=[d.last_contacted_at,d.updated_at,d.created_at].map(x=>Date.parse(String(x||''))).filter(t=>Number.isFinite(t));if(!ts.length)return null;return Math.floor((nowMs-Math.max.apply(null,ts))/86400000);}
+function dealStaleAfter(d,nowMs,setting){if(d.converted_client_id)return false;if(OPEN_STAGES_LIST.indexOf(String(d.stage||''))<0)return false;const q=dealQuietDays(d,nowMs);return q!==null&&q>=staleDaysFor(d.stage,setting);}
+let STALE_DAYS={};
+let STALE_Q=null;
+const loadStaleDays=()=>(STALE_Q=STALE_Q||api('/settings').then(r=>{const v=r&&r.data&&r.data.stage_stale_days;STALE_DAYS=(v&&typeof v==='object')?v:{};return STALE_DAYS;}).catch(()=>{STALE_Q=null;return STALE_DAYS;}));
 // ── Kanban board: columns = open stages, cards = deals (name · value · last
 // contacted). A card opens the same drawer the list uses; moving a card calls
 // the SAME /sales/deals/:id/stage endpoint and only offers canTransition-allowed
@@ -1733,10 +1773,12 @@ function boardCard(d,today){
   const val=money(d.expected_value_cents);
   const lc=d.last_contacted_at?`Last contacted ${esc(ago(d.last_contacted_at))}`:'';
   const due=(d.next_step&&d.next_step_at&&d.next_step_at<=today)?`<div class="bc-due">Due: ${esc(d.next_step)}</div>`:'';
-  // Stalled: no contact in 30+ days (a card the system nudges you about instead of
-  // relying on memory). Never-contacted brand-new deals don't flag — avoids noise.
-  const stale=d.last_contacted_at&&((Date.now()-Date.parse(d.last_contacted_at))/86400000>=30);
-  const staleBadge=stale?`<span class="bc-stale" title="No contact in 30+ days — worth a nudge">${svgi('hourglass')} Stalled</span>`:'';
+  // Stalled: no movement — no logged contact, no edit — for the stage's N days
+  // (Settings → "stale after", default 14; benchmark 2026-10 item 13). Mirrors
+  // lib/sales_lifecycle.ts dealStaleAfter.
+  const stale=dealStaleAfter(d,Date.now(),STALE_DAYS);
+  const staleN=staleDaysFor(d.stage,STALE_DAYS);
+  const staleBadge=stale?`<span class="bc-stale" title="No movement in ${staleN}+ days — worth a nudge">${svgi('hourglass')} Stalled</span>`:'';
   const canMove=boardMoveTargets(d.stage).length>0;
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
   return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}<div class="bc-actions">${moveBtn}</div></article>`;
@@ -1976,6 +2018,7 @@ async function openDeal(id){
     // kept in sync with crm.html by hand). "Mark as lost" stays the separated,
     // quiet action so it can't be fat-fingered; a lost deal keeps its Reopen.
     const signedNow=(data.contracts||[]).some(k=>k.status==='signed');
+    DEAL_FACTS={stage:d.stage,signed:signedNow,converted:!!d.converted_client_id};
     // A saved-but-unsent doc must NEVER read as finished: a plain status chip +
     // a PRIMARY Send. A sent-but-not-emailed doc keeps a persistent "copy link"
     // (LINKS) so it's never silently stuck. `forWhom` personalises the CTA.
@@ -1990,6 +2033,14 @@ async function openDeal(id){
     const draftProp=dealOpen?(data.proposals||[]).find(p=>p.status==='draft'&&!(propTotals(p.line_items).meta||{}).superseded_by):null;
     const draftCon=dealOpen?(data.contracts||[]).find(k=>k.status==='draft'):null;
     const SEND_BOTH=!!(draftProp&&draftCon);
+    // ONE FILLED BUTTON PER VIEW (studio audit 2026-10, change 7; bug 9 counted
+    // five on Billing). Overview's is the stage's do-next (the Path side button);
+    // Billing's is the single most likely money action, picked here in order —
+    // everything else on the tab is quiet. The won deal's header "Send invoice"
+    // is filled only once the deal is converted (otherwise Convert is the one).
+    const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
+    const BILL_PRIMARY=!dealOpen&&!canConvert?'':canConvert?'convert':SEND_BOTH?'both':draftCon?('con:'+draftCon.id):draftProp?('prop:'+draftProp.id):!(data.proposals||[]).length?'addProp':(!(data.contracts||[]).length&&(data.proposals||[]).some(p=>p.status==='accepted'||p.status==='sent'))?'addCon':'';
+    const fillIf=(on)=>on?'btn':'btn ghost';
     const props=(data.proposals||[]).map(p=>{
       const T=propTotals(p.line_items);
       const superseded=!!(T.meta&&T.meta.superseded_by);
@@ -2001,7 +2052,7 @@ async function openDeal(id){
       // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft —
       // the draft stays viewable, the Send button goes.
       const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
-      const act=superseded?'':p.status==='draft'?(closed?`<span class="mut">Never sent — the deal ${d.stage==='lost'?'closed':'was won'} without it</span> `:SEND_BOTH?'':`<button class="btn" data-send-proposal="${p.id}">Send${forWhom} →</button> `):p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
+      const act=superseded?'':p.status==='draft'?(closed?`<span class="mut">Never sent — the deal ${d.stage==='lost'?'closed':'was won'} without it</span> `:SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='prop:'+p.id)}" data-send-proposal="${p.id}">Send${forWhom} →</button> `):p.status==='sent'?`<button class="btn ghost" data-link-proposal="${p.id}">Copy link</button> `:'';
       const revise=canRevise?`<button class="btn ghost" data-revise-prop="${p.id}" title="Create a new version to renegotiate — this one is kept and marked superseded">Revise →</button>`:'';
       // A draft was never sent to anyone, so a mistaken one (the duplicate you
       // meant to overwrite) can simply go. The moment it IS sent it becomes part
@@ -2021,7 +2072,7 @@ async function openDeal(id){
       const signed=k.status==='signed';
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
-      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="btn" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
+      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='con:'+k.id)}" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone
       // holds a signing link, and a signature is permanent. Draft only.
@@ -2043,7 +2094,6 @@ async function openDeal(id){
       return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
-    const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
     const draftContract=(data.contracts||[]).find(k=>k.status==='draft'); // saved but not sent
     // Convert = adding YOUR customer (service voice, frozen billing boundary):
     // the studio bills them for the work — they never subscribe to software.
@@ -2101,7 +2151,7 @@ async function openDeal(id){
     const dpanel=(k)=>`<div class="dtab" id="dpanel-${k}" role="tabpanel" aria-labelledby="dtab-${k}" data-dtab-panel="${k}" hidden>`;
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
     $('detailInner').innerHTML=`
-      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
+      <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
       <div class="dhead">
         <div class="dh-ic" aria-hidden="true">${svgi('pipeline')}</div>
         <div style="min-width:0;flex:1"><div id="dtitle" tabindex="-1">${esc(d.title||'Deal')}</div>
@@ -2112,7 +2162,7 @@ async function openDeal(id){
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
             ${data.last_contacted_at?`<span>Last contacted ${esc(ago(data.last_contacted_at))}</span>`:''}
           </div></div></div>
-      ${(d.stage==='won'||d.converted_client_id)?`<div class="row2 dh-acts" style="padding:0 22px 14px"><button class="btn" id="wonInvoice">Send invoice</button>${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}&client=" data-noscope="1" style="text-decoration:none">Open project</a>`:''}<a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="text-decoration:none">Customer record</a></div>`:''}
+      ${(d.stage==='won'||d.converted_client_id)?`<div class="row2 dh-acts" style="padding:0 22px 14px"><button${d.converted_client_id?' data-primary-for="overview billing"':''} class="${fillIf(!!d.converted_client_id)}" id="wonInvoice">Send invoice</button>${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}&client=" data-noscope="1" style="text-decoration:none">Open project</a>`:''}<a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="text-decoration:none">Customer record</a></div>`:''}
       <div class="dbody">
         <div class="sec life" id="dealLife"><h3>Move stage</h3><div id="pathHost"></div>
           ${d.converted_client_id?'<div class="mut" style="margin-top:10px">Won ✓ — converted to a customer</div>'
@@ -2161,8 +2211,8 @@ async function openDeal(id){
         ${dpanel('billing')}
         ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
           <div class="row2" style="margin-top:8px"><button class="btn" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
-        <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="btn ghost" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
-        <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="btn ghost" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
+        <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addProp')}" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
+        <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addCon')}" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
           <div class="lrows">${(data.invoices||[]).map(v=>{
             // Oct 2026 (item 2): the row's word is the money state — Paid · Processing ·
@@ -2181,10 +2231,10 @@ async function openDeal(id){
           ${(()=>{const r=d.retainer;if(r&&r.status&&r.status!=='canceled'){const per=r.interval==='year'?'year':'month';const st=r.status==='active'?'<span style="color:var(--good,#33664b);font-weight:700">Active</span>':r.status==='past_due'?'<span style="color:var(--bad,#a3423a);font-weight:700">Payment overdue</span>':'<span style="color:var(--warn,#775d31);font-weight:600">Awaiting the client’s authorization</span>';const copyLink=(r.status==='pending'&&r.checkout_url)?` <button class="btn ghost" data-copy-pay="${esc(r.checkout_url)}">Copy authorization link</button>`:'';return `<div class="row2"><span class="mut"><strong>${money(r.amount_cents)}</strong> every ${per} · ${st}</span><span>${copyLink}<button class="btn ghost" id="cancelRetainer">Cancel retainer</button></span></div>`;}return `<div class="mut" style="margin-top:2px">Bill this client automatically for ongoing work — the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do, and either of you can stop it any time.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRetainer">Set up a retainer</button></div><div id="retForm"></div>`;})()}
         </div>
         <div class="sec"><h3>Convert to customer</h3>
-          ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html${customerSite(d)?'?client='+esc(encodeURIComponent(customerSite(d))):''}">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
+          ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html${customerSite(d)?'?client='+esc(encodeURIComponent(customerSite(d))):''}">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
             canConvert?`<div id="convWrap"><button class="btn" id="convert">Convert — set up their workspace</button><div class="mut" style="margin-top:8px">${convExplain}</div></div>`:
-            draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
-            `<div id="convWrap"><button class="btn" disabled>Sign the agreement first</button></div>`}
+            draftContract?`<div class="mut">Your agreement is drafted but hasn’t been sent yet — ${whoName} can’t sign until it goes out. Send it for signature first; once it’s signed you can add them as your customer.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" data-send-contract="${draftContract.id}">Send the agreement for signature →</button></div>`:
+            `<div id="convWrap"><button class="btn ghost" disabled>Sign the agreement first</button></div>`}
         </div>
         </div>
         ${dpanel('activity')}
@@ -2243,14 +2293,21 @@ async function openDeal(id){
       const fwd=(BOARD_NEXT[stage]||[])[0];
       const fwdOk=fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>curIdx;
       let side='';
-      if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
+      // Signature moves the deal (change 7): a deal can now be Won before it is
+      // converted — its do-next is still Convert, so the side button says so.
+      // data-primary-for: the Path bar sits above the tabs, so its do-next is
+      // filled on Overview only — Billing and Activity have their own one
+      // (applyTabPrimaries, run by showDealTab and after every path repaint).
+      if(stage==='won'&&!d.converted_client_id)side=`<button type="button" data-primary-for="overview" class="btn" id="pathConvert">Convert to customer ↓</button>`;
+      else if(stage==='won')side=`<span class="terminal-chip won">Won ✓</span>`;
       else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
-      else if(stage==='contract'&&signedNow)side=`<button type="button" class="btn" id="pathConvert">Convert to customer ↓</button>`;
-      else if(fwdOk)side=`<button type="button" class="btn" id="markComplete">Mark stage complete</button>`;
+      else if(stage==='contract'&&signedNow)side=`<button type="button" data-primary-for="overview" class="btn" id="pathConvert">Convert to customer ↓</button>`;
+      else if(fwdOk)side=`<button type="button" data-primary-for="overview" class="btn" id="markComplete">Mark stage complete</button>`;
       else side=`<span class="mut" style="font-size:13px">Get the agreement signed to convert</span>`;
       host.innerHTML=`<div class="pathrow"><div class="path" role="group" aria-label="Deal stages">${steps}</div><div class="path-side">${side}</div></div>
         ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button type="button" class="btn" id="backGo">Move back</button><button type="button" class="btn ghost" id="backNo">Cancel</button></div>`:''}
-        ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${(stage==='contract'&&signedNow)?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(g.action)} ↓</a>`:esc(g.action)}</div>`:''}`;
+        ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${((stage==='contract'&&signedNow)||(stage==='won'&&!d.converted_client_id))?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(g.action)} ↓</a>`:esc(g.action)}</div>`:''}`;
+      applyTabPrimaries(DTAB);
       const mc=$('markComplete'); if(mc)mc.onclick=()=>pathMove(fwd,mc);
       // the Convert flow stays exactly where it is — these just point at it
       // (the side button AND the signed-guidance "Do next" deep-link).

@@ -94,8 +94,8 @@ test.describe('Agency portfolio', () => {
     await expect(dental.locator('.badge')).toContainText('all clear');
     await expect(dental.locator('.bits')).toHaveCount(0);
     // Phase 1 overhaul: every row carries "Open record" (the hub) + "Their website"
-    await expect(marlow.locator('.rowact')).toHaveText(['Open record', 'Their website']);
-    await expect(dental.locator('.rowact')).toHaveText(['Open record', 'Their website']);
+    await expect(marlow.locator('.rowact')).toHaveText(['Open record', 'Their website', '⋯']);   // ⋯ = tags · owner · note · archive (Oct 2026)
+    await expect(dental.locator('.rowact')).toHaveText(['Open record', 'Their website', '⋯']);
   });
 
   test('cards view keeps the original at-a-glance card (badge + status bits)', async ({ page }) => {
@@ -622,5 +622,156 @@ test.describe('Agency home — one home, one roster', () => {
     await page.goto('/agency.html');
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
     await expect(page.locator('#healthDoor')).toHaveCount(0);
+  });
+});
+
+// ── Money on the roster (Oct 2026 studio audit, change 10) ───────────────────
+// An Outstanding column (sortable) and chip, from /sales/receivables grouped by
+// the invoice's customer — the deal's converted client / site. Best-effort: no
+// receivables → blank cells, never a fake $0.
+test.describe('Agency roster — Outstanding', () => {
+  const receivables = { data: { items: [
+    { id: 'i1', title: 'Deposit', amount_cents: 120000, due_date: ymd(5), status: 'open', state: 'upcoming', overdue: false, deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/1', client_id: 'c1', customer_site_id: 'a1' },
+    { id: 'i2', title: 'Balance', amount_cents: 80000, due_date: ymd(-3), status: 'open', state: 'overdue', overdue: true, deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/2', client_id: 'c1', customer_site_id: 'a1' },
+    { id: 'i3', title: 'Invoice', amount_cents: 30000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Park Florist site', stripe_url: null, client_id: 'c4', customer_site_id: null },   // bridged-only customer: grouped by client id
+    { id: 'i4', title: 'Invoice', amount_cents: 50000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd3', deal: 'Unconverted deal', stripe_url: null, client_id: null, customer_site_id: null },   // no customer yet → nowhere on the roster
+  ], paid: [], total_cents: 280000, overdue_cents: 80000, processing_cents: 0 } };
+
+  test('the column totals what each client owes, marks overdue, and sorts', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('thead')).toContainText('Outstanding');
+    const marlow = table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' });
+    await expect(marlow.locator('td.money .owed')).toHaveText('$2,000');
+    await expect(marlow.locator('td.money .owed')).toHaveClass(/late/);
+    await expect(marlow.locator('td.money .sub')).toHaveText('$800 overdue');
+    const park = table.locator('tbody tr', { hasText: 'Park Florist' });
+    await expect(park.locator('td.money .owed')).toHaveText('$300');
+    await expect(park.locator('td.money .owed')).not.toHaveClass(/late/);
+    await expect(table.locator('tbody tr', { hasText: 'Bright Dental' }).locator('td.money')).toHaveText('—');
+    await expect(marlow.locator('td.num')).toHaveText('2');   // the leads cell is still the one td.num
+    await page.locator('.thb[data-sort="owed"]').click();
+    await page.locator('.thb[data-sort="owed"]').click();      // descending
+    await expect(table.locator('tbody tr').first()).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('.lmeta')).toContainText('Sorted by Outstanding — descending');
+  });
+
+  test('the Outstanding chip shows only clients who owe; an overdue client is never "All clear"', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    await page.locator('[data-view="owed"]').click();
+    await expect(page.locator('[data-view="owed"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('tbody')).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('tbody')).toContainText('Park Florist');
+    await page.locator('[data-view="clear"]').click();
+    await expect(page.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);   // owes, but nothing overdue → still clear
+    await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' })).toHaveCount(0);
+  });
+
+  test('cards view says it under the name; no receivables at all → nothing invented', async ({ page }) => {
+    await pinDisplay(page, 'cards');
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
+    await page.goto('/agency.html');
+    await expect(page.locator('.client', { hasText: 'Marlow’s Kitchen' }).locator('.bitln')).toContainText('$2,000 outstanding · $800 overdue');
+    await expect(page.locator('.client', { hasText: 'Bright Dental' }).locator('.bitln')).toHaveCount(0);
+  });
+
+  test('a failed receivables read leaves the column blank — the roster still loads', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: homeApi });
+    await page.route(/\/functions\/v1\/presence\/sales\/receivables/, (route) => route.fulfill(boom(500)));
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr')).toHaveCount(4);
+    await expect(page.locator('tbody td.money')).toHaveText(['—', '—', '—', '—']);
+  });
+});
+// ── Oct 2026 studio audit, change 6: client housekeeping on the roster row ────
+// PATCH /agency/clients/:site (tags · owner · note · archive/restore) existed with
+// no page. Owners, admins and account managers get a ⋯ on each portfolio row that
+// opens an inline form; tags paint as chips; an Archived view fetches the other
+// half of the portfolio on demand. Bridged-only rows (no portfolio link) have none.
+test.describe('Agency roster — housekeeping', () => {
+  const ROW_API = { ...homeApi, '/agency/portfolio': { data: [
+    { ...MARLOW, tags: ['restaurant', 'burbank'], owner: 'eric@brightstudio.example', notes: 'Prefers texts over email.', has_notes: true },
+    DENTAL, CEDAR,
+  ] } };
+
+  test('tags paint as chips, the ⋯ opens the form prefilled, Save PATCHes tags/owner/notes and the row repaints', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: ROW_API });
+    const patches: unknown[] = [];
+    await page.route('**/functions/v1/presence/agency/clients/*', (route) => {
+      patches.push(route.request().postDataJSON());
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { site_id: 'a1', status: 'active', ...(route.request().postDataJSON() as object) } }) });
+    });
+    await page.goto('/agency.html');
+    const marlow = page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).first();
+    await expect(marlow.locator('.tagchip')).toHaveText(['restaurant', 'burbank']);
+    await expect(marlow.locator('.notedot')).toBeVisible();
+    await marlow.getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    const form = page.locator('form[data-hkform="a1"]');
+    await expect(form).toBeVisible();
+    await expect(form.locator('[name="tags"]')).toHaveValue('restaurant, burbank');
+    await expect(form.locator('[name="owner"]')).toHaveValue('eric@brightstudio.example');
+    await expect(form.locator('[name="notes"]')).toHaveValue('Prefers texts over email.');
+    await form.locator('[name="tags"]').fill('restaurant, burbank, vip');
+    await form.locator('[name="notes"]').fill('Prefers texts. Invoices go to Ana.');
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.dds-toast')).toContainText('Saved.');
+    expect(patches).toEqual([{ tags: ['restaurant', 'burbank', 'vip'], owner_email: 'eric@brightstudio.example', notes: 'Prefers texts. Invoices go to Ana.' }]);
+    await expect(page.locator('form[data-hkform="a1"]')).toHaveCount(0);                      // the form closes
+    await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).first().locator('.tagchip')).toHaveText(['restaurant', 'burbank', 'vip']);
+  });
+
+  test('Archive is a two-press action: the row leaves the list, the Archived view fetches ?archived=true and offers Restore', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: ROW_API });
+    const calls: string[] = [];
+    await page.route(/\/functions\/v1\/presence\/agency\/portfolio/, (route) => {
+      const u = new URL(route.request().url()); calls.push(u.search);
+      return route.fulfill(ok(u.searchParams.get('archived') === 'true' ? { data: [{ ...DENTAL, site_id: 'a9', name: 'Old Bakery', archived: true }] } : ROW_API['/agency/portfolio']));
+    });
+    await page.route('**/functions/v1/presence/agency/clients/*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { site_id: 'a3', status: (route.request().postDataJSON() as { status: string }).status } }) }));
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);                        // 3 on the portfolio + the bridged-only Park Florist
+    await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    const arch = page.locator('form[data-hkform="a3"]').getByRole('button', { name: /Archive/ });
+    await arch.click();
+    await expect(arch).toContainText('Press again');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);                        // armed, nothing sent
+    await arch.click();
+    await expect(page.locator('.dds-toast').filter({ hasText: 'archived' })).toContainText('Cedar Garage archived');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(3);
+    await expect(page.locator('.lhead .lmeta')).toContainText('3 businesses');
+    // the Archived view is its own read, made the first time it is asked for
+    expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(0);
+    await page.locator('[data-view="archived"]').click();
+    await expect(page.locator('tbody tr', { hasText: 'Old Bakery' })).toBeVisible();
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toBeVisible();        // the one just archived joins it
+    expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(1);
+    await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.locator('form[data-hkform="a3"]').getByRole('button', { name: 'Restore client' }).click();
+    await expect(page.locator('.dds-toast').filter({ hasText: 'restored' })).toContainText('Cedar Garage restored');   // the archive toast may still be up
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(0);
+    await page.locator('[data-view="all"]').click();
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
+  });
+
+  test('a read-only member sees no ⋯; a bridged-only customer has none either; the search matches tags', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: ROW_API });
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr', { hasText: 'Park Florist' }).getByRole('button', { name: /More for/ })).toHaveCount(0);   // bridge-only: no portfolio row to patch
+    await page.locator('#search').fill('burbank');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(1);
+    await expect(page.locator('tbody tr[data-open]').first()).toContainText('Marlow’s Kitchen');
+    await installApp(page, { api: { ...ROW_API, '/agency/me': { data: { agency: 'Bright Studio', role: 'readonly', plan: 'agency', branding: {} } } } });
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
+    await expect(page.getByRole('button', { name: /More for/ })).toHaveCount(0);
   });
 });

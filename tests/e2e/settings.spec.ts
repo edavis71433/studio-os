@@ -40,9 +40,10 @@ test.describe('Settings page', () => {
     await page.goto('/settings.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
     await expect(page.locator('#dds-settings')).toHaveAttribute('href', '/settings.html');
-    // the eight areas, each a link to where the thing lives
+    // the nine areas (Automations joined in Oct 2026 — benchmark item 6), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
-    await expect(cards).toHaveCount(8);
+    await expect(cards).toHaveCount(9);
+    await expect(page.locator('[data-card="auto"]')).toHaveAttribute('href', '#automations');
     await expect(page.locator('[data-card="team"]')).toHaveAttribute('href', '/sharing.html');
     await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', '/connections.html');
     await expect(page.locator('[data-card="dev"]')).toHaveAttribute('href', '/developer.html');
@@ -220,5 +221,191 @@ test.describe('Settings page', () => {
     await expect(page.locator('#view-today')).toBeHidden();
     release();
     await expect(page.locator('#view-business')).toBeVisible();
+  });
+});
+
+// ── Three switches, not a workflow builder (benchmark 2026-10, item 6) ────────
+// Acknowledge new enquiries · remind unpaid invoices −7/due/+N · nudge me on a
+// quiet deal — each default off, each showing the exact sentence it sends, each
+// saving itself to /settings the moment it is flipped. Plus the per-stage
+// "stale after" (item 13). The studio's own; never shown while scoped.
+test.describe('Settings — automations', () => {
+  const SAVED = { industry_key: 'generic', auto_ack_enquiries: true, invoice_reminders: true, invoice_remind_after_days: 5, deal_nudges: false, deal_nudge_days: 7, stage_stale_days: { proposal: 7 } };
+  /** record every PUT and answer it the way the route does: the whole row, with the patch applied */
+  const puts = async (page: import('@playwright/test').Page, base: Record<string, unknown>) => {
+    const out: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const row = { ...base };
+    await page.route('**/functions/v1/presence/**', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      const body = route.request().postDataJSON();
+      out.push({ path: new URL(route.request().url()).pathname.replace(/^.*\/functions\/v1\/presence/, ''), body });
+      Object.assign(row, body);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...row } }) });
+    });
+    return out;
+  };
+
+  test('the card opens the section: three switches, all off by default, each with the sentence it will send', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/settings.html');
+    await page.locator('[data-card="auto"]').click();
+    await expect(page.locator('#automations')).toBeVisible();
+    await expect(page.locator('#automations [role="switch"]')).toHaveCount(3);
+    for (const id of ['sw-ack', 'sw-inv', 'sw-deal']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#say-ack')).toHaveText('Thanks for getting in touch — we’ve got your message and will reply within one business day.');
+    await expect(page.locator('#say-inv')).toContainText('Just a friendly nudge: the invoice for $1,250.00 is still open.');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 3 days — a quick follow-up keeps it moving.');
+    await expect(page.locator('#n-inv')).toHaveValue('2');
+    await expect(page.locator('#n-deal')).toHaveValue('3');
+  });
+
+  test('a saved row paints on; flipping a switch PUTs just that field and the sentence follows N', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/settings': { data: SAVED } } });
+    const sent = await puts(page, SAVED);
+    await page.goto('/settings.html#automations');
+    await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#sw-inv')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#n-inv')).toHaveValue('5');
+    await expect(page.locator('#n-inv-echo')).toHaveText('5');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 7 days — a quick follow-up keeps it moving.');
+    await expect(page.locator('#st-proposal')).toHaveValue('7');
+    await expect(page.locator('#st-lead')).toHaveValue('');
+    await page.locator('#sw-deal').click();
+    await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    await page.locator('#sw-inv').click();
+    await expect.poll(() => sent.length).toBe(2);
+    await page.locator('#n-deal').fill('10');
+    await page.locator('#n-deal').press('Tab');
+    await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 10 days — a quick follow-up keeps it moving.');
+    await expect.poll(() => sent.length).toBe(3);
+    await page.locator('#st-lead').fill('21');
+    await page.locator('#st-lead').press('Tab');
+    await expect.poll(() => sent.map((p) => p.body)).toEqual([
+      { deal_nudges: true },
+      { invoice_reminders: false },
+      { deal_nudge_days: 10 },
+      { stage_stale_days: { proposal: 7, lead: 21 } },
+    ]);
+    expect(sent.every((p) => p.path === '/settings')).toBe(true);
+  });
+
+  test('a refused save flips the switch back and says so', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/settings', (route) => route.request().method() === 'PUT' ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed","message":"That didn’t save — nothing was changed. Please try again."}' }) : route.fallback());
+    await page.goto('/settings.html#automations');
+    await page.locator('#sw-ack').click();
+    await expect(page.locator('.dds-toast')).toContainText('didn’t save');
+    await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('drilled into a client the studio’s switches stay out of sight', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
+    await page.goto('/settings.html?client=' + CLIENT + '#automations');
+    await expect(page.locator('[data-card="auto"]')).toHaveCount(0);
+    await expect(page.locator('#automations')).toBeHidden();
+  });
+});
+// ── Oct 2026 studio audit, change 6: the agency's TEAM lives on Settings ──────
+// /agency/members existed with no page (the only way to add a seat was an
+// operator-only route). Agency members at studio level get a Team card and an
+// inline section: the seats, every member with a role, invite / change role /
+// remove for owners and admins. Never on a client's settings; never for a plain
+// studio owner (who has no agency).
+test.describe('Settings — the agency team', () => {
+  const ME = { data: { agency: 'Bright Studio', role: 'owner', plan: 'agency', branding: {}, email: 'eric@brightstudio.example' } };
+  const MEMBERS = { data: [
+    { id: 'm-1', email: 'eric@brightstudio.example', role: 'owner', status: 'active', created_at: '2026-01-10T00:00:00Z' },
+    { id: 'm-2', email: 'sam@brightstudio.example', role: 'designer', status: 'active', created_at: '2026-06-01T00:00:00Z' },
+  ] };
+  const USAGE = { data: { plan: 'agency', seats: { used: 2, limit: 3 }, clients: { used: 3, active: 3, archived: 0, limit: 10 }, editions: {}, publishes_30d: 1 } };
+  const teamApi = { ...API, '/portal/context': AGENCY_CTX, '/agency/me': ME, '/agency/members': MEMBERS, '/agency/usage': USAGE,
+    '/commerce/subscription': { data: { plan: 'agency', plan_name: 'Agency', status: 'active', can_manage_billing: false } } };
+
+  test('an owner sees the Team card, the seats, every member with a role select, and the invite form', async ({ page }) => {
+    await installApp(page, { api: teamApi });
+    await page.goto('/settings.html');
+    const card = page.locator('[data-card="agency_team"]');
+    await expect(card).toContainText('Team');
+    await expect(card.locator('.st')).toHaveText('2 on the team');
+    // the client-portal card is retitled for an agency: it is about the CLIENTS, not the team
+    await expect(page.locator('[data-card="team"] b')).toHaveText('Sharing & access');
+    await card.click();
+    await expect(page.locator('#team')).toBeVisible();
+    await expect(page.locator('#seats')).toHaveText('2 of 3 seats');
+    const rows = page.locator('#people .member');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('eric@brightstudio.example');
+    await expect(rows.nth(0)).toContainText('Owner · you');           // your own row: no controls on yourself
+    await expect(rows.nth(0).locator('select, button')).toHaveCount(0);
+    await expect(rows.nth(1).locator('select[data-role]')).toHaveValue('designer');
+    await expect(rows.nth(1).getByRole('button', { name: 'Remove' })).toBeVisible();
+    await expect(page.locator('#inviteForm')).toBeVisible();
+    await expect(page.locator('#inv-role option')).toHaveCount(7);     // every role but owner
+    await expect(page.locator('#inv-role')).toHaveValue('account_manager');
+  });
+
+  test('Invite POSTs /agency/members {email, role}; the new member joins the list and the count moves', async ({ page }) => {
+    await installApp(page, { api: teamApi });
+    await page.route('**/functions/v1/presence/agency/members', (route) => route.request().method() === 'POST'
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'm-3', email: 'jo@brightstudio.example', role: 'support', status: 'active', emailed: true } }) })
+      : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MEMBERS) }));
+    await page.goto('/settings.html#team');
+    await page.locator('#inv-email').fill('jo@brightstudio.example');
+    await page.locator('#inv-role').selectOption('support');
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && /\/agency\/members$/.test(new URL(r.url()).pathname));
+    await page.locator('#inviteBtn').click();
+    expect((await posted).postDataJSON()).toEqual({ email: 'jo@brightstudio.example', role: 'support' });
+    await expect(page.locator('.dds-toast')).toContainText('Invited — they get an email with a sign-in link.');
+    await expect(page.locator('#people .member')).toHaveCount(3);
+    await expect(page.locator('#people .member').nth(2)).toContainText('jo@brightstudio.example');
+    await expect(page.locator('[data-card="agency_team"] .st')).toHaveText('3 on the team');
+    await expect(page.locator('#inv-email')).toHaveValue('');
+  });
+
+  test('a role change PATCHes /agency/members/:id; Remove is a two-press action that PATCHes status revoked', async ({ page }) => {
+    await installApp(page, { api: teamApi });
+    const patches: Array<{ path: string; body: unknown }> = [];
+    await page.route('**/functions/v1/presence/agency/members/*', (route) => {
+      patches.push({ path: new URL(route.request().url()).pathname.replace(/^.*\/presence/, ''), body: route.request().postDataJSON() });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'm-2', email: 'sam@brightstudio.example', ...(route.request().postDataJSON() as object) } }) });
+    });
+    await page.goto('/settings.html#team');
+    await page.locator('select[data-role="m-2"]').selectOption('account_manager');
+    await expect(page.locator('.dds-toast')).toContainText('Role changed.');
+    const remove = page.locator('#people .member').nth(1).getByRole('button', { name: /Remove/ });
+    await remove.click();                                               // arms
+    await expect(remove).toContainText('Press again');
+    expect(patches).toHaveLength(1);                                    // nothing sent yet
+    await remove.click();                                               // fires
+    await expect(page.locator('#people .member').nth(1)).toHaveClass(/revoked/);
+    await expect(page.locator('#people .member').nth(1)).toContainText('removed');
+    await expect(page.locator('#people .member').nth(1).getByRole('button', { name: 'Restore' })).toBeVisible();
+    expect(patches).toEqual([
+      { path: '/agency/members/m-2', body: { role: 'account_manager' } },
+      { path: '/agency/members/m-2', body: { status: 'revoked' } },
+    ]);
+  });
+
+  test('a designer sees the team read-only; a plain studio owner has no Team card; a drilled-in operator has none either', async ({ page }) => {
+    await installApp(page, { api: { ...teamApi, '/agency/me': { data: { ...ME.data, role: 'designer', email: 'sam@brightstudio.example' } } } });
+    await page.goto('/settings.html#team');
+    await expect(page.locator('#people .member')).toHaveCount(2);
+    await expect(page.locator('#people select')).toHaveCount(0);
+    await expect(page.locator('#people button')).toHaveCount(0);
+    await expect(page.locator('#inviteForm')).toBeHidden();
+    // no agency → no Team card (the default STUDIO context)
+    await installApp(page, { api: API });
+    await page.goto('/settings.html');
+    await expect(page.locator('[data-card="studio"]')).toBeVisible();
+    await expect(page.locator('[data-card="agency_team"]')).toHaveCount(0);
+    await expect(page.locator('[data-card="team"] b')).toHaveText('Team & access');
+    // drilled into a client → the client's settings never show the studio's team
+    await installApp(page, { api: { ...teamApi, '/portal/context': SCOPED_CTX } });
+    await page.goto('/settings.html?client=' + CLIENT);
+    await expect(page.locator('[data-card="studio"]')).toBeVisible();
+    await expect(page.locator('[data-card="agency_team"]')).toHaveCount(0);
+    await expect(page.locator('#team')).toBeHidden();
   });
 });

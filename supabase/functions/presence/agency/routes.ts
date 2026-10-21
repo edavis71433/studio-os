@@ -140,7 +140,9 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       tag: url.searchParams.get('tag') || undefined,
       archived: url.searchParams.has('archived') ? url.searchParams.get('archived') === 'true' : false,
     });
-    return json({ data: rows }, 200, cors);
+    // internal notes are a capability of their own (support reads them, readonly does not)
+    const out = can(member.role, 'notes') ? rows : rows.map((r) => ({ ...r, notes: '' }));
+    return json({ data: out }, 200, cors);
   }
 
   // ── work queues + cross-client patterns — from the existing pipeline only ──

@@ -391,11 +391,15 @@
   .svccat{margin-bottom:8px}
   .svcfoot{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;width:100%;margin-top:auto;padding-top:14px;flex-wrap:wrap}
   .svcfoot button{font-size:13px;padding:7px 15px}
+  /* the catalog's Request this buttons are outlined — the tab has no one filled verb,
+     and three filled buttons made the catalog shout (experience review #37) */
+  .svcfoot button.approve{background:transparent;color:var(--p);border-color:var(--p);box-shadow:none;font-weight:600}
+  .svcfoot button.approve:hover{background:var(--p-soft);color:var(--p);border-color:var(--p)}
   .svcprice{font-size:13.5px;font-weight:600;color:var(--ink)}
   @media (max-width:719px){.acttiles,.svcgrid{grid-template-columns:1fr}}
   @media (prefers-reduced-motion:reduce){.acttile,.acttile:hover{transition:none;transform:none}}
   .reqfilter{display:flex;gap:8px;margin-bottom:12px}
-  .chip[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  .chip[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}   /* a filter reads pressed, not filled (experience review #37) */
   .reqlist{padding:5px 18px}
   .reqrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:13px 2px;cursor:pointer;font-weight:400}
   .reqrow:first-child{border-top:0}
@@ -1319,14 +1323,26 @@ async function paneProject(host,row){
       ta.value='';
       row.when=new Date().toISOString();row.preview=v;row.unfetched=false;
       resortMRows();   // list data — correct whichever conversation is open now
+      const sent=sentMessage(r,v);c.msgs=[sent].concat(c.msgs||[]);if(live())paintProjThread(c);   // the sent message shows at once (experience review #44); the refetch below confirms it
       const mr=await api('/client/projects/'+row.pid+'/messages').catch(()=>null);
       const mrd=(mr&&mr.ok&&mr.body&&mr.body.data)||null;
-      if(Array.isArray(mrd)){c.msgs=mrd.slice();row.when=(c.msgs[0]&&c.msgs[0].created_at)||row.when;resortMRows();}
+      if(Array.isArray(mrd)){c.msgs=keepSent(mrd,[sent]);row.when=(c.msgs[0]&&c.msgs[0].created_at)||row.when;resortMRows();}
       // a failed refetch keeps the msgs we already have — never an error card over a sent thread
       if(live())paintProjThread(c);   // $('mpbody') is grabbed fresh — only paint if this pane still shows this conversation
     }else toast('That didn’t send.');
     btn.disabled=false;
   });
+}
+// The message just sent, for painting into the open thread before the refetch
+// lands: the route's returned row when it carries one, else a local stand-in
+// with the same shape (experience review #44).
+function sentMessage(r,body){const d=(r&&r.body&&r.body.data)||{};return {id:d.id||('local:'+Date.now()),body:d.body||body,author_kind:d.author_kind||'client',created_at:d.created_at||new Date().toISOString()};}
+// A refetch confirms a sent message but never erases it: a read that lags the
+// write (or a stand-in id) keeps the local copy until the server's row shows up.
+function keepSent(fresh,sentList){
+  const out=fresh.slice();
+  for(const s of (sentList||[])){if(!s)continue;const seen=out.some(m=>m&&(m.id===s.id||(m.body===s.body&&m.author_kind!=='staff'&&m.author_kind!=='system')));if(!seen)out.unshift(s);}
+  return out;
 }
 function paintProjThread(c){
   const pb=$('mpbody');if(!pb)return;
@@ -2356,13 +2372,13 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
   $('newSupport').addEventListener('click',()=>openSupport(id));
-  $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';loadThread(id);}else toast('That didn’t send.');b.disabled=false;});
+  $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';PROJ_MSGS=[sentMessage(r,v)].concat(PROJ_MSGS);renderProjTimeline();loadThread(id);}else toast('That didn’t send.');b.disabled=false;});   // the sent message shows at once; loadThread confirms it (experience review #44)
 }
 // re-fetch the thread and repaint the rail (a sent message appears as a timeline item)
 async function loadThread(id){
   delete MC.cache[id];   // only reached after a successful send — the Messages pane's cached copy of this conversation is stale now
   const r=await api('/client/projects/'+id+'/messages').catch(()=>null);if(!r||!r.ok)return;/* a failed refetch must not erase the rail — keep the thread we have */
-  PROJ_MSGS=((r.body&&r.body.data)||[]).slice();PROJ_MSGS_FAILED=false;renderProjTimeline();
+  PROJ_MSGS=keepSent(((r.body&&r.body.data)||[]).slice(),PROJ_MSGS.filter(m=>m&&String(m.id||'').indexOf('local:')===0));PROJ_MSGS_FAILED=false;renderProjTimeline();   // the just-sent message survives a lagging read (experience review #44)
 }
 // ── the project activity timeline (crm.html's anatomy, the client's palette) ─
 // Bundle events (already filtered client-visible server-side; detail.from ===

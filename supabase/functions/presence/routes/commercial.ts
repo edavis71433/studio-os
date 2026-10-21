@@ -22,6 +22,7 @@ import {
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
+import { enquiryAckCopy } from '../lib/commercial.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -149,7 +150,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (isFormPost && siteOrigin) return redirectTo('/contact/');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); }
+    if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
     if (isFormPost && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     return ok200(def.confirmation_text || 'Thanks — your message was sent.');
   }
@@ -169,7 +170,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     if (isFormPost && siteOrigin) return redirectTo('/contact/');
     return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   }
-  if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
+  if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
   if (isFormPost && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
   return ok200('Thanks — your message was sent.');
 }
@@ -291,6 +292,23 @@ async function hashIp(req: Request): Promise<string> {
   const data = new TextEncoder().encode(ip + '|' + (APPROVAL_SECRET || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt'));
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** "Acknowledge new enquiries within a minute" (benchmark 2026-10, item 6):
+ *  the FIRST switch. When the site has it on, the person who just wrote in gets
+ *  ONE short email, right now, on the owner's brand, saying exactly the sentence
+ *  Settings shows (enquiryAckCopy — pinned by test). Default OFF; no email on
+ *  the enquiry → nothing to send; never blocks the submit. */
+async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: string }): Promise<boolean> {
+  if (!sub.email) return false;
+  const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
+  const auto = await automationSettingsFor(siteId);
+  if (!auto.auto_ack_enquiries) return false;
+  const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
+  const studio = String(ident.json?.[0]?.business_name || '').trim();
+  const brand = await loadEmailBrand(siteId);
+  const copy = enquiryAckCopy({ name: sub.name, studio: studio || brand.name });
+  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId });   // they wrote in; this is the reply they are waiting for
 }
 
 async function notifyOwnerOfLead(siteId: string, sub: { form_kind: string; name: string; email: string; phone: string; message: string }) {

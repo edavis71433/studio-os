@@ -29,6 +29,7 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   :focus-visible{outline:2px solid var(--p);outline-offset:1px;border-radius:4px}
   a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
+  @media (max-width:760.98px){#leadMailto{display:inline-flex;align-items:center;min-height:44px}}   /* phone tap target (experience review #43) */
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -1001,8 +1002,6 @@ function renderTL(host,items){
 }
 
 // ── A support row → the thread + an honest status control + reply composer ───
-// legal transitions — kept in sync with lib/intake.ts SUPPORT_NEXT by hand
-const SUPPORT_NEXT={open:['in_progress','resolved','closed'],in_progress:['open','resolved','closed'],resolved:['open','closed'],closed:['open']};
 const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',closed:'Closed'};
 // Oct 2026 review: ONE path for every status change — the select, the header's
 // Resolve / Close, and "Reply and resolve". PATCH /support/:id (the existing
@@ -1055,9 +1054,13 @@ async function paneSupport(host,it){
   // the existing triage route; the server re-checks the ladder)
   const cur=String(req.status||'open');
   if(cur!==it.status){it.status=cur;const chip=$('paneStatusChip');if(chip){chip.textContent=SUPPORT_LABEL[cur]||cur;chip.className='pchip '+cur;}}   // the server's status wins over the feed's
-  const opts=[cur,...(SUPPORT_NEXT[cur]||[])];
-  $('paneStatusWrap').innerHTML=`<label for="paneStatus" style="font-size:11px;color:var(--faint)">Status</label> <select id="paneStatus" aria-label="Support request status">${opts.map(s=>`<option value="${esc(s)}"${s===cur?' selected':''}>${esc(SUPPORT_LABEL[s]||s)}</option>`).join('')}</select>`;
-  $('paneStatus').addEventListener('change',(e)=>setSupportStatus(host,it,e.target.value,e.target));
+  // One way to end a request (experience review #22): the header's Resolve and
+  // Close, plus "Reply and resolve" beside the composer. The server's status
+  // decides which still show — a request the feed thought open but the server
+  // says is resolved loses them here.
+  const openNowSrv=cur==='open'||cur==='in_progress';
+  if(!openNowSrv){const sr0=$('supResolve'),sc0=$('supClose'),st0=$('supTask');if(sr0)sr0.remove();if(sc0)sc0.remove();if(st0)st0.remove();}
+  $('paneStatusWrap').innerHTML='';
   let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
@@ -1155,6 +1158,7 @@ function paneLead(host,it){
         l.replies=sent.concat([{body,at:new Date().toISOString()}]);
         toast(`Sent to ${l.email} — their reply comes back here.`);
         leadMarked(it,'replied');   // the server marked it Replied; every row that shows it agrees
+        clearLeadNudge(it.lead_id);   // …and its "waiting for a reply" nudge leaves now, not on the next load
       }else{
         toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
         btn.disabled=false;btn.textContent='Send reply';
@@ -1189,6 +1193,18 @@ function leadMarked(it,status){
   const h=document.querySelector('#rpane .pname');
   const f=(status==='read'||status==='not_a_fit')&&$('leadNotFit')||h;
   if(f){if(f===h)h.setAttribute('tabindex','-1');f.focus();}
+}
+// The Today nudge ("A quote request is waiting for a reply") and the Inbox's
+// own "Worth a look" row for it are the feed's lead_followup notice. The server
+// retires it on its next pass; until then this clears it locally and leaves a
+// 24-hour marker today.html reads, so neither page keeps asking for a reply
+// that went out (experience review #45).
+function clearLeadNudge(leadId){
+  const id=String(leadId||'');if(!id)return;
+  const mine=(n)=>!!n&&n.kind==='lead_followup'&&(String(n.period||'')==='lead:'+id||String(n.href||'').indexOf('lead:'+id)>=0);
+  if((FEED.notices||[]).some(mine)){FEED.notices=FEED.notices.filter(n=>!mine(n));SYSROWS=buildSystem(FEED,NOTIFS);TOTAL=inboxCount();renderList();}   // the list only — the pane keeps the reply it just showed
+  try{const k='dds-replied-leads';const m=JSON.parse(localStorage.getItem(k)||'{}')||{};m[id]=Date.now();localStorage.setItem(k,JSON.stringify(m));}catch(_){}
+  bumpBell();
 }
 async function setLeadStatus(it,status,btn){
   if(btn)btn.disabled=true;

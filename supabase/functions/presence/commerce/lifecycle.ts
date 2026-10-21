@@ -423,6 +423,96 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
   return { nudged };
 }
 
+// ── Three switches, not a workflow builder (benchmark 2026-10, item 6) ───────
+// The automations below read ONE row: presence_settings on the deal's (agency)
+// site — migration 0134 adds the columns, every one DEFAULT OFF. A database
+// without the columns (deploy ahead of the apply pack) answers 400 to the
+// select; that reads as "every switch off", which is exactly the default, so
+// nothing fires that the owner never turned on. Per-site, cached per sweep.
+export interface AutomationSettings {
+  auto_ack_enquiries: boolean;
+  invoice_reminders: boolean;
+  invoice_remind_after_days: number;   // the +N leg after the due date (−7 and the due day are fixed)
+  deal_nudges: boolean;
+  deal_nudge_days: number;             // quiet for this many days → one nudge a week
+}
+export const AUTOMATION_DEFAULTS: AutomationSettings = { auto_ack_enquiries: false, invoice_reminders: false, invoice_remind_after_days: 2, deal_nudges: false, deal_nudge_days: 3 };
+export const AUTOMATION_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days';
+/** Normalise a settings row (or nothing) into the five values. Pure. */
+export function automationSettings(row: Record<string, unknown> | null | undefined): AutomationSettings {
+  const r = row && typeof row === 'object' ? row : {};
+  const days = (v: unknown, d: number) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n >= 1 && n <= 90 ? n : d; };
+  return {
+    auto_ack_enquiries: r.auto_ack_enquiries === true,
+    invoice_reminders: r.invoice_reminders === true,
+    invoice_remind_after_days: days(r.invoice_remind_after_days, AUTOMATION_DEFAULTS.invoice_remind_after_days),
+    deal_nudges: r.deal_nudges === true,
+    deal_nudge_days: days(r.deal_nudge_days, AUTOMATION_DEFAULTS.deal_nudge_days),
+  };
+}
+export async function automationSettingsFor(siteId: string, cache?: Map<string, AutomationSettings>): Promise<AutomationSettings> {
+  if (cache?.has(siteId)) return cache.get(siteId)!;
+  let out = AUTOMATION_DEFAULTS;
+  try {
+    const r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS}&limit=1`);
+    if (r.ok) out = automationSettings(Array.isArray(r.json) ? r.json[0] : null);   // a 400 (pre-0134) = all off
+  } catch { /* defaults */ }
+  cache?.set(siteId, out);
+  return out;
+}
+
+// ── Invoice reminders: −7 days · the due date · +N days (studio audit, change 10) ─
+// Three legs, each sent AT MOST ONCE, on three disjoint windows, so the client
+// never hears twice in a day and never more than three times per invoice:
+//   before   due−7 ≤ today < due        "coming up"
+//   due      due ≤ today < due+N        "due today"
+//   after    today ≥ due+N              "still unpaid"  (the operator hears this one)
+// An invoice with no due date is treated as due 7 days after it was sent and
+// gets no "before" leg (nobody set a date to warn about). Nothing fires on the
+// day the invoice was sent. The period `invremind:<id>:<slot>` is the dedupe
+// key; the legacy once-ever `invremind:<id>` counts as the after-leg done.
+export type InvoiceReminderSlot = 'before' | 'due' | 'after';
+export const INVOICE_REMIND_BEFORE_DAYS = 7;
+export const UNDATED_INVOICE_DUE_DAYS = 7;
+const ymdOf = (x: unknown): string | null => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(x || '')); return m ? m[1] : null; };
+const daysFromTo = (a: string, b: string): number => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400_000);
+export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unknown; status?: unknown; processing_since?: unknown; stripe_url?: unknown }, todayYmd: string, afterDays: number): InvoiceReminderSlot | null {
+  if (String(inv.status || 'open') !== 'open' || inv.processing_since || !inv.stripe_url) return null;   // nothing to pay, or already settling
+  const sent = ymdOf(inv.created_at);
+  if (!sent || sent >= todayYmd) return null;                       // never on the day it went out
+  const n = Math.max(1, Math.trunc(Number(afterDays)) || AUTOMATION_DEFAULTS.invoice_remind_after_days);
+  const explicitDue = ymdOf(inv.due_date);
+  const due = explicitDue || new Date(Date.parse(sent + 'T00:00:00Z') + UNDATED_INVOICE_DUE_DAYS * 86400_000).toISOString().slice(0, 10);
+  const d = daysFromTo(due, todayYmd);                               // days past due (negative = before)
+  if (d >= n) return 'after';
+  if (d >= 0) return 'due';
+  if (explicitDue && d >= -INVOICE_REMIND_BEFORE_DAYS) return 'before';
+  return null;
+}
+export const invoiceReminderPeriod = (invoiceId: string, slot: InvoiceReminderSlot): string => `invremind:${invoiceId}:${slot}`;
+export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string): { subject: string; line: string } {
+  const name = title || what;
+  if (slot === 'before') return { subject: `Coming up — ${name} (${amount})`, line: `A quick heads-up: the ${what} for <strong>${amount}</strong> is due in a few days. The same secure link works whenever you're ready — nothing expires.` };
+  if (slot === 'due') return { subject: `Due today — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is due today. The same secure link works whenever you're ready — nothing expires.` };
+  return { subject: `A gentle reminder — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.` };
+}
+
+// ── Deal nudge: "no next step for N days" (benchmark item 6, third switch) ───
+/** An OPEN deal is due a nudge when it has been quiet (no edit, no logged
+ *  contact) for N days AND nothing is scheduled ahead — a next step dated in the
+ *  future is a plan, not silence. Pure. */
+export function dealNudgeDue(d: { stage?: unknown; converted_client_id?: unknown; updated_at?: unknown; last_contacted_at?: unknown; next_step_at?: unknown }, nowMs: number, days: number): boolean {
+  if (d.converted_client_id) return false;
+  if (!['qualified', 'proposal', 'contract'].includes(String(d.stage || ''))) return false;
+  const n = Math.max(1, Math.trunc(Number(days)) || AUTOMATION_DEFAULTS.deal_nudge_days);
+  const ts = [d.updated_at, d.last_contacted_at].map((x) => Date.parse(String(x || ''))).filter((t) => Number.isFinite(t));
+  if (!ts.length) return false;
+  if ((nowMs - Math.max(...ts)) / 86400_000 < n) return false;
+  const next = ymdOf(d.next_step_at);
+  if (next && next >= new Date(nowMs).toISOString().slice(0, 10)) return false;   // a next step is scheduled — not silence
+  return true;
+}
+
 // ── CRM: nudge stale DEALS (leads had this; deals didn't) ────────────────────
 // A deal parked in qualified/proposal/contract with no movement for a few days
 // would otherwise sit forever — Pipedrive/Dubsado's whole promise is "no deal
@@ -433,22 +523,38 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
 // dealFollowupPeriod carries the 7-day bucket (the supportAgingPeriod idiom):
 // send-once inside a week, speaks up again the next; the sales.ts teardowns
 // clear every bucket at once via dealFollowupPeriodPrefix (+ the legacy key).
+/** The nudge's one sentence per stage — the preview settings.html shows. Pure. */
+export function dealNudgeCopy(stage: unknown, days: number): string {
+  const n = Math.max(1, Math.trunc(Number(days)) || AUTOMATION_DEFAULTS.deal_nudge_days);
+  const quiet = n === 1 ? 'a day' : `${n} days`;
+  if (stage === 'proposal') return `A proposal has been out for ${quiet} with no reply — a quick nudge often closes it.`;
+  if (stage === 'contract') return `The agreement has been out for ${quiet} and isn’t signed yet — a gentle reminder helps it over the line.`;
+  return `This deal has had no next step for ${quiet} — a quick follow-up keeps it moving.`;
+}
 export async function runDealFollowups(limit = 20): Promise<{ nudged: number; task_nudges: number }> {
   // #8 rides this registered step (see runDealTaskReminders below) so the
   // sweep needs no new /system/run wiring — same cadence, same revenue group.
   const task_nudges = (await runDealTaskReminders(limit).catch(() => ({ nudged: 0 }))).nudged;
   const from = new Date(Date.now() - 30 * 86400_000).toISOString();   // not ancient (<30d)
-  const to = new Date(Date.now() - 3 * 86400_000).toISOString();      // quiet at least 3 days
-  const q = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(qualified,proposal,contract)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,title,stage&order=updated_at.asc&limit=${limit}`);
+  const to = new Date(Date.now() - 1 * 86400_000).toISOString();      // quiet at least a day; the site's own N (dealNudgeDue) decides from here
+  // next_step_at lands with 0089 — fall back to the narrower select before it.
+  let q = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(qualified,proposal,contract)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,title,stage,updated_at,next_step_at&order=updated_at.asc&limit=${limit * 5}`);
+  if (!q.ok) q = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(qualified,proposal,contract)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,title,stage,updated_at&order=updated_at.asc&limit=${limit * 5}`);
   let nudged = 0;
-  for (const deal of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string }>) {
+  // THE SWITCH (benchmark 2026-10, item 6): "Nudge me when a deal has had no next
+  // step for N days" — per site, default OFF (migration 0134). A site that never
+  // turned it on hears nothing; N is theirs too.
+  const settingsCache = new Map<string, AutomationSettings>();
+  for (const deal of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string; updated_at?: string; next_step_at?: string | null }>) {
+    if (nudged >= limit) break;
+    const auto = await automationSettingsFor(deal.site_id, settingsCache);
+    if (!auto.deal_nudges) continue;
+    if (!dealNudgeDue(deal, Date.now(), auto.deal_nudge_days)) continue;
     const siteQ = await svc(`presence_sites?id=eq.${deal.site_id}&select=client_id&limit=1`);
     const clientId = siteQ.json?.[0]?.client_id;
     if (!clientId) continue;
     const title = deal.title || 'a deal';
-    const body = deal.stage === 'proposal' ? 'A proposal has been out for a few days with no reply — a quick nudge often closes it.'
-      : deal.stage === 'contract' ? 'The agreement is sent but not signed yet — a gentle reminder helps it over the line.'
-      : 'This deal has gone quiet for a few days — a quick follow-up keeps it moving.';
+    const body = dealNudgeCopy(deal.stage, auto.deal_nudge_days);
     const fresh = await raiseNotice({ siteId: deal.site_id, clientId, kind: 'deal_followup', period: dealFollowupPeriod(deal.id, Date.now()), headline: `Follow up on ${title}`, body });
     if (fresh) {
       nudged++;
@@ -616,35 +722,47 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
 // (send-once via the notices dedupe), re-using the stored Stripe link, to the
 // deal's contact; the owner gets the notice on the same rail.
 export async function runInvoiceReminders(limit = 20): Promise<{ reminded: number }> {
-  const cutoff = new Date(Date.now() - 7 * 86400_000).toISOString();   // open for 7+ days
+  // Studio audit 2026-10, change 10: three reminders per invoice (−7 · due · +N),
+  // behind the per-site switch "Remind unpaid invoices …" (benchmark item 6),
+  // default OFF (migration 0134). invoiceReminderSlot is the pure schedule; the
+  // notice ledger is the send-once gate per leg.
   const today = new Date().toISOString().slice(0, 10);
-  // Fetch a WIDE candidate window, then drop already-reminded ones up front —
-  // otherwise the oldest `limit` open invoices occupy the window forever and
-  // invoice #limit+1 never gets its reminder (starvation).
   // A payment that is PROCESSING (ACH settling — processing_since, migration
   // 0132) is not unpaid: nudging that client would be wrong. Tolerant: before
   // the migration the filter 400s, so fall back to the pre-0132 query.
-  const TAIL = `&or=(due_date.lt.${today},and(due_date.is.null,created_at.lt.${encodeURIComponent(cutoff)}))&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url&order=created_at.asc&limit=${limit * 5}`;
+  const TAIL = `&created_at=lt.${encodeURIComponent(today)}&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url,due_date,created_at,status&order=created_at.asc&limit=${limit * 10}`;
   let q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null${TAIL}`);
   if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null${TAIL}`);
-  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string }>;
-  let fresh = candidates;
-  if (candidates.length) {
-    const periods = candidates.map((i) => `"invremind:${i.id}"`).join(',');
-    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${candidates.length}`);
+  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string; due_date?: string | null; created_at: string; status?: string; processing_since?: string | null }>;
+  const settingsCache = new Map<string, AutomationSettings>();
+  // Which leg (if any) each invoice is on today — only for sites with the switch on.
+  const due: Array<{ inv: typeof candidates[number]; slot: InvoiceReminderSlot }> = [];
+  for (const inv of candidates) {
+    const auto = await automationSettingsFor(inv.site_id, settingsCache);
+    if (!auto.invoice_reminders) continue;
+    const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days);
+    if (slot) due.push({ inv, slot });
+  }
+  // Drop already-sent legs up front (the wide window + filter avoids the
+  // starvation the old once-ever sweep had). The legacy once-ever key
+  // `invremind:<id>` counts as the after-leg done.
+  let fresh = due;
+  if (due.length) {
+    const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' ? `,"invremind:${inv.id}"` : ''}`).join(',');
+    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length * 2}`);
     const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
-    fresh = candidates.filter((i) => !done.has(`invremind:${i.id}`)).slice(0, limit);
+    fresh = due.filter(({ inv, slot }) => !done.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && done.has(`invremind:${inv.id}`))).slice(0, limit);
   }
   let reminded = 0;
-  for (const inv of fresh) {
+  for (const { inv, slot } of fresh) {
     const siteQ = await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`);
     const clientId = siteQ.json?.[0]?.client_id;
     if (!clientId) continue;
     const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
-    const what = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
+    const what: 'deposit' | 'invoice' = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
     // Discover the client email FIRST — the notice must tell the truth about
     // whether a nudge actually went out (and never burn the once-ever dedupe
-    // on a claim that didn't happen).
+    // on a claim that didn't happen). The client is the invoice's deal contact.
     let email = '';
     try {
       if (inv.deal_id) {
@@ -652,18 +770,24 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
         email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
       }
     } catch { /* treated as no email on file */ }
+    // The earlier legs are the CLIENT's business: a silent ledger row (the
+    // send-once gate) and the email. The after-leg is the one the OPERATOR
+    // hears — an active "Still unpaid" row on the bell, as before.
+    const operatorHears = slot === 'after';
+    if (!operatorHears && !email) continue;   // nothing to send and nobody to tell — wait for the after-leg
     const noticeBody = email
-      ? 'We nudged the client once with the same secure link. If it stays quiet, a personal note usually lands best.'
+      ? (slot === 'after' ? 'We nudged the client with the same secure link — the third and last automatic reminder. If it stays quiet, a personal note usually lands best.'
+        : `Automatic reminder sent (${slot === 'before' ? 'a week before the due date' : 'on the due date'}).`)
       : 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
-    const fresh = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: `invremind:${inv.id}`, headline: `Still unpaid — ${inv.title || what} (${amount})`, body: noticeBody });
-    if (!fresh) continue;   // already reminded once — never nag
+    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `Reminder sent — ${inv.title || what} (${amount})`, body: noticeBody, status: operatorHears ? 'active' : 'dismissed' });
+    if (!created) continue;   // this leg already went — never nag
     reminded++;
     if (email) {
       try {
         const brand = await loadEmailBrand(inv.site_id);
+        const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''));
         const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-        sendEmail(email, `A gentle reminder — ${inv.title || what} (${amount})`,
-          `<p>Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand).catch(() => {});
       } catch { /* the owner notice already carries it */ }
     }
   }

@@ -430,9 +430,9 @@ async function discard(){
 }
 
 function signedOut(){ $('main').innerHTML = `<div class="center"><h2>Sign in to use the Visual Studio.</h2><p class="muted">Your images live in Files.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
-function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t open the Visual Studio just now.</h2><p class="muted">Nothing’s wrong — please refresh in a moment.</p></div>`; }
+function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t open the Visual Studio just now.</h2><p class="muted" style="margin-bottom:16px">Nothing’s wrong — try again in a moment.</p><button id="retry" class="btn">Try again</button></div>`; const rt = $('retry'); if(rt) rt.addEventListener('click', () => { init(); }); }   // Try again reloads in place (experience review #42)
 
-(async function init(){
+async function init(){
   try{
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
@@ -443,7 +443,8 @@ function trouble(){ $('main').innerHTML = `<div class="center"><h2>We couldn’t
     window.__available = !!(r.body.data && r.body.data.available);
     render();
   }catch(_){ trouble(); }
-})();
+}
+init();
 </script>
 </body>
 </html>

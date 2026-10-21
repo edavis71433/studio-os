@@ -88,7 +88,7 @@ const BUCKET_TOKENS = /supportAgingPeriod\(|dealFollowupPeriod\(|leadFollowupPer
 const TERMINAL_OK = [
   // marker in the period expr → why once-per-key is HONEST for it
   { kind: 'publish_failed', marker: 'pub:', why: 'each publish attempt has its own pubId — a new failure is a new event id' },
-  { kind: 'deal_followup', marker: 'invremind:', why: 'an invoice settles exactly once (paid or voided); "never nag" is by design' },
+  { kind: 'deal_followup', marker: 'invoiceReminderPeriod(', why: 'invremind:<id>:<leg> — an invoice settles exactly once (paid or voided); each of the three legs (−7 · due · +N) sends once by design (Oct 2026 studio audit, change 10)' },
   { kind: 'deal_followup', marker: 'remind:', why: 'the unsigned-doc reminder is deliberately once-ever (a silent ledger row)' },
   { kind: 'deal_followup', marker: 'declined:', why: 'a proposal is declined once; period is per-deal — see the adjacent-finding note' },
   { kind: 'deal_signed', marker: '${event}:', why: 'signing/acceptance is terminal per deal; the clear (convert) is terminal too' },
@@ -302,10 +302,13 @@ const restore = () => { globalThis.fetch = realFetch; };
   const DEAL = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
   const realNow = Date.now;
   const { calls, held } = installFake();
-  const stale = { id: DEAL, site_id: SITE, title: 'Bacchus website', stage: 'proposal' };
+  // quiet since mid-June (dealNudgeDue reads updated_at); the site has the Oct 2026
+  // "nudge me" switch ON (benchmark item 6 — default off, so the fixture opts in)
+  const stale = { id: DEAL, site_id: SITE, title: 'Bacchus website', stage: 'proposal', updated_at: '2026-06-20T09:00:00Z', next_step_at: null };
   const orig = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;
+    if (url.includes('presence_settings?') && url.includes('deal_nudges')) return jr([{ deal_nudges: true, deal_nudge_days: 3 }]);
     if (url.includes('presence_deals?') && url.includes('stage=in.(qualified,proposal,contract)')) return jr([stale]);
     if (url.includes('presence_deal_tasks')) return jr([]);
     if (url.includes('presence_deals?') && url.includes('next_step_at')) return jr([]);
