@@ -2158,6 +2158,19 @@ test.describe('deal page — one filled button per view', () => {
     await expect(page.locator('#dpanel-billing [data-send-contract="k-dr"]').nth(1)).toHaveClass(/ghost/);   // …but only the row is filled
   });
 
+  test('Agreement out with BOTH documents drafted and nothing signed: Billing’s one is Send proposal & agreement — Convert waits for the signature', async ({ page }) => {
+    const atContract = { id: DEAL8, title: 'Marlow rebuild', stage: 'contract', expected_value_cents: 500000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null };
+    await installApp(page, { api: bothApi({ deal: atContract }) });
+    await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
+    await expect(page.locator('#sendBothBtn')).toBeVisible();
+    await expect(filledIn(page, '#detailInner')).toHaveCount(1);
+    await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'sendBothBtn');
+    // no Convert on offer before a signature — the card says what has to happen first
+    await expect(page.locator('#convert')).toHaveCount(0);
+    await expect(page.locator('#dpanel-billing')).toContainText('Your agreement is drafted but hasn’t been sent yet');
+    await expect(page.locator('#dpanel-billing [data-send-contract="k-b"]').last()).toHaveClass(/ghost/);
+  });
+
   test('a WON deal that is not converted yet: Won is not terminal — Convert is the do-next, guidance says so, Send invoice is quiet', async ({ page }) => {
     const WON_UNCONVERTED = { ...contractDeal(SIGNED_NO_TERM, { stage: 'won' }) };
     await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}`]: WON_UNCONVERTED, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });

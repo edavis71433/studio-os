@@ -336,6 +336,10 @@ let OWED={bySite:{},byClient:{}};
 function groupReceivables(items){
   const bySite={},byClient={};
   for(const i of(Array.isArray(items)?items:[])){
+    // The #31 money states: a PROCESSING row is paid and settling with Stripe —
+    // the server's own total_cents leaves it out, and so does Outstanding here.
+    // Paid and void rows never reach `items`; this is the one open state to skip.
+    if(i.state==='processing'||i.processing_since)continue;
     const cents=Number(i.amount_cents)||0;const od=(i.state==='overdue'||i.overdue===true)?cents:0;
     const add=(m,k)=>{if(!k)return;const r=m[k]||(m[k]={outstanding_cents:0,overdue_cents:0,count:0});r.outstanding_cents+=cents;r.overdue_cents+=od;r.count++;};
     add(bySite,i.customer_site_id);add(byClient,i.client_id);

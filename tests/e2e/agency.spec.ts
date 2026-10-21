@@ -635,7 +635,11 @@ test.describe('Agency roster — Outstanding', () => {
     { id: 'i2', title: 'Balance', amount_cents: 80000, due_date: ymd(-3), status: 'open', state: 'overdue', overdue: true, deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/2', client_id: 'c1', customer_site_id: 'a1' },
     { id: 'i3', title: 'Invoice', amount_cents: 30000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Park Florist site', stripe_url: null, client_id: 'c4', customer_site_id: null },   // bridged-only customer: grouped by client id
     { id: 'i4', title: 'Invoice', amount_cents: 50000, due_date: null, status: 'open', state: 'upcoming', overdue: false, deal_id: 'd3', deal: 'Unconverted deal', stripe_url: null, client_id: null, customer_site_id: null },   // no customer yet → nowhere on the roster
-  ], paid: [], total_cents: 280000, overdue_cents: 80000, processing_cents: 0 } };
+    // #31 money states: Marlow PAID this one and Stripe is still settling it — the
+    // server leaves it out of total_cents (processing_cents carries it), so the
+    // roster must not call it owed
+    { id: 'i5', title: 'Balance (ACH)', amount_cents: 40000, due_date: ymd(-1), status: 'open', state: 'processing', overdue: false, processing_since: new Date(Date.now() - 3600_000).toISOString(), deal_id: DEAL, deal: 'Marlow rebuild', stripe_url: 'https://pay.example/5', client_id: 'c1', customer_site_id: 'a1' },
+  ], paid: [], total_cents: 280000, overdue_cents: 80000, processing_cents: 40000 } };
 
   test('the column totals what each client owes, marks overdue, and sorts', async ({ page }) => {
     await pinDisplay(page, 'table');
@@ -656,6 +660,20 @@ test.describe('Agency roster — Outstanding', () => {
     await page.locator('.thb[data-sort="owed"]').click();      // descending
     await expect(table.locator('tbody tr').first()).toContainText('Marlow’s Kitchen');
     await expect(page.locator('.lmeta')).toContainText('Sorted by Outstanding — descending');
+  });
+
+  test('a settling (processing) payment is not owed: Outstanding matches the server’s total_cents, never the sum of every row', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    // Marlow's only open money is the $400 the client already paid — nothing is owed
+    const settling = { data: { ...receivables.data, items: receivables.data.items.filter((i) => i.client_id !== 'c1' || i.state === 'processing'), total_cents: 80000, overdue_cents: 0, processing_cents: 40000 } };
+    await installApp(page, { api: { ...homeApi, '/sales/receivables': settling } });
+    await page.goto('/agency.html');
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Park Florist' }).locator('td.money .owed')).toHaveText('$300');   // the column is live…
+    await expect(table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).locator('td.money')).toHaveText('—');          // …and Marlow owes nothing
+    await page.locator('[data-view="owed"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody')).not.toContainText('Marlow’s Kitchen');
   });
 
   test('the Outstanding chip shows only clients who owe; an overdue client is never "All clear"', async ({ page }) => {

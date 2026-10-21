@@ -21,6 +21,7 @@ import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
+import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -66,7 +67,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' };
 interface EntitySpec {
   table: string;
   entityType: string;           // provenance entity_type
@@ -141,7 +142,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   // per-stage stale threshold (item 13). Migration 0134; every switch default off.
   auto_ack_enquiries: { kind: 'bool' }, invoice_reminders: { kind: 'bool' }, invoice_remind_after_days: { kind: 'int', min: 1, max: 90 },
   deal_nudges: { kind: 'bool' }, deal_nudge_days: { kind: 'int', min: 1, max: 90 },
-  stage_stale_days: { kind: 'json' },
+  stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
   hero_layout: { max: 20 }, nav_style: { max: 12 },
@@ -157,6 +158,20 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   nav: { kind: 'json' },
 };
 
+/** { stage: days } for the OPEN stages only, each a whole number 1–365; null when
+ *  the value is not that shape (an array, a string, an unknown stage, 0, 400, 'soon'). */
+export function stageDaysMap(v: unknown): Record<string, number> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out: Record<string, number> = {};
+  for (const [stage, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!(OPEN_STAGES as string[]).includes(stage)) return null;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 365) return null;
+    out[stage] = n;
+  }
+  return out;
+}
+
 function validateFields(payload: Record<string, unknown>, spec: Record<string, FieldRule>, requireRequired: boolean) {
   const errors: Array<{ field: string; message: string }> = [];
   const cleanBody: Record<string, unknown> = {};
@@ -169,6 +184,12 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'int') { const n = Number(v); if (!Number.isFinite(n)) { errors.push({ field: key, message: `${key} must be a number.` }); continue; } const t = Math.trunc(n); if ((rule.min !== undefined && t < rule.min) || (rule.max !== undefined && t > rule.max)) { errors.push({ field: key, message: `${key} must be between ${rule.min ?? '…'} and ${rule.max ?? '…'}.` }); continue; } cleanBody[key] = t; fields.push(key); continue; }
     if (rule.kind === 'uuid') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } if (!UUID_RE.test(String(v))) { errors.push({ field: key, message: `${key} isn’t a valid reference.` }); continue; } cleanBody[key] = v; fields.push(key); continue; }
     if (rule.kind === 'json') { cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue; }
+    if (rule.kind === 'stage_days') {   // the per-stage "stale after N days" map (lib/sales_lifecycle.ts staleDaysFor): open stages only, whole days 1–365
+      if (v === null || v === undefined) { cleanBody[key] = null; fields.push(key); continue; }
+      const shaped = stageDaysMap(v);
+      if (!shaped) { errors.push({ field: key, message: `${key} must map a stage (${OPEN_STAGES.join(', ')}) to a number of days between 1 and 365.` }); continue; }
+      cleanBody[key] = shaped; fields.push(key); continue;
+    }
     if (rule.kind === 'tags') { cleanBody[key] = normalizeTags(v); fields.push(key); continue; }   // Phase SEARCH: the ONE tag gate — normalized to a clean text[]
     if (rule.kind === 'date') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } cleanBody[key] = String(v); fields.push(key); continue; }
     if (rule.kind === 'slug') { const s = clean(String(v ?? '')).toLowerCase(); if (s && !SLUG_RE.test(s)) { errors.push({ field: key, message: 'Links use lowercase letters, numbers, and dashes.' }); continue; } cleanBody[key] = s; fields.push(key); continue; }

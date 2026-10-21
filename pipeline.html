@@ -2038,7 +2038,10 @@ async function openDeal(id){
     // Billing's is the single most likely money action, picked here in order —
     // everything else on the tab is quiet. The won deal's header "Send invoice"
     // is filled only once the deal is converted (otherwise Convert is the one).
-    const canConvert=(d.stage==='contract'||d.stage==='won')&&!d.converted_client_id;
+    // Convert is on offer only once the agreement is SIGNED (the server's own
+    // rule for the convert route) or the deal is Won — an unsigned deal at
+    // Agreement out keeps "Sign the agreement first" / "Send it for signature".
+    const canConvert=((d.stage==='contract'&&signedNow)||d.stage==='won')&&!d.converted_client_id;
     const BILL_PRIMARY=!dealOpen&&!canConvert?'':canConvert?'convert':SEND_BOTH?'both':draftCon?('con:'+draftCon.id):draftProp?('prop:'+draftProp.id):!(data.proposals||[]).length?'addProp':(!(data.contracts||[]).length&&(data.proposals||[]).some(p=>p.status==='accepted'||p.status==='sent'))?'addCon':'';
     const fillIf=(on)=>on?'btn':'btn ghost';
     const props=(data.proposals||[]).map(p=>{
@@ -2210,7 +2213,7 @@ async function openDeal(id){
         </aside></div></div>
         ${dpanel('billing')}
         ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
-          <div class="row2" style="margin-top:8px"><button class="btn" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
+          <div class="row2" style="margin-top:8px"><button class="${fillIf(BILL_PRIMARY==='both')}" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addProp')}" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addCon')}" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
