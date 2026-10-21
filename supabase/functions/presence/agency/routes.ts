@@ -8,6 +8,9 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
+import { needsYouPayload } from './needs_you.ts';
+import { loadReceivables } from '../routes/sales.ts';
+import { resolveSite } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import { buildKitPayload, applyPlan } from '../lib/kits.ts';
@@ -65,7 +68,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_brand_reports?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
     svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
-    svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=site_id&limit=2000`),   // Section 3: leads waiting
+    svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at&limit=2000`),   // Section 3: leads waiting (+ who/when for Needs you)
     svc(`presence_plan_notices?${IN}&status=eq.active&select=site_id,kind&limit=2000`),             // Section 3: attention + billing
     svc(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata&limit=2000`), // DAM-2: files awaiting approval
   ]);
@@ -104,7 +107,8 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
       .map((e) => ({ site_id: runToSite[e.run_id], type: e.type, severity: e.severity, human: e.human })).filter((e) => e.site_id),
     opportunities: oppQ.json ?? [], plans: planQ.json ?? [], drafts: draftQ.json ?? [],
     connections: connQ.json ?? [], reviewReports: revQ.json ?? [], brandReports: brandQ.json ?? [],
-    leads: (leadsQ.json ?? []) as Array<{ site_id: string }>,
+    leads: ((leadsQ.json ?? []) as Array<{ site_id: string }>).map((l) => ({ site_id: l.site_id })),
+    enquiries: (leadsQ.json ?? []) as PortfolioInput['enquiries'],
     notices: (noticesQ.json ?? []) as Array<{ site_id: string; kind: string }>,
     filesPending,
     billingBySite,
@@ -157,6 +161,58 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!can(member.role, 'read')) return forbid(cors);
     const input = await gather(member.agency_id, now);
     return json({ data: { queues: buildQueues(input), patterns: buildPatterns(input) } }, 200, cors);
+  }
+
+  // ── Needs you: the studio's OWN work, one list (Oct 2026 home rebuild). The
+  //    pure helper (needs_you.ts) decides what counts; this gathers the rows at a
+  //    fixed query count: the portfolio gather (clients' sites, evidence, plans,
+  //    enquiries, last changes) + the studio's own money, support, deals and
+  //    reminders + the clients' publishes and connections. Every extra read is
+  //    best-effort: a failed slot contributes nothing and `partial` says so. ──
+  if (route === '/agency/needs-you' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const [input, own] = await Promise.all([gather(member.agency_id, now), ownSiteOf(jwt, principal)]);
+    const ids = input.links.filter((l) => l.status === 'active').map((l) => l.site_id);
+    const IN = `site_id=in.(${ids.join(',')})`;
+    const none = Promise.resolve({ ok: true, json: [] as unknown[] });
+    const swallow = () => ({ ok: false, json: null as unknown });
+    const todayStart = now.slice(0, 10) + 'T00:00:00Z';
+    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ] = await Promise.all([
+      own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
+      own ? svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,created_at,updated_at&limit=200`).catch(swallow) : none,
+      own ? svc(`presence_service_links?agency_site_id=eq.${own.id}&status=eq.active&select=project_id,customer_client_id,customer_site_id&limit=500`).catch(swallow) : none,
+      // next_step/next_step_at land with migration 0089 — a database without it answers "no stale steps", never an error
+      own ? svc(`presence_deals?site_id=eq.${own.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&next_step=not.is.null&select=id,title,stage,next_step,next_step_at,contact_id,converted_client_id,converted_site_id&limit=500`).then((r) => (r.ok ? r : { ok: true, json: [] })).catch(swallow) : none,
+      ids.length ? svc(`presence_publishes?${IN}&select=site_id,status,created_at,error_text&order=created_at.desc&limit=1000`).catch(swallow) : none,
+      ids.length ? svc(`presence_connections?${IN}&status=in.(expired,error,revoked)&select=site_id,provider_key,status&limit=500`).catch(swallow) : none,
+      own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
+    ]);
+    const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
+    const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
+    const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
+    const deals = rowsOf<{ id: string; title: string; stage: string; next_step: string | null; next_step_at: string | null; contact_id: string | null; converted_client_id: string | null; converted_site_id: string | null }>(dealsQ);
+    // names the portfolio does not know by site: bridged-only customers (by client id) and deal contacts — two batched reads
+    const clientIds = [...new Set([
+      ...invoices.map((v) => v.client_id), ...serviceLinks.map((l) => l.customer_client_id), ...deals.map((d) => d.converted_client_id),
+    ].filter((x): x is string => !!x && UUID_RE.test(x)))];
+    const contactIds = [...new Set(deals.map((d) => d.contact_id).filter((x): x is string => !!x && UUID_RE.test(x)))];
+    const [cnQ, ctQ] = await Promise.all([
+      clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
+      contactIds.length ? svc(`presence_contacts?id=in.(${contactIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
+    ]);
+    const namesByClient = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(cnQ).map((c) => [c.id, String(c.name || c.email || '')]).filter(([, n]) => n));
+    const contactName = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(ctQ).map((c) => [c.id, String(c.name || c.email || '')]));
+    const payload = needsYouPayload({
+      nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
+      invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
+      enquiries: input.enquiries, support: rowsOf(supQ), serviceLinks,
+      deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
+      publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
+    });
+    // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
+    const partial = !own || !recv || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
+    return json({ data: { ...payload, partial, own_site: !!own } }, 200, cors);
   }
 
   // ── client management ──
@@ -533,6 +589,25 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   }
 
   return json({ error: 'not_found', message: `No agency route for ${method} ${route}.` }, 404, cors);
+}
+
+/** The agency member's OWN studio site — where its money, support and deals
+ *  live. The same two-step index.ts uses: RLS (resolveSite) first, then an
+ *  active membership for a seat that owns no site. Null when there is none;
+ *  the caller degrades honestly (partial). */
+async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | null> {
+  if (!jwt) return null;
+  try {
+    const s = await resolveSite(jwt);
+    if (s) return s;
+    if (!principal.userId && !principal.email) return null;
+    const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+    const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
+    const siteId = Array.isArray(m.json) && (m.json as Array<{ site_id: string }>)[0]?.site_id;
+    if (!siteId) return null;
+    const [site] = await loadSites([siteId]);
+    return site || null;
+  } catch { return null; }
 }
 
 /** Dispatch one existing engine per site, sequentially, each outcome recorded.

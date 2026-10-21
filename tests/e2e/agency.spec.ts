@@ -4,8 +4,17 @@ import { installApp } from './helpers/app';
 // SS2 (standards sweep) — the Agency roster wears the redesign anatomy: shared
 // .lhead with ↻ refresh under REQ_SEQ, fixed-view chips, sortable typed columns
 // behind a persisted Table ⇄ Cards toggle, caret-preserving search, honest
-// failure states (a failed portfolio read is NEVER "No clients yet"), one-POST
-// starter-kit actions, and ?client= carried on every drill.
+// failure states (a failed portfolio read is NEVER "No clients yet"), and
+// ?client= carried on every drill.
+//
+// Oct 2026 home rebuild: the home shows only what needs the STUDIO. "Needs you"
+// is one list from /agency/needs-you (money · enquiries · support · late deal
+// steps · broken things · approved plans · unpublished changes), each row
+// "Name — what" · when · ONE verb. The roster says Name · Status (Live · Not
+// live yet · Needs you · Archived) · Next · Outstanding, with one button and a
+// ⋯ menu (Their website · Save as a starter kit · Tags, owner, note, archive).
+// Edition, Waiting, Leads, Domain, the "N search issues" line and the Starter
+// kits card are gone from the home.
 //
 // The portfolio fixtures below match the REAL /agency/portfolio row shape —
 // buildPortfolio() in supabase/functions/presence/agency/portfolio.ts returns
@@ -33,14 +42,19 @@ const DENTAL = row({ site_id: 'a2', name: 'Bright Dental', domain: 'brightdental
 const CEDAR = row({ site_id: 'a3', name: 'Cedar Garage', leads_waiting: 1,
   domain: 'cedargarage.example.com', domain_expires_at: nearer });
 
+// the REAL /agency/needs-you shape (needsYouPayload in agency/needs_you.ts)
+const SSL_ROW = { key: 'broken:ev:a1:trust.ssl_missing', kind: 'broken', site_id: 'a1', client_id: null, name: 'Marlow’s Kitchen', what: 'SSL certificate is missing', when: 'Found by the health check', verb: 'Fix', href: '/presence.html?client=a1#domain' };
+const needsYou = (rows: Array<Record<string, unknown>>, over: Record<string, unknown> = {}) => ({ data: {
+  rows: rows.slice(0, 8), more: Math.max(0, rows.length - 8), rest: rows.slice(8), total: rows.length,
+  empty_line: rows.length ? '' : 'Everything is paid and published.', partial: false, own_site: true,
+  next_by_site: Object.fromEntries(rows.filter((r) => r.site_id).map((r) => [r.site_id, { what: r.what, verb: r.verb, href: r.href, kind: r.kind }]).reverse()),
+  next_by_client: Object.fromEntries(rows.filter((r) => r.client_id).map((r) => [r.client_id, { what: r.what, verb: r.verb, href: r.href, kind: r.kind }]).reverse()),
+  ...over,
+} });
 const agencyApi = {
   '/agency/me': { data: { agency: 'Bright Studio', role: 'owner', plan: 'agency', branding: {} } },
   '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR] },
-  '/agency/queues': { data: { queues: [
-    { key: 'high_priority', title: 'High priority', items: [
-      { site_id: 'a1', name: 'Marlow’s Kitchen', why: 'SSL certificate is missing' },
-    ] },
-  ], patterns: [] } },
+  '/agency/needs-you': needsYou([SSL_ROW]),
   '/agency/kits': { data: [] },
   // the FIX 7 delivery map: Marlow has a delivery project, the others don't
   '/studio/customers': { data: [
@@ -73,42 +87,62 @@ test.describe('Agency portfolio', () => {
     expect(errors).toEqual([]);
   });
 
-  test('table view renders the typed columns from the real portfolio payload', async ({ page }) => {
+  test('table view: Name · Status · Next · Outstanding, one button and a ⋯ — never Edition/Waiting/Leads/Domain', async ({ page }) => {
     await pinDisplay(page, 'table');
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
     const table = page.locator('.tscroll table');
-    for (const th of ['Name', 'Edition', 'Status', 'Waiting', 'Leads', 'Domain']) {
-      await expect(table.locator('thead')).toContainText(th);
-    }
+    await expect(table.locator('thead .thb')).toHaveText(['Name▲', 'Status', 'Next', 'Outstanding']);   // ▲ = the default Name sort
     const marlow = table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' });
-    await expect(marlow).toContainText('presence');
-    await expect(marlow.locator('.pill')).toContainText('ready');
-    await expect(marlow.locator('.badge')).toContainText('4 waiting');
-    await expect(marlow.locator('td.num')).toHaveText('2');            // leads_waiting
-    await expect(marlow).toContainText('marlows.example.com');
-    await expect(marlow.locator('.domln .exp')).toContainText('expires in');
-    // bits that have no column of their own still surface under the name
-    await expect(marlow.locator('.bits')).toContainText('1 search issue · billing needs a look');
+    await expect(marlow.locator('.pill')).toHaveText('Needs you');                      // a row in Needs you → the status says so
+    await expect(marlow.locator('td.next')).toHaveText('SSL certificate is missing');   // that client's first Needs-you row
+    await expect(marlow.locator('td.money')).toHaveText('—');
+    // nothing from the old columns, nothing from the website's own report
+    await expect(marlow).not.toContainText('presence');
+    await expect(marlow).not.toContainText('waiting');
+    await expect(marlow).not.toContainText('search issue');
+    await expect(marlow).not.toContainText('marlows.example.com');
     const dental = table.locator('tbody tr', { hasText: 'Bright Dental' });
-    await expect(dental.locator('.badge')).toContainText('all clear');
-    await expect(dental.locator('.bits')).toHaveCount(0);
-    // Phase 1 overhaul: every row carries "Open record" (the hub) + "Their website"
-    await expect(marlow.locator('.rowact')).toHaveText(['Open record', 'Their website', '⋯']);   // ⋯ = tags · owner · note · archive (Oct 2026)
-    await expect(dental.locator('.rowact')).toHaveText(['Open record', 'Their website', '⋯']);
+    await expect(dental.locator('.pill')).toHaveText('Live');                            // published, nothing to do
+    await expect(dental.locator('td.next')).toHaveText('Nothing — all quiet');
+    // one button per row (the hub) + the ⋯ menu
+    await expect(marlow.locator('.rowact')).toHaveText(['Open record', '⋯']);
+    await expect(dental.locator('.rowact')).toHaveText(['Open record', '⋯']);
   });
 
-  test('cards view keeps the original at-a-glance card (badge + status bits)', async ({ page }) => {
+  test('status words: Not live yet for an unpublished site, Live for a monitored one; search issues alone are NOT "Needs you"', async ({ page }) => {
+    // Eric's complaint: every roster row said "5 search issues" for sites that
+    // weren't even live, and read as needing him. Search issues stay on the
+    // client's Website page; the home's status is about the studio's work.
+    await pinDisplay(page, 'table');
+    const quarry = row({ site_id: 'a7', name: 'Quiet Quarry', search_issues: 5, last_published_at: null, status: 'ready' });
+    const watch = row({ site_id: 'a8', name: 'Watched Bakery', edition: 'monitor', last_published_at: null, status: 'ready', search_issues: 2 });
+    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR, quarry, watch] } } });
+    await page.goto('/agency.html');
+    const q = page.locator('tbody tr', { hasText: 'Quiet Quarry' });
+    await expect(q.locator('.pill')).toHaveText('Not live yet');
+    await expect(q.locator('td.next')).toHaveText('Nothing — all quiet');
+    await expect(q).not.toContainText('search issue');
+    await expect(page.locator('tbody tr', { hasText: 'Watched Bakery' }).locator('.pill')).toHaveText('Live');
+    await page.locator('[data-view="needs"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);   // Marlow alone — the one with a Needs-you row
+    await expect(page.locator('tbody')).not.toContainText('Quiet Quarry');
+  });
+
+  test('cards view: name, email, Next line, the status word, Open record + ⋯', async ({ page }) => {
     await pinDisplay(page, 'cards');
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
     const marlow = page.locator('.client', { hasText: 'Marlow’s Kitchen' });
-    await expect(marlow.locator('.badge')).toContainText('4 waiting');
-    await expect(marlow).toContainText('2 leads waiting');
-    await expect(marlow).toContainText('domain expires in');
-    await expect(marlow).toContainText('GoDaddy');
-    await expect(marlow).toContainText('billing needs a look');
-    await expect(page.locator('.client', { hasText: 'Bright Dental' }).locator('.badge')).toContainText('all clear');
+    await expect(marlow.locator('.badge')).toHaveText('Needs you');
+    await expect(marlow).toContainText('Next: SSL certificate is missing');
+    await expect(marlow).not.toContainText('leads waiting');
+    await expect(marlow).not.toContainText('GoDaddy');
+    const dental = page.locator('.client', { hasText: 'Bright Dental' });
+    await expect(dental.locator('.badge')).toHaveText('Live');
+    await expect(dental).toContainText('Next: Nothing — all quiet');
+    await expect(page.locator('.managerow').first().getByRole('button', { name: 'Open record →' })).toBeVisible();
+    await expect(page.locator('.managerow').first().getByRole('button', { name: /More for/ })).toBeVisible();
   });
 
   test('sorting: header clicks toggle order with aria-sort; the lmeta names the sort', async ({ page }) => {
@@ -119,72 +153,31 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Name');
     await expect(page.locator('tbody tr').first()).toContainText('Bright Dental');
     await expect(page.locator('.lmeta')).toContainText('Sorted by Name — ascending');
-    // Leads reads most-first on its first click (numeric, like files' Size)
-    await page.locator('.thb', { hasText: 'Leads' }).click();
-    await expect(page.locator('th[aria-sort="descending"]')).toContainText('Leads');
-    await expect(page.locator('tbody tr .n').first()).toHaveText('Marlow’s Kitchen');   // 2 leads
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Leads — descending');
-    await page.locator('.thb', { hasText: 'Leads' }).click();
-    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Leads');
-    await expect(page.locator('tbody tr .n').first()).toHaveText('Bright Dental');      // 0 leads
+    // Status: Needs you sorts before Not live yet before Live
+    await page.locator('.thb', { hasText: 'Status' }).click();
+    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Status');
+    await expect(page.locator('tbody tr .n').first()).toHaveText('Marlow’s Kitchen');   // Needs you
+    await expect(page.locator('.lmeta')).toContainText('Sorted by Status — ascending');
+    await page.locator('.thb', { hasText: 'Status' }).click();
+    await expect(page.locator('th[aria-sort="descending"]')).toContainText('Status');
+    await expect(page.locator('tbody tr .n').last()).toHaveText('Marlow’s Kitchen');
   });
 
-  test('fixed-view chips filter correctly and carry aria-pressed', async ({ page }) => {
+  test('fixed-view chips are All · Needs you · Outstanding · Archived, filter correctly and carry aria-pressed', async ({ page }) => {
     await pinDisplay(page, 'table');
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
+    await expect(page.locator('.filters button')).toHaveText(['All', 'Needs you', 'Outstanding', 'Archived']);
     await expect(page.locator('[data-view="all"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('tbody tr')).toHaveCount(3);
-    await page.locator('[data-view="attention"]').click();
-    await expect(page.locator('[data-view="attention"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-view="needs"]').click();
+    await expect(page.locator('[data-view="needs"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-view="all"]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr')).toContainText('Marlow’s Kitchen');
-    await page.locator('[data-view="domain"]').click();
-    await expect(page.locator('tbody tr')).toHaveCount(2);   // Marlow (12d) + Cedar (5d); Dental's is far out
-    await expect(page.locator('tbody')).toContainText('Cedar Garage');
-    await page.locator('[data-view="billing"]').click();
-    await expect(page.locator('tbody tr')).toHaveCount(1);
-    await expect(page.locator('tbody tr')).toContainText('Marlow’s Kitchen');
-    await page.locator('[data-view="clear"]').click();
-    await expect(page.locator('tbody tr')).toHaveCount(1);   // Cedar's expiring domain keeps it out of All clear
-    await expect(page.locator('tbody tr')).toContainText('Bright Dental');
     await expect(page.locator('.lmeta')).toContainText('1 business ·');
-  });
-
-  test('domain-expiring threshold matches the platform alert window (45d): a ~40d-out client is "expiring", never "all clear"', async ({ page }) => {
-    // The platform's canonical domain-expiring alert fires at days <= 45 with
-    // severity critical (optimization/providers.ts:27, catalog.ts) — so a 31-45d
-    // client must NOT sit in "All clear" while the queues panel calls it High
-    // priority. This pins the roster to the platform's window, red against the
-    // old de<=30 code.
-    await pinDisplay(page, 'table');
-    const fern = row({ site_id: 'a6', name: 'Fern Florist', domain: 'fern.example.com',
-      domain_expires_at: new Date(Date.now() + 40 * 86400_000).toISOString() });   // 31-45d: the contradiction window
-    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR, fern] } } });
-    await page.goto('/agency.html');
-    await page.locator('[data-view="domain"]').click();
-    await expect(page.locator('tbody')).toContainText('Fern Florist');   // 40d ≤ 45 → in "Domain expiring"
-    await expect(page.locator('tbody tr')).toHaveCount(3);               // Marlow ~12d + Cedar ~5d + Fern ~40d
-    await page.locator('[data-view="clear"]').click();
-    await expect(page.locator('tbody tr')).toHaveCount(1);               // Bright Dental (~200d) alone…
-    await expect(page.locator('tbody')).not.toContainText('Fern Florist'); // …a 31-45d domain is NOT "all clear"
-  });
-
-  test('search-issues-only clients surface in "Needs attention" (they are platform-flagged), never in "All clear"', async ({ page }) => {
-    // A client with attention=0 but search_issues>0 used to appear ONLY in "All"
-    // — invisible in every focused view. They're platform-flagged, so "Needs
-    // attention" must include them; "All clear" already excluded them (kept).
-    await pinDisplay(page, 'table');
-    const quarry = row({ site_id: 'a7', name: 'Quiet Quarry', search_issues: 2 });   // attention 0, search issues only
-    await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [MARLOW, DENTAL, CEDAR, quarry] } } });
-    await page.goto('/agency.html');
-    await page.locator('[data-view="attention"]').click();
-    await expect(page.locator('tbody')).toContainText('Quiet Quarry');   // platform-flagged → visible in the focused view
-    await expect(page.locator('tbody tr')).toHaveCount(2);               // Marlow (attention 4) + Quarry (search issues only)
-    await page.locator('[data-view="clear"]').click();
-    await expect(page.locator('tbody tr')).toHaveCount(1);               // Bright Dental alone…
-    await expect(page.locator('tbody')).not.toContainText('Quiet Quarry'); // …open search issues are never "all clear"
+    await page.locator('[data-view="owed"]').click();
+    await expect(page.locator('#main')).toContainText('No clients match that.');   // no receivables in this fixture → nobody owes
   });
 
   test('search re-renders never destroy the input, its caret POSITION, or focus (the L bug)', async ({ page }) => {
@@ -239,7 +232,7 @@ test.describe('Agency portfolio', () => {
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');          // the roster recovered…
     await expect(page.locator('.top .brand')).toContainText('Bright Studio');       // …with the REAL agency name, not "Your agency"
-    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority'); // …and the queues cockpit mounted
+    await expect(page.locator('#needs .need .row')).toContainText('SSL certificate is missing'); // …and Needs you mounted
     expect(meCalls).toBe(2);   // the retry really re-ran /agency/me
   });
 
@@ -286,28 +279,56 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('#main')).not.toContainText('StaleCo');
   });
 
-  test('saving a starter kit fires exactly ONE POST per click (the duplicate-listener bug)', async ({ page }) => {
+  test('Save as a starter kit lives in the row’s ⋯: one dialog, exactly ONE POST per save, no kits card on the home', async ({ page }) => {
+    await pinDisplay(page, 'table');
     await installApp(page, { api: agencyApi });
-    let posts = 0;
+    const posts: unknown[] = [];
     await page.route(/\/functions\/v1\/presence\/agency\/kits$/, (route) => {
-      if (route.request().method() === 'POST') { posts++; return route.fulfill(ok({ data: { id: 'k' + posts, name: 'Kit ' + posts } })); }
+      if (route.request().method() === 'POST') { posts.push(route.request().postDataJSON()); return route.fulfill(ok({ data: { id: 'k' + posts.length, name: 'Kit ' + posts.length } })); }
       return route.fulfill(ok({ data: [] }));
     });
     await page.goto('/agency.html');
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
-    await page.locator('#kitFromSite').selectOption('a1');
-    await page.locator('#kitName').fill('Contractor Starter');
-    await page.locator('#kitSave').click();
-    await expect(page.locator('.dds-toast')).toContainText('Kit saved.');
-    expect(posts).toBe(1);
-    // the second save is where the old page double-POSTed (loadKits re-attached
-    // its listener to the same button after every save)
-    await page.locator('#kitFromSite').selectOption('a2');
-    await page.locator('#kitName').fill('Dental Starter');
-    await page.locator('#kitSave').click();
-    await expect.poll(() => posts).toBe(2);   // NOT 3
-    await page.waitForTimeout(250);           // give any duplicate listener time to fire
-    expect(posts).toBe(2);
+    await expect(page.locator('#kits, .kitcard, #kitFromSite')).toHaveCount(0);   // the Starter kits card left the home
+    await page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.getByRole('menuitem')).toHaveText(['Their website', 'Save as a starter kit', 'Tags, owner, note, archive']);
+    await page.getByRole('menuitem', { name: 'Save as a starter kit' }).click();
+    const dlg = page.locator('#kitDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText('From Marlow’s Kitchen’s setup.');
+    await expect(page.locator('#kit-name')).toBeFocused();
+    await page.locator('#kit-name').fill('Contractor Starter');
+    await page.locator('#kit-save').click();
+    await expect(page.locator('.dds-toast')).toContainText('Kit saved');
+    await expect(dlg).toBeHidden();
+    expect(posts).toEqual([{ site_id: 'a1', name: 'Contractor Starter' }]);
+    // a second save from another row is one more POST, never two
+    await page.locator('tbody tr', { hasText: 'Bright Dental' }).getByRole('button', { name: 'More for Bright Dental' }).click();
+    await page.getByRole('menuitem', { name: 'Save as a starter kit' }).click();
+    await page.locator('#kit-name').fill('Dental Starter');
+    await page.locator('#kit-save').click();
+    await expect.poll(() => posts.length).toBe(2);
+    await page.waitForTimeout(250);
+    expect(posts.length).toBe(2);
+    expect(posts[1]).toEqual({ site_id: 'a2', name: 'Dental Starter' });
+  });
+
+  test('the ⋯ menu: "Their website" opens the client’s website editor in their scope; Escape closes the menu back to the ⋯', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: agencyApi });
+    await page.goto('/agency.html');
+    const more = page.locator('tbody tr', { hasText: 'Bright Dental' }).getByRole('button', { name: 'More for Bright Dental' });
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('menuitem', { name: 'Their website' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'More for Bright Dental' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'More for Bright Dental' })).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: 'More for Bright Dental' }).click();
+    await page.getByRole('menuitem', { name: 'Their website' }).click();
+    await page.waitForURL(/presence\.html\?client=a2/);
   });
 
   test('display toggle: persists to localStorage and restores on reload (aria-pressed)', async ({ page }) => {
@@ -355,47 +376,108 @@ test.describe('Agency portfolio', () => {
     await page.waitForURL(/crm\.html\?client=a2/);
   });
 
-  test('work queues render as rail-cards whose rows carry ?client=', async ({ page }) => {
+  test('Needs you: one list, each row "Name — what" · when · ONE verb; the button carries the client scope', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
-    const q = page.locator('#queues');
-    await expect(q.locator('.qhead')).toContainText('Needs you');
-    await expect(q.locator('.rcard .rh')).toContainText('High priority');
-    const link = q.locator('.rrows a').first();
-    await expect(link).toContainText('SSL certificate is missing');
-    await expect(link).toHaveAttribute('href', '/today.html?client=a1');
+    const n = page.locator('#needs');
+    await expect(n.locator('.qhead')).toHaveText('Needs you · 1');
+    const row = n.locator('.need .row').first();
+    await expect(row.locator('.t b')).toHaveText('Marlow’s Kitchen');
+    await expect(row.locator('.t')).toContainText('Marlow’s Kitchen — SSL certificate is missing');
+    await expect(row.locator('.when')).toHaveText('Found by the health check');
+    await expect(row.locator('a.rowact')).toHaveText('Fix');
+    await expect(row.locator('a.rowact')).toHaveAttribute('href', '/presence.html?client=a1#domain');
+    await expect(row.locator('a, button')).toHaveCount(1);   // exactly one verb
+    // nothing of the old queue dump
+    await expect(n).not.toContainText('High priority');
+    await expect(n).not.toContainText('Growth');
   });
 
-  test('soft ↻ re-reads the queues panel too, not just the roster (request-count pin)', async ({ page }) => {
-    // ↻ used to wire only load(true); mountQueues ran at boot and via its own
-    // Try-again, so a morning's stale cockpit survived every refresh click.
+  test('Needs you is the studio’s own work in a fixed order: money · enquiry · support · deal · broken · plan · publish', async ({ page }) => {
+    const rows = [
+      { key: 'money:i1', kind: 'money', site_id: 'a1', client_id: 'c1', name: 'Marlow’s Kitchen', what: 'invoice $1,600 is overdue by 3 days', when: 'Sent Oct 14 · no payment yet', verb: 'Resend', href: '/crm.html?deal=d1&tab=billing' },
+      { key: 'money:i2', kind: 'money', site_id: 'a2', client_id: 'c2', name: 'Bright Dental', what: 'invoice $800 is due Nov 3', when: 'Sent Oct 20 · no payment yet', verb: 'Resend', href: '/crm.html?deal=d2&tab=billing' },
+      { key: 'enquiry:e1', kind: 'enquiry', site_id: 'a3', client_id: null, name: 'Cedar Garage', what: 'new enquiry from Maria', when: '2 days ago · quote form', verb: 'Reply', href: '/inbox.html?client=a3#enquiries?sel=lead:e1' },
+      { key: 'support:s1', kind: 'support', site_id: 'a1', client_id: 'c1', name: 'Marlow’s Kitchen', what: 'support request: the gallery page', when: 'Opened yesterday', verb: 'Reply', href: '/inbox.html#support?sel=sup:s1' },
+      { key: 'deal:d9', kind: 'deal', site_id: null, client_id: 'c9', name: 'Claud Beltran', what: 'next step “Book the kickoff call” is 74 days late', when: 'On the deal Bacchus Kitchen · due Aug 8', verb: 'Open deal', href: '/crm.html?deal=d9' },
+      { key: 'broken:publish:a2', kind: 'broken', site_id: 'a2', client_id: null, name: 'Bright Dental', what: 'the last publish failed', when: 'Failed today', verb: 'Fix', href: '/presence.html?client=a2#publish' },
+      { key: 'plan:p1', kind: 'plan', site_id: 'a3', client_id: null, name: 'Cedar Garage', what: 'approved “Protect your email” — not applied yet', when: 'Approved plan', verb: 'Apply', href: '/presence.html?client=a3#foundations' },
+      { key: 'publish:a1', kind: 'publish', site_id: 'a1', client_id: null, name: 'Marlow’s Kitchen', what: 'changes are sitting unpublished', when: 'Last change today', verb: 'Review', href: '/presence.html?client=a1#publish' },
+    ];
+    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou(rows) } });
+    await page.goto('/agency.html');
+    const n = page.locator('#needs');
+    await expect(n.locator('.qhead')).toHaveText('Needs you · 8');
+    await expect(n.locator('.need .row a.rowact')).toHaveText(['Resend', 'Resend', 'Reply', 'Reply', 'Open deal', 'Fix', 'Apply', 'Review']);
+    await expect(n.locator('.need .row').first()).toContainText('Marlow’s Kitchen — invoice $1,600 is overdue by 3 days');
+    await expect(n.locator('.need .row').nth(4)).toContainText('Claud Beltran — next step “Book the kickoff call” is 74 days late');
+    await expect(n.locator('#needsMore')).toHaveCount(0);
+    // the roster's Status/Next read from the same list — first row per client
+    await pinDisplay(page, 'table');
+    await page.reload();
+    const table = page.locator('.tscroll table');
+    await expect(table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).locator('td.next')).toHaveText('invoice $1,600 is overdue by 3 days');
+    await expect(table.locator('tbody tr', { hasText: 'Cedar Garage' }).locator('td.next')).toHaveText('new enquiry from Maria');
+    await expect(table.locator('tbody tr', { hasText: 'Cedar Garage' }).locator('.pill')).toHaveText('Needs you');
+  });
+
+  test('Needs you keeps the first 8 rows and "+N more" expands the rest in place', async ({ page }) => {
+    const rows = Array.from({ length: 11 }, (_, k) => ({ key: 'enquiry:e' + k, kind: 'enquiry', site_id: 'a1', client_id: null, name: 'Marlow’s Kitchen', what: 'new enquiry from Visitor ' + k, when: `${k + 1} days ago`, verb: 'Reply', href: `/inbox.html?client=a1#enquiries?sel=lead:e${k}` }));
+    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou(rows) } });
+    await page.goto('/agency.html');
+    const n = page.locator('#needs');
+    await expect(n.locator('.qhead')).toHaveText('Needs you · 11');
+    await expect(n.locator('.need .row')).toHaveCount(8);
+    await expect(n.locator('#needsMore')).toHaveText('+ 3 more');
+    await n.locator('#needsMore').click();
+    await expect(n.locator('.need .row')).toHaveCount(11);
+    await expect(n.locator('#needsMore')).toHaveCount(0);
+    await expect(n.locator('.need .row').nth(8).locator('a.rowact')).toBeFocused();   // focus lands on the first revealed row
+  });
+
+  test('empty state: "Nothing needs you." plus one honest line; a partial read says so', async ({ page }) => {
+    await pinDisplay(page, 'table');   // the roster pill is read from the table (phones default to Cards)
+    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { empty_line: 'Claud Beltran owes $1,600, due Nov 3.' }) } });
+    await page.goto('/agency.html');
+    const n = page.locator('#needs');
+    await expect(n).toBeVisible();
+    await expect(n.locator('#needsEmpty .nn')).toHaveText('Nothing needs you.');
+    await expect(n.locator('#needsEmpty')).toContainText('Claud Beltran owes $1,600, due Nov 3.');
+    await expect(n.locator('.pnote')).toHaveCount(0);
+    await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).locator('.pill')).toHaveText('Live');   // nothing needs the studio → the roster agrees
+    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { partial: true }) } });
+    await page.goto('/agency.html');
+    await expect(page.locator('#needs .pnote')).toContainText('couldn’t be checked just now');
+  });
+
+  test('soft ↻ re-reads Needs you too, not just the roster (request-count pin)', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     let qcalls = 0;
-    await page.route(/\/functions\/v1\/presence\/agency\/queues/, (route) => {
+    await page.route(/\/functions\/v1\/presence\/agency\/needs-you/, (route) => {
       qcalls++;
-      return route.fulfill(ok(agencyApi['/agency/queues']));
+      return route.fulfill(ok(agencyApi['/agency/needs-you']));
     });
     await page.goto('/agency.html');
-    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority');
-    expect(qcalls).toBe(1);                    // boot mounted the cockpit once
+    await expect(page.locator('#needs .need .row')).toContainText('SSL certificate is missing');
+    expect(qcalls).toBe(1);                    // boot mounted it once
     await page.locator('#refreshBtn').click();
-    await expect.poll(() => qcalls).toBe(2);   // ↻ re-read the queues as well
-    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority');   // and it still renders
+    await expect.poll(() => qcalls).toBe(2);   // ↻ re-read it as well
+    await expect(page.locator('#needs .need .row')).toContainText('SSL certificate is missing');   // and it still renders
   });
 
-  test('queues failure surfaces honestly (never silent absence) and Try again refetches', async ({ page }) => {
+  test('Needs you failure surfaces honestly (never silent absence) and Try again refetches', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     let calls = 0;
-    await page.route(/\/functions\/v1\/presence\/agency\/queues/, (route) => {
+    await page.route(/\/functions\/v1\/presence\/agency\/needs-you/, (route) => {
       calls++;
       if (calls === 1) return route.fulfill(boom());
-      return route.fulfill(ok(agencyApi['/agency/queues']));
+      return route.fulfill(ok(agencyApi['/agency/needs-you']));
     });
     await page.goto('/agency.html');
-    await expect(page.locator('#queues')).toContainText('Your queues wouldn’t load just now');
+    await expect(page.locator('#needs')).toContainText('Needs you wouldn’t load just now');
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');   // the roster is not held hostage
-    await page.locator('#qretry').click();
-    await expect(page.locator('#queues .rcard .rh')).toContainText('High priority');
+    await page.locator('#needsRetry').click();
+    await expect(page.locator('#needs .need .row')).toContainText('SSL certificate is missing');
     expect(calls).toBe(2);
   });
 
@@ -482,16 +564,26 @@ test.describe('Agency home — one home, one roster', () => {
     await page.goto('/agency.html');
     const table = page.locator('.tscroll table');
     const marlow = table.locator('tbody tr', { hasText: 'Marlow’s Kitchen' });
-    await expect(marlow).toContainText('ana@marlows.example');                       // the bridge list's email, on the portfolio row
-    await expect(marlow.locator('.bits')).toContainText('1 support request open');    // and its waiting support
+    await expect(marlow.locator('.sub')).toHaveText('ana@marlows.example');            // the bridge list's email, small under the name
     const park = table.locator('tbody tr', { hasText: 'Park Florist' });
     await expect(park).toHaveCount(1);                                                 // on the bridge list only → still a row
-    await expect(park.locator('.rowact')).toHaveText(['Open record']);                 // Their website only when the portfolio knows the site
+    await expect(park.locator('.rowact')).toHaveText(['Open record']);                 // no ⋯: nothing of theirs to edit or save here
+    await expect(park.locator('.pill')).toHaveText('Not live yet');
     await expect(page.locator('.lhead .lmeta')).toContainText('4 businesses');
-    await page.locator('[data-view="attention"]').click();
-    await expect(table.locator('tbody tr')).toHaveCount(1);                            // Marlow (open support counts as needing attention)
-    await page.locator('[data-view="clear"]').click();
-    await expect(table.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);
+    await page.locator('[data-view="needs"]').click();
+    await expect(table.locator('tbody tr')).toHaveCount(1);                            // Marlow — the one with a Needs-you row
+  });
+
+  test('a bridged-only customer gets Status "Needs you" and a Next line from the list’s next_by_client', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    const owes = { key: 'money:i7', kind: 'money', site_id: null, client_id: 'c4', name: 'Park Florist', what: 'invoice $300 is due Oct 24', when: 'Sent Oct 17 · no payment yet', verb: 'Resend', href: '/crm.html?deal=d7&tab=billing' };
+    await installApp(page, { api: { ...homeApi, '/agency/needs-you': needsYou([SSL_ROW, owes]) } });
+    await page.goto('/agency.html');
+    const park = page.locator('tbody tr', { hasText: 'Park Florist' });
+    await expect(park.locator('.pill')).toHaveText('Needs you');
+    await expect(park.locator('td.next')).toHaveText('invoice $300 is due Oct 24');
+    await page.locator('[data-view="needs"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(2);
   });
 
   test('+ Add a customer lives on the home page and POSTs /sales/customers (customers.html’s dialog)', async ({ page }) => {
@@ -655,9 +747,7 @@ test.describe('Agency roster — Outstanding', () => {
     await expect(park.locator('td.money .owed')).toHaveText('$300');
     await expect(park.locator('td.money .owed')).not.toHaveClass(/late/);
     await expect(table.locator('tbody tr', { hasText: 'Bright Dental' }).locator('td.money')).toHaveText('—');
-    await expect(marlow.locator('td.num')).toHaveText('2');   // the leads cell is still the one td.num
-    await page.locator('.thb[data-sort="owed"]').click();
-    await page.locator('.thb[data-sort="owed"]').click();      // descending
+    await page.locator('.thb[data-sort="owed"]').click();      // Outstanding reads most-first on its first click
     await expect(table.locator('tbody tr').first()).toContainText('Marlow’s Kitchen');
     await expect(page.locator('.lmeta')).toContainText('Sorted by Outstanding — descending');
   });
@@ -676,7 +766,7 @@ test.describe('Agency roster — Outstanding', () => {
     await expect(page.locator('tbody')).not.toContainText('Marlow’s Kitchen');
   });
 
-  test('the Outstanding chip shows only clients who owe; an overdue client is never "All clear"', async ({ page }) => {
+  test('the Outstanding chip shows only clients who owe', async ({ page }) => {
     await pinDisplay(page, 'table');
     await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
     await page.goto('/agency.html');
@@ -685,17 +775,7 @@ test.describe('Agency roster — Outstanding', () => {
     await expect(page.locator('tbody tr')).toHaveCount(2);
     await expect(page.locator('tbody')).toContainText('Marlow’s Kitchen');
     await expect(page.locator('tbody')).toContainText('Park Florist');
-    await page.locator('[data-view="clear"]').click();
-    await expect(page.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);   // owes, but nothing overdue → still clear
-    await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' })).toHaveCount(0);
-  });
-
-  test('cards view says it under the name; no receivables at all → nothing invented', async ({ page }) => {
-    await pinDisplay(page, 'cards');
-    await installApp(page, { api: { ...homeApi, '/sales/receivables': receivables } });
-    await page.goto('/agency.html');
-    await expect(page.locator('.client', { hasText: 'Marlow’s Kitchen' }).locator('.bitln')).toContainText('$2,000 outstanding · $800 overdue');
-    await expect(page.locator('.client', { hasText: 'Bright Dental' }).locator('.bitln')).toHaveCount(0);
+    await expect(page.locator('tbody')).not.toContainText('Bright Dental');
   });
 
   test('a failed receivables read leaves the column blank — the roster still loads', async ({ page }) => {
@@ -731,6 +811,7 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(marlow.locator('.tagchip')).toHaveText(['restaurant', 'burbank']);
     await expect(marlow.locator('.notedot')).toBeVisible();
     await marlow.getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     const form = page.locator('form[data-hkform="a1"]');
     await expect(form).toBeVisible();
     await expect(form.locator('[name="tags"]')).toHaveValue('restaurant, burbank');
@@ -757,6 +838,7 @@ test.describe('Agency roster — housekeeping', () => {
     await page.goto('/agency.html');
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);                        // 3 on the portfolio + the bridged-only Park Florist
     await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     const arch = page.locator('form[data-hkform="a3"]').getByRole('button', { name: /Archive/ });
     await arch.click();
     await expect(arch).toContainText('Press again');
@@ -772,6 +854,7 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toBeVisible();        // the one just archived joins it
     expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(1);
     await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     await page.locator('form[data-hkform="a3"]').getByRole('button', { name: 'Restore client' }).click();
     await expect(page.locator('.dds-toast').filter({ hasText: 'restored' })).toContainText('Cedar Garage restored');   // the archive toast may still be up
     await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(0);
@@ -806,6 +889,7 @@ test.describe('Agency roster — housekeeping', () => {
     await page.goto('/agency.html');
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);                        // Marlow · Dental · Cedar + the bridged-only Park Florist
     await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     const arch = page.locator('form[data-hkform="a3"]').getByRole('button', { name: /Archive/ });
     await arch.click(); await arch.click();
     await expect(page.locator('.dds-toast').filter({ hasText: 'archived' })).toContainText('Cedar Garage archived');
@@ -826,6 +910,7 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(1);
     // Restore from Archived brings the client back to All
     await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     await page.locator('form[data-hkform="a3"]').getByRole('button', { name: 'Restore client' }).click();
     await expect(page.locator('.dds-toast').filter({ hasText: 'restored' })).toContainText('Cedar Garage restored');
     await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(0);
@@ -841,6 +926,7 @@ test.describe('Agency roster — housekeeping', () => {
     await installApp(page, { api: ROW_API });
     await page.goto('/agency.html');
     await page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).first().getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    await page.getByRole('menuitem', { name: 'Tags, owner, note, archive' }).click();
     const form = page.locator('form[data-hkform="a1"]');
     await expect(form.locator('[name="tags"]')).toBeFocused();
     await page.keyboard.press('Escape');
@@ -849,7 +935,7 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(page.getByRole('button', { name: 'More for Marlow’s Kitchen' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('a read-only member sees no ⋯; a bridged-only customer has none either; the search matches tags', async ({ page }) => {
+  test('a read-only member’s ⋯ holds only "Their website"; a bridged-only customer has no ⋯; the search matches tags', async ({ page }) => {
     await pinDisplay(page, 'table');
     await installApp(page, { api: ROW_API });
     await page.goto('/agency.html');
@@ -860,7 +946,8 @@ test.describe('Agency roster — housekeeping', () => {
     await installApp(page, { api: { ...ROW_API, '/agency/me': { data: { agency: 'Bright Studio', role: 'readonly', plan: 'agency', branding: {} } } } });
     await page.goto('/agency.html');
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
-    await expect(page.getByRole('button', { name: /More for/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    await expect(page.getByRole('menuitem')).toHaveText(['Their website']);   // no kit, no housekeeping without manage_clients
   });
 });
 
@@ -877,13 +964,13 @@ test.describe('Agency home — the Health Center door and the kits anchor', () =
     await expect(page.locator('#healthLine .warnw')).toHaveCount(0);
   });
 
-  test('⌘K "Starter kits" lands on #kits: the card is in view and focused', async ({ page }) => {
-    await installApp(page, { api: homeApi });
+  test('⌘K "Starter kits" lands on #kits: the kits card left the home, so Add a customer opens (where "Start from a kit" lives)', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/agency/kits': { data: [{ id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', name: 'Restaurant starter', industry_key: 'restaurant' }] } } });
     await page.goto('/agency.html#kits');
-    await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
-    const kits = page.locator('#kits');
-    await expect(kits).toBeVisible();
-    await expect(kits).toBeFocused();
-    await expect(page.locator('#custDlg')).not.toHaveAttribute('open', /./);   // #kits never opens the Add dialog
+    await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
+    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
+    expect(new URL(page.url()).hash).toBe('');
+    await expect(page.locator('#kits, .kitcard')).toHaveCount(0);
   });
 });

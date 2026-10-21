@@ -501,6 +501,12 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  return json({ data: await loadReceivables(site) }, 200, cors);
+}
+/** The receivables payload itself — shared with the agency home's "Needs you"
+ *  (agency/routes.ts), so the money rows there, the roster's Outstanding column
+ *  and Pipeline's Outstanding tile are the same rows under the same formula. */
+export async function loadReceivables(site: SiteRow) {
   // stripe_url rides along so the list rows can offer the SAME per-invoice
   // actions the deal drawer has (Send vs Resend label, Copy link) — chasing
   // payment is this list's whole point, and voiding a mistake shouldn't
@@ -536,7 +542,7 @@ export async function handleSalesReceivables(_req: Request, site: SiteRow, _prin
   const buckets = moneyBuckets([...items, ...paid], today);
   // total_cents = what is still WAITING on a client (upcoming + overdue) — a
   // processing payment is on its way, not due; it has its own number.
-  return json({ data: { items, paid, buckets, paid_window_days: PAID_WINDOW_DAYS, total_cents: buckets.upcoming.cents + buckets.overdue.cents, overdue_cents: buckets.overdue.cents, processing_cents: buckets.processing.cents } }, 200, cors);
+  return { items, paid, buckets, paid_window_days: PAID_WINDOW_DAYS, total_cents: buckets.upcoming.cents + buckets.overdue.cents, overdue_cents: buckets.overdue.cents, processing_cents: buckets.processing.cents };
 }
 
 // ═══ DEAL TASKS — first-class to-dos on a deal (Salesforce Activities parity) ═══

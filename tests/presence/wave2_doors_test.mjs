@@ -44,7 +44,8 @@ ok('the website’s "health check" desc still answers "health" for an owner (no 
 // ═══ change 11: the Health Center's door on the studio home ═══
 ok('agency.html: the status line reads "Platform: all clear" / "N areas need a look"', /Platform: all clear/.test(ag) && /need'\+\(n===1\?'s':''\)\+' a look/.test(ag) && /id="healthDoor" href="\/admin-health\.html"/.test(ag));
 ok('agency.html: no text link under the kits any more', !/Platform health — background jobs/.test(ag));
-ok('agency.html: #kits scrolls to the Starter kits card', /class="kitcard" id="kits"/.test(ag) && /location\.hash==='#kits'/.test(ag));
+// Oct 2026 home rebuild: the kits card left the home — #kits opens Add a customer (where "Start from a kit" lives)
+ok('agency.html: #kits opens Add a customer, the kits card is gone', !/class="kitcard"/.test(ag) && /location\.hash!=='#kits'/.test(ag) && /Save as a starter kit/.test(ag));
 
 // ═══ change 12: tidy the edges ═══
 ok('build-public.sh: provision.html is carved out of the public build', /for f in email-signature\.html styleguide\.html a11y\.html provision\.html; do/.test(build));
