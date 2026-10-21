@@ -355,10 +355,12 @@ let SORT={key:'name',dir:1};
 let ARCHIVED=null,ARCH_STATE='idle',ARCH_LOCAL=[];   // ARCH_LOCAL: rows archived in THIS session, merged over the server's list so they show at once
 const canManage=()=>!!(ME&&['owner','admin','account_manager'].includes(ME.role));
 const canNote=()=>!!(ME&&ME.role!=='readonly');
+// the server's list is the truth; rows archived here that it already knows leave ARCH_LOCAL
+function setArchived(rows){ARCH_LOCAL=ARCH_LOCAL.filter(c=>!rows.some(x=>x.site_id===c.site_id));ARCHIVED=rows.concat(ARCH_LOCAL);ARCH_STATE='ok';}
 async function loadArchived(){
   ARCH_STATE='loading';render();
-  try{const r=await api('/agency/portfolio?archived=true');const rows=r.ok&&Array.isArray(r.body.data)?r.body.data:[];
-    ARCHIVED=rows.concat(ARCH_LOCAL.filter(c=>!rows.some(x=>x.site_id===c.site_id)));ARCH_STATE=r.ok?'ok':'failed';}
+  try{const r=await api('/agency/portfolio?archived=true');
+    if(r.ok&&Array.isArray(r.body.data))setArchived(r.body.data);else ARCH_STATE='failed';}
   catch(_){ARCH_STATE='failed';}
   render();
 }
@@ -564,7 +566,7 @@ function wireHousekeeping(){
     const f=document.querySelector('[data-hkform="'+id+'"] input');if(f)f.focus();
     else{const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}
   }));
-  document.querySelectorAll('[data-hkrow]').forEach(row=>{row.addEventListener('click',(e)=>e.stopPropagation());row.addEventListener('keydown',(e)=>{if(e.key==='Escape'){HK_OPEN=null;render();}e.stopPropagation();});});
+  document.querySelectorAll('[data-hkrow]').forEach(row=>{row.addEventListener('click',(e)=>e.stopPropagation());row.addEventListener('keydown',(e)=>{if(e.key==='Escape'){const id=row.getAttribute('data-hkrow');HK_OPEN=null;render();const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}e.stopPropagation();});});   // Escape closes and puts focus back on the ⋯ (Cancel's contract)
   document.querySelectorAll('[data-hkcancel]').forEach(b=>b.addEventListener('click',()=>{const id=HK_OPEN;HK_OPEN=null;render();const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}));
   document.querySelectorAll('form[data-hkform]').forEach(f=>f.addEventListener('submit',async(e)=>{
     e.preventDefault();if(HK_BUSY)return;
@@ -685,8 +687,10 @@ function trouble(){
 async function load(soft){
   const gen=++REQ_SEQ;
   let pf,cust;
-  let ar=null;
-  try{[pf,cust,ar]=await Promise.all([api('/agency/portfolio'),api('/studio/customers').catch(()=>({ok:false})),api('/sales/receivables').catch(()=>null)]);}
+  let ar=null,arch=null;
+  // ↻ refreshes the Archived list too once it has been read (it used to stay cached all session)
+  const wantArch=ARCH_STATE==='ok'||VIEWNAME==='archived';
+  try{[pf,cust,ar,arch]=await Promise.all([api('/agency/portfolio'),api('/studio/customers').catch(()=>({ok:false})),api('/sales/receivables').catch(()=>null),wantArch?api('/agency/portfolio?archived=true').catch(()=>null):null]);}
   catch(_){pf={ok:false,status:0,body:{}};cust={ok:false};}
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   if(!pf.ok){
@@ -696,6 +700,10 @@ async function load(soft){
     trouble();return;
   }
   CLIENTS=Array.isArray(pf.body.data)?pf.body.data:[];
+  if(arch&&arch.ok&&Array.isArray(arch.body.data))setArchived(arch.body.data);   // a failed re-read keeps the last good list
+  // the archived half of the portfolio, by site id: the read carries it
+  // (archived_site_ids), plus whatever the Archived view already holds
+  const archIds=new Set((Array.isArray(pf.body.archived_site_ids)?pf.body.archived_site_ids:[]).concat((ARCHIVED||[]).map(x=>x.site_id),ARCH_LOCAL.map(x=>x.site_id)));
   // FIX 7: map each customer's own site → their delivery project id, so opening a
   // client from the portfolio lands on the delivery view. Its failure degrades
   // per-source (a notice; records still open) — never silently.
@@ -713,6 +721,8 @@ async function load(soft){
       const row=c.customer_site_id?bySite[c.customer_site_id]:null;
       if(row){row.client_id=c.client_id;row.email=c.email||row.email||null;row.open_support=Number(c.open_support||0);row.project_count=Number(c.project_count||0);if(c.status&&c.status!=='active')row.customer_status=c.status;return;}
       if(!c.client_id)return;
+      // an archived client lives under Archived only — never back in All as a bridge-only row (with no ⋯, so no Restore)
+      if(c.customer_site_id&&archIds.has(c.customer_site_id))return;
       CLIENTS.push({site_id:c.customer_site_id||('client:'+c.client_id),client_id:c.client_id,name:c.name||c.email||'Customer',email:c.email||null,edition:c.customer_site_id?'presence':'—',status:c.status||'active',
         attention:0,leads_waiting:0,search_issues:0,billing_issue:false,domain:null,domain_registrar:null,domain_expires_at:null,open_support:Number(c.open_support||0),project_count:Number(c.project_count||0),bridge_only:true});
     });
