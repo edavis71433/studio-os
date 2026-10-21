@@ -740,7 +740,7 @@ const MS6_CAPTURE_PAGES = [
 ];
 const LEGAL_PAGES = ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html'];
 const MS6_FAMILY = [...MS6_CAPTURE_PAGES, ...LEGAL_PAGES, '404.html'];
-const INTERNAL_PAGES = ['email-signature.html', 'styleguide.html', 'a11y.html'];
+const INTERNAL_PAGES = ['email-signature.html', 'styleguide.html', 'a11y.html', 'provision.html'];   // provision: studio audit change 12
 
 test.describe('MS6 entry & legal sweep (static pins)', () => {
   test.beforeEach(({}, testInfo) => {

@@ -845,6 +845,7 @@ function renderHome(){
   let html=`<div class="topbar"><div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div></div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
     `<header><h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
   html+=welcomeCardHtml();
+  html+=connectAskHtml();
   // slice 10: the at-a-glance strip — filled by buildNeedsYou from data Home
   // already loads; it stays hidden until at least one tile has a real datum.
   html+=`<div class="glance" id="home-glance" hidden></div>`;
@@ -873,6 +874,9 @@ function renderHome(){
   $('main').innerHTML=html;
   wireWelcome();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
+  document.querySelectorAll('[data-ask-connect]').forEach(b=>b.addEventListener('click',()=>askConnect(b.getAttribute('data-ask-connect'),b.getAttribute('data-label'),b)));
+  // back from Google (connections-callback.html → #connections): land on the card
+  if(location.hash==='#connections'){try{history.replaceState(null,'','/client.html');}catch(_){}const hc=$('home-connect');if(hc)setTimeout(()=>hc.scrollIntoView({block:'start'}),0);}
   buildNeedsYou();
   loadWebsiteCard();
 }
@@ -2111,6 +2115,33 @@ async function renderHelp(){
 const WELCOME_KEY='dds-portal-welcomed';
 function welcomed(){try{return localStorage.getItem(WELCOME_KEY)==='1';}catch(_){return false;}}
 let WELCOME_THIS_VISIT=false;   // the first visit keeps the card across Home re-renders until it ends or × is pressed
+// ── Studio audit change 9: "Connect your Google" — the studio asked, the client
+//    connects with their OWN account. Uses the same POST /connections/:key/connect
+//    the studio's page uses (their session resolves their site, so no scope), and
+//    connections-callback.html brings them back here.
+function connectAskHtml(){
+  const P=PORTAL;
+  if(P.askProblem)return`<section id="home-connect"><div class="card"><h3 style="margin:0 0 6px">That link didn’t open</h3><p class="muted" style="margin:0">${esc(P.askProblem)}</p></div></section>`;
+  const a=P.ask; if(!a||!a.providers||!a.providers.length)return'';
+  const by=a.asked_by?` (${esc(a.asked_by)})`:'';
+  const rows=a.providers.map(p=>`<div class="qrow" id="ask-${esc(p.key)}"><div class="qmain"><h3>${esc(p.name)}</h3><p>${esc(p.purpose||('Lets your studio read '+p.label+'.'))}</p><p class="muted" id="askmsg-${esc(p.key)}" role="alert" style="margin:4px 0 0"></p></div><button type="button" data-ask-connect="${esc(p.key)}" data-label="${esc(p.label)}">Connect</button></div>`).join('');
+  return`<section id="home-connect"><h2>Connect your Google</h2><div class="card qcard">
+    <p class="muted" style="margin:10px 0 4px">Your studio${by} asked to read these from your own Google account. It’s read-only — nothing on your website or your Google account changes, and you can disconnect any time. You approve each one on Google’s own screen.</p>
+    ${rows}</div></section>`;
+}
+async function askConnect(key,label,btn){
+  const msg=$('askmsg-'+key); if(msg)msg.textContent='';
+  btn.disabled=true; const old=btn.textContent; btn.textContent='One moment…';
+  const r=await api('/connections/'+encodeURIComponent(key)+'/connect','POST',{}).catch(()=>null);
+  const d=r&&r.ok&&r.body&&r.body.data;
+  if(d&&d.mode==='oauth'&&d.authorize_url){
+    // the return leg (connections-callback.html) needs the service, and the way back here
+    try{localStorage.setItem('dds-pending-connection',key);localStorage.setItem('dds-pending-label',label||key);localStorage.removeItem('dds-pending-scope');localStorage.setItem('dds-pending-return','/client.html#connections');}catch(_){}
+    location.href=d.authorize_url; return;
+  }
+  btn.disabled=false; btn.textContent=old;
+  if(msg)msg.textContent=(r&&r.body&&typeof r.body.message==='string'&&r.body.message.trim())?r.body.message.trim():'That didn’t start, and nothing changed. Please try again in a moment.';
+}
 function welcomeCardHtml(){
   if(welcomed()&&!WELCOME_THIS_VISIT)return'';
   // PS3: the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
@@ -2587,12 +2618,16 @@ async function load(){
   PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const params=new URLSearchParams(location.search);
   const dsup=params.get('support'); const deep=params.get('project');
+  // studio audit change 9: the studio's "connect your Google" email lands here with
+  // ?connect=<signed token>; a sign-in on the way stashes it (see the boot below)
+  const askTok=params.get('connect')||localStorage.getItem('dds-connect-ask')||'';
+  try{localStorage.removeItem('dds-connect-ask');}catch(_){}
   // item 1: back from Stripe — ?paid=<invoice id> (ids are uuids; anything else is ignored)
   const paidId=/^[0-9a-zA-Z-]{1,64}$/.test(params.get('paid')||'')?params.get('paid'):'';
   if(paidId)paidStore(paidId);
   // honor a deep link once, then drop it from the URL so any later re-load
   // (e.g. after approving something) lands on Home instead of re-opening it.
-  if(dsup||deep||paidId){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
+  if(dsup||deep||paidId||params.get('connect')){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
   const ctx=await api('/portal/context');
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
@@ -2620,6 +2655,11 @@ async function load(){
   PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok);   // …nor a failed notifications read as zero messages — but a reviewer's 403 here is the CONTRACT (reviewerAllowed), not a failure: their bell stays calm
   PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
+  // the studio's ask to connect Google — a client persona only; never a blocker
+  PORTAL.ask=null;
+  if(PORTAL.persona==='client'){const a=await api('/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'')).catch(()=>null);
+    if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
+    else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);}
   PORTAL.ready=true;
   showNav();
   // deep links open the relevant drill-down; the nav stays visible around it.
@@ -2648,6 +2688,9 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await 
       // shows the row as Processing.
       const pp=new URLSearchParams(location.search).get('paid')||'';
       if(/^[0-9a-zA-Z-]{1,64}$/.test(pp)){paidStore(pp);location.replace('/payment-success.html?paid='+encodeURIComponent(pp));return;}
+      // studio audit change 9: keep the studio's "connect your Google" link through the sign-in
+      const ct=new URLSearchParams(location.search).get('connect')||'';
+      if(ct&&ct.length<2048){try{localStorage.setItem('dds-connect-ask',ct);}catch(_){}}
       signedOut();return;
     }
     await load();

@@ -574,6 +574,7 @@ let GUIDE_OPEN=true,PENDING_BACK='';
 // "Convert them") switch to the right tab before they act.
 const DTAB_KEYS=['overview','billing','activity'];
 let DTAB='overview';
+let WANT_SCHEDULE=false;   // crm.html's "Payment schedule" link (…?deal=X#schedule): open the builder once the deal renders
 // ONE filled button per view (studio audit 2026-10, change 7): a control above
 // the tabs names the tabs it is primary for; on any other tab it goes quiet.
 function applyTabPrimaries(tab){
@@ -2000,7 +2001,8 @@ async function openDeal(id){
   const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
   // the tab: a ?dtab= deep link on a fresh open; an in-view refresh keeps the current one
-  if(CURRENT_DEAL!==id){const u=new URLSearchParams(location.search).get('dtab');DTAB=DTAB_KEYS.includes(u)?u:'overview';}
+  // (?tab= is an alias — the record links crm.html-style; #schedule opens Billing and the schedule builder, studio audit change 12)
+  if(CURRENT_DEAL!==id){const q=new URLSearchParams(location.search);const u=q.get('dtab')||q.get('tab');WANT_SCHEDULE=location.hash==='#schedule';DTAB=DTAB_KEYS.includes(u)?u:(WANT_SCHEDULE?'billing':'overview');}
   CURRENT_DEAL=id;
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():'')+(DTAB!=='overview'?'&dtab='+DTAB:''));
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
@@ -2678,7 +2680,7 @@ async function openDeal(id){
     // list uses too; a success re-opens the deal so the row re-renders from
     // fresh server state. [data-copy-pay] also covers the retainer links above.
     wireInvoiceActions($('detailInner'),()=>openDeal(id));
-    const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});});
+    const sendDep=$('sendDeposit'); if(sendDep) sendDep.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Deposit amount (USD)',type:'number',step:'0.01',placeholder:'500'}],async(v)=>{if(!v.amount){toast('Enter a deposit amount.',true);return;}await sendMoney({purpose:'deposit',amount_cents:Math.round(parseFloat(v.amount)*100),title:'Deposit'});},{saveLabel:'Request deposit'});
     // Payment schedule builder: deposit + balance, or N installments. Previews the
     // staged invoices (labels · due dates · amounts · running total = deal total),
     // then mints them via /sales/deals/:id/schedule. The client math mirrors the
@@ -2709,6 +2711,8 @@ async function openDeal(id){
       doPreview();
       $('pl-create').onclick=async()=>{const stages=doPreview();if(!stages.length){toast('Add plan details first.',true);return;}$('pl-create').disabled=true;try{const r=await api('/sales/deals/'+id+'/schedule','POST',{total_cents:totalCents,stages});toast('Payment plan created'+((r.data&&r.data.emailed)?' — the deposit was emailed to the client':((r.data&&r.data.linked)?' — deposit link ready to send':'')));openDeal(id);}catch(e){toast(nice(e),true);$('pl-create').disabled=false;}};
     };
+    // the record's "Payment schedule" link lands on #schedule (studio audit change 12): open the builder straight away, once
+    if(WANT_SCHEDULE){WANT_SCHEDULE=false;if(setupPlanBtn)setupPlanBtn.click();}   // the replaceState above already dropped the hash
     const conv=$('convert'); if(conv) conv.onclick=()=>{
       // two-step confirm (no confirm() dialog). Service language, not SaaS: the
       // labels say WHAT KIND OF WORK this is; the values stay the same edition
@@ -2755,6 +2759,8 @@ async function boot(){
     renderFilters();
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
+    // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"
+    else if(location.hash==='#outstanding'){try{history.replaceState(null,'',location.pathname+location.search);}catch(_){}openReceivables();}
     // Settings → Invoices & agreements lands here with ?services=1: open the catalog straight away
     if(new URLSearchParams(location.search).get('services')==='1'){const sb=$('mngServicesTop');if(sb)sb.click();}
   }catch(_){

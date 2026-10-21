@@ -3756,3 +3756,66 @@ test.describe('Client portal — approval on the deliverable row (audit change 8
     await expect(page.locator('#sec-files [data-adec]')).toHaveCount(0);
   });
 });
+
+// ── Wave 2 doors (Oct 2026 studio audit change 9): the client connects their OWN Google ──
+// The studio's email lands on client.html?connect=<signed token>; the portal
+// reads the ask, paints a card on Home, and Connect runs the SAME flow the
+// studio's page uses — with the client's own session, no scope, back here after.
+test.describe('Client portal — connect your Google (the studio asked)', () => {
+  const ASK = { data: { providers: [
+    { key: 'google_search_console', name: 'Google Search Console', label: 'how you show up in Google Search', purpose: 'See which searches bring people to you, and whether Google can find your pages.', reads: [] },
+    { key: 'google_analytics', name: 'Google Analytics', label: 'your visitor numbers', purpose: 'See how many people visit, and from where.', reads: [] },
+  ], asked_at: '2026-10-20T10:00:00Z', asked_by: 'eric@davisdigitalstudio.com' } };
+
+  test('?connect=<token> → the token goes to GET /connections/ask, the URL is cleaned, and the card lists what was asked', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/connections/ask': ASK } });
+    const asks: string[] = [];
+    await page.route('**/functions/v1/presence/connections/ask**', (route) => { asks.push(route.request().url()); route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ASK) }); });
+    await page.goto('/client.html?connect=tok-abc.iv');
+    const card = page.locator('#home-connect');
+    await expect(card).toBeVisible();
+    await expect(card.locator('h2')).toHaveText('Connect your Google');
+    await expect(card).toContainText('Your studio (eric@davisdigitalstudio.com) asked to read these from your own Google account.');
+    await expect(card.locator('[data-ask-connect]')).toHaveCount(2);
+    expect(asks[0]).toContain('/connections/ask?token=tok-abc.iv');
+    expect(new URL(page.url()).search).toBe('');
+    // not the filled button: the portal's one filled action stays the approval
+    await expect(card.locator('button.approve')).toHaveCount(0);
+  });
+
+  test('Connect → POST /connections/:key/connect with the client’s own session (no scope), remembers the way back, and hands off to Google', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/connections/ask': ASK } });
+    let scopeHeader: string | undefined = 'unset';
+    await page.route('**/functions/v1/presence/connections/google_search_console/connect', (route) => {
+      scopeHeader = route.request().headers()['x-dds-scope-site'];
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { mode: 'oauth', authorize_url: '/connections-callback.html?e2e=google', state: 's' } }) });
+    });
+    await page.goto('/client.html');
+    await page.locator('#ask-google_search_console [data-ask-connect]').click();
+    await page.waitForURL(/connections-callback\.html\?e2e=google/);
+    expect(scopeHeader || '').toBe('');   // the portal never scopes — an empty header is "my own site" to the server (index.ts: `if (scopeReq)`)
+    const remembered = await page.evaluate(() => [localStorage.getItem('dds-pending-connection'), localStorage.getItem('dds-pending-return'), localStorage.getItem('dds-pending-scope')]);
+    expect(remembered).toEqual(['google_search_console', '/client.html#connections', null]);
+  });
+
+  test('a lapsed link says so on the card instead of failing silently', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route('**/functions/v1/presence/connections/ask**', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'bad_token', message: 'That link has expired or isn’t for this account — ask your studio to send a fresh one.' }) }));
+    await page.goto('/client.html?connect=old');
+    await expect(page.locator('#home-connect')).toContainText('That link has expired');
+  });
+
+  test('no ask pending → no card', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/connections/ask': { data: { providers: [], asked_at: null, asked_by: '' } } } });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    await expect(page.locator('#home-connect')).toHaveCount(0);
+  });
+
+  test('signed out with ?connect= → the token survives the sign-in (stashed, then used once)', async ({ page }) => {
+    await installApp(page, { session: null, api: CLIENT_API });
+    await page.goto('/client.html?connect=tok-xyz');
+    await expect(page.locator('#main')).toContainText('Sign in to see your updates.');
+    expect(await page.evaluate(() => localStorage.getItem('dds-connect-ask'))).toBe('tok-xyz');
+  });
+});

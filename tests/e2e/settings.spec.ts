@@ -56,8 +56,8 @@ test.describe('Settings page', () => {
     await expect(page.locator('#f-area')).toHaveValue('Burbank, CA');
     await expect(page.locator('#f-industry')).toHaveValue('generic');
     await expect(page.locator('#main')).not.toContainText('Setting the table');
-    // quick statuses, never blockers
-    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected · 1 needs attention');
+    // quick statuses, never blockers (bug 7: the card names what is connected)
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected — Google Analytics, Search Console · 1 needs attention');
     await expect(page.locator('[data-card="billing"] .st')).toContainText('Studio · Active');
   });
 
@@ -181,7 +181,7 @@ test.describe('Settings page', () => {
     // the studio's own plan never shows inside a client
     await expect(page.locator('[data-card="billing"]')).toHaveCount(0);
     await expect(page.locator('#billing')).toBeHidden();
-    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected · 1 needs attention');
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected — Google Analytics, Search Console · 1 needs attention');
     expect(seen.map(([p]) => p)).not.toContain('/commerce/subscription');
     expect(seen.map(([p]) => p)).not.toContain('/agency/usage');
     expect(seen.filter(([p, scope]) => p === '/identity' && scope !== CLIENT)).toEqual([]);   // the profile read IS the client's
@@ -446,5 +446,27 @@ test.describe('Settings — the agency team', () => {
     await expect(page.locator('[data-card="studio"]')).toBeVisible();
     await expect(page.locator('[data-card="agency_team"]')).toHaveCount(0);
     await expect(page.locator('#team')).toBeHidden();
+  });
+});
+
+// ── Wave 2 doors (Oct 2026 studio audit bug 7): the Connections card always says what is connected ──
+test.describe('Settings — the Connections card status', () => {
+  test('nothing connected → "Nothing connected yet" (never a blank card)', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/connections': { data: { edition: 'studio_os', note: '', groups: {
+      'Google': [{ key: 'google_analytics', label: 'Google Analytics', connection: { status: 'disconnected', health: 'unknown' } }],
+    } } } } });
+    await page.goto('/settings.html');
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('Nothing connected yet');
+  });
+  test('many connected → the count, the first two names, and how many more', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/connections': { data: { edition: 'studio_os', note: '', groups: {
+      'Google': [
+        { key: 'google_analytics', label: 'Google Analytics', connection: { status: 'connected', health: 'ok' } },
+        { key: 'google_search_console', label: 'Search Console', connection: { status: 'connected', health: 'ok' } },
+        { key: 'google_business_profile', label: 'Business Profile', connection: { status: 'connected', health: 'ok' } },
+      ],
+    } } } } });
+    await page.goto('/settings.html');
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('3 connected — Google Analytics, Search Console +1');
   });
 });

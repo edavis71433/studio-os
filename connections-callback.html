@@ -49,7 +49,11 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g
 // carry it too, or "Back to your connections" lands on the same 404 the operator
 // just escaped: a literal loop.
 const PENDING_SCOPE = localStorage.getItem('dds-pending-scope') || '';
-const backHref = PENDING_SCOPE ? '/connections.html?client=' + encodeURIComponent(PENDING_SCOPE) : '/connections.html';
+// Studio audit change 9: a client who connected from THEIR portal goes back
+// there, not to the studio's Connections page. Same-site paths only — the
+// value comes from localStorage, which is untrusted input.
+const PENDING_RETURN = (function(){ const v = localStorage.getItem('dds-pending-return') || ''; return (/^\/[^\/\\]/.test(v) ? v : ''); })();
+const backHref = PENDING_RETURN || (PENDING_SCOPE ? '/connections.html?client=' + encodeURIComponent(PENDING_SCOPE) : '/connections.html');
 
 function show(icon, title, msg, showBtn){
   $('card').innerHTML = (icon === 'ok' ? '<div class="ok">✓</div>' : '<div class="spin" role="status"></div>')
@@ -81,7 +85,7 @@ function show(icon, title, msg, showBtn){
       method:'POST', headers, body: JSON.stringify({ code, state }),
     });
     const body = await r.json().catch(()=>({}));
-    localStorage.removeItem('dds-pending-connection'); localStorage.removeItem('dds-pending-label'); localStorage.removeItem('dds-pending-scope');
+    localStorage.removeItem('dds-pending-connection'); localStorage.removeItem('dds-pending-label'); localStorage.removeItem('dds-pending-scope'); localStorage.removeItem('dds-pending-return');
     if(r.ok){
       show('ok', 'Connected.', 'We’re now reading from ' + label + ' — read-only, always with your approval, and yours to disconnect any time.', true);
     } else {

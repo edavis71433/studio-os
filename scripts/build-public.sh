@@ -36,8 +36,9 @@ cp ./*.js dist/ 2>/dev/null || true
 # instructions), and a11y (internal check page) are repo files, not public
 # site. _redirects also force-404s their URLs as defense-in-depth.
 # Pinned by tests/e2e/marketing.spec.ts (MS6), which runs this script and
-# inspects dist/.
-for f in email-signature.html styleguide.html a11y.html; do
+# inspects dist/. provision.html joined the list in Oct 2026 (studio audit
+# change 12): an unlinked, unauthenticated provisioning form is not public site.
+for f in email-signature.html styleguide.html a11y.html provision.html; do
   rm -f "dist/$f"
 done
 

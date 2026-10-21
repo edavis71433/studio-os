@@ -231,7 +231,7 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
 }
 {
   const ag = read('agency.html');
-  ok('agency.html: ⌘K lands on #add → the dialog opens and the hash is cleared (boot + hashchange)', /function openFromHash\(\)\{\s*if\(location\.hash!=='#add'\)return;/.test(ag) && /history\.replaceState\(null,'',location\.pathname\+location\.search\)/.test(ag) && /window\.addEventListener\('hashchange',openFromHash\)/.test(ag) && /renderTop\(\);\s*openFromHash\(\);/.test(ag));
+  ok('agency.html: ⌘K lands on #add → the dialog opens and the hash is cleared (boot + hashchange)', /function openFromHash\(\)\{[\s\S]{0,400}?if\(location\.hash!=='#add'\)return;/.test(ag) && /history\.replaceState\(null,'',location\.pathname\+location\.search\)/.test(ag) && /window\.addEventListener\('hashchange',openFromHash\)/.test(ag) && /renderTop\(\);\s*openFromHash\(\);/.test(ag));
   ok('add-customer: the response carries the new site id the dialog applies the kit to', /return json\(\{ data: \{ created: true, client_id: clientId, site_id: acct\.siteId/.test(sales));
 }
 

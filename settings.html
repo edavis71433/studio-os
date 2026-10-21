@@ -521,7 +521,11 @@ function signedOut() {
       const stateOf = (x) => { const c = (x && x.connection) || x || {}; const st = c.status, hl = c.health; if (st === 'connected' && hl !== 'down' && hl !== 'attention') return 'on'; if (st === 'connected' || st === 'expired' || st === 'error' || st === 'attention' || hl === 'attention' || hl === 'down') return 'attn'; return 'off'; };
       const states = list.map(stateOf);
       const on = states.filter((x) => x === 'on').length, attn = states.filter((x) => x === 'attn').length;
-      if (on || attn) setStatus('connections', { text: `${on} connected${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
+      // studio audit bug 7: the card says what is connected — the count, the first names, or "nothing yet"
+      const names = list.filter((x, i) => states[i] === 'on').map((x) => String(x.label || x.key || '')).filter(Boolean);
+      const named = names.length ? ' — ' + names.slice(0, 2).map((n) => n.charAt(0).toUpperCase() + n.slice(1)).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '') : '';
+      if (on || attn) setStatus('connections', { text: `${on} connected${named}${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
+      else setStatus('connections', { text: 'Nothing connected yet', cls: '' });
     }).catch(() => {});
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});

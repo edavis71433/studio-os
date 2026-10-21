@@ -361,6 +361,33 @@ test.describe('Connections — the operator connects FOR a client', () => {
       .toHaveAttribute('href', `/connections.html?client=${CLIENT}`);
   });
 
+  test('a client who connected from THEIR portal goes back there (dds-pending-return), never to the studio’s page', async ({ page }) => {
+    await installApp(page);
+    await page.addInitScript(() => {
+      localStorage.setItem('dds-pending-connection', 'google_search_console');
+      localStorage.setItem('dds-pending-label', 'how you show up in Google Search');
+      localStorage.setItem('dds-pending-return', '/client.html#connections');
+    });
+    await page.route('**/functions/v1/presence/connections/google_search_console/callback', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { connected: true, message: 'Connected.' } }) }));
+    await page.goto('/connections-callback.html?code=abc&state=xyz');
+    await expect(page.locator('#card h1')).toHaveText('Connected.');
+    await expect(page.getByRole('link', { name: 'Back to your connections' })).toHaveAttribute('href', '/client.html#connections');
+    expect(await page.evaluate(() => localStorage.getItem('dds-pending-return'))).toBeNull();   // used once
+  });
+
+  test('the return path is same-site only: an off-site value in storage is ignored', async ({ page }) => {
+    await installApp(page);
+    await page.addInitScript(() => {
+      localStorage.setItem('dds-pending-connection', 'google_search_console');
+      localStorage.setItem('dds-pending-return', '//evil.example/phish');
+    });
+    await page.route('**/functions/v1/presence/connections/google_search_console/callback', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { connected: true, message: 'Connected.' } }) }));
+    await page.goto('/connections-callback.html?code=abc&state=xyz');
+    await expect(page.getByRole('link', { name: 'Back to your connections' })).toHaveAttribute('href', '/connections.html');
+  });
+
   test('the callback renders the SERVER’s reason, not a generic shrug', async ({ page }) => {
     await installApp(page);
     await page.addInitScript(() => {
@@ -413,5 +440,61 @@ test.describe('Connections — the row speaks as the studio when scoped into a c
     const more = row.locator('#more-google_search_console');
     await expect(more).toContainText('Who owns it: you do. It’s your account and your permission');
     await expect(more).not.toContainText('You connect this for');
+  });
+});
+
+// ── Wave 2 doors (Oct 2026 studio audit change 9): "Ask the client to connect their Google" ──
+// Scoped into a client, a second door beside the operator's own Connect: one
+// email with a signed link into the client's portal. The row's Connect stays.
+test.describe('Connections — ask the client to connect their Google', () => {
+  const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+  const SCOPED_CTX = { data: {
+    site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
+    edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true,
+    capabilities: ['edit', 'publish', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV,
+    scope: { site_id: CLIENT, name: 'Joe’s Plumbing' },
+  } };
+
+  test('scoped: the button names the client, confirms, POSTs /connections/ask with the scope, and reports the send', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE(), '/portal/context': SCOPED_CTX,
+      '/connections/ask': { data: { asked: ['google_search_console'], emailed: true, to: 'j…@example.com', message: 'Asked — we emailed j…@example.com a link.' } } } });
+    const posts: Array<{ method: string; scope: string | undefined }> = [];
+    await page.route('**/functions/v1/presence/connections/ask', (route) => {
+      posts.push({ method: route.request().method(), scope: route.request().headers()['x-dds-scope-site'] });
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { asked: ['google_search_console'], emailed: true, to: 'j…@example.com', message: 'Asked — we emailed j…@example.com a link.' } }) });
+    });
+    await page.goto(`/connections.html?client=${CLIENT}`);
+    const ask = page.locator('#askClient');
+    await expect(ask).toHaveText('Ask Joe’s Plumbing to connect their Google');
+    await expect(ask).not.toHaveClass(/primary/);                                   // a second door, not the filled one
+    await expect(page.locator('#svc-google_search_console [data-connect]')).toBeVisible();   // the operator path stays
+    await ask.click();
+    await expect(page.getByRole('dialog')).toContainText('Email Joe’s Plumbing a link to connect their Google?');
+    await page.getByRole('button', { name: 'Send the email' }).click();
+    await expect.poll(() => posts.length).toBe(1);
+    expect(posts[0].method).toBe('POST');
+    expect(posts[0].scope).toBe(CLIENT);
+    await expect(page.locator('.dds-toast')).toContainText('Asked — we emailed j…@example.com a link.');   // the shell's toast
+  });
+
+  test('scoped: a pending row reads "Asked the client" and the button becomes "Ask again"', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE({ connection: { status: 'pending', health: 'unknown', last_sync_at: null, connected_at: null, reason: '' } }), '/portal/context': SCOPED_CTX } });
+    await page.goto(`/connections.html?client=${CLIENT}`);
+    await expect(page.locator('#svc-google_search_console .chip.status')).toContainText('Asked the client');
+    await expect(page.locator('#askClient')).toHaveText('Ask again');
+  });
+
+  test('un-scoped (the owner’s own page): no ask button at all', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE() } });
+    await page.goto('/connections.html');
+    await expect(page.locator('#svc-google_search_console [data-connect]')).toBeVisible();
+    await expect(page.locator('#askClient')).toHaveCount(0);
+  });
+
+  test('scoped, Google already connected: nothing to ask for, no button', async ({ page }) => {
+    await installApp(page, { api: { '/connections': SURFACE({ connection: { status: 'connected', health: 'ok', last_sync_at: '2026-08-09T07:30:00Z', connected_at: '2026-08-01T00:00:00Z', reason: '' } }), '/portal/context': SCOPED_CTX } });
+    await page.goto(`/connections.html?client=${CLIENT}`);
+    await expect(page.locator('#svc-google_search_console .chip.status')).toContainText('Connected');
+    await expect(page.locator('#askClient')).toHaveCount(0);
   });
 });
