@@ -315,7 +315,11 @@ test.describe('Settings — automations', () => {
 // remove for owners and admins. Never on a client's settings; never for a plain
 // studio owner (who has no agency).
 test.describe('Settings — the agency team', () => {
-  const ME = { data: { agency: 'Bright Studio', role: 'owner', plan: 'agency', branding: {}, email: 'eric@brightstudio.example' } };
+  // the REAL /agency/me shape — agency · role · plan · branding · email · member_id
+  // (routes.ts). The page knows its own row from email or member_id; the shape is
+  // pinned server-side by tests/presence/agency_members_guard_test.mjs, so a server
+  // that stopped returning them fails there, not silently here.
+  const ME = { data: { agency: 'Bright Studio', role: 'owner', plan: 'agency', branding: {}, email: 'eric@brightstudio.example', member_id: 'm-1' } };
   const MEMBERS = { data: [
     { id: 'm-1', email: 'eric@brightstudio.example', role: 'owner', status: 'active', created_at: '2026-01-10T00:00:00Z' },
     { id: 'm-2', email: 'sam@brightstudio.example', role: 'designer', status: 'active', created_at: '2026-06-01T00:00:00Z' },
@@ -387,6 +391,40 @@ test.describe('Settings — the agency team', () => {
       { path: '/agency/members/m-2', body: { role: 'account_manager' } },
       { path: '/agency/members/m-2', body: { status: 'revoked' } },
     ]);
+  });
+
+  // Post-merge review of #47: the "no controls on your own row" guard read an email
+  // /agency/me never returned, so in production an owner could demote or remove
+  // themselves. /agency/me now returns email + member_id, and the server refuses the
+  // caller's own row and the last owner with a plain-words 409 the page shows.
+  test('your own row is known by member_id alone; a refused change shows the server’s words and the row stays as it was', async ({ page }) => {
+    const twoOwners = { data: [MEMBERS.data[0], { ...MEMBERS.data[1], role: 'owner' }] };
+    await installApp(page, { api: { ...teamApi, '/agency/members': twoOwners,
+      '/agency/me': { data: { agency: 'Bright Studio', role: 'owner', plan: 'agency', branding: {}, member_id: 'm-1' } } } });   // no email: the id is enough
+    const patches: unknown[] = [];
+    await page.route('**/functions/v1/presence/agency/members/*', (route) => {
+      patches.push(route.request().postDataJSON());
+      return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'last_owner', message: 'The team needs at least one owner. Make someone else an owner first.' }) });
+    });
+    await page.goto('/settings.html#team');
+    const rows = page.locator('#people .member');
+    await expect(rows.nth(0)).toContainText('Owner · you');
+    await expect(rows.nth(0).locator('select, button')).toHaveCount(0);                 // matched by member_id, no email needed
+    // a refused role change: the toast carries the server's sentence, the select goes back
+    const sel = page.locator('select[data-role="m-2"]');
+    await expect(sel).toHaveValue('owner');
+    await sel.selectOption('designer');
+    await expect(page.locator('.dds-toast')).toContainText('The team needs at least one owner. Make someone else an owner first.');
+    await expect(sel).toHaveValue('owner');
+    await expect(sel).toBeEnabled();
+    // a refused removal: the row is NOT marked removed and Remove is usable again
+    const remove = rows.nth(1).getByRole('button', { name: /Remove/ });
+    await remove.click(); await remove.click();
+    await expect(page.locator('.dds-toast').last()).toContainText('The team needs at least one owner.');
+    await expect(rows.nth(1)).not.toHaveClass(/revoked/);
+    await expect(rows.nth(1)).not.toContainText('removed');
+    await expect(remove).toBeEnabled();
+    expect(patches).toEqual([{ role: 'designer' }, { status: 'revoked' }]);
   });
 
   test('a designer sees the team read-only; a plain studio owner has no Team card; a drilled-in operator has none either', async ({ page }) => {

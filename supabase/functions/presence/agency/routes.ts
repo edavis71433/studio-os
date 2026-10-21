@@ -127,7 +127,9 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
 
   // ── who am I ──
   if (route === '/agency/me' && method === 'GET') {
-    return json({ data: { agency: member.agency_name, role: member.role, plan: member.plan, branding: member.branding } }, 200, cors);
+    // email + member_id: the Team section needs to know which row is YOURS (no
+    // controls on yourself). The server guard below is the law; this is the hint.
+    return json({ data: { agency: member.agency_name, role: member.role, plan: member.plan, branding: member.branding, email: member.email, member_id: member.member_id } }, 200, cors);
   }
 
   // ── the portfolio: directory + everything observable from one place ──
@@ -135,14 +137,19 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!can(member.role, 'read')) return forbid(cors);
     const url = new URL(req.url);
     const input = await gather(member.agency_id, now);
-    const rows = filterPortfolio(buildPortfolio(input), {
+    const all = buildPortfolio(input);
+    const rows = filterPortfolio(all, {
       search: url.searchParams.get('search') || undefined,
       tag: url.searchParams.get('tag') || undefined,
       archived: url.searchParams.has('archived') ? url.searchParams.get('archived') === 'true' : false,
     });
     // internal notes are a capability of their own (support reads them, readonly does not)
     const out = can(member.role, 'notes') ? rows : rows.map((r) => ({ ...r, notes: '' }));
-    return json({ data: out }, 200, cors);
+    // which sites are archived, alongside the list: the roster page folds the
+    // bridge list (/studio/customers) into these rows and must NOT give an
+    // archived client a fresh bridge-only row in All. Same read, no second gather.
+    const archivedSiteIds = all.filter((r) => r.archived).map((r) => r.site_id);
+    return json({ data: out, archived_site_ids: archivedSiteIds }, 200, cors);
   }
 
   // ── work queues + cross-client patterns — from the existing pipeline only ──
@@ -338,6 +345,22 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (['owner', 'admin', 'account_manager', 'content_strategist', 'designer', 'developer', 'support', 'readonly'].includes(b?.role)) patch.role = b.role;
       if (b?.status === 'revoked' || b?.status === 'active') patch.status = b.status;
       if (!Object.keys(patch).length) return json({ error: 'empty_update', message: 'Nothing to change.' }, 400, cors);
+      // Your own row is off limits — nobody demotes or removes themselves. The
+      // page hides the controls on your row; this is what makes it true.
+      const ownRow = () => json({ error: 'own_row', message: 'You can’t change your own role or remove yourself. Ask another owner to do it.' }, 409, cors);
+      if (m[1] === member.member_id) return ownRow();
+      const cur = await svc(`presence_agency_members?id=eq.${m[1]}&agency_id=eq.${member.agency_id}&select=id,email,role,status&limit=1`);
+      const target = (cur.json ?? [])[0] as { id: string; email: string; role: string; status: string } | undefined;
+      if (!cur.ok || !target) return json({ error: 'not_found', message: 'No such member.' }, 404, cors);
+      if (String(target.email || '').toLowerCase() === String(member.email || '').toLowerCase()) return ownRow();
+      // The team always keeps one owner: the last active owner can be neither
+      // demoted nor removed (an admin can manage members, so this is not covered
+      // by the own-row rule alone).
+      const losesOwner = target.role === 'owner' && target.status === 'active' && ((typeof patch.role === 'string' && patch.role !== 'owner') || patch.status === 'revoked');
+      if (losesOwner) {
+        const owners = await svc(`presence_agency_members?agency_id=eq.${member.agency_id}&role=eq.owner&status=eq.active&select=id&limit=100`);
+        if ((owners.json ?? []).length <= 1) return json({ error: 'last_owner', message: 'The team needs at least one owner. Make someone else an owner first.' }, 409, cors);
+      }
       const w = await svc(`presence_agency_members?id=eq.${m[1]}&agency_id=eq.${member.agency_id}&select=id,email,role,status`, {
         method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch),
       });

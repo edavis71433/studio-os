@@ -761,6 +761,76 @@ test.describe('Agency roster — housekeeping', () => {
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
   });
 
+  // Post-merge review of #47: a client archived from the ⋯ menu came BACK after a
+  // reload — load() folded every /studio/customers entry the (non-archived) portfolio
+  // did not know into All as a bridge-only row, ⋯-less, while the same client also sat
+  // under Archived. The portfolio read now carries archived_site_ids and the roster
+  // skips them. Also: ↻ re-reads the Archived list once it has been read (it used to
+  // stay cached for the session).
+  test('an archived client stays under Archived after a reload — never back in All as a bridge-only row; Restore from there brings it back; ↻ re-reads Archived', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: { ...ROW_API, '/studio/customers': { data: [
+      ...homeApi['/studio/customers'].data,
+      { client_id: 'c3', customer_site_id: 'a3', project_id: 'p3', name: 'Cedar Garage', email: 'cedar@garage.example', status: 'active', open_support: 0, project_count: 1 },   // the bridge list keeps knowing an archived client
+    ] } } });
+    let archivedOnServer = false;
+    const calls: string[] = [];
+    await page.route(PF_RE, (route) => {
+      const u = new URL(route.request().url()); calls.push(u.search);
+      const cedar = { ...CEDAR, archived: true };
+      if (u.searchParams.get('archived') === 'true') return route.fulfill(ok({ data: archivedOnServer ? [cedar] : [] }));
+      return route.fulfill(ok(archivedOnServer ? { data: [MARLOW, DENTAL], archived_site_ids: ['a3'] } : { data: [MARLOW, DENTAL, CEDAR], archived_site_ids: [] }));
+    });
+    await page.route('**/functions/v1/presence/agency/clients/*', (route) => {
+      const st = (route.request().postDataJSON() as { status: string }).status; archivedOnServer = st === 'archived';
+      return route.fulfill(ok({ data: { site_id: 'a3', status: st } }));
+    });
+    await page.goto('/agency.html');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);                        // Marlow · Dental · Cedar + the bridged-only Park Florist
+    await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    const arch = page.locator('form[data-hkform="a3"]').getByRole('button', { name: /Archive/ });
+    await arch.click(); await arch.click();
+    await expect(page.locator('.dds-toast').filter({ hasText: 'archived' })).toContainText('Cedar Garage archived');
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(3);
+    // the reload: the server knows a3 is archived; the bridge list still lists it
+    await page.reload();
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(3);
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(0);      // NOT back as a bridge-only row
+    await expect(page.locator('tbody tr', { hasText: 'Park Florist' })).toHaveCount(1);      // a genuinely bridge-only customer still gets its row
+    await page.locator('[data-view="archived"]').click();
+    const cedarArch = page.locator('tbody tr', { hasText: 'Cedar Garage' });
+    await expect(cedarArch).toHaveCount(1);
+    await expect(cedarArch.getByRole('button', { name: 'More for Cedar Garage' })).toBeVisible();   // the ⋯ is there, so Restore is reachable
+    expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(1);
+    // ↻ re-reads the Archived list now that it has been read
+    await page.locator('#refreshBtn').click();
+    await expect.poll(() => calls.filter((c) => c.includes('archived=true')).length).toBe(2);
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(1);
+    // Restore from Archived brings the client back to All
+    await page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' }).click();
+    await page.locator('form[data-hkform="a3"]').getByRole('button', { name: 'Restore client' }).click();
+    await expect(page.locator('.dds-toast').filter({ hasText: 'restored' })).toContainText('Cedar Garage restored');
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' })).toHaveCount(0);
+    await page.locator('[data-view="all"]').click();
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
+    await expect(page.locator('tbody tr', { hasText: 'Cedar Garage' }).getByRole('button', { name: 'More for Cedar Garage' })).toBeVisible();
+    await page.reload();                                                                      // and it stays back
+    await expect(page.locator('tbody tr[data-open]')).toHaveCount(4);
+  });
+
+  test('Escape in the housekeeping form closes it and puts focus back on the ⋯ (Cancel’s contract)', async ({ page }) => {
+    await pinDisplay(page, 'table');
+    await installApp(page, { api: ROW_API });
+    await page.goto('/agency.html');
+    await page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).first().getByRole('button', { name: 'More for Marlow’s Kitchen' }).click();
+    const form = page.locator('form[data-hkform="a1"]');
+    await expect(form.locator('[name="tags"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(form).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'More for Marlow’s Kitchen' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'More for Marlow’s Kitchen' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   test('a read-only member sees no ⋯; a bridged-only customer has none either; the search matches tags', async ({ page }) => {
     await pinDisplay(page, 'table');
     await installApp(page, { api: ROW_API });

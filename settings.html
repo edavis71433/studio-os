@@ -275,7 +275,8 @@ const ROLE_HELP = 'Owners and admins run the team and the brand. Account manager
 let TEAM = null, TEAM_ME = null;
 function canManageTeam() { return !!(TEAM_ME && (TEAM_ME.role === 'owner' || TEAM_ME.role === 'admin')); }
 function memberHtml(m) {
-  const mine = TEAM_ME && String(m.email).toLowerCase() === String(TEAM_ME.email || '').toLowerCase();
+  // your own row: matched by the member id /agency/me returns, or by email — either is enough
+  const mine = !!TEAM_ME && ((!!TEAM_ME.member_id && m.id === TEAM_ME.member_id) || (!!TEAM_ME.email && String(m.email).toLowerCase() === String(TEAM_ME.email).toLowerCase()));
   const revoked = m.status === 'revoked';
   const roleCtl = canManageTeam() && !mine && !revoked
     ? `<select data-role="${esc(m.id)}" aria-label="Role for ${esc(m.email)}">${Object.keys(ROLE_WORD).map((k) => `<option value="${k}"${m.role === k ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('')}</select>`
@@ -288,7 +289,7 @@ async function loadTeam() {
   const sec = $('team'); if (!sec) return;
   const [me, list, usage] = await Promise.all([api('/agency/me'), api('/agency/members'), api('/agency/usage').catch(() => null)]);
   if (!me.ok || !list.ok) { sec.hidden = false; $('people').innerHTML = '<p class="seats">We couldn’t load your team just now.</p>'; return; }
-  TEAM_ME = { ...(me.body.data || {}), email: (me.body.data && me.body.data.email) || (window.__ddsEmail || '') };
+  TEAM_ME = { ...(me.body.data || {}) };   // /agency/me: agency, role, plan, branding, email, member_id
   TEAM = Array.isArray(list.body.data) ? list.body.data : [];
   const u = usage && usage.ok && usage.body && usage.body.data && usage.body.data.seats;
   const active = TEAM.filter((m) => m.status !== 'revoked').length;
