@@ -559,7 +559,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
       if (to) {
         const up = await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&stage=in.(lead,qualified,proposal,contract)&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) });
         moved = up.ok && Array.isArray(up.json) && up.json.length > 0;
-        if (moved) await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deal_id: inv.deal_id, site_id: inv.site_id, kind: 'stage_change', actor: 'stripe', actor_kind: 'system', detail: { to_stage: to, because: 'deposit_paid' } }) }).catch(() => {});
+        if (moved) await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deal_id: inv.deal_id, site_id: inv.site_id, kind: 'stage_change', actor: 'stripe', actor_kind: 'system', to_stage: to, detail: { because: 'deposit_paid' } }) }).catch(() => {});   // to_stage is a COLUMN (pipeline.html / deal_activity.ts read it) — never only inside detail
       }
     } catch { /* the payment stands; the stage move is best-effort */ }
   }

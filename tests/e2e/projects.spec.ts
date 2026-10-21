@@ -1039,7 +1039,13 @@ test.describe('Projects — a client context lists that client’s projects', ()
 // date the reminders chase); "+ Share" can ask in the same step; the row
 // reads the approval's state as a chip; "+ Request" carries a date too.
 test.describe('Project record — approval per deliverable (audit change 8)', () => {
-  const withApproval = (status: string, due: string | null = '2026-10-30') => {
+  // due dates are RELATIVE to the run's local day — the page decides "overdue"
+  // on the studio's calendar, so a fixed date would flip the chip one morning
+  const ymdLocal = (d: number) => { const t = new Date(); t.setDate(t.getDate() + d); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+  const dayLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+  const DUE = ymdLocal(10), DUE_LABEL = dayLabel(DUE);
+  const PAST = ymdLocal(-3), PAST_LABEL = dayLabel(PAST);
+  const withApproval = (status: string, due: string | null = DUE) => {
     const detail = JSON.parse(JSON.stringify(P1_DETAIL));
     detail.data.approvals = [
       { id: 'a2', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage mock', status, content_hash: 'h2', client_visible: true, due_date: due },
@@ -1081,10 +1087,12 @@ test.describe('Project record — approval per deliverable (audit change 8)', ()
     await installApp(page, { api: { ...API, '/projects/p1': withApproval('pending') } });
     await page.goto('/projects.html?project=p1');
     const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
-    await expect(row.locator('.tag.ap.awaiting')).toHaveText('Awaiting approval · due Oct 30, 2026');
+    await expect(row.locator('.tag.ap.awaiting')).toHaveText(`Awaiting approval · due ${DUE_LABEL}`);
+    await expect(row.locator('.tag.ap.awaiting')).not.toHaveClass(/overdue/);
     await expect(row.locator('[data-ask]')).toHaveCount(0);
     await expect(row.locator('[data-dl="d1"]')).toBeVisible();   // Download stays
-    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage mock' })).toContainText('due Oct 30, 2026');
+    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage mock' })).toContainText(`due ${DUE_LABEL}`);
+    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage mock' }).locator('.tag.overdue')).toHaveCount(0);
     await expect(page.locator('#apList .item').filter({ hasText: 'Homepage design' })).not.toContainText('due');
   });
 
@@ -1099,6 +1107,25 @@ test.describe('Project record — approval per deliverable (audit change 8)', ()
     await page.reload();
     await expect(row.locator('.tag.ap.changes')).toHaveText('Changes requested');
     await expect(row.locator('[data-ask="d1"]')).toBeVisible();
+  });
+
+  test('a PAST-DUE pending approval is honest: "Overdue · due …" on the file row, an overdue tag on the Approvals card — decided ones never', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/projects/p1': withApproval('pending', PAST) } });
+    await page.goto('/projects.html?project=p1');
+    const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
+    await expect(row.locator('.tag.ap.awaiting')).toHaveText(`Overdue · due ${PAST_LABEL}`);
+    await expect(row.locator('.tag.ap.awaiting')).toHaveClass(/overdue/);
+    await expect(row.locator('[data-ask]')).toHaveCount(0);   // still pending — the studio does not ask twice
+    const card = page.locator('#apList .item').filter({ hasText: 'Homepage mock' });
+    await expect(card.locator('.tag.overdue')).toHaveText('overdue');
+    await expect(card).toContainText(`due ${PAST_LABEL}`);
+    await expect(page.locator('#apList .item').filter({ hasText: 'Homepage design' }).locator('.tag.overdue')).toHaveCount(0);   // undated → never overdue
+    // the same date on an APPROVED one is history, not a late answer
+    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withApproval('approved', PAST)) }));
+    await page.reload();
+    await expect(row.locator('.tag.ap.approved')).toHaveText('Approved');
+    await expect(page.locator('#apList .tag.overdue')).toHaveCount(0);
   });
 
   test('an undated pending approval reads "Awaiting approval" with no date', async ({ page }) => {
@@ -1165,7 +1192,7 @@ test.describe('Project record — approval per deliverable (audit change 8)', ()
     detail.data.is_studio_view = false;
     await installApp(page, { api: { ...API, '/projects': { ...LIST, is_studio_view: false }, '/projects/p1': detail } });
     await page.goto('/projects.html?project=p1');
-    await expect(page.locator('#dlList .tag.ap.awaiting')).toHaveText('Awaiting approval · due Oct 30, 2026');
+    await expect(page.locator('#dlList .tag.ap.awaiting')).toHaveText(`Awaiting approval · due ${DUE_LABEL}`);
     await expect(page.locator('[data-ask]')).toHaveCount(0);
   });
 });

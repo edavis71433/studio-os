@@ -36,6 +36,8 @@
   .card h3{font-family:var(--serif);font-weight:500;font-size:19px;margin:0 0 5px;line-height:1.2;letter-spacing:-.01em}
   .card p{margin:0;color:var(--soft);font-size:14.5px}
   .card.approve{border-left:3px solid var(--p)}
+  .card.approve .apdue{font-size:12.5px;color:var(--faint);margin-top:-4px}
+  .card.approve .apdue.late{color:var(--dds-bad,#c43c3c);font-weight:600}
   .row{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}
   button{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 17px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
@@ -163,6 +165,7 @@
   .fok{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--warn-soft);color:var(--warn);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
   .fok.ok{background:var(--good-soft);color:var(--good)}
   .fok.chg{background:var(--p-soft);color:var(--p)}
+  .fok.od{background:transparent;color:var(--dds-bad,#c43c3c);border:1px solid currentColor}
   .frow.asks{flex-wrap:wrap}
   .frow.asks .facts{flex:0 0 100%;display:flex;gap:8px;flex-wrap:wrap;margin-left:46px}
   .frow.asks .fnote{flex:0 0 100%;margin-left:46px}
@@ -1475,9 +1478,15 @@ function isClientUpload(f){return !!f&&(f.client_upload===true||String(f.note||'
 // Decided → the answer as a chip. No approval → the row as it always was.
 const AP_FILE_CHIP={pending:['Needs your OK',''],approved:['Approved','ok'],changes_requested:['Changes requested','chg'],rejected:['Declined','chg']};
 function approvalForFile(approvals,fid){return (approvals||[]).find(a=>a&&a.subject_type==='deliverable'&&a.subject_id===fid)||null;}
+// A pending approval is OVERDUE once its due date has passed — the same rule as
+// the studio's reminder sweep (lib/approvals.ts approvalReminderDue: whole days
+// to the due date < 0), in the client's LOCAL calendar like the invoice chips.
+function approvalOverdue(a){if(!a||a.status!=='pending')return false;const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(a.due_date||''));return !!m&&m[0]<portalTodayYmd();}
+// "answer by Oct 24, 2026" while there is time; "was due Oct 24, 2026" once it has passed
+function approvalDueText(a){if(!a||a.status!=='pending'||!a.due_date)return'';return (approvalOverdue(a)?'was due ':'answer by ')+niceDay(a.due_date);}
 function fileRowHtml(f,ap){
-  const mine=isClientUpload(f);const when=fdate(f.created_at);const ch=ap&&AP_FILE_CHIP[ap.status];const asks=!!(ch&&ap.status==='pending');
-  const due=asks&&ap.due_date?` · answer by ${esc(niceDay(ap.due_date))}`:'';
+  const mine=isClientUpload(f);const when=fdate(f.created_at);const late=approvalOverdue(ap);const ch=late?['Overdue — needs your OK','od']:(ap&&AP_FILE_CHIP[ap.status]);const asks=!!(ch&&ap.status==='pending');
+  const due=asks&&ap.due_date?` · ${esc(approvalDueText(ap))}`:'';
   const acts=asks?`<span class="facts"><button class="fbtn" data-adec="${esc(ap.id)}" data-ah="${esc(ap.content_hash||'')}" aria-label="Approve — ${esc(f.title)}">Approve</button><button class="fbtn" data-areq="${esc(ap.id)}" data-box="fnote-${esc(ap.id)}" aria-label="Request changes — ${esc(f.title)}">Request changes</button></span>`+
     `<div class="fnote" id="fnote-${esc(ap.id)}" style="display:none"><textarea rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="fbtn" data-asend="${esc(ap.id)}" data-ah="${esc(ap.content_hash||'')}" data-box="fnote-${esc(ap.id)}">Send request</button><button class="fbtn" data-acancel="${esc(ap.id)}" data-box="fnote-${esc(ap.id)}">Cancel</button></div></div>`:'';
   return `<div class="frow${asks?' asks':''}"${ap?` data-apfile="${esc(f.id)}"`:''}><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span>`+
@@ -2287,7 +2296,7 @@ async function openProject(id,focusSection){
   // approvals that need the client — per-kind tag, per-card id (notification
   // anchors emit #approval-<id>), and a helper line so "request changes" is
   // clearly safe. Decided ones form a paper-trail section below.
-  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p><div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p>${a.due_date?`<p class="apdue${approvalOverdue(a)?' late':''}">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`:''}<div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}

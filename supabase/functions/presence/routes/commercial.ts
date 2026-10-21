@@ -18,11 +18,10 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import {
   validateScheduleTime, isScheduleKind, validateSubmission, formParamsToSubmission,
   signApprovalToken, verifyApprovalToken, type ApprovalTokenPayload,
-  leadFollowupResolvesOn, leadFollowupNoticeKey,
+  leadFollowupResolvesOn, leadFollowupNoticeKey, enquiryAckCopy,
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
-import { enquiryAckCopy } from '../lib/commercial.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';

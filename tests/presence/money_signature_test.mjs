@@ -108,7 +108,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('settings.html: the invoice preview is the lifecycle sentence', settings.includes(`<span id="say-inv">${invLine}</span>`), invLine);
   ok('settings.html: three switches, default off, each writes /settings', (settings.match(/role="switch"/g) || []).length === 3 && /flip\('sw-ack', 'auto_ack_enquiries'\)/.test(settings) && /flip\('sw-inv', 'invoice_reminders'\)/.test(settings) && /flip\('sw-deal', 'deal_nudges'\)/.test(settings));
   const content = read('supabase/functions/presence/routes/content.ts');
-  ok('content.ts: /settings accepts the six 0134 fields, N bounded 1–90', /auto_ack_enquiries: \{ kind: 'bool' \}/.test(content) && /invoice_remind_after_days: \{ kind: 'int', min: 1, max: 90 \}/.test(content) && /stage_stale_days: \{ kind: 'json' \}/.test(content));
+  ok('content.ts: /settings accepts the six 0134 fields, N bounded 1–90', /auto_ack_enquiries: \{ kind: 'bool' \}/.test(content) && /invoice_remind_after_days: \{ kind: 'int', min: 1, max: 90 \}/.test(content) && /stage_stale_days: \{ kind: 'stage_days' \}/.test(content));
   ok('content.ts: the settings read retries without the 0134 columns (deploy-order tolerant)', /pre-0134/.test(content));
   ok('migration 0134 + its apply pack exist and add the six columns', /add column if not exists stage_stale_days jsonb/.test(read('supabase/migrations/0134_automation_switches.sql')) && /add column if not exists deal_nudge_days integer not null default 3/.test(read('docs/presence/APPLY-0134-prod.sql')));
 }

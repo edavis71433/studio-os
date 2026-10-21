@@ -230,6 +230,49 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
+  // Studio audit (Oct 2026) change 8: a dated approval reads its date honestly —
+  // "answer by …" while there is time, "was due …" + an Overdue chip once the
+  // date has passed (the client's LOCAL day, the same rule the reminder sweep
+  // uses: whole days to the due date < 0). Decided approvals are never overdue.
+  const ymdLocal = (d: number) => { const t = new Date(); t.setDate(t.getDate() + d); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+  const dayLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+  const datedApi = (due: string, status = 'pending') => ({ ...CLIENT_API, [`/client/projects/${PID}`]: { data: {
+    ...(CLIENT_API[`/client/projects/${PID}`] as { data: Record<string, unknown> }).data,
+    approvals: [{ id: 'a1', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage design', summary: 'The first mockup.', content_hash: 'h1', status, due_date: due }],
+  } } });
+
+  test('a dated approval with time left: "answer by …" on the file row and the Needs-your-OK card — nothing is called overdue', async ({ page }) => {
+    const due = ymdLocal(3);
+    await installApp(page, { api: datedApi(due) });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('.frow', { hasText: 'Homepage mockup' });
+    await expect(row.locator('.fok')).toHaveText('Needs your OK');
+    await expect(row.locator('.fok')).not.toHaveClass(/od/);
+    await expect(row.locator('.fmeta')).toContainText(`answer by ${dayLabel(due)}`);
+    await expect(page.locator('#approval-a1 .apdue')).toHaveText(`Please answer by ${dayLabel(due)}.`);
+    await expect(page.locator('#approval-a1 .apdue')).not.toHaveClass(/late/);
+  });
+
+  test('a PAST-DUE approval says so: "Overdue — needs your OK" chip, "was due …" meta, the card names the missed date; Approve still works', async ({ page }) => {
+    const due = ymdLocal(-3);
+    await installApp(page, { api: datedApi(due) });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('.frow', { hasText: 'Homepage mockup' });
+    await expect(row.locator('.fok')).toHaveText('Overdue — needs your OK');
+    await expect(row.locator('.fok')).toHaveClass(/od/);
+    await expect(row.locator('.fmeta')).toContainText(`was due ${dayLabel(due)}`);
+    await expect(row.locator('.fmeta')).not.toContainText('answer by');
+    await expect(page.locator('#approval-a1 .apdue')).toHaveClass(/late/);
+    await expect(page.locator('#approval-a1 .apdue')).toContainText(`Overdue — your answer was due ${dayLabel(due)}.`);
+    await expect(row.getByRole('button', { name: 'Approve — Homepage mockup' })).toBeVisible();   // late is not locked
+    // the same past date on a DECIDED approval is history — no overdue anywhere
+    await installApp(page, { api: datedApi(due, 'approved') });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('.frow', { hasText: 'Homepage mockup' }).locator('.fok')).toHaveText('Approved');
+    await expect(page.locator('.fok.od')).toHaveCount(0);
+    await expect(page.locator('.apdue')).toHaveCount(0);
+  });
+
   test('context bar (≥720px): studio identity, nav landmark, bell + account chip', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'the context bar only exists at ≥720px');
     await installApp(page, { api: CLIENT_API });
@@ -3616,9 +3659,14 @@ test.describe('Client Home — one filled button, approve and pay in one click',
 // date the studio asked for, Approve / Request changes right there — through
 // the SAME decide route + content_hash as the Needs-your-OK card.
 test.describe('Client portal — approval on the deliverable row (audit change 8)', () => {
+  // the date is RELATIVE (a week out): a pending approval whose date has passed
+  // reads "was due …" + Overdue instead — pinned in the Home queue block above
+  const ymdLocal = (d: number) => { const t = new Date(); t.setDate(t.getDate() + d); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+  const DUE = ymdLocal(7);
+  const DUE_LABEL = (() => { const [y, m, d] = DUE.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })();
   const bundleWith = (approval: Record<string, unknown>) => {
     const b = JSON.parse(JSON.stringify(CLIENT_API[`/client/projects/${PID}`]));
-    b.data.approvals = [{ id: 'a1', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage design', summary: 'The first mockup.', content_hash: 'h1', status: 'pending', due_date: '2026-07-20', ...approval }];
+    b.data.approvals = [{ id: 'a1', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage design', summary: 'The first mockup.', content_hash: 'h1', status: 'pending', due_date: DUE, ...approval }];
     return b;
   };
   const api = (approval: Record<string, unknown> = {}) => ({ ...CLIENT_API, [`/client/projects/${PID}`]: bundleWith(approval) });
@@ -3628,7 +3676,7 @@ test.describe('Client portal — approval on the deliverable row (audit change 8
     await page.goto(`/client.html?project=${PID}`);
     const row = page.locator('#sec-files .frow[data-apfile="d1"]');
     await expect(row.locator('.fok')).toHaveText('Needs your OK');
-    await expect(row.locator('.fmeta')).toHaveText('Shared by your studio · July 6 · answer by Jul 20, 2026');
+    await expect(row.locator('.fmeta')).toHaveText(`Shared by your studio · July 6 · answer by ${DUE_LABEL}`);
     await expect(row.getByRole('button', { name: 'Approve — Homepage mockup' })).toBeVisible();
     await expect(row.getByRole('button', { name: 'Request changes — Homepage mockup' })).toBeVisible();
     await expect(row.getByRole('button', { name: 'Download — Homepage mockup' })).toBeVisible();

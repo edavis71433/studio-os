@@ -206,6 +206,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .tag.ap.awaiting{background:var(--warn-soft);color:var(--warn);text-transform:none}
   .tag.ap.approved{background:var(--good-soft);color:var(--good);text-transform:none}
   .tag.ap.changes{background:var(--warn-soft);color:var(--bad);text-transform:none}
+  .tag.ap.overdue{color:var(--bad)}
   .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .empty{color:var(--soft);font-size:13.5px;padding:6px 0}
   .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:500;cursor:pointer;padding:0;text-decoration:none}
@@ -325,6 +326,12 @@ const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(
 // "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
 const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
 const statusLabel=(s)=>String(s||'').replace('_',' ');
+// audit change 8: a pending approval is OVERDUE once its due date has passed —
+// the same rule as the server's reminder sweep (lib/approvals.ts
+// approvalReminderDue: whole days to the due date < 0), on the studio's local
+// day, so the record agrees with the daily reminder the client is getting.
+const todayYmd=()=>{const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);};
+const approvalOverdue=(a,today)=>{if(!a||a.status!=='pending')return false;const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(a.due_date||''));return !!m&&m[0]<String(today||todayYmd());};
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -807,11 +814,12 @@ async function openProject(id){
     const apFor=(did)=>(data.approvals||[]).find(a=>a&&a.subject_type==='deliverable'&&a.subject_id===did)||null;
     const AP_CHIP={pending:['Awaiting approval','awaiting'],approved:['Approved','approved'],changes_requested:['Changes requested','changes'],rejected:['Declined','changes']};
     const dl=(data.deliverables||[]).map(x=>{const fromClient=isClientUpload(x);const a=apFor(x.id);const ch=a&&AP_CHIP[a.status];
-      const chip=ch?`<span class="tag ap ${ch[1]}" data-apchip="${x.id}">${ch[0]}${(a.status==='pending'&&a.due_date)?' · due '+esc(niceDay(a.due_date)):''}</span>`:'';
+      const late=approvalOverdue(a);
+      const chip=ch?`<span class="tag ap ${ch[1]}${late?' overdue':''}" data-apchip="${x.id}">${late?'Overdue':ch[0]}${(a.status==='pending'&&a.due_date)?' · due '+esc(niceDay(a.due_date)):''}</span>`:'';
       const ask=(STUDIO&&x.status==='shared'&&!(a&&a.status==='pending'))?`<button class="btn ghost sm" data-ask="${x.id}" data-asktitle="${esc(x.title)}">Ask them to approve</button>`:'';
       return `<div class="item"><div class="t">${esc(x.title)}${fromClient?'<span class="tag fromclient">From client</span>':''}${x.status==='shared'?'<span class="tag client">shared</span>':'<span class="tag">draft</span>'}${chip}${fromClient?'<span class="s">Uploaded by the client</span>':''}</div><div class="row2" style="margin-top:0;flex-wrap:nowrap">${ask}<button class="btn ghost sm" data-dl="${x.id}">Download</button></div></div>`;
     }).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
-    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span>${(a.status==='pending'&&a.due_date)?`<span class="s">due ${esc(niceDay(a.due_date))}</span>`:''}</div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
+    const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span>${approvalOverdue(a)?'<span class="tag overdue">overdue</span>':''}${(a.status==='pending'&&a.due_date)?`<span class="s">due ${esc(niceDay(a.due_date))}</span>`:''}</div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
 
     $('detailInner').innerHTML=`
       <nav class="crumbs" aria-label="Breadcrumb"><button class="crumb" id="closeDetail">Projects</button><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span></nav>
