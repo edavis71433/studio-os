@@ -66,7 +66,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' };
 interface EntitySpec {
   table: string;
   entityType: string;           // provenance entity_type
@@ -137,6 +137,11 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   logo_media_id: { kind: 'uuid' }, og_media_id: { kind: 'uuid' },
   announcement_text: { max: 140 }, announcement_url: { max: 300 }, announcement_expires_at: { kind: 'date' },
   industry_key: { max: 40 },   // Phase T3: drives template vocabulary + schema
+  // Three switches, not a workflow builder (benchmark 2026-10, item 6) + the
+  // per-stage stale threshold (item 13). Migration 0134; every switch default off.
+  auto_ack_enquiries: { kind: 'bool' }, invoice_reminders: { kind: 'bool' }, invoice_remind_after_days: { kind: 'int', min: 1, max: 90 },
+  deal_nudges: { kind: 'bool' }, deal_nudge_days: { kind: 'int', min: 1, max: 90 },
+  stage_stale_days: { kind: 'json' },
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
   hero_layout: { max: 20 }, nav_style: { max: 12 },
@@ -161,7 +166,7 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (!rule) continue; // closed set: unknown keys ignored
     const v = payload[key];
     if (rule.kind === 'bool') { cleanBody[key] = !!v; fields.push(key); continue; }
-    if (rule.kind === 'int') { const n = Number(v); if (!Number.isFinite(n)) { errors.push({ field: key, message: `${key} must be a number.` }); continue; } cleanBody[key] = Math.trunc(n); fields.push(key); continue; }
+    if (rule.kind === 'int') { const n = Number(v); if (!Number.isFinite(n)) { errors.push({ field: key, message: `${key} must be a number.` }); continue; } const t = Math.trunc(n); if ((rule.min !== undefined && t < rule.min) || (rule.max !== undefined && t > rule.max)) { errors.push({ field: key, message: `${key} must be between ${rule.min ?? '…'} and ${rule.max ?? '…'}.` }); continue; } cleanBody[key] = t; fields.push(key); continue; }
     if (rule.kind === 'uuid') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } if (!UUID_RE.test(String(v))) { errors.push({ field: key, message: `${key} isn’t a valid reference.` }); continue; } cleanBody[key] = v; fields.push(key); continue; }
     if (rule.kind === 'json') { cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue; }
     if (rule.kind === 'tags') { cleanBody[key] = normalizeTags(v); fields.push(key); continue; }   // Phase SEARCH: the ONE tag gate — normalized to a clean text[]
@@ -274,7 +279,8 @@ async function singleton(req: Request, jwt: string, site: SiteRow, principal: Pr
 }, preParsed?: Record<string, unknown>) {
   const method = req.method.toUpperCase();
   if (method === 'GET') {
-    const r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
+    let r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
+    if (!r.ok && r.status === 400 && cfg.select.includes(AUTOMATION_SETTINGS_COLS)) r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + AUTOMATION_SETTINGS_COLS, '')}&limit=1`);   // pre-0134
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${cfg.noun} just now.` }, 502, cors);
     return json({ data: r.json?.[0] ?? null }, 200, cors);
   }
@@ -351,9 +357,14 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
   return null;
 }
 
+// The 0134 columns (the three switches + the per-stage stale threshold). A
+// database without them 400s the widened select; `singleton` retries the read
+// without them, so Settings never goes dark ahead of the apply pack.
+const AUTOMATION_SETTINGS_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days,stage_stale_days';
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
-  select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at',
+  select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
+    + ',' + AUTOMATION_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

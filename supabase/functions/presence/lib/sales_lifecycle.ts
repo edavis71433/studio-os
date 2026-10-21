@@ -529,3 +529,63 @@ export function nextStepStaleAfter(nextStep: unknown, event: 'signed' | 'won'): 
   if (event === 'won') return /\b(close|closing|convert|deposit|win)\b/.test(s);
   return false;
 }
+
+// ── Signature moves the deal (studio audit 2026-10, change 7) ─────────────────
+// The leaders move the stage themselves on signature; Studio OS raised a notice
+// and left the deal at "Agreement out". The rule, pure so it is testable:
+//   · signed, and NO deposit is still waiting on the client → Won. (No deposit
+//     was minted, or it is paid / settling — nothing stands between the
+//     signature and the work.)
+//   · signed, a deposit still OPEN → stays at Agreement out, "ready to convert";
+//     the deposit's payment echo moves it to Won (stageAfterDepositPaid).
+// 'won' here is the STAGE; convert (the workspace, the portal) stays its own
+// step and is still offered on a won-unconverted deal (convertOutcome allows it).
+export interface DepositView { status?: unknown; purpose?: unknown; processing_since?: unknown; deleted_at?: unknown }
+/** Does an invoice row still WAIT on the client? Open, not settling, not voided. */
+export function depositStillOpen(inv: DepositView | null | undefined): boolean {
+  if (!inv) return false;
+  if (inv.deleted_at) return false;
+  return String(inv.status || '') === 'open' && !inv.processing_since;
+}
+/** The stage a deal lands on the moment its agreement is signed. */
+export function stageAfterSignature(opts: { currentStage: Stage | string; deposits: DepositView[] }): Stage {
+  const cur = String(opts.currentStage || '');
+  if (cur === 'won' || cur === 'lost') return cur as Stage;   // terminal stays terminal (a reopened deal re-signs on its own)
+  const waiting = (opts.deposits || []).some((d) => String(d.purpose || '') === 'deposit' && depositStillOpen(d));
+  return waiting ? 'contract' : 'won';
+}
+/** The stage a deal lands on when a DEPOSIT payment lands: Won only once the
+ *  agreement is signed (a deposit paid off a proposal alone is not a close);
+ *  null = leave the stage alone. */
+export function stageAfterDepositPaid(opts: { currentStage: Stage | string; signed: boolean; purpose: unknown }): Stage | null {
+  if (String(opts.purpose || '') !== 'deposit') return null;
+  if (!opts.signed) return null;
+  const cur = String(opts.currentStage || '');
+  if (cur === 'won' || cur === 'lost') return null;
+  return 'won';
+}
+
+// ── Pipeline hygiene (benchmark 2026-10, item 13): stale after N days per stage ─
+// A deal with no movement — no logged contact, no edit, no stage change — for N
+// days wears the `is-stale` badge on the board. N is per stage (presence_settings
+// .stage_stale_days, migration 0134), default 14 everywhere. pipeline.html
+// carries a verbatim JS mirror of staleDaysFor / dealStaleAfter (no bundler).
+export const DEFAULT_STALE_DAYS = 14;
+export function staleDaysFor(stage: unknown, setting: unknown): number {
+  const s = (setting && typeof setting === 'object') ? (setting as Record<string, unknown>)[String(stage)] : undefined;
+  const n = Math.trunc(Number(s));
+  return (Number.isFinite(n) && n >= 1 && n <= 365) ? n : DEFAULT_STALE_DAYS;
+}
+/** Days since the deal last moved: the later of last contact and last edit. null = unknown. */
+export function dealQuietDays(d: { last_contacted_at?: unknown; updated_at?: unknown; created_at?: unknown }, nowMs: number): number | null {
+  const ts = [d.last_contacted_at, d.updated_at, d.created_at].map((x) => Date.parse(String(x || ''))).filter((t) => Number.isFinite(t));
+  if (!ts.length) return null;
+  return Math.floor((nowMs - Math.max(...ts)) / 86400000);
+}
+/** Stale = an OPEN deal quiet for at least the stage's N days. Won/lost/converted never flag. */
+export function dealStaleAfter(d: { stage?: unknown; converted_client_id?: unknown; last_contacted_at?: unknown; updated_at?: unknown; created_at?: unknown }, nowMs: number, setting: unknown): boolean {
+  if (d.converted_client_id) return false;
+  if (!(OPEN_STAGES as string[]).includes(String(d.stage || ''))) return false;
+  const q = dealQuietDays(d, nowMs);
+  return q !== null && q >= staleDaysFor(d.stage, setting);
+}

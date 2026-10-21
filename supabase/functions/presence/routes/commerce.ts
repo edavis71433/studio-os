@@ -544,10 +544,29 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
     const { tickChecklistForDeal } = await import('../lib/service_bridge.ts');
     ticked = await tickChecklistForDeal(String(inv.site_id), String(inv.deal_id), 'deposit_paid', 'stripe', 'system');
   }
+  // DEPOSIT PAID MOVES THE DEAL (studio audit 2026-10, change 7): a signed deal
+  // that was waiting on its deposit lands on Won the moment the deposit lands.
+  // Pure rule (stageAfterDepositPaid): deposit + signed agreement + an open
+  // stage → Won; anything else leaves the stage alone. Idempotent (the PATCH
+  // matches only a still-open stage) and independent of `fresh`, like the tick.
+  let moved = false;
+  if (isDeposit && inv.deal_id) {
+    try {
+      const { stageAfterDepositPaid } = await import('../lib/sales_lifecycle.ts');
+      const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=stage&limit=1`)).json?.[0];
+      const signed = ((await svc(`presence_contracts?deal_id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&status=eq.signed&deleted_at=is.null&select=id&limit=1`)).json || []).length > 0;
+      const to = deal ? stageAfterDepositPaid({ currentStage: String(deal.stage || ''), signed, purpose: inv.purpose }) : null;
+      if (to) {
+        const up = await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&stage=in.(lead,qualified,proposal,contract)&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) });
+        moved = up.ok && Array.isArray(up.json) && up.json.length > 0;
+        if (moved) await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deal_id: inv.deal_id, site_id: inv.site_id, kind: 'stage_change', actor: 'stripe', actor_kind: 'system', detail: { to_stage: to, because: 'deposit_paid' } }) }).catch(() => {});
+      }
+    } catch { /* the payment stands; the stage move is best-effort */ }
+  }
   // `notice` = told just now; `already` = a retry, the operator was told before.
   // notice:false + already:false means the operator has NOT been told — the
   // webhook reads exactly these flags and writes its own in-app floor then.
-  return json({ data: { notice: fresh, already: outcome === 'exists', emailed, receipted, ticked } }, 200, cors);
+  return json({ data: { notice: fresh, already: outcome === 'exists', emailed, receipted, ticked, moved } }, 200, cors);
 }
 
 async function handleBillingSync(req: Request, cors: Record<string, string>): Promise<Response> {

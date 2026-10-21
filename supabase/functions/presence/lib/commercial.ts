@@ -212,3 +212,18 @@ export async function verifyApprovalToken(token: string, secret: string, nowSec:
   if (!payload.site_id || !payload.plan_id || (payload.kind !== 'infrastructure' && payload.kind !== 'connected')) return { ok: false, error: 'malformed' };
   return { ok: true, payload };
 }
+
+// ── "Acknowledge new enquiries within a minute" (benchmark 2026-10, item 6) ───
+// The ONE sentence the automatic reply sends. settings.html shows it verbatim
+// (the preview under the switch), tests/presence/money_signature_test.mjs pins
+// the two copies against each other. Pure.
+export const ENQUIRY_ACK_SENTENCE = 'Thanks for getting in touch — we’ve got your message and will reply within one business day.';
+export function enquiryAckCopy(opts: { name?: unknown; studio?: unknown }): { subject: string; sentence: string; footer: string } {
+  const studio = String(opts.studio || '').trim();
+  const first = String(opts.name || '').trim().split(/\s+/)[0] || '';
+  return {
+    subject: studio ? `We got your message — ${studio}` : 'We got your message',
+    sentence: first ? `Hi ${first} — ${ENQUIRY_ACK_SENTENCE.charAt(0).toLowerCase()}${ENQUIRY_ACK_SENTENCE.slice(1)}` : ENQUIRY_ACK_SENTENCE,
+    footer: 'This is an automatic acknowledgement; a person will follow up.',
+  };
+}

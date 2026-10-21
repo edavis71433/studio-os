@@ -266,6 +266,11 @@ export function shapeClientConversations(events: ConversationEvent[]): Map<strin
 // bell count self-heals on the next load.
 export const INVOICE_REMINDER_PREFIX = 'invremind:';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The invoice id inside a reminder period — the legacy once-ever
+ *  `invremind:<id>` and the Oct 2026 three-leg `invremind:<id>:<slot>` alike. */
+export function invoiceIdOfPeriod(period: string): string {
+  return String(period || '').slice(INVOICE_REMINDER_PREFIX.length).split(':')[0];
+}
 /** The invoice ids that the reminder notices in `rows` point at (UUIDs only). */
 export function invoiceReminderIds(rows: Array<{ kind?: unknown; period?: unknown }>): string[] {
   const out = new Set<string>();
@@ -273,7 +278,7 @@ export function invoiceReminderIds(rows: Array<{ kind?: unknown; period?: unknow
     if (String(n?.kind ?? '') !== 'deal_followup') continue;
     const p = String(n?.period ?? '');
     if (!p.startsWith(INVOICE_REMINDER_PREFIX)) continue;
-    const id = p.slice(INVOICE_REMINDER_PREFIX.length);
+    const id = invoiceIdOfPeriod(p);
     if (UUID_RE.test(id)) out.add(id);
   }
   return [...out];
@@ -285,7 +290,7 @@ export function renderableNotices<T extends { kind?: unknown; period?: unknown }
     if (CLIENT_ACTIVITY_NOTICE_KINDS.has(kind)) continue;          // its counted half renders elsewhere
     const p = String(n?.period ?? '');
     if (kind === 'deal_followup' && p.startsWith(INVOICE_REMINDER_PREFIX) && openInvoiceIds) {
-      const id = p.slice(INVOICE_REMINDER_PREFIX.length);
+      const id = invoiceIdOfPeriod(p);
       // only an id we could have looked up is judged; a malformed period is kept
       if (UUID_RE.test(id) && !openInvoiceIds.has(id)) { stale.push(n); continue; }    // paid or voided → no longer owed
     }
