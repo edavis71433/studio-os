@@ -64,6 +64,7 @@ export function buildPortfolio(i: PortfolioInput) {
       archived: l?.status === 'archived',
       tags: l?.tags || [], owner: l?.owner_email || '', assigned: l?.assigned || [],
       has_notes: !!(l?.notes || '').trim(),
+      notes: String(l?.notes || ''),   // the row's internal note (the route strips it for roles without the notes cap)
       domain: s.custom_domain,
       domain_registrar: s.domain_registrar || null,
       domain_expires_at: s.domain_expires_at || null,
