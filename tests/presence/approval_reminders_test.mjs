@@ -7,13 +7,15 @@
 // PART B — the route (routes/project_delivery.ts): subject_type 'deliverable' is
 //          checked against THIS project, due_date is stored (and degrades before
 //          0135), the "Needs your OK" email carries the date; both records return
-//          subject_type / subject_id / due_date.
+//          subject_type / subject_id / due_date; (follow-up to #49) the read's
+//          retry without due_date fires on the missing-column signal only.
 // PART C — the sweep (commerce/lifecycle.runApprovalReminders) driven through a
 //          fetch fake: the day-before row and the overdue-yesterday row are
 //          emailed, the overdue-reminded-today row and the due-today row are
 //          not; the overdue one raises exactly one studio notice; the claim is
 //          stamped BEFORE the send with the previous value in the WHERE; a
-//          second tick the same day sends nothing.
+//          second tick the same day sends nothing; (follow-up to #49) the read
+//          skips rows reminded today so a full window never starves the rest.
 // PART D — migration 0135 + APPLY pack + registration + the bell's deep link.
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -78,10 +80,39 @@ const { approvalReminderDue, approvalReminderCopy, cleanDueDate, dueDateText, da
   ok('B7: the prior PENDING approval on the same subject is still superseded', /status=eq\.pending`, \{ method: 'PATCH'[\s\S]{0,40}status: 'superseded'/.test(pd));
   ok('B8: the "Needs your OK — {title}" email carries the due date when set', /`Needs your OK — \$\{title\}`/.test(pd) && /They’d like your answer by <strong>\$\{dueDateText\(String\(a\.due_date\)\)\}<\/strong>/.test(pd) && /\$\{when\}<p>Nothing goes ahead without you/.test(pd));
   ok('B9: the ONE approvals read (loadApprovals) selects due_date and retries without it', /export async function loadApprovals/.test(pj) && /select=\$\{cols\},due_date`\);\s*if \(withDue\.ok\) return rows\(withDue\);/.test(pj) && /select=\$\{cols\}`\)\);/.test(pj));
+  ok('B9a: … but ONLY on the missing-column signal naming due_date (follow-up to #49) — any other failure returns as it is', /if \(!missingColumnSignal\(withDue\.json, withDue\.text, 'due_date'\)\) return rows\(withDue\);/.test(pj) && /import \{ missingColumnSignal \} from '\.\.\/lib\/inbound_email\.ts';/.test(pj));
   ok('B10: GET /projects/:id returns subject_type, subject_id (+ due_date) via loadApprovals', /loadApprovals\(`project_id=eq\.\$\{id\}&site_id=eq\.\$\{site\.id\}[^`]*`, 'id,subject_type,subject_id,title/.test(pj));
   ok('B11: GET /client/projects/:id returns subject_type, subject_id (+ due_date) via loadApprovals', /loadApprovals\(`project_id=eq\.\$\{id\}&site_id=eq\.\$\{s\}&deleted_at=is\.null&client_visible=is\.true[^`]*`, 'id,subject_type,subject_id,title/.test(cd));
   ok('B12: the client decide route is untouched (status=pending AND content_hash guard)', /status=eq\.pending&content_hash=eq\.\$\{a\.content_hash\}/.test(cd));
   ok('B13: a decision from EITHER side clears the studio\'s approval_overdue row (exact per-approval key)', /clearApprovalOverdue\(site\.id, a\.project_id, id\)/.test(pd) && /clearApprovalOverdue\(s, a\.project_id, id\)/.test(cd) && /clearNotice\(clientId, 'approval_overdue', approvalOverduePeriod\(projectId, approvalId\)\)/.test(pj));
+
+  // B14–B16: loadApprovals through a fetch fake — the retry fires on the
+  // pre-0135 signal and on nothing else (follow-up to #49: a flaky read must
+  // not come back as an undated list that hides "Overdue").
+  const { loadApprovals } = await import('../../supabase/functions/presence/routes/projects.ts');
+  const realFetchB = globalThis.fetch;
+  const resp = (data, status = 200) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+  const DATED = [{ id: 'a1', status: 'pending', due_date: '2026-10-19' }];
+  const UNDATED = [{ id: 'a1', status: 'pending' }];
+  const drive = async (first) => {
+    const gets = [];
+    globalThis.fetch = async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      gets.push(url);
+      if (/select=[^&]*due_date/.test(url)) return first();
+      return resp(UNDATED);
+    };
+    const out = await loadApprovals('project_id=eq.p1', 'id,status');
+    globalThis.fetch = realFetchB;
+    return { out, gets };
+  };
+  const b14 = await drive(() => resp(DATED));
+  ok('B14: a healthy read returns the dated rows in ONE call', b14.gets.length === 1 && b14.out.length === 1 && b14.out[0].due_date === '2026-10-19');
+  const b15 = await drive(() => resp({ code: 'PGRST204', message: "Could not find the 'due_date' column of 'presence_approvals' in the schema cache" }, 400));
+  ok('B15: pre-0135 (400 naming due_date) → retried without the column, the rows come back undated', b15.gets.length === 2 && !/due_date/.test(b15.gets[1]) && b15.out.length === 1 && b15.out[0].due_date === undefined);
+  const b16 = await drive(() => resp('upstream connect error', 503));
+  const b16b = await drive(() => resp({ code: 'PGRST301', message: 'JWT expired' }, 401));
+  ok('B16: an outage (503) or an auth failure (401) is NOT retried into an undated list — one call, no rows', b16.gets.length === 1 && b16.out.length === 0 && b16b.gets.length === 1 && b16b.out.length === 0, `${b16.gets.length}/${b16.out.length} ${b16b.gets.length}/${b16b.out.length}`);
 }
 
 // ═══ PART C — the sweep through a fetch fake ═══
@@ -106,9 +137,17 @@ function installFake(rows) {
     if (url.includes('api.resend.com/emails')) { sent.push(body); return jr({ id: 're_1' }, 200); }
     if (url.includes('suppressed_emails') || url.includes('email_suppress')) return jr([]);
     if (url.includes('presence_approvals') && method === 'GET') {
-      // the sweep's filter: pending · client-visible · dated · due by tomorrow
+      // the sweep's filter as PostgREST would apply it: pending · client-visible
+      // · dated · due by tomorrow · (follow-up to #49) not yet reminded today
+      // when the URL says so — then ORDER BY due_date asc and LIMIT n, because
+      // the starvation case (C13) is exactly about which rows fit the window.
       const tomorrow = dayOff(1);
-      return jr(rows.filter((r) => r.status === 'pending' && r.client_visible === true && r.due_date && r.due_date <= tomorrow));
+      const notSince = (url.match(/last_reminded_at\.lt\.([^),&]+)/) || [])[1];
+      const lim = Number((url.match(/[?&]limit=(\d+)/) || [])[1]) || Infinity;
+      const hit = rows.filter((r) => r.status === 'pending' && r.client_visible === true && r.due_date && r.due_date <= tomorrow
+        && (!notSince || r.last_reminded_at == null || r.last_reminded_at < decodeURIComponent(notSince)));
+      hit.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0));
+      return jr(hit.slice(0, lim));
     }
     if (url.includes('presence_approvals') && method === 'PATCH') {
       const id = (url.match(/id=eq\.([0-9a-f-]{36})/) || [])[1];
@@ -184,6 +223,21 @@ const restore = () => { globalThis.fetch = realFetch; };
   const r5 = await runApprovalReminders(50);
   ok('C12: before migration 0135 the sweep is a clean no-op (400 on the column → zeros, no throw)', r5.reminded === 0 && r5.overdue_notices === 0);
   restore();
+
+  // C13 — starvation (follow-up to #49). X is the OLDEST overdue approval and
+  // was reminded today by an earlier tick; Y is overdue and owed. With
+  // limit=1 the old read returned [X] every time (ordered by due_date) and Y
+  // was never reached. The read now excludes rows reminded today, so Y fits.
+  const X = '11111111-1111-4111-8111-111111111111';
+  const Y = '22222222-2222-4222-8222-222222222222';
+  const rows2 = [ap(X, dayOff(-5), todayAt(2)), ap(Y, dayOff(-2), yesterdayAt(20))];
+  const fake2 = installFake(rows2);
+  const r6 = await runApprovalReminders(1);
+  const read = fake2.calls.find((x) => x.url.includes('presence_approvals') && x.method === 'GET');
+  ok('C13a: the read excludes rows already reminded today (or=(last_reminded_at.is.null,last_reminded_at.lt.<today 00:00Z>))', !!read && new RegExp(`or=\\(last_reminded_at\\.is\\.null,last_reminded_at\\.lt\\.${encodeURIComponent(`${dayOff(0)}T00:00:00Z`).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`).test(read.url) && /&limit=1$/.test(read.url), read && read.url);
+  ok('C13b: with limit=1 and X (reminded today) sorting first, Y STILL gets its reminder and its studio notice', r6.reminded === 1 && r6.overdue_notices === 1 && fake2.claims.length === 1 && fake2.claims[0].id === Y && fake2.sent.length === 1 && /File 2/.test(fake2.sent[0].subject) && fake2.notices.length === 1 && fake2.notices[0].period === `approval:${PROJ}:${Y}`, JSON.stringify(r6));
+  ok('C13c: X was neither claimed nor mailed again today', !fake2.claims.some((c) => c.id === X) && rows2[0].last_reminded_at === todayAt(2));
+  restore();
 }
 
 // ═══ PART D — migration, pack, registration, the bell ═══
@@ -199,7 +253,7 @@ const restore = () => { globalThis.fetch = realFetch; };
   ok('D3: 0135 opens with a rollback note and touches no RLS', /^-- rollback:/.test(mig) && !/row level security|create policy|grant /i.test(mig));
   ok('D4: 0135 indexes the sweep\'s read (pending · client-visible · dated)', /create index if not exists presence_approvals_due_idx/.test(mig) && /status = 'pending' and client_visible = true and due_date is not null/.test(mig));
   ok('D5: APPLY-0135 carries the same columns, index and CHECK, plus verify queries', /add column if not exists due_date date/.test(pack) && /add column if not exists last_reminded_at timestamptz/.test(pack) && /presence_approvals_due_idx/.test(pack) && /'approval_overdue'/.test(pack) && /'studio_published'/.test(pack) && /-- Verify/.test(pack));
-  ok('D6: runApprovalReminders exists, reads only dated pending client-visible approvals due by tomorrow', /export async function runApprovalReminders/.test(lc) && /presence_approvals\?status=eq\.pending&client_visible=is\.true&deleted_at=is\.null&due_date=not\.is\.null&due_date=lte\./.test(lc));
+  ok('D6: runApprovalReminders exists, reads only dated pending client-visible approvals due by tomorrow, not yet reminded today', /export async function runApprovalReminders/.test(lc) && /presence_approvals\?status=eq\.pending&client_visible=is\.true&deleted_at=is\.null&due_date=not\.is\.null&due_date=lte\.\$\{tomorrow\}&or=\(last_reminded_at\.is\.null,last_reminded_at\.lt\.\$\{encodeURIComponent\(todayStart\)\}\)/.test(lc));
   ok('D7: the sweep decides with the pure rule and claims with the previous stamp in the WHERE', /approvalReminderDue\(a, nowIso\)/.test(lc) && /last_reminded_at=\$\{prev\}&select=id`/.test(lc) && /last_reminded_at: nowIso/.test(lc));
   ok('D8: the client mail goes through emailBridgedCustomer; the studio notice is approval_overdue', /emailBridgedCustomer\(a\.site_id, a\.project_id, copy\.subject, copy\.html\)/.test(lc) && /kind: 'approval_overdue', period: approvalOverduePeriod\(a\.project_id, a\.id\)/.test(lc));
   ok('D9: registered in BOTH tick modes (split revenue group + the default chain)', /\['approval_reminders', \(\) => runApprovalReminders\(50\)\]/.test(sys) && /step\('approval_reminders', \(\) => runApprovalReminders\(50\)\)/.test(sys));

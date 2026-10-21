@@ -7,6 +7,7 @@
 import { json } from '../../_shared/http.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { approvalOverduePeriod } from '../lib/approvals.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { ensureProjectForDeal, ensureBridge, reconcileChecklistFacts } from '../lib/service_bridge.ts';
@@ -162,10 +163,15 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
 
 /** The ONE approvals read both records use. `due_date` (migration 0135) rides
  *  along; before the column exists PostgREST 400s on the select, so the read
- *  retries without it — the record still renders, just undated. */
+ *  retries without it — the record still renders, just undated. ONLY on that
+ *  precise signal (missingColumnSignal naming due_date): any other failure —
+ *  an outage, a timeout, a 5xx — is returned as it is (no rows, like every
+ *  other read on the record), never retried into an undated list that would
+ *  quietly read "Awaiting approval" where it should read "Overdue". */
 export async function loadApprovals(filter: string, cols: string): Promise<any[]> {
   const withDue = await svc(`presence_approvals?${filter}&select=${cols},due_date`);
   if (withDue.ok) return rows(withDue);
+  if (!missingColumnSignal(withDue.json, withDue.text, 'due_date')) return rows(withDue);
   return rows(await svc(`presence_approvals?${filter}&select=${cols}`));
 }
 
