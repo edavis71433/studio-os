@@ -8,6 +8,7 @@
 
 export interface SiteLite { id: string; edition: string; status: string; last_published_at: string | null; custom_domain: string | null; domain_registrar?: string | null; domain_expires_at?: string | null }
 export interface LeadLite { site_id: string }
+export interface EnquiryLite { id: string; site_id: string; name: string | null; email: string | null; form_kind: string | null; created_at: string | null }
 export interface NoticeLite { site_id: string; kind: string }
 export interface LinkRow { site_id: string; status: string; tags: string[]; owner_email: string; assigned: string[]; notes: string; onboarded_at: string }
 export interface MomentLite { site_id: string; moment_key: string; type: string; headline: string }
@@ -25,6 +26,7 @@ export interface PortfolioInput {
   plans: PlanLite[]; drafts: DraftLite[]; connections: ConnLite[];
   reviewReports: ReportLite[]; brandReports: ReportLite[];
   leads?: LeadLite[]; notices?: NoticeLite[];   // PP/Section-3: waiting leads + active notices
+  enquiries?: EnquiryLite[];                     // the same leads with who/when — Needs you names them
   filesPending?: Record<string, number>;         // DAM-2: site_id → files awaiting approval
   billingBySite?: Record<string, string>;       // site_id → entitlement status (active|paused|lapsed)
   lastChange: Record<string, string>;      // site_id → latest change event at

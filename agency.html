@@ -107,7 +107,7 @@
   .managerow{text-align:right;margin-top:5px}
   .managerow button{background:none;border:none;color:var(--p);font-weight:500;font-size:12.5px;cursor:pointer;padding:2px 4px;font-family:inherit}
 
-  /* ── work queues panel — today.html's rail-card (.rcard/.rrows) anatomy ── */
+  /* ── rail cards (Needs you, This week, Key deals) — today.html's .rcard/.rrows anatomy ── */
   .qhead{font-size:13px;color:var(--soft);font-weight:600;margin:0 0 10px}
   .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:10px}
   .rcard .rh{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 6px}
@@ -120,27 +120,35 @@
   .qfail{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:13px 16px;margin-bottom:10px;font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .qfail button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:transparent;color:var(--ink);padding:5px 12px;cursor:pointer}
   .qfail button:hover{border-color:var(--p);color:var(--p)}
-  #queues{margin-bottom:22px}
 
-  /* ── starter kits (CP-1) — class-based card, no inline style soup ── */
-  /* Starter kits is a FORM sitting on a data-tier page. The page is 1600 wide
-     because the client TABLE wants it; a "Kit name" field 700px wide and a
-     paragraph running 1560px are just the roster's width leaking into content
-     that gains nothing from it. The card still spans the page (it lines up with
-     the table above), but its prose and controls hold the focused measure. */
-  .kitcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:18px 20px;box-shadow:var(--shadow);margin-top:18px}
-  .kitcard p,.kitcard .kitrow{max-width:var(--dds-w-focus,760px)}
-  .kitcard h2{font-size:15px;font-weight:600;font-family:var(--sans);margin:0 0 6px}
-  .kitcard .muted{margin-bottom:10px}
-  .kitrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
-  .kitrow select,.kitrow input{font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);flex:1;min-width:150px;margin:0}
-  .kitrow select:focus,.kitrow input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
-  .kitrow .btn{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 16px;cursor:pointer;flex:0 0 auto}
-  .kitrow .btn:hover{border-color:var(--p);color:var(--p)}
-  .kitrow .btn[disabled]{opacity:.6;cursor:default}
   .owed{font-weight:600;font-variant-numeric:tabular-nums} .owed.late{color:var(--bad,#a3423a)}
-  .kitchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;margin:0 6px 6px 0;font-size:13px}
-  .kitchip button{border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px;font-family:inherit}
+  /* ── Needs you (Oct 2026 home rebuild): one list of the studio's own work —
+        the Today board's row anatomy (avatar · "Name — what" · when · one verb) ── */
+  #needs{margin-bottom:22px}
+  .need .row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+  .need .row:first-child{border-top:0}
+  .need .av{width:32px;height:32px;border-radius:50%;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 auto}
+  .need .t{flex:1;min-width:0;font-size:13.5px;line-height:1.35}
+  .need .t b{font-weight:600}
+  .need .t .when{display:block;font-size:12px;color:var(--faint);margin-top:1px}
+  .need a.rowact{text-decoration:none;flex:0 0 auto}
+  .need .nn{font-size:15px;font-weight:600;margin:0 0 2px}
+  .need .qmore{margin:8px 0 0}
+  .linkbtn{font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer}
+  .linkbtn:hover{text-decoration:underline}
+  .need .pnote{font-size:12px;color:var(--faint);margin:8px 0 0}
+  /* status words on the roster: Live · Not live yet · Needs you · Archived */
+  .pill.needs,.pill.live,.pill.quiet{text-transform:none}   /* sentence case: "Needs you", not "Needs You" */
+  .pill.needs{background:var(--warn-soft);color:var(--warn)} .pill.live{background:var(--good-soft);color:var(--good)} .pill.quiet{background:var(--bg);color:var(--soft)}
+  .tscroll td.next{font-size:13px;color:var(--soft);max-width:360px}
+  .tscroll td.next .nx{color:var(--ink)}
+  /* the row's ⋯ menu: Their website · Save as a starter kit · Tags, owner, note, archive */
+  /* fixed, drawn in #rowMenuHost under its ⋯ after each render — the table's own
+     scroll box (.tscroll overflow:auto) would clip a menu drawn inside the row */
+  .rowmenu{position:fixed;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);box-shadow:var(--shadow);padding:6px;min-width:220px;text-align:left}
+  .rowmenu button{display:block;width:100%;font:inherit;font-size:13.5px;text-align:left;background:none;border:none;border-radius:6px;padding:8px 10px;color:var(--ink);cursor:pointer}
+  .rowmenu button:hover,.rowmenu button:focus-visible{background:var(--p-soft);color:var(--p);outline:none}
+  .cardmenu{display:inline-block}
 
   /* ── the studio strip (one home): Today's money tiles + This week + Key deals,
         read from the studio's OWN site (never scoped) — pipeline's .stats anatomy ── */
@@ -213,13 +221,16 @@
 </head>
 <body>
 <div class="wrap">
-  <!-- the top row, the queues and the studio strip live OUTSIDE #main: the roster
+  <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
   <div id="top"></div>
-  <section id="queues" aria-label="Work queues" hidden></section>
+  <section id="needs" aria-label="Needs you" hidden></section>
   <section id="studio" aria-label="Your studio" hidden></section>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<!-- the one open ⋯ menu lives here, outside the table (a sticky cell is its own
+     stacking context and would paint over a menu drawn inside the row) -->
+<div id="rowMenuHost"></div>
 <!-- customers.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
 <dialog id="custDlg" aria-label="Add a customer">
   <form id="custForm" class="dbody">
@@ -269,6 +280,19 @@
   </form>
 </dialog>
 
+<!-- Save as a starter kit (from the roster row's ⋯): POST /agency/kits — the kit
+     is then offered under "Start from a kit" in Add a customer. Kits left the home. -->
+<dialog id="kitDlg" aria-label="Save as a starter kit">
+  <form id="kitForm" class="dbody">
+    <h3>Save as a starter kit</h3>
+    <p class="note" id="kitFrom" style="margin:0 0 4px"></p>
+    <label for="kit-name">Kit name</label>
+    <input id="kit-name" maxlength="80" placeholder="Restaurant starter" autocomplete="off">
+    <p class="note">Saves their services, FAQs, voice, colors and industry — never their name, reviews or photos. Start the next customer from it in Add a customer.</p>
+    <div class="row2"><button type="button" class="btn ghost" id="kit-cancel">Cancel</button><button type="submit" class="btn" id="kit-save">Save kit</button></div>
+  </form>
+</dialog>
+
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Agency roster (A7.2 → standards sweep SS2): the studio's portfolio as a real
@@ -296,25 +320,26 @@ const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 // ── list-view state: fixed views · display · sort · search ───────────────────
-const daysToExpiry=(c)=>c.domain_expires_at?Math.floor((Date.parse(c.domain_expires_at)-Date.now())/86400000):null;
-// 45 = the platform's canonical domain-expiring window (optimization/providers.ts
-// fires infrastructure.domain_expiring at days<=45, severity critical) — the
-// roster must agree, or a 31-45d client sits in "All clear" here while the
-// queues panel above calls it High priority.
-const DOMAIN_SOON_DAYS=45;
-const domainSoon=(c)=>{const de=daysToExpiry(c);return de!==null&&de<=DOMAIN_SOON_DAYS;};
-const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain expiring'],['billing','Billing'],['owed','Outstanding'],['clear','All clear'],['archived','Archived']];
+// Oct 2026 home rebuild: the roster says four things per client — Name · Status
+// (Live · Not live yet · Needs you · Archived) · Next (that client's first
+// Needs-you row, else "Nothing — all quiet") · Outstanding — and one button.
+// Edition, Waiting, Leads, Domain and the "N search issues" line are gone from
+// the home (search issues stay on the client's Website page).
+const VIEWS=[['all','All'],['needs','Needs you'],['owed','Outstanding'],['archived','Archived']];
 let VIEWNAME='all',Q='';
+// what each client needs next, from /agency/needs-you (by site, and by client id for bridged-only customers)
+let NEXT={bySite:{},byClient:{}};
+function nextFor(c){return(c.site_id&&NEXT.bySite[c.site_id])||(c.client_id&&NEXT.byClient[c.client_id])||null;}
+const STATUS_RANK={'Needs you':0,'Not live yet':1,'Live':2,'Archived':3};
+function statusWord(c){
+  if(c.archived)return'Archived';
+  if(nextFor(c))return'Needs you';
+  if(c.status==='live'||c.last_published_at||c.edition==='monitor')return'Live';
+  return'Not live yet';
+}
 const viewMatch=(c)=>{
-  const att=Number(c.attention||0);
-  // search_issues counts too: a search-issues-only client is platform-flagged
-  // (and already kept out of "All clear") — without this it was invisible in
-  // every focused view.
-  if(VIEWNAME==='attention')return att>0||Number(c.search_issues||0)>0||Number(c.open_support||0)>0;
-  if(VIEWNAME==='domain')return domainSoon(c);
-  if(VIEWNAME==='billing')return !!c.billing_issue;
+  if(VIEWNAME==='needs')return !!nextFor(c);
   if(VIEWNAME==='owed')return Number(c.outstanding_cents||0)>0;   // money on the roster (Oct 2026 studio audit, change 10)
-  if(VIEWNAME==='clear')return att===0&&!c.billing_issue&&!domainSoon(c)&&!Number(c.search_issues||0)&&!Number(c.open_support||0)&&!Number(c.overdue_cents||0);
   return true;
 };
 // Table ⇄ Cards display choice, persisted; small screens default to Cards.
@@ -322,15 +347,12 @@ const DISPLAY_KEY='dds-display:agency';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
   return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
 function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
-// sortable columns (the fields /agency/portfolio actually returns)
+// sortable columns
 const COLS=[
   ['name','Name',(c)=>String(c.name||'').toLowerCase()],
-  ['edition','Edition',(c)=>String(c.edition||'')],
-  ['status','Status',(c)=>String(c.status||'')],
-  ['attention','Waiting',(c)=>Number(c.attention||0)],
-  ['leads','Leads',(c)=>Number(c.leads_waiting||0)],
+  ['status','Status',(c)=>STATUS_RANK[statusWord(c)]],
+  ['next','Next',(c)=>{const n=nextFor(c);return n?'0'+String(n.what).toLowerCase():'1';}],
   ['owed','Outstanding',(c)=>Number(c.outstanding_cents||0)],
-  ['domain','Domain',(c)=>c.domain_expires_at?Date.parse(c.domain_expires_at):Infinity],
 ];
 // ── Money on the roster (Oct 2026 studio audit, change 10): what each client
 //    still owes, from /sales/receivables (the studio's own book) grouped by the
@@ -380,18 +402,10 @@ function sortedRows(){
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
 }
-// the at-a-glance status bits (Section 3) — everything asking for someone
-function statusBits(c,skipColumns){
-  const bits=[];
-  if(!skipColumns){const lw=Number(c.leads_waiting||0);if(lw)bits.push(`${lw} lead${lw===1?'':'s'} waiting`);}
-  if(!skipColumns){const de=daysToExpiry(c);
-    if(de!==null&&de<=DOMAIN_SOON_DAYS)bits.push(`domain ${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}${c.domain_registrar?' · '+c.domain_registrar:''}`);}
-  const si=Number(c.search_issues||0);if(si)bits.push(`${si} search issue${si===1?'':'s'}`);
-  if(c.billing_issue)bits.push('billing needs a look');
-  if(!skipColumns){const o=Number(c.outstanding_cents||0);if(o)bits.push(`${money(o)} outstanding${Number(c.overdue_cents||0)?' · '+money(c.overdue_cents)+' overdue':''}`);}
-  const os=Number(c.open_support||0);if(os)bits.push(`${os} support request${os===1?'':'s'} open`);
-  return bits;
-}
+// the Status word as a pill
+function statusPill(c){const w=statusWord(c);const cls=w==='Needs you'?'needs':w==='Live'?'live':'quiet';return `<span class="pill ${cls}">${esc(w)}</span>`;}
+// the Next line: that client's first Needs-you row in a few words, else all quiet
+function nextText(c){const n=nextFor(c);return n?String(n.what):'Nothing — all quiet';}
 
 function lheadHtml(shown){
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
@@ -413,12 +427,19 @@ function chipsHtml(){
     VIEWS.map(([k,label])=>`<button data-view="${k}" aria-pressed="${VIEWNAME===k?'true':'false'}">${label}</button>`).join('')
   }</div>`;
 }
-function domainCell(c){
-  const de=daysToExpiry(c);
-  const nm=c.domain?esc(c.domain):'—';
-  if(de===null)return `<span class="domln">${nm}</span>`;
-  if(de<=DOMAIN_SOON_DAYS)return `<span class="domln">${nm} <span class="exp">${de<0?'expired':(de===0?'expires today':'expires in '+de+'d')}</span></span>`;
-  return `<span class="domln">${nm}</span>`;
+// the row's ⋯ menu — "Their website" and "Save as a starter kit" live here now
+// (they were buttons on every row), with the housekeeping form behind the third item
+let MENU_OPEN=null;
+function menuBtnHtml(c,cls){
+  if(c.bridge_only)return'';
+  return `<button class="${cls}" data-menu="${esc(c.site_id)}" aria-haspopup="menu" aria-expanded="${MENU_OPEN===c.site_id?'true':'false'}" aria-label="More for ${esc(c.name||'this client')}" title="Their website, starter kit, tags, note, archive">⋯</button>`;
+}
+function menuHtml(c){
+  return `<div class="rowmenu" role="menu" data-menufor="${esc(c.site_id)}">
+    <button type="button" role="menuitem" data-web="${esc(c.site_id)}">Their website</button>
+    ${canManage()?`<button type="button" role="menuitem" data-kit="${esc(c.site_id)}">Save as a starter kit</button>
+    <button type="button" role="menuitem" data-hk="${esc(c.site_id)}">Tags, owner, note, archive</button>`:''}
+  </div>`;
 }
 function tableHtml(list){
   const ths=COLS.map(([k,label])=>{
@@ -426,17 +447,13 @@ function tableHtml(list){
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
-    const att=Number(c.attention||0);
-    const bits=statusBits(c,true);   // leads/domain have their own columns here
+    const n=nextFor(c);
     return `<tr data-open="${esc(c.site_id)}" tabindex="0" aria-label="Open ${esc(c.name||'(unnamed)')}">
-      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${c.has_notes||c.notes?'<span class="notedot" title="Has an internal note" aria-label="Has an internal note">✎</span>':''}${c.email?`<div class="sub">${esc(c.email)}</div>`:''}${(c.tags||[]).length?`<div class="tags">${c.tags.map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')}</div>`:''}${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
-      <td>${esc(c.edition||'presence')}</td>
-      <td><span class="pill">${esc(c.status||'—')}</span></td>
-      <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
-      <td class="num">${Number(c.leads_waiting||0)}</td>
+      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${c.has_notes||c.notes?'<span class="notedot" title="Has an internal note" aria-label="Has an internal note">✎</span>':''}${c.email?`<div class="sub">${esc(c.email)}</div>`:''}${(c.tags||[]).length?`<div class="tags">${c.tags.map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')}</div>`:''}</td>
+      <td>${statusPill(c)}</td>
+      <td class="next">${n?`<span class="nx">${esc(n.what)}</span>`:'<span class="muted">Nothing — all quiet</span>'}</td>
       <td class="money">${owedCell(c)}</td>
-      <td>${domainCell(c)}</td>
-      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button>${c.bridge_only?'':`<button class="rowact ghost" data-web="${esc(c.site_id)}">Their website</button>`}${(!c.bridge_only&&canManage())?`<button class="rowact ghost" data-hk="${esc(c.site_id)}" aria-expanded="${HK_OPEN===c.site_id?'true':'false'}" aria-label="More for ${esc(c.name||'this client')}" title="Tags, owner, note, archive">⋯</button>`:''}</td>
+      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button>${menuBtnHtml(c,'rowact ghost')}</td>
     </tr>${HK_OPEN===c.site_id?`<tr class="hk" data-hkrow="${esc(c.site_id)}"><td colspan="${COLS.length+1}">${hkFormHtml(c)}</td></tr>`:''}`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -444,35 +461,16 @@ function tableHtml(list){
 function cardsHtml(list){
   let h='';
   for(const c of list){
-    const att=Number(c.attention||0);
-    const bits=statusBits(c,false);
-    const statusLine=bits.length?`<br><span class="bitln">${esc(bits.join(' · '))}</span>`:'';
+    const w=statusWord(c);
     h+=`<div style="margin-bottom:10px"><button class="client" data-open="${esc(c.site_id)}"><span class="av">${esc(initial(c.name))}</span>
-      <span><span class="n">${esc(c.name||'(unnamed)')}</span><br><span class="m">${esc(c.edition||'presence')} · ${esc(c.status||'')}</span>${statusLine}</span>
-      <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
-    // FIX 7: opening a client goes to your DELIVERY view; managing their website
-    // is the clearly-secondary action.
-    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button>${c.bridge_only?'':`<button data-web="${esc(c.site_id)}">Their website →</button>`}${(!c.bridge_only&&canManage())?`<button data-hk="${esc(c.site_id)}" aria-expanded="${HK_OPEN===c.site_id?'true':'false'}" aria-label="More for ${esc(c.name||'this client')}">Tags, note, archive</button>`:''}</div>`;
+      <span><span class="n">${esc(c.name||'(unnamed)')}</span>${c.email?`<br><span class="m">${esc(c.email)}</span>`:''}<br><span class="bitln" style="color:var(--soft)">Next: ${esc(nextText(c))}</span></span>
+      <span class="badge ${w==='Needs you'?'wait':'ok'}">${esc(w)}</span></button>`;
+    // opening a client goes to their record; everything else sits behind ⋯
+    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button>${c.bridge_only?'':`<span class="cardmenu">${menuBtnHtml(c,'')}</span>`}</div>`;
     if(HK_OPEN===c.site_id)h+=`<div class="cardhk" data-hkrow="${esc(c.site_id)}">${hkFormHtml(c)}</div>`;
     h+=`</div>`;
   }
   return h;
-}
-// ── Phase CP-1: starter kits — save one client's setup, start the next from it ──
-function kitCardHtml(){
-  return `<div class="kitcard" id="kits" tabindex="-1"><h2>Starter kits</h2>
-    <p class="muted">Save a client's setup (services, FAQs, voice, colors, industry — never their name, reviews, or photos) and start the next client from it. Applying only fills what's empty; it never overwrites work.</p>
-    <div id="kitList" class="muted">Loading…</div>
-    <div class="kitrow">
-      <select id="kitFromSite" aria-label="Save a kit from which client"><option value="">Save a kit from…</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
-      <input id="kitName" aria-label="Kit name" placeholder="Kit name (e.g. Contractor Starter)">
-      <button class="btn" id="kitSave">Save kit</button>
-    </div>
-    <div class="kitrow">
-      <select id="kitPick" aria-label="Apply a kit"><option value="">Apply a kit…</option>${KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('')}</select>
-      <select id="kitToSite" aria-label="Apply the kit to which client"><option value="">…to client</option>${CLIENTS.map(c=>`<option value="${esc(c.site_id)}">${esc(c.name||'(unnamed)')}</option>`).join('')}</select>
-      <button class="btn" id="kitApply">Apply</button>
-    </div></div>`;
 }
 
 function render(){
@@ -488,7 +486,6 @@ function render(){
   }else{
     h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
   }
-  h+=kitCardHtml();
   // Any re-render must never destroy a focused search input's value or caret
   // (contacts.html's contract) — capture before the innerHTML swap, restore after.
   const act=document.activeElement;const wasQ=!!(act&&act.id==='search');
@@ -496,7 +493,6 @@ function render(){
   $('main').innerHTML=h;
   wire();
   if(wasQ){const nq=$('search');if(nq){if(qv!=null)nq.value=qv;nq.focus();try{nq.setSelectionRange(qp,qp);}catch(_){/* */}}}
-  paintKits();
 }
 function wire(){
   // search — client-side filter, re-rendered live; render() preserves input/caret/focus
@@ -504,26 +500,25 @@ function wire(){
   const ae=$('addCustEmpty');if(ae)ae.addEventListener('click',openAddCustomer);
   // fixed-view chips — focus returns to the clicked chip after the re-render
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
-    VIEWNAME=b.getAttribute('data-view');HK_OPEN=null;
+    VIEWNAME=b.getAttribute('data-view');HK_OPEN=null;MENU_OPEN=null;
     if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'&&ARCH_STATE!=='loading'){loadArchived();return;}
     render();
     const nb=document.querySelector('[data-view="'+VIEWNAME+'"]');if(nb)nb.focus();
   }));
   // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract).
-  // The queues cockpit refreshes too (it's QSEQ-guarded and re-renders its own
-  // failure state honestly; no listeners survive its innerHTML swap, so nothing
-  // double-mounts) — ↻ used to leave it stale all morning.
+  // Needs you refreshes too (NSEQ-guarded; it re-renders its own failure state
+  // honestly and re-paints the roster's Status/Next once it lands).
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{
-    mountQueues();mountStudio();
+    mountNeeds();mountStudio();
     load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true));
   });
   const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
   const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>);
-  // Waiting/Leads read most-first on their first click
+  // Outstanding reads most-first on its first click
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');
-    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:(k==='attention'||k==='leads')?-1:1};
+    if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:k==='owed'?-1:1};
     render();
     const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
   }));
@@ -534,10 +529,22 @@ function wire(){
     tr.addEventListener('click',open);
     tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();openClient(tr.getAttribute('data-open'));}});
   });
-  // Phase 1 overhaul: "Open record" → the customer hub; "Their website" → the
-  // client's website editor in their scope (was their Today, which reads like the studio's own).
-  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/presence.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  // "Open record" → the customer hub. The ⋯ menu holds "Their website" (the
+  // client's website editor in their scope), "Save as a starter kit" and the
+  // housekeeping form. One menu open at a time; Escape or a click elsewhere closes it.
   document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openClient(b.getAttribute('data-rec'));}));
+  document.querySelectorAll('[data-menu]').forEach(b=>b.addEventListener('click',(e)=>{
+    e.stopPropagation();const id=b.getAttribute('data-menu');MENU_OPEN=MENU_OPEN===id?null:id;HK_OPEN=null;render();
+    const first=document.querySelector('[data-menufor="'+id+'"] button');if(first)first.focus();
+    else{const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();}
+  }));
+  paintMenu();   // draws the open menu (if any) into #rowMenuHost BEFORE its items are wired below
+  document.querySelectorAll('[data-menufor]').forEach(m=>{
+    m.addEventListener('click',(e)=>e.stopPropagation());
+    m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){const id=m.getAttribute('data-menufor');MENU_OPEN=null;render();const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();e.stopPropagation();}});
+  });
+  document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/presence.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
+  document.querySelectorAll('[data-kit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();const id=b.getAttribute('data-kit');MENU_OPEN=null;render();openKitDialog(id);}));
   const ar=$('archRetry');if(ar)ar.addEventListener('click',()=>loadArchived());
   wireHousekeeping();
 }
@@ -570,12 +577,12 @@ async function patchClient(id,patch){
 }
 function wireHousekeeping(){
   document.querySelectorAll('[data-hk]').forEach(b=>b.addEventListener('click',(e)=>{
-    e.stopPropagation();const id=b.getAttribute('data-hk');HK_OPEN=HK_OPEN===id?null:id;render();
+    e.stopPropagation();const id=b.getAttribute('data-hk');HK_OPEN=HK_OPEN===id?null:id;MENU_OPEN=null;render();
     const f=document.querySelector('[data-hkform="'+id+'"] input');if(f)f.focus();
-    else{const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}
+    else{const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();}
   }));
-  document.querySelectorAll('[data-hkrow]').forEach(row=>{row.addEventListener('click',(e)=>e.stopPropagation());row.addEventListener('keydown',(e)=>{if(e.key==='Escape'){const id=row.getAttribute('data-hkrow');HK_OPEN=null;render();const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}e.stopPropagation();});});   // Escape closes and puts focus back on the ⋯ (Cancel's contract)
-  document.querySelectorAll('[data-hkcancel]').forEach(b=>b.addEventListener('click',()=>{const id=HK_OPEN;HK_OPEN=null;render();const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}));
+  document.querySelectorAll('[data-hkrow]').forEach(row=>{row.addEventListener('click',(e)=>e.stopPropagation());row.addEventListener('keydown',(e)=>{if(e.key==='Escape'){const id=row.getAttribute('data-hkrow');HK_OPEN=null;render();const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();}e.stopPropagation();});});   // Escape closes and puts focus back on the ⋯ (Cancel's contract)
+  document.querySelectorAll('[data-hkcancel]').forEach(b=>b.addEventListener('click',()=>{const id=HK_OPEN;HK_OPEN=null;render();const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();}));
   document.querySelectorAll('form[data-hkform]').forEach(f=>f.addEventListener('submit',async(e)=>{
     e.preventDefault();if(HK_BUSY)return;
     const id=f.getAttribute('data-hkform');const c=findClient(id);if(!c)return;
@@ -589,7 +596,7 @@ function wireHousekeeping(){
       c.tags=Array.isArray(d.tags)?d.tags:tags;c.owner=d.owner_email!=null?d.owner_email:owner;
       if('notes' in patch){c.notes=typeof d.notes==='string'?d.notes:patch.notes;c.has_notes=!!c.notes.trim();}
       HK_OPEN=null;toast('Saved.');render();
-      const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();
+      const nb=document.querySelector('[data-menu="'+id+'"]');if(nb)nb.focus();
     }catch(err){toast(err.message||'That didn’t save.',true);}
     finally{HK_BUSY=false;const nb2=f.querySelector('button[type=submit]');if(nb2)nb2.disabled=false;}
   }));
@@ -609,57 +616,51 @@ function wireHousekeeping(){
   }));
 }
 
-// ── starter kits: data + painting. Events are DELEGATED ONCE below — the old
-//    per-loadKits addEventListener calls piled up on the same buttons, so one
-//    click on Save/Apply fired two POSTs after the first save. Never again. ──
-let KITS=[],KITS_STATE='loading',KIT_BUSY=false;
-function paintKits(){
-  const host=$('kitList');if(!host)return;
-  if(KITS_STATE==='loading'){host.textContent='Loading…';return;}
-  if(KITS_STATE==='failed'){host.textContent='Kits wouldn’t load just now.';return;}
-  host.innerHTML=KITS.length?KITS.map(k=>`<span class="kitchip">${esc(k.name)} <button data-delkit="${esc(k.id)}" title="Delete kit" aria-label="Delete kit ${esc(k.name)}">✕</button></span>`).join(''):'No kits yet — save your best-configured client as the first one.';
-  const pick=$('kitPick');if(pick){const v=pick.value;pick.innerHTML='<option value="">Apply a kit…</option>'+KITS.map(k=>`<option value="${esc(k.id)}">${esc(k.name)}</option>`).join('');pick.value=v;}
+// ── Save as a starter kit (the roster row's ⋯). Kits left the home (Oct 2026):
+//    saving lives here, applying lives in Add a customer's "Start from a kit".
+//    One submit handler, attached once at parse time — never per render. ──
+let KIT_BUSY=false,KIT_SITE=null;
+function openKitDialog(siteId){
+  const c=findClient(siteId);if(!c)return;
+  KIT_SITE=siteId;$('kit-name').value='';$('kitFrom').textContent='From '+(c.name||'this client')+'’s setup.';
+  const sb2=$('kit-save');if(sb2)sb2.disabled=false;
+  $('kitDlg').showModal();setTimeout(()=>$('kit-name').focus(),20);
 }
-async function loadKits(){
+$('kit-cancel').onclick=()=>$('kitDlg').close();
+$('kitForm').onsubmit=async(e)=>{
+  e.preventDefault();if(KIT_BUSY)return;
+  const nm=$('kit-name').value.trim();
+  if(!nm){toast('Name the kit.',true);$('kit-name').focus();return;}
+  KIT_BUSY=true;const btn=$('kit-save');btn.disabled=true;
   try{
-    const r=await api('/agency/kits');
-    if(!r.ok){KITS_STATE='failed';paintKits();return;}
-    KITS=(r.body&&r.body.data)||[];KITS_STATE='ok';paintKits();
-  }catch(_){KITS_STATE='failed';paintKits();}
+    const r=await apiSend('POST','/agency/kits',{site_id:KIT_SITE,name:nm});
+    if(r.ok){$('kitDlg').close();toast('Kit saved — pick it under “Start from a kit” when you add a customer.');}
+    else{toast((r.body&&r.body.message)||'That didn’t save.',true);btn.disabled=false;}
+  }catch(_){toast('That didn’t save.',true);btn.disabled=false;}
+  finally{KIT_BUSY=false;}
+};
+// the open ⋯ menu is drawn once per render into #rowMenuHost (outside the
+// table) and sits under its button — position:fixed, so neither the table's
+// scroll box nor a sticky cell can clip or cover it
+function paintMenu(){
+  const host=$('rowMenuHost');if(!host)return;
+  const c=MENU_OPEN?findClient(MENU_OPEN):null;
+  host.innerHTML=c?menuHtml(c):'';
+  positionMenu();
 }
-// ONE delegated listener for every kit action, attached ONCE at parse time —
-// #main re-renders can never duplicate it, and loadKits never touches wiring.
-document.addEventListener('click',async(e)=>{
-  const del=e.target.closest&&e.target.closest('[data-delkit]');
-  if(del){
-    if(!del.dataset.armed){del.dataset.armed='1';del.textContent='?';setTimeout(()=>{delete del.dataset.armed;del.textContent='✕';},2500);return;}
-    await apiSend('DELETE','/agency/kits/'+del.getAttribute('data-delkit'));loadKits();return;
-  }
-  if(e.target.closest&&e.target.closest('#kitSave')){
-    if(KIT_BUSY)return;
-    const sid=($('kitFromSite')||{}).value,nm=(($('kitName')||{}).value||'').trim();
-    if(!sid||!nm){toast('Pick a client and name the kit.',true);return;}
-    KIT_BUSY=true;const btn=$('kitSave');if(btn)btn.disabled=true;
-    try{
-      const r=await apiSend('POST','/agency/kits',{site_id:sid,name:nm});
-      if(r.ok){const ni=$('kitName');if(ni)ni.value='';toast('Kit saved.');loadKits();}
-      else toast((r.body&&r.body.message)||'That didn’t save.',true);
-    }finally{KIT_BUSY=false;const nb=$('kitSave');if(nb)nb.disabled=false;}
-    return;
-  }
-  if(e.target.closest&&e.target.closest('#kitApply')){
-    if(KIT_BUSY)return;
-    const kid=($('kitPick')||{}).value,sid=($('kitToSite')||{}).value;
-    if(!kid||!sid){toast('Pick a kit and a client.',true);return;}
-    KIT_BUSY=true;const btn=$('kitApply');if(btn)btn.disabled=true;
-    try{
-      const r=await apiSend('POST','/agency/kits/'+kid+'/apply',{site_id:sid});
-      if(r.ok){const a=(r.body.data&&r.body.data.applied)||{};const sk=(r.body.data&&r.body.data.skipped)||[];toast('Applied: '+(a.offerings||0)+' services, '+(a.faqs||0)+' FAQs'+(a.voice?', voice':'')+(a.colors?', colors':'')+(a.industry?', industry':'')+(sk.length?' · skipped '+sk.length+' already set':''));loadKits();}
-      else toast((r.body&&r.body.message)||'That didn’t apply.',true);
-    }finally{KIT_BUSY=false;const nb=$('kitApply');if(nb)nb.disabled=false;}
-    return;
-  }
-});
+function positionMenu(){
+  const host=$('rowMenuHost');const m=host&&host.firstElementChild;const b=MENU_OPEN&&document.querySelector('[data-menu="'+MENU_OPEN+'"]');
+  if(!m||!b)return;
+  const r=b.getBoundingClientRect();
+  // below the button, or above it when the button sits near the bottom edge
+  const below=r.bottom+4+m.offsetHeight<=window.innerHeight-8;
+  m.style.top=(below?r.bottom+4:Math.max(8,r.top-4-m.offsetHeight))+'px';
+  m.style.left=Math.max(8,Math.min(window.innerWidth-m.offsetWidth-8,r.right-m.offsetWidth))+'px';
+}
+// a click anywhere else closes an open ⋯ menu; a scroll or resize moves it with its button
+document.addEventListener('click',()=>{if(MENU_OPEN){MENU_OPEN=null;render();}});
+window.addEventListener('scroll',positionMenu,{passive:true});
+window.addEventListener('resize',positionMenu);
 
 // FIX 7 (preserved verbatim): opening a client goes to that customer's DELIVERY
 // view — the project thread, Share-a-file, approvals and support on the STUDIO's
@@ -683,8 +684,8 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to you
 // — NEVER the empty roster ("No clients yet" was the old lie). Try-again re-runs
 // the FULL boot path (me + load + mounts): a load()-only retry after a failed
 // /agency/me left a recovered portfolio wearing ME=null placeholders with the
-// queues cockpit never mounted. boot is idempotent here — mountHealthDoor
-// guards its own node and mountQueues is QSEQ-guarded.
+// Needs you never mounted. boot is idempotent here — mountHealthDoor
+// guards its own node and mountNeeds is NSEQ-guarded.
 function trouble(){
   $('main').innerHTML=`<div class="center"><h2>We couldn’t load your portfolio just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="primary">Try again</button></div>`;
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
@@ -739,7 +740,6 @@ async function load(soft){
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
   render();
-  loadKits();
 }
 
 // ── the top row: who you are, + Add a customer, platform health (staff) ──
@@ -845,9 +845,9 @@ $('cu-cancel').onclick=()=>$('custDlg').close();
 // dialog and clear the hash, so Back or a reload never reopens it. Boot calls it once
 // the member is known; a hash change while already on the home opens it too.
 function openFromHash(){
-  // ⌘K's "Starter kits" lands on /agency.html#kits (audit bug 10): scroll the card into view
-  if(location.hash==='#kits'){const k=$('kits');if(k){k.scrollIntoView({block:'start'});k.focus({preventScroll:true});}return;}
-  if(location.hash!=='#add')return;
+  // ⌘K's "Starter kits" lands on /agency.html#kits: the kits card left the home,
+  // so it opens Add a customer, where "Start from a kit" lives
+  if(location.hash!=='#add'&&location.hash!=='#kits')return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
   if(ME)openAddCustomer();
 }
@@ -923,12 +923,12 @@ async function boot(){
     if(!me.ok){trouble();return;}
     ME=me.body.data||{};
     renderTop();
-    openFromHash();   // ⌘K → /agency.html#add
+    openFromHash();   // ⌘K → /agency.html#add (or #kits)
+    const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
     await load();
-    mountQueues();   // "what needs me today" — the cross-client morning cockpit
+    await needs;
     mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
     mountHealthDoor();   // staff-only doorway to the platform Health Center
-    if(location.hash==='#kits')openFromHash();   // the kits card exists only now (⌘K → /agency.html#kits)
   }catch(_){trouble();}
 }
 boot();
@@ -949,32 +949,53 @@ async function mountHealthDoor(){
   }catch(_){/* the door is a nicety, never a blocker */}
 }
 
-// ── Work queues: aggregated cross-client queues (L5.7). One calm panel of
-//    today.html rail-cards; each row jumps into that client (?client= carried).
-//    Failure renders an HONEST "wouldn't load" line + Try again — never silent
-//    absence (the old behavior swallowed every error). ──
-let QSEQ=0;
-async function mountQueues(){
-  const host=$('queues');if(!host)return;
-  const gen=++QSEQ;
-  let r;try{r=await api('/agency/queues');}catch(_){r={ok:false,status:0,body:{}};}
-  if(gen!==QSEQ)return;   // a newer queues read started — drop this one
-  if(!r.ok||!r.body.data){
-    host.hidden=false;
-    host.innerHTML=`<h2 class="qhead">Needs you</h2>
-      <div class="qfail">Your queues wouldn’t load just now.<button id="qretry" type="button">Try again</button></div>`;
-    const qr=$('qretry');if(qr)qr.addEventListener('click',()=>mountQueues());
+// ── Needs you (Oct 2026 home rebuild): ONE list of the studio's own work from
+//    /agency/needs-you — overdue and due-soon money, unanswered enquiries, open
+//    support, late deal steps, broken things, approved plans not applied,
+//    unpublished changes. Each row: "Name — what" · when · one verb. The same
+//    payload names each client's Next on the roster. Failure renders an HONEST
+//    "wouldn't load" line + Try again — never silent absence. ──
+let NSEQ=0,NEEDS=null,NEEDS_EXPANDED=false;
+const initials=(n)=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';
+function needRowHtml(r){
+  return `<div class="row" data-need="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span>
+    <div class="t"><b>${esc(r.name)}</b> — ${esc(r.what)}${r.when?`<span class="when">${esc(r.when)}</span>`:''}</div>
+    <a class="rowact" href="${esc(r.href)}" data-noscope="1">${esc(r.verb)}</a></div>`;
+}
+function paintNeeds(){
+  const host=$('needs');if(!host||!NEEDS)return;
+  const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
+  const shown=NEEDS_EXPANDED?rows.concat(rest):rows;
+  const left=NEEDS_EXPANDED?Math.max(0,more-rest.length):more;
+  const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  host.hidden=false;
+  if(!rows.length){
+    host.innerHTML=`<h2 class="qhead">Needs you</h2><div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
     return;
   }
-  const queues=((r.body.data.queues)||[]).filter(q=>q.items&&q.items.length);
-  if(!queues.length){host.hidden=true;host.innerHTML='';return;}   // genuinely nothing waiting — absence is truth
-  host.hidden=false;
-  host.innerHTML=`<h2 class="qhead">Needs you</h2>`+
-    queues.map(q=>`<div class="rcard">
-      <p class="rh">${esc(q.title)} · ${q.items.length}</p>
-      <div class="rrows">${q.items.slice(0,5).map(it=>`<a href="/today.html?client=${encodeURIComponent(it.site_id)}"><span><strong>${esc(it.name)}</strong> — ${esc(it.why)}</span><span class="rn" aria-hidden="true">→</span></a>`).join('')}</div>
-      ${q.items.length>5?`<p class="qmore">+ ${q.items.length-5} more</p>`:''}
-    </div>`).join('');
+  const total=Number(NEEDS.total||rows.length);
+  host.innerHTML=`<h2 class="qhead">Needs you · ${total}</h2><div class="rcard need" id="needsList">${shown.map(needRowHtml).join('')}${
+    left>0?`<p class="qmore"><button type="button" class="linkbtn" id="needsMore">+ ${left} more</button></p>`:''}${partial}</div>`;
+  const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('.row:nth-child('+(rows.length+1)+') a');if(a)a.focus();}});
+}
+function applyNext(){NEXT={bySite:(NEEDS&&NEEDS.next_by_site)||{},byClient:(NEEDS&&NEEDS.next_by_client)||{}};}
+async function mountNeeds(){
+  const host=$('needs');if(!host)return;
+  const gen=++NSEQ;
+  let r;try{r=await api('/agency/needs-you');}catch(_){r={ok:false,status:0,body:{}};}
+  if(gen!==NSEQ)return;   // a newer read started — drop this one
+  if(!r.ok||!r.body.data||typeof r.body.data!=='object'){
+    host.hidden=false;
+    host.innerHTML=`<h2 class="qhead">Needs you</h2>
+      <div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`;
+    const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+    return;
+  }
+  const d=r.body.data;
+  NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{}};
+  NEEDS_EXPANDED=false;
+  applyNext();paintNeeds();
+  if(LOADED_ONCE)render();   // the roster's Status/Next read from this payload
 }
 </script>
 </body>
