@@ -97,7 +97,8 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   const ws = read('supabase/functions/presence/routes/workspace.ts');
   ok('workspace.ts: studio_published lands on the client\'s Website overview', /studio_published: '\/presence\.html'/.test(ws));
   const feed = read('supabase/functions/presence/lib/inbox_feed.ts');
-  ok('inbox_feed.ts: studio_published is NOT protected → dismissible', !/studio_published/.test(feed));
+  // benchmark 8 names the kind in UPDATE_NOTICE_KINDS (an update, not an ask); the pin is about the PROTECTED set only
+  ok('inbox_feed.ts: studio_published is NOT protected → dismissible', !/NOTICE_PROTECTED_KINDS: ReadonlySet<string> = new Set\(\[[^\]]*studio_published/.test(feed));
 
   const tl = read('supabase/functions/presence/lib/website_timeline.ts');
   ok('website_timeline.ts: operator already reads as "Your studio" on the timeline', /case 'staff': case 'operator': return 'Your studio'/.test(tl));
