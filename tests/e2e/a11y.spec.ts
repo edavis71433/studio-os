@@ -34,7 +34,8 @@ test.describe('Accessibility', () => {
       await page.waitForLoadState('networkidle');
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
       const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
-      expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+      // name the offending nodes in the failure, so a CI-only finding can be placed without a rerun
+      expect(serious.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.html.slice(0, 120)).join(' | ')}`)).toEqual([]);
     });
   }
 

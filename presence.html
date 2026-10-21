@@ -188,6 +188,7 @@ a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
 .hb-card-h .meta{font-size:12.5px;color:var(--ink-3)}
 .hb-card .note{font-size:12.5px;color:var(--ink-3);margin-top:10px;line-height:1.5}
 .hb-card .note a{color:var(--plum)}
+.hb-row.quiet .t a{color:var(--plum);text-decoration:underline;text-underline-offset:2px}
 /* Oct 2026 audit change 2: health checks + recent activity on the overview */
 .hb-checks{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:var(--dds-s2,8px)}
 .hb-checks li{font-size:12.5px;line-height:1.45}
@@ -660,8 +661,8 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 @media(min-width:761px){
   .designstudio{display:flex;align-items:stretch;gap:var(--dds-s5,20px)}
   #designCanvas{flex:1 1 auto;min-width:0;order:2}
-  #trayPanel.dc-left{position:relative;order:1;top:auto;bottom:auto;left:auto;z-index:1;flex:0 0 auto;width:min(320px,30vw);transform:none;visibility:visible;box-shadow:none;border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;align-self:stretch;max-height:calc(100vh - 150px);transition:width var(--dur,200ms) var(--ease,ease-out),margin var(--dur,200ms) var(--ease,ease-out),opacity var(--dur,.2s)}
-  #trayPanel.dc-left:not(.on){width:0;border-width:0;margin-right:-20px;opacity:0;pointer-events:none}
+  #trayPanel.dc-left{position:relative;order:1;top:auto;bottom:auto;left:auto;z-index:1;flex:0 0 auto;width:min(320px,30vw);transform:none;visibility:visible;box-shadow:none;border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;align-self:stretch;max-height:calc(100vh - 150px);transition:width var(--dur,200ms) var(--ease,ease-out),margin var(--dur,200ms) var(--ease,ease-out),opacity var(--dur,200ms)}
+  #trayPanel.dc-left:not(.on){width:0;border-width:0;margin-right:calc(-1 * var(--dds-s5,20px));opacity:0;pointer-events:none}
 }
 .dc-panel-head{position:sticky;top:0;z-index:2;background:var(--sheet,#fff);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:var(--dds-s4,16px) var(--dds-s4,16px);border-bottom:1px solid var(--hair);flex:0 0 auto}
 .dc-panel-head .dc-panel-t{font-weight:600;font-size:14px}
