@@ -436,6 +436,7 @@ test.describe('Agency portfolio', () => {
   });
 
   test('empty state: "Nothing needs you." plus one honest line; a partial read says so', async ({ page }) => {
+    await pinDisplay(page, 'table');   // the roster pill is read from the table (phones default to Cards)
     await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { empty_line: 'Claud Beltran owes $1,600, due Nov 3.' }) } });
     await page.goto('/agency.html');
     const n = page.locator('#needs');
