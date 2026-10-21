@@ -5,6 +5,8 @@
 // the client side (the customer / reviewer) READS only client_visible rows. All
 // writes are studio-side. Reuses the P2-C event/idempotency idioms; no legacy data.
 import { json } from '../../_shared/http.ts';
+import { clearNotice } from '../lib/notice.ts';
+import { approvalOverduePeriod } from '../lib/approvals.ts';
 import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { ensureProjectForDeal, ensureBridge, reconcileChecklistFacts } from '../lib/service_bridge.ts';
@@ -158,6 +160,28 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
+/** The ONE approvals read both records use. `due_date` (migration 0135) rides
+ *  along; before the column exists PostgREST 400s on the select, so the read
+ *  retries without it — the record still renders, just undated. */
+export async function loadApprovals(filter: string, cols: string): Promise<any[]> {
+  const withDue = await svc(`presence_approvals?${filter}&select=${cols},due_date`);
+  if (withDue.ok) return rows(withDue);
+  return rows(await svc(`presence_approvals?${filter}&select=${cols}`));
+}
+
+/** The studio's "Still waiting on the client" row (approval_overdue, raised by
+ *  lifecycle.runApprovalReminders) ends the moment THAT approval is decided —
+ *  from either side. The period is per-approval (a re-request mints a new
+ *  approval, a new row), so the exact key is the right clear. Best-effort. */
+export async function clearApprovalOverdue(siteId: string, projectId: string | null, approvalId: string): Promise<void> {
+  try {
+    if (!projectId) return;
+    const siteQ = await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (clientId) await clearNotice(clientId, 'approval_overdue', approvalOverduePeriod(projectId, approvalId));
+  } catch { /* never block a decision on its echo */ }
+}
+
 export async function handleProject(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const studio = await isStudioSide(jwt, site, principal);
@@ -173,7 +197,7 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
       svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,detail,status,priority,client_visible,client_action_required,assigned_to,milestone_id,due_date,sort_order,completed_at,source&order=sort_order.asc&limit=500`),
       svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${site.id}&select=kind,detail,actor,client_visible,created_at&order=created_at.desc&limit=50`),
       svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,note,status,client_visible,media_id,created_at&order=created_at.desc&limit=200`),
-      svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,subject_type,subject_id,title,summary,content_hash,status,client_visible,requested_at,decided_at,decision_note&order=created_at.desc&limit=100`),
+      loadApprovals(`project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&order=created_at.desc&limit=100`, 'id,subject_type,subject_id,title,summary,content_hash,status,client_visible,requested_at,decided_at,decision_note'),
     ]);
     const now = nowIso();
     const milestones = forViewer(rows(ms), studio).sort(compareOrder);
@@ -182,7 +206,7 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
     const events = forViewer(rows(ev), studio);
     // for the client side, deliverables are only visible when shared; approvals only when client_visible
     const deliverables = (studio ? rows(dl) : rows(dl).filter((d) => d.client_visible === true && d.status === 'shared'));
-    const approvals = forViewer(rows(ap), studio);
+    const approvals = forViewer(ap, studio);
     const progress = progressOf(studio ? tasksAll : tasksAll.filter((t) => t.client_visible === true));
     // W11 — on the STUDIO side, surface the customer's authoritative SaaS
     // subscription status (read-only). This is the customer's Studio OS SOFTWARE

@@ -95,6 +95,7 @@ const TERMINAL_OK = [
   { kind: 'deletion_requested', marker: 'del:', why: 'a cancelled deletion request that is re-requested mints a NEW request id' },
   { kind: 'new_review', marker: 'review:', why: 'one row per review; moderating THAT review is terminal — a new review mints a new id' },
   { kind: 'new_booking', marker: 'appt:', why: 'one row per appointment; deciding THAT booking is terminal — a new booking mints a new id' },
+  { kind: 'approval_overdue', marker: 'approvalOverduePeriod(', why: 'one row per approval (audit change 8); deciding THAT approval is terminal — a re-request mints a new approval id' },
 ];
 const clearedRaises = raises.filter((r) => r.kind && clearedKinds.has(r.kind));
 ok('A0: cleared-kind raise sites exist to check (>= 8)', clearedRaises.length >= 8, `found ${clearedRaises.length}`);

@@ -159,6 +159,14 @@
   .fname{display:block;font-weight:600;font-size:14px;color:var(--ink);overflow-wrap:anywhere}
   .fmeta{display:block;color:var(--faint);font-size:12.5px;margin-top:1px}
   .fyou{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--good-soft);color:var(--good);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  /* audit change 8: the approval that binds this file — the ask (warn), the answer (good / changes) */
+  .fok{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--warn-soft);color:var(--warn);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .fok.ok{background:var(--good-soft);color:var(--good)}
+  .fok.chg{background:var(--p-soft);color:var(--p)}
+  .frow.asks{flex-wrap:wrap}
+  .frow.asks .facts{flex:0 0 100%;display:flex;gap:8px;flex-wrap:wrap;margin-left:46px}
+  .frow.asks .fnote{flex:0 0 100%;margin-left:46px}
+  @media (max-width:719px){.frow.asks .facts,.frow.asks .fnote{margin-left:0}}
   .fst{flex:0 0 auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .fst.sig{background:var(--good-soft);color:var(--good)}
   /* PS2 — Invoices rows: the invoice name is a REAL h3 (heading nav on the money
@@ -1459,12 +1467,23 @@ function fileIcon(title){
 // START of its own note earns the chip — display-only, not worth a schema column.
 const CLIENT_UPLOAD_NOTE='Uploaded by the client';
 function isClientUpload(f){return !!f&&(f.client_upload===true||String(f.note||'').startsWith(CLIENT_UPLOAD_NOTE));}
-function fileRowHtml(f){
-  const mine=isClientUpload(f);const when=fdate(f.created_at);
-  return `<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span>`+
-    `<span class="fmain"><span class="fname">${esc(f.title)}${mine?'<span class="fyou">You shared</span>':''}</span>`+
-    `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}</span></span>`+
-    `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button></div>`;
+// audit change 8: `ap` is the approval that binds THIS file (subject_type
+// 'deliverable', subject_id = the file), newest first. Pending → "Needs your
+// OK" chip, "answer by {date}" in the meta, and Approve / Request changes right
+// on the row (the SAME decide route + content_hash as the Needs-your-OK card —
+// the row's buttons carry data-box so the note opens here, not up there).
+// Decided → the answer as a chip. No approval → the row as it always was.
+const AP_FILE_CHIP={pending:['Needs your OK',''],approved:['Approved','ok'],changes_requested:['Changes requested','chg'],rejected:['Declined','chg']};
+function approvalForFile(approvals,fid){return (approvals||[]).find(a=>a&&a.subject_type==='deliverable'&&a.subject_id===fid)||null;}
+function fileRowHtml(f,ap){
+  const mine=isClientUpload(f);const when=fdate(f.created_at);const ch=ap&&AP_FILE_CHIP[ap.status];const asks=!!(ch&&ap.status==='pending');
+  const due=asks&&ap.due_date?` · answer by ${esc(niceDay(ap.due_date))}`:'';
+  const acts=asks?`<span class="facts"><button class="fbtn" data-adec="${esc(ap.id)}" data-ah="${esc(ap.content_hash||'')}" aria-label="Approve — ${esc(f.title)}">Approve</button><button class="fbtn" data-areq="${esc(ap.id)}" data-box="fnote-${esc(ap.id)}" aria-label="Request changes — ${esc(f.title)}">Request changes</button></span>`+
+    `<div class="fnote" id="fnote-${esc(ap.id)}" style="display:none"><textarea rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><div class="row"><button class="fbtn" data-asend="${esc(ap.id)}" data-ah="${esc(ap.content_hash||'')}" data-box="fnote-${esc(ap.id)}">Send request</button><button class="fbtn" data-acancel="${esc(ap.id)}" data-box="fnote-${esc(ap.id)}">Cancel</button></div></div>`:'';
+  return `<div class="frow${asks?' asks':''}"${ap?` data-apfile="${esc(f.id)}"`:''}><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span>`+
+    `<span class="fmain"><span class="fname">${esc(f.title)}${mine?'<span class="fyou">You shared</span>':''}${ch?`<span class="fok ${ch[1]}">${ch[0]}</span>`:''}</span>`+
+    `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}${due}</span></span>`+
+    `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button>${acts}</div>`;
 }
 // Documents (proposals & agreements): a Signed chip is the good/green state;
 // everything else stays purple. Meta = kind · signed/sent <date>.
@@ -1634,7 +1653,7 @@ async function renderFiles(){
   else if(docs.length)html+=`<section><h2>Documents</h2><div class="flv" id="fdocs">${docs.map(docRowHtml).join('')}</div></section>`;
   const withFiles=snaps.filter(s=>s&&!s.failed&&s.deliverables&&s.deliverables.length);
   const failedSnaps=snaps.filter(s=>s&&s.failed);
-  for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(fileRowHtml).join('')}</div></section>`;
+  for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(f=>fileRowHtml(f)).join('')}</div></section>`;
   // per-project read failures get their own honest line — never the empty copy
   for(const s of failedSnaps)html+=`<section><h2>${esc(s.name)}</h2><p class="muted fload">We couldn’t load this project’s files just now — please try again in a moment.</p></section>`;
   // PS6 (PS1 residual): a failed PROJECTS read left every project section silently
@@ -2283,7 +2302,7 @@ async function openProject(id,focusSection){
   // no-preflight upload that minted an orphan media row per retry is gone).
   html+=`<section id="sec-files"><h2>Files</h2>`;
   const dels=(data.deliverables||[]);
-  if(dels.length)html+=`<div class="flv">${dels.map(fileRowHtml).join('')}</div>`;
+  if(dels.length)html+=`<div class="flv">${dels.map(f=>fileRowHtml(f,approvalForFile(data.approvals,f.id))).join('')}</div>`;
   html+=shareCardHtml()+`</section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
@@ -2336,9 +2355,13 @@ async function openProject(id,focusSection){
     if(r.status===409){PORTAL.snaps=null;openProject(id,'sec-approvals');return;}
     if(btn)btn.disabled=false;};
   document.querySelectorAll('[data-adec]').forEach(b=>b.addEventListener('click',()=>adec(b.getAttribute('data-adec'),b.getAttribute('data-ah'),'approved',null,b)));
-  document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-areq'));if(n){n.style.display='block';const t=$('nt-'+b.getAttribute('data-areq'));if(t)t.focus();}}));
-  document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=$('note-'+b.getAttribute('data-acancel'));if(n)n.style.display='none';}));
-  document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=$('nt-'+b.getAttribute('data-asend'));adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
+  // the note box: the card's (#note-<id> / #nt-<id>) or, from a file row, the
+  // row's own (data-box) — same decide call either way
+  const noteBox=(b,attr)=>$(b.getAttribute('data-box')||('note-'+b.getAttribute(attr)));
+  const noteText=(b,attr)=>{const box=noteBox(b,attr);return box?box.querySelector('textarea'):$('nt-'+b.getAttribute(attr));};
+  document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=noteBox(b,'data-areq');if(n){n.style.display='block';const t=noteText(b,'data-areq');if(t)t.focus();}}));
+  document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=noteBox(b,'data-acancel');if(n)n.style.display='none';}));
+  document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=noteText(b,'data-asend');adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
   document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
   document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id,'sec-todos');}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));   // re-focus the acted-on section
   // the share card, in drill-in context: compose preselects THIS project, and a

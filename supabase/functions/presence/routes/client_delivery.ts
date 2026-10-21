@@ -17,7 +17,7 @@ import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
-import { isStudioSide, studioDenied } from './projects.ts';
+import { isStudioSide, studioDenied, loadApprovals, clearApprovalOverdue } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
@@ -329,11 +329,13 @@ export async function handleClientProject(_req: Request, site: SiteRow, _princip
     svc(`presence_tasks?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,detail,status,priority,client_action_required,source,due_date,sort_order,completed_at&order=sort_order.asc&limit=500`),
     svc(`presence_project_events?project_id=eq.${id}&site_id=eq.${s}&client_visible=is.true&select=kind,detail,created_at&order=created_at.desc&limit=50`),
     svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.shared&select=id,title,note,created_at&order=created_at.desc&limit=200`),
-    svc(`presence_approvals?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,subject_type,title,summary,content_hash,status,decided_at&order=created_at.desc&limit=100`),
+    // subject_id + due_date (audit change 8): the portal draws the approval on
+    // the deliverable's own row, with "due {date}" when the studio set one
+    loadApprovals(`project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&order=created_at.desc&limit=100`, 'id,subject_type,subject_id,title,summary,content_hash,status,decided_at'),
     svc(`presence_surveys?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,title,created_at&order=created_at.desc&limit=50`),
   ]);
   const tasks = rows(ts).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
-  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: rows(ap), surveys: rows(sv), progress: progressOf(rows(ts)) } }, 200, cors);
+  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys: rows(sv), progress: progressOf(rows(ts)) } }, 200, cors);
 }
 
 export async function handleClientReport(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -420,6 +422,7 @@ export async function handleClientApprovalDecide(req: Request, site: SiteRow, pr
     body: JSON.stringify({ status: b.decision, decided_by: readerKey(principal), decided_by_kind: principal.kind, decided_at: nowIso(), decision_note: clean(b.note, 1000) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   await clientEvent(s, a.project_id, 'approval_decided', principal, { approval_id: id, decision: b.decision });
+  await clearApprovalOverdue(s, a.project_id, id);   // audit change 8: the studio's "still waiting" row ends with the client's answer
   // Tell the studio. bucket:false — a decision is TERMINAL (the status guard
   // above lets it happen once), so the period is the bare approval key and the
   // email sends exactly once, ever. Awaited but never fails this request (see notifyStudioOfClientAction).

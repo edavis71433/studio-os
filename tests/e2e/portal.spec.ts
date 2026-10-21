@@ -3609,3 +3609,102 @@ test.describe('Client Home — one filled button, approve and pay in one click',
     await expect(page.getByRole('button', { name: 'Mark done' })).not.toHaveClass(/approve/);
   });
 });
+
+// ── Studio audit (Oct 2026) change 8: the approval lives on the file's row ────
+// A deliverable approval (subject_type 'deliverable' + subject_id) is drawn on
+// that file's row in the record's Files section — "Needs your OK" chip, the
+// date the studio asked for, Approve / Request changes right there — through
+// the SAME decide route + content_hash as the Needs-your-OK card.
+test.describe('Client portal — approval on the deliverable row (audit change 8)', () => {
+  const bundleWith = (approval: Record<string, unknown>) => {
+    const b = JSON.parse(JSON.stringify(CLIENT_API[`/client/projects/${PID}`]));
+    b.data.approvals = [{ id: 'a1', subject_type: 'deliverable', subject_id: 'd1', title: 'Homepage design', summary: 'The first mockup.', content_hash: 'h1', status: 'pending', due_date: '2026-07-20', ...approval }];
+    return b;
+  };
+  const api = (approval: Record<string, unknown> = {}) => ({ ...CLIENT_API, [`/client/projects/${PID}`]: bundleWith(approval) });
+
+  test('pending: the row carries the chip, "answer by" the date, and both decisions', async ({ page }) => {
+    await installApp(page, { api: api() });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('#sec-files .frow[data-apfile="d1"]');
+    await expect(row.locator('.fok')).toHaveText('Needs your OK');
+    await expect(row.locator('.fmeta')).toHaveText('Shared by your studio · July 6 · answer by Jul 20, 2026');
+    await expect(row.getByRole('button', { name: 'Approve — Homepage mockup' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Request changes — Homepage mockup' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Download — Homepage mockup' })).toBeVisible();
+    // the Needs-your-OK card still stands (Home's queue and the anchors rely on it)
+    await expect(page.locator('#approval-a1')).toBeVisible();
+  });
+
+  test('Approve on the row posts the SAME decide route with the presented hash, and reloads the record', async ({ page }) => {
+    await installApp(page, { api: api() });
+    let bundleGets = 0;
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) => { if (route.request().method() === 'GET') bundleGets++; return route.fallback(); });
+    await page.goto(`/client.html?project=${PID}`);
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/client/approvals/a1/decide')),
+      page.locator('#sec-files .frow[data-apfile="d1"]').getByRole('button', { name: 'Approve — Homepage mockup' }).click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ decision: 'approved', presented_hash: 'h1', note: '' });
+    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+    await expect.poll(() => bundleGets).toBe(2);
+  });
+
+  test('Request changes on the row opens the row\'s own note and sends changes_requested with it', async ({ page }) => {
+    await installApp(page, { api: api() });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('#sec-files .frow[data-apfile="d1"]');
+    await expect(row.locator('#fnote-a1')).toBeHidden();
+    await row.getByRole('button', { name: 'Request changes — Homepage mockup' }).click();
+    await expect(row.locator('#fnote-a1')).toBeVisible();
+    await expect(page.locator('#note-a1')).toBeHidden();   // the card's own note box stays closed — the row opened ITS box
+    await row.locator('#fnote-a1 textarea').fill('Make the hero photo bigger.');
+    const [req] = await Promise.all([
+      page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/client/approvals/a1/decide')),
+      row.locator('#fnote-a1').getByRole('button', { name: 'Send request' }).click(),
+    ]);
+    expect(req.postDataJSON()).toEqual({ decision: 'changes_requested', presented_hash: 'h1', note: 'Make the hero photo bigger.' });
+    await expect(page.locator('#toast')).toContainText('Sent — your studio will take a look.');
+  });
+
+  test('Cancel closes the row\'s note without deciding', async ({ page }) => {
+    await installApp(page, { api: api() });
+    let decides = 0;
+    await page.route('**/functions/v1/presence/client/approvals/a1/decide', (route) => { decides++; return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{"status":"approved"}}' }); });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('#sec-files .frow[data-apfile="d1"]');
+    await row.getByRole('button', { name: 'Request changes — Homepage mockup' }).click();
+    await expect(row.locator('#fnote-a1')).toBeVisible();
+    await row.locator('#fnote-a1').getByRole('button', { name: 'Cancel' }).click();
+    await expect(row.locator('#fnote-a1')).toBeHidden();
+    expect(decides).toBe(0);
+  });
+
+  test('decided: the answer is the chip, the buttons are gone; undated: no "answer by"', async ({ page }) => {
+    await installApp(page, { api: api({ status: 'approved', decided_at: '2026-07-10T00:00:00Z' }) });
+    await page.goto(`/client.html?project=${PID}`);
+    const row = page.locator('#sec-files .frow[data-apfile="d1"]');
+    await expect(row.locator('.fok.ok')).toHaveText('Approved');
+    await expect(row.locator('[data-adec]')).toHaveCount(0);
+    await expect(row.locator('[data-areq]')).toHaveCount(0);
+    // the record strips ?project= once opened, so re-enter by URL rather than reload
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(bundleWith({ status: 'changes_requested', due_date: null })) }));
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(row.locator('.fok.chg')).toHaveText('Changes requested');
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(bundleWith({ due_date: null })) }));
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(row.locator('.fok')).toHaveText('Needs your OK');
+    await expect(row.locator('.fmeta')).toHaveText('Shared by your studio · July 6');
+  });
+
+  test('an approval that names no file (project-level, or pre-0135 rows) leaves the file rows as they were', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });   // the default fixture: a1 has no subject_id
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-files .frow')).toHaveCount(1);
+    await expect(page.locator('#sec-files .frow[data-apfile]')).toHaveCount(0);
+    await expect(page.locator('#sec-files .fok')).toHaveCount(0);
+    await expect(page.locator('#sec-files [data-adec]')).toHaveCount(0);
+  });
+});
