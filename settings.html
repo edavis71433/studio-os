@@ -63,6 +63,19 @@
   .plan .line{margin:0 0 6px} .plan .line.warn{color:var(--warn)} .plan .limits{color:var(--soft);margin:0 0 10px}
   .plan .team{color:var(--soft);margin:0} .plan .team a{color:var(--p);text-decoration:none;font-weight:500} .plan .team a:hover{text-decoration:underline}
   .plan .aside{color:var(--faint);font-size:12.5px;margin:10px 0 0}
+  /* ── the Team section (Oct 2026 studio audit, change 6): the agency's seats, over /agency/members ── */
+  .people{margin:10px 0 0}
+  .member{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+  .member:first-child{border-top:0}
+  .member .who{flex:1;min-width:180px} .member .who b{display:block;font-weight:600;font-size:14px} .member .who span{font-size:12.5px;color:var(--faint)}
+  .member select{font:inherit;font-size:13.5px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 9px}
+  .member .rolew{font-size:13px;color:var(--soft)}
+  .member .revoked{opacity:.6}
+  .invite{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)} .invite[hidden]{display:none}
+  .invite > div{flex:1;min-width:180px} .invite label{display:block;font-size:12px;font-weight:600;color:var(--soft);margin:0 0 4px}
+  .invite input,.invite select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
+  .seats{font-size:13px;color:var(--soft);margin:0}
+  .rolehelp{font-size:12.5px;color:var(--faint);margin:8px 0 0}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
@@ -93,6 +106,20 @@
        the owner to the builder's Business view; now the status line, the agency
        limits and the one way to change the plan sit on Settings. Never while
        scoped into a client — /commerce/* answers for the CALLER's own account. -->
+  <!-- Studio audit 2026-10, change 6: the agency's TEAM. /agency/members (invite with
+       a role, change a role, remove) existed with no page — the only way to add a
+       seat was an operator route. Agency members at studio level only; a client's
+       settings never show the studio's team. -->
+  <section class="card" id="team" aria-labelledby="teamHead" hidden>
+    <div class="card-h"><h2 id="teamHead" tabindex="-1">Team</h2><span class="hint" id="seats"></span></div>
+    <div class="people" id="people" aria-live="polite"></div>
+    <form class="invite" id="inviteForm" hidden>
+      <div><label for="inv-email">Invite by email</label><input id="inv-email" type="email" maxlength="160" placeholder="name@yourstudio.com" autocomplete="off"></div>
+      <div><label for="inv-role">Role</label><select id="inv-role"></select></div>
+      <div style="flex:0 0 auto"><button class="btn sm primary" type="submit" id="inviteBtn">Invite</button></div>
+    </form>
+    <p class="rolehelp" id="roleHelp"></p>
+  </section>
   <section class="card" id="billing" aria-labelledby="billingHead" hidden>
     <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
     <div class="plan" id="plan" aria-live="polite"></div>
@@ -128,6 +155,7 @@ const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.te
 const IC = {
   studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+  agency_team: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20a6 6 0 0 1 12 0"/><path d="M10 20a6 6 0 0 1 12 0"/>',
   billing: '<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
   money: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><path d="M8 7V5h8v2"/>',
   connections: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
@@ -138,7 +166,10 @@ const IC = {
 const CARDS = [
   { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
-  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true },
+  // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
+  { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
+  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
+    agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
   { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, when it renews, and how to change it.', ownerOnly: true },
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
@@ -161,8 +192,9 @@ function cardHtml(c, status) {
   if (c.hrefOperator && CTX && CTX.is_operator) c = { ...c, href: c.hrefOperator, scoped: false };
   const who = scopeName() || 'this client';
   const href = (SCOPE && c.scoped) ? withClient(c.href) : c.href;
-  const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : c.title;
-  const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : c.desc;
+  const agency = !!(CTX && CTX.is_agency) && !SCOPE;
+  const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : (agency && c.agencyTitle) ? c.agencyTitle : c.title;
+  const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : (agency && c.agencyDesc) ? c.agencyDesc : c.desc;
   const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
   return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.key]}</svg></span>` +
@@ -171,13 +203,87 @@ function cardHtml(c, status) {
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
 function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); }
 function renderCards() {
-  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE));
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)));
   $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('');
   const sc = $('cards').querySelector('[data-card="studio"]');
   if (sc) sc.addEventListener('click', (e) => { e.preventDefault(); reveal('studio', 'f-name'); });
   const bc = $('cards').querySelector('[data-card="billing"]');
   if (bc) bc.addEventListener('click', (e) => { e.preventDefault(); reveal('billing', 'billingHead'); });
+  const tc = $('cards').querySelector('[data-card="agency_team"]');
+  if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
 }
+
+// ── the team, inline: GET /agency/members, POST to invite, PATCH to change a role
+//    or remove. Owners and admins manage (manage_members); everyone else on the
+//    team sees the list read-only. Role words are plain; the server keys stay. ──
+const ROLE_WORD = { owner: 'Owner', admin: 'Admin', account_manager: 'Account manager', content_strategist: 'Content strategist', designer: 'Designer', developer: 'Developer', support: 'Support', readonly: 'Read only' };
+const ROLE_HELP = 'Owners and admins run the team and the brand. Account managers work inside clients and publish. Content strategists, designers and developers prepare work; support reads and leaves notes; read only looks.';
+let TEAM = null, TEAM_ME = null;
+function canManageTeam() { return !!(TEAM_ME && (TEAM_ME.role === 'owner' || TEAM_ME.role === 'admin')); }
+function memberHtml(m) {
+  const mine = TEAM_ME && String(m.email).toLowerCase() === String(TEAM_ME.email || '').toLowerCase();
+  const revoked = m.status === 'revoked';
+  const roleCtl = canManageTeam() && !mine && !revoked
+    ? `<select data-role="${esc(m.id)}" aria-label="Role for ${esc(m.email)}">${Object.keys(ROLE_WORD).map((k) => `<option value="${k}"${m.role === k ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('')}</select>`
+    : `<span class="rolew">${esc(ROLE_WORD[m.role] || m.role)}${mine ? ' · you' : ''}${revoked ? ' · removed' : (m.status === 'invited' ? ' · invited' : '')}</span>`;
+  const act = canManageTeam() && !mine ? (revoked ? `<button class="btn sm" type="button" data-restore="${esc(m.id)}">Restore</button>` : `<button class="btn sm" type="button" data-revoke="${esc(m.id)}">Remove</button>`) : '';
+  return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span></div>${roleCtl}${act}</div>`;
+}
+async function loadTeam() {
+  if (SCOPE || !(CTX && CTX.is_agency)) return;
+  const sec = $('team'); if (!sec) return;
+  const [me, list, usage] = await Promise.all([api('/agency/me'), api('/agency/members'), api('/agency/usage').catch(() => null)]);
+  if (!me.ok || !list.ok) { sec.hidden = false; $('people').innerHTML = '<p class="seats">We couldn’t load your team just now.</p>'; return; }
+  TEAM_ME = { ...(me.body.data || {}), email: (me.body.data && me.body.data.email) || (window.__ddsEmail || '') };
+  TEAM = Array.isArray(list.body.data) ? list.body.data : [];
+  const u = usage && usage.ok && usage.body && usage.body.data && usage.body.data.seats;
+  const active = TEAM.filter((m) => m.status !== 'revoked').length;
+  $('seats').textContent = u && u.limit ? `${typeof u.used === 'number' ? u.used : active} of ${u.limit} seats` : `${active} seat${active === 1 ? '' : 's'}`;
+  setStatus('agency_team', { text: `${active} on the team` });
+  sec.hidden = false;
+  renderTeam();
+}
+function renderTeam() {
+  $('people').innerHTML = TEAM.length ? TEAM.map(memberHtml).join('') : '<p class="seats">Just you so far.</p>';
+  const f = $('inviteForm'); f.hidden = !canManageTeam();
+  $('roleHelp').textContent = ROLE_HELP;
+  const sel = $('inv-role'); if (sel && !sel.options.length) sel.innerHTML = Object.keys(ROLE_WORD).filter((k) => k !== 'owner').map((k) => `<option value="${k}"${k === 'account_manager' ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('');
+  $('people').querySelectorAll('[data-role]').forEach((s) => s.addEventListener('change', async () => {
+    const id = s.getAttribute('data-role'), m = TEAM.find((x) => x.id === id); if (!m) return;
+    const prev = m.role; s.disabled = true;
+    const r = await api('/agency/members/' + encodeURIComponent(id), 'PATCH', { role: s.value });
+    s.disabled = false;
+    if (!r.ok) { s.value = prev; toast(nice(r.body, 'That didn’t save.'), true); return; }
+    m.role = (r.body.data && r.body.data.role) || s.value; toast('Role changed.');
+  }));
+  $('people').querySelectorAll('[data-revoke],[data-restore]').forEach((b) => b.addEventListener('click', async () => {
+    const restore = b.hasAttribute('data-restore'); const id = b.getAttribute(restore ? 'data-restore' : 'data-revoke'); const m = TEAM.find((x) => x.id === id); if (!m) return;
+    if (!restore && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Remove ' + m.email + '? Press again'; setTimeout(() => { delete b.dataset.armed; b.textContent = 'Remove'; }, 3000); return; }
+    b.disabled = true;
+    const r = await api('/agency/members/' + encodeURIComponent(id), 'PATCH', { status: restore ? 'active' : 'revoked' });
+    if (!r.ok) { b.disabled = false; toast(nice(r.body, 'That didn’t save.'), true); return; }
+    m.status = (r.body.data && r.body.data.status) || (restore ? 'active' : 'revoked');
+    toast(restore ? m.email + ' is back on the team.' : m.email + ' removed — they can’t sign in to the studio any more.');
+    renderTeam();
+  }));
+}
+const inviteForm = $('inviteForm');
+if (inviteForm) inviteForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('inv-email').value.trim().toLowerCase(), role = $('inv-role').value;
+  if (!email.includes('@')) { toast('Enter their email.', true); $('inv-email').focus(); return; }
+  const b = $('inviteBtn'); b.disabled = true;
+  const r = await api('/agency/members', 'POST', { email, role });
+  b.disabled = false;
+  if (!r.ok) { toast(nice(r.body, 'That invite didn’t go out.'), true); return; }
+  const d = r.body.data || {};
+  const row = { id: d.id, email: d.email || email, role: d.role || role, status: d.status || 'active', created_at: new Date().toISOString() };
+  const i = TEAM.findIndex((m) => m.email === row.email); if (i >= 0) TEAM[i] = { ...TEAM[i], ...row }; else TEAM.push(row);
+  $('inv-email').value = '';
+  toast(d.emailed === false ? 'Added — the invite email didn’t send; share the sign-in page with them.' : 'Invited — they get an email with a sign-in link.');
+  const active = TEAM.filter((m) => m.status !== 'revoked').length; setStatus('agency_team', { text: `${active} on the team` });
+  renderTeam();
+});
 function setStatus(key, status) {
   STATUSES[key] = status;
   const card = $('cards').querySelector(`[data-card="${key}"] .t`);
@@ -320,6 +426,8 @@ function signedOut() {
       if (on || attn) setStatus('connections', { text: `${on} connected${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
     }).catch(() => {});
     loadPlan().catch(() => {});
+    loadTeam().catch(() => {});
+    if (location.hash === '#team') { const sec = $('team'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing') { const sec = $('billing'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
   } catch (_) {

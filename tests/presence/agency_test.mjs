@@ -74,6 +74,8 @@ const INPUT = {
     m.moments === 1 && m.criticals === 1 && m.open_opportunities === 1 && m.plans_waiting === 1 && m.review_open === true &&
     m.unpublished_changes === true && rows.find((r) => r.site_id === 's2').migration === 'ready');
   ok('portfolio: archived stays visible only when asked', filterPortfolio(rows, {}).length === 2 && filterPortfolio(rows, { archived: true }).length === 1);
+  // Oct 2026 studio audit change 6: the row carries its internal note text (the route strips it for roles without the notes cap)
+  ok('portfolio: the row carries the note text', rows.find((r) => r.site_id === 's1').notes === 'VIP' && rows.find((r) => r.site_id === 's1').has_notes === true);
   // Section 3 — at-a-glance status (all from already-gathered rows)
   ok('portfolio: leads waiting counted per client', m.leads_waiting === 2 && rows.find((r) => r.site_id === 's2').leads_waiting === 0);
   ok('portfolio: attention = active notices + waiting approvals + waiting leads', m.attention === (1 /*notice*/ + 1 /*plan proposed*/ + 2 /*leads*/));
