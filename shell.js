@@ -273,7 +273,7 @@
     var primary = drawn.filter(function (s) { return !s.utility; });
     UTILS = drawn.filter(function (s) { return s.utility; });
     var ctxLabel = brandCtxLabel(nav, secKey);
-    var att = (CTX && CTX.attention_count) || 0;   // Phase FLOW: bell badge from context (no extra request)
+    var att = badgeCount();   // Phase FLOW: bell badge from context (no extra request); quiet after Mark read until the count changes
 
     // ── Lightning context bar (salesforce-reference §11.5): each nav SECTION is
     // ONE flat item. Single-link sections render as a plain link (aria-current
@@ -619,7 +619,7 @@
   function markAttentionFresh() { lastAttentionAt = Date.now(); }
   function paintBell() {
     var b = document.getElementById('dds-bell');
-    if (b) b.innerHTML = bellInner((CTX && CTX.attention_count) || 0);
+    if (b) b.innerHTML = bellInner(badgeCount());
   }
   // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
   // resolving a support request) can ask for the badge now, past the throttle.
@@ -645,41 +645,135 @@
   });
 
   // ── notifications (lazy; reuses /portal/feed — no new system) ──
-  var notif;
+  // Benchmark 8 — the bell grows up: three tabs (All · Needs you · Updates),
+  // "Mark read" distinct from "Clear", and a priority tier (approvals + money)
+  // that sits on top with a stronger left accent. The rows are the SAME feed
+  // rows every other surface reads; each arrives tagged `tier` and `priority`
+  // by routes/workspace.ts. The Inbox stays the one place for conversations —
+  // the bell is the glance, and its footer still sends you there.
+  var notif, bellTab = 'all', bellRows = [];
+  var BELL_READ_KEY = 'dds-bell-read';
+  var NOTICE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function bellRead() { try { return JSON.parse(localStorage.getItem(BELL_READ_KEY) || 'null') || null; } catch (_) { return null; } }
+  // "Mark read" is the operator's own read mark, kept locally: the rows dim and
+  // the badge quiets until the server's count CHANGES (something new arrived,
+  // or something cleared). The server's number itself is never touched — a
+  // marked-read invoice is still unpaid, and the Inbox still lists it.
+  function markBellRead() {
+    var ids = bellRows.map(function (r) { return r.id; }).filter(Boolean);
+    try { localStorage.setItem(BELL_READ_KEY, JSON.stringify({ count: (CTX && CTX.attention_count) || 0, ids: ids, at: Date.now() })); } catch (_) { /* */ }
+    paintBell(); paintBellRows();
+  }
+  function badgeCount() {
+    var n = (CTX && CTX.attention_count) || 0, m = bellRead();
+    return (m && typeof m.count === 'number' && m.count === n) ? 0 : n;
+  }
   function setExpanded(id, open) { var b = document.getElementById(id); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  // one row shape for every kind of feed item the bell draws
+  function shapeBellRows(d, revr) {
+    var out = [];
+    var at = function (href) { return revr ? '/client.html' : withScope(href || '/today.html'); };
+    (d.notices || []).forEach(function (n) {
+      out.push({ id: String(n.id || ''), href: at(n.href), title: n.headline || 'Needs a look', sub: n.body || '', tier: n.tier === 'update' ? 'update' : 'needs_you', priority: !!n.priority, clearable: NOTICE_ID_RE.test(String(n.id || '')) && n.dismissible !== false });
+    });
+    // An approval tap lands on the thing that RESOLVES it (file → Files,
+    // connected → Connections, infra → the Foundations desk) — never a generic landing.
+    (d.pending_approvals || []).forEach(function (p) {
+      var target = revr ? '/client.html' : (p.href ? p.href : p.kind === 'connected' ? '/connections.html' : p.kind === 'file' ? '/files.html' : '/presence.html#foundations');
+      out.push({ id: 'approval:' + String(p.id || ''), href: revr ? target : withScope(target), title: 'Waiting for approval', sub: p.title || 'A change is ready', tier: 'needs_you', priority: true, clearable: false });
+    });
+    (d.moments || []).slice(0, 4).forEach(function (m) {
+      out.push({ id: 'moment:' + String(m.id || ''), href: at('/today.html'), title: m.headline || 'A moment', sub: m.summary || '', tier: 'update', priority: false, clearable: false });
+    });
+    // priority first, then the asks, then the updates — stable within each band
+    return out.map(function (r, i) { r.i = i; return r; }).sort(function (a, b) {
+      var ka = (a.priority ? 0 : 2) + (a.tier === 'needs_you' ? 0 : 1), kb = (b.priority ? 0 : 2) + (b.tier === 'needs_you' ? 0 : 1);
+      return ka - kb || a.i - b.i;
+    });
+  }
+  function bellRowHtml(r, seen) {
+    return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (r.sub ? '<div class="sub">' + esc(r.sub) + '</div>' : '') + '</a>';
+  }
+  function paintBellRows() {
+    if (!notif) return;
+    var body = notif.querySelector('.body'); if (!body) return;
+    var m = bellRead(), seenIds = {};
+    (m && m.ids || []).forEach(function (id) { seenIds[id] = 1; });
+    var list = bellRows.filter(function (r) { return bellTab === 'all' || r.tier === bellTab; });
+    var out = list.map(function (r) { return bellRowHtml(r, !!seenIds[r.id]); }).join('');
+    var empty = bellTab === 'update' ? 'No updates right now.' : bellTab === 'needs_you' ? 'Nothing needs you right now.' : 'You’re all caught up.';
+    body.innerHTML = out || '<div class="muted">' + empty + '</div>';
+    Array.prototype.forEach.call(notif.querySelectorAll('.tabs [role=tab]'), function (t) {
+      var on = t.getAttribute('data-tab') === bellTab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false'); t.setAttribute('tabindex', on ? '0' : '-1'); t.classList.toggle('on', on);
+    });
+    var clr = notif.querySelector('#dds-bell-clear');
+    if (clr) { var can = bellRows.some(function (r) { return r.clearable; }); clr.disabled = !can; clr.title = can ? 'Clear the rows that can be cleared by hand' : 'Nothing here can be cleared by hand — money and approvals clear when they are resolved'; }
+    var mr = notif.querySelector('#dds-bell-read');
+    if (mr) mr.disabled = !bellRows.length;
+  }
+  // "Clear" dismisses every row the server lets a hand dismiss — the SAME rule
+  // Today's "Done" buttons follow (a real notice id + dismissible). Approvals,
+  // money and the synthetic rows stay: they clear when the thing is resolved.
+  function clearBell() {
+    var targets = bellRows.filter(function (r) { return r.clearable; });
+    if (!targets.length) return;
+    var btn = notif.querySelector('#dds-bell-clear'); if (btn) btn.disabled = true;
+    Promise.all(targets.map(function (r) {
+      return window.ddsApi('/commerce/notices/dismiss', { method: 'POST', body: { id: r.id } }).then(function (res) { return res && res.ok ? r.id : null; });
+    })).then(function (done) {
+      var gone = {}; done.forEach(function (id) { if (id) gone[id] = 1; });
+      var n = Object.keys(gone).length;
+      bellRows = bellRows.filter(function (r) { return !gone[r.id]; });
+      paintBellRows();
+      if (n) { if (window.ddsToast) window.ddsToast(n === 1 ? 'Cleared.' : 'Cleared ' + n + '.'); window.ddsBellRefresh(); }
+      else if (window.ddsToast) window.ddsToast('Couldn’t clear those just now — try again in a moment.', 'err');
+    });
+  }
   function toggleNotifications() {
     if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); setExpanded('dds-bell', false); return; }
     closeAllLayers();
-    if (!notif) { notif = el('<div class="dds-pop" role="region" aria-label="Notifications"><h4>Needs a look</h4><div class="body"><div class="muted">Loading…</div></div></div>'); document.body.appendChild(notif); notif.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    if (!notif) {
+      notif = el('<div class="dds-pop dds-bell-pop" role="region" aria-label="Notifications"><h4>Needs a look</h4>' +
+        '<div class="tabs" role="tablist" aria-label="Notification views"><button type="button" role="tab" data-tab="all" aria-selected="true">All</button><button type="button" role="tab" data-tab="needs_you" aria-selected="false">Needs you</button><button type="button" role="tab" data-tab="update" aria-selected="false">Updates</button></div>' +
+        '<div class="body"><div class="muted">Loading…</div></div>' +
+        '<div class="acts"><button type="button" id="dds-bell-read" disabled>Mark read</button><button type="button" id="dds-bell-clear" disabled>Clear</button></div></div>');
+      document.body.appendChild(notif); notif.addEventListener('click', function (e) { e.stopPropagation(); });
+      Array.prototype.forEach.call(notif.querySelectorAll('.tabs [role=tab]'), function (t) {
+        t.addEventListener('click', function () { bellTab = t.getAttribute('data-tab'); paintBellRows(); t.focus(); });
+      });
+      // the tablist keyboard contract: arrows move between tabs
+      notif.querySelector('.tabs').addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        var tabs = [].slice.call(notif.querySelectorAll('.tabs [role=tab]')), i = tabs.indexOf(document.activeElement);
+        if (i < 0) return; e.preventDefault();
+        var j = e.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+        bellTab = tabs[j].getAttribute('data-tab'); paintBellRows(); tabs[j].focus();
+      });
+      notif.querySelector('#dds-bell-read').addEventListener('click', markBellRead);
+      notif.querySelector('#dds-bell-clear').addEventListener('click', clearBell);
+    }
     notif.classList.add('open');
     setExpanded('dds-bell', true);
     api('/portal/feed').then(function (r) {
       var body = notif.querySelector('.body');
       // A FAILED read is not an empty one — never claim "caught up" on an error.
       if (!r.ok) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
-      var d = r.body.data || {}; var out = '';
+      var d = r.body.data || {};
       // A reviewer's whole world is client.html — every bell row lands THERE
       // (the owner pages these rows normally target are 403 walls for them).
       var revr = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
-      // Phase FLOW: notices first (a lead waiting, a domain expiring) — each taps
-      // straight through to the page that resolves it, from any screen.
-      (d.notices || []).forEach(function (n) { out += '<a class="row" href="' + esc(revr ? '/client.html' : withScope(n.href || '/today.html')) + '"><b>' + esc(n.headline || 'Needs a look') + '</b>' + (n.body ? '<div class="sub">' + esc(n.body) + '</div>' : '') + '</a>'; });
-      // An approval tap lands on the thing that RESOLVES it (file → Files,
-      // connected → Connections, infra → the Foundations desk) — never a generic landing.
-      (d.pending_approvals || []).forEach(function (p) {
-        var target = revr ? '/client.html' : (p.href ? p.href : p.kind === 'connected' ? '/connections.html' : p.kind === 'file' ? '/files.html' : '/presence.html#foundations');
-        out += '<a class="row" href="' + esc(revr ? target : withScope(target)) + '"><b>Waiting for approval</b><div class="sub">' + esc(p.title || 'A change is ready') + '</div></a>';
-      });
-      (d.moments || []).slice(0, 4).forEach(function (m) { out += '<a class="row" href="' + esc(revr ? '/client.html' : withScope('/today.html')) + '">' + esc(m.headline || 'A moment') + (m.summary ? '<div class="sub">' + esc(m.summary) + '</div>' : '') + '</a>'; });
+      bellRows = shapeBellRows(d, revr);
+      paintBellRows();
       // W4: the bell is the quick glance; the Inbox is the complete "everything that
       // needs you" (also client messages, surveys, new leads). Send them to the one
       // place rather than have two surfaces compete. A client's "one place" is their
       // updates page — never the owner Inbox.
-      var isReviewer = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
-      var footer = isReviewer
-        ? '<a class="row" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
-        : '<a class="row" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
-      body.innerHTML = (out || '<div class="muted">You’re all caught up.</div>') + footer;
+      var old = notif.querySelector('.foot'); if (old) old.remove();
+      var foot = revr
+        ? '<a class="row foot" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
+        : '<a class="row foot" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
+      notif.appendChild(el(foot));
     });
   }
   function closeNotifications() { if (notif) notif.classList.remove('open'); setExpanded('dds-bell', false); }

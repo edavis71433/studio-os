@@ -116,6 +116,31 @@ export function noticeDismissible(kind: unknown, period: unknown): boolean {
   return true;
 }
 
+// ── The bell grows up (benchmark 8): two tiers, one priority flag ───────────
+// Every feed row is either something that NEEDS the owner (an ask) or an
+// UPDATE (a report — money landed, the studio published, a reviewer decided).
+// The badge counts asks only; updates still render, under their own tab.
+// Priority marks money and approvals so they sit on top with a stronger accent.
+export type FeedTier = 'needs_you' | 'update';
+/** Notice kinds that report rather than ask. Everything else is an ask. */
+export const UPDATE_NOTICE_KINDS: ReadonlySet<string> = new Set([
+  'invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder',
+]);
+/** Money kinds — the ones a studio can least afford to scroll past. */
+export const MONEY_NOTICE_KINDS: ReadonlySet<string> = new Set([
+  'payment_trouble', 'account_lapsed', 'invoice_void_paid', 'retainer_status', 'trial_ended',
+]);
+export function noticeTier(kind: unknown): FeedTier {
+  return UPDATE_NOTICE_KINDS.has(String(kind ?? '')) ? 'update' : 'needs_you';
+}
+/** Approvals and money sit on top. An unpaid-invoice reminder rides the shared
+ *  deal_followup kind, so (as everywhere else) only its period can tell. */
+export function noticePriority(kind: unknown, period: unknown): boolean {
+  const k = String(kind ?? '');
+  if (MONEY_NOTICE_KINDS.has(k) || k === 'approval_overdue') return true;
+  return k === 'deal_followup' && String(period ?? '').startsWith(INVOICE_REMINDER_PREFIX);
+}
+
 export interface BellInput {
   /** active presence_plan_notices rows (kind only is used) */
   notices: Array<{ kind?: unknown }>;
@@ -155,7 +180,9 @@ export function studioBellCount(i: BellInput): number {
   // FIX 1 dedupe — see freshEnquiries.
   const newEnquiries = freshEnquiries(i.newEnquiries || 0, notices);
   // F1: the client-portal notices are the email throttle key, not a count.
-  const countedNotices = notices.filter((n) => !CLIENT_ACTIVITY_NOTICE_KINDS.has(String(n?.kind ?? ''))).length;
+  // Benchmark 8: an UPDATE (money landed, the studio published) is news, not an
+  // ask — it renders under the bell's Updates tab and never rings the badge.
+  const countedNotices = notices.filter((n) => !CLIENT_ACTIVITY_NOTICE_KINDS.has(String(n?.kind ?? '')) && noticeTier(n?.kind) === 'needs_you').length;
   // detail.from='client' is stamped ONLY by the client door (client_delivery.ts /
   // inbound_email.ts) — actor_kind can't tell the customer from the studio owner
   // (both 'client'), and the studio's own actions must never ring its own bell.

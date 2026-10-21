@@ -25,7 +25,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries, invoiceReminderIds, renderableNotices } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
 
 // ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
@@ -373,17 +373,19 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   ]);
   const marks = (marksQ as Record<string, string> | null) || null;
   const markFor = (key: string) => (marks ? (marks[key] ?? null) : null);
-  const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) }));
+  // Benchmark 8: every feed row carries a tier (needs_you | update) and a
+  // priority flag (approvals + money) — the bell's tabs and ordering read them.
+  const moments = filterForRole(role, (momQ.ok && momQ.json) || [], (m: any) => ({ surface: 'business_moments', override: overrideFor(shares, 'business_moments', m.id) })).map((m: any) => ({ ...m, tier: 'update', priority: false }));
   // approvals are 'always' visible to the reviewer (they must see what to approve)
   const showApprovals = visibleTo(role, 'approvals');
-  const pending = showApprovals ? [
+  const pending = (showApprovals ? [
     ...(((infraQ.ok && infraQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'infrastructure', title: p.title, summary: p.summary, decide_path: `/foundations/plans/${p.id}/decide` })),
     ...(((writeQ.ok && writeQ.json) || []) as any[]).map((p) => ({ id: p.id, kind: 'connected', provider: p.provider_key, title: p.title, summary: p.summary, decide_path: `/connections/${p.provider_key}/write/${p.id}/decide` })),
     // DAM-2: a file replacement waiting for approval — same feed, links into Files
     // href is audience-aware: files.html is an OWNER page — a reviewer decides
     // from their own view, never a 403 wall.
     ...(((fileQ.ok && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: seesFull ? `/files.html?focus=${m.id}` : '/client.html' })),
-  ] : [];
+  ] : []).map((p) => ({ ...p, tier: 'needs_you', priority: true }));   // an approval is always an ask, always on top
   const last = (pubQ.ok && pubQ.json?.[0]) || null;
   // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,
   // so "a lead is waiting" / "your domain expires soon" surface on every page —
@@ -392,7 +394,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
   // the server would refuse, and refuses one the client never drew. Synthetic rows
   // below carry no id/period at all; the client's UUID guard is what excludes them.
-  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period) }));
+  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period), tier: noticeTier(n.kind), priority: noticePriority(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing
@@ -404,7 +406,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   if (seesFull) {
     const newEnquiries = freshEnquiries((((enqQ.ok && enqQ.json) || []) as any[]).length, notices);
     if (newEnquiries > 0) notices.unshift({
-      id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false,
+      id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false, tier: 'needs_you', priority: false,
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
       body: 'Someone reached out through your website and is waiting to hear back.',
       href: noticeHref('website_enquiry'),
@@ -415,7 +417,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // the new-enquiries row: counted live, never stored, gone when resolved.
     const openFeedback = feedbackQ || 0;
     if (openFeedback > 0) notices.unshift({
-      id: 'client-feedback', kind: 'client_feedback', period: null, dismissible: false,
+      id: 'client-feedback', kind: 'client_feedback', period: null, dismissible: false, tier: 'needs_you', priority: false,
       headline: openFeedback === 1 ? 'Your client left a note on the draft' : `${openFeedback} notes from your client on the draft`,
       body: 'Feedback on the shared draft is waiting — read and resolve it in the builder’s Comments panel.',
       href: noticeHref('client_feedback'),
@@ -429,7 +431,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       const tree = await treeP;
       const missing = tree ? tree.pages.flatMap((p: any) => p.sections.filter((s: any) => s.status === 'missing_required')) : [];
       if (missing.length > 0) notices.push({
-        id: 'missing-required', kind: 'missing_required', period: null, dismissible: false,
+        id: 'missing-required', kind: 'missing_required', period: null, dismissible: false, tier: 'needs_you', priority: false,
         headline: missing.length === 1 ? 'A section needs filling in before you can publish' : `${missing.length} sections need filling in before you can publish`,
         body: 'Add the missing details and your website is ready to go live.',
         href: noticeHref('missing_required'),
@@ -452,7 +454,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         ]);
         const lastSeen = ((seen.json as any[]) || [])[0]?.last_seen_at || null;
         const unread = (((ev.json as any[]) || [])).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
-        if (unread > 0) notices.unshift({ id: 'bridge-updates', kind: 'client_updates', period: null, dismissible: false, headline: unread === 1 ? 'An update from your studio' : `${unread} updates from your studio`, body: 'New activity on your project — messages, files, or something to approve.', href: '/client.html' });
+        if (unread > 0) notices.unshift({ id: 'bridge-updates', kind: 'client_updates', period: null, dismissible: false, tier: 'needs_you', priority: false, headline: unread === 1 ? 'An update from your studio' : `${unread} updates from your studio`, body: 'New activity on your project — messages, files, or something to approve.', href: '/client.html' });
       }
     } catch { /* best-effort — the bell still works without this row */ }
   }
@@ -561,7 +563,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = cv.needsReply; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClientAt, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-      client_messages = client_messages.slice(0, 20);
+      client_messages = client_messages.slice(0, 20).map((r) => ({ ...r, tier: (r.type === 'support' ? (r.status === 'open' || r.status === 'in_progress') : !!r.needs_reply) ? 'needs_you' : 'update', priority: false }));
     } catch { /* best-effort — the inbox still renders without this section */ }
   }
   // Slice 2 (additive): per-lead rows so the Inbox list pane renders its Enquiries
@@ -583,6 +585,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
             id: f.id, form_kind: String(f.form_kind || 'contact'), name: String(f.name || ''), email: String(f.email || ''),
             phone: String(f.phone || ''), message: String(f.message || '').slice(0, 400), status: String(f.status || 'new'),
             created_at: f.created_at, thread_key: tk, unread: threadUnread(String(f.created_at || ''), markFor(tk), true),
+            tier: String(f.status || 'new') === 'new' ? 'needs_you' : 'update', priority: false,
           };
         })
         : undefined;
