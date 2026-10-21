@@ -10556,6 +10556,16 @@ async function ipeLink() {
   } catch (_) {}
 }
 
+// A live shell hint (the fixed pill, shell.js ddsHint) steps aside the moment the
+// owner starts working on the canvas: same as tapping "Got it" (it stays seen),
+// removed at once so nothing fading still sits over the page.
+function dcDismissShellHint() {
+  try {
+    const h = document.querySelector(".dds-hint.show"); if (!h) return;
+    const x = h.querySelector(".x"); if (x) x.click();
+    h.remove();
+  } catch (_) {}
+}
 // ── inject the editing chrome into the rendered preview document ─────────────
 function dcInjectCanvas(doc, main) {
   const win = doc.defaultView;
@@ -10619,7 +10629,23 @@ function dcInjectCanvas(doc, main) {
   let bar = doc.getElementById("dds-dc-bar");
   if (!bar) { bar = doc.createElement("div"); bar.id = "dds-dc-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
   let current = null, hideT = null;
-  const place = (el2) => { const r = el2.getBoundingClientRect(); bar.style.top = Math.max(2, r.top + win.scrollY + 6) + "px"; bar.style.left = Math.max(2, r.left + win.scrollX + 6) + "px"; };
+  // The toolbar sits on the section's top edge, OUTSIDE its text. Placed inside
+  // the padding it wrapped to two rows on a narrow canvas (an iPad's 250px
+  // frame) and covered the heading — nothing under it could be double-clicked
+  // to edit. When the top edge is scrolled out of view the bar takes the
+  // bottom edge instead; only a section taller than the window keeps the old
+  // inside placement, pinned to the visible top.
+  const place = (el2) => {
+    const r = el2.getBoundingClientRect();
+    const top = r.top + win.scrollY, left = r.left + win.scrollX, sy = win.scrollY;
+    bar.style.left = Math.max(2, left + 6) + "px";   // width (and so wrapping) settles before the height is read
+    const h = bar.offsetHeight || 0;
+    let y;
+    if (top - h >= Math.max(2, sy)) y = top - h;
+    else if (top + r.height + h <= sy + win.innerHeight) y = top + r.height;
+    else y = Math.max(top + 6, sy + 2);
+    bar.style.top = y + "px";
+  };
   const hideBar = () => { bar.classList.remove("on"); if (current) { current.classList.remove("dc-hot"); current = null; } };
   const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 170); };
   bar.addEventListener("mouseenter", () => clearTimeout(hideT));
@@ -10715,6 +10741,14 @@ function dcInjectCanvas(doc, main) {
       });
     });
   });
+  // The shell's one-time hint is a pill fixed to the bottom of the WINDOW, and on
+  // a tablet the canvas runs under it: a heading in that strip could not be
+  // double-clicked (the pill's "Got it" took the click). Starting to build IS
+  // the "Got it" — the first press or key on the canvas dismisses the hint.
+  if (!doc.body.hasAttribute("data-dc-hintguard")) {
+    doc.body.setAttribute("data-dc-hintguard", "1");
+    ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+  }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
