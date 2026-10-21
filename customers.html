@@ -24,36 +24,36 @@
   }
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
         inbox.html's list-pane header by hand (.lhead/.lrow1/#viewBtn/#viewMenu) ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:6px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .viewdd{position:relative;min-width:0;flex:1}
-  #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;max-width:100%}
+  #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
   #viewBtn .car{font-size:10px;color:var(--faint)}
   #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
-  #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
-  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
+  .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
   /* Phase 2: the Customers | People tab strip under the header */
-  .seg.tabs2{margin:0 0 12px;background:var(--bg)}
-  .seg.tabs2 button{font-size:13.5px;padding:7px 14px}
+  .seg.tabs2{margin:0 0 var(--dds-s3,12px);background:var(--bg)}
+  .seg.tabs2 button{font-size:13.5px;padding:var(--dds-s2,8px) var(--dds-s4,16px)}
   .seg.tabs2 button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
-  .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:4px}
+  .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
 
-  .bar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
-  .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
+  .bar{display:flex;gap:var(--dds-s2,8px);margin-bottom:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
+  .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
 
   /* ── the Add-a-customer dialog — contacts.html's custDlg, ported wholesale
@@ -70,22 +70,22 @@
      .dbody scrolls, sized to the 8vh offsets (pipeline's shipped pattern). */
   dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
-  .dbody{padding:22px;max-height:calc(84vh - 22px);overflow:auto}
-  .dbody h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 12px}
-  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 5px}
-  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:9px 12px;outline:none}
+  .dbody{padding:var(--dds-s6,24px);max-height:calc(84vh - 22px);overflow:auto}
+  .dbody h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 var(--dds-s3,12px)}
+  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 var(--dds-s1,4px)}
+  .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
-  .dbody .note{font-size:12.5px;color:var(--faint);margin:12px 0 0;line-height:1.5}
-  #cu-mode{display:flex;flex-direction:column;gap:8px;margin:2px 0 4px}
-  .modeopt{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
+  .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
+  .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
   .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
-  .modeopt input{width:auto;margin-top:3px;accent-color:var(--p)}
+  .modeopt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--p)}
   .modeopt strong{display:block;font-weight:600;font-size:13.5px}
   .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
-  .dbody .done{text-align:center;padding:8px 0 4px}
-  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px}
+  .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
+  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
   .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
-  .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+  .row2{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s4,16px)}
 
   /* ── the table view: sortable columns; the table scrolls in its OWN container ── */
   /* position:relative is load-bearing — see contacts.html: the Actions <th>'s
@@ -94,13 +94,13 @@
   .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
   thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
-  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:var(--dds-s3,12px) var(--dds-s4,16px);width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:var(--dds-s1,4px)}
   thead th .thb:hover{color:var(--p)}
   thead th .arrow{font-size:10px;color:var(--p)}
   tbody tr{cursor:pointer}
   tbody tr:hover{background:var(--p-soft)}
   tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
-  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody td{padding:var(--dds-s3,12px) var(--dds-s4,16px);border-bottom:1px solid var(--line);vertical-align:middle}
   tbody tr:last-child td{border-bottom:none}
   td .n{font-weight:600}
   td.num{font-variant-numeric:tabular-nums}
@@ -117,28 +117,28 @@
   }
   @media (min-width:768px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) th.acts,:root:not([data-theme="light"]) td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
   @media (min-width:768px){:root[data-theme="dark"] th.acts,:root[data-theme="dark"] td.acts{box-shadow:-10px 0 9px -10px rgba(0,0,0,.5)}}
-  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:var(--dds-s1,4px) var(--dds-s3,12px);cursor:pointer;white-space:nowrap}
   .rowact:hover{border-color:var(--p);color:var(--p)}
   .rowact.ghost{color:var(--soft);border-color:transparent}
   td.acts{white-space:nowrap;text-align:right} td.acts .rowact+.rowact{margin-left:6px}
 
   /* ── the card view (today's look, kept for warmth) ── */
-  .cust{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:11px}
+  .cust{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s4,16px);box-shadow:var(--shadow);margin-bottom:var(--dds-s3,12px)}
   .cust:hover{border-color:var(--p)}
-  .crow{display:flex;align-items:center;gap:14px}
+  .crow{display:flex;align-items:center;gap:var(--dds-s4,16px)}
   .av{width:38px;height:38px;border-radius:var(--dds-r,8px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
   .n{font-weight:600;font-size:15px}
   .m{font-size:12.5px;color:var(--faint)}
-  .badge{margin-left:auto;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .badge{margin-left:auto;font-size:12px;font-weight:600;padding:var(--dds-s1,4px) 10px;border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
-  .pill{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
+  .pill{font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .pill.complete{background:var(--good-soft);color:var(--good)}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
-  .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
-  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .acts{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;align-items:center;margin-top:var(--dds-s3,12px)}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn:hover{filter:brightness(1.05)}
-  .center{text-align:center;padding:52px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14.5px}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
