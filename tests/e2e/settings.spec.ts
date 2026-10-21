@@ -305,6 +305,9 @@ test.describe('Settings — automations', () => {
     await page.goto('/settings.html?client=' + CLIENT + '#automations');
     await expect(page.locator('[data-card="auto"]')).toHaveCount(0);
     await expect(page.locator('#automations')).toBeHidden();
+  });
+});
+
 // ── Oct 2026 studio audit, change 6: the agency's TEAM lives on Settings ──────
 // /agency/members existed with no page (the only way to add a seat was an
 // operator-only route). Agency members at studio level get a Team card and an

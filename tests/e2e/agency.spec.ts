@@ -687,6 +687,9 @@ test.describe('Agency roster — Outstanding', () => {
     await page.goto('/agency.html');
     await expect(page.locator('tbody tr')).toHaveCount(4);
     await expect(page.locator('tbody td.money')).toHaveText(['—', '—', '—', '—']);
+  });
+});
+
 // ── Oct 2026 studio audit, change 6: client housekeeping on the roster row ────
 // PATCH /agency/clients/:site (tags · owner · note · archive/restore) existed with
 // no page. Owners, admins and account managers get a ⋯ on each portfolio row that
