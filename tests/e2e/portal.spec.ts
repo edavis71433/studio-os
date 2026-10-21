@@ -3699,7 +3699,7 @@ test.describe('Client portal — approval on the deliverable row (audit change 8
     await expect(row.locator('.fmeta')).toHaveText('Shared by your studio · July 6');
   });
 
-  test('an approval that names no file (project-level, or pre-0134 rows) leaves the file rows as they were', async ({ page }) => {
+  test('an approval that names no file (project-level, or pre-0135 rows) leaves the file rows as they were', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });   // the default fixture: a1 has no subject_id
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.locator('#sec-files .frow')).toHaveCount(1);

@@ -6,7 +6,7 @@
 //          the dated copy, the due-date cleaner, the overdue notice period.
 // PART B — the route (routes/project_delivery.ts): subject_type 'deliverable' is
 //          checked against THIS project, due_date is stored (and degrades before
-//          0134), the "Needs your OK" email carries the date; both records return
+//          0135), the "Needs your OK" email carries the date; both records return
 //          subject_type / subject_id / due_date.
 // PART C — the sweep (commerce/lifecycle.runApprovalReminders) driven through a
 //          fetch fake: the day-before row and the overdue-yesterday row are
@@ -14,7 +14,7 @@
 //          not; the overdue one raises exactly one studio notice; the claim is
 //          stamped BEFORE the send with the previous value in the WHERE; a
 //          second tick the same day sends nothing.
-// PART D — migration 0134 + APPLY pack + registration + the bell's deep link.
+// PART D — migration 0135 + APPLY pack + registration + the bell's deep link.
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -74,7 +74,7 @@ const { approvalReminderDue, approvalReminderCopy, cleanDueDate, dueDateText, da
   ok('B3: a deliverable approval defaults its title to the file\'s', /const title = clean\(b\.title, 200\) \|\| ver\.title/.test(pd));
   ok('B4: due_date is cleaned (cleanDueDate) and a bad one is refused with 422', /cleanDueDate\(b\.due_date\)/.test(pd) && /The due date needs to be a real date/.test(pd));
   ok('B5: due_date is written on the approval row only when given', /if \(dueDate\) row\.due_date = dueDate;/.test(pd));
-  ok('B6: pre-0134 degrade — a 400 naming due_date retries the insert without it', /ins\.status === 400 && \/due_date\/\.test\(ins\.text/.test(pd) && /delete row\.due_date;/.test(pd));
+  ok('B6: pre-0135 degrade — a 400 naming due_date retries the insert without it', /ins\.status === 400 && \/due_date\/\.test\(ins\.text/.test(pd) && /delete row\.due_date;/.test(pd));
   ok('B7: the prior PENDING approval on the same subject is still superseded', /status=eq\.pending`, \{ method: 'PATCH'[\s\S]{0,40}status: 'superseded'/.test(pd));
   ok('B8: the "Needs your OK — {title}" email carries the due date when set', /`Needs your OK — \$\{title\}`/.test(pd) && /They’d like your answer by <strong>\$\{dueDateText\(String\(a\.due_date\)\)\}<\/strong>/.test(pd) && /\$\{when\}<p>Nothing goes ahead without you/.test(pd));
   ok('B9: the ONE approvals read (loadApprovals) selects due_date and retries without it', /export async function loadApprovals/.test(pj) && /select=\$\{cols\},due_date`\);\s*if \(withDue\.ok\) return rows\(withDue\);/.test(pj) && /select=\$\{cols\}`\)\);/.test(pj));
@@ -179,26 +179,26 @@ const restore = () => { globalThis.fetch = realFetch; };
   };
   const r4 = await runApprovalReminders(50);
   ok('C11: a tick that loses the claim race sends nothing (the WHERE guards the stamp)', r4.reminded === 0 && stolen.sent.length === 0, JSON.stringify(r4));
-  // pre-0134: the filter 400s on the unknown column → clean no-op, no throw
+  // pre-0135: the filter 400s on the unknown column → clean no-op, no throw
   globalThis.fetch = async (input) => { const url = typeof input === 'string' ? input : input.url; return url.includes('presence_approvals') ? jr({ code: '42703', message: 'column presence_approvals.due_date does not exist' }, 400) : jr([]); };
   const r5 = await runApprovalReminders(50);
-  ok('C12: before migration 0134 the sweep is a clean no-op (400 on the column → zeros, no throw)', r5.reminded === 0 && r5.overdue_notices === 0);
+  ok('C12: before migration 0135 the sweep is a clean no-op (400 on the column → zeros, no throw)', r5.reminded === 0 && r5.overdue_notices === 0);
   restore();
 }
 
 // ═══ PART D — migration, pack, registration, the bell ═══
 {
-  const mig = read('supabase/migrations/0134_approval_due_date_reminders.sql');
-  const pack = read('docs/presence/APPLY-0134-prod.sql');
+  const mig = read('supabase/migrations/0135_approval_due_date_reminders.sql');
+  const pack = read('docs/presence/APPLY-0135-prod.sql');
   const lc = read('supabase/functions/presence/commerce/lifecycle.ts');
   const sys = read('supabase/functions/presence/routes/system.ts');
   const ws = read('supabase/functions/presence/routes/workspace.ts');
   const prev = read('supabase/migrations/0133_actor_kind_operator.sql');
-  ok('D1: 0134 adds due_date (date) + last_reminded_at (timestamptz), idempotently', /add column if not exists due_date date;/.test(mig) && /add column if not exists last_reminded_at timestamptz;/.test(mig));
-  ok('D2: 0134 widens the notice-kind CHECK with approval_overdue and carries the 0133 list forward', /'approval_overdue'/.test(mig) && /'studio_published'/.test(mig) && (() => { const kinds = (s) => (s.match(/check \(kind in \(([\s\S]*?)\)\);/) || ['', ''])[1].match(/'([a-z_]+)'/g) || []; const old = kinds(prev); const now = new Set(kinds(mig)); return old.length > 30 && old.every((k) => now.has(k)); })());
-  ok('D3: 0134 opens with a rollback note and touches no RLS', /^-- rollback:/.test(mig) && !/row level security|create policy|grant /i.test(mig));
-  ok('D4: 0134 indexes the sweep\'s read (pending · client-visible · dated)', /create index if not exists presence_approvals_due_idx/.test(mig) && /status = 'pending' and client_visible = true and due_date is not null/.test(mig));
-  ok('D5: APPLY-0134 carries the same columns, index and CHECK, plus verify queries', /add column if not exists due_date date/.test(pack) && /add column if not exists last_reminded_at timestamptz/.test(pack) && /presence_approvals_due_idx/.test(pack) && /'approval_overdue'/.test(pack) && /'studio_published'/.test(pack) && /-- Verify/.test(pack));
+  ok('D1: 0135 adds due_date (date) + last_reminded_at (timestamptz), idempotently', /add column if not exists due_date date;/.test(mig) && /add column if not exists last_reminded_at timestamptz;/.test(mig));
+  ok('D2: 0135 widens the notice-kind CHECK with approval_overdue and carries the 0133 list forward', /'approval_overdue'/.test(mig) && /'studio_published'/.test(mig) && (() => { const kinds = (s) => (s.match(/check \(kind in \(([\s\S]*?)\)\);/) || ['', ''])[1].match(/'([a-z_]+)'/g) || []; const old = kinds(prev); const now = new Set(kinds(mig)); return old.length > 30 && old.every((k) => now.has(k)); })());
+  ok('D3: 0135 opens with a rollback note and touches no RLS', /^-- rollback:/.test(mig) && !/row level security|create policy|grant /i.test(mig));
+  ok('D4: 0135 indexes the sweep\'s read (pending · client-visible · dated)', /create index if not exists presence_approvals_due_idx/.test(mig) && /status = 'pending' and client_visible = true and due_date is not null/.test(mig));
+  ok('D5: APPLY-0135 carries the same columns, index and CHECK, plus verify queries', /add column if not exists due_date date/.test(pack) && /add column if not exists last_reminded_at timestamptz/.test(pack) && /presence_approvals_due_idx/.test(pack) && /'approval_overdue'/.test(pack) && /'studio_published'/.test(pack) && /-- Verify/.test(pack));
   ok('D6: runApprovalReminders exists, reads only dated pending client-visible approvals due by tomorrow', /export async function runApprovalReminders/.test(lc) && /presence_approvals\?status=eq\.pending&client_visible=is\.true&deleted_at=is\.null&due_date=not\.is\.null&due_date=lte\./.test(lc));
   ok('D7: the sweep decides with the pure rule and claims with the previous stamp in the WHERE', /approvalReminderDue\(a, nowIso\)/.test(lc) && /last_reminded_at=\$\{prev\}&select=id`/.test(lc) && /last_reminded_at: nowIso/.test(lc));
   ok('D8: the client mail goes through emailBridgedCustomer; the studio notice is approval_overdue', /emailBridgedCustomer\(a\.site_id, a\.project_id, copy\.subject, copy\.html\)/.test(lc) && /kind: 'approval_overdue', period: approvalOverduePeriod\(a\.project_id, a\.id\)/.test(lc));

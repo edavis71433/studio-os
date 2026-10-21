@@ -137,7 +137,7 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
   // a deliverable approval defaults its title to the file's (the studio rarely has a better name for it)
   const title = clean(b.title, 200) || ver.title || '';
   if (!title) return json({ error: 'validation', message: 'An approval request needs a title.' }, 422, cors);
-  // audit change 8: an optional date for the answer (migration 0134). A bad
+  // audit change 8: an optional date for the answer (migration 0135). A bad
   // date is refused outright rather than silently dropped — the studio would
   // otherwise believe a reminder is coming.
   if (b.due_date !== undefined && b.due_date !== null && String(b.due_date).trim() !== '' && !cleanDueDate(b.due_date)) return json({ error: 'validation', message: 'The due date needs to be a real date (YYYY-MM-DD).' }, 422, cors);
@@ -150,7 +150,7 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
       requested_by: by, requested_by_kind: kind, client_visible: b.client_visible === false ? false : true };
   if (dueDate) row.due_date = dueDate;
   let ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
-  // pre-0134 degrade: the column is not there yet → the request still lands, undated
+  // pre-0135 degrade: the column is not there yet → the request still lands, undated
   if (!ins.ok && dueDate && ins.status === 400 && /due_date/.test(ins.text || '')) {
     delete row.due_date;
     ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });

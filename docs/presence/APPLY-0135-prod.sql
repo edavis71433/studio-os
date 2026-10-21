@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  APPLY PACK · migration 0134  (owner-apply, prod)
+--  APPLY PACK · migration 0135  (owner-apply, prod)
 -- ═══════════════════════════════════════════════════════════════════════════
 --  Run this ONCE (Supabase → SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships the presence function. ADDITIVE and IDEMPOTENT (add column
@@ -15,16 +15,16 @@
 --  the client is reminded the day before and daily once overdue, at most once a
 --  day; the studio gets one dismissible notice when an approval goes overdue.
 --
---  Covers: supabase/migrations/0134_approval_due_date_reminders.sql
+--  Covers: supabase/migrations/0135_approval_due_date_reminders.sql
 -- ═══════════════════════════════════════════════════════════════════════════
 
 alter table public.presence_approvals add column if not exists due_date date;
 alter table public.presence_approvals add column if not exists last_reminded_at timestamptz;
 
 comment on column public.presence_approvals.due_date is
-  'Studio audit change 8 (0134): when the studio would like the client''s answer. Null = no date, no reminder. Carried in the request email and drawn as "due {date}" on both records.';
+  'Studio audit change 8 (0135): when the studio would like the client''s answer. Null = no date, no reminder. Carried in the request email and drawn as "due {date}" on both records.';
 comment on column public.presence_approvals.last_reminded_at is
-  'Studio audit change 8 (0134): the reminder sweep''s once-per-UTC-day gate (lifecycle.runApprovalReminders) — stamped before the send so a parallel tick can never double-remind.';
+  'Studio audit change 8 (0135): the reminder sweep''s once-per-UTC-day gate (lifecycle.runApprovalReminders) — stamped before the send so a parallel tick can never double-remind.';
 
 create index if not exists presence_approvals_due_idx
   on public.presence_approvals (due_date)
@@ -52,7 +52,7 @@ alter table public.presence_plan_notices
   ));
 
 comment on constraint presence_plan_notices_kind_check on public.presence_plan_notices is
-  'Notice kinds the code raises. 0134 added approval_overdue (a client-visible approval passed its due date — commerce/lifecycle.runApprovalReminders raises one dismissible row per approval, period approval:<project id>:<approval id>). Full 0133 superset carried forward — no kind dropped.';
+  'Notice kinds the code raises. 0135 added approval_overdue (a client-visible approval passed its due date — commerce/lifecycle.runApprovalReminders raises one dismissible row per approval, period approval:<project id>:<approval id>). Full 0133 superset carried forward — no kind dropped.';
 
 -- Verify (expect two rows: due_date date, last_reminded_at timestamp with time zone):
 -- select column_name, data_type from information_schema.columns

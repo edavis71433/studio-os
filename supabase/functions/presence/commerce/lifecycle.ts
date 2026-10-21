@@ -736,7 +736,7 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
 
 // ── APPROVAL REMINDERS: the client is chased so nobody has to remember to ─────
 // Studio audit (Oct 2026) change 8. An approval put to the client with a
-// due_date (migration 0134) gets a calm email the DAY BEFORE and then DAILY
+// due_date (migration 0135) gets a calm email the DAY BEFORE and then DAILY
 // once overdue, never twice in one UTC day — the gate is the row's own
 // last_reminded_at, stamped BEFORE the send with the previous value in the
 // WHERE, so two ticks racing the same approval cannot both send (one PATCH
@@ -745,7 +745,7 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
 // approval the first time it goes overdue (kind approval_overdue, period
 // approval:<project>:<approval> — the bell deep-links the project). Approvals
 // without a due date are never reminded; internal (client_visible=false) ones
-// never reach the client. Pre-0134 the filter 400s on the missing column and
+// never reach the client. Pre-0135 the filter 400s on the missing column and
 // the sweep is a clean no-op. The decision rule itself is pure
 // (lib/approvals.ts approvalReminderDue) and pinned in
 // tests/presence/approval_reminders_test.mjs.
@@ -753,7 +753,7 @@ export async function runApprovalReminders(limit = 50): Promise<{ reminded: numb
   const nowIso = new Date().toISOString();
   const tomorrow = new Date(Date.parse(nowIso) + 86_400_000).toISOString().slice(0, 10);
   const q = await svc(`presence_approvals?status=eq.pending&client_visible=is.true&deleted_at=is.null&due_date=not.is.null&due_date=lte.${tomorrow}&select=id,site_id,project_id,title,due_date,last_reminded_at,status,client_visible&order=due_date.asc&limit=${limit}`);
-  if (!q.ok) return { reminded: 0, overdue_notices: 0, skipped_no_email: 0 };   // pre-0134 → clean no-op
+  if (!q.ok) return { reminded: 0, overdue_notices: 0, skipped_no_email: 0 };   // pre-0135 → clean no-op
   let reminded = 0, overdue_notices = 0, skipped_no_email = 0;
   for (const a of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; project_id: string | null; title?: string; due_date: string; last_reminded_at: string | null; status: string; client_visible: boolean }>) {
     const kind = approvalReminderDue(a, nowIso);

@@ -29,7 +29,7 @@ export async function approvalHash(subjectType: string, subjectId: string, versi
 }
 
 // ═══ Due dates + reminders (studio audit, Oct 2026, change 8) ════════════════
-// An approval may carry `due_date` (date, migration 0134). The reminder sweep
+// An approval may carry `due_date` (date, migration 0135). The reminder sweep
 // (commerce/lifecycle.runApprovalReminders) decides with the pure rule below and
 // records `last_reminded_at` as its once-per-day gate. Benchmark: Basecamp's
 // Clientside reminds 24h before the due date and daily when overdue.

@@ -160,7 +160,7 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
-/** The ONE approvals read both records use. `due_date` (migration 0134) rides
+/** The ONE approvals read both records use. `due_date` (migration 0135) rides
  *  along; before the column exists PostgREST 400s on the select, so the read
  *  retries without it — the record still renders, just undated. */
 export async function loadApprovals(filter: string, cols: string): Promise<any[]> {
