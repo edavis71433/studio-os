@@ -50,6 +50,11 @@
   /* the answer is a live region — in the tree from first render (never display:none) so the FIRST answer is announced */
   .answer{margin-top:12px;padding:13px 15px;background:var(--p-soft);border-radius:var(--dds-r-lg,10px);font-size:14px;white-space:pre-wrap;line-height:1.55}
   .answer:empty{padding:0;margin:0;background:transparent}
+  /* benchmark 7: what the answer drew on — chips, then an honest line when it's judgment */
+  .answer .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;white-space:normal}
+  .answer .srcs .lbl{font-size:12px;color:var(--soft);align-self:center}
+  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px;line-height:18px}
+  .answer .lowc{margin-top:8px;font-size:12.5px;color:var(--soft);white-space:normal}
 
   /* ── sections · topic cards · answers ── */
   .sec{margin-top:24px}
@@ -177,6 +182,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const FN = SUPABASE_URL + "/functions/v1/presence";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "", BUSY = false;
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 const SCOPE = (new URLSearchParams(location.search).get('client')||'');
@@ -198,9 +204,16 @@ async function ask(question){
   }
   BUSY=true; btn.disabled=true; btn.textContent='Asking…'; box.textContent='Looking at your studio…';
   const r = await apiPost('/concierge/ask', { question:q });
-  box.textContent = (r.ok && r.body && r.body.data && r.body.data.text)
+  const d = (r.ok && r.body && r.body.data) || {};
+  // the route returns `answer` (`text` is the older key — neither deploy order blanks the box)
+  box.textContent = d.answer || d.text
     || (r.offline ? 'Your connection dropped before the question went through — nothing changed. Try again when you’re back online.'
     : 'I don’t have anything measured on that yet — I’d rather say so than guess. The answers below cover the essentials, and support can look with you.');
+  // benchmark 7: chips naming what it drew on (the route's source_labels, never
+  // invented here) and an honest line when part of the answer is judgment
+  const labels = Array.isArray(d.source_labels) ? d.source_labels.filter(Boolean).slice(0, 4) : [];
+  if(labels.length){ const s=document.createElement('div'); s.className='srcs'; s.innerHTML='<span class="lbl">Drew on:</span>'+labels.map(l=>`<span class="src">${esc(l)}</span>`).join(''); box.appendChild(s); }
+  if(d.low_confidence){ const n=document.createElement('div'); n.className='lowc'; n.textContent='Part of this is judgment rather than measurement — treat it as a nudge.'; box.appendChild(n); }
   BUSY=false; btn.disabled=false; btn.textContent='Ask';
 }
 $('askForm').addEventListener('submit', (e)=>{ e.preventDefault(); ask($('q').value); });

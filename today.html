@@ -44,6 +44,11 @@
   /* a11y: live regions stay in the accessibility tree from first render (never
      display:none) so the FIRST answer is announced; empty = zero-height/invisible */
   .answer:empty{padding:0;margin:0;background:transparent}
+  /* benchmark 7: what the answer drew on — chips, then an honest line when it's judgment */
+  .answer .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;white-space:normal}
+  .answer .srcs .lbl{font-size:12px;color:var(--soft);align-self:center}
+  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px;line-height:18px}
+  .answer .lowc{margin-top:8px;font-size:12.5px;color:var(--soft);white-space:normal}
   .tag{display:inline-block;font-size:12px;color:var(--soft);font-weight:500;margin-bottom:8px;text-transform:capitalize}
   .calm{background:var(--good-soft);border-color:transparent}
   .calm h2{color:var(--good)}
@@ -756,7 +761,7 @@ async function explain(id, btn){
   const box = $('ans-'+id); if(!box) return;
   btn.disabled = true; btn.textContent = 'One moment…';
   try{ const r = await apiPost('/concierge/ask', { question: 'What does this mean, and what should I do about it?', topic_id: id });
-    box.textContent = (r && r.data && r.data.text) || 'Open it when you have a minute — nothing changes until you decide.';
+    paintAnswer(box, r && r.data, 'Open it when you have a minute — nothing changes until you decide.');
   }catch(_){ box.textContent = 'I couldn’t load the details just now — nothing’s wrong, try again in a moment.'; }
   btn.disabled = false; btn.textContent = 'Walk me through it';
 }
@@ -817,11 +822,28 @@ async function todoDone(id, btn){
   }
   catch(_){ btn.disabled = false; if(window.ddsToast) ddsToast('Couldn’t save that just now — try again in a moment.', 'err'); }
 }
+// ── AI shows its sources (benchmark 7): the answer, then chips naming what it
+// drew on (the route's source_labels — the moment and the measured evidence,
+// never invented here) and, when the route flags it, one honest line that part
+// of the answer is judgment. The route returns `answer`; `text` is the older
+// key, kept so neither deploy order blanks the box. ──
+function paintAnswer(box, d, fallback){
+  d = d || {};
+  const text = d.answer || d.text || fallback;
+  box.textContent = text;
+  const labels = Array.isArray(d.source_labels) ? d.source_labels.filter(Boolean).slice(0, 4) : [];
+  if(labels.length){
+    const s = document.createElement('div'); s.className = 'srcs';
+    s.innerHTML = '<span class="lbl">Drew on:</span>' + labels.map(l => `<span class="src">${esc(l)}</span>`).join('');
+    box.appendChild(s);
+  }
+  if(d.low_confidence){ const n = document.createElement('div'); n.className = 'lowc'; n.textContent = 'Part of this is judgment rather than measurement — treat it as a nudge.'; box.appendChild(n); }
+}
 async function ask(){
   const q = $('q'), box = $('askAns'), btn = $('askBtn');
   const question = (q.value||'').trim(); if(!question) return;
   btn.disabled = true; btn.textContent = '…'; box.textContent = 'Thinking about your presence…';
-  try{ const r = await apiPost('/concierge/ask', { question }); box.textContent = (r && r.data && r.data.text) || 'I don’t have anything measured on that yet — I’d rather say so than guess.'; }
+  try{ const r = await apiPost('/concierge/ask', { question }); paintAnswer(box, r && r.data, 'I don’t have anything measured on that yet — I’d rather say so than guess.'); }
   catch(_){ box.textContent = 'I couldn’t answer just now — nothing’s wrong, please try again in a moment.'; }
   btn.disabled = false; btn.textContent = 'Ask';
 }

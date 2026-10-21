@@ -26,6 +26,9 @@ export interface ConciergeAnswer {
   topic: { id: string; headline: string } | null;
   actions: Array<{ label: string; section: string }>;  // prepared pointers — never performed
   sources: { moment_id: string | null; recommendation_ids: string[]; evidence_count: number };
+  /** Benchmark 7: what the answer drew on, in the owner's words — the topic's
+   *  headline and the plain-language evidence lines. Chips, never internals. */
+  source_labels: string[];
   grounded: boolean;
   low_confidence: boolean;
 }
@@ -161,12 +164,30 @@ function memoryNudge(g: Grounding): string {
 const HONEST_LOW_CONF = ' A note of honesty: part of this is judgment rather than hard measurement, so treat it as a nudge, not a certainty.';
 const HONEST_NO_EVIDENCE = 'I can only speak to what’s actually been measured about your presence, and I don’t have anything on that — I’d rather say so than guess.';
 
+/** The chips under an answer: the moment it is about, then the evidence it
+ *  rests on — each a short plain sentence, trimmed, deduped, at most four.
+ *  Pure and exported so the pins can hold it. Nothing is invented: an answer
+ *  with no topic and no evidence shows no chips at all. */
+export function sourceLabels(topic: { headline: string } | null, ev: Array<{ human: string }>): string[] {
+  const out: string[] = [];
+  const push = (raw: unknown) => {
+    let t = String(raw ?? '').replace(/\s+/g, ' ').trim();
+    if (!t) return;
+    if (t.length > 60) t = t.slice(0, 57).replace(/[\s,;:—-]+$/, '') + '…';
+    if (!out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  };
+  if (topic) push(topic.headline);
+  for (const e of ev || []) { if (out.length >= 4) break; push(e.human); }
+  return out.slice(0, 4);
+}
+
 function base(verb: Verb, text: string, topic: ReturnType<typeof topicOf>, recs: Grounding['recommendations'], ev: Grounding['evidence'], actions: ConciergeAnswer['actions'] = []): ConciergeAnswer {
   return {
     verb, text,
     topic: topic ? { id: topic.id, headline: topic.headline } : null,
     actions,
     sources: { moment_id: topic?.id ?? null, recommendation_ids: recs.map((r) => r.hash), evidence_count: ev.length },
+    source_labels: sourceLabels(topic, ev),
     grounded: !!(topic || recs.length || ev.length),
     low_confidence: lowConf(ev),
   };

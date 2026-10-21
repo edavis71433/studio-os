@@ -140,6 +140,7 @@
   .pcomposer textarea{width:100%;font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px 12px;resize:vertical;min-height:58px}
   .pcomposer textarea:focus{outline:none;border-color:var(--p)}
   .crow{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .ai-note{font-size:12px;color:var(--faint);margin-top:5px}
   .crow .spacer{flex:1}
   button{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 14px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.5;cursor:default}
@@ -911,6 +912,30 @@ function insertSavedReplies(taId){
     ta.parentNode.insertBefore(sel,ta);
   });
 }
+// ── Draft a reply (benchmark 7): the EXISTING /writer/rewrite (action 'write')
+// drafts from the person's own message + the studio's fact sheet; the draft
+// lands in the textarea for editing and NOTHING is sent — Send stays the
+// operator's click. A quiet note says it was drafted by AI until they edit.
+// A plan without drafting (403) or a writer that's off (503) answers with the
+// server's own sentence; the manual path is always the product. ──
+async function draftReply(taId, prompt, btn){
+  const ta=$(taId);if(!ta||!btn)return;
+  const was=btn.textContent;btn.disabled=true;btn.textContent='Drafting…';
+  let r;
+  try{r=await api('/writer/rewrite','POST',{action:'write',field:'answer',prompt:String(prompt||'').slice(0,400)});}
+  catch(_){r={ok:false,body:{}};}
+  btn.disabled=false;btn.textContent=was;
+  const cur=$(taId);if(cur!==ta)return;   // the pane re-rendered under us
+  const text=r.ok&&r.body&&r.body.data&&String(r.body.data.text||'').trim();
+  if(!text){toast((r.body&&r.body.message)||'The draft didn’t come through — nothing changed. Write it by hand or try again.');return;}
+  const v=String(ta.value||'').replace(/\s+$/,'');
+  ta.value=v?(v+'\n\n'+text):text;
+  let note=ta.parentNode.querySelector('.ai-note');
+  if(!note){note=document.createElement('div');note.className='ai-note';note.setAttribute('role','note');ta.insertAdjacentElement('afterend',note);}
+  note.textContent='Drafted by AI — edit before sending.';
+  ta.addEventListener('input',()=>{const n=ta.parentNode.querySelector('.ai-note');if(n)n.remove();},{once:true});
+  ta.focus();
+}
 function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
 function restoreComposer(it){const s=DRAFT;if(!s||s.sel!==it.id)return;DRAFT=null;for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}if(s.focus){const el=$(s.focus);if(el)el.focus();}}
 async function paneMessage(host,it){
@@ -947,7 +972,10 @@ async function paneMessage(host,it){
   if(reply){
     pc.innerHTML=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">Reply to the client</label>
       <textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea>
-      <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+      <div class="crow"><button type="button" id="msgDraft">Draft a reply</button><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+    // the newest thing the CLIENT said is what a draft answers (convItem titles the studio's own as "You …")
+    const lastClient=items.find(x=>x&&x.type==='message'&&!/^You\b/.test(String(x.title||'')));
+    $('msgDraft').addEventListener('click',()=>draftReply('msgBody',`A short, friendly reply from the studio to ${it.client||'the client'}'s message: "${String((lastClient&&lastClient.body)||'they asked how the project is going').slice(0,280)}"`,$('msgDraft')));
     $('msgForm').onsubmit=async(e)=>{
       e.preventDefault();
       const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;
@@ -1077,7 +1105,9 @@ async function paneSupport(host,it){
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+  const lastClientMsg=[...msgs].reverse().find(m=>m.author_kind==='client'||m.author_kind==='customer');
+  $('supDraft').addEventListener('click',()=>draftReply('supBody',`A short, friendly reply from the studio to a support request "${String(req.subject||'Support request').slice(0,80)}": "${String((lastClientMsg&&lastClientMsg.body)||req.body||'').slice(0,240)}"`,$('supDraft')));
   // one send path: post the reply; "Reply and resolve" then ends the wait too
   const sendReply=async(andResolve)=>{
     const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
@@ -1147,7 +1177,7 @@ function paneLead(host,it){
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
       <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
-      <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
+      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
@@ -1172,6 +1202,7 @@ function paneLead(host,it){
       }
     };
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
+    const ld=$('leadDraft');if(ld)ld.addEventListener('click',()=>draftReply('leadBody',`A short, friendly reply from the studio to ${l.name||'someone'} who sent a ${KIND[l.form_kind]?KIND[l.form_kind].toLowerCase():'message'} through the website: "${String(l.message||'they left their details without a message').slice(0,280)}". Continue after the greeting already written; do not repeat it.`,ld));
     restoreComposer(it);
   }
   const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));
