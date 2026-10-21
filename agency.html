@@ -181,6 +181,21 @@
   .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
   .row2{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
   .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
+  /* ── client housekeeping (Oct 2026 studio audit, change 6): tags · owner · note · archive, inline under the row ── */
+  .tagchip{display:inline-block;font-size:11px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 8px;margin:3px 4px 0 0}
+  .notedot{display:inline-block;font-size:11px;color:var(--faint);margin-left:4px}
+  tr.hk td{background:var(--p-soft);padding:12px 14px 14px;cursor:default}
+  tr.hk td:hover{background:var(--p-soft)}
+  .hkform{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:var(--dds-w-focus,760px)}
+  .hkform label{display:block;font-size:12px;font-weight:600;color:var(--soft);margin:0 0 4px}
+  .hkform input,.hkform textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px}
+  .hkform textarea{min-height:64px;resize:vertical}
+  .hkform .full{grid-column:1 / -1}
+  .hkacts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .hkacts .spacer{flex:1}
+  .hkacts .danger{color:var(--bad);border-color:transparent}
+  .cardhk{background:var(--p-soft);border-radius:var(--dds-r-lg,10px);padding:12px 14px;margin:6px 0 10px}
+  @media (max-width:759px){.hkform{grid-template-columns:1fr}}
   button.primary{font-family:inherit;font-size:14px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:9px 18px;cursor:pointer}
   a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
   .center{text-align:center;padding:52px 20px}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
@@ -284,7 +299,7 @@ const daysToExpiry=(c)=>c.domain_expires_at?Math.floor((Date.parse(c.domain_expi
 // queues panel above calls it High priority.
 const DOMAIN_SOON_DAYS=45;
 const domainSoon=(c)=>{const de=daysToExpiry(c);return de!==null&&de<=DOMAIN_SOON_DAYS;};
-const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain expiring'],['billing','Billing'],['owed','Outstanding'],['clear','All clear']];
+const VIEWS=[['all','All'],['attention','Needs attention'],['domain','Domain expiring'],['billing','Billing'],['owed','Outstanding'],['clear','All clear'],['archived','Archived']];
 let VIEWNAME='all',Q='';
 const viewMatch=(c)=>{
   const att=Number(c.attention||0);
@@ -336,9 +351,21 @@ function owedCell(c){
 }
 let SORT={key:'name',dir:1};
 
+// the Archived view lists the OTHER half of the portfolio — a separate read (?archived=true), fetched the first time it is asked for
+let ARCHIVED=null,ARCH_STATE='idle',ARCH_LOCAL=[];   // ARCH_LOCAL: rows archived in THIS session, merged over the server's list so they show at once
+const canManage=()=>!!(ME&&['owner','admin','account_manager'].includes(ME.role));
+const canNote=()=>!!(ME&&ME.role!=='readonly');
+async function loadArchived(){
+  ARCH_STATE='loading';render();
+  try{const r=await api('/agency/portfolio?archived=true');const rows=r.ok&&Array.isArray(r.body.data)?r.body.data:[];
+    ARCHIVED=rows.concat(ARCH_LOCAL.filter(c=>!rows.some(x=>x.site_id===c.site_id)));ARCH_STATE=r.ok?'ok':'failed';}
+  catch(_){ARCH_STATE='failed';}
+  render();
+}
 function sortedRows(){
   const q=Q.trim().toLowerCase();
-  const list=CLIENTS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.domain||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
+  const src=VIEWNAME==='archived'?(ARCHIVED||[]):CLIENTS;
+  const list=src.filter(c=>VIEWNAME==='archived'||viewMatch(c)).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.domain||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q)||(c.tags||[]).some(t=>String(t).toLowerCase().includes(q)));
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
@@ -392,15 +419,15 @@ function tableHtml(list){
     const att=Number(c.attention||0);
     const bits=statusBits(c,true);   // leads/domain have their own columns here
     return `<tr data-open="${esc(c.site_id)}" tabindex="0" aria-label="Open ${esc(c.name||'(unnamed)')}">
-      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${c.email?`<div class="sub">${esc(c.email)}</div>`:''}${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
+      <td><span class="n">${esc(c.name||'(unnamed)')}</span>${c.has_notes||c.notes?'<span class="notedot" title="Has an internal note" aria-label="Has an internal note">✎</span>':''}${c.email?`<div class="sub">${esc(c.email)}</div>`:''}${(c.tags||[]).length?`<div class="tags">${c.tags.map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')}</div>`:''}${bits.length?`<div class="bits">${esc(bits.join(' · '))}</div>`:''}</td>
       <td>${esc(c.edition||'presence')}</td>
       <td><span class="pill">${esc(c.status||'—')}</span></td>
       <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
       <td class="num">${Number(c.leads_waiting||0)}</td>
       <td class="money">${owedCell(c)}</td>
       <td>${domainCell(c)}</td>
-      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button>${c.bridge_only?'':`<button class="rowact ghost" data-web="${esc(c.site_id)}">Their website</button>`}</td>
-    </tr>`;
+      <td class="acts"><button class="rowact" data-rec="${esc(c.site_id)}">Open record</button>${c.bridge_only?'':`<button class="rowact ghost" data-web="${esc(c.site_id)}">Their website</button>`}${(!c.bridge_only&&canManage())?`<button class="rowact ghost" data-hk="${esc(c.site_id)}" aria-expanded="${HK_OPEN===c.site_id?'true':'false'}" aria-label="More for ${esc(c.name||'this client')}" title="Tags, owner, note, archive">⋯</button>`:''}</td>
+    </tr>${HK_OPEN===c.site_id?`<tr class="hk" data-hkrow="${esc(c.site_id)}"><td colspan="${COLS.length+1}">${hkFormHtml(c)}</td></tr>`:''}`;
   }).join('');
   return `<div class="tscroll"><table aria-label="Clients"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
@@ -415,7 +442,8 @@ function cardsHtml(list){
       <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></button>`;
     // FIX 7: opening a client goes to your DELIVERY view; managing their website
     // is the clearly-secondary action.
-    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button>${c.bridge_only?'':`<button data-web="${esc(c.site_id)}">Their website →</button>`}</div>`;
+    h+=`<div class="managerow"><button data-rec="${esc(c.site_id)}">Open record →</button>${c.bridge_only?'':`<button data-web="${esc(c.site_id)}">Their website →</button>`}${(!c.bridge_only&&canManage())?`<button data-hk="${esc(c.site_id)}" aria-expanded="${HK_OPEN===c.site_id?'true':'false'}" aria-label="More for ${esc(c.name||'this client')}">Tags, note, archive</button>`:''}</div>`;
+    if(HK_OPEN===c.site_id)h+=`<div class="cardhk" data-hkrow="${esc(c.site_id)}">${hkFormHtml(c)}</div>`;
     h+=`</div>`;
   }
   return h;
@@ -443,8 +471,10 @@ function render(){
   h+=chipsHtml();
   h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
   if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
-  if(!list.length){
-    h+=`<div class="center"><p class="muted">${CLIENTS.length?'No clients match that.':'No clients yet.'}</p>${CLIENTS.length?'':'<p style="margin-top:14px"><button type="button" class="btn" id="addCustEmpty">+ Add a customer</button></p>'}</div>`;
+  if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'){
+    h+=`<div class="center"><p class="muted">${ARCH_STATE==='failed'?'Archived clients wouldn’t load just now.':'Loading archived clients…'}</p>${ARCH_STATE==='failed'?'<p style="margin-top:12px"><button type="button" class="btn ghost" id="archRetry">Try again</button></p>':''}</div>`;
+  }else if(!list.length){
+    h+=`<div class="center"><p class="muted">${VIEWNAME==='archived'?'Nothing archived.':CLIENTS.length?'No clients match that.':'No clients yet.'}</p>${CLIENTS.length?'':'<p style="margin-top:14px"><button type="button" class="btn" id="addCustEmpty">+ Add a customer</button></p>'}</div>`;
   }else{
     h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
   }
@@ -464,7 +494,9 @@ function wire(){
   const ae=$('addCustEmpty');if(ae)ae.addEventListener('click',openAddCustomer);
   // fixed-view chips — focus returns to the clicked chip after the re-render
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
-    VIEWNAME=b.getAttribute('data-view');render();
+    VIEWNAME=b.getAttribute('data-view');HK_OPEN=null;
+    if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'&&ARCH_STATE!=='loading'){loadArchived();return;}
+    render();
     const nb=document.querySelector('[data-view="'+VIEWNAME+'"]');if(nb)nb.focus();
   }));
   // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract).
@@ -496,6 +528,75 @@ function wire(){
   // client's website editor in their scope (was their Today, which reads like the studio's own).
   document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();location.href='/presence.html?client='+encodeURIComponent(b.getAttribute('data-web'));}));
   document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openClient(b.getAttribute('data-rec'));}));
+  const ar=$('archRetry');if(ar)ar.addEventListener('click',()=>loadArchived());
+  wireHousekeeping();
+}
+
+// ── client housekeeping — tags · owner · internal note · archive/restore, over
+//    PATCH /agency/clients/:site (routes that existed with no page; Oct 2026
+//    studio audit change 6). Owners, admins and account managers (manage_clients)
+//    see the ⋯; the note field needs the notes capability (everyone but readonly).
+//    The form sits inline under the row and never touches the roster's own reads
+//    — a save patches the row in place; archive/restore moves it between lists. ──
+let HK_OPEN=null,HK_BUSY=false;
+function hkFormHtml(c){
+  const archived=!!c.archived;
+  return `<form class="hkform" data-hkform="${esc(c.site_id)}" aria-label="Housekeeping for ${esc(c.name||'this client')}">
+    <div><label for="hk-tags-${esc(c.site_id)}">Tags <span style="font-weight:400">(comma-separated)</span></label><input id="hk-tags-${esc(c.site_id)}" name="tags" value="${esc((c.tags||[]).join(', '))}" placeholder="restaurant, burbank"></div>
+    <div><label for="hk-owner-${esc(c.site_id)}">Owner on your team</label><input id="hk-owner-${esc(c.site_id)}" name="owner" type="email" value="${esc(c.owner||'')}" placeholder="you@yourstudio.com"></div>
+    ${canNote()?`<div class="full"><label for="hk-note-${esc(c.site_id)}">Internal note <span style="font-weight:400">(your team only — never the client)</span></label><textarea id="hk-note-${esc(c.site_id)}" name="notes" maxlength="4000" placeholder="Anything the team should know.">${esc(c.notes||'')}</textarea></div>`:''}
+    <div class="hkacts full">
+      <button type="submit" class="btn">Save</button>
+      <button type="button" class="btn ghost" data-hkcancel="1">Cancel</button>
+      <span class="spacer"></span>
+      ${archived?`<button type="button" class="btn ghost" data-hkrestore="${esc(c.site_id)}">Restore client</button>`:`<button type="button" class="btn ghost danger" data-hkarchive="${esc(c.site_id)}">Archive client</button>`}
+    </div></form>`;
+}
+function findClient(id){return CLIENTS.find(x=>x.site_id===id)||(ARCHIVED||[]).find(x=>x.site_id===id)||null;}
+async function patchClient(id,patch){
+  const r=await apiSend('PATCH','/agency/clients/'+encodeURIComponent(id),patch);
+  if(!r.ok)throw new Error((r.body&&r.body.message)||'That didn’t save.');
+  return r.body.data||{};
+}
+function wireHousekeeping(){
+  document.querySelectorAll('[data-hk]').forEach(b=>b.addEventListener('click',(e)=>{
+    e.stopPropagation();const id=b.getAttribute('data-hk');HK_OPEN=HK_OPEN===id?null:id;render();
+    const f=document.querySelector('[data-hkform="'+id+'"] input');if(f)f.focus();
+    else{const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}
+  }));
+  document.querySelectorAll('[data-hkrow]').forEach(row=>{row.addEventListener('click',(e)=>e.stopPropagation());row.addEventListener('keydown',(e)=>{if(e.key==='Escape'){HK_OPEN=null;render();}e.stopPropagation();});});
+  document.querySelectorAll('[data-hkcancel]').forEach(b=>b.addEventListener('click',()=>{const id=HK_OPEN;HK_OPEN=null;render();const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();}));
+  document.querySelectorAll('form[data-hkform]').forEach(f=>f.addEventListener('submit',async(e)=>{
+    e.preventDefault();if(HK_BUSY)return;
+    const id=f.getAttribute('data-hkform');const c=findClient(id);if(!c)return;
+    const tags=String(f.elements.tags.value||'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,10);
+    const owner=String(f.elements.owner.value||'').trim().toLowerCase();
+    const patch={tags,owner_email:owner};
+    if(f.elements.notes)patch.notes=String(f.elements.notes.value||'');
+    HK_BUSY=true;const sb2=f.querySelector('button[type=submit]');if(sb2)sb2.disabled=true;
+    try{
+      const d=await patchClient(id,patch);
+      c.tags=Array.isArray(d.tags)?d.tags:tags;c.owner=d.owner_email!=null?d.owner_email:owner;
+      if('notes' in patch){c.notes=typeof d.notes==='string'?d.notes:patch.notes;c.has_notes=!!c.notes.trim();}
+      HK_OPEN=null;toast('Saved.');render();
+      const nb=document.querySelector('[data-hk="'+id+'"]');if(nb)nb.focus();
+    }catch(err){toast(err.message||'That didn’t save.',true);}
+    finally{HK_BUSY=false;const nb2=f.querySelector('button[type=submit]');if(nb2)nb2.disabled=false;}
+  }));
+  document.querySelectorAll('[data-hkarchive],[data-hkrestore]').forEach(b=>b.addEventListener('click',async()=>{
+    if(HK_BUSY)return;
+    const restore=b.hasAttribute('data-hkrestore');const id=b.getAttribute(restore?'data-hkrestore':'data-hkarchive');const c=findClient(id);if(!c)return;
+    // archive is a two-press action (the kits' delete pattern): the first press arms it
+    if(!restore&&!b.dataset.armed){b.dataset.armed='1';b.textContent='Archive '+(c.name||'this client')+'? Press again';setTimeout(()=>{delete b.dataset.armed;b.textContent='Archive client';},3000);return;}
+    HK_BUSY=true;b.disabled=true;
+    try{
+      await patchClient(id,{status:restore?'active':'archived'});
+      if(restore){ARCHIVED=(ARCHIVED||[]).filter(x=>x.site_id!==id);ARCH_LOCAL=ARCH_LOCAL.filter(x=>x.site_id!==id);c.archived=false;CLIENTS.push(c);toast((c.name||'Client')+' restored.');}
+      else{CLIENTS=CLIENTS.filter(x=>x.site_id!==id);c.archived=true;ARCH_LOCAL.push(c);if(ARCHIVED)ARCHIVED.push(c);toast((c.name||'Client')+' archived — find them under Archived.');}
+      HK_OPEN=null;render();
+    }catch(err){toast(err.message||'That didn’t save.',true);b.disabled=false;}
+    finally{HK_BUSY=false;}
+  }));
 }
 
 // ── starter kits: data + painting. Events are DELEGATED ONCE below — the old
