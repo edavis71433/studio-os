@@ -42,32 +42,32 @@ html.dds-embed #detailWrap{padding-top:0}
   :root[data-theme="dark"] .pstep.current{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:26px 20px 90px}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 
   /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
         customers.html / contacts.html / leads.html / inbox.html by hand
         (.lhead/.lrow1/.obj-ic/.lbtn/.lmeta + the Table ⇄ Cards seg) ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:14px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:6px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
-  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:8px;padding:5px 8px;cursor:pointer}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
-  .seg button{border:none;border-radius:0;padding:6px 12px;font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
+  .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
   @media (max-width:760.98px){.seg button{min-height:44px;padding:6px 14px}}   /* phone tap targets (experience review #43) */
 
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .bar{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
   /* ── C2 search — the rosters' .search anatomy (contacts.html), kept in sync by hand ── */
-  .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 16px;outline:none}
+  .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:var(--dds-s2,8px) var(--dds-s4,16px);outline:none}
   .search:focus{border-color:var(--p)}
-  .chip{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
+  .chip{font-size:13px;padding:6px var(--dds-s3,12px);border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
-  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 14px;background:var(--p);color:#fff;cursor:pointer}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.ghost:hover{border-color:var(--p);color:var(--p)}
   .btn.sm{font-size:12.5px;padding:6px 10px}
@@ -78,12 +78,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
   thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
-  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:11px 14px;width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px}
+  thead th .thb{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:none;border:none;padding:var(--dds-s3,12px) var(--dds-s4,16px);width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:var(--dds-s1,4px)}
   thead th .thb:hover{color:var(--p)}
   thead th .arrow{font-size:10px;color:var(--p)}
   tbody tr{cursor:pointer}
   tbody tr:hover{background:var(--p-soft)}
-  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody td{padding:var(--dds-s3,12px) var(--dds-s4,16px);border-bottom:1px solid var(--line);vertical-align:middle}
   tbody tr:last-child td{border-bottom:none}
   td .n{font-weight:600}
   /* the row's REAL control: the project name is a button (accessible name +
@@ -93,49 +93,49 @@ html.dds-embed #detailWrap{padding-top:0}
   td.num{font-variant-numeric:tabular-nums}
   td .mutcell{color:var(--faint)}
   .pcell{min-width:130px}
-  .pcell .pnum{display:block;font-size:11.5px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+  .pcell .pnum{display:block;font-size:11.5px;color:var(--faint);margin-top:var(--dds-s1,4px);font-variant-numeric:tabular-nums}
   .prog{height:7px;border-radius:999px;background:var(--line);overflow:hidden}
   .prog>i{display:block;height:100%;background:var(--p)}
-  .badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .badge{font-size:12px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)}
 
   /* ── the card view (the original roster look, kept for small screens) ── */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;box-shadow:var(--shadow)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:var(--dds-s3,12px);align-items:center;box-shadow:var(--shadow)}
   .card:hover{border-color:var(--p)}
   .card .t{font-weight:600}
   .card .m{color:var(--soft);font-size:13px;margin-top:2px}
-  .card .cprog{margin-top:8px;max-width:220px}
-  .pill{font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
+  .card .cprog{margin-top:var(--dds-s2,8px);max-width:220px}
+  .pill{font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .pill.complete{background:var(--good-soft);color:var(--good)}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
 
   /* ── the RECORD PAGE (Lightning anatomy, dds skin — crm.html's patterns) ── */
-  #detailWrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:20px 20px 90px}
-  .crumbs{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--soft);margin-bottom:12px;flex-wrap:wrap}
-  .crumbs .crumb{font:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:2px 4px;border-radius:6px}
+  #detailWrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:var(--dds-s5,20px) var(--dds-s5,20px) 90px}
+  .crumbs{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;color:var(--soft);margin-bottom:var(--dds-s3,12px);flex-wrap:wrap}
+  .crumbs .crumb{font:inherit;border:none;background:none;color:var(--p);font-weight:600;cursor:pointer;padding:2px var(--dds-s1,4px);border-radius:var(--dds-r-sm,6px)}
   .crumbs .crumb:hover{background:var(--p-soft)}
   .crumbs [aria-current="page"]{color:var(--ink);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rhead{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .rhead{display:flex;gap:var(--dds-s4,16px);align-items:flex-start;flex-wrap:wrap}
   .rhead .obj-ic{width:44px;height:44px;border-radius:var(--dds-r-lg,10px);font-size:20px;box-shadow:var(--shadow)}
   .rhead-t{min-width:0;flex:1}
   .rhead h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2;overflow-wrap:anywhere}
-  .rec-sub{color:var(--soft);font-size:14px;margin-top:5px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
-  .rhead-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .rec-sub{color:var(--soft);font-size:14px;margin-top:var(--dds-s1,4px);display:flex;flex-wrap:wrap;gap:6px var(--dds-s3,12px);align-items:center}
+  .rhead-acts{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
   /* Status ▾ dropdown — the slice-2 popup contract (aria-expanded · Escape
      returns focus · outside click via the ONE document-level delegated closer) */
   .statusdd{position:relative}
   #statusMenu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
-  #statusMenu [role=menuitem]{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:8px;padding:8px 10px;cursor:pointer}
+  #statusMenu [role=menuitem]{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
   #statusMenu [role=menuitem]:hover{background:var(--p-soft)}
   /* .rcar, not .car — shell.js's injected nav uses .car for its own caret and
      this page must never restyle the shell's markup */
   .rcar{font-size:10px;color:var(--faint)}
 
   /* highlights panel: label-over-value tiles */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:16px;box-shadow:none}
-  .hl{background:var(--card);padding:12px 12px;min-width:0;display:flex;align-items:center;gap:9px;border-left:1px solid var(--line)}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);overflow:hidden;margin-top:var(--dds-s4,16px);box-shadow:none}
+  .hl{background:var(--card);padding:var(--dds-s3,12px) var(--dds-s3,12px);min-width:0;display:flex;align-items:center;gap:var(--dds-s2,8px);border-left:1px solid var(--line)}
   .hl:first-child{border-left:none}
-  .hl .ico{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hl .ico{width:28px;height:28px;border-radius:var(--dds-r,8px);display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
   .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
   .hl .ico svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   .hl .hl-main{min-width:0;flex:1}
@@ -143,61 +143,61 @@ html.dds-embed #detailWrap{padding-top:0}
   .hl-v{font-family:var(--sans);font-size:15px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
 
   /* ── the Path = milestones in order (Lightning chevrons, dds skin) ── */
-  .pathcard{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:12px 14px}
-  .pathrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .pathcard{margin-top:var(--dds-s4,16px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px)}
+  .pathrow{display:flex;gap:var(--dds-s3,12px);align-items:center;flex-wrap:wrap}
   ol.path{display:flex;flex:1 1 340px;min-width:0;list-style:none;padding:0;margin:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .pstep{flex:1;min-width:72px;font-size:12.5px;font-weight:600;padding:9px 16px;text-align:center;
+  .pstep{flex:1;min-width:72px;font-size:12.5px;font-weight:600;padding:var(--dds-s2,8px) var(--dds-s4,16px);text-align:center;
     background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
-  .pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:8px 0 0 8px}
-  .pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 8px 8px 0}
-  .pstep:only-child{clip-path:none;border-radius:8px}
+  .pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:var(--dds-r,8px) 0 0 var(--dds-r,8px)}
+  .pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
+  .pstep:only-child{clip-path:none;border-radius:var(--dds-r,8px)}
   .pstep.done{background:var(--good-soft);color:var(--good)}
   .pstep.current{background:var(--p);color:#fff}
   .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
-  .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 12px}
+  .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
   .terminal-chip.won{background:var(--good-soft);color:var(--good)}
   /* ── Oct 2026 review: milestones in the record's lifecycle idiom (crm.html's
      "Visual refresh" .pstep rules, the mock's .ms) — same <li class="pstep">
      DOM, same done ✓ / current / todo states and aria-current the spec pins. */
   ol.path{gap:6px;flex:1 1 520px}
-  .pstep,.pstep:first-child,.pstep:last-child,.pstep:only-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-size:12px;font-weight:500;padding:7px 4px 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;line-height:1.3}
+  .pstep,.pstep:first-child,.pstep:last-child,.pstep:only-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-size:12px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s1,4px) 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;line-height:1.3}
   .pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
   .pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pstep.current{color:var(--p)}}
   :root[data-theme="dark"] .pstep.current{color:var(--p)}
-  .pathcard{box-shadow:none;padding:12px 16px}
+  .pathcard{box-shadow:none;padding:var(--dds-s3,12px) var(--dds-s4,16px)}
   @media (max-width:640px){.pstep,.pstep:first-child,.pstep:last-child{flex:0 0 auto;min-width:96px}}
 
   /* ── two-column body: related-list cards ── */
-  .dbody{margin-top:18px}
-  .dgrid{display:grid;gap:16px;align-items:start}
+  .dbody{margin-top:var(--dds-s5,20px)}
+  .dgrid{display:grid;gap:var(--dds-s4,16px);align-items:start}
   @media(min-width:900px){.dgrid{grid-template-columns:minmax(0,1fr) 330px}}
-  .dmain{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .dside{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .dmain{display:flex;flex-direction:column;gap:var(--dds-s4,16px);min-width:0}
+  .dside{display:flex;flex-direction:column;gap:var(--dds-s4,16px);min-width:0}
   /* .rsec, not .sec — shell.js's injected top-bar nav wraps every section in
      its OWN div.sec wrapper (shell.js nav markup); an unscoped .sec here
      would restyle the flat slice-7 bar into boxed buttons. Page classes must
      never collide with shell markup. */
-  .rsec{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px;box-shadow:var(--shadow)}
-  .rsec h3{font-size:14.5px;font-weight:700;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .rsec{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s4,16px);box-shadow:var(--shadow)}
+  .rsec h3{font-size:14.5px;font-weight:700;margin:0 0 var(--dds-s2,8px);display:flex;justify-content:space-between;align-items:center;gap:10px}
   .rsec h3 .n{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:2px}
   /* Messages keeps its intentional accent emphasis (the pre-slice styling) */
   #detailInner .rsec.msgs{border-color:var(--p);box-shadow:0 1px 3px rgba(91,63,160,.08)}
   #detailInner .rsec.msgs form.mini textarea{min-height:90px}
   #detailInner .rsec.msgs form.mini{background:var(--card)}
-  .subhead{font-size:12px;color:var(--faint);font-weight:500;margin:14px 0 4px}
-  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);min-width:0}
+  .subhead{font-size:12px;color:var(--faint);font-weight:500;margin:var(--dds-s4,16px) 0 var(--dds-s1,4px)}
+  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:var(--dds-s2,8px) 0;border-bottom:1px solid var(--line);min-width:0}
   .item:last-child{border-bottom:none}
   .item .t{font-size:14px;line-height:1.45;overflow-wrap:anywhere;min-width:0}
   .item .t.donetext{color:var(--faint);text-decoration:line-through}
   .item .s{color:var(--faint);font-size:12.5px;display:block}
   .item input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin:0}
-  .titem{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+  .titem{display:flex;gap:10px;align-items:flex-start;padding:var(--dds-s2,8px) 0;border-bottom:1px solid var(--line)}
   .titem:last-child{border-bottom:none}
   .titem .tmain{flex:1;min-width:0}
-  .titem input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin-top:3px}
-  .tag{font-size:12px;font-weight:500;padding:2px 7px;border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap;text-transform:capitalize}
+  .titem input[type=checkbox]{accent-color:var(--p);width:16px;height:16px;flex:0 0 auto;margin-top:var(--dds-s1,4px)}
+  .tag{font-size:12px;font-weight:500;padding:2px var(--dds-s2,8px);border-radius:999px;background:var(--line);color:var(--soft);margin-left:6px;white-space:nowrap;text-transform:capitalize}
   .tag.client{background:var(--p-soft);color:var(--p)}
   .tag.fromclient{background:var(--good-soft);color:var(--good)}
   .tag.action{background:var(--warn-soft);color:var(--warn)}
@@ -212,34 +212,26 @@ html.dds-embed #detailWrap{padding-top:0}
   .linkbtn{font:inherit;font-size:inherit;border:none;background:none;color:var(--p);font-weight:500;cursor:pointer;padding:0;text-decoration:none}
   .linkbtn:hover{text-decoration:underline}
 
-  form.mini{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
-  input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:9px 11px;width:100%}
+  form.mini{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin-top:10px;padding:var(--dds-s3,12px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
+  input,textarea,select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);width:100%}
   textarea{min-height:70px;resize:vertical}
-  label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 3px}
+  label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 var(--dds-s1,4px)}
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}.chk input{width:auto}
   /* the standard-step picker: the ten delivery steps we already know about,
      ticked in a list (several at once), with the ones this project already
      holds shown but disabled so the absence is explained, never mysterious */
   .sp-h{font-size:12px;font-weight:500;color:var(--soft)}
-  .sp-row{align-items:flex-start;gap:8px;padding:2px 0;cursor:pointer}
+  .sp-row{align-items:flex-start;gap:var(--dds-s2,8px);padding:2px 0;cursor:pointer}
   .sp-row input{margin-top:2px;flex:0 0 auto;accent-color:var(--p)}
   .sp-row .sp-t{min-width:0}
   .sp-row.has{opacity:.62;cursor:default}
   .sp-has{display:block;font-size:11.5px;color:var(--soft);margin-top:1px}
-  .stepnudge{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:2px 0 8px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg);font-size:13.5px;color:var(--soft)}
+  .stepnudge{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);align-items:center;justify-content:space-between;padding:10px var(--dds-s3,12px);margin:2px 0 var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg);font-size:13.5px;color:var(--soft)}
   .stepnudge .sn-t{flex:1 1 190px;min-width:0}
   .mut{color:var(--soft);font-size:13px}
   a{color:var(--p)}
   /* Centering, mobile-safe (SS6 review; same doctrine as customers/contacts).
-     NOT margin:auto — mobile browsers resolve the top-layer dialog's
-     containing block against the DOCUMENT height, so vertical auto-margins
-     push a tall dialog's bottom below the visible viewport and the browser
-     pans/zooms chasing it, leaving the submit row untappable. Explicit 8vh
-     margins anchor it in the visible viewport (near-centered when tall). The
-     <dialog> itself must not scroll either (browsers won't programmatically
-     scroll the top-layer element) — the form inside is the scroller, and its
-     controls hold 16px so a phone focus never zooms the visual viewport. */
-  dialog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);margin:8vh auto;padding:18px 20px}
+     NOT margin:auto — mobile browsers resolve the top-layer dialog's containing block against the DOCUMENT height, so vertical auto-margins push a tall dialog's bottom below the visible viewport and the browser pans/zooms chasing it, leaving the submit row untappable. Explicit 8vh margins anchor it in the visible viewport (near-centered when tall). The <dialog> itself must not scroll either (browsers won't programmatically scroll the top-layer element) — the form inside is the scroller, and its controls hold var(--dds-s4,16px) so a phone focus never zooms the visual viewport. */ dialog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);color:var(--ink);box-shadow:var(--shadow);max-width:480px;width:calc(100% - 40px);margin:8vh auto;padding:var(--dds-s5,20px) var(--dds-s5,20px)}
   dialog form{max-height:calc(84vh - 56px);overflow:auto}
   dialog input,dialog textarea,dialog select{font-size:16px}
   dialog::backdrop{background:rgba(27,21,37,.4)}

@@ -811,7 +811,12 @@ test.describe('Today — the studio home (mockup)', () => {
     const rows = week.locator('.trow');
     await expect(rows).toHaveCount(2);                                     // d3 is 10 days out → Coming up; d4 is won → never a to-do
     await expect(rows.nth(0)).toContainText('Send Claud the kickoff details');
-    await expect(rows.nth(0)).toContainText('Claud Beltran — website build · Today');
+    await expect(rows.nth(0).locator('.fmeta')).toHaveText('Claud Beltran — website build');
+    // Oct 2026 Today board: the one "Due today" chip sits only on the row due today; the right-hand column carries the time or the day word
+    await expect(rows.nth(0).locator('.tdue')).toHaveText('Due today');
+    await expect(rows.nth(1).locator('.tdue')).toHaveCount(0);
+    await expect(rows.nth(1).locator('.tat')).toHaveText(/^(Tomorrow|[A-Z][a-z]{2})$/);   // d2 is two days out → a day word, tabular, at the right
+    await expect(week.locator('.tdue')).toHaveCount(1);
     await expect(rows.nth(0).locator('a.frow')).toHaveAttribute('href', '/crm.html?deal=d1');
     await expect(rows.nth(1)).toContainText('Collect content from Bacchus');
     await expect(week.getByText('Nothing overdue.')).toBeVisible();

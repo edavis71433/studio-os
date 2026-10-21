@@ -42,6 +42,7 @@ function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(Stri
 function ymdParts(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));return m?{mon:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}),day:String(+m[3]),wd:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'})}:null;}
 // When a dated to-do is due, in words: Overdue · Today · Tomorrow · a weekday
 // inside the coming week · a short date beyond it. No date → says so.
+function todoAt(at,days,nowMs){if(/T\d\d:\d\d/.test(String(at||'')))return slotTime(at);if(days===0)return'';return dueLabel(at,nowMs);}
 function dueLabel(ymd,nowMs){const d=daysBetween(localYmd(nowMs),ymd);const p=ymdParts(ymd);if(d==null||!p)return'No date set';if(d<0)return'Overdue · '+p.mon+' '+p.day;if(d===0)return'Today';if(d===1)return'Tomorrow';if(d<7)return p.wd;return p.mon+' '+p.day;}
 // The stat strip — one tile per HONEST read. `s` is GET /sales/summary's data
 // (null when that read failed or 403'd → its three tiles drop); `enquiries` is
@@ -537,6 +538,11 @@ ok('dueLabel: overdue · today · tomorrow · weekday inside the week · short d
   dueLabel(addDays(H,-7),HOME_NOW).startsWith('Overdue · ') && dueLabel(H,HOME_NOW)==='Today' && dueLabel(addDays(H,1),HOME_NOW)==='Tomorrow'
   && /^[A-Z][a-z]{2}$/.test(dueLabel(addDays(H,3),HOME_NOW)) && /^[A-Z][a-z]{2} \d{1,2}$/.test(dueLabel(addDays(H,12),HOME_NOW))
   && dueLabel(null,HOME_NOW)==='No date set' && dueLabel('garbage',HOME_NOW)==='No date set');
+ok('todoAt: a timed step shows its time; a dated one its day word; today\'s says nothing (the chip does); undated says so',
+  todoAt(H+'T14:30',0,HOME_NOW)==='2:30 pm' && todoAt(H,0,HOME_NOW)==='' && todoAt(addDays(H,2),2,HOME_NOW)===dueLabel(addDays(H,2),HOME_NOW)
+  && todoAt(addDays(H,-3),-3,HOME_NOW).startsWith('Overdue · ') && todoAt(null,null,HOME_NOW)==='No date set');
+ok('today: a This-week row draws the time/day word in .tat and the one "Due today" chip only on a row due today',
+  /\$\{r\.days===0\?'<span class="tdue">Due today<\/span>':''\}<span class="tat">\$\{esc\(todoAt\(r\.at,r\.days\)\)\}<\/span><\/a>/.test(today));
 // stat strip — one tile per honest read
 const SUMMARY={total:3,open:{count:2,value_cents:650000},won_month:{count:1,value_cents:320000},win_rate:{pct:100,won:1,lost:0},by_stage:[],ar:{outstanding_cents:160000,count:1,overdue_cents:0,overdue_count:0}};
 {
@@ -612,8 +618,8 @@ const DEALS=[
     initials('Bacchus Kitchen')==='BK' && initials('Hettie Orange Designs')==='HO' && initials('cher')==='C' && initials('')==='?');
 }
 // structural pins — the wiring the mockup sections must keep
-for(const fn of ['daysBetween','ymdParts','dueLabel','statTiles','weekTodos','comingUp','customerRows','initials']){
-  const m=String({daysBetween,ymdParts,dueLabel,statTiles,weekTodos,comingUp,customerRows,initials}[fn]);
+for(const fn of ['daysBetween','ymdParts','dueLabel','todoAt','statTiles','weekTodos','comingUp','customerRows','initials']){
+  const m=String({daysBetween,ymdParts,dueLabel,todoAt,statTiles,weekTodos,comingUp,customerRows,initials}[fn]);
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('today: the open-stage allowlist is shared by This week / Coming up (lead · qualified · proposal · contract)',

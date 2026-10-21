@@ -17,39 +17,39 @@
   :root[data-theme="dark"] .step.done .dot{color:#171320}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:44px 20px 100px}
+  .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:44px var(--dds-s5,20px) 100px}
   .eyebrow{font-size:12px;color:var(--p);font-weight:500}
-  h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:12px 0 .2em;letter-spacing:-.01em;text-wrap:balance}
-  .sub{color:var(--soft);font-size:16px;margin:0 0 4px;max-width:52ch}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:20px 22px;box-shadow:var(--shadow);margin-top:22px}
-  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:16px 0 8px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:var(--dds-s3,12px) 0 .2em;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--soft);font-size:16px;margin:0 0 var(--dds-s1,4px);max-width:52ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s5,20px) var(--dds-s6,24px);box-shadow:var(--shadow);margin-top:var(--dds-s6,24px)}
+  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:var(--dds-s4,16px) 0 var(--dds-s2,8px)}
   label:first-child{margin-top:0}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px 15px;cursor:pointer;transition:.15s}
+  .chips{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px)}
+  .chip{font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:var(--dds-s2,8px) var(--dds-s4,16px);cursor:pointer;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .chip:hover{border-color:var(--p)} .chip.on{background:var(--p-soft);color:var(--p);border-color:var(--p-soft)}
-  .svc{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  input[type=text],textarea{width:100%;font-family:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:11px 13px}
+  .svc{display:flex;gap:var(--dds-s2,8px);align-items:center;margin-bottom:var(--dds-s2,8px)}
+  input[type=text],textarea{width:100%;font-family:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s3,12px) var(--dds-s3,12px)}
   input:focus,textarea:focus{outline:none;border-color:var(--p)}
   textarea{resize:vertical;min-height:64px}
   .svc button{flex:0 0 auto;border:none;background:none;color:var(--faint);font-size:20px;cursor:pointer;line-height:1}
-  .addsvc{font-family:inherit;font-size:13.5px;font-weight:600;color:var(--p);background:none;border:none;cursor:pointer;padding:4px 0}
-  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:22px}
-  button.primary{font-family:inherit;font-size:15px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;transition:.15s}
+  .addsvc{font-family:inherit;font-size:13.5px;font-weight:600;color:var(--p);background:none;border:none;cursor:pointer;padding:var(--dds-s1,4px) 0}
+  .bar{display:flex;align-items:center;gap:var(--dds-s4,16px);flex-wrap:wrap;margin-top:var(--dds-s6,24px)}
+  button.primary{font-family:inherit;font-size:15px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--p);background:var(--p);color:#fff;padding:var(--dds-s3,12px) var(--dds-s6,24px);cursor:pointer;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   button.primary:hover{background:var(--p-deep)} button.primary:disabled{opacity:.55;cursor:default}
   a.plain,button.plain{color:var(--soft);text-decoration:none;font-weight:500;font-size:14px;background:none;border:none;cursor:pointer;font-family:inherit}
   a.plain:hover,button.plain:hover{color:var(--p)}
-  .hint{font-size:12.5px;color:var(--faint);margin-top:12px}
-  .steps{display:flex;flex-direction:column;gap:2px;margin:18px 0}
-  .step{display:flex;align-items:center;gap:11px;padding:9px 4px;font-size:14.5px}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:var(--dds-s3,12px)}
+  .steps{display:flex;flex-direction:column;gap:2px;margin:var(--dds-s5,20px) 0}
+  .step{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s2,8px) var(--dds-s1,4px);font-size:14.5px}
   .step .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:0 0 auto;display:grid;place-items:center;font-size:12px;color:var(--faint)}
   .step.done .dot{background:var(--good);border-color:var(--good);color:#fff}
   .step.now .dot{border-color:var(--p);color:var(--p)}
   .step .t{font-weight:600} .step .w{color:var(--soft);font-size:13px}
-  .lesson{display:flex;gap:11px;padding:12px 0;border-top:1px solid var(--line);font-size:14px}
+  .lesson{display:flex;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) 0;border-top:1px solid var(--line);font-size:14px}
   .lesson b{color:var(--ink)} .lesson .ic{color:var(--p);flex:0 0 auto}
-  .center{text-align:center;padding:30px 10px}
-  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:24px auto}
-  .big{font-family:var(--serif);font-size:24px;margin:0 0 8px}
+  .center{text-align:center;padding:var(--dds-s7,32px) 10px}
+  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s6,24px) auto}
+  .big{font-family:var(--serif);font-size:24px;margin:0 0 var(--dds-s2,8px)}
   footer{margin-top:36px;color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}

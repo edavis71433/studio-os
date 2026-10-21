@@ -23,66 +23,66 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:48px 22px 96px}
+  .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:48px var(--dds-s6,24px) 96px}
   header .eyebrow{font-size:12.5px;color:var(--soft);font-weight:500}
   header h1{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.12;margin:.35em 0 .1em;text-wrap:balance}
   header .sub{color:var(--soft);font-size:15.5px;margin:0}
-  .stack{display:flex;flex-direction:column;gap:16px;margin-top:34px}
-  .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:22px 22px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .stack{display:flex;flex-direction:column;gap:var(--dds-s4,16px);margin-top:var(--dds-s7,32px)}
+  .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s6,24px) var(--dds-s6,24px) var(--dds-s5,20px);box-shadow:var(--shadow);position:relative;overflow:hidden}
   /* visual refresh: no accent stripe — the row's icon tile carries the tone */
   .moment::before{display:none}
   .moment h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0 0 6px;line-height:1.2;text-wrap:balance}
   .moment p{margin:0;color:var(--soft);font-size:15px}
-  .row{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
-  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+  .row{display:flex;align-items:center;gap:10px;margin-top:var(--dds-s4,16px);flex-wrap:wrap}
+  button{font-family:inherit;font-size:14px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:transparent;color:var(--ink);padding:var(--dds-s2,8px) var(--dds-s4,16px);cursor:pointer;transition:background var(--dds-t-fast,120ms) var(--dds-ease,ease-out),border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   button:hover{background:var(--accent-soft);border-color:var(--accent)}
   button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   button.primary:hover{filter:brightness(1.05)}
   button.ghost{border-color:transparent;color:var(--soft);padding-left:6px;padding-right:6px}
   button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .answer{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-radius:var(--dds-r-lg,10px);font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
+  .answer{margin-top:var(--dds-s4,16px);padding:var(--dds-s4,16px) var(--dds-s4,16px);background:var(--accent-soft);border-radius:var(--dds-r-lg,10px);font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
   /* a11y: live regions stay in the accessibility tree from first render (never
      display:none) so the FIRST answer is announced; empty = zero-height/invisible */
   .answer:empty{padding:0;margin:0;background:transparent}
   /* benchmark 7: what the answer drew on — chips, then an honest line when it's judgment */
   .answer .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;white-space:normal}
   .answer .srcs .lbl{font-size:12px;color:var(--soft);align-self:center}
-  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px;line-height:18px}
-  .answer .lowc{margin-top:8px;font-size:12.5px;color:var(--soft);white-space:normal}
-  .tag{display:inline-block;font-size:12px;color:var(--soft);font-weight:500;margin-bottom:8px;text-transform:capitalize}
+  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) 10px;line-height:18px}
+  .answer .lowc{margin-top:var(--dds-s2,8px);font-size:12.5px;color:var(--soft);white-space:normal}
+  .tag{display:inline-block;font-size:12px;color:var(--soft);font-weight:500;margin-bottom:var(--dds-s2,8px);text-transform:capitalize}
   .calm{background:var(--good-soft);border-color:transparent}
   .calm h2{color:var(--good)}
   a.moment.todo{display:block;text-decoration:none;color:inherit}
   a.moment.todo:hover{border-color:var(--accent)}
   .golink{color:var(--accent);font-weight:600;font-size:14px}
-  .features{margin-top:40px;padding-top:26px;border-top:1px solid var(--line)}
-  .features .lead{font-size:13px;color:var(--soft);margin:0 0 12px}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+  .features{margin-top:var(--dds-s8,40px);padding-top:var(--dds-s7,32px);border-top:1px solid var(--line)}
+  .features .lead{font-size:13px;color:var(--soft);margin:0 0 var(--dds-s3,12px)}
+  .chips{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px)}
+  .chip{font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px var(--dds-s3,12px)}
   /* "More about your business" — secondary context, collapsed by default so Today
      opens on what needs the owner. Native <details> keeps it keyboard-accessible. */
-  details.more{margin-top:40px;border-top:1px solid var(--line);padding-top:6px}
-  details.more>summary{list-style:none;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--soft);padding:12px 2px;display:flex;align-items:center;gap:9px}
+  details.more{margin-top:var(--dds-s8,40px);border-top:1px solid var(--line);padding-top:6px}
+  details.more>summary{list-style:none;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--soft);padding:var(--dds-s3,12px) 2px;display:flex;align-items:center;gap:var(--dds-s2,8px)}
   details.more>summary::-webkit-details-marker{display:none}
-  details.more>summary::before{content:"›";display:inline-block;transition:transform .15s;color:var(--faint);font-size:16px}
+  details.more>summary::before{content:"›";display:inline-block;transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out);color:var(--faint);font-size:16px}
   details.more[open]>summary::before{transform:rotate(90deg)}
   details.more>summary:hover{color:var(--accent)}
-  details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--dds-r-sm,6px)}
   @media (prefers-reduced-motion:reduce){details.more>summary::before{transition:none}}
-  .ask{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
-  .ask h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 4px}
-  .ask p{margin:0 0 14px;color:var(--soft);font-size:14px}
+  .ask{margin-top:var(--dds-s7,32px);padding-top:var(--dds-s6,24px);border-top:1px solid var(--line)}
+  .ask h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 var(--dds-s1,4px)}
+  .ask p{margin:0 0 var(--dds-s4,16px);color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
-  .askbox input{flex:1;font-family:inherit;font-size:15px;padding:12px 15px;border-radius:var(--dds-r-lg,10px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .askbox input{flex:1;font-family:inherit;font-size:15px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border-radius:var(--dds-r-lg,10px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
   .askbox input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
   .muted{color:var(--soft);font-size:14px}
-  .center{text-align:center;padding:56px 20px}
-  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 8px}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
+  .center{text-align:center;padding:56px var(--dds-s5,20px)}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:23px;margin:0 0 var(--dds-s2,8px)}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
   a.link{color:var(--accent);text-decoration:none;font-weight:500}
   a.link:hover{text-decoration:underline}
-  .appnav{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 26px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-  .appnav a{font-size:13.5px;color:var(--soft);text-decoration:none;padding:6px 12px;border-radius:999px;font-weight:500;white-space:nowrap}
+  .appnav{display:flex;flex-wrap:wrap;gap:var(--dds-s1,4px);margin:0 0 var(--dds-s7,32px);padding-bottom:var(--dds-s4,16px);border-bottom:1px solid var(--line)}
+  .appnav a{font-size:13.5px;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:999px;font-weight:500;white-space:nowrap}
   .appnav a:hover{background:var(--accent-soft);color:var(--accent)}
   .appnav a[aria-current="page"]{background:var(--accent);color:#fff}
   .appnav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -93,13 +93,13 @@
      Today's schedule · the Concierge) and a rail (This month · Recent records ·
      Waiting on clients). Below 980px everything stacks, main first. */
   @media (min-width:980px){.wrap{max-width:var(--dds-w-app,1280px)}}
-  .cols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:30px;align-items:start}
-  @media (min-width:980px){.cols{grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:26px}}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--dds-s5,20px);margin-top:var(--dds-s7,32px);align-items:start}
+  @media (min-width:980px){.cols{grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:var(--dds-s7,32px)}}
   /* every rail card degraded away → no aside, main owns the full row */
   .cols.norail{grid-template-columns:minmax(0,1fr)}
-  .colmain{min-width:0;display:flex;flex-direction:column;gap:18px}
-  .colrail{min-width:0;display:flex;flex-direction:column;gap:16px}
-  .seclab{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 9px}
+  .colmain{min-width:0;display:flex;flex-direction:column;gap:var(--dds-s5,20px)}
+  .colrail{min-width:0;display:flex;flex-direction:column;gap:var(--dds-s4,16px)}
+  .seclab{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 var(--dds-s2,8px)}
   section.home-sec{margin:0}
   /* the Needs-you feed: one card, one row per item. Each row KEEPS the
      .moment.todo identity (attention math + responsive pins), restyled from a
@@ -108,58 +108,58 @@
      the "Done" <button> is its SIBLING — a button may never nest inside an
      anchor (invalid HTML, and assistive tech can't reach the inner control). */
   .feedcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden}
-  .feedcard .moment.todo{display:flex;align-items:center;gap:14px;background:transparent;border:0;border-radius:0;box-shadow:none;padding:14px 18px;border-top:1px solid var(--line);overflow:visible}
+  .feedcard .moment.todo{display:flex;align-items:center;gap:var(--dds-s4,16px);background:transparent;border:0;border-radius:0;box-shadow:none;padding:var(--dds-s4,16px) var(--dds-s5,20px);border-top:1px solid var(--line);overflow:visible}
   .feedcard .moment.todo:first-child{border-top:0}
   .feedcard .moment.todo::before{display:none}
   .feedcard .moment.todo:hover{background:var(--accent-soft)}
   .feedcard .moment.todo:focus-visible,.feedcard .frow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-  .feedcard .frow{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
+  .feedcard .frow{display:flex;align-items:center;gap:var(--dds-s4,16px);flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
   .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
   .fico{flex:0 0 auto;width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--warn-soft);display:grid;place-items:center;font-size:16px}
   .fico.ap{background:var(--accent-soft)}
   .fmain{flex:1 1 auto;min-width:0}
   .fhead{display:block;font-weight:600;font-size:14.5px;color:var(--ink);line-height:1.35;margin:0}
   .fmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
-  .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap}
+  .fcta{flex:0 0 auto;font-size:12.5px;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:var(--dds-r,8px);padding:6px var(--dds-s3,12px);white-space:nowrap}
   /* Oct 2026 experience review: the FIRST thing that needs you wears the page's one filled button */
   .feedcard > .moment:first-child .fcta{background:var(--accent);color:#fff}
   /* the manual "Done" — quiet by design: the row usually clears itself, this is
      only for the residue. Never shown on money or legal obligations. */
-  .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px 13px;white-space:nowrap;cursor:pointer}
+  .fdone{flex:0 0 auto;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px var(--dds-s3,12px);white-space:nowrap;cursor:pointer}
   .fdone:hover{color:var(--ink);border-color:var(--soft)}
   .fdone:disabled{opacity:.5;cursor:default}
   @media (max-width:600px){.feedcard .moment.todo{flex-wrap:wrap}.feedcard .frow{flex-wrap:wrap}.fcta{margin-left:50px}}
-  .moment.calm.slim{padding:16px 18px}
+  .moment.calm.slim{padding:var(--dds-s4,16px) var(--dds-s5,20px)}
   .moment.calm.slim h2{font-size:17px;margin-bottom:2px}
   .moment.calm.slim p{font-size:13.5px}
   /* rail + schedule cards */
-  .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:16px 18px}
-  .rcard .rh{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 12px}
-  .mtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s4,16px) var(--dds-s5,20px)}
+  .rcard .rh{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 var(--dds-s3,12px)}
+  .mtiles{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s3,12px) var(--dds-s4,16px)}
   .mtile .n{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.2}
   .mtile .l{font-size:11.5px;color:var(--faint);line-height:1.35;margin-top:1px}
-  .trend{margin:12px 0 0;font-size:12.5px;color:var(--soft)}
-  .rfoot{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:13px}
-  .rrows a{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
+  .trend{margin:var(--dds-s3,12px) 0 0;font-size:12.5px;color:var(--soft)}
+  .rfoot{margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:13px}
+  .rrows a{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:var(--dds-s2,8px) 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
   .rrows a:first-child{border-top:0}
   .rrows a:hover{color:var(--accent)}
-  .rrows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+  .rrows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--dds-r,8px)}
   .rrows .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap}
   /* non-link rail rows (recent wins carry no drill-in id — no fake link) */
-  .rrows .rr{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);font-size:13.5px;font-weight:500}
+  .rrows .rr{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:var(--dds-s2,8px) 0;border-top:1px solid var(--line);color:var(--ink);font-size:13.5px;font-weight:500}
   .rrows .rr:first-child{border-top:0}
-  .schedrow{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+  .schedrow{display:flex;align-items:baseline;gap:var(--dds-s3,12px);padding:var(--dds-s2,8px) 0;border-top:1px solid var(--line);font-size:14px}
   .schedrow:first-child{border-top:0;padding-top:2px}
   .schedrow .st{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent);font-size:13px;min-width:64px}
   .schedrow .sm{flex:1 1 auto;min-width:0;color:var(--ink)}
   .schedrow .sm .who{color:var(--soft)}
-  .schip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn);text-transform:capitalize}
+  .schip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:2px var(--dds-s2,8px);background:var(--warn-soft);color:var(--warn);text-transform:capitalize}
   .schedempty{margin:0;color:var(--soft);font-size:13.5px}
   /* ── the studio home (2026-10 mockup): money band · stat strip · This week ·
      Coming up · Customers. Same language as the refresh — hairline borders,
      8px corners, one icon tile per fact, sentence case, no shadows. ── */
-  .alert{display:flex;align-items:center;gap:12px;padding:10px 14px;margin-top:22px;border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);background:var(--warn-soft);border-radius:var(--dds-r-lg,10px);flex-wrap:wrap}
-  .alert .ico{width:28px;height:28px;border-radius:7px;background:var(--card);color:var(--warn);display:grid;place-items:center;flex:0 0 auto}
+  .alert{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:10px var(--dds-s4,16px);margin-top:var(--dds-s6,24px);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);background:var(--warn-soft);border-radius:var(--dds-r-lg,10px);flex-wrap:wrap}
+  .alert .ico{width:28px;height:28px;border-radius:var(--dds-r,8px);background:var(--card);color:var(--warn);display:grid;place-items:center;flex:0 0 auto}
   .alert .ico svg,.hl .ico svg{stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   .alert .ico svg{width:15px;height:15px}
   .alert .t{flex:1 1 300px;font-size:13.5px;color:var(--ink)} .alert .t b{font-weight:600}
@@ -167,7 +167,7 @@
   /* Oct 2026 benchmark (item 2): the four money buckets under the band's line —
      Paid green · Processing blue · Upcoming neutral · Overdue red, the same
      families crm.html's .schip and client.html's .fst use. */
-  .mbuckets{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:5px;font-size:12.5px;color:var(--soft)}
+  .mbuckets{display:flex;flex-wrap:wrap;gap:var(--dds-s1,4px) var(--dds-s5,20px);margin-top:var(--dds-s1,4px);font-size:12.5px;color:var(--soft)}
   .mbuckets .mb b{font-weight:600;color:var(--ink)} .mbuckets .mb i{font-style:normal;color:var(--faint)}
   .mbuckets .mb.good b{color:var(--good)} .mbuckets .mb.bad b{color:var(--dds-bad,#c43c3c)} .mbuckets .mb.info b{color:var(--dds-info,#2a6fb5)}
   .abtn{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12.5px;font-weight:500;text-decoration:none;white-space:nowrap}
@@ -176,11 +176,11 @@
   .abtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* the stat strip — crm.html's .hl-panel anatomy (icon tile · label · value · sub);
      a 1px line-coloured gap draws the hairlines however the tiles wrap */
-  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin-top:18px;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--line);overflow:hidden}
-  .hl{display:flex;align-items:center;gap:12px;padding:13px 16px;min-width:0;background:var(--card);color:inherit;text-decoration:none}
+  .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin-top:var(--dds-s5,20px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--line);overflow:hidden}
+  .hl{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);min-width:0;background:var(--card);color:inherit;text-decoration:none}
   .hl:hover{background:var(--bg)}
   .hl:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-  .hl .ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:var(--accent-soft);color:var(--accent)}
+  .hl .ico{width:36px;height:36px;border-radius:var(--dds-r,8px);display:grid;place-items:center;flex:0 0 auto;background:var(--accent-soft);color:var(--accent)}
   .hl .ico.good{background:var(--good-soft);color:var(--good)} .hl .ico.warn{background:var(--warn-soft);color:var(--warn)} .hl .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
   .hl .ico svg{width:17px;height:17px}
   .hl-main{min-width:0;flex:1}
@@ -194,7 +194,7 @@
     .hl{gap:9px;padding:10px 12px;border-left:1px solid var(--line)}
     .hl:nth-child(odd){border-left:none}
     .hl:nth-child(n+3){border-top:1px solid var(--line)}
-    .hl .ico{width:28px;height:28px;border-radius:7px}
+    .hl .ico{width:28px;height:28px;border-radius:var(--dds-r,8px)}
     .hl .ico svg{width:14px;height:14px}
     .hl-k,.hl-s{font-size:11.5px}
     .hl-v{font-size:16px}
@@ -205,26 +205,30 @@
   .seclink:hover{text-decoration:underline}
   /* This week — to-do rows: a box, the step, the deal + when, one Done */
   .rcard.list{padding:0;overflow:hidden}
-  .trow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line)}
+  .trow{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:10px var(--dds-s4,16px);border-top:1px solid var(--line)}
   .trow:first-child{border-top:0}
   .trow:hover{background:var(--accent-soft)}
-  .trow .frow{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
+  .trow .frow{display:flex;align-items:center;gap:var(--dds-s3,12px);flex:1 1 auto;min-width:0;color:inherit;text-decoration:none}
   .trow .frow:focus-visible,.mrow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .tdot{width:16px;height:16px;border:1.5px solid var(--dds-line-strong,#c9c9d2);border-radius:4px;flex:0 0 auto;background:var(--card)}
-  .trow.late .fmeta{color:var(--warn)}
-  .quiet{margin:0;padding:9px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--soft);background:var(--bg)}
+  /* Oct 2026 Today board: the time (or day word) at the right in tabular small
+     text; only a row due today wears the one "Due today" chip */
+  .tat{flex:0 0 auto;min-width:54px;text-align:right;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tdue{flex:0 0 auto;font-size:11px;font-weight:600;line-height:1.5;padding:1px 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn);white-space:nowrap}
+  .trow.late .tat{color:var(--warn)}
+  .quiet{margin:0;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-top:1px solid var(--line);font-size:12.5px;color:var(--soft);background:var(--bg)}
   /* Coming up — dated rows: month + day block, the thing, one CTA */
-  .mrow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);color:inherit;text-decoration:none}
+  .mrow{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:10px var(--dds-s4,16px);border-top:1px solid var(--line);color:inherit;text-decoration:none}
   .mrow:first-child{border-top:0}
   .mrow:hover{background:var(--accent-soft)}
   .md{width:42px;text-align:center;font-size:11px;color:var(--faint);line-height:1.15;flex:0 0 auto}
   .md b{display:block;font-size:15px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
   @media (max-width:600px){.trow,.mrow{flex-wrap:wrap}.trow .fdone,.mrow .fcta{margin-left:28px}}
   /* Customers — avatar · name · status, in the rail */
-  .crows a{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px}
+  .crows a{display:flex;align-items:center;gap:10px;padding:var(--dds-s2,8px) 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px}
   .crows a:first-child{border-top:0}
   .crows a:hover .cn{color:var(--accent)}
-  .crows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+  .crows a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--dds-r,8px)}
   .cav{width:26px;height:26px;border-radius:50%;background:var(--good-soft);color:var(--good);font-size:10.5px;font-weight:600;display:grid;place-items:center;flex:0 0 auto}
   .cmain{min-width:0;display:flex;flex-direction:column}
   .cn{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -315,6 +319,10 @@ function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(Stri
 function ymdParts(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));return m?{mon:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}),day:String(+m[3]),wd:new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'})}:null;}
 // When a dated to-do is due, in words: Overdue · Today · Tomorrow · a weekday
 // inside the coming week · a short date beyond it. No date → says so.
+// The right-hand column of a to-do row: the time when the step carries one,
+// else the day word (Tomorrow · a weekday · a short date · Overdue · …). A row
+// due today says nothing here — its "Due today" chip already does.
+function todoAt(at,days,nowMs){if(/T\d\d:\d\d/.test(String(at||'')))return slotTime(at);if(days===0)return'';return dueLabel(at,nowMs);}
 function dueLabel(ymd,nowMs){const d=daysBetween(localYmd(nowMs),ymd);const p=ymdParts(ymd);if(d==null||!p)return'No date set';if(d<0)return'Overdue · '+p.mon+' '+p.day;if(d===0)return'Today';if(d===1)return'Tomorrow';if(d<7)return p.wd;return p.mon+' '+p.day;}
 // The stat strip — one tile per HONEST read. `s` is GET /sales/summary's data
 // (null when that read failed or 403'd → its three tiles drop); `enquiries` is
@@ -453,7 +461,7 @@ function weekHtml(todos){
   if(!todos.length)return'';
   const late=todos.some(r=>r.days!=null&&r.days<0);
   return `<section class="home-sec" id="this-week"><div class="sech"><h2 class="seclab">This week</h2><a class="seclink" href="${esc(scopeHref('/pipeline.html'))}">Pipeline →</a></div><div class="rcard list">${
-    todos.map(r=>`<div class="trow${r.days!=null&&r.days<0?' late':''}" data-todo="${esc(r.id)}"><a class="frow" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(r.id)))}"><span class="tdot" aria-hidden="true"></span><div class="fmain"><h3 class="fhead">${esc(r.title)}</h3><span class="fmeta">${r.deal?esc(r.deal)+' · ':''}${esc(dueLabel(r.at))}</span></div></a><button type="button" class="fdone" data-todo-done="${esc(r.id)}" aria-label="Done — ${esc(r.title)}">Done</button></div>`).join('')
+    todos.map(r=>`<div class="trow${r.days!=null&&r.days<0?' late':''}${r.days===0?' due':''}" data-todo="${esc(r.id)}"><a class="frow" href="${esc(scopeHref('/crm.html?deal='+encodeURIComponent(r.id)))}"><span class="tdot" aria-hidden="true"></span><div class="fmain"><h3 class="fhead">${esc(r.title)}</h3>${r.deal?`<span class="fmeta">${esc(r.deal)}</span>`:''}</div>${r.days===0?'<span class="tdue">Due today</span>':''}<span class="tat">${esc(todoAt(r.at,r.days))}</span></a><button type="button" class="fdone" data-todo-done="${esc(r.id)}" aria-label="Done — ${esc(r.title)}">Done</button></div>`).join('')
   }${late?'':'<p class="quiet">Nothing overdue.</p>'}</div></section>`;
 }
 function comingHtml(items){
@@ -805,7 +813,7 @@ async function dismiss(id, btn){
     if(card){
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
       if(reduce){ card.remove(); }
-      else { card.style.transition='opacity .3s ease, transform .3s ease'; card.style.opacity='0'; card.style.transform='translateY(-6px)'; setTimeout(()=>card.remove(), 300); }
+      else { card.style.transition='opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out), transform var(--dds-t-slow,320ms) var(--dds-ease,ease-out)'; card.style.opacity='0'; card.style.transform='translateY(-6px)'; setTimeout(()=>card.remove(), 300); }
     }
   }
   catch(_){ btn.disabled = false; }
@@ -833,7 +841,7 @@ async function dismissNotice(id, btn){
     if(row){
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
       if(reduce){ row.remove(); }
-      else { row.style.transition='opacity .25s ease'; row.style.opacity='0'; setTimeout(()=>row.remove(), 250); }
+      else { row.style.transition='opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out)'; row.style.opacity='0'; setTimeout(()=>row.remove(), 250); }
     }
   }
   catch(_){ btn.disabled = false; }
@@ -981,7 +989,7 @@ function orientationCard(c){
     <button class="primary" id="orientDone">Got it</button>`;
   host.insertBefore(card, host.firstChild);
   const b=document.getElementById('orientDone');
-  if(b) b.addEventListener('click',()=>{ card.style.transition='opacity .25s'; card.style.opacity='0'; setTimeout(()=>card.remove(),250); });
+  if(b) b.addEventListener('click',()=>{ card.style.transition='opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out)'; card.style.opacity='0'; setTimeout(()=>card.remove(),250); });
 }
 
 // ── Phase P: "what you own" + the honest upsell — quiet, at the bottom, never a

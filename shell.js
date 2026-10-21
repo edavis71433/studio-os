@@ -784,9 +784,9 @@
   // and honest — no invented features; the full Help page is always one tap away.
   // Distinct from the site-aware Concierge; this is help ABOUT the product.
   var help, helpTok = 0;
-  var HELP_IN = 'width:100%;box-sizing:border-box;margin:8px 0;padding:8px 10px;border:1px solid var(--dds-line,#e5e5e5);border-radius:9px;font:inherit;font-size:14px;background:var(--dds-card,#fff);color:inherit';
-  var HELP_CHIP = 'font:inherit;font-size:12.5px;margin:3px 4px 0 0;padding:4px 11px;border-radius:999px;border:1px solid var(--dds-line,#ddd);background:transparent;color:inherit;cursor:pointer';
-  var HELP_LINK = 'display:inline-block;margin:6px 8px 0 0;font-weight:600;font-size:13px;color:var(--dds-accent,#5b3fa0);text-decoration:none';
+  var HELP_IN = 'width:100%;box-sizing:border-box;margin:var(--dds-s2,8px) 0;padding:var(--dds-s2,8px) 10px;border:1px solid var(--dds-line,#e5e5e5);border-radius:var(--dds-r,8px);font:inherit;font-size:14px;background:var(--dds-card,#fff);color:inherit';
+  var HELP_CHIP = 'font:inherit;font-size:12.5px;margin:var(--dds-s1,4px) var(--dds-s1,4px) 0 0;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;border:1px solid var(--dds-line,#ddd);background:transparent;color:inherit;cursor:pointer';
+  var HELP_LINK = 'display:inline-block;margin:6px var(--dds-s2,8px) 0 0;font-weight:600;font-size:13px;color:var(--dds-accent,#5b3fa0);text-decoration:none';
   function toggleHelp() {
     if (help && help.classList.contains('open')) { closeHelp(); return; }
     closeAllLayers();
@@ -852,7 +852,7 @@
     // Multi-item groups get a quiet header so a long menu stays scannable.
     UTILS.forEach(function (sec) {
       var vis = visibleItems(sec);
-      if (vis.length > 1) rows += '<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
+      if (vis.length > 1) rows += '<div style="padding:var(--dds-s2,8px) var(--dds-s4,16px) 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-soft,#8a8198)">' + esc(sec.label) + '</div>';
       vis.forEach(function (i) { rows += '<a class="row" href="' + esc(withScope(i.href)) + '">' + esc(i.label) + (i.desc ? '<span class="sub">' + esc(i.desc) + '</span>' : '') + '</a>'; });
     });
     // Notifications toggle (Web Push) — reviewers don't get it (their world is
@@ -1442,7 +1442,7 @@
   function setOffline(off) {
     if (off) {
       if (!offBanner) {
-        offBanner = el('<div id="dds-offline" role="alert" style="position:fixed;top:var(--dds-shell-h,54px);left:0;right:0;z-index:2147483003;background:#8a6d3b;color:#fff;font-family:var(--dds-sans,sans-serif);font-size:13px;font-weight:600;text-align:center;padding:8px 14px">You’re offline — changes can’t save until the connection returns. Keep this tab open.</div>');
+        offBanner = el('<div id="dds-offline" role="alert" style="position:fixed;top:var(--dds-shell-h,54px);left:0;right:0;z-index:2147483003;background:#8a6d3b;color:#fff;font-family:var(--dds-sans,sans-serif);font-size:13px;font-weight:600;text-align:center;padding:var(--dds-s2,8px) 14px">You’re offline — changes can’t save until the connection returns. Keep this tab open.</div>');
         document.body.appendChild(offBanner);
       }
       offBanner.style.display = 'block';
