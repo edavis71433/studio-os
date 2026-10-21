@@ -28,6 +28,7 @@ export interface ProvisionResult {
   edition?: 'monitor' | 'presence';
   hosted?: boolean;
   netlifyUrl?: string | null;
+  created?: boolean;   // true only when THIS run created the site row (benchmark 12: the example-data seed keys on it)
   error?: string;
 }
 
@@ -146,5 +147,5 @@ export async function provisionForSignup(opts: {
     });
   }
 
-  return { ok: true, siteId: String(site.id), edition, hosted: needsHosting, netlifyUrl };
+  return { ok: true, siteId: String(site.id), edition, hosted: needsHosting, netlifyUrl, created };
 }

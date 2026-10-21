@@ -13,6 +13,8 @@
 //   POST /commerce/portal           (authed)  Stripe billing portal (manage/cancel/change)
 //   GET  /commerce/first-run        (authed)  the welcome checklist (derived)
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
+//   GET  /commerce/example-data     (authed)  are the trial's example rows still here? (benchmark 12)
+//   POST /commerce/example-data/remove (authed) delete exactly those rows
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
 import { raiseNotice, raiseNoticeDetailed } from '../lib/notice.ts';
@@ -28,6 +30,7 @@ import type { PlanKey, Term } from '../commerce/catalog.ts';
 import { supportFor } from '../commerce/support.ts';
 import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
+import { seedExampleData, exampleDataCounts, removeExampleData } from '../commerce/example_data.ts';
 import { bridgeCustomerToStudio, CONNECT_INTENT_TAG } from './sales.ts';
 import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
@@ -175,6 +178,9 @@ async function handleSignup(req: Request, cors: Record<string, string>) {
       return json({ error: 'provision_incomplete', message: msg, account_created: true }, 502, cors);
     }
     if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioned', site_id: prov.siteId }) });
+    // Benchmark 12: a brand-new site (this run CREATED the row — never an existing
+    // one) gets one example customer, deal and enquiry. Best-effort, never blocking.
+    if (prov.created && prov.siteId) await seedExampleData(prov.siteId).catch(() => {});
     // If a studio pre-listed this email (connect-by-email), connect them now.
     await autoConnectPreListedStudio(chain.clientId, prov.siteId || null, email, businessName);
     return json({ data: { mode: 'trial', message: 'Your workspace is ready.', redirect: `${siteUrl()}/presence.html`, site_id: prov.siteId, trial_days: TRIAL_DAYS } }, 201, cors);
@@ -614,6 +620,7 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
       }
       // mark the signup provisioned (by session id, best-effort)
       if (obj.id) await svc(`presence_signups?stripe_session_id=eq.${encodeURIComponent(String(obj.id))}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioned', site_id: prov.siteId, stripe_customer_id: customer }) });
+      if (prov.created && prov.siteId) await seedExampleData(prov.siteId).catch(() => {});   // benchmark 12: a paid signup's first session isn't empty either
       console.log(`[billing-sync] provisioned client=${clientId} plan=${plan} site=${prov.siteId}`);
       return json({ data: { provisioned: true, site_id: prov.siteId } }, 200, cors);
     }
@@ -774,6 +781,22 @@ export async function handleCommerce(req: Request, route: string, method: string
   if (route === '/commerce/notices/dismiss' && method === 'POST') {
     if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
     return handleNoticeDismiss(req, jwt, cors);
+  }
+  // Benchmark 12: the example rows a new trial was seeded with — are any still
+  // here (Today's card), and remove exactly those (the card's one action).
+  if (route === '/commerce/example-data' && method === 'GET') {
+    if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    const site = await resolveSite(jwt);
+    if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
+    const counts = await exampleDataCounts(String(site.id));
+    return json({ data: { present: counts.contacts + counts.deals + counts.enquiries > 0, counts } }, 200, cors);
+  }
+  if (route === '/commerce/example-data/remove' && method === 'POST') {
+    if (!authed) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    const site = await resolveSite(jwt);
+    if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
+    const removed = await removeExampleData(String(site.id), site.client_id ? String(site.client_id) : null);
+    return json({ data: { ok: true, removed, message: 'The example customer, deal and enquiry are gone.' } }, 200, cors);
   }
   return json({ error: 'not_found', message: `No commerce route for ${method} ${route}.` }, 404, cors);
 }
