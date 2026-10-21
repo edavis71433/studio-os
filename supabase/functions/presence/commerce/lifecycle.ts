@@ -873,10 +873,17 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
 // the sweep is a clean no-op. The decision rule itself is pure
 // (lib/approvals.ts approvalReminderDue) and pinned in
 // tests/presence/approval_reminders_test.mjs.
+//
+// Starvation guard (follow-up to #49): the read EXCLUDES rows already reminded
+// today (last_reminded_at on or after today's UTC midnight). Without it, once
+// more than `limit` approvals were overdue the oldest `limit` — all stamped by
+// the day's first tick — filled the window on every later tick and the rest
+// were never reached. The pure rule still re-checks each row (defence in depth).
 export async function runApprovalReminders(limit = 50): Promise<{ reminded: number; overdue_notices: number; skipped_no_email: number }> {
   const nowIso = new Date().toISOString();
   const tomorrow = new Date(Date.parse(nowIso) + 86_400_000).toISOString().slice(0, 10);
-  const q = await svc(`presence_approvals?status=eq.pending&client_visible=is.true&deleted_at=is.null&due_date=not.is.null&due_date=lte.${tomorrow}&select=id,site_id,project_id,title,due_date,last_reminded_at,status,client_visible&order=due_date.asc&limit=${limit}`);
+  const todayStart = `${nowIso.slice(0, 10)}T00:00:00Z`;
+  const q = await svc(`presence_approvals?status=eq.pending&client_visible=is.true&deleted_at=is.null&due_date=not.is.null&due_date=lte.${tomorrow}&or=(last_reminded_at.is.null,last_reminded_at.lt.${encodeURIComponent(todayStart)})&select=id,site_id,project_id,title,due_date,last_reminded_at,status,client_visible&order=due_date.asc&limit=${limit}`);
   if (!q.ok) return { reminded: 0, overdue_notices: 0, skipped_no_email: 0 };   // pre-0135 → clean no-op
   let reminded = 0, overdue_notices = 0, skipped_no_email = 0;
   for (const a of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; project_id: string | null; title?: string; due_date: string; last_reminded_at: string | null; status: string; client_visible: boolean }>) {
