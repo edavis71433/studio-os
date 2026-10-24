@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 // M1 _shared extraction: identity, CORS, and the json helper now live in
 // _shared so the future presence function imports the same primitives.
 // Behavior is byte-identical; route logic, gates, and tables stay here.
-import { corsFor, cors } from '../_shared/cors.ts';
+import { corsFor, cors, CORS_ORIGINS } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
 import {
   verifyStaff, verifyAdminJwt, staffRevocation, atLeast, jwtIatMs,
@@ -882,7 +882,11 @@ async function deepAudit(targetUrl: string) {
       break;
     }
     if (res && res.ok) {
-      html = (await res.text()).slice(0, 600000);
+      // 2MB, not 600KB: Squarespace and other builder homepages often run 800KB+
+      // of HTML, and the 600KB cut dropped the footer, which is where most small
+      // business sites keep their address and phone. The local checks then
+      // reported "no address / no phone" for sites that show both.
+      html = (await res.text()).slice(0, 2000000);
       out.fetchedHtml = true;
       out.url = current;
       try { const fu = new URL(current); out.domain = fu.hostname; out.https = fu.protocol === 'https:'; } catch (_e) { /* */ }
@@ -1062,7 +1066,7 @@ function critiqueEmailHtml(domain: string, result: any) {
 
 const DDS_KNOWLEDGE = `
 ABOUT DAVIS DIGITAL STUDIO
-Davis Digital Studio is Eric Davis, a web designer in Los Angeles who builds websites and SEO for small businesses. Positioning: enterprise experience, small business heart. Fully remote, works with small businesses across the United States, local to LA. Eric brings nearly a decade of experience including managing 13 enterprise websites.
+Davis Digital Studio is Eric Davis, a web designer in Los Angeles who builds websites and SEO for small businesses. Positioning: enterprise experience, small business heart. Fully remote, works with small businesses across the United States, local to LA. Eric brings nearly a decade of enterprise experience, including managing thousands of domains and subdomains.
 
 WEBSITE BUILDS (one-time pricing, every project includes a free discovery call to confirm scope and price)
 1. Template — $1,500 one-time. Get online fast with a polished template build on whatever platform fits the business. Best for new businesses that need a clean, professional presence right away. Includes: your branding applied (colors, fonts, logo), up to 5 pages mobile-optimized, contact form and basic SEO setup, Google Analytics installation, 1 revision round, launch walkthrough video. You update it yourself, no code needed.
@@ -4535,7 +4539,93 @@ async function auditWrite(
 
 // resolvePrincipal moved to ../_shared/auth.ts — M1 extraction.
 
-serve(async (req) => {
+// PSI report trimmed to what the public tools read: category scores, each
+// audit's score/displayValue/numericValue (no `details`: that is where the
+// screenshots and network traces live), and the CrUX field data.
+// deno-lint-ignore no-explicit-any
+function trimPsiReport(d: any) {
+  const lr = (d && d.lighthouseResult) || {};
+  const audits: Record<string, unknown> = {};
+  // deno-lint-ignore no-explicit-any
+  for (const [k, a] of Object.entries(lr.audits || {}) as [string, any][]) {
+    audits[k] = {
+      id: a && a.id, title: a && a.title, score: a ? a.score : null, scoreDisplayMode: a && a.scoreDisplayMode,
+      displayValue: a && a.displayValue, numericValue: a && a.numericValue, numericUnit: a && a.numericUnit,
+    };
+  }
+  const categories: Record<string, unknown> = {};
+  // deno-lint-ignore no-explicit-any
+  for (const [k, c] of Object.entries(lr.categories || {}) as [string, any][]) {
+    categories[k] = { id: c && c.id, title: c && c.title, score: c ? c.score : null };
+  }
+  return {
+    id: d && d.id,
+    analysisUTCTimestamp: d && d.analysisUTCTimestamp,
+    loadingExperience: d && d.loadingExperience,
+    originLoadingExperience: d && d.originLoadingExperience,
+    lighthouseResult: {
+      requestedUrl: lr.requestedUrl, finalUrl: lr.finalUrl, finalDisplayedUrl: lr.finalDisplayedUrl,
+      fetchTime: lr.fetchTime, lighthouseVersion: lr.lighthouseVersion, runWarnings: lr.runWarnings,
+      categories, audits,
+    },
+  };
+}
+
+// The visitor copy of a lead email is built in the browser, so treat it as
+// untrusted. audit_lead can mail any address, and without this anyone could
+// use it to send their own links and images from the studio's domain. Keep the
+// layout; drop anything active; only links back to the studio stay clickable.
+const LEAD_EMAIL_LINK_OK = /^(https:\/\/(www\.)?davisdigitalstudio\.com([\/?#]|$)|https:\/\/calendly\.com\/eric-davisdigitalstudio([\/?#]|$)|mailto:eric@davisdigitalstudio\.com$|tel:\+19167120806$)/i;
+function sanitizeLeadEmailHtml(input: unknown): string {
+  let h = String(input || '').slice(0, 200000);
+  // Active or embedding elements, with or without a closing tag.
+  h = h.replace(/<(script|style|iframe|frame|frameset|object|embed|applet|form|input|button|textarea|select|option|video|audio|source|track|svg|math|template|base|link)\b[\s\S]*?<\/\1\s*>/gi, '');
+  h = h.replace(/<\/?(script|style|iframe|frame|frameset|object|embed|applet|form|input|button|textarea|select|option|video|audio|source|track|svg|math|template|base|link|img|picture|image)\b[^>]*>/gi, '');
+  h = h.replace(/<meta\b[^>]*http-equiv[^>]*>/gi, '');
+  // Inline event handlers, srcset/src/background/action attributes, CSS url().
+  h = h.replace(/\s(on[a-z]+|srcset|src|background|action|formaction|poster|xlink:href)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  h = h.replace(/url\s*\([^)]*\)/gi, 'none');
+  h = h.replace(/expression\s*\(/gi, '(');
+  // Links: keep the allowlisted ones, strip the href from everything else.
+  h = h.replace(/\shref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_m, _all, dq, sq, bare) => {
+    const url = String(dq ?? sq ?? bare ?? '').trim().replace(/&amp;/g, '&');
+    return LEAD_EMAIL_LINK_OK.test(url) ? ` href="${url.replace(/"/g, '&quot;')}"` : '';
+  });
+  return h;
+}
+
+// Subject lines carry the business name the visitor typed: one line, no
+// links, bounded, so the subject cannot be used to carry someone else's message.
+function leadSubjectName(name: unknown): string {
+  const s = String(name || '').replace(/[\r\n\t<>]/g, ' ').replace(/(https?:\/\/|www\.)\S+/gi, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return s || 'your business';
+}
+
+// Per-request CORS on EVERY response. Many routes below still call json()
+// without passing reqCors, so they fall back to CORS_ORIGINS[0]. When the
+// ALLOWED_ORIGINS secret was reordered (Oct 2026) that silently broke the public
+// free tools on davisdigitalstudio.com. Fixing it at the response layer covers
+// every route at once: if the caller's origin is on the allowlist, it is what
+// the browser gets back, whichever helper built the response.
+function withRequestCors(handler: (req: Request) => Promise<Response>) {
+  return async (req: Request): Promise<Response> => {
+    const res = await handler(req);
+    try {
+      const origin = req.headers.get('origin') || '';
+      if (origin && CORS_ORIGINS.includes(origin) && res.status >= 200 && res.status <= 599 &&
+          res.headers.get('Access-Control-Allow-Origin') !== origin) {
+        const headers = new Headers(res.headers);
+        headers.set('Access-Control-Allow-Origin', origin);
+        headers.set('Vary', 'Origin');
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+      }
+    } catch (_) { /* the CORS fix-up must never break a response */ }
+    return res;
+  };
+}
+const serveWithRequestCors = (handler: (req: Request) => Promise<Response>) => serve(withRequestCors(handler));
+
+serveWithRequestCors(async (req) => {
   const reqCors = corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: reqCors });
 
@@ -4954,7 +5044,10 @@ serve(async (req) => {
         const psiRes = await fetch(psiUrl, { signal: AbortSignal.timeout(90000) });
         const psiData = await psiRes.json();
         if (psiData.error) return json({ error: psiData.error.message || 'PSI error', code: psiData.error.code });
-        return json({ data: psiData });
+        // `lite: true` callers (the public Free Site Review) only read category
+        // scores, a few audit fields and the CrUX field data. The full report is
+        // ~500KB per scan (screenshots, network traces), so send just that.
+        return json({ data: body.lite ? trimPsiReport(psiData) : psiData });
       } catch (psiErr) {
         const isTimeout = psiErr instanceof Error && (psiErr.name === 'TimeoutError' || psiErr.message.includes('timeout'));
         return json({ error: isTimeout ? 'timeout' : 'fetch_failed', message: String(psiErr) });
@@ -7458,9 +7551,20 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
           </div>
         </div>
       `);
-      const ericEmailed = await emailOk(ERIC, `New Audit Lead: ${clientName} (${url}) — ${score}/100`, ericHtml);
+      // Subjects per tool, and no empty "()" when there is no URL (the Local
+      // Visibility quiz has none). The business name is cleaned for subjects.
+      const subjName = leadSubjectName(clientName);
+      const scoreTxt = typeof score === 'number' ? `${score}/100` : 'no score';
+      const isLocalVisibility = tool === 'local_visibility';
+      const ericSubject = isLocalVisibility
+        ? `New Local Visibility lead: ${subjName} — ${scoreTxt}`
+        : `New Audit Lead: ${subjName}${url ? ` (${String(url).slice(0, 120)})` : ''} — ${scoreTxt}`;
+      const leadSubject = isLocalVisibility
+        ? `Your Local Visibility results for ${subjName}`
+        : `Your free site score for ${subjName}`;
+      const ericEmailed = await emailOk(ERIC, ericSubject, ericHtml);
       let leadEmailed = false;
-      if (clientEmail && userConfirmHtml) leadEmailed = await emailOk(clientEmail, `Your free site score for ${clientName}`, userConfirmHtml, CLIENT_OPTS);
+      if (clientEmail && userConfirmHtml) leadEmailed = await emailOk(clientEmail, leadSubject, sanitizeLeadEmailHtml(userConfirmHtml), CLIENT_OPTS);
       return json({ ok: true, emailed: ericEmailed, lead_emailed: leadEmailed });
     }
 
