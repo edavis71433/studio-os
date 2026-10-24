@@ -4,6 +4,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 // Behavior is byte-identical; route logic, gates, and tables stay here.
 import { corsFor, cors, CORS_ORIGINS } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
+import { checkDiscoverability, socialProfiles } from '../_shared/site_discovery.ts';
 import {
   verifyStaff, verifyAdminJwt, staffRevocation, atLeast, jwtIatMs,
   resolvePrincipal, ROLE_RANK, TENANT_ID, type Principal,
@@ -847,7 +848,7 @@ async function deepAudit(targetUrl: string) {
     onPage: { title: '', titleLength: 0, metaDescription: '', metaDescriptionLength: 0, canonical: null, h1Count: 0, h1Text: '', h2Count: 0, h3Count: 0, ogTitle: false, ogDescription: false, ogImage: false, ogUrl: false, twitterCard: false, wordCount: 0, imageCount: 0, imagesWithAlt: 0, internalLinks: 0, externalLinks: 0, favicon: false, langAttr: false },
     schema: { blocks: 0, types: [] as string[], hasLocalBusiness: false, hasOrganization: false, hasWebSite: false, hasBreadcrumb: false, localBusinessNAP: null as any },
     local: { phoneOnPage: false, phone: null as string | null, zipOnPage: false, googleMapsEmbed: false, hoursMentioned: false, socialLinks: [] as string[] },
-    discoverability: { robotsTxt: false, robotsTxtBlocksAll: false, sitemapDeclared: false, sitemapUrl: null as string | null, sitemapXml: false, sitemapUrlCount: 0 },
+    discoverability: { robotsTxt: false, robotsTxtBlocksAll: false, sitemapDeclared: false, sitemapUrl: null as string | null, sitemapXml: false, sitemapUrlCount: 0, sitemapIsIndex: false },
   };
 
   let normalized = (targetUrl || '').trim();
@@ -893,8 +894,11 @@ async function deepAudit(targetUrl: string) {
     }
   } catch (_) { /* blocked or unreachable → html stays empty → caller returns 'unreachable' */ }
 
+  // robots.txt + sitemap of the same site, fetched while the HTML is parsed
+  // (every hop SSRF-checked, bounded time and size; see _shared/site_discovery.ts).
+  const discovery = out.fetchedHtml ? checkDiscoverability(out.url, assertPublicHttpUrl, BROWSER_UA).catch(() => null) : null;
+
   if (html) {
-    const lc = html.toLowerCase();
     const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
     if (titleMatch) { out.onPage.title = titleMatch[1].replace(/\s+/g, ' ').trim(); out.onPage.titleLength = out.onPage.title.length; }
     const md1 = html.match(/<meta[^>]+name=["']description["'][^>]*content=["']([^"']*)["']/i);
@@ -970,10 +974,14 @@ async function deepAudit(targetUrl: string) {
     out.local.zipOnPage = /\b\d{5}(-\d{4})?\b/.test(bodyText);
     out.local.googleMapsEmbed = /maps\.google\.com\/maps|google\.com\/maps\/embed|maps\.googleapis|google\.com\/maps\?/i.test(html);
     out.local.hoursMentioned = /\b(mon|tue|wed|thu|fri|sat|sun)(day)?\b[\s\S]{0,40}\d{1,2}\s*(am|pm|:)/i.test(bodyText);
-    const socials = ['facebook.com','instagram.com','twitter.com','x.com','linkedin.com','youtube.com','tiktok.com','yelp.com','pinterest.com'];
-    for (const p of socials) if (lc.includes(p)) out.local.socialLinks.push(p);
+    // Profiles the page really links to (<a href>, JSON-LD sameAs), matched by
+    // host. A raw-text search counted Squarespace's xmlns:fb attribute as a
+    // Facebook page and "x.com" inside "dropbox.com" as an X profile.
+    out.local.socialLinks = socialProfiles(html, out.url, schemas);
   }
 
+  const disc = discovery ? await discovery : null;
+  if (disc) out.discoverability = disc;
   return out;
 }
 
@@ -4551,6 +4559,9 @@ function trimPsiReport(d: any) {
     audits[k] = {
       id: a && a.id, title: a && a.title, score: a ? a.score : null, scoreDisplayMode: a && a.scoreDisplayMode,
       displayValue: a && a.displayValue, numericValue: a && a.numericValue, numericUnit: a && a.numericUnit,
+      // Lighthouse 13 insights that bundle several pass/fail checks (document
+      // latency: redirects, server speed, compression) keep that small checklist.
+      ...(a && a.details && a.details.type === 'checklist' ? { details: { type: 'checklist', items: a.details.items } } : {}),
     };
   }
   const categories: Record<string, unknown> = {};
