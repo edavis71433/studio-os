@@ -326,17 +326,22 @@ export async function runProspectNurture(limit = 10): Promise<{ sent: number; sk
   if (Deno.env.get('NURTURE_DRIP') !== '1') return { sent: 0, skipped_off: true };
   const from = new Date(Date.now() - 21 * 86400_000).toISOString();  // not stale
   const to = new Date(Date.now() - 7 * 86400_000).toISOString();     // aged a week
-  const q = await svc(`audit_leads?client_email=not.is.null&nurture_sent_at=is.null&status=eq.new&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,client_email,business_name,url,score&order=created_at.asc&limit=${limit}`);
+  // tool != local_visibility: those leads took the six-question quiz, not the
+  // site review this email talks about (they already got their results).
+  const q = await svc(`audit_leads?client_email=not.is.null&nurture_sent_at=is.null&status=eq.new&tool=neq.local_visibility&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,client_email,business_name,url,score&order=created_at.asc&limit=${limit}`);
   if (!q.ok) return { sent: 0 };
   let sent = 0;
   for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_email: string; business_name?: string; url?: string; score?: number }>) {
     const scoreLine = typeof lead.score === 'number'
       ? `it scored <strong>${lead.score}/100</strong> at the time`
       : 'we sent you the findings at the time';
-    const html = `<p>Hi${lead.business_name ? ' — this is about ' + lead.business_name : ''},</p>
+    // Clean URLs: the site moved to Squarespace (the .html addresses only work
+    // through redirects now). The business name is visitor input, so escape it.
+    const bizName = lead.business_name ? String(lead.business_name).replace(/[<>&"]/g, '').slice(0, 120) : '';
+    const html = `<p>Hi${bizName ? ' — this is about ' + bizName : ''},</p>
 <p>About a week ago you ran the free site review on <strong>${(lead.url || 'your website').replace(/[<>&"]/g, '')}</strong> — ${scoreLine}.</p>
-<p>If you've made changes since, it's worth <a href="https://davisdigitalstudio.com/audit.html">running it again</a> to see the score move. And if any of the findings felt hard to act on, I'm happy to talk them through — a short call, no charge, no pitch.</p>
-<p><a href="https://davisdigitalstudio.com/contact.html">Book a free 15-minute call</a></p>
+<p>If you've made changes since, it's worth <a href="https://davisdigitalstudio.com/audit">running it again</a> to see the score move. And if any of the findings felt hard to act on, I'm happy to talk them through — a short call, no charge, no pitch.</p>
+<p><a href="https://calendly.com/eric-davisdigitalstudio/30min">Book a free call</a></p>
 <p>— Eric<br>Davis Digital Studio</p>`;
     const ok = await sendEmail(lead.client_email, 'Your website review, a week later', html);
     // Stamp regardless of send outcome (a suppressed/bounced address must not
