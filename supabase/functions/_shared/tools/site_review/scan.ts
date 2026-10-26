@@ -65,18 +65,24 @@ export function pageTable(pages: PageFacts[]) {
   };
 }
 
-export function vitalsTable(psi: PsiOutcome) {
+export function vitalsTable(psi: PsiOutcome, desktop: PsiOutcome | null = null) {
   if (!psi.ok || !psi.vitals.length) {
     return { title: 'Core Web Vitals (mobile)', note: "Google's speed test couldn't measure your homepage today, so these are left out of the score.", columns: ['Measure', 'Your site', 'Good is under', 'Status'], rows: [] as (string | number)[][] };
   }
   const label = { good: 'Good', needs_work: 'Needs work', poor: 'Slow' } as const;
+  // Desktop (Phase 4): shown beside the phone numbers, never part of the score.
+  const d = desktop && desktop.ok ? desktop : null;
+  const dv = (key: string) => d?.vitals.find((x) => x.key === key)?.display || '–';
+  const scores = d && d.scores.performance != null && psi.scores.performance != null
+    ? ` Google’s speed score: ${psi.scores.performance} on a phone, ${d.scores.performance} on a computer. Your score uses the phone result, since that is how most local customers arrive.` : '';
   return {
-    title: 'Core Web Vitals (mobile)',
-    note: "Google's measures of how fast and steady a page feels on a phone. Measured on the homepage" + (psi.vitals.some((v) => v.key === 'tbt') ? '; Total Blocking Time stands in for Interaction to Next Paint, which needs real-visitor data your site doesn’t have yet.' : '.'),
-    columns: ['Measure', 'Your site', 'Good is under', 'Status'],
-    rows: psi.vitals.map((v) => [v.label, v.display, vitalLimitDisplay(v.key), label[v.status]]),
+    title: 'Core Web Vitals',
+    note: "Google's measures of how fast and steady a page feels. Measured on the homepage" + (psi.vitals.some((v) => v.key === 'tbt') ? '; Total Blocking Time stands in for Interaction to Next Paint, which needs real-visitor data your site doesn’t have yet.' : '.') + scores,
+    columns: d ? ['Measure', 'Phone', 'Computer', 'Good is under', 'Phone status'] : ['Measure', 'Your site (phone)', 'Good is under', 'Status'],
+    rows: psi.vitals.map((v) => d ? [v.label, v.display, dv(v.key), vitalLimitDisplay(v.key), label[v.status]] : [v.label, v.display, vitalLimitDisplay(v.key), label[v.status]]),
   };
 }
+
 
 // Trimmed page facts for raw_results (no link lists or full text).
 const slim = (p: PageFacts) => ({ url: p.url, path: p.path, title: p.title, metaDescription: p.metaDescription, canonical: p.canonical, noindex: p.noindex, h1s: p.h1s, images: p.images, og: p.og, jsonldTypes: p.jsonld.items.map((i) => i['@type']).slice(0, 10), jsonldErrors: p.jsonld.parseErrors, telLinks: p.telLinks, phones: p.phonesInText, address: p.address, mapEmbed: p.mapEmbed, wordCount: p.wordCount, placeholder: p.placeholder, cta: p.cta, social: p.social, mixedContent: p.mixedContent });
@@ -90,6 +96,7 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
 
   // PageSpeed starts first: it is the slow one.
   const psiPromise = runPsi(inp.url, 40_000, deps.psiFetch);
+  const desktopPromise = runPsi(inp.url, 40_000, deps.psiFetch, 'desktop');
 
   progress({ step: 'pages', done: 0, total: MAX_PAGES });
   const home = await fetchHtml(inp.url, crawlDeps, Math.min(deadline, t0 + 12_000));
@@ -143,6 +150,14 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
     new Promise<PsiOutcome>((r) => { psiTimer = setTimeout(() => r({ ok: false, reason: 'timeout' }), Math.max(0, Math.min(deadline - 16_000, t0 + 42_000) - now())); }),
   ]);
   clearTimeout(psiTimer);
+  // The desktop run started at the same moment; give it a few more seconds at
+  // most, and leave it out if it isn't back.
+  let deskTimer: ReturnType<typeof setTimeout> | undefined;
+  const desktop = await Promise.race([
+    desktopPromise,
+    new Promise<PsiOutcome>((r) => { deskTimer = setTimeout(() => r({ ok: false, reason: 'timeout' }), Math.max(0, Math.min(4000, deadline - 16_000 - now()))); }),
+  ]);
+  clearTimeout(deskTimer);
   const broken = await brokenPromise;
 
   progress({ step: 'search' });
@@ -173,11 +188,11 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
       summary: narrative.summary,
       items: narrative.findings.map(({ check_id: _id, ...f }) => f),
       top_three: narrative.top_three,
-      tables: [vitalsTable(psi), pageTable(pages)],
+      tables: [vitalsTable(psi, desktop), pageTable(pages)],
     },
     raw: {
       pages: pages.map(slim), discoverability: discovery, http_redirect: httpRedirect, broken_links: broken, links_checked: linkList.length,
-      psi, checks: checks.map(({ draft: _d, ...c }) => c), narrative: { source: narrative.source, attempts: narrative.attempts },
+      psi, psi_desktop: desktop, checks: checks.map(({ draft: _d, ...c }) => c), narrative: { source: narrative.source, attempts: narrative.attempts },
       elapsed_ms: now() - t0,
     },
     costUsd: narrative.costUsd,

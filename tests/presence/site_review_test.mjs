@@ -166,7 +166,8 @@ ok('narrative: request uses Haiku 5.5, structured output, no temperature', sentB
 ok('narrative: cost logged from usage ($0.10 / $0.50 per million)', Math.abs(nar.costUsd - (4000 * 0.1 + 1200 * 0.5) / 1e6) < 1e-9);
 
 // ── the site-review function, end to end ──
-Object.assign(scanDeps, { guard: allowAll, siteFetch, psiFetch: () => Promise.resolve(new Response(JSON.stringify(PSI), { status: 200 })), claudeFetch: claudeOk });
+const psiUrls = [];
+Object.assign(scanDeps, { guard: allowAll, siteFetch, psiFetch: (u) => { psiUrls.push(String(u)); return Promise.resolve(new Response(JSON.stringify(PSI), { status: 200 })); }, claudeFetch: claudeOk });
 const req = (body, ip = '203.0.113.50') => new Request('https://x/functions/v1/site-review', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip, origin: 'https://tools.davisdigitalstudio.com' }, body: JSON.stringify(body) });
 const readAll = async (r) => (await r.text()).split('\n').filter(Boolean).map((l) => JSON.parse(l));
 
@@ -189,6 +190,7 @@ const row = fake.state.tables.tool_reports.find((x) => x.id === doneEv?.report_i
 ok('function: report saved with input, scores, findings and raw results', !!row && row.tool === 'site_review' && row.input.business_name === 'Sample Bistro' && row.input.city === 'Burbank' && typeof row.scores.overall === 'number' && row.findings.items.length > 0 && row.raw_results.pages.length >= 4);
 ok('function: answer is the teaser (two findings, no tables)', doneEv.report.unlocked === false && doneEv.report.findings.length === 2 && doneEv.report.tables.length === 0 && doneEv.report.pillars.length === 4);
 ok('function: full report has the CWV and per-page tables', row.findings.tables.length === 2 && row.findings.tables[0].rows.length === 4 && row.findings.tables[1].columns.includes('Images missing alt'));
+ok('desktop: a computer column sits beside the phone numbers; the score stays phone-only', row.findings.tables[0].columns.join() === 'Measure,Phone,Computer,Good is under,Phone status' && /52 on a phone, 52 on a computer/.test(row.findings.tables[0].note) && row.raw_results.psi_desktop?.ok === true && psiUrls.some((u) => /strategy=desktop/.test(u)) && psiUrls.some((u) => /strategy=mobile/.test(u)));
 ok('function: scan cost and cache recorded', fake.state.tables.tool_usage_log.some((u) => u.kind === 'scan' && u.report_id === row.id && u.cost_usd > 0) && fake.state.tables.tool_scan_cache.some((c) => c.report_id === row.id && c.cache_key === 'example-bistro.com'));
 ok('function: the crawler stayed on the site and checked robots, sitemap and http→https', siteRequests.every((s) => s.includes('example-bistro.com')) && siteRequests.some((s) => s.endsWith('/robots.txt')) && siteRequests.some((s) => s.startsWith('GET http://www.example-bistro.com/')));
 

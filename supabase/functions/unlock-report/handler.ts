@@ -17,6 +17,11 @@ import { clientIp, hashId, isEmail, logUsage, rateHit } from '../_shared/tools/g
 import { publicReport } from '../_shared/tools/report_view.ts';
 import { reportReadyEmail, sendEmail } from '../_shared/tools/email.ts';
 import { maySend, unsubscribeUrl } from '../_shared/email_infra.ts';
+import { reportPdf } from '../_shared/tools/pdf.ts';
+
+/** "Cedar-Core-Site-Review.pdf" */
+export const pdfName = (business: string | null, toolName: string) =>
+  `${(business || 'Your').normalize('NFKD').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'Your'}-${toolName.replace(/\s+/g, '-')}.pdf`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clip = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
@@ -101,8 +106,12 @@ export async function handler(req: Request): Promise<Response> {
     let emailed = false;
     if ((await maySend(email, { critical: true })).ok) {
       const unsub = await unsubscribeUrl(email);
-      const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: unsub });
-      emailed = (await sendEmail({ to: email, ...msg, unsubscribeUrl: unsub })).ok;
+      // Phase 4: the full report as a PDF attachment. If it can't be built,
+      // the email still goes, pointing at the page's "Save as PDF" button.
+      let pdf: Uint8Array | null = null;
+      try { pdf = reportPdf(view, reportUrl(reportId)); } catch { pdf = null; }
+      const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: unsub, pdfAttached: !!pdf });
+      emailed = (await sendEmail({ to: email, ...msg, unsubscribeUrl: unsub, ...(pdf ? { attachments: [{ filename: pdfName(view.business.name, TOOL_NAMES[tool]), content: pdf }] } : {}) })).ok;
     }
     const alerted = await triggerLeadAlert(reportId);
     await logUsage({ tool, kind: 'unlock', ip_hash: ipHash, email, report_id: reportId, note: `emailed=${emailed} alerted=${alerted}` });

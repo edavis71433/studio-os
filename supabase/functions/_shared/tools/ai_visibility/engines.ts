@@ -15,10 +15,12 @@ export interface Engine {
   ask: (question: string, ctx: { city: string }, budgetMs: number, fetchImpl: typeof fetch) => Promise<EngineResult>;
 }
 
-// Claude Opus 5.5 with live web search: what someone asking Claude for a
-// recommendation gets today. $4 / $20 per million tokens, $10 per 1,000 searches.
-export const CLAUDE_ENGINE_MODEL = 'claude-opus-5-5';
-const OPUS_IN = 4 / 1_000_000, OPUS_OUT = 20 / 1_000_000, SEARCH = 10 / 1000;
+// Claude Sonnet 5.5 with live web search. Opus 5.5 measured about $0.80 a
+// scan live (Oct 26 2026), above the spec's $0.30-0.60, so Eric chose Sonnet
+// 5.5: same web search, about half the cost. $2 / $10 per million tokens,
+// $10 per 1,000 searches.
+export const CLAUDE_ENGINE_MODEL = 'claude-sonnet-5-5';
+const MODEL_IN = 2 / 1_000_000, MODEL_OUT = 10 / 1_000_000, SEARCH = 10 / 1000;
 
 const claudeKey = () => Deno.env.get('ANTHROPIC_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || '';
 
@@ -74,7 +76,7 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
     // If this account can't use the fallback beta, ask again without it.
     if (r.status === 400 && withFallbacks && /fallback/i.test(JSON.stringify(j?.error || ''))) { withFallbacks = false; round--; continue; }
     const u = j?.usage || {};
-    cost += (Number(u.input_tokens) || 0) * OPUS_IN + (Number(u.output_tokens) || 0) * OPUS_OUT + (Number(u.server_tool_use?.web_search_requests) || 0) * SEARCH;
+    cost += (Number(u.input_tokens) || 0) * MODEL_IN + (Number(u.output_tokens) || 0) * MODEL_OUT + (Number(u.server_tool_use?.web_search_requests) || 0) * SEARCH;
     if (!r.ok || !j) return { ok: false, reason: 'error', costUsd: cost };
     if (j.stop_reason === 'refusal') return { ok: false, reason: 'refusal', costUsd: cost };
     const blocks = Array.isArray(j.content) ? j.content : [];
