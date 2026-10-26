@@ -284,7 +284,7 @@ ok('page: fires scan_started, scan_completed and scan_failed; handles needs_deta
 ok('redirects: /ai-visibility serves the page', /^\/ai-visibility\s+\/ai-visibility\.html\s+200$/m.test(file('_redirects')));
 ok('deploy: ai-visibility ships to production', file('.github/workflows/deploy.yml').includes('functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}'));
 const eng = file('supabase/functions/_shared/tools/ai_visibility/engines.ts');
-ok('engine: Claude Sonnet 5.5, live web search, no temperature', eng.includes("'claude-sonnet-5-5'") && eng.includes("'web_search_20260209'") && !/temperature/.test(eng.replace(/\/\/.*$/gm, '')));
+ok('engine: Claude Sonnet 5.5, live web search called directly (citations), no temperature', eng.includes("'claude-sonnet-5-5'") && eng.includes("'web_search_20260209'") && eng.includes("allowed_callers: ['direct']") && !/temperature/.test(eng.replace(/\/\/.*$/gm, '')));
 
 const passed = results.filter((x) => x.p).length;
 console.log(`\n════ FREE TOOLS PHASE 3 AI VISIBILITY: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
