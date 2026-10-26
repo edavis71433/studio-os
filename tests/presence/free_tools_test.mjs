@@ -94,6 +94,12 @@ ok('unlock: lead is mirrored into audit_leads for the Studio OS pipeline', mirro
 const visitorMail = fake.state.emails.find((e) => e.to[0] === 'pat@example.com');
 ok('unlock: visitor gets "Your report is ready" with the report link and one-click unsubscribe', out.email_queued === true && visitorMail?.subject === 'Your Site Review is ready' && visitorMail.html.includes(`/report/${sampleId}`) && !!visitorMail.headers['List-Unsubscribe'] && visitorMail.from === 'Eric Davis <eric@davisdigitalstudio.com>');
 const alertMail = fake.state.emails.find((e) => e.to[0] === 'eric@davisdigitalstudio.com');
+const att = visitorMail?.attachments?.[0];
+const pdfText = att ? atob(att.content) : '';
+ok('unlock: the full report is attached as a PDF named after the business', !!att && att.filename === 'Cedar-Core-Site-Review.pdf' && pdfText.startsWith('%PDF-1.4') && pdfText.trimEnd().endsWith('%%EOF') && /A PDF copy is attached/.test(visitorMail.html));
+ok('unlock: the attached PDF carries every finding and the Calendly link', ['The homepage takes almost 5 seconds', 'Burbank doesn', 'No business details for Google', 'calendly.com/eric-davisdigitalstudio/30min'].every((t) => pdfText.includes(t)));
+const xrefAt = Number(/startxref\n(\d+)/.exec(pdfText)?.[1]);
+ok('pdf: the cross-reference table is where the file says it is (valid structure)', pdfText.slice(xrefAt, xrefAt + 4) === 'xref');
 ok('unlock: Eric gets the lead alert with the report link, reply-to the visitor', alertMail?.subject === 'New lead: Cedar & Core ran Site Review' && alertMail.html.includes(`/report/${sampleId}`) && alertMail.reply_to === 'pat@example.com');
 ok('unlock: logged in the usage log', fake.state.tables.tool_usage_log.some((u) => u.kind === 'unlock' && u.report_id === sampleId));
 
@@ -177,6 +183,9 @@ fake.state.spend = 0;
 
 // ── structural ──
 const pageJs = read('tool-report.js');
+const { pdfString, wrap, textWidth } = await import('../../supabase/functions/_shared/tools/pdf.ts');
+ok('pdf: parentheses and backslashes escaped; curly quotes and dashes in WinAnsi; emoji safe', pdfString('a (b) \\ c') === 'a \\(b\\) \\\\ c' && pdfString('\u2019\u2014') === '\\222\\227' && pdfString('\u{1F600}') === '?');
+ok('pdf: wrapping keeps every line inside the width, long words broken', wrap('word '.repeat(60), 'F1', 10, 200).every((l) => textWidth(l, 'F1', 10) <= 200) && wrap('x'.repeat(300), 'F1', 10, 100).length > 2);
 ok('report page: never uses innerHTML (report text is untrusted)', !/innerHTML/.test(pageJs));
 ok('report page: fires the spec GA4 events', ['report_viewed', 'email_captured', 'calendly_clicked', 'pdf_downloaded'].every((e) => pageJs.includes(`'${e}'`)));
 ok('report page: noindex and print stylesheet', /noindex/.test(read('report.html')) && /@media print/.test(read('tool-report.css')));

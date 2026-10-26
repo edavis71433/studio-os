@@ -10,9 +10,15 @@ import { ERIC_EMAIL, FROM } from './config.ts';
 const RESEND_URL = () => Deno.env.get('RESEND_API_URL') || 'https://api.resend.com/emails';
 const RESEND_KEY = () => Deno.env.get('RESEND_KEY') || Deno.env.get('RESEND_API_KEY') || '';
 
+function toBase64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
 export const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
-export async function sendEmail(msg: { to: string; subject: string; html: string; text: string; replyTo?: string; unsubscribeUrl?: string }): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function sendEmail(msg: { to: string; subject: string; html: string; text: string; replyTo?: string; unsubscribeUrl?: string; attachments?: { filename: string; content: Uint8Array }[] }): Promise<{ ok: boolean; id?: string; error?: string }> {
   if (!RESEND_KEY()) return { ok: false, error: 'resend_not_configured' };
   const headers: Record<string, string> = {};
   if (msg.unsubscribeUrl) {
@@ -23,7 +29,7 @@ export async function sendEmail(msg: { to: string; subject: string; html: string
     const r = await fetch(RESEND_URL(), {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: [msg.to], reply_to: msg.replyTo || ERIC_EMAIL, subject: msg.subject, html: msg.html, text: msg.text, headers }),
+      body: JSON.stringify({ from: FROM, to: [msg.to], reply_to: msg.replyTo || ERIC_EMAIL, subject: msg.subject, html: msg.html, text: msg.text, headers, ...(msg.attachments?.length ? { attachments: msg.attachments.map((a) => ({ filename: a.filename, content: toBase64(a.content) })) } : {}) }),
       signal: AbortSignal.timeout(10_000),
     });
     const out = await r.json().catch(() => ({}));
@@ -45,7 +51,7 @@ ${footer}
 const button = (href: string, label: string) =>
   `<a href="${esc(href)}" style="display:inline-block;background:${NAVY};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 22px;border-radius:999px;">${esc(label)}</a>`;
 
-export function reportReadyEmail(p: { name?: string | null; toolName: string; businessName?: string | null; score: number | null; label: string | null; reportUrl: string; calendlyUrl: string; unsubscribeUrl: string }) {
+export function reportReadyEmail(p: { name?: string | null; toolName: string; businessName?: string | null; score: number | null; label: string | null; reportUrl: string; calendlyUrl: string; unsubscribeUrl: string; pdfAttached?: boolean }) {
   const hi = p.name ? `Hi ${esc(p.name)},` : 'Hi,';
   const forWhat = p.businessName ? ` for ${esc(p.businessName)}` : '';
   const scoreLine = p.score != null ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Your overall score is <strong>${p.score}</strong>${p.label ? ` (${esc(p.label)})` : ''}. The full report has every finding, the three fixes that matter most, and the details behind each one.</p>` : '';
@@ -54,7 +60,7 @@ export function reportReadyEmail(p: { name?: string | null; toolName: string; bu
 <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Your ${esc(p.toolName)}${forWhat} is ready.</p>
 ${scoreLine}
 <p style="margin:0 0 22px;">${button(p.reportUrl, 'Open your report')}</p>
-<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:${MUTED};">To save a PDF, open the report and use the "Save as PDF" button.</p>
+<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:${MUTED};">${p.pdfAttached ? 'A PDF copy is attached to this email.' : 'To save a PDF, open the report and use the "Save as PDF" button.'}</p>
 <p style="margin:18px 0 0;font-size:15px;line-height:1.6;">If you'd like me to walk you through it, <a href="${esc(p.calendlyUrl)}" style="color:${NAVY};font-weight:600;">book a free 30 minute call</a>.</p>
 <p style="margin:18px 0 0;font-size:15px;line-height:1.6;">Eric Davis<br><span style="color:${MUTED};">Davis Digital Studio</span></p>`,
     `<p style="font-size:12px;color:${MUTED};margin:18px 4px 0;line-height:1.6;">You're getting this because you asked for this report on davisdigitalstudio.com. Davis Digital Studio LLC · Burbank, California · <a href="${esc(p.unsubscribeUrl)}" style="color:${MUTED};">Unsubscribe</a></p>`,
@@ -65,7 +71,7 @@ Your ${p.toolName}${p.businessName ? ` for ${p.businessName}` : ''} is ready.${p
 
 Open your report: ${p.reportUrl}
 
-To save a PDF, open the report and use the "Save as PDF" button.
+${p.pdfAttached ? 'A PDF copy is attached to this email.' : 'To save a PDF, open the report and use the "Save as PDF" button.'}
 
 If you'd like me to walk you through it, book a free 30 minute call: ${p.calendlyUrl}
 
