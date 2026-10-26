@@ -74,7 +74,7 @@ const SCHEMA_FIT: Record<string, RegExp> = {
   other: /^(LocalBusiness|Organization|ProfessionalService|.+Business|.+Service)$/,
 };
 // Any schema type that describes a business (exact names and the usual suffixes).
-const LOCALISH = /^(?:LocalBusiness|Organization|Corporation|NGO|ProfessionalService|Restaurant|Bakery|Brewery|Winery|Distillery|CafeOrCoffeeShop|BarOrPub|Plumber|Electrician|Locksmith|Dentist|Physician|Optician|Florist|Attorney|Notary|DaySpa|HealthClub|ExerciseGym|Physiotherapy|TattooParlor|MovingCompany|HousePainter|PestControl|\w*(?:Business|Store|Service|Establishment|Salon|Restaurant|Contractor|Clinic|Gym|Spa|Shop|Center|Agency|Office))$/;
+const LOCALISH = /^(?:LocalBusiness|Organization|Corporation|NGO|ProfessionalService|Restaurant|Bakery|Brewery|Winery|Distillery|CafeOrCoffeeShop|BarOrPub|Plumber|Electrician|Locksmith|Dentist|Physician|Optician|Florist|Attorney|Notary|DaySpa|HealthClub|ExerciseGym|Physiotherapy|TattooParlor|MovingCompany|HousePainter|PestControl|AutoRepair|AutoDealer|AutoBodyShop|AutoWash|GasStation|Hotel|Motel|Resort|BedAndBreakfast|Hostel|Campground|RealEstateAgent|LegalService|AccountingService|InsuranceAgency|FinancialService|ChildCare|Preschool|School|Library|Church|PlaceOfWorship|VeterinaryCare|AnimalShelter|PetStore|Pharmacy|Hospital|TravelAgency|EmploymentAgency|SelfStorage|SportsClub|BowlingAlley|GolfCourse|NightClub|MovieTheater|ArtGallery|Museum|Zoo|Aquarium|AmusementPark|\w*(?:Business|Store|Service|Establishment|Salon|Restaurant|Contractor|Clinic|Gym|Spa|Shop|Center|Agency|Office|Dealer|Repair|Station|Care|Agent|Hotel|Lodging|Studio|Company|Firm|Practice|Bar|Pub|Cafe|Garage|Wash|Market|Theater|Gallery|Club))$/;
 
 function typesOf(items: Record<string, unknown>[]): string[] {
   const out: string[] = [];
@@ -138,7 +138,9 @@ export function runChecks(d: SiteData): Check[] {
   const badLen = pages.filter((p) => p.title && (p.title.length < 30 || p.title.length > 60));
   add({
     id: 'title_length', area: 'Titles and descriptions', pillar: 'search', weight: 2,
-    status: !badLen.length ? 'pass' : badLen.some((p) => p.path === homePath) ? 'fail' : 'warn',
+    // Most builder homepages run short ("Sample Bistro"); only a homepage
+    // title well outside the range is a failure (audit 2.2).
+    status: !badLen.length ? 'pass' : badLen.some((p) => p.path === homePath && (p.title.length < 20 || p.title.length > 70)) ? 'fail' : 'warn',
     evidence: badLen.length ? badLen.slice(0, 4).map((p) => `${p.path}: ${q(p.title)} (${p.title.length} characters)`).join('; ') : 'All titles are 30 to 60 characters',
     draft: badLen.length ? (() => { const p = badLen[0]; const short = p.title.length < 30; return { title: short ? `The ${p.path === '/' ? 'homepage' : p.path} title is too short to say much` : `The ${p.path === '/' ? 'homepage' : p.path} title gets cut off in Google`, what: `The title on ${p.path} is ${q(p.title)}, ${p.title.length} characters${badLen.length > 1 ? `, and ${badLen.length - 1} other page${badLen.length > 2 ? 's are' : ' is'} outside the 30 to 60 character range` : ''}.`, why: short ? 'A short title leaves out the words people actually search for, like what you do and where.' : 'Google cuts titles off at about 60 characters, so the end of yours, often the part that says where you are, never shows.', fix: 'Rewrite the title to fit 30 to 60 characters with your service and city in it.' }; })() : undefined,
   });
@@ -184,13 +186,18 @@ export function runChecks(d: SiteData): Check[] {
   });
 
   // ── Headings (Search)
-  const h1Bad = pages.filter((p) => p.h1s.length !== 1 || !p.h1s[0]);
-  const homeH1 = home.h1s.length !== 1 || !home.h1s[0];
+  // Judged on the page's own content. An extra H1 in the header or footer (a
+  // site-wide promo block on Squarespace, say) is the builder's doing: it
+  // still shows, but as a warning, never a homepage failure.
+  const h1Off = (p: PageFacts) => (p.contentH1s ?? p.h1s).length !== 1 || !(p.contentH1s ?? p.h1s)[0];
+  const h1Bad = pages.filter((p) => h1Off(p) || p.h1s.length !== (p.contentH1s ?? p.h1s).length);
+  const homeH1 = h1Off(home);
+  const onlyOutside = h1Bad.length > 0 && h1Bad.every((p) => !h1Off(p));
   add({
     id: 'h1_one', area: 'Headings', pillar: 'search', weight: 2,
     status: homeH1 ? 'fail' : h1Bad.length ? 'warn' : 'pass',
     evidence: h1Bad.length ? h1Bad.slice(0, 4).map((p) => `${p.path}: ${p.h1s.length === 0 ? 'no H1' : p.h1s.length > 1 ? `${p.h1s.length} H1s` : 'empty H1'}`).join('; ') : `One main heading per page (homepage: ${q(home.h1s[0] || '')})`,
-    draft: h1Bad.length ? { title: homeH1 ? (home.h1s.length === 0 ? 'Your homepage has no main heading' : home.h1s.length > 1 ? `Your homepage has ${home.h1s.length} main headings` : 'Your homepage main heading is empty') : 'Some pages have no single main heading', what: homeH1 ? (home.h1s.length > 1 ? `The homepage has ${home.h1s.length} H1 headings (${list(home.h1s.map((h) => q(h, 40)), 2)})${h1Bad.length > 1 ? `, and ${h1Bad.length - 1} other page${h1Bad.length > 2 ? 's don\u2019t' : ' doesn\u2019t'} have exactly one either` : ''}.` : `The homepage has ${home.h1s.length === 0 ? 'no H1 (main heading)' : 'an empty H1 (main heading)'}${h1Bad.length > 1 ? `, and so do ${h1Bad.length - 1} other pages` : ''}.`) : `${list(paths(h1Bad))} ${h1Bad.length > 1 ? "don't" : "doesn't"} have exactly one H1 (main heading).`, why: 'The main heading is how Google and screen readers learn what a page is about at a glance.', fix: 'Give each page one clear main heading that names what the page offers.' } : undefined,
+    draft: h1Bad.length ? { title: homeH1 ? (home.h1s.length === 0 ? 'Your homepage has no main heading' : home.h1s.length > 1 ? `Your homepage has ${home.h1s.length} main headings` : 'Your homepage main heading is empty') : 'Some pages have no single main heading', what: homeH1 ? (home.h1s.length > 1 ? `The homepage has ${home.h1s.length} H1 headings (${list(home.h1s.map((h) => q(h, 40)), 2)})${h1Bad.length > 1 ? `, and ${h1Bad.length - 1} other page${h1Bad.length > 2 ? 's don\u2019t' : ' doesn\u2019t'} have exactly one either` : ''}.` : `The homepage has ${home.h1s.length === 0 ? 'no H1 (main heading)' : 'an empty H1 (main heading)'}${h1Bad.length > 1 ? `, and so do ${h1Bad.length - 1} other pages` : ''}.`) : onlyOutside ? `${list(paths(h1Bad))} ${h1Bad.length > 1 ? 'have' : 'has'} a second H1 (main heading) in the header or footer, outside the page content.` : `${list(paths(h1Bad))} ${h1Bad.length > 1 ? "don't" : "doesn't"} have exactly one H1 (main heading).`, why: 'The main heading is how Google and screen readers learn what a page is about at a glance.', fix: 'Give each page one clear main heading that names what the page offers.' } : undefined,
   });
   const skipped = pages.filter((p) => p.headingLevels.some((l, i) => i > 0 && l > p.headingLevels[i - 1] + 1));
   add({
@@ -216,7 +223,7 @@ export function runChecks(d: SiteData): Check[] {
   const strayNoindex = pages.filter((p) => p.noindex);
   add({
     id: 'noindex', area: 'Indexing', pillar: 'search', weight: 3,
-    status: strayNoindex.length ? 'fail' : 'pass',
+    status: strayNoindex.some((p) => p.path === homePath) ? 'fail' : strayNoindex.length ? 'warn' : 'pass',
     evidence: strayNoindex.length ? `noindex on ${list(paths(strayNoindex))}` : 'No page asks Google to stay away',
     draft: strayNoindex.length ? { title: strayNoindex.some((p) => p.path === homePath) ? 'Your homepage tells Google not to list it' : `${strayNoindex.length} page${strayNoindex.length > 1 ? 's tell' : ' tells'} Google not to list ${strayNoindex.length > 1 ? 'them' : 'it'}`, what: `${list(paths(strayNoindex))} ${strayNoindex.length > 1 ? 'carry' : 'carries'} a "noindex" tag, which keeps the page out of Google entirely.`, why: 'A page with noindex can never show up in search, no matter how good it is. This is often left on by accident after a redesign.', fix: 'Remove the noindex setting from pages you want people to find.' } : undefined,
   });
@@ -266,12 +273,14 @@ export function runChecks(d: SiteData): Check[] {
   const fit = SCHEMA_FIT[d.businessType] || SCHEMA_FIT.other;
   const node = businessNode(allItems);
   const nodeTypes = node ? typesOf([node]) : [];
-  const fits = nodeTypes.some((t) => fit.test(t));
+  // "Other" covers dentists, lawyers, auto shops, hotels…: any specific
+  // business type fits it (audit 2.7).
+  const fits = nodeTypes.some((t) => fit.test(t) || (d.businessType === 'other' && LOCALISH.test(t)));
   add({
     id: 'schema_type', area: 'Structured data', pillar: 'search', weight: 2,
     status: !blocks ? 'na' : fits ? 'pass' : node ? 'warn' : 'fail',
     evidence: node ? `Business type in the code: ${list(nodeTypes)}` : `No business type in the code (found: ${list(types, 4) || 'nothing'})`,
-    draft: blocks && !fits ? { title: node ? 'Your structured data uses a generic business type' : 'Your structured data doesn’t describe a business', what: node ? `The structured data calls you a ${list(nodeTypes)}, not a type specific to a ${d.businessType} business.` : `The structured data describes ${list(types, 3) || 'the page'}, but nothing says what kind of business you are.`, why: `A specific type (like ${d.businessType === 'restaurant' ? 'Restaurant' : d.businessType === 'salon' ? 'HairSalon' : 'LocalBusiness'}) helps Google show you for the right searches.`, fix: 'Set the structured data type to the one that matches your business.' } : undefined,
+    draft: blocks && !fits ? { title: node ? 'Your structured data uses a generic business type' : 'Your structured data doesn’t describe a business', what: node ? `The structured data calls you a ${list(nodeTypes)}, not a type specific to ${d.businessType === 'other' ? 'your kind of business' : `a ${d.businessType} business`}.` : `The structured data describes ${list(types, 3) || 'the page'}, but nothing says what kind of business you are.`, why: `A specific type (like ${d.businessType === 'restaurant' ? 'Restaurant' : d.businessType === 'salon' ? 'HairSalon' : 'LocalBusiness'}) helps Google show you for the right searches.`, fix: 'Set the structured data type to the one that matches your business.' } : undefined,
   });
   const hasName = !!node?.name, hasAddr = !!node?.address, hasPhone = !!node?.telephone, hasHours = !!(node?.openingHours || node?.openingHoursSpecification);
   const missingParts = [!hasName && 'name', !hasAddr && 'address', !hasPhone && 'phone', !hasHours && 'hours'].filter(Boolean) as string[];
@@ -409,11 +418,17 @@ export function runChecks(d: SiteData): Check[] {
   // ── Local
   const node2 = businessNode(allItems);
   const sAddr = schemaAddress(node2);
-  const city = d.city || sAddr.city;
-  const cityN = norm(city);
+  // "Burbank, CA", "Burbank and Glendale", "Los Angeles / Burbank": any named
+  // place counts, state codes don't (audit 2.1: the field says "city or
+  // service area", and the whole string never matched).
+  const cityParts = (d.city || sAddr.city).split(/\s*(?:,|;|\/|&|\+|\band\b|\bor\b)\s*/i).map((x) => x.trim()).filter((x) => x.length >= 3 && !/^california$/i.test(x));
+  const city = cityParts[0] || d.city || sAddr.city;
+  const cityKeys = cityParts.map(norm).filter(Boolean);
+  const cityN = cityKeys[0] || '';
+  const inPlaces = (ps: string[]) => ps.some((x) => cityKeys.some((k) => norm(x).includes(k)));
   const cityPlaces = cityN ? [home.title, ...home.h1s, home.firstParagraph] : [];
-  const cityHit = cityN && cityPlaces.some((s) => norm(s).includes(cityN));
-  const cityAnywhere = cityN && pages.some((p) => [p.title, ...p.h1s, p.firstParagraph].some((s) => norm(s).includes(cityN)));
+  const cityHit = cityN && inPlaces(cityPlaces);
+  const cityAnywhere = cityN && pages.some((p) => inPlaces([p.title, ...p.h1s, p.firstParagraph]));
   add({
     id: 'city_mention', area: 'Local', pillar: 'local', weight: 3,
     status: !cityN ? 'na' : cityHit ? 'pass' : cityAnywhere ? 'warn' : 'fail',
@@ -481,6 +496,16 @@ export function runChecks(d: SiteData): Check[] {
         evidence: `${o.count} image${o.count > 1 ? 's' : ''} larger than needed${o.savingsKb ? ` (about ${o.savingsKb} KB to save)` : ''}`,
         draft: { title: `${o.count} image${o.count > 1 ? 's are' : ' is'} bigger than ${o.count > 1 ? 'they need' : 'it needs'} to be`, what: `Google flagged ${o.count} oversized image${o.count > 1 ? 's' : ''} on the homepage${o.savingsKb ? `, about ${o.savingsKb >= 1024 ? `${(o.savingsKb / 1024).toFixed(1)} MB` : `${o.savingsKb} KB`} more than needed` : ''}.`, why: 'Oversized photos are the most common reason small business sites load slowly on phones.', fix: 'Serve each photo at the size it is actually shown.' },
       });
+    }
+  }
+  // A homepage cut off at the size cap has lost its footer, where the address,
+  // phone, map and social links live: those checks are skipped, not failed
+  // (audit 2.10; the scan adds a note).
+  if (home.truncated) {
+    for (const c of checks) {
+      if (['address_on_site', 'address_footer', 'tel_link', 'social_links', 'privacy_policy', 'map_embed', 'nap_consistency'].includes(c.id) && c.status !== 'pass') {
+        c.status = 'na'; c.draft = undefined; c.evidence = 'Not checked: the homepage is larger than we can read in full';
+      }
     }
   }
   return checks;

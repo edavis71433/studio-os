@@ -13,7 +13,7 @@ globalThis.fetch = fake.fetch;
 const { assertPublicHttpUrl, normalizeSiteUrl } = await import('../../supabase/functions/_shared/tools/url_guard.ts');
 const { parsePage } = await import('../../supabase/functions/_shared/tools/site_review/html.ts');
 const { socialProfiles } = await import('../../supabase/functions/_shared/site_discovery.ts');
-const { candidatesFrom, pickPages, looksBlocked, sitemapLocs } = await import('../../supabase/functions/_shared/tools/site_review/crawl.ts');
+const { candidatesFrom, pickPages, looksBlocked, sitemapLocs, httpRedirectsToHttps } = await import('../../supabase/functions/_shared/tools/site_review/crawl.ts');
 const { readPsi } = await import('../../supabase/functions/_shared/tools/site_review/psi.ts');
 const { runChecks, pillarScores, overallScore, deriveBusinessName, andList } = await import('../../supabase/functions/_shared/tools/site_review/checks.ts');
 const { writeNarrative, groundedIn } = await import('../../supabase/functions/_shared/tools/site_review/narrative.ts');
@@ -128,6 +128,74 @@ ok('scoring: PageSpeed failure → Performance "Couldn\'t measure today" and lef
 ok('scoring: noindex on the homepage is a Fix-now failure', runChecks({ ...base, pages: [{ ...allPages[0], noindex: true }, ...allPages.slice(1)] }).find((c) => c.id === 'noindex').status === 'fail');
 // Hettie's situation: no address anywhere, no structured data, Google speed 87.
 const { priorityOf, rankIssues } = await import('../../supabase/functions/_shared/tools/site_review/checks.ts');
+// ── audit P2 accuracy fixes ──
+// 2.4 Cloudflare's bot-management script on a normal page is not a wall.
+const cfPage = `<html><head><title>Sample Bistro</title><script src="/cdn-cgi/challenge-platform/h/b/scripts/jsd/abc/main.js"></script></head><body><h1>Sample Bistro</h1><p>${'pasta '.repeat(100)}</p></body></html>`;
+ok('blocked: Cloudflare bot-management script on a 200 page is not a wall; a real challenge still is', !looksBlocked(200, cfPage) && looksBlocked(503, cfPage) && looksBlocked(200, '<html><script>window._cf_chl_opt={}</script>') && looksBlocked(200, '<html><title>Just a moment...</title>'));
+
+// 2.1 "Burbank, CA" and "Burbank and Glendale" still find Burbank.
+ok('city: "Burbank, CA", "Burbank and Glendale", "Los Angeles / Burbank" all pass when the homepage says Burbank', ['Burbank, CA', 'Burbank and Glendale', 'Los Angeles / Burbank', 'burbank, california'].every((c) => runChecks({ ...base, city: c }).find((x) => x.id === 'city_mention').status === byId.city_mention.status) && byId.city_mention.status === 'pass');
+ok('city: a city the site never names still fails, worded with the first place typed', (() => { const c = runChecks({ ...base, city: 'Glendale, CA' }).find((x) => x.id === 'city_mention'); return c.status === 'fail' && /^Glendale doesn/.test(c.draft.title); })());
+
+// 2.2 Short builder titles are Important, not Fix now; far outside the range still fails.
+const withTitle = (t) => runChecks({ ...base, pages: [{ ...allPages[0], title: t }, ...allPages.slice(1)] }).find((c) => c.id === 'title_length');
+ok('title: a 25-character homepage title warns; 13 characters fails', withTitle('Sample Bistro Pasadena CA').status === 'warn' && priorityOf(withTitle('Sample Bistro Pasadena CA')) === 'Important' && withTitle('Sample Bistro').status === 'fail');
+
+// 2.6 noindex on an inner page is a warning; on the homepage still a failure.
+ok('noindex: an inner page warns, the homepage fails', runChecks({ ...base, pages: [allPages[0], { ...allPages[1], noindex: true }] }).find((c) => c.id === 'noindex').status === 'warn' && runChecks({ ...base, pages: [{ ...allPages[0], noindex: true }, ...allPages.slice(1)] }).find((c) => c.id === 'noindex').status === 'fail');
+ok('crawl: legal and utility pages are never picked', candidatesFrom(`${SITE}/`, [{ href: '/privacy', text: 'Privacy', inNav: false, inFooter: true }, { href: '/terms-of-service', text: 'Terms', inNav: false, inFooter: true }, { href: '/policies/refund-policy', text: 'Refunds', inNav: false, inFooter: true }, { href: '/thank-you', text: '', inNav: false, inFooter: false }, { href: '/about', text: 'About', inNav: true, inFooter: false }], []).map((c) => c.path).join() === '/about');
+
+// 2.7 "Other" accepts any specific business type; auto shops and hotels are businesses.
+const schemaOf = (type) => runChecks({ ...base, businessType: 'other', pages: [{ ...allPages[0], jsonld: { blocks: 1, parseErrors: 0, items: [{ '@type': type, name: 'X', telephone: '(626) 555-0100', address: { streetAddress: '1 Main St', addressLocality: 'Burbank' } }] } }, ...allPages.slice(1)] });
+ok('schema: under "Other", Dentist, AutoRepair and Hotel all fit and keep their details check', ['Dentist', 'AutoRepair', 'Hotel', 'RealEstateAgent', 'LegalService'].every((t) => { const cs = schemaOf(t); return cs.find((c) => c.id === 'schema_type').status === 'pass' && cs.find((c) => c.id === 'schema_details').status !== 'na'; }));
+ok('schema: the generic-type wording never says "a other business"', !/a other/.test(JSON.stringify(runChecks({ ...base, businessType: 'other', pages: [{ ...allPages[0], jsonld: { blocks: 1, parseErrors: 0, items: [{ '@type': 'WebSite', name: 'X' }] } }, ...allPages.slice(1)] }))));
+
+// 2.8 "5000 square feet" is copy; the footer address wins.
+const sq = parsePage(`<html><body><main><h1>Venue</h1><p>We have 5000 square feet of event space and 3 Court dates a week.</p></main><footer><p>Find us at 123 Olive Ave, Burbank, CA 91502</p></footer></body></html>`, 'https://x.com/', socialProfiles);
+ok('address: marketing copy with a number is not an address; the footer address is', sq.address === '123 Olive Ave' && parsePage('<html><body><p>Call us. 5000 square feet.</p></body></html>', 'https://x.com/', socialProfiles).address === null);
+
+// 2.3 H1 → tagline H2 → button is the builder hero; the CTA is still found.
+const hero = parsePage('<html><body><main><h1>Sample Bistro</h1><h2>Handmade pasta in Pasadena</h2><a href="/reserve">Book a table</a><h2>Our story</h2><p>x</p></main></body></html>', 'https://x.com/', socialProfiles);
+const heroForm = parsePage('<html><body><main><h1>Plumber</h1><h2>Same-day service</h2><form><input type="submit" value="Get a free quote"></form><h2>Reviews</h2></main></body></html>', 'https://x.com/', socialProfiles);
+ok('cta: a tagline <h2> before the button no longer hides it; a submit button counts', hero.cta === 'Book a table' && heroForm.cta === 'Get a free quote');
+
+// Live-run finds: real copy that mentions "your business name"; a site-wide footer H1; a throttled homepage.
+ok('placeholder: "not just your business name" is copy, "[Your Business Name]" is a template slot', parsePage('<html><body><p>Show up for searches, not just your business name.</p></body></html>', 'https://x.com/', socialProfiles).placeholder === null && parsePage('<html><body><h1>[Your Business Name]</h1></body></html>', 'https://x.com/', socialProfiles).placeholder !== null);
+const footerH1 = parsePage('<html><body><main><h1>Seasonal menu</h1></main><footer><h1>A little Bacchus, to go.</h1></footer></body></html>', 'https://x.com/', socialProfiles);
+const footerH1Checks = runChecks({ ...base, pages: [footerH1, ...allPages.slice(1)] }).find((c) => c.id === 'h1_one');
+ok('h1: a second H1 in the footer warns and says where it is; the content H1 still counts as the one', footerH1.contentH1s.length === 1 && footerH1.h1s.length === 2 && footerH1Checks.status === 'warn' && /header or footer/.test(footerH1Checks.draft.what));
+const { runSiteReview } = await import('../../supabase/functions/_shared/tools/site_review/scan.ts');
+let homeHits = 0;
+const flakyFetch = async (u) => { const url = String(u); if (url === `${SITE}/` && ++homeHits === 1) return new Response('<html><title>503</title></html>', { status: 503 }); if (pages[url]) return new Response(pages[url], { status: 200 }); return new Response('nope', { status: 404 }); };
+const flaky = await runSiteReview({ url: `${SITE}/`, city: 'Burbank', businessType: 'restaurant' }, { guard: async () => {}, siteFetch: flakyFetch, psiFetch: async () => new Response('{}', { status: 500 }), claudeFetch: async () => new Response('{}', { status: 500 }) });
+ok('scan: a homepage that answers 503 once is fetched again instead of reported unreachable', flaky.ok === true && homeHits === 2);
+
+// 2.12 Footer column titles don't count as skipped heading levels.
+const outline = parsePage('<html><body><header><h5>Menu</h5></header><main><h1>A</h1><h2>B</h2></main><footer><h4>Hours</h4><h4>Visit</h4></footer></body></html>', 'https://x.com/', socialProfiles);
+ok('headings: the outline comes from the page content, not the header or footer', outline.headingLevels.join() === '1,2');
+
+// 2.9 Numbers are checked in every field, and the fixed thresholds are allowed.
+const tcheck = byId.title_length;
+ok('narrative: an invented statistic in why-it-matters is rejected', !groundedIn({ title: 'Slow homepage', what_we_found: 'Google measured 4.8 s.', why_it_matters: '53% of visitors leave after 3 seconds.', fix: 'Shrink the images.' }, { ...tcheck, evidence: 'LCP 4.8 s' }));
+ok('narrative: a known threshold like "30 to 60 characters" is allowed', groundedIn({ title: 'Short title', what_we_found: 'Your title is outside the 30 to 60 character range.', why_it_matters: 'Google shows about 60 characters.', fix: 'Rewrite it.' }, { ...tcheck, evidence: 'x' }));
+
+// 2.11 http → http://www → https counts as redirecting to https.
+const chainFetch = async (u) => { const url = String(u); const hop = (loc) => new Response(null, { status: 301, headers: { location: loc } }); if (url === 'http://chain.example/') return hop('http://www.chain.example/'); if (url === 'http://www.chain.example/') return hop('https://www.chain.example/'); if (url === 'http://open.example/') return new Response('<html>', { status: 200 }); return new Response(null, { status: 404 }); };
+ok('https: a two-hop chain that ends on https passes; a site answering over http fails', await httpRedirectsToHttps('https://chain.example/', { guard: async () => {}, fetchImpl: chainFetch }) === true && await httpRedirectsToHttps('https://open.example/', { guard: async () => {}, fetchImpl: chainFetch }) === false);
+
+// 2.5 Shopify-style sites: /pages/* and /collections/* are top-level pages.
+const shop = candidatesFrom('https://shop.example/', [
+  { href: '/collections/all', text: 'Shop', inNav: true, inFooter: false }, { href: '/pages/about-us', text: 'About', inNav: true, inFooter: false },
+  { href: '/pages/contact', text: 'Contact', inNav: true, inFooter: false }, { href: '/blogs/news', text: 'Blog', inNav: true, inFooter: false }, { href: '/pages/faq', text: 'FAQ', inNav: false, inFooter: true },
+], []);
+ok('crawl: a Shopify site gets its about, contact, shop and blog pages reviewed', (() => { const p = pickPages(shop).map((c) => c.path); return p.includes('/pages/about-us') && p.includes('/pages/contact') && p.includes('/collections/all') && p.length >= 4; })());
+
+// 2.10 A homepage cut at the size cap skips the footer checks instead of failing them.
+const cutHome = { ...allPages[0], truncated: true, address: null, addressInFooter: false, telLinks: [], phonesInText: [], social: [], mapEmbed: false, links: allPages[0].links.filter((l) => !/privacy/i.test(l.href)) };
+const cutChecks = runChecks({ ...base, pages: [cutHome, ...allPages.slice(1).map((p) => ({ ...p, address: null, addressInFooter: false, telLinks: [], phonesInText: [], social: [], mapEmbed: false }))] });
+ok('truncated: footer checks are skipped (na), not failed, when the homepage was cut off', ['address_on_site', 'address_footer', 'tel_link', 'social_links', 'map_embed'].every((id) => cutChecks.find((c) => c.id === id).status === 'na') && parsePage('<html></html>', 'https://x.com/', socialProfiles, true).truncated === true);
+
+
 const bare = allPages.map((p) => ({ ...p, address: null, addressInFooter: false, jsonld: { blocks: 0, parseErrors: 0, items: [] } }));
 const bareChecks = runChecks({ ...base, pages: bare, psi: { ...psi, scores: { ...psi.scores, performance: 87 } } });
 const bareIssues = rankIssues(bareChecks).map((c) => c.id);

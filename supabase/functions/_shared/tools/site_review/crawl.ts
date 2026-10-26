@@ -10,6 +10,9 @@ import { fetchPublic, looksLikeHtml, sameSite, sitemapInfo, type FetchLike, type
 export const BOT_UA = 'Mozilla/5.0 (compatible; DavisDigitalStudioBot/1.0; +https://davisdigitalstudio.com/free-tools)';
 export const MAX_PAGES = 8;
 export const MAX_BYTES = 2 * 1024 * 1024;
+// The homepage gets more room: builder pages (Wix especially) ship 1-3 MB of
+// markup, and the footer facts live at the end (audit 2.10).
+export const HOME_MAX_BYTES = 4 * 1024 * 1024;
 export const REQUEST_TIMEOUT_MS = 10_000;
 
 export type FetchFail = 'unreachable' | 'not_html' | 'blocked';
@@ -22,18 +25,22 @@ const HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5';
 /** Cloudflare / bot-wall challenge pages, and the plain 403 most WAFs send. */
 export function looksBlocked(status: number, text: string): boolean {
   if (status === 403 || status === 429) return true;
-  if (status === 503 || status === 200) {
-    return /cf-chl-|challenge-platform|cf_chl_opt|<title>\s*(just a moment|attention required|access denied)/i.test(text.slice(0, 20000)) ||
-      /(?:captcha-delivery\.com|perimeterx|px-captcha|_Incapsula_Resource|sucuri website firewall|botfailover|bm-verify|pardon our interruption|request unsuccessful\. incapsula|please enable js and disable any ad blocker|<title>\s*access denied)/i.test(text.slice(0, 20000));
-  }
-  return false;
+  if (status !== 503 && status !== 200) return false;
+  const head = text.slice(0, 20000);
+  // Cloudflare's bot-management script (/cdn-cgi/challenge-platform/…/jsd/)
+  // rides on every page it proxies, so on a 200 it is not a wall by itself
+  // (audit 2.3): a real challenge page carries the cf-chl markers or the
+  // challenge title. On a 503 the script alone is enough.
+  const cloudflare = status === 503 ? /cf-chl-|challenge-platform|cf_chl_opt/i : /cf-chl-|cf_chl_opt|_cf_chl/i;
+  return cloudflare.test(head) || /<title>\s*(just a moment|attention required|access denied)/i.test(head) ||
+    /(?:captcha-delivery\.com|perimeterx|px-captcha|_Incapsula_Resource|sucuri website firewall|botfailover|bm-verify|pardon our interruption|request unsuccessful\. incapsula|please enable js and disable any ad blocker)/i.test(head);
 }
 
-export async function fetchHtml(url: string, deps: CrawlDeps, deadline: number): Promise<Fetched | FetchFail> {
+export async function fetchHtml(url: string, deps: CrawlDeps, deadline: number, maxBytes = MAX_BYTES): Promise<Fetched | FetchFail> {
   const now = deps.now || Date.now;
   const left = deadline - now();
   if (left < 500) return 'unreachable';
-  const r = await fetchPublic(url, deps.guard, { ua: BOT_UA, accept: HTML_ACCEPT, timeoutMs: Math.min(REQUEST_TIMEOUT_MS, left), maxBytes: MAX_BYTES, maxHops: 5, fetchImpl: deps.fetchImpl });
+  const r = await fetchPublic(url, deps.guard, { ua: BOT_UA, accept: HTML_ACCEPT, timeoutMs: Math.min(REQUEST_TIMEOUT_MS, left), maxBytes, maxHops: 5, fetchImpl: deps.fetchImpl });
   if (!r) return 'unreachable';
   if (looksBlocked(r.status, r.text)) return 'blocked';
   if (r.status >= 400) return 'unreachable';
@@ -44,7 +51,10 @@ export async function fetchHtml(url: string, deps: CrawlDeps, deadline: number):
 // ── page picking ─────────────────────────────────────────────────────────────
 
 const SKIP_EXT = /\.(pdf|jpe?g|png|gif|webp|svg|ico|zip|docx?|xlsx?|pptx?|mp[34]|mov|avi|css|js|json|xml|txt|rss|atom)$/i;
-const SKIP_PATH = /\/(cart|checkout|account|login|log-in|signin|sign-in|register|wp-admin|wp-login|admin|search|tag|tags|category|author|feed|cdn-cgi|privacy-policy-generator)(\/|$)/i;
+// Utility and legal pages are not the business's pages: a noindex on the
+// privacy policy or a 14-character "Terms" title says nothing about the
+// business, and they'd otherwise fill the slots after the menu (audit 2.6).
+const SKIP_PATH = /\/(cart|checkout|account|login|log-in|signin|sign-in|register|wp-admin|wp-login|admin|search|tag|tags|category|author|feed|cdn-cgi|privacy-policy-generator|privacy|privacy-policy|policies|terms|terms-of-service|terms-of-use|terms-and-conditions|tos|legal|disclaimer|accessibility|accessibility-statement|cookie-policy|cookies|refund-policy|return-policy|shipping-policy|thank-you|thanks|unsubscribe|sitemap|404|not-found)(\/|$)/i;
 
 // [category, path/text pattern]; the order is the preference order.
 const WANTED: [string, RegExp][] = [
@@ -63,6 +73,7 @@ export function normalizePath(u: URL): string {
 }
 
 export interface Candidate { url: string; path: string; text: string; source: 'nav' | 'footer' | 'body' | 'sitemap' }
+const CONTAINER = /^\/(pages|collections|products|blogs|policies|p|s|site|en|en-us)\//i;
 
 /** Same-site, page-like links, deduplicated by path, in discovery order. */
 export function candidatesFrom(baseUrl: string, links: { href: string; text: string; inNav: boolean; inFooter: boolean }[], sitemapUrls: string[]): Candidate[] {
@@ -93,9 +104,11 @@ export function candidatesFrom(baseUrl: string, links: { href: string; text: str
 export function pickPages(cands: Candidate[], max = MAX_PAGES): Candidate[] {
   const picked: Candidate[] = [];
   const take = (c: Candidate | undefined) => { if (c && !picked.includes(c) && picked.length < max - 1) picked.push(c); };
-  // Top-level pages first ("/services"); a nested one ("/blog/a-post") only
-  // when the site has nothing else, and never more than one.
-  const depth = (c: Candidate) => c.path.split('/').filter(Boolean).length;
+  // Top-level pages first ("/services"); nested ones ("/blog/a-post") only
+  // when the site has little else. Shops and builders keep their pages one
+  // level down ("/pages/about", "/collections/all" on Shopify): that container
+  // doesn't make the page less top-level (audit 2.5).
+  const depth = (c: Candidate) => c.path.replace(CONTAINER, '/').split('/').filter(Boolean).length;
   const top = (c: Candidate) => depth(c) <= 1;
   for (const [, re] of WANTED) {
     take(cands.find((c) => top(c) && (re.test(c.path) || re.test(c.text)) && c.source !== 'sitemap') ||
@@ -104,8 +117,9 @@ export function pickPages(cands: Candidate[], max = MAX_PAGES): Candidate[] {
   for (const c of cands.filter((c) => c.source === 'nav' && top(c))) take(c);
   for (const c of cands.filter((c) => c.source === 'footer' && top(c))) take(c);
   for (const c of cands.filter(top)) take(c);
-  const nested = cands.find((c) => depth(c) === 2 && c.source !== 'sitemap') || cands.find((c) => depth(c) === 2);
-  if (nested) take(nested);
+  const nested = cands.filter((c) => depth(c) === 2);
+  const room = picked.length < 3 ? 3 : 1;
+  for (const c of [...nested.filter((c) => c.source !== 'sitemap'), ...nested.filter((c) => c.source === 'sitemap')].slice(0, room)) take(c);
   return picked;
 }
 
@@ -140,13 +154,26 @@ export async function httpRedirectsToHttps(homeUrl: string, deps: CrawlDeps): Pr
   const httpUrl = `http://${u.host}${u.pathname || '/'}`;
   try { await deps.guard(httpUrl); } catch { return null; }
   const doFetch = deps.fetchImpl || ((i: string, init?: RequestInit) => fetch(i, init));
-  try {
-    const r = await doFetch(httpUrl, { method: 'GET', redirect: 'manual', headers: { 'User-Agent': BOT_UA }, signal: AbortSignal.timeout(6000) });
-    try { await r.body?.cancel(); } catch { /* */ }
-    const loc = r.headers.get('location') || '';
-    if (r.status >= 300 && r.status < 400 && loc) return /^https:\/\//i.test(new URL(loc, httpUrl).toString());
-    return false;   // answered over plain http without redirecting
-  } catch { return null; }
+  // Follow up to three hops: "http → http://www → https" is a common chain
+  // (canonical host first, then the scheme), and every hop ends on https
+  // (audit 2.11). Each hop goes through the guard.
+  let current = httpUrl;
+  for (let hop = 0; hop < 3; hop++) {
+    if (hop) { try { await deps.guard(current); } catch { return false; } }
+    try {
+      const r = await doFetch(current, { method: 'GET', redirect: 'manual', headers: { 'User-Agent': BOT_UA }, signal: AbortSignal.timeout(6000) });
+      try { await r.body?.cancel(); } catch { /* */ }
+      const loc = r.headers.get('location') || '';
+      if (r.status >= 300 && r.status < 400 && loc) {
+        const next = new URL(loc, current).toString();
+        if (/^https:\/\//i.test(next)) return true;
+        current = next;
+        continue;
+      }
+      return false;   // answered over plain http without redirecting
+    } catch { return null; }
+  }
+  return false;
 }
 
 /** HEAD-check up to `limit` internal links; returns the ones that are broken
