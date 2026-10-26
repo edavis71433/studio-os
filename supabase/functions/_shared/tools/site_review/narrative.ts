@@ -28,6 +28,8 @@ Rules:
 - No promises about rankings, traffic or revenue.
 - "fix" is one sentence that names the fix and the direction, not a step-by-step to-do list someone else could follow.
 - Keep every finding tied to the check_id it came from. Do not merge or invent checks.
+- Write what_we_found as plain sentences. Never paste or quote the raw evidence field, and never add lines like "Evidence:" or "The check reported:".
+- When you mention a score, say whose it is: "Google's mobile speed test scored 55" is not the same number as the Performance pillar score. Only use numbers that appear in the JSON.
 
 Return JSON only, matching the schema:
 - summary: 2 to 3 sentences on what the site does well and what to fix first, for this kind of business.
@@ -73,6 +75,13 @@ export function groundedIn(f: { what_we_found: string; title: string }, c: Check
   const source = `${c.evidence} ${c.draft?.what || ''} ${c.draft?.title || ''}`;
   const known = new Set(numbersIn(source));
   return [...numbersIn(f.what_we_found), ...numbersIn(f.title)].every((n) => known.has(n));
+}
+
+/** The summary may only state numbers that appear in what Claude was given
+ *  (scores, evidence, template text). */
+export function summaryGrounded(summary: string, payload: unknown): boolean {
+  const known = new Set(numbersIn(JSON.stringify(payload)));
+  return numbersIn(summary).every((n) => known.has(n));
 }
 
 export function templateFinding(c: Check): Finding {
@@ -144,6 +153,8 @@ export async function writeNarrative(inp: NarrativeInput, budgetMs: number, fetc
       const c = byId.get(String(f.check_id));
       if (!c || seen.has(c.id)) continue;
       seen.add(c.id);
+      // Claude sometimes appends the raw evidence string; keep the sentence part.
+      f.what_we_found = String(f.what_we_found || '').replace(/\s*(?:Evidence|The check (?:reported|found|says)|Check (?:result|reported))\s*:[\s\S]*$/i, '').trim();
       const ok = groundedIn(f, c) && f.title && f.what_we_found && f.why_it_matters && f.fix;
       findings.push(ok ? { check_id: c.id, title: f.title, what_we_found: f.what_we_found, why_it_matters: f.why_it_matters, fix: f.fix, priority: priorityOf(c), pillar: pillarName(c.pillar) } : templateFinding(c));
     }
@@ -153,8 +164,9 @@ export async function writeNarrative(inp: NarrativeInput, budgetMs: number, fetc
     const rank = (p: Priority) => (p === 'Fix now' ? 0 : p === 'Important' ? 1 : 2);
     findings.sort((a, b) => rank(a.priority) - rank(b.priority));
     const top = res.data.top_three.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3);
+    const summary = res.data.summary.trim();
     return {
-      summary: res.data.summary.trim() || templateNarrative(inp).summary,
+      summary: summary && summaryGrounded(summary, payload) ? summary : templateNarrative(inp).summary,
       findings,
       top_three: top.length === 3 ? top : templateNarrative(inp).top_three,
       source: 'claude', costUsd: cost, attempts: attempt,
