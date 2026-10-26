@@ -14,7 +14,7 @@ const { scoreLabel, publicReport } = await import('../../supabase/functions/_sha
 const { windowStart, cacheKeyFor, isEmail, beginScan, finishScan } = await import('../../supabase/functions/_shared/tools/guard.ts');
 const { reportReadyEmail, leadAlertEmail } = await import('../../supabase/functions/_shared/tools/email.ts');
 const { handler: reportHandler } = await import('../../supabase/functions/tool-report/handler.ts');
-const { handler: unlockHandler } = await import('../../supabase/functions/unlock-report/handler.ts');
+const { handler: unlockHandler, pendingFollowUps } = await import('../../supabase/functions/unlock-report/handler.ts');
 const { handler: alertHandler } = await import('../../supabase/functions/send-lead-alert/handler.ts');
 fake.handlers.leadAlert = alertHandler;
 
@@ -83,6 +83,7 @@ ok('unlock: invalid email is a 400 with a plain message', r.status === 400 && /v
 fake.state.emails.length = 0;
 r = await unlockHandler(post('unlock-report', { report_id: sampleId, email: 'Pat@Example.com', name: 'Pat', consent_marketing: true }));
 out = await r.json();
+await pendingFollowUps();
 const stored = fake.state.tables.tool_reports.find((x) => x.id === sampleId);
 const lead = fake.state.tables.tool_leads[0];
 ok('unlock: responds with the full report', r.status === 200 && out.ok && out.report.unlocked && out.report.findings.length === 5 && out.report.tables.length === 2);
@@ -91,7 +92,7 @@ ok('unlock: lead row has the email (lowercased), name, consent and business deta
 const mirror = fake.state.tables.audit_leads[0];
 ok('unlock: lead is mirrored into audit_leads for the Studio OS pipeline', mirror?.client_email === 'pat@example.com' && mirror.source === 'free_tools' && mirror.score === 64 && lead.audit_lead_id === mirror.id);
 const visitorMail = fake.state.emails.find((e) => e.to[0] === 'pat@example.com');
-ok('unlock: visitor gets "Your report is ready" with the report link and one-click unsubscribe', out.emailed === true && visitorMail?.subject === 'Your Site Review is ready' && visitorMail.html.includes(`/report/${sampleId}`) && !!visitorMail.headers['List-Unsubscribe'] && visitorMail.from === 'Eric Davis <eric@davisdigitalstudio.com>');
+ok('unlock: visitor gets "Your report is ready" with the report link and one-click unsubscribe', out.email_queued === true && visitorMail?.subject === 'Your Site Review is ready' && visitorMail.html.includes(`/report/${sampleId}`) && !!visitorMail.headers['List-Unsubscribe'] && visitorMail.from === 'Eric Davis <eric@davisdigitalstudio.com>');
 const alertMail = fake.state.emails.find((e) => e.to[0] === 'eric@davisdigitalstudio.com');
 ok('unlock: Eric gets the lead alert with the report link, reply-to the visitor', alertMail?.subject === 'New lead: Cedar & Core ran Site Review' && alertMail.html.includes(`/report/${sampleId}`) && alertMail.reply_to === 'pat@example.com');
 ok('unlock: logged in the usage log', fake.state.tables.tool_usage_log.some((u) => u.kind === 'unlock' && u.report_id === sampleId));
@@ -116,8 +117,33 @@ fake.state.failResend = true;
 const d = seed({ ...sample, id: crypto.randomUUID() });
 r = await unlockHandler(post('unlock-report', { report_id: d, email: 'resend-down@example.com' }));
 out = await r.json();
+await pendingFollowUps();
 fake.state.failResend = false;
-ok('unlock: if email sending fails the visitor still sees the full report', r.status === 200 && out.report.unlocked && out.emailed === false);
+ok('unlock: if email sending fails the visitor still sees the full report', r.status === 200 && out.report.unlocked);
+ok('unlock: a failed send is recorded in the usage log', fake.state.tables.tool_usage_log.some((u) => u.kind === 'unlock' && u.report_id === d && /emailed=false/.test(u.note)));
+
+// Speed: the page gets its answer before a slow email finishes.
+fake.state.resendDelayMs = 400;
+const slow = seed({ ...sample, id: crypto.randomUUID() });
+const sentBefore = fake.state.emails.length;
+const t0 = Date.now();
+r = await unlockHandler(post('unlock-report', { report_id: slow, email: 'slow@example.com' }));
+const answeredMs = Date.now() - t0;
+const sentAtAnswer = fake.state.emails.length - sentBefore;
+await pendingFollowUps();
+fake.state.resendDelayMs = 0;
+ok('unlock: answers before the emails go out (slow send does not hold the page)', r.status === 200 && answeredMs < 300 && sentAtAnswer === 0 && fake.state.emails.length - sentBefore === 2, `answered in ${answeredMs}ms with ${sentAtAnswer} sent`);
+
+// On Supabase the follow-up is handed to EdgeRuntime.waitUntil.
+const handed = [];
+globalThis.EdgeRuntime = { waitUntil: (p) => handed.push(p) };
+const viaRt = seed({ ...sample, id: crypto.randomUUID() });
+r = await unlockHandler(post('unlock-report', { report_id: viaRt, email: 'runtime@example.com' }));
+await Promise.all(handed);
+delete globalThis.EdgeRuntime;
+ok('unlock: uses EdgeRuntime.waitUntil when Supabase provides it', r.status === 200 && handed.length === 1 && fake.state.emails.some((e) => e.to[0] === 'runtime@example.com'));
+
+await pendingFollowUps();
 
 // ── send-lead-alert is internal only ──
 r = await alertHandler(new Request('https://x/functions/v1/send-lead-alert', { method: 'POST', body: JSON.stringify({ report_id: sampleId }) }));

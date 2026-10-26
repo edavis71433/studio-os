@@ -7,8 +7,9 @@
 //   3. mirrors the lead into audit_leads so it shows in the Studio OS pipeline
 //   4. emails the visitor the report link ("Your report is ready")
 //   5. triggers send-lead-alert so Eric hears about it right away
-// Steps 3-5 are best-effort: the visitor always gets the full report on screen
-// even if an email or the mirror fails, and the response says what was sent.
+// Steps 3-5 run AFTER the response (EdgeRuntime.waitUntil) and are best-effort:
+// the visitor gets the full report at once, and a slow or failed email never
+// holds the page. The usage log's note records what was actually sent.
 
 import { CALENDLY_URL, LIMITS, TOOL_NAMES, reportUrl, toolsCors, toolsJson, type ToolId } from '../_shared/tools/config.ts';
 import { dbReady, getReport, insert, patch, enc } from '../_shared/tools/db.ts';
@@ -90,17 +91,37 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   const view = publicReport(row);
-  const auditLeadId = await mirrorToAuditLeads(tool, input, email, view);
-  if (auditLeadId) await patch(`tool_leads?id=eq.${enc(String(lead.id))}`, { audit_lead_id: auditLeadId }).catch(() => {});
 
-  let emailed = false;
-  if ((await maySend(email, { critical: true })).ok) {
-    const unsub = await unsubscribeUrl(email);
-    const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: unsub });
-    emailed = (await sendEmail({ to: email, ...msg, unsubscribeUrl: unsub })).ok;
-  }
-  const alerted = await triggerLeadAlert(reportId);
-  await logUsage({ tool, kind: 'unlock', ip_hash: ipHash, email, report_id: reportId, note: `emailed=${emailed} alerted=${alerted}` });
+  // The visitor sees the full report as soon as the lead is saved. The mirror
+  // and both emails (each up to 10s, the alert on a cold function) run after
+  // the response, so a slow send never leaves the page sitting on "Unlocking…".
+  const followUp = async () => {
+    const auditLeadId = await mirrorToAuditLeads(tool, input, email, view);
+    if (auditLeadId) await patch(`tool_leads?id=eq.${enc(String(lead.id))}`, { audit_lead_id: auditLeadId }).catch(() => {});
+    let emailed = false;
+    if ((await maySend(email, { critical: true })).ok) {
+      const unsub = await unsubscribeUrl(email);
+      const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: unsub });
+      emailed = (await sendEmail({ to: email, ...msg, unsubscribeUrl: unsub })).ok;
+    }
+    const alerted = await triggerLeadAlert(reportId);
+    await logUsage({ tool, kind: 'unlock', ip_hash: ipHash, email, report_id: reportId, note: `emailed=${emailed} alerted=${alerted}` });
+  };
+  runAfterResponse(followUp().catch(() => {}));
 
-  return toolsJson(req, { ok: true, emailed, report: view });
+  return toolsJson(req, { ok: true, email_queued: true, report: view });
+}
+
+// Supabase's edge runtime keeps the function alive for a promise handed to
+// EdgeRuntime.waitUntil after the response is sent. Anywhere else (tests, a
+// local run) there is no such hook, so the work is tracked here instead and a
+// caller can await pendingFollowUps().
+const pending: Promise<unknown>[] = [];
+function runAfterResponse(p: Promise<unknown>): void {
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(p);
+  else pending.push(p);
+}
+export async function pendingFollowUps(): Promise<void> {
+  await Promise.all(pending.splice(0));
 }

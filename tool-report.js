@@ -251,7 +251,7 @@
         }
         T.track('email_captured', { consent_marketing: form.consent_marketing.checked });
         render(out.body.report);
-        $('trNotes').appendChild(el('li', null, out.body.emailed ? 'Done. A copy of this link is on its way to ' + email + '.' : 'Done. Bookmark this page to come back to it.'));
+        $('trNotes').appendChild(el('li', null, out.body.email_queued || out.body.emailed ? 'Done. A copy of this link is on its way to ' + email + '.' : 'Done. Bookmark this page to come back to it.'));
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function () {
