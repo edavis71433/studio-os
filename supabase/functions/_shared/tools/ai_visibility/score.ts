@@ -131,6 +131,29 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
 const andList = (xs: string[]) => xs.length <= 1 ? (xs[0] || '') : xs.length === 2 ? `${xs[0]} and ${xs[1]}` : `${xs.slice(0, -1).join(', ')}, and ${xs[xs.length - 1]}`;
 const NOUN: Record<string, string> = { restaurant: 'a restaurant', salon: 'a salon', retail: 'a shop', 'home services': 'someone for the job', 'health and wellness': 'a studio', other: 'a business like yours' };
 
+// The wrong-facts finding speaks to the worst kind of error found: a mix-up
+// with another business needs different words from wrong hours (found live:
+// "drives to the wrong address" under an acting-studio mix-up).
+const mixUpOnly = (types: FlagType[]) => types.every((t) => t === 'confused_with_other' || t === 'outdated_offerings') && types.includes('confused_with_other');
+export function wrongFactsTitle(types: FlagType[]): string {
+  if (types.includes('marked_closed')) return 'AI thinks you might be closed';
+  if (mixUpOnly(types)) return 'AI mixes you up with another business';
+  if (types.length === 1 && types[0] === 'outdated_offerings') return 'AI describes services you may not offer';
+  return 'AI has some of your facts wrong';
+}
+export function wrongFactsWhy(types: FlagType[]): string {
+  if (types.includes('marked_closed')) return 'Someone told you are closed goes straight to the next name on the list.';
+  if (types.includes('wrong_address') || types.includes('wrong_hours')) return 'A customer who drives to the wrong address or arrives after the hours AI gave them rarely tries again.';
+  if (types.includes('confused_with_other')) return 'When AI blends you with another business, customers get its details instead of yours, or decide you are not what they need.';
+  return 'Someone looking for what you actually offer may be told you do something else.';
+}
+export function wrongFactsFix(types: FlagType[], from: string[]): string {
+  if (mixUpOnly(types)) return from.length
+    ? `Use the same name, city and one-line description of what you do on ${andList(['your site', ...from, 'your main listings'])}, so AI can tell you apart.`
+    : 'Use the same name, city and one-line description of what you do on your site and every listing, so AI can tell you apart.';
+  return from.length ? `Correct your details on ${andList(from)} so AI repeats the right ones.` : 'Correct your details on the listings AI reads so it repeats the right ones.';
+}
+
 export function buildIssues(a: {
   recs: AnswerRecord[]; target: { name: string; city: string }; businessType: string; url: string | null;
   readiness: ReadinessResult; competitors: Competitor[]; sources: ReturnType<typeof sourcesFrom>; engines: ReturnType<typeof perEngine>;
@@ -189,7 +212,7 @@ export function buildIssues(a: {
     const severe = types.some((t) => t === 'marked_closed' || t === 'wrong_address');
     add({ id: 'wrong_facts', area: 'Accuracy', pillar: 'accuracy', weight: severe ? 3 : 2, status: severe ? 'fail' : 'warn',
       evidence: `${types.map((t) => FLAG_LABELS[t]).join('; ')}: ${flags[0].detail}${from.length ? `; those answers cited ${andList(from)}` : ''}`,
-      draft: { title: types.includes('marked_closed') ? 'AI thinks you might be closed' : 'AI has some of your facts wrong', what: `${flags[0].detail}${flags.length > 1 ? ` (${plural(flags.length, 'error')} in total: ${andList(types.map((t) => FLAG_LABELS[t].toLowerCase()))})` : ''}${from.length ? `. Those answers drew on ${andList(from)}.` : '.'}`, why: 'A customer who drives to the wrong address or arrives after the hours AI gave them rarely tries again.', fix: from.length ? `Correct your details on ${andList(from)} so AI repeats the right ones.` : 'Correct your details on the listings AI reads so it repeats the right ones.' } });
+      draft: { title: wrongFactsTitle(types), what: `${flags[0].detail.replace(/[.\s]+$/, '')}${flags.length > 1 ? ` (${plural(flags.length, 'error')} in total: ${andList(types.map((t) => FLAG_LABELS[t].toLowerCase()))})` : ''}${from.length ? `. Those answers drew on ${andList(from)}.` : '.'}`, why: wrongFactsWhy(types), fix: wrongFactsFix(types, from) } });
   } else if (a.recs.some((r) => r.extraction && r.extraction.targetFound)) {
     strengths.push('No wrong facts about the business in any answer');
   }

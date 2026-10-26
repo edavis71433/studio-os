@@ -11,7 +11,7 @@ import type { FetchLike, UrlGuard } from '../../site_discovery.ts';
 import { scoreLabel } from '../report_view.ts';
 import { writeNarrative, type Narrative } from '../site_review/narrative.ts';
 import { checkAmbiguous } from './ambiguity.ts';
-import { enabledEngines, type Engine } from './engines.ts';
+import { ENGINES, enabledEngines, type Engine } from './engines.ts';
 import { domainOf, extractAnswer, type KnownFacts } from './extract.ts';
 import { buildPrompts, type VisibilityInput } from './prompts.ts';
 import { checkReadiness, type ReadinessResult } from './readiness.ts';
@@ -115,6 +115,22 @@ export async function runAiVisibility(inp: VisibilityInput, deps: AiScanDeps): P
     return { ok: false, error: 'engines_failed', message: "We couldn't read the AI answers just now. Please try again in a few minutes.", costUsd: cost };
   }
 
+  const rawAnswers = answers.map(({ e, p, r }) => ({ engine: e.id, prompt: p.id, question: p.text, ok: r.ok, reason: r.ok ? null : r.reason, text: r.ok ? r.text : null, sources: r.ok ? r.sources : [] }));
+  const report = await assembleReport(inp, { engines, failedEngines, promptIds: prompts.map((p) => p.id), records, readiness, rawAnswers, aiFetch, now, deadline, onProgress: progress });
+  return { ok: true, ...report, raw: { ...report.raw, elapsed_ms: now() - t0 }, costUsd: cost + report.costUsd };
+}
+
+/** Everything after the answers are read: scores, competitors, findings and
+ *  the narrative. Shared by a live scan and rebuildFromRaw, which re-scores a
+ *  saved report after the rules change without asking the AI anything new. */
+export async function assembleReport(inp: VisibilityInput, ctx: {
+  engines: { id: string; name: string }[]; failedEngines: { id: string; name: string }[]; promptIds: string[];
+  records: AnswerRecord[]; readiness: ReadinessResult; rawAnswers: unknown[];
+  aiFetch: typeof fetch; now: () => number; deadline: number; onProgress?: (p: AiProgress) => void;
+}) {
+  const { engines, failedEngines, records, readiness, aiFetch, now, deadline } = ctx;
+  const target = { name: inp.businessName, city: inp.city };
+  let cost = 0;
   const ownDomain = readiness.checked ? domainOf(readiness.homeUrl) : inp.url ? domainOf(inp.url) : null;
   const competitors = competitorsFrom(records, target);
   const sources = sourcesFrom(records, ownDomain);
@@ -128,22 +144,24 @@ export async function runAiVisibility(inp: VisibilityInput, deps: AiScanDeps): P
   for (const e of failedEngines) notes.push(`${e.name} couldn't be checked today, so this report covers the other assistants.`);
   if (inp.url && !readiness.checked) notes.push("We couldn't read your website, so AI readiness is left out of the overall score.");
 
-  progress({ step: 'writing' });
+  try { ctx.onProgress?.({ step: 'writing' }); } catch { /* stream closed */ }
+  // "Other" with a search phrase reads better as the phrase ("web design in Burbank").
+  const phrase = inp.searchPhrases.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean)[0];
+  const lookingFor = inp.businessType === 'other' && phrase ? phrase : LOOKING_FOR[inp.businessType] || LOOKING_FOR.other;
   const narrative = await writeNarrative({
     businessName: inp.businessName, businessType: inp.businessType, city: inp.city, url: inp.url || '',
     overall: s.overall, pillars: s.pillars.map((p) => ({ name: p.name, score: p.score, note: p.note })),
-    issues, strengths, pagesReviewed: prompts.map((p) => p.id), notes,
+    issues, strengths, pagesReviewed: ctx.promptIds, notes,
   }, Math.max(0, deadline - now()), aiFetch, now, {
     system: AI_SYSTEM,
     pillarName: aiPillarName,
     fallbackSummary: () => named === 0
-      ? `When we asked ${engines.map((e) => e.name).join(' and ')} for ${LOOKING_FOR[inp.businessType] || LOOKING_FOR.other} in ${inp.city}, ${inp.businessName} came up in 0 of ${un.length} answers.${competitors[0] ? ` ${competitors[0].name} was named most often, in ${competitors[0].mentions}.` : ''} The fixes below are the places to start.`
+      ? `When we asked ${engines.map((e) => e.name).join(' and ')} for ${lookingFor} in ${inp.city}, ${inp.businessName} came up in 0 of ${un.length} answers.${competitors[0] ? ` ${competitors[0].name} was named most often, in ${competitors[0].mentions}.` : ''} The fixes below are the places to start.`
       : `${inp.businessName} came up in ${named} of ${un.length} answers when we asked for local recommendations in ${inp.city}.${competitors[0] ? ` ${competitors[0].name} was named most often, in ${competitors[0].mentions}.` : ''} The fixes below would close the gap.`,
   });
   cost += narrative.costUsd;
 
   return {
-    ok: true,
     input: { business_name: inp.businessName, city: inp.city, business_type: inp.businessType, search_phrases: inp.searchPhrases || null, url: readiness.checked ? readiness.homeUrl : inp.url, detail: inp.detail || null },
     scores: {
       overall: s.overall, label: scoreLabel(s.overall), pillars: s.pillars, notes,
@@ -159,12 +177,41 @@ export async function runAiVisibility(inp: VisibilityInput, deps: AiScanDeps): P
       tables: buildTables({ recs: records, target, competitors, sources, engines: engineStats, readiness }),
     },
     raw: {
-      answers: answers.map(({ e, p, r }) => ({ engine: e.id, prompt: p.id, question: p.text, ok: r.ok, reason: r.ok ? null : r.reason, text: r.ok ? r.text : null, sources: r.ok ? r.sources : [] })),
+      answers: ctx.rawAnswers,
       extractions: records.map((r) => ({ engine: r.engine, prompt: r.promptId, extraction: r.extraction })),
       readiness, competitors, sources, engines: engineStats, failed_engines: failedEngines.map((e) => e.id),
-      narrative: { source: narrative.source, attempts: narrative.attempts }, elapsed_ms: now() - t0,
+      narrative: { source: narrative.source, attempts: narrative.attempts },
     },
     costUsd: cost,
     narrativeSource: narrative.source,
   };
+}
+
+/** Re-score a saved report from its stored answers and extractions: the same
+ *  assembly a live scan runs, with no new questions to the AI. The narrative
+ *  is rewritten by Claude when a key is set, otherwise from the templates. */
+// deno-lint-ignore no-explicit-any
+export async function rebuildFromRaw(row: { input: any; raw: any }, deps: { aiFetch?: typeof fetch; now?: () => number } = {}) {
+  const now = deps.now || Date.now;
+  const inp: VisibilityInput = {
+    businessName: String(row.input.business_name), city: String(row.input.city), businessType: String(row.input.business_type || 'other'),
+    searchPhrases: String(row.input.search_phrases || ''), url: row.input.url || null, detail: String(row.input.detail || ''),
+  };
+  const nameOf = (id: string) => ENGINES.find((e) => e.id === id)?.name || id;
+  const failed: string[] = row.raw.failed_engines || [];
+  // deno-lint-ignore no-explicit-any
+  const extraction = (a: any) => (row.raw.extractions || []).find((x: any) => x.engine === a.engine && x.prompt === a.prompt)?.extraction || null;
+  // deno-lint-ignore no-explicit-any
+  const records: AnswerRecord[] = (row.raw.answers || []).map((a: any) => ({
+    engine: a.engine, engineName: nameOf(a.engine), promptId: a.prompt, kind: String(a.prompt).startsWith('b') ? 'branded' : 'unbranded',
+    question: a.question, ok: !!a.ok && !failed.includes(a.engine), sources: a.ok ? a.sources || [] : [], extraction: extraction(a),
+  }));
+  const engineIds = [...new Set(records.map((r) => r.engine))];
+  const report = await assembleReport(inp, {
+    engines: engineIds.map((id) => ({ id, name: nameOf(id) })),
+    failedEngines: failed.map((id) => ({ id, name: nameOf(id) })),
+    promptIds: [...new Set(records.map((r) => r.promptId))], records, readiness: row.raw.readiness, rawAnswers: row.raw.answers,
+    aiFetch: deps.aiFetch || fetch, now, deadline: now() + 20_000,
+  });
+  return { ...report, raw: { ...report.raw, elapsed_ms: row.raw.elapsed_ms ?? null, rebuilt_at: new Date(now()).toISOString() } };
 }
