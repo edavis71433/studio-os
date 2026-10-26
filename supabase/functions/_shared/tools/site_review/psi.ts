@@ -78,11 +78,13 @@ export function readPsi(d: any): PsiResult {
   };
 }
 
-export async function runPsi(url: string, budgetMs: number, fetchImpl: typeof fetch = fetch): Promise<PsiOutcome> {
+/** strategy 'mobile' drives the score (spec); 'desktop' (Phase 4) is shown
+ *  alongside it in the speed table and never changes the score. */
+export async function runPsi(url: string, budgetMs: number, fetchImpl: typeof fetch = fetch, strategy: 'mobile' | 'desktop' = 'mobile'): Promise<PsiOutcome> {
   const key = Deno.env.get('PSI_KEY') || Deno.env.get('PSI_API_KEY') || '';
   if (!key) return { ok: false, reason: 'not_configured' };
-  const cats = ['performance', 'seo', 'accessibility', 'best-practices'].map((c) => `&category=${c}`).join('');
-  const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile${cats}&key=${encodeURIComponent(key)}`;
+  const cats = (strategy === 'mobile' ? ['performance', 'seo', 'accessibility', 'best-practices'] : ['performance']).map((c) => `&category=${c}`).join('');
+  const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}${cats}&key=${encodeURIComponent(key)}`;
   try {
     const r = await fetchImpl(api, { signal: AbortSignal.timeout(Math.max(1000, budgetMs)) });
     const d = await r.json();
