@@ -107,3 +107,13 @@
   Cache-Control: no-cache, must-revalidate
 /ai-disclaimer
   Cache-Control: no-cache, must-revalidate
+
+# Free Tools pages (audit 4.3): the clean paths miss the /*.html rule, so they
+# were cached for an hour after a deploy. Reports are private pages: no index.
+/report/*
+  Cache-Control: no-cache, must-revalidate
+  X-Robots-Tag: noindex
+/site-review
+  Cache-Control: no-cache, must-revalidate
+/ai-visibility
+  Cache-Control: no-cache, must-revalidate

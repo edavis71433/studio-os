@@ -52,6 +52,13 @@
 /the-experience.html    /how-we-work    301
 
 # Clean URLs for the tools (each keeps its own page; no longer funneled to a dead hub)
+# The tool pages and reports belong to tools.davisdigitalstudio.com: the
+# functions only answer that origin and the main site, so the same paths on
+# the app host would load the page and then fail to fetch (audit 4.2).
+https://app.davisdigitalstudio.com/report/*      https://tools.davisdigitalstudio.com/report/:splat  301!
+https://app.davisdigitalstudio.com/site-review   https://tools.davisdigitalstudio.com/site-review    301!
+https://app.davisdigitalstudio.com/ai-visibility https://tools.davisdigitalstudio.com/ai-visibility  301!
+
 # Free Tools rebuild (Oct 2026): the old tools now live at https://tools.davisdigitalstudio.com.
 # Forced (!) because the old page files still exist in the build.
 /audit             https://tools.davisdigitalstudio.com/site-review   301!

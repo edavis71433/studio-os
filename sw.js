@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v14'; // bumped: studio door + every app/token page excluded from cache-first — a stale signing page is a correctness bug
+const CACHE_NAME = 'dds-v15'; // bumped: the Free Tools pages (/report/*, /site-review, /ai-visibility) are never served from cache
 const PRECACHE = [
   '/about',
   '/services',
@@ -9,7 +9,9 @@ const PRECACHE = [
 ];
 
 // Pages that must always load fresh (have live API calls or dynamic content)
-const NETWORK_FIRST = ['/audit', '/tools', '/report-card', '/local-visibility', '/pricing-estimator', '/roi-calculator', '/'];
+const NETWORK_FIRST = ['/audit', '/tools', '/report-card', '/local-visibility', '/pricing-estimator', '/roi-calculator', '/site-review', '/ai-visibility', '/'];
+// The Free Tools report page carries private data and versioned scripts: never from this cache.
+const NEVER_CACHE = /^\/(report\/|site-review|ai-visibility)/;
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -73,6 +75,7 @@ self.addEventListener('fetch', function(e) {
       url.pathname.startsWith('/payment-')) return; // every signed-in/app/money surface — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
+  if (NEVER_CACHE.test(url.pathname)) return;   // plain network, no cache lookups or puts
   var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });
   if (isNetworkFirst) {
     e.respondWith(
