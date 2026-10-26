@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Site Review | Davis Digital Studio</title>
+<meta name="description" content="A free review of your website: what it does well and what to fix first, in plain English, using real data from your own pages.">
+<link rel="canonical" href="https://tools.davisdigitalstudio.com/site-review">
+<meta property="og:title" content="Free Site Review | Davis Digital Studio">
+<meta property="og:description" content="See what your website does well and what to fix first, in plain English. About 45 seconds.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://tools.davisdigitalstudio.com/og-image.jpg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="/tool-report.css?v=3">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+</head>
+<body>
+<header class="tr-top">
+  <div class="tr-wrap tr-top-row">
+    <a class="tr-logo" href="https://davisdigitalstudio.com/"><img src="/tools-logo.webp" alt="Davis Digital Studio" width="250" height="56"></a>
+  </div>
+</header>
+
+<main class="tr-wrap" id="srMain">
+  <section class="tr-head sr-intro" id="srIntro">
+    <p class="tr-eyebrow">Free Site Review</p>
+    <h1>What your website does well, and what to fix first</h1>
+    <p class="sr-lede">Enter your website and we&rsquo;ll check up to 8 pages with Google&rsquo;s own speed test and more than 30 checks for search, trust and local visibility. Plain English, real data from your pages, about 45 seconds.</p>
+  </section>
+
+  <section class="tr-card sr-form-card" id="srFormCard">
+    <form id="srForm" novalidate>
+      <label class="sr-field">Your website
+        <input type="text" name="url" inputmode="url" autocomplete="url" placeholder="yourbusiness.com" required maxlength="500" autocapitalize="off" spellcheck="false">
+      </label>
+      <div class="tr-fields">
+        <label>Type of business
+          <select name="business_type">
+            <option value="restaurant">Restaurant</option>
+            <option value="salon">Salon</option>
+            <option value="retail">Retail</option>
+            <option value="home services">Home services</option>
+            <option value="health and wellness">Health and wellness</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </label>
+        <label>City or service area <span class="tr-opt">(optional)</span>
+          <input type="text" name="city" autocomplete="address-level2" placeholder="Burbank" maxlength="80">
+        </label>
+      </div>
+      <div class="sr-turnstile" id="srTurnstile"></div>
+      <button type="submit" class="tr-btn" id="srBtn">Review my site</button>
+      <p class="tr-form-msg" id="srMsg" role="status"></p>
+      <p class="tr-fine">Free, no account needed. You&rsquo;ll see your score and two findings right away; the full report is emailed to you if you want it.</p>
+    </form>
+  </section>
+
+  <section class="tr-card sr-loading" id="srLoading" hidden aria-live="polite">
+    <h2>Reviewing <span id="srHost"></span></h2>
+    <p class="sr-expect">This usually takes 30 to 50 seconds. Keep this page open.</p>
+    <ol class="sr-steps" id="srSteps">
+      <li data-step="pages"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Finding your pages</span></li>
+      <li data-step="speed"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Running Google&rsquo;s speed test</span></li>
+      <li data-step="search"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Checking search signals</span></li>
+      <li data-step="trust"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Checking trust and local signals</span></li>
+      <li data-step="writing"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Writing your report</span></li>
+    </ol>
+  </section>
+
+  <section class="tr-card sr-error" id="srError" hidden>
+    <h2 id="srErrorTitle">We couldn&rsquo;t finish your review</h2>
+    <p id="srErrorText"></p>
+    <div class="sr-error-actions">
+      <button type="button" class="tr-btn tr-btn-ghost" id="srRetry">Try another address</button>
+      <a class="tr-btn" data-calendly href="https://calendly.com/eric-davisdigitalstudio/30min">Book a free 30 minute call</a>
+    </div>
+  </section>
+
+  <section class="sr-what" id="srWhat">
+    <h2>What we check</h2>
+    <div class="sr-what-grid">
+      <div class="tr-pillar"><p class="tr-pillar-name">Performance</p><p>Google&rsquo;s mobile speed test and Core Web Vitals on your homepage.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">Search</p><p>Titles, descriptions, headings, indexing, structured data and content.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">Trust and conversion</p><p>Security, contact details, a clear call to action, and how links share.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">Local</p><p>Your city, address, map, and whether your details match everywhere.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer class="tr-foot tr-wrap">
+  <p>Davis Digital Studio LLC · Burbank, California · <a href="https://davisdigitalstudio.com/">davisdigitalstudio.com</a> · <a href="https://davisdigitalstudio.com/privacy">Privacy</a></p>
+</footer>
+
+<script src="/analytics.js" defer></script>
+<script src="/tools-common.js?v=3" defer></script>
+<script src="/site-review.js?v=3" defer></script>
+</body>
+</html>
