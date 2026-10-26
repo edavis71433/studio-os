@@ -2,8 +2,9 @@
 // "Your report is ready" to the visitor, and "New lead: [business] ran [tool]"
 // to Eric. No follow-up sequence (spec). Every visitor email carries the
 // one-click unsubscribe link from _shared/email_infra.ts, and the suppression
-// store is respected (an opt-out still gets the report they just asked for,
-// a bounce or complaint never does).
+// store is respected: an unsubscribed, bounced or complaining address is not
+// mailed (the report is still on screen). The greeting uses only a plain
+// first name, since the name field is visitor-typed free text (audit 1.3).
 
 import { ERIC_EMAIL, FROM } from './config.ts';
 
@@ -14,6 +15,14 @@ function toBase64(bytes: Uint8Array): string {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
+}
+
+/** The part of a typed name that is safe to greet with: the first word, letters
+ *  only (with apostrophes, hyphens, dots), at most 30 characters. Anything
+ *  else ("Pat — your invoice is overdue") drops to a plain "Hi,". */
+export function greetingName(name: unknown): string | null {
+  const first = String(name ?? '').trim().split(/\s+/)[0] || '';
+  return /^[\p{L}][\p{L}'’.\-]{0,29}$/u.test(first) ? first : null;
 }
 
 export const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -52,7 +61,8 @@ const button = (href: string, label: string) =>
   `<a href="${esc(href)}" style="display:inline-block;background:${NAVY};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 22px;border-radius:999px;">${esc(label)}</a>`;
 
 export function reportReadyEmail(p: { name?: string | null; toolName: string; businessName?: string | null; score: number | null; label: string | null; reportUrl: string; calendlyUrl: string; unsubscribeUrl: string; pdfAttached?: boolean }) {
-  const hi = p.name ? `Hi ${esc(p.name)},` : 'Hi,';
+  const first = greetingName(p.name);
+  const hi = first ? `Hi ${esc(first)},` : 'Hi,';
   const forWhat = p.businessName ? ` for ${esc(p.businessName)}` : '';
   const scoreLine = p.score != null ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Your overall score is <strong>${p.score}</strong>${p.label ? ` (${esc(p.label)})` : ''}. The full report has every finding, the three fixes that matter most, and the details behind each one.</p>` : '';
   const html = shell(
@@ -65,7 +75,7 @@ ${scoreLine}
 <p style="margin:18px 0 0;font-size:15px;line-height:1.6;">Eric Davis<br><span style="color:${MUTED};">Davis Digital Studio</span></p>`,
     `<p style="font-size:12px;color:${MUTED};margin:18px 4px 0;line-height:1.6;">You're getting this because you asked for this report on davisdigitalstudio.com. Davis Digital Studio LLC · Burbank, California · <a href="${esc(p.unsubscribeUrl)}" style="color:${MUTED};">Unsubscribe</a></p>`,
   );
-  const text = `${p.name ? `Hi ${p.name},` : 'Hi,'}
+  const text = `${first ? `Hi ${first},` : 'Hi,'}
 
 Your ${p.toolName}${p.businessName ? ` for ${p.businessName}` : ''} is ready.${p.score != null ? `\nYour overall score is ${p.score}${p.label ? ` (${p.label})` : ''}.` : ''}
 
