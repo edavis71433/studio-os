@@ -32,7 +32,7 @@ export function windowStart(now: Date, unit: 'hour' | 'day' | 'week'): Date {
 
 /** Collapse a free-text input so "Bacchus Kitchen " and "bacchus  kitchen" share a cache slot. */
 export const normalizeKeyPart = (s: unknown) =>
-  String(s ?? '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
+  String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&|\+/g, ' and ').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 /** Site Review caches per URL (host + path); AI Visibility per business + city. */
 export function cacheKeyFor(tool: ToolId, input: Record<string, unknown>): string {

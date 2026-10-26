@@ -63,6 +63,7 @@
 # is an alias of this site; its bare root goes to the main site, which links the tools.
 /report/*          /report.html        200
 /site-review       /site-review.html   200
+/ai-visibility     /ai-visibility.html 200
 https://tools.davisdigitalstudio.com/   https://davisdigitalstudio.com/   302!
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
