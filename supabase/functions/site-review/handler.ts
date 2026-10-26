@@ -14,7 +14,7 @@
 
 import { CALENDLY_URL, toolsCors, toolsJson } from '../_shared/tools/config.ts';
 import { dbReady, insert } from '../_shared/tools/db.ts';
-import { beginScan, finishScan, logUsage } from '../_shared/tools/guard.ts';
+import { beginScan, failScan, finishScan } from '../_shared/tools/guard.ts';
 import { publicReport } from '../_shared/tools/report_view.ts';
 import { assertPublicHttpUrl, normalizeSiteUrl } from '../_shared/tools/url_guard.ts';
 import { ERROR_MESSAGES, runSiteReview, type ScanDeps } from '../_shared/tools/site_review/scan.ts';
@@ -55,15 +55,15 @@ export async function handler(req: Request): Promise<Response> {
           onProgress: (p) => send({ type: 'progress', ...p }),
         });
         if (!result.ok) {
-          await logUsage({ tool: 'site_review', kind: 'scan', ip_hash: gate.ipHash, note: `failed:${result.error}` });
+          await failScan({ tool: 'site_review', ipHash: gate.ipHash, usageId: gate.usageId, costUsd: 0, note: `failed:${result.error}` });
           send({ type: 'error', error: result.error, message: ERROR_MESSAGES[result.error], calendly: CALENDLY_URL });
         } else {
           const row = await insert('tool_reports', { tool: 'site_review', input: result.input, raw_results: result.raw, findings: result.findings, scores: result.scores, unlocked: false });
-          await finishScan({ tool: 'site_review', ipHash: gate.ipHash, cacheKey: gate.cacheKey, reportId: String(row.id), costUsd: result.costUsd });
+          await finishScan({ tool: 'site_review', ipHash: gate.ipHash, cacheKey: gate.cacheKey, usageId: gate.usageId, reportId: String(row.id), costUsd: result.costUsd });
           send({ type: 'done', report_id: String(row.id), report: publicReport(row) });
         }
       } catch (_e) {
-        await logUsage({ tool: 'site_review', kind: 'scan', ip_hash: gate.ipHash, note: 'failed:exception' });
+        await failScan({ tool: 'site_review', ipHash: gate.ipHash, usageId: gate.usageId, note: 'failed:exception' });
         send({ type: 'error', error: 'failed', message: "Something went wrong on our side. Try again in a minute, or book a call and I'll run it by hand.", calendly: CALENDLY_URL });
       } finally {
         closed = true;

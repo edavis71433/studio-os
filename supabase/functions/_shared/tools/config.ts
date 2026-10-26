@@ -31,6 +31,13 @@ export const LIMITS = {
   unlocksPerIpPerDay: 12,
 };
 
+// What a scan is expected to cost, reserved against the daily cap the moment
+// it starts (audit 1.2: the cap was only charged when a scan finished, so
+// scans started in the same minute all passed it). Set above the typical
+// run so the cap is conservative: Site Review is one Haiku call, AI
+// Visibility measured $0.31-0.40 on Sonnet.
+export const ESTIMATED_COST_USD: Record<ToolId, number> = { site_review: 0.01, ai_visibility: 0.45 };
+
 // Cache: Site Review 24 hours per URL; AI Visibility 7 days per business + city.
 export const CACHE_HOURS: Record<ToolId, number> = { site_review: 24, ai_visibility: 24 * 7 };
 

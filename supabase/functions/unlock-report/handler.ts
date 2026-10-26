@@ -97,6 +97,12 @@ export async function handler(req: Request): Promise<Response> {
 
   const view = publicReport(row);
 
+  // An unsubscribed, bounced or complaining address is never mailed, even for
+  // the report it just asked for: the form takes any address, so this is what
+  // keeps it from being used to mail people who said no (audit 1.3). Checked
+  // before the response so the page can say whether a copy is coming.
+  const sendable = (await maySend(email)).ok;
+
   // The visitor sees the full report as soon as the lead is saved. The mirror
   // and both emails (each up to 10s, the alert on a cold function) run after
   // the response, so a slow send never leaves the page sitting on "Unlocking…".
@@ -104,7 +110,7 @@ export async function handler(req: Request): Promise<Response> {
     const auditLeadId = await mirrorToAuditLeads(tool, input, email, view);
     if (auditLeadId) await patch(`tool_leads?id=eq.${enc(String(lead.id))}`, { audit_lead_id: auditLeadId }).catch(() => {});
     let emailed = false;
-    if ((await maySend(email, { critical: true })).ok) {
+    if (sendable) {
       const unsub = await unsubscribeUrl(email);
       // Phase 4: the full report as a PDF attachment. If it can't be built,
       // the email still goes, pointing at the page's "Save as PDF" button.
@@ -118,7 +124,7 @@ export async function handler(req: Request): Promise<Response> {
   };
   runAfterResponse(followUp().catch(() => {}));
 
-  return toolsJson(req, { ok: true, email_queued: true, report: view });
+  return toolsJson(req, { ok: true, email_queued: sendable, report: view });
 }
 
 // Supabase's edge runtime keeps the function alive for a promise handed to

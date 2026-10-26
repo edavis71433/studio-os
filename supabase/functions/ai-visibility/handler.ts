@@ -12,7 +12,7 @@
 
 import { CALENDLY_URL, toolsCors, toolsJson } from '../_shared/tools/config.ts';
 import { dbReady, insert } from '../_shared/tools/db.ts';
-import { beginScan, finishScan, logUsage } from '../_shared/tools/guard.ts';
+import { beginScan, failScan, finishScan } from '../_shared/tools/guard.ts';
 import { publicReport } from '../_shared/tools/report_view.ts';
 import { assertPublicHttpUrl, normalizeSiteUrl } from '../_shared/tools/url_guard.ts';
 import { runAiVisibility, type AiScanDeps } from '../_shared/tools/ai_visibility/scan.ts';
@@ -62,15 +62,15 @@ export async function handler(req: Request): Promise<Response> {
           onProgress: (p) => send({ type: 'progress', ...p }),
         });
         if (!result.ok) {
-          await logUsage({ tool: 'ai_visibility', kind: 'scan', ip_hash: gate.ipHash, cost_usd: result.costUsd, note: `failed:${result.error}` });
+          await failScan({ tool: 'ai_visibility', ipHash: gate.ipHash, usageId: gate.usageId, costUsd: result.costUsd, note: `failed:${result.error}` });
           send(result.error === 'ambiguous' ? { type: 'needs_detail', message: result.message } : { type: 'error', error: result.error, message: result.message, calendly: CALENDLY_URL });
         } else {
           const row = await insert('tool_reports', { tool: 'ai_visibility', input: result.input, raw_results: result.raw, findings: result.findings, scores: result.scores, unlocked: false });
-          await finishScan({ tool: 'ai_visibility', ipHash: gate.ipHash, cacheKey: gate.cacheKey, reportId: String(row.id), costUsd: result.costUsd });
+          await finishScan({ tool: 'ai_visibility', ipHash: gate.ipHash, cacheKey: gate.cacheKey, usageId: gate.usageId, reportId: String(row.id), costUsd: result.costUsd });
           send({ type: 'done', report_id: String(row.id), report: publicReport(row) });
         }
       } catch (_e) {
-        await logUsage({ tool: 'ai_visibility', kind: 'scan', ip_hash: gate.ipHash, note: 'failed:exception' });
+        await failScan({ tool: 'ai_visibility', ipHash: gate.ipHash, usageId: gate.usageId, note: 'failed:exception' });
         send({ type: 'error', error: 'failed', message: "Something went wrong on our side. Try again in a minute, or book a call and I'll run it by hand.", calendly: CALENDLY_URL });
       } finally {
         closed = true;

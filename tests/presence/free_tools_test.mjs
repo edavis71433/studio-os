@@ -11,8 +11,8 @@ globalThis.fetch = fake.fetch;
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const { scoreLabel, publicReport } = await import('../../supabase/functions/_shared/tools/report_view.ts');
-const { windowStart, cacheKeyFor, isEmail, beginScan, finishScan } = await import('../../supabase/functions/_shared/tools/guard.ts');
-const { reportReadyEmail, leadAlertEmail } = await import('../../supabase/functions/_shared/tools/email.ts');
+const { windowStart, cacheKeyFor, isEmail, beginScan, finishScan, failScan } = await import('../../supabase/functions/_shared/tools/guard.ts');
+const { reportReadyEmail, leadAlertEmail, greetingName } = await import('../../supabase/functions/_shared/tools/email.ts');
 const { handler: reportHandler } = await import('../../supabase/functions/tool-report/handler.ts');
 const { handler: unlockHandler, pendingFollowUps } = await import('../../supabase/functions/unlock-report/handler.ts');
 const { handler: alertHandler } = await import('../../supabase/functions/send-lead-alert/handler.ts');
@@ -128,6 +128,24 @@ fake.state.failResend = false;
 ok('unlock: if email sending fails the visitor still sees the full report', r.status === 200 && out.report.unlocked);
 ok('unlock: a failed send is recorded in the usage log', fake.state.tables.tool_usage_log.some((u) => u.kind === 'unlock' && u.report_id === d && /emailed=false/.test(u.note)));
 
+// Audit 1.3: an unsubscribed address is never mailed, even for its own report;
+// the page is told so up front. The lead and the unlock still happen.
+fake.state.tables.suppressed_emails.push({ email: 'optout@example.com', reason: 'opt_out' });
+const e = seed({ ...sample, id: crypto.randomUUID() });
+let mailsBefore = fake.state.emails.length;
+r = await unlockHandler(post('unlock-report', { report_id: e, email: 'optout@example.com', name: 'Pat' }));
+out = await r.json();
+await pendingFollowUps();
+ok('unlock: an opted-out address gets the report on screen but no email, and the page is told', r.status === 200 && out.report.unlocked && out.email_queued === false && !fake.state.emails.some((m) => m.to?.includes?.('optout@example.com') || m.to === 'optout@example.com') && fake.state.tables.tool_leads.some((l) => l.email === 'optout@example.com'));
+ok('unlock: the skipped send is recorded', fake.state.tables.tool_usage_log.some((u) => u.kind === 'unlock' && u.report_id === e && /emailed=false/.test(u.note)));
+ok('unlock: the lead alert still reaches Eric', fake.state.emails.length === mailsBefore + 1 && /New lead/.test(fake.state.emails[fake.state.emails.length - 1].subject));
+
+// Audit 1.3: the typed name is free text; only a plain first name is greeted.
+const mail = (n) => reportReadyEmail({ name: n, toolName: 'Site Review', score: 64, label: 'Needs work', reportUrl: 'https://t/x', calendlyUrl: 'https://c', unsubscribeUrl: 'https://u' });
+ok('greeting: a plain first name is used in both html and text', mail('Pat').html.includes('Hi Pat,') && mail('Pat').text.startsWith('Hi Pat,') && greetingName("O'Brien-Smith") === "O'Brien-Smith" && greetingName('José Luis') === 'José');
+ok('greeting: a message smuggled into the name is cut to the first word', mail('Pat — your invoice is overdue, pay at evil.example').html.includes('Hi Pat,') && !/invoice|evil/.test(mail('Pat — your invoice is overdue, pay at evil.example').html + mail('Pat — your invoice is overdue, pay at evil.example').text));
+ok('greeting: a URL, a number, or nothing falls back to a plain "Hi,"', mail('http://evil.example').html.includes('>Hi,<') && mail('12345').text.startsWith('Hi,') && mail('').text.startsWith('Hi,') && greetingName('x'.repeat(31)) === null && !/evil/.test(mail('http://evil.example').text));
+
 // Speed: the page gets its answer before a slow email finishes.
 fake.state.resendDelayMs = 400;
 const slow = seed({ ...sample, id: crypto.randomUUID() });
@@ -180,6 +198,27 @@ ok('gate: at the $10 daily cap new scans stop with the "resting" message', !g.ok
 g = await beginScan(scanReq('192.0.2.5'), { tool: 'site_review', turnstileToken: 'good-token', input: { url: 'cached.example' } });
 ok('gate: cached reports still serve when the cap is hit (they cost nothing)', g.ok && !!g.cachedReport);
 fake.state.spend = 0;
+
+// Audit 1.2: the expected cost is reserved when a scan STARTS, so a second scan
+// started while the first is still running sees the cap; the reservation is
+// then replaced by the real cost (one row, not two), or kept on an exception.
+fake.state.spend = 9.6;
+let g1 = await beginScan(scanReq('192.0.2.6'), { tool: 'ai_visibility', turnstileToken: 'good-token', input: { business_name: 'Reserve One', city: 'Burbank' } });
+const reserved = fake.state.tables.tool_usage_log.find((u) => u.id === g1.usageId);
+ok('gate: a scan reserves its expected cost in the log the moment it starts', g1.ok && !!g1.usageId && reserved?.kind === 'scan' && reserved.cost_usd === 0.45 && reserved.note === 'reserved' && reserved.report_id == null);
+let g2 = await beginScan(scanReq('192.0.2.7'), { tool: 'ai_visibility', turnstileToken: 'good-token', input: { business_name: 'Reserve Two', city: 'Burbank' } });
+ok('gate: a second scan started before the first finishes is stopped by the cap', !g2.ok && g2.response.status === 503);
+const rowsBefore = fake.state.tables.tool_usage_log.length;
+await finishScan({ tool: 'ai_visibility', ipHash: g1.ipHash, cacheKey: g1.cacheKey, usageId: g1.usageId, reportId: scanned, costUsd: 0.31 });
+ok('gate: finishScan replaces the reservation with the real cost, no second row', fake.state.tables.tool_usage_log.length === rowsBefore && reserved.cost_usd === 0.31 && reserved.report_id === scanned && reserved.note === null);
+fake.state.spend = 0;
+g1 = await beginScan(scanReq('192.0.2.8'), { tool: 'site_review', turnstileToken: 'good-token', input: { url: 'fails.example' } });
+const reserved2 = fake.state.tables.tool_usage_log.find((u) => u.id === g1.usageId);
+await failScan({ tool: 'site_review', ipHash: g1.ipHash, usageId: g1.usageId, note: 'failed:exception' });
+ok('gate: a scan that dies keeps its reservation as the charge, with the failure noted', g1.ok && reserved2.cost_usd === 0.01 && reserved2.note === 'failed:exception');
+g1 = await beginScan(scanReq('192.0.2.9'), { tool: 'site_review', turnstileToken: 'good-token', input: { url: 'fails2.example' } });
+await failScan({ tool: 'site_review', ipHash: g1.ipHash, usageId: g1.usageId, costUsd: 0.004, note: 'failed:blocked' });
+ok('gate: a scan that fails with a known cost settles to that cost', fake.state.tables.tool_usage_log.find((u) => u.id === g1.usageId).cost_usd === 0.004);
 
 // ── structural ──
 const pageJs = read('tool-report.js');

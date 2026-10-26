@@ -8,11 +8,16 @@
 // a bill); the rate limiter fails OPEN (the spend cap still bounds the cost, and
 // a limiter hiccup shouldn't turn every visitor away).
 
-import { CACHE_HOURS, CALENDLY_URL, LIMITS, RESTING_MESSAGE, dailySpendCapUsd, toolsJson, type ToolId } from './config.ts';
-import { enc, insert, rpc, select, upsert } from './db.ts';
+import { CACHE_HOURS, CALENDLY_URL, ESTIMATED_COST_USD, LIMITS, RESTING_MESSAGE, dailySpendCapUsd, toolsJson, type ToolId } from './config.ts';
+import { enc, insert, patch, rpc, select, upsert } from './db.ts';
 
 // ── pure helpers (unit-tested) ───────────────────────────────────────────────
 
+// Supabase's gateway REPLACES x-forwarded-for with the address it saw, so
+// the first entry is the real client and a caller's own header is discarded
+// (probed 2026-10-26: 14 unlock calls with 14 different spoofed values all
+// landed in one rate bucket). Keep that order; on a host that appends
+// instead, the trusted entry would be the last one.
 export function clientIp(req: Request): string {
   const xff = req.headers.get('x-forwarded-for') || '';
   return (xff.split(',')[0] || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || '').trim() || 'unknown';
@@ -96,7 +101,7 @@ export async function spendCapReached(): Promise<boolean> {
   } catch { return true; }
 }
 
-export async function logUsage(row: { tool: string; kind: 'scan' | 'cache_hit' | 'unlock' | 'blocked'; ip_hash?: string; email?: string | null; report_id?: string | null; cost_usd?: number; note?: string }): Promise<void> {
+export async function logUsage(row: { tool: string; kind: 'scan' | 'cache_hit' | 'unlock' | 'blocked'; ip_hash?: string; email?: string | null; report_id?: string | null; cost_usd?: number; note?: string | null }): Promise<void> {
   try { await insert('tool_usage_log', { cost_usd: 0, ...row }); } catch { /* logging never blocks a visitor */ }
 }
 
@@ -125,10 +130,11 @@ export async function cloneForVisitor(reportId: string): Promise<Record<string, 
 
 export type ScanGate =
   | { ok: false; response: Response }
-  | { ok: true; ipHash: string; cacheKey: string; cachedReport: Record<string, unknown> | null };
+  | { ok: true; ipHash: string; cacheKey: string; usageId?: string; cachedReport: Record<string, unknown> | null };
 
 /** Run before any scan. On ok with cachedReport set, return that report's
- *  teaser instead of scanning. On ok without it, scan, then call finishScan. */
+ *  teaser instead of scanning. On ok without it, scan, then call finishScan
+ *  (or failScan) with the usageId so the reserved cost is settled. */
 export async function beginScan(req: Request, opts: { tool: ToolId; turnstileToken: unknown; input: Record<string, unknown> }): Promise<ScanGate> {
   const ip = clientIp(req);
   const ipHash = await hashId('ip', ip);
@@ -157,11 +163,40 @@ export async function beginScan(req: Request, opts: { tool: ToolId; turnstileTok
   }
 
   if (await spendCapReached()) return stop(503, 'resting', RESTING_MESSAGE, 'spend_cap');
-  return { ok: true, ipHash, cacheKey, cachedReport: null };
+  // Reserve the expected cost now, so scans in flight count against the cap
+  // and a scan that dies mid-way is still paid for in the log. Fails closed:
+  // a scan we can't account for doesn't run.
+  const usageId = await reserveUsage(opts.tool, ipHash);
+  if (!usageId) return stop(503, 'resting', RESTING_MESSAGE, 'reserve_failed');
+  return { ok: true, ipHash, cacheKey, usageId, cachedReport: null };
 }
 
-/** After a successful scan: log its estimated cost and cache it. */
-export async function finishScan(opts: { tool: ToolId; ipHash: string; cacheKey: string; reportId: string; costUsd: number }): Promise<void> {
-  await logUsage({ tool: opts.tool, kind: 'scan', ip_hash: opts.ipHash, report_id: opts.reportId, cost_usd: Math.max(0, opts.costUsd || 0) });
+async function reserveUsage(tool: ToolId, ipHash: string): Promise<string | null> {
+  try {
+    const row = await insert<{ id: string }>('tool_usage_log', { tool, kind: 'scan', ip_hash: ipHash, cost_usd: ESTIMATED_COST_USD[tool], note: 'reserved' });
+    return row?.id ? String(row.id) : null;
+  } catch { return null; }
+}
+
+/** Replace the reservation with what the scan actually cost. Without a
+ *  reservation id (older callers, tests) a fresh row is written instead. */
+async function settleUsage(opts: { tool: ToolId; ipHash: string; usageId?: string | null; reportId?: string | null; costUsd: number; note?: string | null }): Promise<void> {
+  const fields = { cost_usd: Math.max(0, opts.costUsd || 0), report_id: opts.reportId ?? null, note: opts.note ?? null };
+  if (opts.usageId) {
+    try { await patch(`tool_usage_log?id=eq.${enc(opts.usageId)}`, fields); return; } catch { /* fall through: write a row rather than lose the cost */ }
+  }
+  await logUsage({ tool: opts.tool, kind: 'scan', ip_hash: opts.ipHash, ...fields });
+}
+
+/** After a successful scan: settle its cost and cache it. */
+export async function finishScan(opts: { tool: ToolId; ipHash: string; cacheKey: string; usageId?: string | null; reportId: string; costUsd: number }): Promise<void> {
+  await settleUsage({ tool: opts.tool, ipHash: opts.ipHash, usageId: opts.usageId, reportId: opts.reportId, costUsd: opts.costUsd });
   await storeCache(opts.tool, opts.cacheKey, opts.reportId);
+}
+
+/** After a failed scan: settle what it cost before failing. When the cost is
+ *  unknown (an exception), the reservation stands as the charge. */
+export async function failScan(opts: { tool: ToolId; ipHash: string; usageId?: string | null; costUsd?: number; note: string }): Promise<void> {
+  const costUsd = opts.costUsd ?? (opts.usageId ? ESTIMATED_COST_USD[opts.tool] : 0);
+  await settleUsage({ tool: opts.tool, ipHash: opts.ipHash, usageId: opts.usageId, costUsd, note: opts.note });
 }
