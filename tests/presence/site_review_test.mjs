@@ -126,6 +126,16 @@ ok('scoring: overall is the weighted sum of the pillars', overallScore(pillars) 
 const noPsi = pillarScores(runChecks({ ...base, psi: { ok: false, reason: 'timeout' } }), false);
 ok('scoring: PageSpeed failure → Performance "Couldn\'t measure today" and left out', noPsi[0].score === null && noPsi[0].note === "Couldn't measure today" && overallScore(noPsi) === Math.round((noPsi[1].score * 30 + noPsi[2].score * 20 + noPsi[3].score * 20) / 70));
 ok('scoring: noindex on the homepage is a Fix-now failure', runChecks({ ...base, pages: [{ ...allPages[0], noindex: true }, ...allPages.slice(1)] }).find((c) => c.id === 'noindex').status === 'fail');
+// Hettie's situation: no address anywhere, no structured data, Google speed 87.
+const { priorityOf, rankIssues } = await import('../../supabase/functions/_shared/tools/site_review/checks.ts');
+const bare = allPages.map((p) => ({ ...p, address: null, addressInFooter: false, jsonld: { blocks: 0, parseErrors: 0, items: [] } }));
+const bareChecks = runChecks({ ...base, pages: bare, psi: { ...psi, scores: { ...psi.scores, performance: 87 } } });
+const bareIssues = rankIssues(bareChecks).map((c) => c.id);
+ok('dedupe: no address anywhere → one address finding, Local score still counts it', bareIssues.includes('address_on_site') && !bareIssues.includes('address_footer') && bareChecks.find((c) => c.id === 'address_footer').status === 'fail');
+ok('dedupe: no structured data → one schema finding, not a second "nothing to confirm"', bareIssues.includes('schema_present') && !bareIssues.includes('nap_consistency'));
+ok('dedupe: a real name/address/phone mismatch is still reported', rankIssues(runChecks({ ...base, pages: [{ ...allPages[0], telLinks: ['(818) 555-9999'], phonesInText: [] }, ...allPages.slice(1).map((p) => ({ ...p, telLinks: [], phonesInText: [] }))] })).some((c) => c.id === 'nap_consistency'));
+const perf = (n) => priorityOf({ id: 'perf_score', status: n >= 90 ? 'pass' : n >= 50 ? 'warn' : 'fail', weight: 6, score: n / 100 });
+ok('priority: Google speed 87 → Later, 62 → Important, 40 → Fix now', perf(87) === 'Later' && perf(62) === 'Important' && perf(40) === 'Fix now');
 ok('business name: og:site_name, else the brand part of the title', deriveBusinessName(home) === 'Sample Bistro' && deriveBusinessName({ ...home, og: { ...home.og, siteName: '' }, jsonld: { blocks: 0, parseErrors: 0, items: [] }, title: 'Home | Cedar & Core' }) === 'Cedar & Core');
 ok('wording: lists read naturally', andList(['a']) === 'a' && andList(['a', 'b']) === 'a and b' && andList(['search', 'trust and conversion', 'local']) === 'search, trust and conversion, and local');
 

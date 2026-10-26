@@ -425,7 +425,9 @@ export function runChecks(d: SiteData): Check[] {
     id: 'address_footer', area: 'Local', pillar: 'local', weight: 2,
     status: footerAddr ? 'pass' : addrPages.length ? 'warn' : 'fail',
     evidence: footerAddr ? 'Address in the footer' : addrPages.length ? `Address only on ${list(paths(addrPages))}` : 'No address anywhere',
-    draft: !footerAddr ? { title: addrPages.length ? 'Your address isn’t in the footer' : 'No address in the footer', what: addrPages.length ? `Your address appears on ${list(paths(addrPages))} but not in the site-wide footer.` : 'The footer, where people and Google expect it, has no address.', why: 'An address on every page is one of the clearest signals that you serve this area.', fix: 'Put your address (or service area) in the footer.' } : undefined,
+    // With no address anywhere, "We couldn't find your address" (address_on_site)
+    // is the one finding; this check still counts in the Local score.
+    draft: !footerAddr && addrPages.length ? { title: 'Your address isn’t in the footer', what: `Your address appears on ${list(paths(addrPages))} but not in the site-wide footer.`, why: 'An address on every page is one of the clearest signals that you serve this area.', fix: 'Put your address (or service area) in the footer.' } : undefined,
   });
   const mapPages = pages.filter((p) => p.mapEmbed);
   add({
@@ -449,8 +451,9 @@ export function runChecks(d: SiteData): Check[] {
     id: 'nap_consistency', area: 'Local', pillar: 'local', weight: 3,
     status: !canCompare ? (pagePhones.size || addrPages.length ? 'warn' : 'fail') : issues.length ? (issues.length > 1 ? 'fail' : 'warn') : 'pass',
     evidence: !canCompare ? 'No structured data to compare the page details against' : issues.length ? issues.join('; ') : 'Name, address and phone match across pages and the structured data',
-    draft: (!canCompare || issues.length) ? (issues.length ? { title: 'Your name, address or phone don’t match everywhere', what: `${issues[0][0].toUpperCase() + issues[0].slice(1)}${issues.length > 1 ? `, and ${issues.length - 1} more mismatch${issues.length > 2 ? 'es' : ''}` : ''}.`, why: 'Google cross-checks these details. When they disagree, it trusts the listing less and may show the wrong one.', fix: 'Use exactly the same name, address and phone everywhere.' }
-      : { title: 'Google has nothing to confirm your details against', what: 'Your pages show contact details, but there is no structured data repeating your name, address and phone for Google.', why: 'Matching details in the code are one of the ways Google confirms a local business is real and where it says it is.', fix: 'Add structured data with the same name, address and phone as the site.' }) : undefined,
+    // Only when details actually disagree. With no structured data to compare
+    // against, the schema_present / schema_type finding already says so.
+    draft: issues.length ? { title: 'Your name, address or phone don’t match everywhere', what: `${issues[0][0].toUpperCase() + issues[0].slice(1)}${issues.length > 1 ? `, and ${issues.length - 1} more mismatch${issues.length > 2 ? 'es' : ''}` : ''}.`, why: 'Google cross-checks these details. When they disagree, it trusts the listing less and may show the wrong one.', fix: 'Use exactly the same name, address and phone everywhere.' } : undefined,
   });
 
   // ── Performance (PageSpeed)
@@ -515,6 +518,9 @@ export function overallScore(pillars: { weight: number; score: number | null }[]
 
 export type Priority = 'Fix now' | 'Important' | 'Later';
 export function priorityOf(c: Check): Priority {
+  // A graded check (Google's speed score) is prioritized by the score itself:
+  // under 50 Fix now, 50 to 74 Important, 75 and up Later.
+  if (typeof c.score === 'number') return c.score < 0.5 ? 'Fix now' : c.score < 0.75 ? 'Important' : 'Later';
   if (c.status === 'fail' && c.weight >= 2) return 'Fix now';
   if (c.status === 'fail' || c.weight >= 2) return 'Important';
   return 'Later';
