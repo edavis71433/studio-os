@@ -52,12 +52,19 @@
 /the-experience.html    /how-we-work    301
 
 # Clean URLs for the tools (each keeps its own page; no longer funneled to a dead hub)
-/audit             /audit.html         200
+# Free Tools rebuild (Oct 2026): the old tools now live at https://tools.davisdigitalstudio.com.
+# Forced (!) because the old page files still exist in the build.
+/audit             https://tools.davisdigitalstudio.com/site-review   301!
+/audit.html        https://tools.davisdigitalstudio.com/site-review   301!
+/speed-test        https://tools.davisdigitalstudio.com/site-review   301!
 /ai-critique       /ai-critique.html   200
 /report-card       /report-card.html   200
-/roi-calculator    /roi-calculator.html 200
-/pricing-estimator /pricing-estimator.html 200
-/local-visibility  /local-visibility.html 200
+/roi-calculator    https://tools.davisdigitalstudio.com/site-review   301!
+/roi-calculator.html https://tools.davisdigitalstudio.com/site-review 301!
+/pricing-estimator https://davisdigitalstudio.com/pricing   301!
+/pricing-estimator.html https://davisdigitalstudio.com/pricing 301!
+/local-visibility  https://tools.davisdigitalstudio.com/ai-visibility 301!
+/local-visibility.html https://tools.davisdigitalstudio.com/ai-visibility 301!
 
 # Free Tools (Oct 2026 rebuild): the hosted report page. tools.davisdigitalstudio.com
 # is an alias of this site; its bare root goes to the main site, which links the tools.
@@ -68,7 +75,8 @@ https://tools.davisdigitalstudio.com/   https://davisdigitalstudio.com/   302!
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)
-/tools             /tools.html         200
+/tools             https://davisdigitalstudio.com/free-tools 301!
+/tools.html        https://davisdigitalstudio.com/free-tools 301!
 
 # Clean URLs for the marketing pages (extensionless links resolve to the .html file)
 # /portal: the marketing chrome's "Client login" uses the clean URL; portal.html

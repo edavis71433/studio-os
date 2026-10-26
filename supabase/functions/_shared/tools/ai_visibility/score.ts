@@ -32,6 +32,11 @@ export const isDirectory = (d: string) => DIRECTORIES.test(d);
 const SOURCE_NAMES: Record<string, string> = { 'yelp.com': 'Yelp', 'google.com': 'Google', 'maps.google.com': 'Google Maps', 'tripadvisor.com': 'TripAdvisor', 'opentable.com': 'OpenTable', 'resy.com': 'Resy', 'facebook.com': 'Facebook', 'instagram.com': 'Instagram', 'nextdoor.com': 'Nextdoor', 'angi.com': 'Angi', 'thumbtack.com': 'Thumbtack', 'bbb.org': 'BBB', 'eater.com': 'Eater', 'timeout.com': 'Time Out', 'infatuation.com': 'The Infatuation', 'yellowpages.com': 'Yellow Pages', 'houzz.com': 'Houzz' };
 export const sourceName = (d: string) => SOURCE_NAMES[d] || d;
 
+// Organizations an answer may name that aren't rival businesses: chambers,
+// visitor bureaus, city departments, directories (found live: "Burbank
+// Chamber of Commerce" listed as a web design competitor).
+export const NOT_A_COMPETITOR = /\b(chamber of commerce|chamber\b|visitors? bureau|convention (and|&) visitors|tourism|city of\b|county of\b|small business (development|administration)|SBA\b|SCORE\b|BBB\b|better business bureau|yelp|google|angi\b|thumbtack|nextdoor|upwork|fiverr|reddit|facebook|instagram)/i;
+
 export interface Competitor { name: string; mentions: number; engines: string[]; aboveYou: boolean; answers: number[] }
 
 export function competitorsFrom(recs: AnswerRecord[], target: { name: string; city: string }): Competitor[] {
@@ -41,7 +46,7 @@ export function competitorsFrom(recs: AnswerRecord[], target: { name: string; ci
     const tpos = r.extraction.targetPosition;
     const seenHere = new Set<string>();
     r.extraction.businesses.forEach((b, i) => {
-      if (sameBusiness(target, b)) return;
+      if (sameBusiness(target, b) || NOT_A_COMPETITOR.test(b.name)) return;
       let c = list.find((x) => sameBusiness({ name: x.name, city: '' }, { name: b.name, city: null }));
       if (!c) { c = { key: nameTokens(b.name).join(' '), name: b.name, mentions: 0, engines: [], aboveYou: false, answers: [], aboveCount: 0 }; list.push(c); }
       if (seenHere.has(c.key)) return;
@@ -177,7 +182,10 @@ export function buildIssues(a: {
   if (flagged.length) {
     const flags = flagged.flatMap((r) => r.extraction!.flags.map((f) => ({ ...f, engine: r.engineName })));
     const types = [...new Set(flags.map((f) => f.type))];
-    const from = sourcesFrom(flagged, null).filter((s) => !s.own).slice(0, 2).map((s) => sourceName(s.domain));
+    // Where the wrong facts came from, never counting the business's own site
+    // (found live: "correct your details on davisdigitalstudio.com").
+    const own = new Set(a.sources.filter((s) => s.own).map((s) => s.domain));
+    const from = sourcesFrom(flagged, null).filter((s) => !own.has(s.domain)).slice(0, 2).map((s) => sourceName(s.domain));
     const severe = types.some((t) => t === 'marked_closed' || t === 'wrong_address');
     add({ id: 'wrong_facts', area: 'Accuracy', pillar: 'accuracy', weight: severe ? 3 : 2, status: severe ? 'fail' : 'warn',
       evidence: `${types.map((t) => FLAG_LABELS[t]).join('; ')}: ${flags[0].detail}${from.length ? `; those answers cited ${andList(from)}` : ''}`,

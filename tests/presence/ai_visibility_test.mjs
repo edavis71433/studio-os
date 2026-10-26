@@ -79,6 +79,8 @@ const withReady = scoreAll(recs, { checked: true, score: 50, checks: [], facts: 
 ok('score: with a website, 40/25/20/15', withReady.overall === Math.round((s.rec * 40 + s.aw * 25 + s.acc * 20 + 50 * 15) / 100));
 const comps = competitorsFrom(recs, bac);
 ok('competitors: counted once per answer, ranked, and "ranked above you" when ahead or you were absent', comps[0].name === 'Union' && comps[0].mentions === 5 && comps[0].aboveYou === true && comps.find((c) => c.name === 'Perle').mentions === 2 && comps.length <= 5);
+const withChamber = competitorsFrom([rec('unbranded', ex(['Burbank Chamber of Commerce', 'Backhouse Media', 'City of Burbank'], null))], { name: 'Davis Digital Studio', city: 'Burbank' });
+ok('competitors: chambers, city offices and directories are not competitors', withChamber.length === 1 && withChamber[0].name === 'Backhouse Media');
 const srcs = sourcesFrom(recs, 'bacchuskitchen.com');
 const { canonicalSource } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
 ok('sources: country and city editions merge (tripadvisor.in, la.eater.com, m.yelp.com)', canonicalSource('tripadvisor.in') === 'tripadvisor.com' && canonicalSource('tripadvisor.co.uk') === 'tripadvisor.com' && canonicalSource('la.eater.com') === 'eater.com' && canonicalSource('m.yelp.com') === 'yelp.com' && canonicalSource('glowupfinder.com') === 'glowupfinder.com');
@@ -180,6 +182,7 @@ const ids = row.findings.items.map((f) => f.title);
 ok('Bacchus: appeared in 3 of 5 (fuzzy match on "+ Wine Bar")', row.scores.highlights[0].value === '3 of 5 answers');
 ok('Bacchus: Union is the top competitor, ranked above', row.raw_results.competitors[0].name === 'Union' && row.raw_results.competitors[0].mentions === 5 && row.raw_results.competitors[0].aboveYou);
 ok('Bacchus: "AI recommends Union instead" names the source (Yelp)', ids.some((t) => t === 'AI recommends Union instead') && /Yelp/.test(JSON.stringify(row.findings.items.find((f) => f.title === 'AI recommends Union instead'))));
+ok('Bacchus: the business\'s own site is never named as where a wrong fact came from', !/bacchus\.example/.test(JSON.stringify(row.findings.items.find((f) => f.title === 'AI has some of your facts wrong'))));
 ok('Bacchus: wrong hours flagged, and where it came from', ids.includes('AI has some of your facts wrong') && /9am/.test(JSON.stringify(row.findings.items)) && row.scores.pillars[2].score === 75);
 ok('Bacchus: website read for readiness; GPTBot block found', row.raw_results.readiness.checked && row.raw_results.readiness.checks.find((c) => c.id === 'ai_crawlers').status === 'warn' && ids.includes('Your website blocks some AI crawlers'));
 ok('Bacchus: known facts from the site fed to extraction (hours)', row.raw_results.readiness.facts.hours === 'Tu-Su 17:00-22:00' && /1384 E Washington/.test(row.raw_results.readiness.facts.address));
