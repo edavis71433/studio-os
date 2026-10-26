@@ -69,12 +69,19 @@ export interface NarrativeInput {
 
 const numbersIn = (s: string) => (String(s).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => n.replace(',', ''));
 
-/** A Claude finding is kept only if every number it states appears in the
- *  check's own evidence or template text. */
-export function groundedIn(f: { what_we_found: string; title: string }, c: Check): boolean {
-  const source = `${c.evidence} ${c.draft?.what || ''} ${c.draft?.title || ''}`;
-  const known = new Set(numbersIn(source));
-  return [...numbersIn(f.what_we_found), ...numbersIn(f.title)].every((n) => known.has(n));
+// The fixed thresholds the checks are written against ("30 to 60 characters",
+// "under 150 words", "2.5 s"): a finding may quote them even when the check's
+// own text didn't.
+const THRESHOLDS = ['30', '60', '70', '160', '150', '2.5', '4', '0.1', '200', '100', '50', '75'];
+
+/** A Claude finding is kept only if every number it states, in any of its four
+ *  fields, appears in the check's own evidence or template text or is one of
+ *  the known thresholds. Why-it-matters is where invented statistics
+ *  ("53% of visitors leave after 3 seconds") tend to land (audit 2.9). */
+export function groundedIn(f: { what_we_found: string; title: string; why_it_matters?: string; fix?: string }, c: Check): boolean {
+  const source = `${c.evidence} ${c.draft?.what || ''} ${c.draft?.title || ''} ${c.draft?.why || ''} ${c.draft?.fix || ''}`;
+  const known = new Set([...numbersIn(source), ...THRESHOLDS]);
+  return [f.title, f.what_we_found, f.why_it_matters || '', f.fix || ''].flatMap(numbersIn).every((n) => known.has(n));
 }
 
 /** The summary may only state numbers that appear in what Claude was given

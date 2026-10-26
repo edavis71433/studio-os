@@ -19,6 +19,8 @@ export interface PageFacts {
   favicon: boolean;
   h1s: string[];
   headingLevels: number[];
+  contentH1s: string[];          // H1s inside the page's own content (not header/footer)
+  truncated: boolean;            // the fetch hit the size cap: the end of the page is missing
   images: { total: number; missingAlt: number };
   og: { title: boolean; description: boolean; image: boolean; siteName: string };
   jsonld: { blocks: number; parseErrors: number; items: Record<string, unknown>[] };
@@ -78,8 +80,12 @@ function regions(html: string) {
 }
 
 const PHONE = /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]\d{4}\b/g;
-const STREET = /\b\d{1,6}\s+(?:[A-Z0-9][\w.'-]*\s+){0,4}(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place|Pkwy|Parkway|Hwy|Highway|Cir|Circle|Ter|Terrace|Sq|Square)\b\.?(?:[\s,]+(?:Suite|Ste|Unit|#)\s*[\w-]+)?/i;
-const PLACEHOLDER = /\b(lorem ipsum|dolor sit amet|your (?:business|company) name|sample text|insert (?:text|content) here|john doe|jane doe|example\.com|coming soon placeholder|blog post title (?:one|two|three|four)|first blog post|sample (?:page|post)|this is (?:an? )?(?:example|sample) (?:page|post))\b/i;
+// At least one word between the number and the suffix: "5000 square feet"
+// and "3 Court dates" are copy, not addresses (audit 2.8).
+const STREET = /\b\d{1,6}\s+(?:[A-Z0-9][\w.'-]*\s+){1,4}(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place|Pkwy|Parkway|Hwy|Highway|Cir|Circle|Ter|Terrace|Sq|Square)\b\.?(?:[\s,]+(?:Suite|Ste|Unit|#)\s*[\w-]+)?/i;
+// "your business name" only as a template slot ("[Your Business Name]", "your
+// business name here"): real copy says "not just your business name".
+const PLACEHOLDER = /\[your (?:business|company) name\]|\b(lorem ipsum|dolor sit amet|your (?:business|company) name here|sample text|insert (?:text|content) here|john doe|jane doe|example\.com|coming soon placeholder|blog post title (?:one|two|three|four)|first blog post|sample (?:page|post)|this is (?:an? )?(?:example|sample) (?:page|post))\b/i;
 const CTA = /\b(book(?: now| online| a| an)?|reserve|reservations?|call(?: now| us| today)?|order(?: now| online)?|get a (?:quote|free quote|estimate)|free (?:quote|estimate|consultation)|request (?:a )?(?:quote|appointment|estimate)|schedule|make an appointment|appointments?|buy now|shop(?: now)?|get started|sign up|contact us|view menu|see (?:the )?menu)\b/i;
 
 export function parseJsonLd(html: string): { blocks: number; parseErrors: number; items: Record<string, unknown>[] } {
@@ -102,7 +108,7 @@ export function parseJsonLd(html: string): { blocks: number; parseErrors: number
   return out;
 }
 
-export function parsePage(html: string, url: string, socialProfiles: (html: string, base: string, schemas: unknown[]) => string[]): PageFacts {
+export function parsePage(html: string, url: string, socialProfiles: (html: string, base: string, schemas: unknown[]) => string[], truncated = false): PageFacts {
   const u = new URL(url);
   const head = (html.match(/<head\b[\s\S]*?<\/head>/i) || [''])[0] || html.slice(0, 50000);
   const { body, nav, footer } = regions(html);
@@ -145,18 +151,26 @@ export function parsePage(html: string, url: string, socialProfiles: (html: stri
   const words = contentText ? contentText.split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length : 0;
 
   const firstP = (contentHtml.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i) || [])[1];
-  const street = text.match(STREET);
+  // The footer is where the real address lives; the body only as a fallback.
+  const street = footerText.match(STREET) || text.match(STREET);
 
-  // "First screen": the start of the page's own content, before the second
-  // section heading or about the first 3,000 characters of markup, whichever
-  // comes first. Builders put the hero CTA there.
+  // "First screen": the start of the page's own content, up to the SECOND
+  // section heading (builders put a tagline <h2> under the H1, before the
+  // button; audit 2.3) or about 6,000 characters of markup past the H1,
+  // whichever comes first. Builders put the hero CTA there.
   const firstScreen = (() => {
     const h = contentHtml;
-    const h2 = h.search(/<h2\b/i);
-    const cut = Math.min(h2 > 0 ? h2 : h.length, 3000 + (h.search(/<h1\b/i) > 0 ? h.search(/<h1\b/i) : 0));
+    const h2s = [...h.matchAll(/<h2\b/gi)].map((m) => m.index ?? 0);
+    const cut = Math.min(h2s[1] ?? h.length, 6000 + Math.max(0, h.search(/<h1\b/i)));
     return h.slice(0, cut);
   })();
-  const ctaEl = [...firstScreen.matchAll(/<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => clean(m[2], 60) || clean(attr(m[0], 'aria-label') || '', 60)).find((t) => CTA.test(t));
+  const ctaTexts = [...firstScreen.matchAll(/<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => clean(m[2], 60) || clean(attr(m[0], 'aria-label') || '', 60))
+    .concat([...firstScreen.matchAll(/<input\b[^>]*type\s*=\s*["']?submit[^>]*>/gi)].map((m) => clean(attr(m[0], 'value') || '', 60)));
+  const ctaEl = ctaTexts.find((t) => CTA.test(t));
+  // Heading outline from the page's own content: builder footers end in
+  // h4-h6 column titles that would read as a skipped level (audit 2.12).
+  const contentHeadingLevels = [...contentHtml.matchAll(/<h([1-6])\b/gi)].map((m) => Number(m[1]));
+  const contentH1s = [...contentHtml.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => clean(m[1], 200));
   // Header buttons ("Book now" in the top bar) are on the first screen too.
   const navCta = [...nav.matchAll(/<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => clean(m[2], 60)).find((t) => CTA.test(t) && !/^contact us$/i.test(t));
 
@@ -180,7 +194,9 @@ export function parsePage(html: string, url: string, socialProfiles: (html: stri
     viewport: metaContent(head, 'name', 'viewport') !== null,
     favicon: !!iconTag,
     h1s: headings.filter((h) => h[1] === '1').map((h) => clean(h[2], 200)),
-    headingLevels: headings.map((h) => Number(h[1])),
+    headingLevels: contentHeadingLevels,
+    contentH1s,
+    truncated,
     images: { total: imgs.length, missingAlt },
     og: {
       title: !!metaContent(head, 'property', 'og:title'),

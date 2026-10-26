@@ -7,7 +7,7 @@
 
 import { checkDiscoverability, socialProfiles, type FetchLike, type UrlGuard } from '../../site_discovery.ts';
 import { parsePage, type PageFacts } from './html.ts';
-import { brokenLinks, candidatesFrom, fetchHtml, fetchSitemapLocs, httpRedirectsToHttps, pickPages, BOT_UA, MAX_PAGES, type Fetched } from './crawl.ts';
+import { brokenLinks, candidatesFrom, fetchHtml, fetchSitemapLocs, httpRedirectsToHttps, pickPages, BOT_UA, MAX_PAGES, type Fetched, HOME_MAX_BYTES } from './crawl.ts';
 import { runPsi, vitalLimitDisplay, type PsiOutcome } from './psi.ts';
 import { deriveBusinessName, overallScore, pillarScores, rankIssues, runChecks, type Check } from './checks.ts';
 import { writeNarrative, type Narrative } from './narrative.ts';
@@ -99,9 +99,15 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
   const desktopPromise = runPsi(inp.url, 40_000, deps.psiFetch, 'desktop');
 
   progress({ step: 'pages', done: 0, total: MAX_PAGES });
-  const home = await fetchHtml(inp.url, crawlDeps, Math.min(deadline, t0 + 12_000));
+  let home = await fetchHtml(inp.url, crawlDeps, Math.min(deadline, t0 + 12_000), HOME_MAX_BYTES);
+  // Builders answer a burst with a 503 now and then (seen on Squarespace):
+  // one more try before telling the visitor their site is unreachable.
+  if (home === 'unreachable') {
+    await new Promise((r) => setTimeout(r, 1500));
+    home = await fetchHtml(inp.url, crawlDeps, Math.min(deadline, t0 + 14_000), HOME_MAX_BYTES);
+  }
   if (typeof home === 'string') return { ok: false, error: home === 'blocked' ? 'blocked' : 'unreachable' };
-  const homeFacts = parsePage(home.html, home.url, socialProfiles);
+  const homeFacts = parsePage(home.html, home.url, socialProfiles, home.truncated);
   // A bot wall we don't have a signature for: a "homepage" with no title, no
   // main heading, almost no text and almost no links is not a page we can
   // honestly review.
@@ -129,7 +135,7 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
   const seenPaths = new Set([homeFacts.path]);
   const pages: PageFacts[] = [homeFacts];
   for (const f of fetched.filter((x): x is Fetched => !!x)) {
-    const facts = parsePage(f.html, f.url, socialProfiles);
+    const facts = parsePage(f.html, f.url, socialProfiles, f.truncated);
     if (seenPaths.has(facts.path)) continue;
     seenPaths.add(facts.path);
     pages.push(facts);
@@ -170,6 +176,7 @@ export async function runSiteReview(inp: ScanInput, deps: ScanDeps): Promise<Sca
   const notes: string[] = [];
   if (!psi.ok) notes.push("Google's speed test couldn't measure your site today, so Performance is left out of the overall score.");
   if (pages.length < 2) notes.push('We could only load your homepage, so this review covers that one page.');
+  if (homeFacts.truncated) notes.push('Your homepage is larger than we can read in full, so the checks that look at the footer (address, phone, map, social links) were skipped rather than guessed.');
 
   progress({ step: 'writing' });
   const issues = rankIssues(checks);
