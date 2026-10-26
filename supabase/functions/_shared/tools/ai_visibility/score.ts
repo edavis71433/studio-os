@@ -16,7 +16,7 @@ import type { PromptKind } from './prompts.ts';
 
 export interface AnswerRecord {
   engine: string; engineName: string; promptId: string; kind: PromptKind; question: string;
-  ok: boolean; sources: { url: string; title: string }[]; extraction: Extraction | null;
+  ok: boolean; sources: { url: string; title: string }[]; searched?: { url: string; title: string }[]; extraction: Extraction | null;
 }
 
 export const AI_PILLARS = [
@@ -35,7 +35,11 @@ export const sourceName = (d: string) => SOURCE_NAMES[d] || d;
 // Organizations an answer may name that aren't rival businesses: chambers,
 // visitor bureaus, city departments, directories (found live: "Burbank
 // Chamber of Commerce" listed as a web design competitor).
-export const NOT_A_COMPETITOR = /\b(chamber of commerce|chamber\b|visitors? bureau|convention (and|&) visitors|tourism|city of\b|county of\b|small business (development|administration)|SBA\b|SCORE\b|BBB\b|better business bureau|yelp|google|angi\b|thumbtack|nextdoor|upwork|fiverr|reddit|facebook|instagram)/i;
+export const NOT_A_COMPETITOR = /\b(chamber of commerce|chamber\b|visitors? bureau|convention (and|&) visitors|tourism (?:board|bureau|office|authority)|city of\b|county of\b|small business (development|administration)|better business bureau|yelp|google|angi\b|thumbtack|nextdoor|upwork|fiverr|reddit|facebook|instagram)/i;
+// The acronyms are case-sensitive: "Score Pilates" and "Sba Landscaping" are
+// businesses, "SCORE" and "SBA" are not (audit 3.11).
+const NOT_A_COMPETITOR_ACRONYM = /\b(SBA|SCORE|BBB)\b/;
+export const notACompetitor = (name: string) => NOT_A_COMPETITOR.test(name) || NOT_A_COMPETITOR_ACRONYM.test(name);
 
 export interface Competitor { name: string; mentions: number; engines: string[]; aboveYou: boolean; answers: number[] }
 
@@ -46,7 +50,10 @@ export function competitorsFrom(recs: AnswerRecord[], target: { name: string; ci
     const tpos = r.extraction.targetPosition;
     const seenHere = new Set<string>();
     r.extraction.businesses.forEach((b, i) => {
-      if (sameBusiness(target, b) || NOT_A_COMPETITOR.test(b.name)) return;
+      // The target never competes with itself, even when the answer put it
+      // in a neighborhood the owner didn't type ("Davis Digital Studio
+      // (Silver Lake)" for Los Angeles; audit 3.5).
+      if (sameBusiness(target, b) || sameBusiness({ name: target.name, city: '' }, { name: b.name, city: null }) || notACompetitor(b.name)) return;
       let c = list.find((x) => sameBusiness({ name: x.name, city: '' }, { name: b.name, city: null }));
       if (!c) { c = { key: nameTokens(b.name).join(' '), name: b.name, mentions: 0, engines: [], aboveYou: false, answers: [], aboveCount: 0 }; list.push(c); }
       if (seenHere.has(c.key)) return;
@@ -73,14 +80,28 @@ export function canonicalSource(domain: string): string {
   return sub ? sub[1] : d;
 }
 
+/** Sources the answers CITED, counted per answer, with how many answers' web
+ *  searches also surfaced each one ("seen"). Only cited sources count as
+ *  where an answer got its information (audit 3.1). */
 export function sourcesFrom(recs: AnswerRecord[], ownDomain: string | null) {
   const counts = new Map<string, number>();
+  const seen = seenFrom(recs);
   for (const r of recs) {
     if (!r.ok) continue;
     for (const d of new Set(r.sources.map((s) => canonicalSource(domainOf(s.url))).filter(Boolean))) counts.set(d, (counts.get(d) || 0) + 1);
   }
-  return [...counts.entries()].map(([domain, count]) => ({ domain, count, own: !!ownDomain && (domain === ownDomain || domain.endsWith('.' + ownDomain)), directory: isDirectory(domain) }))
-    .sort((a, b) => b.count - a.count || a.domain.localeCompare(b.domain));
+  return [...counts.entries()].map(([domain, count]) => ({ domain, count, seen: seen.get(domain) || 0, own: !!ownDomain && (domain === ownDomain || domain.endsWith('.' + ownDomain)), directory: isDirectory(domain) }))
+    .sort((a, b) => b.count - a.count || b.seen - a.seen || a.domain.localeCompare(b.domain));
+}
+
+/** Per domain, how many answers' searches returned it (cited or not). */
+export function seenFrom(recs: AnswerRecord[]): Map<string, number> {
+  const seen = new Map<string, number>();
+  for (const r of recs) {
+    if (!r.ok) continue;
+    for (const d of new Set([...r.sources, ...(r.searched || [])].map((s) => canonicalSource(domainOf(s.url))).filter(Boolean))) seen.set(d, (seen.get(d) || 0) + 1);
+  }
+  return seen;
 }
 
 const posWeight = (p: number) => (p === 1 ? 1 : p <= 3 ? 0.7 : 0.4);
@@ -207,8 +228,12 @@ export function buildIssues(a: {
     const types = [...new Set(flags.map((f) => f.type))];
     // Where the wrong facts came from, never counting the business's own site
     // (found live: "correct your details on davisdigitalstudio.com").
+    // Only sources the flagged answers actually cited, directories first
+    // (audit 3.2: with one flagged answer every source tied at 1 and the
+    // alphabetical winner, an unrelated domain, got the blame).
     const own = new Set(a.sources.filter((s) => s.own).map((s) => s.domain));
-    const from = sourcesFrom(flagged, null).filter((s) => !own.has(s.domain)).slice(0, 2).map((s) => sourceName(s.domain));
+    const cited = sourcesFrom(flagged, null).filter((s) => !own.has(s.domain));
+    const from = [...cited.filter((s) => s.directory), ...cited.filter((s) => !s.directory)].slice(0, 2).map((s) => sourceName(s.domain));
     const severe = types.some((t) => t === 'marked_closed' || t === 'wrong_address');
     add({ id: 'wrong_facts', area: 'Accuracy', pillar: 'accuracy', weight: severe ? 3 : 2, status: severe ? 'fail' : 'warn',
       evidence: `${types.map((t) => FLAG_LABELS[t]).join('; ')}: ${flags[0].detail}${from.length ? `; those answers cited ${andList(from)}` : ''}`,
@@ -220,9 +245,11 @@ export function buildIssues(a: {
   // Sources.
   if (a.url && a.readiness.checked) {
     const own = a.sources.find((s) => s.own);
+    const ownDomain = domainOf(a.url);
+    const ownSeen = seenFrom(a.recs).get(ownDomain) || 0;
     if (!own && a.sources.length) add({ id: 'own_site_not_cited', area: 'Sources', pillar: 'readiness', weight: 2, status: 'warn',
-      evidence: `Your website was cited in 0 answers; ${a.sources.length} other sources were cited`,
-      draft: { title: 'AI never cites your own website', what: `Across every answer, the AI cited ${plural(a.sources.length, 'source')}, led by ${andList(a.sources.slice(0, 2).map((s) => sourceName(s.domain)))}, but never your website.`, why: 'When AI only reads about you elsewhere, it repeats whatever those sites say, right or wrong.', fix: 'Give your site pages AI can quote: what you do, where, hours and what makes you different, in plain text.' } });
+      evidence: `Your website was cited in 0 answers${ownSeen ? ` (it came up in the search for ${plural(ownSeen, 'answer')} but wasn't used)` : ''}; ${a.sources.length} other sources were cited`,
+      draft: { title: ownSeen ? 'AI finds your website but never uses it' : 'AI never cites your own website', what: ownSeen ? `Your site came up in the AI's web search for ${plural(ownSeen, 'answer')}, but the AI never drew on it; it cited ${andList(a.sources.slice(0, 2).map((s) => sourceName(s.domain)))} instead.` : `Across every answer, the AI cited ${plural(a.sources.length, 'source')}, led by ${andList(a.sources.slice(0, 2).map((s) => sourceName(s.domain)))}, but never your website.`, why: 'When AI only reads about you elsewhere, it repeats whatever those sites say, right or wrong.', fix: 'Give your site pages AI can quote: what you do, where, hours and what makes you different, in plain text.' } });
     else if (own) strengths.push(`Your website was cited in ${plural(own.count, 'answer')}`);
   }
   const lead = a.sources.find((s) => s.directory);
@@ -252,7 +279,7 @@ export function buildIssues(a: {
 
 // ── tables for the full report ───────────────────────────────────────────────
 
-export function buildTables(a: { recs: AnswerRecord[]; target: { name: string }; competitors: Competitor[]; sources: ReturnType<typeof sourcesFrom>; engines: ReturnType<typeof perEngine>; readiness: ReadinessResult }) {
+export function buildTables(a: { recs: AnswerRecord[]; target: { name: string }; ownDomain?: string | null; competitors: Competitor[]; sources: ReturnType<typeof sourcesFrom>; engines: ReturnType<typeof perEngine>; readiness: ReadinessResult }) {
   const tables: { title: string; note?: string; columns: string[]; rows: (string | number)[][] }[] = [];
   tables.push({
     title: 'Answers by AI', note: 'How often each assistant named you when asked for a local recommendation, and whether it knew you when asked by name.',
@@ -264,10 +291,17 @@ export function buildTables(a: { recs: AnswerRecord[]; target: { name: string };
     columns: ['Business', 'Times named', 'Named by', 'Ranked above you'],
     rows: a.competitors.map((c) => [c.name, c.mentions, c.engines.join(', '), c.aboveYou ? 'Yes' : 'No']),
   });
+  // Cited sources first, then sites that only came up in the assistant's
+  // search and were never used: a site that is found but not read is its
+  // own finding for the owner.
+  const seen = seenFrom(a.recs);
+  const citedDomains = new Set(a.sources.map((s) => s.domain));
+  const seenOnly = [...seen.entries()].filter(([d]) => !citedDomains.has(d)).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+    .map(([domain, n]) => ({ domain, count: 0, seen: n, own: a.sources.some((s) => s.own) ? false : !!(a.ownDomain && (domain === a.ownDomain || domain.endsWith('.' + a.ownDomain))), directory: isDirectory(domain) }));
   tables.push({
-    title: 'Sources AI cited', note: 'Where the answers got their information. The count is how many answers cited each one.',
-    columns: ['Source', 'Answers citing it', 'Note'],
-    rows: a.sources.slice(0, 10).map((s) => [sourceName(s.domain), s.count, s.own ? 'Your website' : s.directory ? 'Directory or review site' : '']),
+    title: 'Sources AI used', note: '"Cited" is how many answers drew on the source. "Seen in search" is how many answers\u2019 web searches returned it, whether or not the assistant used it.',
+    columns: ['Source', 'Cited', 'Seen in search', 'Note'],
+    rows: [...a.sources, ...seenOnly].slice(0, 12).map((s) => [sourceName(s.domain), s.count, s.seen, s.own ? 'Your website' : s.directory ? 'Directory or review site' : '']),
   });
   const flags = a.recs.flatMap((r) => (r.extraction?.flags || []).map((f) => [FLAG_LABELS[f.type], r.engineName, f.detail]));
   if (flags.length) tables.push({ title: 'Wrong facts in AI answers', columns: ['Problem', 'AI', 'What it said'], rows: flags });

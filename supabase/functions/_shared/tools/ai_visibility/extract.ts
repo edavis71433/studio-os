@@ -38,16 +38,29 @@ export function nameTokens(s: string): string[] {
 }
 const cityKey = (s: string | null | undefined) => nameTokens(s || '').join(' ');
 
-/** Same business? Every core word of the shorter name appears in the longer
- *  one (so "Bacchus Kitchen" ~ "Bacchus Kitchen + Wine Bar"), the shorter has
- *  at least one distinctive word, and the cities don't contradict each other. */
+/** Same business? (audit 3.4)
+ *  - The mention carries every word of the target ("Bacchus Kitchen + Wine
+ *    Bar" for "Bacchus Kitchen"). A one-word target only matches a mention of
+ *    at most two words ("Union Restaurant", not "Union Station Cafe").
+ *  - Or the mention is a shorter form that keeps the target's first word,
+ *    the brand ("Bacchus Kitchen" for "Bacchus Kitchen + Wine Bar"; never
+ *    "Wine Bar", never "Pizza" for "Joe's Pizza").
+ *  - Or the mention is the target as a domain ("DavisDigitalStudio.com").
+ *  A mention placed in a different city is a namesake, not the target
+ *  (competitorsFrom still keeps it off the competitor list). */
 export function sameBusiness(target: { name: string; city: string }, mention: { name: string; city: string | null }): boolean {
-  const a = nameTokens(target.name), b = nameTokens(mention.name);
+  const a = nameTokens(target.name);
+  const raw = String(mention.name || '').trim();
+  const b = nameTokens(/^[\w.-]+\.[a-z]{2,}$/i.test(raw) ? raw.replace(/\.[a-z]{2,}$/i, '') : raw);
   if (!a.length || !b.length) return false;
-  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
-  const longSet = new Set(long);
-  if (!short.every((t) => longSet.has(t))) return false;
-  if (short.join('').length < 4) return false;                 // "Bar" alone isn't a match
+  if (b.length === 1 && b[0] === a.join('')) return true;    // "davisdigitalstudio.com"
+  if (a.length === 1 && a[0] === b.join('')) return true;
+  const aSet = new Set(a), bSet = new Set(b);
+  if (a.every((t) => bSet.has(t))) {
+    if (a.length === 1 && (b.length > 2 || a[0].length < 4)) return false;   // "Bar" alone isn't a match
+  } else if (b.every((t) => aSet.has(t))) {
+    if (b[0] !== a[0] || b.join('').length < 4) return false;
+  } else return false;
   if (mention.city && target.city) {
     const mc = cityKey(mention.city), tc = cityKey(target.city);
     if (mc && tc && !mc.includes(tc) && !tc.includes(mc)) return false;
@@ -84,7 +97,12 @@ const SYSTEM = `You read one answer an AI assistant gave to a local recommendati
 - target_description: one plain sentence summarizing what the answer says about the target, or "" if it says nothing.
 - knows_business: "yes" if the answer clearly knows the target and describes it specifically; "vague" if it mentions it with little or generic detail, or hedges about whether it exists; "no" if it says it doesn't know it or doesn't mention it.
 - described_correctly: false if what the answer says about the target contradicts the known facts or says it is closed; otherwise true.
-- accuracy_flags: only for clear errors about the target: an address or hours that contradict the known facts, saying it is closed, mixing it up with a different business, or describing services the known facts contradict. Each with a one-sentence detail quoting what the answer said. Empty when there is nothing clearly wrong. Never flag something just because it is missing.`;
+- accuracy_flags: only for clear errors about the target: an address or hours that contradict the known facts, saying it is closed, presenting another business's details as the target's, or describing services the known facts contradict. Each with a one-sentence detail quoting what the answer said. Empty when there is nothing clearly wrong. Never flag something just because it is missing. An answer that says it doesn't know the target and names a different business as a possible match, while saying it is a different business, is NOT a mix-up: that is knows_business "no" with no flag.`;
+
+// A "did you mean X, which is a different business" is the assistant being
+// careful, not a mix-up (audit 3.3: it cost 25 Accuracy points live).
+const NOT_A_MIXUP = /\b(?:is|as|be) (?:a )?(?:different|separate|unrelated) business|not (?:the same|related|affiliated)|closest match|may be thinking of|did you mean|doesn'?t appear to be the same/i;
+export const realFlags = (flags: { type: FlagType; detail: string }[]) => flags.filter((f) => f.type !== 'confused_with_other' || !NOT_A_MIXUP.test(f.detail));
 
 export async function extractAnswer(args: { question: string; answer: string; target: { name: string; city: string }; facts: KnownFacts }, budgetMs: number, fetchImpl: typeof fetch = fetch): Promise<{ ok: true; data: Extraction; costUsd: number } | { ok: false; costUsd: number }> {
   const key = Deno.env.get('ANTHROPIC_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || '';
@@ -115,9 +133,9 @@ export async function extractAnswer(args: { question: string; answer: string; ta
     // The model may record the target only in target_mentioned; keep our code
     // as the judge, but accept a mention it saw that the list missed.
     const found = pos != null || (d.target_mentioned === true && nameTokens(args.answer).join(' ').includes(nameTokens(args.target.name).join(' ')));
-    const flags = (Array.isArray(d.accuracy_flags) ? d.accuracy_flags : [])
+    const flags = realFlags((Array.isArray(d.accuracy_flags) ? d.accuracy_flags : [])
       .filter((f: { type?: string }) => FLAG_TYPES.includes(f?.type as FlagType))
-      .map((f: { type: FlagType; detail?: string }) => ({ type: f.type, detail: String(f.detail || '').slice(0, 300) }))
+      .map((f: { type: FlagType; detail?: string }) => ({ type: f.type, detail: String(f.detail || '').slice(0, 300) })))
       .slice(0, 5);
     return {
       ok: true, costUsd,

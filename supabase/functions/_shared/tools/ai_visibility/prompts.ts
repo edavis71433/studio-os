@@ -16,6 +16,8 @@ const NOUN: Record<string, string> = {
 };
 
 const first = (s: string) => s.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean)[0] || '';
+// "company" → "companies", "business" → "businesses", "studio" → "studios".
+export const plural = (noun: string) => /[^aeiou]y$/i.test(noun) ? noun.replace(/y$/i, 'ies') : /(s|x|z|ch|sh)$/i.test(noun) ? `${noun}es` : `${noun}s`;
 
 function industryPrompt(type: string, city: string, phrase: string): string {
   switch (type) {
@@ -36,26 +38,26 @@ export function buildPrompts(inp: VisibilityInput): Prompt[] {
     { id: 'b1', kind: 'branded', text: `What do you know about ${where}?` },
     { id: 'b2', kind: 'branded', text: `Is ${where} any good, and what do they offer?` },
   ];
-  // "Other" has no category word of its own ("the best local business in
-  // Burbank" is not a question anyone asks). When the visitor says what
-  // customers search for, every local question is about that instead: found
-  // in the first live run, where Davis Digital Studio was checked against
-  // computer repair shops.
+  // When the visitor says what customers search for, the local questions ask
+  // for that ("emergency plumber", not "a home services company"; audit 3.6),
+  // with one category question kept for context. "Other" has no category
+  // word of its own, so there every question uses the phrase.
   const phrase = first(inp.searchPhrases);
+  const phrased: Prompt[] = [
+    { id: 'u2', kind: 'unbranded', text: `Can you recommend someone for ${phrase} near ${city}?` },
+    { id: 'u3', kind: 'unbranded', text: `What are the top rated ${phrase} businesses in ${city}, and why?` },
+    { id: 'u4', kind: 'unbranded', text: `I need ${phrase} in ${city}. Who should I go to?` },
+  ];
   if (inp.businessType === 'other' && phrase) {
-    return [
-      { id: 'u1', kind: 'unbranded', text: `Who's the best for ${phrase} in ${city}?` },
-      { id: 'u2', kind: 'unbranded', text: `Can you recommend someone for ${phrase} near ${city}?` },
-      { id: 'u3', kind: 'unbranded', text: `What are the top rated ${phrase} businesses in ${city}, and why?` },
-      { id: 'u4', kind: 'unbranded', text: `I need ${phrase} in ${city}. Who should I go to?` },
-      { id: 'u5', kind: 'unbranded', text: `Who would you hire for ${phrase} in ${city}?` },
-      ...branded,
-    ];
+    return [{ id: 'u1', kind: 'unbranded', text: `Who's the best for ${phrase} in ${city}?` }, ...phrased, { id: 'u5', kind: 'unbranded', text: `Who would you hire for ${phrase} in ${city}?` }, ...branded];
+  }
+  if (phrase) {
+    return [{ id: 'u1', kind: 'unbranded', text: `What's the best ${noun} in ${city}?` }, ...phrased, { id: 'u5', kind: 'unbranded', text: industryPrompt(inp.businessType, city, phrase) }, ...branded];
   }
   return [
     { id: 'u1', kind: 'unbranded', text: `What's the best ${noun} in ${city}?` },
     { id: 'u2', kind: 'unbranded', text: `Can you recommend a ${noun} near ${city}?` },
-    { id: 'u3', kind: 'unbranded', text: `What are the top rated ${noun}s in ${city}, and why?` },
+    { id: 'u3', kind: 'unbranded', text: `What are the top rated ${plural(noun)} in ${city}, and why?` },
     { id: 'u4', kind: 'unbranded', text: `I need a ${noun} in ${city}. Who should I go to?` },
     { id: 'u5', kind: 'unbranded', text: industryPrompt(inp.businessType, city, phrase) },
     ...branded,

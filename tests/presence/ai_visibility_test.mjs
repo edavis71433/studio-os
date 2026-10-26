@@ -51,7 +51,7 @@ const read = readClaudeAnswer([
   { type: 'text', text: 'Try Union.', citations: [{ type: 'web_search_result_location', url: 'https://www.yelp.com/biz/a', title: 'A - Yelp', cited_text: '…' }] },
   { type: 'text', text: ' Or Bacchus Kitchen.' },
 ]);
-ok('engine: answer text joined, sources from results and citations, deduplicated', read.text === 'Try Union. Or Bacchus Kitchen.' && read.sources.length === 2 && domainOf(read.sources[0].url) === 'yelp.com');
+ok('engine: answer text joined; cited sources and search-only results kept apart, deduplicated', read.text === 'Try Union. Or Bacchus Kitchen.' && read.sources.length + read.searched.length === 2 && [...read.sources, ...read.searched].some((x) => domainOf(x.url) === 'yelp.com') && !read.searched.some((x) => read.sources.some((c) => c.url === x.url)));
 ok('engine: only Claude is enabled for Phase 3', ENGINES.map((e) => e.id).join() === 'claude');
 
 // ── robots for AI crawlers ──
@@ -87,10 +87,35 @@ const { canonicalSource } = await import('../../supabase/functions/_shared/tools
 ok('sources: country and city editions merge (tripadvisor.in, la.eater.com, m.yelp.com)', canonicalSource('tripadvisor.in') === 'tripadvisor.com' && canonicalSource('tripadvisor.co.uk') === 'tripadvisor.com' && canonicalSource('la.eater.com') === 'eater.com' && canonicalSource('m.yelp.com') === 'yelp.com' && canonicalSource('glowupfinder.com') === 'glowupfinder.com');
 ok('sources: counted per answer, directories marked', srcs[0].domain === 'yelp.com' && srcs[0].count === 2 && srcs[0].directory === true);
 
+// ── audit P2: matching, competitors, prompts, flags ──
+const T = { name: 'Union', city: 'Pasadena' };
+ok('match: a one-word name only matches a mention of at most two words', !sameBusiness(T, { name: 'Union Station Cafe', city: null }) && sameBusiness(T, { name: 'Union Restaurant', city: null }) && sameBusiness({ name: 'Perle', city: 'Pasadena' }, { name: 'Perle Bakery', city: null }));
+const B = { name: 'Bacchus Kitchen + Wine Bar', city: 'Pasadena' };
+ok('match: a shorter mention must keep the brand word', sameBusiness(B, { name: 'Bacchus Kitchen', city: null }) && !sameBusiness(B, { name: 'Wine Bar', city: null }) && !sameBusiness({ name: "Joe's Pizza", city: 'Burbank' }, { name: 'Pizza', city: null }));
+const D = { name: 'Davis Digital Studio', city: 'Los Angeles' };
+ok('match: a domain form matches; a different name sharing a word does not', sameBusiness(D, { name: 'DavisDigitalStudio.com', city: null }) && !sameBusiness(D, { name: 'Davis Media', city: null }));
+const { notACompetitor } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
+const selfRec = { engine: 'claude', engineName: 'Claude', promptId: 'u1', kind: 'unbranded', question: 'q', ok: true, sources: [], extraction: { businesses: [{ name: 'Davis Digital Studio', city: 'Silver Lake' }, { name: 'Digilite', city: null }], targetFound: false, targetPosition: null, targetDescription: '', knows: 'no', describedCorrectly: true, flags: [] } };
+ok('competitors: the business placed in a neighborhood is never its own competitor', competitorsFrom([selfRec], D).map((c) => c.name).join() === 'Digilite');
+ok('competitors: acronyms are case-sensitive, civic bodies still drop', !notACompetitor('Score Pilates') && !notACompetitor('Sba Landscaping') && !notACompetitor('Tourism Bakery') && notACompetitor('SCORE Los Angeles') && notACompetitor('Burbank Chamber of Commerce') && notACompetitor('Visit Burbank Tourism Bureau'));
+const { plural } = await import('../../supabase/functions/_shared/tools/ai_visibility/prompts.ts');
+const plumber = buildPrompts({ businessName: 'Valleyline Plumbing', city: 'Glendale', businessType: 'home services', searchPhrases: 'emergency plumber', url: null, detail: '' });
+ok('prompts: a search phrase drives four of the five local questions for every type', plumber.filter((p) => p.kind === 'unbranded' && /emergency plumber/.test(p.text)).length === 4 && /home services company in Glendale/.test(plumber[0].text) && plumber[4].text === 'Who do I call for emergency plumber in Glendale?');
+ok('prompts: plurals are real words', plural('company') === 'companies' && plural('local business') === 'local businesses' && plural('studio') === 'studios' && /home services companies/.test(buildPrompts({ businessName: 'x', city: 'Glendale', businessType: 'home services', searchPhrases: '', url: null, detail: '' })[2].text));
+const { realFlags } = await import('../../supabase/functions/_shared/tools/ai_visibility/extract.ts');
+ok('flags: "closest match is X, which is a different business" is not a mix-up; a wrong address still is', realFlags([{ type: 'confused_with_other', detail: 'The answer suggests Yonda Davis Studio, an acting center, as the closest match, which is a different business.' }, { type: 'wrong_address', detail: 'It said 500 Main St.' }]).map((f) => f.type).join() === 'wrong_address' && realFlags([{ type: 'confused_with_other', detail: 'It described the hours and menu of Bacchus Bistro as if they were the target.' }]).length === 1);
+const { homeSections, checkReadiness } = await import('../../supabase/functions/_shared/tools/ai_visibility/readiness.ts');
+const onePage = `<html><head><title>Cedar & Core Pilates Burbank</title><script type="application/ld+json">{"@type":"Organization","name":"Cedar & Core"}</script><script type="application/ld+json">{"@type":"LocalBusiness","name":"Cedar & Core","telephone":"(818) 555-0100","address":{"streetAddress":"1 Magnolia Blvd","addressLocality":"Burbank"}}</script></head><body><h1>Cedar & Core, Burbank</h1><h2>About us</h2><p>${'story '.repeat(90)}</p><h2>Our services</h2><p>${'reformer '.repeat(90)}</p><h2>Visit</h2><p>short</p></body></html>`;
+ok('readiness: homepage sections are read with their word counts', homeSections(onePage).map((s) => `${s.heading}:${s.words}`).join() === 'Cedar & Core, Burbank:0,About us:90,Our services:90,Visit:1');
+const oneFetch = (u) => Promise.resolve(String(u) === 'https://cedar.example/' ? new Response(onePage, { status: 200 }) : new Response('nope', { status: 404 }));
+const rd = await checkReadiness('https://cedar.example/', { businessName: 'Cedar & Core', city: 'Burbank', businessType: 'health and wellness' }, { guard: async () => {}, fetchImpl: oneFetch }, 8000);
+ok('readiness: a one-page site with about and services sections passes; the richest schema node wins', rd.checked && rd.checks.find((c) => c.id === 'about_services').status === 'pass' && /homepage section/.test(rd.checks.find((c) => c.id === 'about_services').detail) && rd.checks.find((c) => c.id === 'schema_nap').status === 'pass');
+
 // ── the function end to end, with scripted Claude ──
 // The scenario says, per question, what the engine answers and what extraction reads from it.
 function scenario(map) {
   const calls = { engine: 0, extract: 0, ambiguity: 0, narrative: 0 };
+  const flaked = new Set();
   const respond = (obj, status = 200) => Promise.resolve(new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } }));
   const fn = (url, init) => {
     const body = JSON.parse(init.body);
@@ -101,13 +126,15 @@ function scenario(map) {
       const q = body.messages[0].content;
       const s = map.answer(q);
       if (!s) return respond({ type: 'error', error: { message: 'overloaded' } }, 529);
-      return respond({ stop_reason: 'end_turn', content: [{ type: 'web_search_tool_result', content: (s.sources || []).map((u) => ({ type: 'web_search_result', url: u, title: '' })) }, { type: 'text', text: s.text }], usage: { input_tokens: 5000, output_tokens: 600, server_tool_use: { web_search_requests: 2 } } });
+      if (map.flakyOnce && !flaked.has(q)) { flaked.add(q); return respond({ type: 'error', error: { message: 'overloaded' } }, 529); }
+      return respond({ stop_reason: 'end_turn', content: [{ type: 'web_search_tool_result', content: [...(s.sources || []), ...(s.seen || [])].map((u) => ({ type: 'web_search_result', url: u, title: '' })) }, { type: 'text', text: s.text, citations: (s.sources || []).map((u) => ({ type: 'web_search_result_location', url: u, title: '', cited_text: '' })) }], usage: { input_tokens: 5000, output_tokens: 600, server_tool_use: { web_search_requests: 2 } } });
     }
     if (sys.startsWith('You decide whether a business name')) { calls.ambiguity++; return text({ ambiguous: !!map.ambiguous, reason: map.ambiguous ? 'A chain with many locations.' : 'Distinctive name.' }); }
     if (sys.startsWith('You read one answer')) {
       calls.extract++;
       const q = /Question asked: (.*)\n/.exec(body.messages[0].content)[1];
       const s = map.answer(q);
+      if (map.extractFail && map.extractFail.test(q)) return respond({ type: 'error' }, 500);
       return text({ businesses_mentioned: s.names.map((n) => ({ name: n, city: null })), target_mentioned: false, target_description: s.desc || '', knows_business: s.knows || 'no', described_correctly: !(s.flags || []).length, accuracy_flags: s.flags || [] });
     }
     calls.narrative++;
@@ -147,7 +174,7 @@ ok('Cedar & Core: Claude narrative down → template summary still says 0 of 5',
 ok('Cedar & Core: progress streamed in order (asking → reading → writing)', ['asking', 'reading', 'writing'].every((s, i, a) => { const idx = events.findIndex((e) => e.step === s); return idx >= 0 && (i === 0 || idx > events.findIndex((e) => e.step === a[i - 1])); }) && events.some((e) => e.step === 'asking' && e.done === 7 && e.total === 7));
 const teaser = doneEv.report;
 ok('teaser: score, "appeared in", top competitor and summary only (no findings, no pillars)', teaser.highlights.length === 2 && teaser.findings.length === 0 && teaser.pillars.length === 0 && !!teaser.summary && teaser.tables.length === 0);
-ok('full report: competitors, sources and the questions tables', ['Who AI recommends instead', 'Sources AI cited', 'The questions we asked', 'Answers by AI'].every((t) => cedarFull.tables.some((x) => x.title === t)) && cedarFull.tables.find((t) => t.title === 'Who AI recommends instead').rows[0][0] === 'Burbank Pilates Co');
+ok('full report: competitors, sources and the questions tables', ['Who AI recommends instead', 'Sources AI used', 'The questions we asked', 'Answers by AI'].every((t) => cedarFull.tables.some((x) => x.title === t)) && cedarFull.tables.find((t) => t.title === 'Who AI recommends instead').rows[0][0] === 'Burbank Pilates Co');
 ok('cost logged: 7 engine calls + 7 extractions + checks', fake.state.tables.tool_usage_log.some((u) => u.kind === 'scan' && u.report_id === row.id && u.cost_usd > 0.1));
 
 // Bacchus Kitchen: real, appears in 3 of 5, Union beats it, wrong hours from Yelp, website blocks GPTBot.
@@ -170,7 +197,7 @@ sc = scenario({
   answer: (q) => {
     if (/What do you know about Bacchus/.test(q)) return { text: 'Bacchus Kitchen is a wine bar in Pasadena, open from 9am.', names: ['Bacchus Kitchen'], knows: 'yes', flags: [{ type: 'wrong_hours', detail: 'It said Bacchus Kitchen opens at 9am.' }], sources: ['https://www.yelp.com/biz/bacchus'] };
     if (/Bacchus/.test(q)) return { text: 'Bacchus Kitchen + Wine Bar in Pasadena is well liked.', names: ['Bacchus Kitchen + Wine Bar'], knows: 'yes', sources: ['https://www.yelp.com/biz/bacchus'] };
-    return namedIn.test(q) ? { text: 'Union, then Bacchus Kitchen + Wine Bar.', names: ['Union', 'Bacchus Kitchen + Wine Bar'], sources: ['https://www.yelp.com/x', 'https://la.eater.com/y'] } : { text: 'Union or Perle.', names: ['Union', 'Perle'], sources: ['https://www.yelp.com/z'] };
+    return namedIn.test(q) ? { text: 'Union, then Bacchus Kitchen + Wine Bar.', names: ['Union', 'Bacchus Kitchen + Wine Bar'], sources: ['https://www.yelp.com/x', 'https://la.eater.com/y'], seen: ['https://www.zoominfo.com/c/bacchus', 'https://www.bacchus.example/menu'] } : { text: 'Union or Perle.', names: ['Union', 'Perle'], sources: ['https://www.yelp.com/z'], seen: ['https://www.zoominfo.com/c/bacchus'] };
   },
   narrative: { summary: 'You come up in 3 of 5 local answers, but Union is named in 5.', top_three: ['a', 'b', 'c'], findings: [] },
 });
@@ -189,6 +216,12 @@ ok('Bacchus: website read for readiness; GPTBot block found', row.raw_results.re
 ok('Bacchus: known facts from the site fed to extraction (hours)', row.raw_results.readiness.facts.hours === 'Tu-Su 17:00-22:00' && /1384 E Washington/.test(row.raw_results.readiness.facts.address));
 ok('Bacchus: "website" step streamed when a URL is given', events.some((e) => e.step === 'website'));
 ok('Bacchus: readiness table and wrong-facts table in the full report', bacFull.tables.some((t) => t.title === 'AI readiness of your website') && bacFull.tables.some((t) => t.title === 'Wrong facts in AI answers'));
+// Audit 3.1: cited and merely-seen sources are told apart.
+const srcTable = bacFull.tables.find((t) => t.title === 'Sources AI used');
+const zoom = srcTable.rows.find((r) => r[0] === 'zoominfo.com');
+ok('Bacchus: Yelp is cited by all 7 answers; zoominfo only came up in search (0 cited, seen in 5) and is not a "source"', srcTable.columns.join() === 'Source,Cited,Seen in search,Note' && srcTable.rows[0][0] === 'Yelp' && srcTable.rows[0][1] === 7 && zoom && zoom[1] === 0 && zoom[2] === 5 && !row.raw_results.sources.some((x) => x.domain === 'zoominfo.com'));
+ok('Bacchus: the wrong-hours finding blames Yelp (cited by that answer), never a seen-only domain', /Yelp/.test(JSON.stringify(row.findings.items.find((f) => f.pillar === 'Accuracy'))) && !/zoominfo/.test(JSON.stringify(row.findings.items)));
+ok('Bacchus: own site seen in search but not cited is its own finding', srcTable.rows.some((r) => r[3] === 'Your website' && r[1] === 0 && r[2] === 3) && ids.includes('AI finds your website but never uses it'));
 ok('Bacchus: Claude summary kept (its numbers are real)', row.findings.summary === 'You come up in 3 of 5 local answers, but Union is named in 5.');
 
 // Rebuild: re-score a saved report from its stored answers, no new AI questions.
@@ -223,6 +256,16 @@ Object.assign(scanDeps, { aiFetch: sc.fn });
 r = await handler(req({ business_name: 'Valleyline Plumbing', city: 'Glendale', business_type: 'home services' }, '198.51.100.6'));
 ev = (await readAll(r)).find((e) => e.type === 'error');
 ok('engines down: friendly retry message and no report saved', ev?.error === 'engines_failed' && /try again/i.test(ev.message) && fake.state.tables.tool_reports.length === before);
+
+// Audit 3.7/3.8: a 529 on one question is retried once; an answer that can't be read is noted, not hidden.
+sc = scenario({ flakyOnce: true, answer: () => ({ text: 'Union or Perle.', names: ['Union', 'Perle'] }), extractFail: /recommend a restaurant/, narrativeDown: true });
+Object.assign(scanDeps, { aiFetch: sc.fn, siteFetch: undefined });
+r = await handler(req({ business_name: 'Retry Diner', city: 'Pasadena', business_type: 'restaurant' }, '198.51.100.8'));
+events = await readAll(r);
+row = lastRow();
+ok('retry: every question was asked twice (529 then an answer) and the scan still completed', events.some((e) => e.type === 'done') && sc.calls.engine === 14);
+ok('unread: one answer that failed extraction is left out of the counts and the report says so', row.scores.notes.some((n) => /1 of the 7 answers couldn.t be read/.test(n)) && row.scores.highlights[0].value === '0 of 4 answers');
+ok('progress: "asking" counts finish before "reading" starts', (() => { const steps = events.filter((e) => e.type === 'progress').map((e) => e.step); const lastAsk = steps.lastIndexOf('asking'), firstRead = steps.indexOf('reading'); return firstRead === -1 || lastAsk < firstRead; })());
 
 // Cache: same business + city within 7 days → a locked copy, no AI calls.
 sc = scenario({ answer: () => ({ text: 'x', names: [] }) });
