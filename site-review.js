@@ -149,7 +149,7 @@
     if (!t) {
       if (turnstileDown || !window.turnstile) { fail('bot_check', BOT_CHECK_DOWN); return; }
       renderTurnstile();
-      setMsg('One moment while we check you’re a person, then press the button again.', 'error');
+      setMsg(window.turnstile && widgetId !== null ? 'Tick “Verify you are human” above, then press the button again.' : 'One moment while we check you’re a person, then press the button again.', 'error');
       return;
     }
     busy = true;
