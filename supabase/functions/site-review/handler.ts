@@ -2,7 +2,7 @@
 //   POST /functions/v1/site-review
 //   { url, business_type, city?, turnstile_token }
 // Public (deployed --no-verify-jwt). The gate (_shared/tools/guard.ts) runs
-// first: Turnstile, 3/hour and 10/day per IP, the 24 h cache (a cache hit gets
+// first: Turnstile, 3/hour and 15/day per IP, the 24 h cache (a cache hit gets
 // its own locked copy), and the daily spend cap. A refused request gets a
 // plain JSON error with an HTTP status.
 //
