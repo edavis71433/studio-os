@@ -154,9 +154,13 @@ table.tr-table { width: 100%; border-collapse: collapse; font-size: 14px; min-wi
 .sr-field input { font-size: 18px; padding: 14px 16px; }
 .sr-field input[aria-invalid="true"] { border-color: var(--tr-fix); }
 .sr-turnstile { margin: 4px 0 16px; min-height: 0; }
+/* The waiting and error cards are transitional: narrower, centered on the
+   page, text centered, with the step list centered as a block (Eric, Oct 26). */
+.sr-loading, .sr-error { max-width: 560px; margin-left: auto; margin-right: auto; text-align: center; }
 .sr-loading h2, .sr-error h2 { margin: 0 0 8px; overflow-wrap: anywhere; }
 .sr-expect { color: var(--tr-muted); margin: 0 0 22px; }
-.sr-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.sr-steps { list-style: none; margin: 0 auto; padding: 0; display: inline-grid; gap: 14px; text-align: left; }
+.sr-error-actions { justify-content: center; }
 .sr-steps li { display: flex; align-items: center; gap: 12px; color: var(--tr-muted); font-size: 16px; }
 .sr-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(15, 20, 42, .18); flex: none; position: relative; }
 .sr-steps li[data-state="active"] { color: var(--tr-navy); font-weight: 600; }
