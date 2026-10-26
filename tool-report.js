@@ -134,6 +134,8 @@
       var sec = el('section');
       sec.appendChild(el('h2', null, t.title));
       if (t.note) sec.appendChild(el('p', { class: 'tr-table-note' }, t.note));
+      // A table with nothing measured (PageSpeed down) shows its note only.
+      if (!(t.rows || []).length) { wrap.appendChild(sec); return; }
       var box = el('div', { class: 'tr-table-wrap' });
       var table = el('table', { class: 'tr-table' });
       var thead = el('thead'), hr = el('tr');

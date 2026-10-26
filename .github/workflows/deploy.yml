@@ -48,7 +48,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then echo "Pre-deploy test gate FAILED"; exit 1; fi
           echo "Pre-deploy test gate passed."
       - name: Type-check (deno check)
-        run: deno check supabase/functions/presence/index.ts supabase/functions/tool-report/index.ts supabase/functions/unlock-report/index.ts supabase/functions/send-lead-alert/index.ts
+        run: deno check supabase/functions/presence/index.ts supabase/functions/tool-report/index.ts supabase/functions/unlock-report/index.ts supabase/functions/send-lead-alert/index.ts supabase/functions/site-review/index.ts
       - name: Verify migrations (fenced files intact; numbers unique)
         run: |
           for n in 0003 0004 0005; do
@@ -106,6 +106,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
+      - name: Deploy site-review (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
       - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
@@ -130,7 +135,9 @@ jobs:
           [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
           [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
-          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated)."
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/site-review" -H "Content-Type: application/json" -d '{"url":"example.com"}')
+          [ "$code" = "403" ] || { echo "site-review expected 403 without a Turnstile token, got $code"; exit 1; }
+          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated, site-review 403 without Turnstile)."
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
@@ -184,6 +191,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
+      - name: Deploy site-review (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
       - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
@@ -208,4 +220,6 @@ jobs:
           [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
           [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
-          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated)."
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/site-review" -H "Content-Type: application/json" -d '{"url":"example.com"}')
+          [ "$code" = "403" ] || { echo "site-review expected 403 without a Turnstile token, got $code"; exit 1; }
+          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated, site-review 403 without Turnstile)."
