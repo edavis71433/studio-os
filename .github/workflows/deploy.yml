@@ -48,7 +48,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then echo "Pre-deploy test gate FAILED"; exit 1; fi
           echo "Pre-deploy test gate passed."
       - name: Type-check (deno check)
-        run: deno check supabase/functions/presence/index.ts
+        run: deno check supabase/functions/presence/index.ts supabase/functions/tool-report/index.ts supabase/functions/unlock-report/index.ts supabase/functions/send-lead-alert/index.ts
       - name: Verify migrations (fenced files intact; numbers unique)
         run: |
           for n in 0003 0004 0005; do
@@ -88,6 +88,24 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
+      # Free Tools (0136): public report read + unlock, and the internal lead
+      # alert. Each does its own gating (send-lead-alert checks the service key),
+      # so --no-verify-jwt matches the other public functions.
+      - name: Deploy tool-report (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
+      - name: Deploy unlock-report (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
+      - name: Deploy send-lead-alert (staging)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+
       - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
@@ -104,6 +122,15 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
           [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
           echo "presence smoke passed (catalog 200, /connections 401 gated)."
+
+      - name: Smoke test — Free Tools functions answer and gate
+        run: |
+          base="https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/tool-report?id=00000000-0000-4000-8000-000000000000")
+          [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
+          [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
+          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated)."
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
@@ -139,6 +166,24 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
+      # Free Tools (0136): public report read + unlock, and the internal lead
+      # alert. Each does its own gating (send-lead-alert checks the service key),
+      # so --no-verify-jwt matches the other public functions.
+      - name: Deploy tool-report (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
+      - name: Deploy unlock-report (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
+      - name: Deploy send-lead-alert (PRODUCTION)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+
       - name: Smoke test — clever-api version handshake
         run: |
           sleep 5
@@ -155,3 +200,12 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
           [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
           echo "presence smoke passed (catalog 200, /connections 401 gated)."
+
+      - name: Smoke test — Free Tools functions answer and gate
+        run: |
+          base="https://${{ secrets.SUPABASE_PROJECT_REF_PROD }}.supabase.co/functions/v1"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/tool-report?id=00000000-0000-4000-8000-000000000000")
+          [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
+          [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
+          echo "Free Tools smoke passed (tool-report 404 on unknown id, send-lead-alert 401 gated)."
