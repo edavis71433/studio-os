@@ -2,7 +2,7 @@
 //   POST /functions/v1/ai-visibility
 //   { business_name, city, business_type?, search_phrases?, url?, detail?, turnstile_token }
 // Public (deployed --no-verify-jwt). Same gate as Site Review
-// (_shared/tools/guard.ts): Turnstile, 3/hour and 10/day per IP, the 7-day
+// (_shared/tools/guard.ts): Turnstile, 3/hour and 15/day per IP, the 7-day
 // cache per business + city (a hit gets its own locked copy), the daily spend
 // cap. An accepted scan streams newline-delimited JSON:
 //   {"type":"progress","step":"asking","done":3,"total":7}

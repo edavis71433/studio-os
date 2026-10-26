@@ -21,12 +21,12 @@ export const FROM = `Eric Davis <${ERIC_EMAIL}>`;
 export const TOOLS_BASE_URL = (Deno.env.get('TOOLS_BASE_URL') || 'https://tools.davisdigitalstudio.com').replace(/\/$/, '');
 export const reportUrl = (id: string) => `${TOOLS_BASE_URL}/report/${id}`;
 
-// Rate limits: 3 scans per IP per hour and 10 per day; 2 runs per email per
+// Rate limits: 3 scans per IP per hour and 15 per day (Eric, Oct 26; was 10); 2 runs per email per
 // tool per week (counted at unlock, since the teaser comes before the email).
 // Unlocks per IP are capped too, so the form can't be used to spray email.
 export const LIMITS = {
   scansPerHour: 3,
-  scansPerDay: 10,
+  scansPerDay: 15,
   unlocksPerEmailPerToolPerWeek: 2,
   unlocksPerIpPerDay: 12,
 };

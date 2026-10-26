@@ -50,6 +50,8 @@ ok('full report: AI Visibility closing line from the spec', /show up where your 
 // ── pure guard helpers ──
 const t = new Date('2026-10-29T17:42:10Z'); // a Thursday
 ok('window: hour start', windowStart(t, 'hour').toISOString() === '2026-10-29T17:00:00.000Z');
+const { LIMITS } = await import('../../supabase/functions/_shared/tools/config.ts');
+ok('limits: 3 scans per hour and 15 per day per address; 12 unlocks per address per day', LIMITS.scansPerHour === 3 && LIMITS.scansPerDay === 15 && LIMITS.unlocksPerIpPerDay === 12);
 ok('window: day start', windowStart(t, 'day').toISOString() === '2026-10-29T00:00:00.000Z');
 ok('window: week starts Monday', windowStart(t, 'week').toISOString() === '2026-10-26T00:00:00.000Z' && windowStart(new Date('2026-11-01T23:00:00Z'), 'week').toISOString() === '2026-10-26T00:00:00.000Z');
 ok('cache key: Site Review ignores scheme, www, case and trailing slash', cacheKeyFor('site_review', { url: 'https://www.Example.com/' }) === 'example.com' && cacheKeyFor('site_review', { url: 'example.com' }) === 'example.com');
