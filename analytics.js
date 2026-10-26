@@ -57,10 +57,15 @@
     // The launcher may be injected after the banner (concierge.js loads
     // independently), and the banner's height changes when its text wraps,
     // so re-check on an interval while the banner is on screen.
+    // The banner also covers the bottom of the page itself: on a phone the
+    // Free Tools form's submit button sits exactly under it (seen on an
+    // iPhone, Oct 26). Give the page that much room at the bottom so the
+    // visitor can always scroll the content above the banner.
     function shiftLauncher() {
+      var h = b.offsetHeight || 0;
+      document.body.style.paddingBottom = h ? (h + 16) + 'px' : '';
       var l = document.querySelector('.dds-cc-launch');
       if (!l) return;
-      var h = b.offsetHeight || 0;
       l.style.bottom = (24 + h) + 'px';
     }
     var launcherWatch = setInterval(function () {
@@ -70,6 +75,7 @@
     shiftLauncher();
     function restoreLauncher() {
       clearInterval(launcherWatch);
+      document.body.style.paddingBottom = '';
       var l = document.querySelector('.dds-cc-launch');
       if (l) l.style.bottom = '';
     }
