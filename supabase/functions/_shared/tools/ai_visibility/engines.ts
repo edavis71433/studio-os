@@ -6,7 +6,10 @@
 // keys exist; nothing else in the tool changes, and the report already shows
 // per-engine counts and says which engine couldn't be checked.
 
-export interface EngineAnswer { ok: true; text: string; sources: { url: string; title: string }[]; costUsd: number }
+// sources: what the answer CITED (the assistant drew on it). searched: what
+// its web search returned but the answer never used (audit 3.1: the two were
+// one list, so "Yelp was cited in 5 answers" meant "Yelp came up in search").
+export interface EngineAnswer { ok: true; text: string; sources: { url: string; title: string }[]; searched: { url: string; title: string }[]; model?: string; costUsd: number }
 export type EngineResult = EngineAnswer | { ok: false; reason: 'timeout' | 'error' | 'refusal'; costUsd: number };
 export interface Engine {
   id: string;
@@ -24,22 +27,23 @@ const MODEL_IN = 2 / 1_000_000, MODEL_OUT = 10 / 1_000_000, SEARCH = 10 / 1000;
 
 const claudeKey = () => Deno.env.get('ANTHROPIC_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-export function readClaudeAnswer(content: { type: string; [k: string]: unknown }[]): { text: string; sources: { url: string; title: string }[] } {
+export function readClaudeAnswer(content: { type: string; [k: string]: unknown }[]): { text: string; sources: { url: string; title: string }[]; searched: { url: string; title: string }[] } {
   const parts: string[] = [];
   const sources: { url: string; title: string }[] = [];
-  const add = (url: unknown, title: unknown) => {
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || sources.some((s) => s.url === url)) return;
-    sources.push({ url, title: typeof title === 'string' ? title.slice(0, 200) : '' });
+  const searched: { url: string; title: string }[] = [];
+  const add = (into: { url: string; title: string }[], url: unknown, title: unknown) => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || into.some((s) => s.url === url)) return;
+    into.push({ url, title: typeof title === 'string' ? title.slice(0, 200) : '' });
   };
   for (const b of content || []) {
     if (b.type === 'text') {
       parts.push(String(b.text || ''));
-      for (const c of (b.citations as { url?: string; title?: string }[] | undefined) || []) add(c.url, c.title);
+      for (const c of (b.citations as { url?: string; title?: string }[] | undefined) || []) add(sources, c.url, c.title);
     } else if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) {
-      for (const r of b.content as { url?: string; title?: string }[]) add(r.url, r.title);
+      for (const r of b.content as { url?: string; title?: string }[]) add(searched, r.url, r.title);
     }
   }
-  return { text: parts.join('').trim(), sources };
+  return { text: parts.join('').trim(), sources, searched: searched.filter((s) => !sources.some((c) => c.url === s.url)) };
 }
 
 async function askClaude(question: string, ctx: { city: string }, budgetMs: number, fetchImpl: typeof fetch): Promise<EngineResult> {
@@ -50,6 +54,8 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
   let cost = 0;
   const content: { type: string; [k: string]: unknown }[] = [];
   let withFallbacks = true;
+  let retried = false;
+  let model: string | undefined;
   // A server-tool turn can pause after its own search loop; resume up to twice.
   for (let round = 0; round < 3; round++) {
     const left = deadline - Date.now();
@@ -61,7 +67,7 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
         headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', ...(withFallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}) },
         body: JSON.stringify({
           model: CLAUDE_ENGINE_MODEL,
-          max_tokens: 3000,
+          max_tokens: 4000,
           output_config: { effort: 'low' },
           ...(withFallbacks ? { fallbacks: 'default' } : {}),
           tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3, user_location: { type: 'approximate', city: ctx.city, country: 'US' } }],
@@ -77,7 +83,17 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
     if (r.status === 400 && withFallbacks && /fallback/i.test(JSON.stringify(j?.error || ''))) { withFallbacks = false; round--; continue; }
     const u = j?.usage || {};
     cost += (Number(u.input_tokens) || 0) * MODEL_IN + (Number(u.output_tokens) || 0) * MODEL_OUT + (Number(u.server_tool_use?.web_search_requests) || 0) * SEARCH;
+    // One retry on a rate limit or overload when the budget allows (audit
+    // 3.7: seven questions go out at once, and four lost answers end the scan).
+    if ((r.status === 429 || r.status === 529 || r.status === 503 || r.status === 500) && !retried && deadline - Date.now() > 8000) {
+      retried = true;
+      const after = Math.min(3000, Math.max(1000, (Number(r.headers.get('retry-after')) || 1.5) * 1000));
+      await new Promise((res) => setTimeout(res, after));
+      round--;
+      continue;
+    }
     if (!r.ok || !j) return { ok: false, reason: 'error', costUsd: cost };
+    if (typeof j.model === 'string') model = j.model;
     if (j.stop_reason === 'refusal') return { ok: false, reason: 'refusal', costUsd: cost };
     const blocks = Array.isArray(j.content) ? j.content : [];
     content.push(...blocks);
@@ -88,7 +104,7 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
 
   function done(): EngineResult {
     const a = readClaudeAnswer(content);
-    return a.text ? { ok: true, text: a.text.slice(0, 12000), sources: a.sources.slice(0, 40), costUsd: cost } : { ok: false, reason: 'error', costUsd: cost };
+    return a.text ? { ok: true, text: a.text.slice(0, 12000), sources: a.sources.slice(0, 40), searched: a.searched.slice(0, 40), model, costUsd: cost } : { ok: false, reason: 'error', costUsd: cost };
   }
 }
 

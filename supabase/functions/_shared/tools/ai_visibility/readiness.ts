@@ -51,14 +51,33 @@ const CATEGORY: Record<string, RegExp> = {
   other: /./,
 };
 
+// The richest business node wins, not the first: sites often emit an
+// Organization stub (name only) before the LocalBusiness with address and
+// phone (audit 3.10).
 function bizNode(pages: PageFacts[]): Record<string, unknown> | null {
+  let best: Record<string, unknown> | null = null, bestScore = -1;
   for (const p of pages) for (const it of p.jsonld.items) {
     const t = it['@type'];
     const types = (Array.isArray(t) ? t : [t]).filter((x) => typeof x === 'string') as string[];
-    if (types.some((x) => /LocalBusiness|Organization|Restaurant|Store|Salon|Service|Business|Establishment|Clinic|Gym|Spa|Shop|Plumber|Electrician|Bakery|BarOrPub|CafeOrCoffeeShop|Winery/.test(x) && x !== 'WebSite' && x !== 'WebPage')) return it;
+    if (!types.some((x) => /LocalBusiness|Organization|Restaurant|Store|Salon|Service|Business|Establishment|Clinic|Gym|Spa|Shop|Plumber|Electrician|Bakery|BarOrPub|CafeOrCoffeeShop|Winery|Dentist|Attorney|Hotel|Agent|Repair|Dealer|School|Church|Pharmacy|Hospital|Studio|Company/.test(x) && x !== 'WebSite' && x !== 'WebPage')) continue;
+    const score = (it.name ? 1 : 0) + (it.address ? 2 : 0) + (it.telephone ? 2 : 0) + (it.openingHours || it.openingHoursSpecification ? 1 : 0);
+    if (score > bestScore) { best = it; bestScore = score; }
   }
-  return null;
+  return best;
 }
+/** The homepage's h2/h3 sections: heading text and the word count up to the next heading. */
+export function homeSections(html: string): { heading: string; words: number }[] {
+  const body = (html.match(/<body\b[\s\S]*$/i) || [html])[0].replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' ');
+  const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+  const parts = body.split(/(?=<h[1-3]\b)/i).slice(1);
+  return parts.map((part) => {
+    const m = part.match(/^<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/i);
+    const heading = m ? text(m[1]).slice(0, 120) : '';
+    const rest = text(m ? part.slice(m[0].length) : part);
+    return { heading, words: rest ? rest.split(' ').filter((w) => /[a-z0-9]/i.test(w)).length : 0 };
+  }).filter((s) => s.heading);
+}
+
 const addrOf = (n: Record<string, unknown> | null): string => {
   const a = n?.address; const o = Array.isArray(a) ? a[0] : a;
   if (typeof o === 'string') return o;
@@ -103,8 +122,15 @@ export async function checkReadiness(url: string | null, inp: { businessName: st
 
   const about = pages.find((p) => p !== homeFacts && /about|story|team/i.test(p.path) && p.wordCount >= 150);
   const services = pages.find((p) => p !== homeFacts && /services?|menus?|products?|treatments?|classes|what-we-do|work/i.test(p.path) && p.wordCount >= 150);
-  checks.push({ id: 'about_services', label: 'About and services pages with plain descriptions', status: about && services ? 'pass' : about || services ? 'warn' : 'fail',
-    detail: about && services ? `Found ${about.path} (${about.wordCount} words) and ${services.path} (${services.wordCount} words)` : about ? `Found ${about.path}, but no services or menu page with real text` : services ? `Found ${services.path}, but no about page with real text` : 'No about or services page with at least 150 words' });
+  // A one-page site keeps its about and services as homepage sections: a
+  // section heading with a real paragraph under it counts (audit 3.9).
+  const sections = homeSections(home.html);
+  const aboutSection = sections.find((s) => /\b(about|our story|who we are|meet|the team)\b/i.test(s.heading) && s.words >= 60);
+  const servicesSection = sections.find((s) => /\b(services?|what we do|what we offer|menu|treatments?|classes|offerings?|products?)\b/i.test(s.heading) && s.words >= 60);
+  const aboutOk = about || aboutSection, servicesOk = services || servicesSection;
+  const where = (p: PageFacts | undefined, s: { heading: string; words: number } | undefined) => p ? `${p.path} (${p.wordCount} words)` : `the homepage section "${s!.heading.slice(0, 40)}" (${s!.words} words)`;
+  checks.push({ id: 'about_services', label: 'About and services pages with plain descriptions', status: aboutOk && servicesOk ? 'pass' : aboutOk || servicesOk ? 'warn' : 'fail',
+    detail: aboutOk && servicesOk ? `Found ${where(about, aboutSection)} and ${where(services, servicesSection)}` : aboutOk ? `Found ${where(about, aboutSection)}, but no services or menu page or section with real text` : servicesOk ? `Found ${where(services, servicesSection)}, but no about page or section with real text` : 'No about or services page or section with real text' });
 
   const idText = norm([homeFacts.title, ...homeFacts.h1s].join(' '));
   const hasName = nameIn(idText, inp.businessName);
