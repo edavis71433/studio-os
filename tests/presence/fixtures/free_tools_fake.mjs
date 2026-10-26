@@ -13,6 +13,7 @@ export function makeFake(opts = {}) {
     emails: [],
     spend: opts.spend ?? 0,
     failResend: false,
+    resendDelayMs: 0,
     calls: [],
   };
   const handlers = { leadAlert: null };
@@ -84,6 +85,7 @@ export function makeFake(opts = {}) {
       return handlers.leadAlert ? handlers.leadAlert(req) : reply({ error: 'no handler' }, 500);
     }
     if (url.host === 'api.resend.com') {
+      if (state.resendDelayMs) await new Promise((r) => setTimeout(r, state.resendDelayMs));
       if (state.failResend) return reply({ message: 'down' }, 500);
       state.emails.push(JSON.parse(init.body));
       return reply({ id: `em_${state.emails.length}` });
