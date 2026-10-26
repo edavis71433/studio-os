@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Visibility Check | Davis Digital Studio</title>
+<meta name="description" content="When someone asks AI for a business like yours, do you get recommended? A free check that asks a live AI assistant and shows who it recommends instead, and why.">
+<link rel="canonical" href="https://tools.davisdigitalstudio.com/ai-visibility">
+<meta property="og:title" content="AI Visibility Check | Davis Digital Studio">
+<meta property="og:description" content="Does AI recommend your business? See who it recommends instead, and why. Free, about a minute.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://tools.davisdigitalstudio.com/og-image.jpg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="/tool-report.css?v=3">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+</head>
+<body>
+<header class="tr-top">
+  <div class="tr-wrap tr-top-row">
+    <a class="tr-logo" href="https://davisdigitalstudio.com/"><img src="/tools-logo.webp" alt="Davis Digital Studio" width="250" height="56"></a>
+  </div>
+</header>
+
+<main class="tr-wrap" id="srMain">
+  <section class="tr-head sr-intro" id="srIntro">
+    <p class="tr-eyebrow">AI Visibility Check</p>
+    <h1>When someone asks AI for a business like yours, do you come up?</h1>
+    <p class="sr-lede">We ask a live AI assistant the questions your customers ask, with its own web search on, then show you whether it recommends you, who it recommends instead, and why. Real answers, counted honestly. About a minute.</p>
+  </section>
+
+  <section class="tr-card sr-form-card" id="srFormCard">
+    <form id="srForm" novalidate>
+      <div class="tr-fields">
+        <label>Business name
+          <input type="text" name="business_name" autocomplete="organization" placeholder="Bacchus Kitchen" required maxlength="120">
+        </label>
+        <label>City or neighborhood
+          <input type="text" name="city" autocomplete="address-level2" placeholder="Pasadena" required maxlength="80">
+        </label>
+      </div>
+      <div class="tr-fields">
+        <label>Type of business
+          <select name="business_type">
+            <option value="restaurant">Restaurant</option>
+            <option value="salon">Salon</option>
+            <option value="retail">Retail</option>
+            <option value="home services">Home services</option>
+            <option value="health and wellness">Health and wellness</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </label>
+        <label>Your website <span class="tr-opt">(optional)</span>
+          <input type="text" name="url" inputmode="url" autocomplete="url" placeholder="yourbusiness.com" maxlength="500" autocapitalize="off" spellcheck="false">
+        </label>
+      </div>
+      <label class="sr-field">What do customers search for? <span class="tr-opt">(optional)</span>
+        <input type="text" name="search_phrases" placeholder="e.g. balayage, patio brunch, emergency plumber" maxlength="200">
+      </label>
+      <label class="sr-field" id="srDetailWrap" hidden>Street or neighborhood
+        <input type="text" name="detail" placeholder="e.g. on Colorado Blvd" maxlength="120">
+      </label>
+      <div class="sr-turnstile" id="srTurnstile"></div>
+      <button type="submit" class="tr-btn" id="srBtn">Check my business</button>
+      <p class="tr-form-msg" id="srMsg" role="status"></p>
+      <p class="tr-fine">Free, no account needed. You&rsquo;ll see your score and who AI recommends right away; the full report is emailed to you if you want it.</p>
+    </form>
+  </section>
+
+  <section class="tr-card sr-loading" id="srLoading" hidden aria-live="polite">
+    <h2>Checking <span id="srHost"></span></h2>
+    <p class="sr-expect">This usually takes about a minute. Keep this page open.</p>
+    <ol class="sr-steps" id="srSteps">
+      <li data-step="asking"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Asking AI what your customers ask</span></li>
+      <li data-step="website"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Checking what your website tells AI</span></li>
+      <li data-step="reading"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Reading the answers</span></li>
+      <li data-step="writing"><span class="sr-dot" aria-hidden="true"></span><span class="sr-label">Writing your report</span></li>
+    </ol>
+  </section>
+
+  <section class="tr-card sr-error" id="srError" hidden>
+    <h2 id="srErrorTitle">We couldn&rsquo;t finish your check</h2>
+    <p id="srErrorText"></p>
+    <div class="sr-error-actions">
+      <button type="button" class="tr-btn tr-btn-ghost" id="srRetry">Try again</button>
+      <a class="tr-btn" data-calendly href="https://calendly.com/eric-davisdigitalstudio/30min">Book a free 30 minute call</a>
+    </div>
+  </section>
+
+  <section class="sr-what" id="srWhat">
+    <h2>What you&rsquo;ll see</h2>
+    <div class="sr-what-grid">
+      <div class="tr-pillar"><p class="tr-pillar-name">Recommendation rate</p><p>How often AI names you when asked for a business like yours nearby.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">Who it recommends instead</p><p>The businesses AI names, how often, and the sources it trusts.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">Accuracy</p><p>Whether AI knows you by name and gets your details right.</p></div>
+      <div class="tr-pillar"><p class="tr-pillar-name">AI readiness</p><p>Whether your website gives AI something to read and cite.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer class="tr-foot tr-wrap">
+  <p>Davis Digital Studio LLC · Burbank, California · <a href="https://davisdigitalstudio.com/">davisdigitalstudio.com</a> · <a href="https://davisdigitalstudio.com/privacy">Privacy</a></p>
+</footer>
+
+<script src="/analytics.js" defer></script>
+<script src="/tools-common.js?v=3" defer></script>
+<script src="/ai-visibility.js?v=1" defer></script>
+</body>
+</html>

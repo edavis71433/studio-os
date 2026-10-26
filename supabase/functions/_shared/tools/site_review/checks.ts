@@ -18,7 +18,7 @@ export const PILLARS: { key: Pillar; name: string; weight: number }[] = [
   { key: 'trust', name: 'Trust and conversion', weight: 20 },
   { key: 'local', name: 'Local', weight: 20 },
 ];
-export const pillarName = (k: Pillar) => PILLARS.find((p) => p.key === k)!.name;
+export const pillarName = (k: Pillar | string) => PILLARS.find((p) => p.key === k)?.name ?? k;
 
 export interface Draft { title: string; what: string; why: string; fix: string }
 export interface Check {

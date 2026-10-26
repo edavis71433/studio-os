@@ -84,12 +84,16 @@ export function summaryGrounded(summary: string, payload: unknown): boolean {
   return numbersIn(summary).every((n) => known.has(n));
 }
 
-export function templateFinding(c: Check): Finding {
+/** Per-tool wording: the AI Visibility Check reuses this writer with its own
+ *  instructions, pillar names and fallback summary. */
+export interface NarrativeOptions { system?: string; pillarName?: (k: string) => string; fallbackSummary?: (inp: NarrativeInput) => string }
+
+export function templateFinding(c: Check, opts: NarrativeOptions = {}): Finding {
   const d = c.draft!;
-  return { check_id: c.id, title: d.title, what_we_found: d.what, why_it_matters: d.why, fix: d.fix, priority: priorityOf(c), pillar: pillarName(c.pillar) };
+  return { check_id: c.id, title: d.title, what_we_found: d.what, why_it_matters: d.why, fix: d.fix, priority: priorityOf(c), pillar: (opts.pillarName || pillarName)(c.pillar) };
 }
 
-export function templateNarrative(inp: NarrativeInput, attempts = 0, costUsd = 0): Narrative {
+export function templateNarrative(inp: NarrativeInput, attempts = 0, costUsd = 0, opts: NarrativeOptions = {}): Narrative {
   const issues = inp.issues.slice(0, 12);
   const top = issues.slice(0, 3).map((c) => c.draft!.fix);
   const strong = inp.pillars.filter((p) => p.score != null && p.score >= 80).map((p) => p.name.toLowerCase());
@@ -100,10 +104,10 @@ export function templateNarrative(inp: NarrativeInput, attempts = 0, costUsd = 0
     strong.length ? `Your site is in good shape on ${andList(strong)}.` : `We reviewed ${inp.pagesReviewed.length} page${inp.pagesReviewed.length > 1 ? 's' : ''} of your site.`,
     weak.length ? `The weakest area is ${weak[0]}${first ? `, and the first thing to fix is this: ${first.charAt(0).toLowerCase() + first.slice(1)}.` : '.'}` : first ? `The first thing to fix: ${first.charAt(0).toLowerCase() + first.slice(1)}.` : 'We found nothing urgent to fix.',
   ].join(' ') + pagesNote;
-  return { summary, findings: issues.map(templateFinding), top_three: top, source: 'template', costUsd, attempts };
+  return { summary: opts.fallbackSummary ? opts.fallbackSummary(inp) : summary, findings: issues.map((c) => templateFinding(c, opts)), top_three: top, source: 'template', costUsd, attempts };
 }
 
-async function callClaude(payload: unknown, timeoutMs: number, fetchImpl: typeof fetch): Promise<{ ok: true; data: { summary: string; findings: Omit<Finding, 'priority' | 'pillar'>[]; top_three: string[] }; costUsd: number } | { ok: false; costUsd: number }> {
+async function callClaude(payload: unknown, timeoutMs: number, fetchImpl: typeof fetch, system = SYSTEM): Promise<{ ok: true; data: { summary: string; findings: Omit<Finding, 'priority' | 'pillar'>[]; top_three: string[] }; costUsd: number } | { ok: false; costUsd: number }> {
   const key = Deno.env.get('ANTHROPIC_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || '';
   if (!key) return { ok: false, costUsd: 0 };
   try {
@@ -113,7 +117,7 @@ async function callClaude(payload: unknown, timeoutMs: number, fetchImpl: typeof
       body: JSON.stringify({
         model: NARRATIVE_MODEL,
         max_tokens: 6000,
-        system: SYSTEM,
+        system,
         output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
         messages: [{ role: 'user', content: `Here are the results for this site. Write the report.\n\n${JSON.stringify(payload)}` }],
       }),
@@ -130,21 +134,22 @@ async function callClaude(payload: unknown, timeoutMs: number, fetchImpl: typeof
   } catch { return { ok: false, costUsd: 0 }; }
 }
 
-export async function writeNarrative(inp: NarrativeInput, budgetMs: number, fetchImpl: typeof fetch = fetch, now: () => number = Date.now): Promise<Narrative> {
+export async function writeNarrative(inp: NarrativeInput, budgetMs: number, fetchImpl: typeof fetch = fetch, now: () => number = Date.now, opts: NarrativeOptions = {}): Promise<Narrative> {
+  const pName = opts.pillarName || pillarName;
   const issues = inp.issues.slice(0, 12);
   const byId = new Map(issues.map((c) => [c.id, c]));
   const payload = {
     business: { name: inp.businessName, type: inp.businessType, city: inp.city || null, website: inp.url },
     overall_score: inp.overall, pillar_scores: inp.pillars, pages_reviewed: inp.pagesReviewed, notes: inp.notes,
     strengths: inp.strengths.slice(0, 8),
-    issues: issues.map((c) => ({ check_id: c.id, area: c.area, pillar: pillarName(c.pillar), status: c.status, priority: priorityOf(c), evidence: c.evidence, plain_draft: c.draft })),
+    issues: issues.map((c) => ({ check_id: c.id, area: c.area, pillar: pName(c.pillar), status: c.status, priority: priorityOf(c), evidence: c.evidence, plain_draft: c.draft })),
   };
   const deadline = now() + budgetMs;
   let cost = 0;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const left = deadline - now();
-    if (left < 4000) return templateNarrative(inp, attempt - 1, cost);
-    const res = await callClaude(payload, Math.min(25_000, left - 500), fetchImpl);
+    if (left < 4000) return templateNarrative(inp, attempt - 1, cost, opts);
+    const res = await callClaude(payload, Math.min(25_000, left - 500), fetchImpl, opts.system);
     cost += res.costUsd;
     if (!res.ok) continue;
     const seen = new Set<string>();
@@ -156,21 +161,21 @@ export async function writeNarrative(inp: NarrativeInput, budgetMs: number, fetc
       // Claude sometimes appends the raw evidence string; keep the sentence part.
       f.what_we_found = String(f.what_we_found || '').replace(/\s*(?:Evidence|The check (?:reported|found|says)|Check (?:result|reported))\s*:[\s\S]*$/i, '').trim();
       const ok = groundedIn(f, c) && f.title && f.what_we_found && f.why_it_matters && f.fix;
-      findings.push(ok ? { check_id: c.id, title: f.title, what_we_found: f.what_we_found, why_it_matters: f.why_it_matters, fix: f.fix, priority: priorityOf(c), pillar: pillarName(c.pillar) } : templateFinding(c));
+      findings.push(ok ? { check_id: c.id, title: f.title, what_we_found: f.what_we_found, why_it_matters: f.why_it_matters, fix: f.fix, priority: priorityOf(c), pillar: pName(c.pillar) } : templateFinding(c, opts));
     }
     // Anything Claude skipped still gets reported, from the template.
-    for (const c of issues) if (!seen.has(c.id)) findings.push(templateFinding(c));
+    for (const c of issues) if (!seen.has(c.id)) findings.push(templateFinding(c, opts));
     // Keep our importance order; Claude may reorder within the same priority.
     const rank = (p: Priority) => (p === 'Fix now' ? 0 : p === 'Important' ? 1 : 2);
     findings.sort((a, b) => rank(a.priority) - rank(b.priority));
     const top = res.data.top_three.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3);
     const summary = res.data.summary.trim();
     return {
-      summary: summary && summaryGrounded(summary, payload) ? summary : templateNarrative(inp).summary,
+      summary: summary && summaryGrounded(summary, payload) ? summary : templateNarrative(inp, 0, 0, opts).summary,
       findings,
-      top_three: top.length === 3 ? top : templateNarrative(inp).top_three,
+      top_three: top.length === 3 ? top : templateNarrative(inp, 0, 0, opts).top_three,
       source: 'claude', costUsd: cost, attempts: attempt,
     };
   }
-  return templateNarrative(inp, 2, cost);
+  return templateNarrative(inp, 2, cost, opts);
 }
