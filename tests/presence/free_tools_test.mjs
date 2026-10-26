@@ -236,6 +236,8 @@ for (const f of ['site-review.js', 'ai-visibility.js']) {
   const js = read(f);
   ok(`${f}: explains a bot check that never loads, resets after the back button, and has a watchdog`, /bot_check/.test(js) && /challenges\.cloudflare\.com and reload/.test(js) && /addEventListener\('pageshow'/.test(js) && /e\.persisted && busy/.test(js) && /150000/.test(js) && /turnstileDown = true/.test(js));
 }
+const analyticsJs = read('analytics.js');
+ok('consent banner: the page gets bottom room while the banner shows, so it never covers the submit button', /document\.body\.style\.paddingBottom = h \? \(h \+ 16\) \+ 'px' : ''/.test(analyticsJs) && /restoreLauncher\(\) \{\n\s+clearInterval\(launcherWatch\);\n\s+document\.body\.style\.paddingBottom = '';/.test(analyticsJs));
 ok('deploy: the production run smoke-tests the pages on the static host', /Smoke test — Free Tools pages on the static host/.test(deployFile) && /tools\.davisdigitalstudio\.com\/report\/00000000/.test(deployFile) && deployFile.indexOf('Free Tools pages on the static host') > deployFile.indexOf('Deploy ai-visibility (PRODUCTION)'));
 ok('report page: fires the spec GA4 events', ['report_viewed', 'email_captured', 'calendly_clicked', 'pdf_downloaded'].every((e) => pageJs.includes(`'${e}'`)));
 ok('report page: noindex and print stylesheet', /noindex/.test(read('report.html')) && /@media print/.test(read('tool-report.css')));
