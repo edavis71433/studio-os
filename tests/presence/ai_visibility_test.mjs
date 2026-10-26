@@ -14,7 +14,8 @@ const { buildPrompts } = await import('../../supabase/functions/_shared/tools/ai
 const { sameBusiness, nameTokens, domainOf } = await import('../../supabase/functions/_shared/tools/ai_visibility/extract.ts');
 const { readClaudeAnswer, ENGINES } = await import('../../supabase/functions/_shared/tools/ai_visibility/engines.ts');
 const { agentAllowed } = await import('../../supabase/functions/_shared/tools/ai_visibility/readiness.ts');
-const { scoreAll, competitorsFrom, sourcesFrom } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
+const { scoreAll, competitorsFrom, sourcesFrom, wrongFactsTitle, wrongFactsWhy, wrongFactsFix } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
+const { rebuildFromRaw } = await import('../../supabase/functions/_shared/tools/ai_visibility/scan.ts');
 const { handler, scanDeps } = await import('../../supabase/functions/ai-visibility/handler.ts');
 const { publicReport } = await import('../../supabase/functions/_shared/tools/report_view.ts');
 
@@ -189,6 +190,20 @@ ok('Bacchus: known facts from the site fed to extraction (hours)', row.raw_resul
 ok('Bacchus: "website" step streamed when a URL is given', events.some((e) => e.step === 'website'));
 ok('Bacchus: readiness table and wrong-facts table in the full report', bacFull.tables.some((t) => t.title === 'AI readiness of your website') && bacFull.tables.some((t) => t.title === 'Wrong facts in AI answers'));
 ok('Bacchus: Claude summary kept (its numbers are real)', row.findings.summary === 'You come up in 3 of 5 local answers, but Union is named in 5.');
+
+// Rebuild: re-score a saved report from its stored answers, no new AI questions.
+const bacRow = row;
+sc = scenario({ answer: () => null, narrativeDown: true });
+const rebuilt = await rebuildFromRaw({ input: bacRow.input, raw: bacRow.raw_results }, { aiFetch: sc.fn });
+ok('rebuild: no engine, extraction or ambiguity calls', sc.calls.engine === 0 && sc.calls.extract === 0 && sc.calls.ambiguity === 0);
+ok('rebuild: same scores, competitors and tables as the live scan', rebuilt.scores.overall === bacRow.scores.overall && JSON.stringify(rebuilt.scores.pillars) === JSON.stringify(bacRow.scores.pillars) && rebuilt.raw.competitors[0].name === 'Union' && JSON.stringify(rebuilt.findings.tables) === JSON.stringify(bacRow.findings.tables));
+ok('rebuild: same findings (template wording when Claude is down) and marked rebuilt', rebuilt.findings.items.map((f) => f.title).join('|') === ids.join('|') && rebuilt.raw.narrative.source === 'template' && !!rebuilt.raw.rebuilt_at && rebuilt.raw.answers.length === 7);
+
+// Wrong facts: the words match the kind of error.
+ok('wrong facts: a mix-up gets its own title, reason and fix', wrongFactsTitle(['confused_with_other']) === 'AI mixes you up with another business' && /blends you with another business/.test(wrongFactsWhy(['confused_with_other'])) && !/address|hours/.test(wrongFactsWhy(['confused_with_other'])) && /tell you apart/.test(wrongFactsFix(['confused_with_other'], ['davismedia.org'])) && wrongFactsFix(['confused_with_other'], ['davismedia.org']).includes('on your site, davismedia.org, and your main listings'));
+ok('wrong facts: hours or address keep the wrong-address reason', /wrong address/.test(wrongFactsWhy(['wrong_hours'])) && /wrong address/.test(wrongFactsWhy(['confused_with_other', 'wrong_address'])) && wrongFactsTitle(['confused_with_other', 'wrong_hours']) === 'AI has some of your facts wrong');
+ok('wrong facts: a detail ending in a period never doubles it', (() => { const it = rebuilt.findings.items.find((f) => f.pillar === 'Accuracy'); return !!it && !/\.\./.test(it.what_we_found); })());
+ok('wrong facts: closed beats everything', wrongFactsTitle(['marked_closed', 'confused_with_other']) === 'AI thinks you might be closed' && /closed/.test(wrongFactsWhy(['marked_closed', 'wrong_hours'])));
 
 // Ambiguous name → ask for the street; no engine calls spent.
 sc = scenario({ ambiguous: true, answer: () => ({ text: 'x', names: [] }) });
