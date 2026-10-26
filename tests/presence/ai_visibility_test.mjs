@@ -76,6 +76,8 @@ ok('score: with a website, 40/25/20/15', withReady.overall === Math.round((s.rec
 const comps = competitorsFrom(recs, bac);
 ok('competitors: counted once per answer, ranked, and "ranked above you" when ahead or you were absent', comps[0].name === 'Union' && comps[0].mentions === 5 && comps[0].aboveYou === true && comps.find((c) => c.name === 'Perle').mentions === 2 && comps.length <= 5);
 const srcs = sourcesFrom(recs, 'bacchuskitchen.com');
+const { canonicalSource } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
+ok('sources: country and city editions merge (tripadvisor.in, la.eater.com, m.yelp.com)', canonicalSource('tripadvisor.in') === 'tripadvisor.com' && canonicalSource('tripadvisor.co.uk') === 'tripadvisor.com' && canonicalSource('la.eater.com') === 'eater.com' && canonicalSource('m.yelp.com') === 'yelp.com' && canonicalSource('glowupfinder.com') === 'glowupfinder.com');
 ok('sources: counted per answer, directories marked', srcs[0].domain === 'yelp.com' && srcs[0].count === 2 && srcs[0].directory === true);
 
 // ── the function end to end, with scripted Claude ──
@@ -131,6 +133,7 @@ let row = lastRow();
 const cedarFull = publicReport({ ...row, unlocked: true });
 ok('Cedar & Core: report saved; asked 7 questions, read 7 answers, 1 ambiguity check', !!doneEv && sc.calls.engine === 7 && sc.calls.extract === 7 && sc.calls.ambiguity === 1);
 ok('Cedar & Core: headline finding is "AI doesn\'t know you exist yet"', cedarFull.findings[0]?.title === "AI doesn't know you exist yet" && cedarFull.findings[0].priority === 'Fix now');
+ok('Cedar & Core: accuracy left out when AI never mentioned it, so the overall score is 0', row.scores.pillars[2].score === null && row.scores.pillars[2].note === 'AI said nothing about you to check' && row.scores.overall === 0);
 ok('Cedar & Core: appeared in 0 of 5, top competitor named, recommendation 0', row.scores.highlights[0].value === '0 of 5 answers' && row.scores.highlights[1].value === 'Burbank Pilates Co' && row.scores.pillars[0].score === 0);
 ok('Cedar & Core: snapshot wording from the spec is on the report', row.scores.notes[0] === "Based on live AI queries run today through each company's API. Answers vary by person and day, so treat this as a snapshot.");
 ok('Cedar & Core: Claude narrative down → template summary still says 0 of 5', /0 of 5 answers/.test(row.findings.summary) && row.raw_results.narrative.source === 'template');

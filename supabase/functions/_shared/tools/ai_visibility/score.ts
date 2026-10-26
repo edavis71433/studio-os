@@ -58,11 +58,21 @@ export function competitorsFrom(recs: AnswerRecord[], target: { name: string; ci
     .slice(0, 5);
 }
 
+// Country and city editions of one directory are one source to the owner
+// (tripadvisor.in, la.eater.com, m.yelp.com → TripAdvisor, Eater, Yelp).
+export function canonicalSource(domain: string): string {
+  const d = domain.replace(/^(m|mobile|en|www)\./, '');
+  const m = d.match(/(?:^|\.)(tripadvisor|yelp|opentable|groupon|google)\.[a-z.]+$/);
+  if (m) return `${m[1]}.com`;
+  const sub = d.match(/(?:^|\.)(eater\.com|timeout\.com|infatuation\.com|patch\.com|nextdoor\.com)$/);
+  return sub ? sub[1] : d;
+}
+
 export function sourcesFrom(recs: AnswerRecord[], ownDomain: string | null) {
   const counts = new Map<string, number>();
   for (const r of recs) {
     if (!r.ok) continue;
-    for (const d of new Set(r.sources.map((s) => domainOf(s.url)).filter(Boolean))) counts.set(d, (counts.get(d) || 0) + 1);
+    for (const d of new Set(r.sources.map((s) => canonicalSource(domainOf(s.url))).filter(Boolean))) counts.set(d, (counts.get(d) || 0) + 1);
   }
   return [...counts.entries()].map(([domain, count]) => ({ domain, count, own: !!ownDomain && (domain === ownDomain || domain.endsWith('.' + ownDomain)), directory: isDirectory(domain) }))
     .sort((a, b) => b.count - a.count || a.domain.localeCompare(b.domain));
@@ -76,11 +86,16 @@ export function scoreAll(recs: AnswerRecord[], readiness: ReadinessResult) {
   const rec = un.length ? Math.round((un.reduce((n, r) => n + (r.extraction!.targetFound ? posWeight(r.extraction!.targetPosition || 9) : 0), 0) / un.length) * 100) : null;
   const aw = br.length ? Math.round(br.reduce((n, r) => { const e = r.extraction!; return n + (e.knows === 'no' ? 0 : e.knows === 'yes' && e.describedCorrectly ? 100 : 50); }, 0) / br.length) : null;
   const flagTypes = new Set(recs.flatMap((r) => (r.extraction?.flags || []).map((f) => f.type)));
-  const acc = recs.some((r) => r.extraction) ? Math.max(0, 100 - 25 * flagTypes.size) : null;
+  // Accuracy only means something when AI actually said something about the
+  // business. If no answer named it or knew it, there was nothing to get right,
+  // and a "perfect" 100 would flatter a business AI has never heard of.
+  const discussed = recs.some((r) => r.extraction && (r.extraction.targetFound || r.extraction.knows !== 'no'));
+  const acc = discussed ? Math.max(0, 100 - 25 * flagTypes.size) : null;
   const ready = readiness.checked ? readiness.score : null;
   const pillars = AI_PILLARS.map((p) => {
     const score = p.key === 'recommendation' ? rec : p.key === 'awareness' ? aw : p.key === 'accuracy' ? acc : ready;
-    const note = p.key === 'readiness' && !readiness.checked ? (readiness.reason === 'no_url' ? 'No website given' : "Couldn't read your website") : undefined;
+    const note = p.key === 'readiness' && !readiness.checked ? (readiness.reason === 'no_url' ? 'No website given' : "Couldn't read your website")
+      : p.key === 'accuracy' && score == null ? 'AI said nothing about you to check' : undefined;
     return { key: p.key, name: p.name, weight: p.weight, score, ...(note ? { note } : {}) };
   });
   const live = pillars.filter((p) => p.score != null);
