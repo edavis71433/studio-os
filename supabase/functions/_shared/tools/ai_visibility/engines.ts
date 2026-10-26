@@ -70,7 +70,12 @@ async function askClaude(question: string, ctx: { city: string }, budgetMs: numb
           max_tokens: 4000,
           output_config: { effort: 'low' },
           ...(withFallbacks ? { fallbacks: 'default' } : {}),
-          tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3, user_location: { type: 'approximate', city: ctx.city, country: 'US' } }],
+          // allowed_callers "direct": on web_search_20260209 the default runs the
+          // search through code-execution "dynamic filtering", and the first live
+          // scan after the cited-vs-seen split came back with ZERO citations in all
+          // seven answers. A direct search returns the documented cited form
+          // (text blocks with web_search_result_location citations).
+          tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3, allowed_callers: ['direct'], user_location: { type: 'approximate', city: ctx.city, country: 'US' } }],
           messages,
         }),
         signal: AbortSignal.timeout(Math.max(1000, left)),

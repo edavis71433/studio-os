@@ -27,15 +27,18 @@ export const AI_PILLARS = [
 ] as const;
 export const aiPillarName = (k: string) => AI_PILLARS.find((p) => p.key === k)?.name || k;
 
-const DIRECTORIES = /(^|\.)(yelp\.com|tripadvisor\.[a-z.]+|google\.com|maps\.google\.com|goo\.gl|opentable\.com|resy\.com|yellowpages\.com|bbb\.org|angi\.com|homeadvisor\.com|thumbtack\.com|nextdoor\.com|facebook\.com|instagram\.com|groupon\.com|mapquest\.com|foursquare\.com|zocdoc\.com|vagaro\.com|styleseat\.com|classpass\.com|mindbodyonline\.com|eater\.com|timeout\.com|infatuation\.com|doordash\.com|ubereats\.com|grubhub\.com|houzz\.com|porch\.com|healthgrades\.com)$/;
+const DIRECTORIES = /(^|\.)(yelp\.com|tripadvisor\.[a-z.]+|google\.com|maps\.google\.com|goo\.gl|opentable\.com|resy\.com|yellowpages\.com|bbb\.org|angi\.com|homeadvisor\.com|thumbtack\.com|nextdoor\.com|facebook\.com|instagram\.com|groupon\.com|mapquest\.com|foursquare\.com|zocdoc\.com|vagaro\.com|styleseat\.com|classpass\.com|mindbodyonline\.com|eater\.com|timeout\.com|infatuation\.com|doordash\.com|ubereats\.com|grubhub\.com|houzz\.com|porch\.com|healthgrades\.com|clutch\.co|designrush\.com|upcity\.com|goodfirms\.co|sortlist\.com|expertise\.com|agencyspotter\.com|themanifest\.com|agencies\.semrush\.com|linkedin\.com|bark\.com|avvo\.com|zillow\.com|realtor\.com|manta\.com|zoominfo\.com)$/;
 export const isDirectory = (d: string) => DIRECTORIES.test(d);
-const SOURCE_NAMES: Record<string, string> = { 'yelp.com': 'Yelp', 'google.com': 'Google', 'maps.google.com': 'Google Maps', 'tripadvisor.com': 'TripAdvisor', 'opentable.com': 'OpenTable', 'resy.com': 'Resy', 'facebook.com': 'Facebook', 'instagram.com': 'Instagram', 'nextdoor.com': 'Nextdoor', 'angi.com': 'Angi', 'thumbtack.com': 'Thumbtack', 'bbb.org': 'BBB', 'eater.com': 'Eater', 'timeout.com': 'Time Out', 'infatuation.com': 'The Infatuation', 'yellowpages.com': 'Yellow Pages', 'houzz.com': 'Houzz' };
+const SOURCE_NAMES: Record<string, string> = { 'yelp.com': 'Yelp', 'google.com': 'Google', 'maps.google.com': 'Google Maps', 'tripadvisor.com': 'TripAdvisor', 'opentable.com': 'OpenTable', 'resy.com': 'Resy', 'facebook.com': 'Facebook', 'instagram.com': 'Instagram', 'nextdoor.com': 'Nextdoor', 'angi.com': 'Angi', 'thumbtack.com': 'Thumbtack', 'bbb.org': 'BBB', 'eater.com': 'Eater', 'timeout.com': 'Time Out', 'infatuation.com': 'The Infatuation', 'yellowpages.com': 'Yellow Pages', 'houzz.com': 'Houzz', 'clutch.co': 'Clutch', 'designrush.com': 'DesignRush', 'upcity.com': 'UpCity', 'goodfirms.co': 'GoodFirms', 'expertise.com': 'Expertise.com', 'agencies.semrush.com': 'Semrush Agency Partners', 'linkedin.com': 'LinkedIn', 'zoominfo.com': 'ZoomInfo' };
 export const sourceName = (d: string) => SOURCE_NAMES[d] || d;
 
 // Organizations an answer may name that aren't rival businesses: chambers,
 // visitor bureaus, city departments, directories (found live: "Burbank
 // Chamber of Commerce" listed as a web design competitor).
-export const NOT_A_COMPETITOR = /\b(chamber of commerce|chamber\b|visitors? bureau|convention (and|&) visitors|tourism (?:board|bureau|office|authority)|city of\b|county of\b|small business (development|administration)|better business bureau|yelp|google|angi\b|thumbtack|nextdoor|upwork|fiverr|reddit|facebook|instagram)/i;
+// Also the directories and marketplaces an answer names as if they were
+// businesses (found live: Clutch.co, DesignRush and UpCity as the top three
+// "competitors" of a web studio).
+export const NOT_A_COMPETITOR = /\b(chamber of commerce|chamber\b|visitors? bureau|convention (and|&) visitors|tourism (?:board|bureau|office|authority)|city of\b|county of\b|small business (development|administration)|better business bureau|yelp|google|angi\b|thumbtack|nextdoor|upwork|fiverr|reddit|facebook|instagram|clutch(\.co)?\b|designrush|upcity|goodfirms|sortlist|expertise\.com|agency ?spotter|the manifest|semrush|houzz|homeadvisor|porch\.com|tripadvisor|opentable|doordash|grubhub|uber ?eats|zocdoc|healthgrades|avvo|findlaw|justia|zillow|realtor\.com|yellow ?pages|yp\.com|manta\b|craigslist|linkedin|bark\.com|groupon|foursquare|mapquest)/i;
 // The acronyms are case-sensitive: "Score Pilates" and "Sba Landscaping" are
 // businesses, "SCORE" and "SBA" are not (audit 3.11).
 const NOT_A_COMPETITOR_ACRONYM = /\b(SBA|SCORE|BBB)\b/;

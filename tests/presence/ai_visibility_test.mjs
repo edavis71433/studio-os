@@ -97,6 +97,8 @@ ok('match: a domain form matches; a different name sharing a word does not', sam
 const { notACompetitor } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
 const selfRec = { engine: 'claude', engineName: 'Claude', promptId: 'u1', kind: 'unbranded', question: 'q', ok: true, sources: [], extraction: { businesses: [{ name: 'Davis Digital Studio', city: 'Silver Lake' }, { name: 'Digilite', city: null }], targetFound: false, targetPosition: null, targetDescription: '', knows: 'no', describedCorrectly: true, flags: [] } };
 ok('competitors: the business placed in a neighborhood is never its own competitor', competitorsFrom([selfRec], D).map((c) => c.name).join() === 'Digilite');
+const { isDirectory } = await import('../../supabase/functions/_shared/tools/ai_visibility/score.ts');
+ok('competitors: B2B directories named as businesses are dropped and counted as directories (live: Clutch.co, DesignRush, UpCity)', ['Clutch.co', 'Clutch', 'DesignRush', 'UpCity', 'GoodFirms', 'Expertise.com', 'Semrush Agency Partners', 'Yelp Burbank'].every(notACompetitor) && ['clutch.co', 'designrush.com', 'upcity.com', 'goodfirms.co', 'agencies.semrush.com', 'linkedin.com'].every(isDirectory) && canonicalSource('agencies.semrush.com') === 'agencies.semrush.com' && !notACompetitor('Cluster Designs LLC') && !notACompetitor('Crosscheck Designs'));
 ok('competitors: acronyms are case-sensitive, civic bodies still drop', !notACompetitor('Score Pilates') && !notACompetitor('Sba Landscaping') && !notACompetitor('Tourism Bakery') && notACompetitor('SCORE Los Angeles') && notACompetitor('Burbank Chamber of Commerce') && notACompetitor('Visit Burbank Tourism Bureau'));
 const { plural } = await import('../../supabase/functions/_shared/tools/ai_visibility/prompts.ts');
 const plumber = buildPrompts({ businessName: 'Valleyline Plumbing', city: 'Glendale', businessType: 'home services', searchPhrases: 'emergency plumber', url: null, detail: '' });
@@ -218,7 +220,7 @@ ok('Bacchus: "website" step streamed when a URL is given', events.some((e) => e.
 ok('Bacchus: readiness table and wrong-facts table in the full report', bacFull.tables.some((t) => t.title === 'AI readiness of your website') && bacFull.tables.some((t) => t.title === 'Wrong facts in AI answers'));
 // Audit 3.1: cited and merely-seen sources are told apart.
 const srcTable = bacFull.tables.find((t) => t.title === 'Sources AI used');
-const zoom = srcTable.rows.find((r) => r[0] === 'zoominfo.com');
+const zoom = srcTable.rows.find((r) => r[0] === 'ZoomInfo');
 ok('Bacchus: Yelp is cited by all 7 answers; zoominfo only came up in search (0 cited, seen in 5) and is not a "source"', srcTable.columns.join() === 'Source,Cited,Seen in search,Note' && srcTable.rows[0][0] === 'Yelp' && srcTable.rows[0][1] === 7 && zoom && zoom[1] === 0 && zoom[2] === 5 && !row.raw_results.sources.some((x) => x.domain === 'zoominfo.com'));
 ok('Bacchus: the wrong-hours finding blames Yelp (cited by that answer), never a seen-only domain', /Yelp/.test(JSON.stringify(row.findings.items.find((f) => f.pillar === 'Accuracy'))) && !/zoominfo/.test(JSON.stringify(row.findings.items)));
 ok('Bacchus: own site seen in search but not cited is its own finding', srcTable.rows.some((r) => r[3] === 'Your website' && r[1] === 0 && r[2] === 3) && ids.includes('AI finds your website but never uses it'));
@@ -282,7 +284,7 @@ ok('page: fires scan_started, scan_completed and scan_failed; handles needs_deta
 ok('redirects: /ai-visibility serves the page', /^\/ai-visibility\s+\/ai-visibility\.html\s+200$/m.test(file('_redirects')));
 ok('deploy: ai-visibility ships to production', file('.github/workflows/deploy.yml').includes('functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}'));
 const eng = file('supabase/functions/_shared/tools/ai_visibility/engines.ts');
-ok('engine: Claude Sonnet 5.5, live web search, no temperature', eng.includes("'claude-sonnet-5-5'") && eng.includes("'web_search_20260209'") && !/temperature/.test(eng.replace(/\/\/.*$/gm, '')));
+ok('engine: Claude Sonnet 5.5, live web search called directly (citations), no temperature', eng.includes("'claude-sonnet-5-5'") && eng.includes("'web_search_20260209'") && eng.includes("allowed_callers: ['direct']") && !/temperature/.test(eng.replace(/\/\/.*$/gm, '')));
 
 const passed = results.filter((x) => x.p).length;
 console.log(`\n════ FREE TOOLS PHASE 3 AI VISIBILITY: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
