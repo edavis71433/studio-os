@@ -226,6 +226,17 @@ const { pdfString, wrap, textWidth } = await import('../../supabase/functions/_s
 ok('pdf: parentheses and backslashes escaped; curly quotes and dashes in WinAnsi; emoji safe', pdfString('a (b) \\ c') === 'a \\(b\\) \\\\ c' && pdfString('\u2019\u2014') === '\\222\\227' && pdfString('\u{1F600}') === '?');
 ok('pdf: wrapping keeps every line inside the width, long words broken', wrap('word '.repeat(60), 'F1', 10, 200).every((l) => textWidth(l, 'F1', 10) <= 200) && wrap('x'.repeat(300), 'F1', 10, 100).length > 2);
 ok('report page: never uses innerHTML (report text is untrusted)', !/innerHTML/.test(pageJs));
+// Audit 4.2-4.6, 4.10, 4.11: delivery glue.
+const headersFile = read('_headers'), redirectsFile = read('_redirects'), swFile = read('sw.js'), deployFile = read('.github/workflows/deploy.yml');
+ok('headers: report and tool pages always revalidate; reports carry X-Robots-Tag noindex', /\/report\/\*\n  Cache-Control: no-cache, must-revalidate\n  X-Robots-Tag: noindex/.test(headersFile) && /\/site-review\n  Cache-Control: no-cache/.test(headersFile) && /\/ai-visibility\n  Cache-Control: no-cache/.test(headersFile));
+ok('redirects: the app host sends reports and tool pages to the tools host, before the rewrites', (() => { const i = redirectsFile.indexOf('https://app.davisdigitalstudio.com/report/*'); return i > 0 && i < redirectsFile.indexOf('/report/*          /report.html') && /app\.davisdigitalstudio\.com\/site-review\s+https:\/\/tools\.davisdigitalstudio\.com\/site-review\s+301!/.test(redirectsFile) && /app\.davisdigitalstudio\.com\/ai-visibility\s+https:\/\/tools\.davisdigitalstudio\.com\/ai-visibility\s+301!/.test(redirectsFile); })());
+ok('service worker: never caches the tool pages or reports; cache name bumped', /NEVER_CACHE = \/\^\\\/\(report\\\/\|site-review\|ai-visibility\)\//.test(swFile) && /if \(NEVER_CACHE\.test\(url\.pathname\)\) return;/.test(swFile) && !/dds-v14/.test(swFile));
+ok('stale paths: /tools is out of the sitemap and the app manifest has no /audit shortcut', !/davisdigitalstudio\.com\/tools</.test(read('sitemap.xml')) && !/"\/audit"/.test(read('manifest.json')));
+for (const f of ['site-review.js', 'ai-visibility.js']) {
+  const js = read(f);
+  ok(`${f}: explains a bot check that never loads, resets after the back button, and has a watchdog`, /bot_check/.test(js) && /challenges\.cloudflare\.com and reload/.test(js) && /addEventListener\('pageshow'/.test(js) && /e\.persisted && busy/.test(js) && /150000/.test(js) && /turnstileDown = true/.test(js));
+}
+ok('deploy: the production run smoke-tests the pages on the static host', /Smoke test — Free Tools pages on the static host/.test(deployFile) && /tools\.davisdigitalstudio\.com\/report\/00000000/.test(deployFile) && deployFile.indexOf('Free Tools pages on the static host') > deployFile.indexOf('Deploy ai-visibility (PRODUCTION)'));
 ok('report page: fires the spec GA4 events', ['report_viewed', 'email_captured', 'calendly_clicked', 'pdf_downloaded'].every((e) => pageJs.includes(`'${e}'`)));
 ok('report page: noindex and print stylesheet', /noindex/.test(read('report.html')) && /@media print/.test(read('tool-report.css')));
 ok('redirects: /report/<id> serves report.html', /^\/report\/\*\s+\/report\.html\s+200$/m.test(read('_redirects')));

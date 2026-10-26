@@ -12,20 +12,32 @@
   var STEPS = ['asking', 'website', 'reading', 'writing'];
   var widgetId = null;
   var busy = false;
+  var turnstileDown = false;   // the bot check never loaded (ad blocker, strict network)
 
   T.setTool('ai_visibility');
 
   function renderTurnstile() {
     if (widgetId !== null || !window.turnstile) return;
-    try { widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only' }); } catch (e) { widgetId = null; }
+    try { widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only', 'error-callback': function () { turnstileDown = true; return true; } }); } catch (e) { widgetId = null; }
   }
   (function waitForTurnstile(n) {
     if (window.turnstile) { renderTurnstile(); return; }
-    if (n > 100) return;
+    if (n > 100) { turnstileDown = true; return; }
     setTimeout(function () { waitForTurnstile(n + 1); }, 100);
   })(0);
   function token() { try { return widgetId !== null && window.turnstile ? window.turnstile.getResponse(widgetId) || '' : ''; } catch (e) { return ''; } }
   function resetTurnstile() { try { if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId); } catch (e) {} }
+
+  var BOT_CHECK_DOWN = 'The quick check that you’re a person (from Cloudflare) couldn’t load. If you use a strict ad blocker or a company network, allow challenges.cloudflare.com and reload this page, or book a call and I’ll run it by hand.';
+
+  // A scan should be over inside about a minute; if the stream stalls (a
+  // hung function, a proxy that buffers), say so instead of spinning forever.
+  function watchdog() {
+    setTimeout(function () { if (busy) fail('connection', 'This is taking longer than it should. Please try again in a minute.'); }, 150000);
+  }
+  // The back button after a finished scan restores this page from the
+  // browser's cache mid-"loading": put the form back.
+  window.addEventListener('pageshow', function (e) { if (e.persisted && busy) { busy = false; show('form'); resetTurnstile(); } });
 
   function setMsg(text, tone) {
     var m = $('srMsg');
@@ -57,7 +69,7 @@
   function fail(reason, message) {
     busy = false;
     T.track('scan_failed', { reason: reason });
-    var titles = { resting: 'The tools are resting for today', rate_limited: 'That’s a lot of checks for now', engines_failed: 'The AI services didn’t answer' };
+    var titles = { bot_check: 'Our bot check couldn’t load', resting: 'The tools are resting for today', rate_limited: 'That’s a lot of checks for now', engines_failed: 'The AI services didn’t answer' };
     $('srErrorTitle').textContent = titles[reason] || 'We couldn’t finish your check';
     $('srErrorText').textContent = message || 'Something went wrong on our side. Try again in a minute.';
     show('error');
@@ -128,7 +140,10 @@
     if (city.length < 2) { setMsg('Enter your city or neighborhood.', 'error'); f.city.focus(); return; }
     if (url && !/^(https?:\/\/)?[^\s\/]+\.[^\s]{2,}/i.test(url)) { setMsg('That website doesn’t look right. Try yourbusiness.com, or leave it blank.', 'error'); f.url.focus(); return; }
     var t = token();
-    if (!t) { renderTurnstile(); setMsg('One moment while we check you’re a person, then press the button again.', 'error'); return; }
+    if (!t) {
+      if (turnstileDown || !window.turnstile) { fail('bot_check', BOT_CHECK_DOWN); return; }
+      renderTurnstile(); setMsg('One moment while we check you’re a person, then press the button again.', 'error'); return;
+    }
     busy = true;
     hasUrl = !!url;
     setMsg('');
@@ -136,6 +151,7 @@
     markStep('asking', '');
     show('loading');
     T.track('scan_started', { business_type: f.business_type.value, has_website: hasUrl });
+    watchdog();
 
     fetch(T.api('ai-visibility'), {
       method: 'POST',

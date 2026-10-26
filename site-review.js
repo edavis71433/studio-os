@@ -13,19 +13,20 @@
   var STEPS = ['pages', 'speed', 'search', 'trust', 'writing'];
   var widgetId = null;
   var busy = false;
+  var turnstileDown = false;   // the bot check never loaded (ad blocker, strict network)
 
   T.setTool('site_review');
 
   function renderTurnstile() {
     if (widgetId !== null || !window.turnstile) return;
     try {
-      widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only' });
+      widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only', 'error-callback': function () { turnstileDown = true; return true; } });
     } catch (e) { widgetId = null; }
   }
   // api.js loads async; render as soon as it is there.
   (function waitForTurnstile(n) {
     if (window.turnstile) { renderTurnstile(); return; }
-    if (n > 100) return;
+    if (n > 100) { turnstileDown = true; return; }
     setTimeout(function () { waitForTurnstile(n + 1); }, 100);
   })(0);
 
@@ -35,6 +36,17 @@
   function resetTurnstile() {
     try { if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId); } catch (e) {}
   }
+
+  var BOT_CHECK_DOWN = 'The quick check that you’re a person (from Cloudflare) couldn’t load. If you use a strict ad blocker or a company network, allow challenges.cloudflare.com and reload this page, or book a call and I’ll run it by hand.';
+
+  // A scan should be over inside about a minute; if the stream stalls (a
+  // hung function, a proxy that buffers), say so instead of spinning forever.
+  function watchdog() {
+    setTimeout(function () { if (busy) fail('connection', 'This is taking longer than it should. Please try again in a minute.'); }, 150000);
+  }
+  // The back button after a finished scan restores this page from the
+  // browser's cache mid-"loading": put the form back.
+  window.addEventListener('pageshow', function (e) { if (e.persisted && busy) { busy = false; show('form'); resetTurnstile(); } });
 
   function setMsg(text, tone) {
     var m = $('srMsg');
@@ -66,6 +78,7 @@
     busy = false;
     T.track('scan_failed', { reason: reason });
     var titles = {
+      bot_check: 'Our bot check couldn’t load',
       blocked: 'Your site blocked our checker',
       resting: 'The tools are resting for today',
       rate_limited: 'That’s a lot of scans for now',
@@ -134,6 +147,7 @@
     form.url.setAttribute('aria-invalid', 'false');
     var t = token();
     if (!t) {
+      if (turnstileDown || !window.turnstile) { fail('bot_check', BOT_CHECK_DOWN); return; }
       renderTurnstile();
       setMsg('One moment while we check you’re a person, then press the button again.', 'error');
       return;
@@ -145,6 +159,7 @@
     markStep('pages', '');
     show('loading');
     T.track('scan_started', { business_type: form.business_type.value });
+    watchdog();
 
     fetch(T.api('site-review'), {
       method: 'POST',

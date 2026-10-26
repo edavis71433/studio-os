@@ -237,3 +237,14 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/ai-visibility" -H "Content-Type: application/json" -d '{"business_name":"Smoke Test","city":"Burbank"}')
           [ "$code" = "403" ] || { echo "ai-visibility expected 403 without a Turnstile token, got $code"; exit 1; }
           echo "Free Tools smoke passed (tool-report 404, send-lead-alert 401, site-review and ai-visibility 403 without Turnstile)."
+
+      # The static site deploys from Netlify on every push, on its own clock.
+      # Rule of thumb when a page needs a new function field: ship the function
+      # (this workflow) first, the page second. This step checks the pages a
+      # visitor actually loads are up and still carry what the scan needs.
+      - name: Smoke test — Free Tools pages on the static host
+        run: |
+          curl -s --fail https://tools.davisdigitalstudio.com/site-review | grep -q 'challenges.cloudflare.com/turnstile' || { echo "site-review page smoke FAILED (no Turnstile script)"; exit 1; }
+          curl -s --fail https://tools.davisdigitalstudio.com/ai-visibility | grep -q 'id="srForm"' || { echo "ai-visibility page smoke FAILED (no form)"; exit 1; }
+          curl -s --fail https://tools.davisdigitalstudio.com/report/00000000-0000-4000-8000-000000000000 | grep -q 'id="trReport"' || { echo "report page smoke FAILED"; exit 1; }
+          echo "Free Tools pages smoke passed (site-review, ai-visibility, report shell)."

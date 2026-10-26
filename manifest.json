@@ -29,11 +29,6 @@
   ],
   "shortcuts": [
     {
-      "name": "Free Site Review",
-      "url": "/audit",
-      "description": "Get your free site review"
-    },
-    {
       "name": "Free Report Card",
       "url": "/report-card",
       "description": "Get your free Digital Report Card"
