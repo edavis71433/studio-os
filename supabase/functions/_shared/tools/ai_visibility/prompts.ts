@@ -32,13 +32,32 @@ export function buildPrompts(inp: VisibilityInput): Prompt[] {
   const noun = NOUN[inp.businessType] || NOUN.other;
   const city = inp.city;
   const where = inp.detail ? `${inp.businessName} (${inp.detail}) in ${city}` : `${inp.businessName} in ${city}`;
+  const branded: Prompt[] = [
+    { id: 'b1', kind: 'branded', text: `What do you know about ${where}?` },
+    { id: 'b2', kind: 'branded', text: `Is ${where} any good, and what do they offer?` },
+  ];
+  // "Other" has no category word of its own ("the best local business in
+  // Burbank" is not a question anyone asks). When the visitor says what
+  // customers search for, every local question is about that instead: found
+  // in the first live run, where Davis Digital Studio was checked against
+  // computer repair shops.
+  const phrase = first(inp.searchPhrases);
+  if (inp.businessType === 'other' && phrase) {
+    return [
+      { id: 'u1', kind: 'unbranded', text: `Who's the best for ${phrase} in ${city}?` },
+      { id: 'u2', kind: 'unbranded', text: `Can you recommend someone for ${phrase} near ${city}?` },
+      { id: 'u3', kind: 'unbranded', text: `What are the top rated ${phrase} businesses in ${city}, and why?` },
+      { id: 'u4', kind: 'unbranded', text: `I need ${phrase} in ${city}. Who should I go to?` },
+      { id: 'u5', kind: 'unbranded', text: `Who would you hire for ${phrase} in ${city}?` },
+      ...branded,
+    ];
+  }
   return [
     { id: 'u1', kind: 'unbranded', text: `What's the best ${noun} in ${city}?` },
     { id: 'u2', kind: 'unbranded', text: `Can you recommend a ${noun} near ${city}?` },
     { id: 'u3', kind: 'unbranded', text: `What are the top rated ${noun}s in ${city}, and why?` },
     { id: 'u4', kind: 'unbranded', text: `I need a ${noun} in ${city}. Who should I go to?` },
-    { id: 'u5', kind: 'unbranded', text: industryPrompt(inp.businessType, city, first(inp.searchPhrases)) },
-    { id: 'b1', kind: 'branded', text: `What do you know about ${where}?` },
-    { id: 'b2', kind: 'branded', text: `Is ${where} any good, and what do they offer?` },
+    { id: 'u5', kind: 'unbranded', text: industryPrompt(inp.businessType, city, phrase) },
+    ...branded,
   ];
 }

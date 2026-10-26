@@ -43,7 +43,7 @@ export async function handler(req: Request): Promise<Response> {
     if (!url) return toolsJson(req, { error: 'invalid_url', message: "That website doesn't look right. Try something like yourbusiness.com, or leave it blank." }, 400);
     try { await (scanDeps.guard || assertPublicHttpUrl)(url); } catch { return toolsJson(req, { error: 'invalid_url', message: "We couldn't use that website address. Check it, or leave it blank." }, 400); }
   }
-  const input = { business_name: detail ? `${businessName} ${detail}` : businessName, city };
+  const input = { business_name: detail ? `${businessName} ${detail}` : businessName, city, business_type: businessType === 'other' ? '' : businessType, search_phrases: searchPhrases };
 
   const gate = await beginScan(req, { tool: 'ai_visibility', turnstileToken: body.turnstile_token, input });
   if (!gate.ok) return gate.response;

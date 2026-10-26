@@ -45,7 +45,10 @@ export function cacheKeyFor(tool: ToolId, input: Record<string, unknown>): strin
       return `${host}${path}`;
     } catch { return normalizeKeyPart(raw); }
   }
-  return `${normalizeKeyPart(input.business_name)}|${normalizeKeyPart(input.city)}`;
+  // Business + city (spec), plus what shapes the questions: the type and the
+  // search phrase. Same business asked about different services is a different scan.
+  const extra = [input.business_type, input.search_phrases].map(normalizeKeyPart).filter(Boolean);
+  return [normalizeKeyPart(input.business_name), normalizeKeyPart(input.city), ...extra].join('|');
 }
 
 export const isEmail = (s: unknown) => typeof s === 'string' && s.length <= 254 && /^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(s.trim());

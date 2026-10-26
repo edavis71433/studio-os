@@ -27,6 +27,9 @@ ok('prompts: 5 unbranded + 2 branded', P.filter((p) => p.kind === 'unbranded').l
 ok('prompts: the visitor\'s search phrase goes into the industry question', P[4].text === "What's the best place for balayage in Burbank?");
 ok('prompts: branded questions name the business and city', P[5].text === 'What do you know about Saffron & Shear in Burbank?' && /Saffron & Shear in Burbank any good/.test(P[6].text));
 ok('prompts: the street/neighborhood detail is used when given', buildPrompts({ businessName: 'Joe\'s Pizza', city: 'Burbank', businessType: 'restaurant', searchPhrases: '', url: null, detail: 'on Magnolia' })[5].text.includes("Joe's Pizza (on Magnolia) in Burbank"));
+const dds = buildPrompts({ businessName: 'Davis Digital Studio', city: 'Burbank', businessType: 'other', searchPhrases: 'web design', url: null, detail: '' });
+ok('prompts: "Other" + a search phrase asks every local question about that phrase', dds.filter((p) => p.kind === 'unbranded').every((p) => /web design/.test(p.text) && /Burbank/.test(p.text)) && !dds.some((p) => /local business/.test(p.text)) && dds.filter((p) => p.kind === 'branded').length === 2);
+ok('prompts: "Other" without a phrase keeps the general questions', buildPrompts({ businessName: 'X', city: 'Burbank', businessType: 'other', searchPhrases: '', url: null, detail: '' })[0].text === "What's the best local business in Burbank?");
 ok('prompts: restaurant default industry question is date night', buildPrompts({ businessName: 'X', city: 'Pasadena', businessType: 'restaurant', searchPhrases: '', url: null, detail: '' })[4].text === 'Where should I eat for date night in Pasadena?');
 
 // ── fuzzy matching ──
@@ -36,6 +39,7 @@ ok('match: works the other way round and ignores punctuation/case', sameBusiness
 ok('match: a namesake in another city does not count', !sameBusiness(bac, { name: 'Bacchus Kitchen', city: 'Phoenix' }));
 ok('match: a different business sharing one word does not count', !sameBusiness(bac, { name: 'Bacchus Wine Bar', city: 'Pasadena' }) && !sameBusiness({ name: 'Bar', city: 'X' }, { name: 'Bar Amá', city: null }));
 const { cacheKeyFor } = await import('../../supabase/functions/_shared/tools/guard.ts');
+ok('cache key: a different service or type is a different scan', cacheKeyFor('ai_visibility', { business_name: 'Davis Digital Studio', city: 'Burbank', search_phrases: 'web design' }) !== cacheKeyFor('ai_visibility', { business_name: 'Davis Digital Studio', city: 'Burbank', search_phrases: 'seo' }) && cacheKeyFor('ai_visibility', { business_name: 'X', city: 'Y', business_type: '', search_phrases: '' }) === cacheKeyFor('ai_visibility', { business_name: 'X', city: 'Y' }));
 ok('cache key: "Cedar & Core" and "cedar and core" share a slot', cacheKeyFor('ai_visibility', { business_name: 'Cedar & Core', city: 'Burbank' }) === cacheKeyFor('ai_visibility', { business_name: 'cedar and core', city: 'BURBANK' }));
 ok('match: "&" and "and" are the same', nameTokens('Cedar & Core').join(' ') === nameTokens('Cedar and Core').join(' '));
 
@@ -205,7 +209,7 @@ ok('engines down: friendly retry message and no report saved', ev?.error === 'en
 // Cache: same business + city within 7 days → a locked copy, no AI calls.
 sc = scenario({ answer: () => ({ text: 'x', names: [] }) });
 Object.assign(scanDeps, { aiFetch: sc.fn });
-r = await handler(req({ business_name: 'cedar and core', city: 'BURBANK' }, '198.51.100.7'));
+r = await handler(req({ business_name: 'cedar and core', city: 'BURBANK', business_type: 'health and wellness' }, '198.51.100.7'));
 const cached = await r.json();
 ok('cache: a repeat within 7 days is a fresh locked copy, no AI calls', cached.type === 'done' && cached.cached === true && sc.calls.engine === 0 && sc.calls.ambiguity === 0);
 
