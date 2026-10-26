@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Report | Davis Digital Studio</title>
+<meta name="description" content="Your free report from Davis Digital Studio.">
+<!-- Private, per-visitor reports: never indexed, never sent as a referrer. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="/tool-report.css">
+</head>
+<body>
+<header class="tr-top">
+  <div class="tr-wrap tr-top-row">
+    <a class="tr-logo" href="https://davisdigitalstudio.com/"><img src="/tools-logo.webp" alt="Davis Digital Studio" width="250" height="56"></a>
+    <button type="button" class="tr-btn tr-btn-ghost" id="trPdf" hidden>Save as PDF</button>
+  </div>
+</header>
+
+<main class="tr-wrap" id="trMain" aria-live="polite">
+  <div class="tr-state" id="trLoading">
+    <span class="tr-spinner" aria-hidden="true"></span>
+    <p>Loading your report…</p>
+  </div>
+
+  <div class="tr-state" id="trError" hidden>
+    <h1>We couldn't open that report</h1>
+    <p id="trErrorText">Check the link in your email, or book a call and I'll pull it up for you.</p>
+    <a class="tr-btn" data-calendly href="https://calendly.com/eric-davisdigitalstudio/30min">Book a free 30 minute call</a>
+  </div>
+
+  <article id="trReport" hidden>
+    <section class="tr-head">
+      <p class="tr-eyebrow" id="trTool"></p>
+      <h1 id="trBusiness"></h1>
+      <p class="tr-meta" id="trMeta"></p>
+    </section>
+
+    <section class="tr-card tr-hero">
+      <div class="tr-score" id="trScore"></div>
+      <div class="tr-hero-copy">
+        <p class="tr-label" id="trLabel"></p>
+        <p class="tr-summary" id="trSummary"></p>
+        <ul class="tr-notes" id="trNotes"></ul>
+      </div>
+    </section>
+
+    <section class="tr-highlights" id="trHighlights" hidden></section>
+    <section class="tr-pillars" id="trPillars" hidden></section>
+
+    <section id="trTopThreeWrap" hidden>
+      <h2>Top 3 fixes</h2>
+      <ol class="tr-top3" id="trTopThree"></ol>
+    </section>
+
+    <section id="trFindingsWrap" hidden>
+      <h2 id="trFindingsTitle">What we found</h2>
+      <div id="trFindings"></div>
+    </section>
+
+    <section class="tr-card tr-unlock" id="trUnlock" hidden>
+      <h2>Get the full report</h2>
+      <p id="trUnlockWhat">See every finding, the three fixes that matter most, and the details behind each one. We'll email you a link to keep.</p>
+      <form id="trUnlockForm" novalidate>
+        <div class="tr-fields">
+          <label>Email <span class="tr-req">(required)</span>
+            <input type="email" name="email" autocomplete="email" required maxlength="254">
+          </label>
+          <label>Name <span class="tr-opt">(optional)</span>
+            <input type="text" name="name" autocomplete="name" maxlength="120">
+          </label>
+        </div>
+        <label class="tr-check"><input type="checkbox" name="consent_marketing"> Send me occasional tips on getting found online. Unsubscribe any time.</label>
+        <button type="submit" class="tr-btn" id="trUnlockBtn">Show my full report</button>
+        <p class="tr-form-msg" id="trUnlockMsg" role="status"></p>
+        <p class="tr-fine">I'll only use your email to send this report and, if you tick the box, the occasional tip. <a href="https://davisdigitalstudio.com/privacy">Privacy policy</a></p>
+      </form>
+    </section>
+
+    <div id="trTables"></div>
+
+    <section class="tr-closing" id="trClosing">
+      <h2 id="trClosingText"></h2>
+      <a class="tr-btn tr-btn-light" data-calendly id="trClosingBtn" href="https://calendly.com/eric-davisdigitalstudio/30min">Book a free 30 minute call</a>
+      <p class="tr-closing-url">calendly.com/eric-davisdigitalstudio/30min</p>
+    </section>
+  </article>
+</main>
+
+<footer class="tr-foot tr-wrap">
+  <p>Davis Digital Studio LLC · Burbank, California · <a href="https://davisdigitalstudio.com/">davisdigitalstudio.com</a></p>
+</footer>
+
+<script src="/analytics.js" defer></script>
+<script src="/tools-common.js" defer></script>
+<script src="/tool-report.js" defer></script>
+</body>
+</html>
