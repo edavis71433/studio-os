@@ -172,8 +172,16 @@ table.tr-table { width: 100%; border-collapse: collapse; font-size: 14px; min-wi
 .sr-error p { margin: 0 0 20px; }
 .sr-error-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .sr-what h2 { margin-top: 40px; }
-.sr-what-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.sr-what-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; }
 .sr-what-grid p:last-child { margin: 0; font-size: 15px; color: var(--tr-ink); }
+.sr-what h3 { font: 600 17px/1.4 Inter, sans-serif; color: var(--tr-navy); margin: 0 0 6px; }
+.sr-what-intro, .sr-more-tools { max-width: 680px; line-height: 1.65; color: var(--tr-ink); }
+.sr-what-intro { margin: 0 0 18px; }
+.sr-how { margin: 0; padding-left: 22px; display: grid; gap: 12px; max-width: 680px; line-height: 1.6; color: var(--tr-ink); }
+.sr-faq { display: grid; gap: 18px; max-width: 680px; }
+.sr-faq p { margin: 0; line-height: 1.6; color: var(--tr-ink); }
+.sr-what a { color: var(--tr-navy); text-decoration: underline; }
+.sr-more-tools { margin: 28px 0 0; }
 
 /* ── print / Save as PDF ───────────────────────────────────────────────── */
 @media print {
