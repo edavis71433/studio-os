@@ -17,6 +17,7 @@ on:
       - "tests/e2e/**"
       - "playwright.config.ts"
       - "package.json"
+      - "package-lock.json"
       - ".github/workflows/e2e.yml"
   pull_request:
     paths:
@@ -26,19 +27,28 @@ on:
       - "tests/e2e/**"
       - "playwright.config.ts"
       - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/e2e.yml"
   workflow_dispatch:
 
 jobs:
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # About 3,500 tests on two workers took 27 to 41 minutes across Oct and Nov
+    # 2026. A run that hits this cap is cancelled with no test summary at all.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # npm ci installs exactly what package-lock.json says. Plain `npm install`
+      # took whatever npm called latest that minute, so Playwright's 1.65.0 release
+      # broke every install for an hour on Nov 5 2026 (it reached npm in pieces).
+      # To move Playwright: change @playwright/test and playwright-core together in
+      # package.json, run `npm install`, commit the lockfile, let this check prove it.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
       - name: Run browser E2E
