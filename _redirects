@@ -84,11 +84,6 @@ https://tools.davisdigitalstudio.com/   https://davisdigitalstudio.com/   302!
 # and only this host matches, so every other host keeps serving the root files.
 https://tools.davisdigitalstudio.com/sitemap.xml   /tools-sitemap.xml   200!
 https://tools.davisdigitalstudio.com/robots.txt    /tools-robots.txt    200!
-# TEMPORARY edge probe for PR 97, reverted before review
-https://deploy-preview-97--studio-os-dds.netlify.app/sitemap.xml   /tools-sitemap.xml   200!
-https://deploy-preview-97--studio-os-dds.netlify.app/robots.txt    /tools-robots.txt    200!
-https://deploy-preview-97--studio-os-dds.netlify.app/security.txt  /tools-robots.txt    200
-/probe-97-marker   /tools-robots.txt   200
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)
