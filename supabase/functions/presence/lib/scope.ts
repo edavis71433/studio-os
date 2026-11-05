@@ -5,7 +5,9 @@
 // server re-validates it every request and FAILS CLOSED — it never falls back to a
 // different tenant. Reuses the existing agency authorization (resolveAgencyMember +
 // agencySiteIds + role capability); it invents no second auth system and never
-// bypasses RLS for the un-scoped (own-site) path.
+// bypasses RLS for the un-scoped (own-site) path. RLS can't see a per-request scope
+// (my_presence_site_ids admits only the owner), so a scope that passes here reads
+// and writes site content through siteDb (lib/db.ts): service role, pinned to this site.
 import { svc } from './db.ts';
 import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { sendEmail } from '../commerce/account.ts';

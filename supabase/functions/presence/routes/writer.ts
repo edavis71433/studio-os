@@ -8,7 +8,7 @@
 // auto-publishes. Without ANTHROPIC_KEY the routes answer honestly that
 // drafting help isn't available — the manual paths are always the product.
 import { json } from '../../_shared/http.ts';
-import { asUser } from '../lib/db.ts';
+import type { SiteDb } from '../lib/db.ts';
 import { generateDraft, acceptDraft, discardDraft } from '../writer/engine.ts';
 import { rewriteSnippet, REWRITE_ACTIONS } from '../writer/rewrite.ts';
 import type { RewriteAction } from '../writer/rewrite.ts';
@@ -108,14 +108,14 @@ export async function handleWriterRewrite(req: Request, site: SiteRow, cors: Rec
   return json({ data: payload }, 200, cors);
 }
 
-export async function handleWriterList(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_ai_drafts?site_id=eq.${site.id}&select=id,kind,status,prompt_summary,confidence,missing_facts,created_at,resolved_at,applied_summary&order=created_at.desc&limit=20`);
+export async function handleWriterList(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_ai_drafts?site_id=eq.${site.id}&select=id,kind,status,prompt_summary,confidence,missing_facts,created_at,resolved_at,applied_summary&order=created_at.desc&limit=20`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open your drafts just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
 }
 
-export async function handleWriterGet(jwt: string, site: SiteRow, draftId: string, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_ai_drafts?id=eq.${draftId}&site_id=eq.${site.id}&select=id,kind,status,prompt_summary,options,chosen_option,confidence,missing_facts,assumptions,approval_required,created_at&limit=1`);
+export async function handleWriterGet(db: SiteDb, site: SiteRow, draftId: string, cors: Record<string, string>) {
+  const r = await db(`presence_ai_drafts?id=eq.${draftId}&site_id=eq.${site.id}&select=id,kind,status,prompt_summary,options,chosen_option,confidence,missing_facts,assumptions,approval_required,created_at&limit=1`);
   if (!r.ok || !r.json?.[0]) return json({ error: 'not_found', message: 'That draft isn’t here.' }, 404, cors);
   return json({ data: r.json[0] }, 200, cors);
 }

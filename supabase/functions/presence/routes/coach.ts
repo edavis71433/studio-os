@@ -7,7 +7,7 @@
 // the room invokes the EXISTING Writer/Editor flow — proposal, approval,
 // Draft Writer, all unchanged. Ignoring an opportunity is always free.
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc, type SiteDb } from '../lib/db.ts';
 import { runGrowthCoach, decideOpportunity } from '../coach/engine.ts';
 import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
@@ -35,9 +35,9 @@ export async function handleCoachRun(site: SiteRow, cors: Record<string, string>
   return json({ data: summary }, 200, cors);
 }
 
-export async function handleCoachList(jwt: string, site: SiteRow, cors: Record<string, string>) {
+export async function handleCoachList(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
   const today = new Date().toISOString().slice(0, 10);
-  const r = await asUser(jwt, `presence_growth_opportunities?site_id=eq.${site.id}&or=(status.eq.open,and(status.eq.deferred,deferred_until.lte.${today}))&select=${OPP_SELECT}&order=timing_ends.asc.nullslast,created_at.desc&limit=12`);
+  const r = await db(`presence_growth_opportunities?site_id=eq.${site.id}&or=(status.eq.open,and(status.eq.deferred,deferred_until.lte.${today}))&select=${OPP_SELECT}&order=timing_ends.asc.nullslast,created_at.desc&limit=12`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open the opportunity list just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
 }

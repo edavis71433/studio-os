@@ -8,7 +8,7 @@
 // The Guardian critiques; "Improve" hands findings to the AI Editor through
 // the customer. Nothing here writes content. No scores reach customers.
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import type { SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { runBrandReview, dismissBrandFinding } from '../guardian/engine.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -25,13 +25,13 @@ const LIST_FIELDS: Record<string, number> = {
 const READING_LEVELS = ['everyday', 'relaxed', 'professional', 'technical'];
 const PROFILE_SELECT = 'mission,vision,core_values,personality,voice_characteristics,preferred_vocabulary,words_prefer,words_avoid,never_claims,reading_level,industry_terminology,taglines,elevator_pitch,target_audience,brand_promise,selling_points,learned,updated_at';
 
-export async function handleBrandProfileGet(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_brand_profile?site_id=eq.${site.id}&select=${PROFILE_SELECT}&limit=1`);
+export async function handleBrandProfileGet(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_brand_profile?site_id=eq.${site.id}&select=${PROFILE_SELECT}&limit=1`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open your brand profile just now.' }, 502, cors);
   return json({ data: r.json?.[0] ?? null }, 200, cors);
 }
 
-export async function handleBrandProfilePut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handleBrandProfilePut(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   let payload: Record<string, unknown> = {};
   try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right — nothing changed.' }, 400, cors); }
   const clean: Record<string, unknown> = {};
@@ -50,7 +50,7 @@ export async function handleBrandProfilePut(req: Request, jwt: string, site: Sit
   }
   if (!fields.length) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
   // `learned` is deliberately not writable here — guidance belongs to observation, the profile to the customer
-  const w = await asUser(jwt, `presence_brand_profile?on_conflict=site_id&select=${PROFILE_SELECT}`, {
+  const w = await db(`presence_brand_profile?on_conflict=site_id&select=${PROFILE_SELECT}`, {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify({ site_id: site.id, ...clean }),
   });
@@ -70,15 +70,15 @@ export async function handleBrandReviewRun(req: Request, site: SiteRow, cors: Re
   return json({ data: summary }, 200, cors);
 }
 
-export async function handleBrandReportList(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_brand_reports?site_id=eq.${site.id}&select=id,scope,target,status,open_count,deterministic_only,created_at&order=created_at.desc&limit=10`);
+export async function handleBrandReportList(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_brand_reports?site_id=eq.${site.id}&select=id,scope,target,status,open_count,deterministic_only,created_at&order=created_at.desc&limit=10`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open the brand reports just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
 }
 
-export async function handleBrandReportGet(jwt: string, site: SiteRow, reportId: string, cors: Record<string, string>) {
+export async function handleBrandReportGet(db: SiteDb, site: SiteRow, reportId: string, cors: Record<string, string>) {
   // internal_metrics deliberately not selected — numbers stay internal (Law 13)
-  const r = await asUser(jwt, `presence_brand_reports?id=eq.${reportId}&site_id=eq.${site.id}&select=id,scope,target,status,findings,open_count,deterministic_only,created_at&limit=1`);
+  const r = await db(`presence_brand_reports?id=eq.${reportId}&site_id=eq.${site.id}&select=id,scope,target,status,findings,open_count,deterministic_only,created_at&limit=1`);
   if (!r.ok || !r.json?.[0]) return json({ error: 'not_found', message: 'That report isn’t here.' }, 404, cors);
   return json({ data: r.json[0] }, 200, cors);
 }

@@ -7,7 +7,7 @@
 // (optimization/knowledge.ts). The knowledge provider reads the stored facts
 // on the next evidence run.
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { extractKnowledge } from '../optimization/knowledge.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -38,8 +38,8 @@ export async function handleKnowledgeImport(req: Request, site: SiteRow, princip
   return json({ data: { id: ins.json[0].id, filename, items: extracted.items.length, phones: extracted.phones.length, hours_lines: extracted.hours_lines.length } }, 200, cors);
 }
 
-export async function handleKnowledgeList(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_knowledge_docs?site_id=eq.${site.id}&deleted_at=is.null&select=id,filename,extracted,created_at&order=created_at.desc&limit=${MAX_DOCS}`);
+export async function handleKnowledgeList(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_knowledge_docs?site_id=eq.${site.id}&deleted_at=is.null&select=id,filename,extracted,created_at&order=created_at.desc&limit=${MAX_DOCS}`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open your documents just now.' }, 502, cors);
   return json({ data: (r.json ?? []).map((d: { id: string; filename: string; created_at: string; extracted: { items?: unknown[] } }) => ({
     id: d.id, filename: d.filename, created_at: d.created_at, items: (d.extracted?.items || []).length,

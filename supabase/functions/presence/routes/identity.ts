@@ -1,9 +1,10 @@
 // GET /identity  — the identity singleton, nothing else.
-// PUT /identity  — the service's first write: validate, upsert under the
-//                  caller's JWT (RLS proves ownership via with-check), write a
+// PUT /identity  — the service's first write: validate, upsert through siteDb
+//                  (the owner under their JWT, where RLS proves ownership via
+//                  with-check; an authorised scope pinned to its site), write a
 //                  provenance change event, return the saved row.
 import { json } from '../../_shared/http.ts';
-import { asUser } from '../lib/db.ts';
+import type { SiteDb } from '../lib/db.ts';
 import { validateIdentity } from '../lib/validate.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
@@ -12,14 +13,14 @@ import type { Principal } from '../../_shared/auth.ts';
 
 const SELECT = 'site_id,business_name,tagline,description,phone,email,story,service_area,booking_url,ordering_url,social,seo_title,seo_description,updated_at';
 
-export async function handleGetIdentity(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_identity?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
+export async function handleGetIdentity(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_identity?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your business details just now.' }, 502, cors);
   const row = Array.isArray(r.json) && r.json.length ? r.json[0] : null;
   return json({ data: row }, 200, cors);
 }
 
-export async function handlePutIdentity(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handlePutIdentity(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   // M9 optimistic lock: identity is part of the published snapshot (opt-in).
   const stale = await guardStaleDraft(req, site, cors);
   if (stale) return stale;
@@ -30,10 +31,10 @@ export async function handlePutIdentity(req: Request, jwt: string, site: SiteRow
   if (!v.ok) return json({ error: 'validation_failed', message: 'Some fields need a second look.', fields: v.errors }, 422, cors);
   if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
 
-  // Upsert the singleton under the caller's JWT — RLS with-check enforces that
-  // this site belongs to the caller. site_id is the conflict target.
+  // Upsert the singleton: for an owner RLS with-check enforces that this site
+  // belongs to the caller; for a scope, siteDb's pin does. site_id is the conflict target.
   const body = { site_id: site.id, ...v.clean };
-  const w = await asUser(jwt, `presence_identity?on_conflict=site_id&select=${SELECT}`, {
+  const w = await db(`presence_identity?on_conflict=site_id&select=${SELECT}`, {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify(body),
