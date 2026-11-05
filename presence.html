@@ -345,6 +345,12 @@ html.dc-edit:not(.plan-watch) #view-design .dc-actbtn.primary{border-color:var(-
   html.dc-edit:not(.plan-watch) #btnEditExit{position:sticky;left:0;z-index:3;box-shadow:0 0 0 12px var(--sheet)}
   html.dc-edit:not(.plan-watch) #dcBtnPublish{position:sticky;right:0;z-index:3;order:6;box-shadow:0 0 0 12px var(--sheet)}
 }
+/* the tip sits above the message area, so neither ever covers the other */
+html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important}
+@media(max-width:760px){
+  html.dc-edit:not(.plan-watch) .toasts{bottom:72px}   /* no dock here; clear of the floating Add section */
+  html.dc-edit:not(.plan-watch) .dds-hint{bottom:150px !important}
+}
 /* side panels open under the bar, so Exit, Undo and Publish stay in reach */
 @media(min-width:761px){html.dc-edit:not(.plan-watch) .dc-slideover{top:var(--dc-bar-h)}}
 /* more tabs than room: fade the edge so the rest read as there */
@@ -622,7 +628,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .sheetcard .foot{display:flex;gap:var(--dds-s6,24px);justify-content:flex-end;align-items:baseline}
 
 /* toasts */
-.toasts{position:fixed;bottom:calc(84px + 16px);left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
+.toasts{position:fixed;bottom:calc(84px + 16px);left:0;right:0;padding:0 var(--dds-s4,16px);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
 @media(min-width:761px){.toasts{bottom:28px}}
 .toast{background:var(--ink);color:var(--paper);padding:10px var(--dds-s4,16px);border-radius:var(--r-lg);font-size:13px;box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-width:88vw}
 .toast.bad{background:var(--clay)}
@@ -650,14 +656,23 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .content:has(#view-design.on){max-width:none}
 
 /* #1 — template-first, BIG realistic-preview gallery */
-#designGallery{margin:var(--dds-s1,4px) 0 var(--dds-s7,32px)}
-.tg-head{margin-bottom:var(--dds-s4,16px)}
-.tg-head .tg-h{font-weight:600;font-size:16px}
-.tg-head .hint{margin-top:2px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--dds-s6,24px)}
+#designGallery{margin:0;padding:var(--dds-s4,16px) var(--dds-s4,16px) 0}
+.tg-fold{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--sheet,#fff)}
+.tg-fold>summary{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);cursor:pointer;list-style:none;border-radius:var(--r-lg)}
+.tg-fold>summary::-webkit-details-marker{display:none}
+.tg-fold>summary:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+.tg-cur{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tg-cur .tg-h{font-size:12px;color:var(--ink-2)}
+.tg-cur .tg-curname{font-size:14px;font-weight:600}
+.tg-change{flex:none;font-size:13px;font-weight:500;color:var(--ink)}
+.tg-change::after{content:" \25BE"}
+.tg-fold[open] .tg-change::after{content:" \25B4"}
+.tg-fold>.hint{padding:0 var(--dds-s4,16px);font-size:13px;line-height:1.5;color:var(--ink-2)}
+.tg-fold>.tg-grid{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px)}
+.tg-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--dds-s4,16px)}   /* it lives in a side panel: one column, never wider than the panel */
 .tg-card{border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;background:var(--sheet,#fff);display:flex;flex-direction:column}
 .tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 0 0 1px var(--plum,#5b3fa0)}
-.tg-shot{position:relative;height:430px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
+.tg-shot{position:relative;height:300px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
 .tg-shot iframe{position:absolute;top:0;left:0;width:294%;height:294%;transform:scale(.34);transform-origin:0 0;border:none;pointer-events:none;display:block}
 .tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
@@ -683,7 +698,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-act{margin-top:var(--dds-s3,12px);display:flex;gap:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
 .tg-start{font:inherit;font-size:13px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
 .tg-start.current{background:transparent;color:var(--plum,#5b3fa0);cursor:default}
-.tg-second{font:inherit;font-size:12.5px;padding:6px 2px;background:none;border:none;color:var(--plum,#5b3fa0);cursor:pointer;text-decoration:underline}
 
 /* #2 — CANVAS-DOMINANT workspace: the canvas is full width; tray + settings are
    on-demand slide-over panels, not permanent rails. */
@@ -1860,7 +1874,7 @@ function go(view, early) {
 }
 // PT-2C: one-time contextual education per surface (reuses the shell hint system).
 const VIEW_HINTS = {
-  design: ["edit-doubleclick", "Double-click any text on your page to change it. Everything saves itself, and nothing goes live until you publish."],
+  design: ["edit-doubleclick", "Double-click the words in a section to change them. Everything saves itself, and nothing goes live until you publish."],
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
   business: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
 };
@@ -4726,7 +4740,22 @@ function eeEditBlock(bi) {                       // open this one section's edit
 }
 function eeEditCore(view) {                      // open the core-section tab
   closePreview(); go(view || "design");
-  if ((view || "design") === "design" && typeof openSettingsPanel === "function") openSettingsPanel("styles");
+  if ((view || "design") === "design") { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); return; }
+  toastAction(`You’re on the ${eeTabWord(view)} tab.`, "Back to your page", () => go("design"), 10000);
+}
+function eeTabWord(view) {                       // the tab's own label, which follows the site's vocabulary (Menu/Services)
+  const b = $("nav") && $("nav").querySelector(`[data-view="${view}"]`);
+  return b ? b.textContent : "Business";
+}
+// A double-click never leaves Edit mode by surprise. A core section's words live on
+// another tab until core sections move onto the canvas, so say where and offer the way.
+let EE_CORE_TOAST = null;
+function eeDoubleClickTarget(secEl) {
+  const c = eeClassify(secEl);
+  if (c.kind === "block") { eeEditBlock(c.bi); return; }
+  if (c.view === "design") { eeEditCore(c.view); return; }
+  if (EE_CORE_TOAST) EE_CORE_TOAST.remove();
+  EE_CORE_TOAST = toastAction(`These words come from your ${eeTabWord(c.view)} tab.`, "Edit them there", () => eeEditCore(c.view), 8000);
 }
 function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
   const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
@@ -9292,10 +9321,14 @@ function openTrayPanel(tab) {
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   const want = dcRailTabName(tab);
   dcRailTab(want);
+  const tray = $("designTray"); if (tray) tray.scrollTop = 0;
+  // preventScroll: this lands while the panel is still opening, about 1px wide, where
+  // the intro text is hundreds of pixels tall. A plain focus scrolled the list past
+  // its own search box and left it there once the panel had widened.
   setTimeout(() => { try {
     (want === "add" ? (p.querySelector("#designTray .tray-search") || $("tabAdd"))
       : want === "files" ? ($("pfSearch") || $("tabFiles"))
-      : $("tabContents")).focus();
+      : $("tabContents")).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
 // clicking a rail launcher again (same tab) closes it — a clear toggle
@@ -9405,15 +9438,30 @@ async function mountTemplateGallery() {
   host.hidden = false;
   renderTemplateGallery();
 }
+// Styles leads with the choices people make every day. The templates wait in one row
+// until asked for: the list is long, and every card draws a live preview of the site.
+let TG_OPEN = false;
 function renderTemplateGallery() {
   const host = $("designGallery"); if (!host || !LOOKS) return;
   host.textContent = "";
-  const head = el("div", "tg-head");
-  head.appendChild(el("div", "tg-h", "Start with a template"));
-  head.appendChild(el("div", "hint", "Pick the overall design first — it sets your whole layout. Your words stay; only the look and structure change, and nothing goes live until you publish. Fine-tune colours and type afterwards in the Design studio."));
-  host.appendChild(head);
-  const grid = el("div", "tg-grid");
   const curSlug = (LOOKS.current && LOOKS.current.slug) || "";
+  const cur = (LOOKS.templates || []).find((t) => t.slug === curSlug);
+  const fold = el("details", "tg-fold");
+  const sum = el("summary");
+  const label = el("span", "tg-cur");
+  label.appendChild(el("span", "tg-h", "Template"));
+  if (cur) label.appendChild(el("span", "tg-curname", cur.name));
+  sum.appendChild(label);
+  sum.appendChild(el("span", "tg-change", "Change"));
+  fold.appendChild(sum);
+  const draw = () => { if (!fold.querySelector(".tg-grid")) drawTemplateGrid(fold, curSlug); };
+  fold.addEventListener("toggle", () => { TG_OPEN = fold.open; if (fold.open) draw(); });
+  host.appendChild(fold);
+  if (TG_OPEN) { fold.open = true; draw(); }
+}
+function drawTemplateGrid(fold, curSlug) {
+  fold.appendChild(el("div", "hint", "A template sets your whole layout. Your words stay, only the look and structure change, and nothing goes live until you publish."));
+  const grid = el("div", "tg-grid");
   // A cold-start draft has nothing real to render; render the DEMO silhouette so
   // every card shows a designed page. Once there IS real content, we render it in
   // the actual /preview pipeline (the most faithful possible preview of the look).
@@ -9447,15 +9495,11 @@ function renderTemplateGallery() {
     if (active) { start.disabled = true; }
     else start.addEventListener("click", () => applyTemplateFromGallery(t));
     act.appendChild(start);
-    const second = el("button", "tg-second", "Change the look"); second.type = "button";
-    second.title = "Fine-tune colors, type and corners in Styles";
-    second.addEventListener("click", () => openSettingsPanel("styles"));
-    act.appendChild(second);
     body.appendChild(act);
     card.appendChild(body);
     grid.appendChild(card);
   });
-  host.appendChild(grid);
+  fold.appendChild(grid);
 }
 // The demo silhouette: a small, on-brand canned page (nav · hero · cards · split ·
 // footer) painted in the template family's colour + type. Representative sample
@@ -10847,7 +10891,7 @@ function ipeStart(doc, fieldEl, secEl) {
   if (IPE) ipeCommit();                       // starting a new session banks the old one
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
-  if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeEditTarget(secEl); return; }   // never a dead double-click
+  if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeDoubleClickTarget(secEl); return; }   // never a dead double-click
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
@@ -11145,6 +11189,7 @@ function dcInjectCanvas(doc, main) {
       // every section (and top/bottom), plus a big placeholder on an empty page.
       // Clicking one opens the section picker AT that spot; it's also the drop
       // target the drag ghost snaps to. Purely an editing overlay — never served.
+      "#presence-preview-badge{display:none!important}" +
       ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:system-ui,-apple-system,sans-serif}" +
       ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed rgba(42,111,181,.28);transform:translateY(-50%);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
       ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:#2a6fb5}" +
@@ -11285,7 +11330,7 @@ function dcInjectCanvas(doc, main) {
         if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // inside the live session = word-select
         const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
         e.preventDefault();
-        if (f && el2.contains(f)) ipeStart(doc, f, el2); else eeEditTarget(el2);
+        if (f && el2.contains(f)) ipeStart(doc, f, el2); else eeDoubleClickTarget(el2);
       });
     }
     // keyboard path (a11y contract): every stamped field is Tab-reachable in
