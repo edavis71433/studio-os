@@ -4,31 +4,19 @@ name: E2E (Playwright)
 # real page JS against stubbed Supabase + mocked API fixtures — across
 # desktop / tablet / mobile. No secrets, no live backend, fully deterministic.
 #
+# There is no `paths:` filter, on purpose. A required check that a path filter
+# skips never reports, so the pull request sits on "Expected" forever. Instead
+# the `browser` job always starts and its first step decides whether the suite
+# needs to run. When it doesn't, `browser` still reports green in a few seconds.
+#
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
-# "e2e / browser" as a required status check.
+# "browser" as a required status check. Leave "Require branches to be up to date"
+# off, or every merge sends each open pull request back through the full suite.
 
 on:
   push:
     branches: [main, staging]
-    paths:
-      - "**/*.html"
-      - "shell.js"
-      - "shell.css"
-      - "tests/e2e/**"
-      - "playwright.config.ts"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/e2e.yml"
   pull_request:
-    paths:
-      - "**/*.html"
-      - "shell.js"
-      - "shell.css"
-      - "tests/e2e/**"
-      - "playwright.config.ts"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/e2e.yml"
   workflow_dispatch:
 
 jobs:
@@ -38,8 +26,73 @@ jobs:
     # 2026. A run that hits this cap is cancelled with no test summary at all.
     timeout-minutes: 60
     steps:
+      # Depth 2 gives the next step something to compare with: a pull request is
+      # checked out as GitHub's trial merge, whose first parent is the base branch.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      # Run unless every changed file is one the suite cannot reach. The test server
+      # publishes the whole repo root and marketing.spec.ts runs build-public.sh, so
+      # this names what to skip, not what to run: a new folder or file type gets tested
+      # until someone shows it can't matter. If a spec starts reading a file under a
+      # skipped path, take that path off the list (tests/workflows/e2e_scope_test.mjs).
+      #
+      # This is a step, not a separate job the suite `needs`. If a separate job failed,
+      # the suite would be skipped, and GitHub counts a skipped job as a pass.
+      - name: Decide whether the browser suite needs to run
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base=HEAD^1
+          elif [ "$EVENT" = push ] && git fetch --quiet --no-tags --depth=1 origin "$BEFORE"; then
+            base=$BEFORE
+          else
+            # A manual run, a new branch (BEFORE is all zeros), or a force push whose old commit is gone.
+            base=
+          fi
+          changed=
+          if [ -n "$base" ]; then
+            # --no-renames lists both sides of a move: a page moved into docs/ has left the site.
+            changed=$(git -c core.quotepath=off diff --name-only --no-renames "$base" HEAD) || changed=
+          fi
+
+          run=false
+          while IFS= read -r file; do
+            case "$file" in
+              docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
+              tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
+              .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
+              # Any other folder runs. Root-level .md and .sql don't, but one inside an asset
+              # folder would reach dist/ and trip build-public.sh, which a spec runs.
+              */*) run=true ;;
+              *.md|*.sql) ;;
+              # Everything else, including an empty list: nothing proves the suite can be skipped.
+              *) run=true ;;
+            esac
+          done <<< "$changed"
+
+          # A count, not the names: a line of stdout can be read as a workflow command.
+          echo "Compared with ${base:-nothing}: $(printf '%s' "$changed" | grep -c '') changed files. Run the suite: $run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = true ]; then
+            verdict="The browser suite is running."
+          else
+            verdict="The browser suite did not run: no changed file can affect it. This green means skipped, not passed."
+            echo "::notice title=Browser suite skipped::$verdict"
+          fi
+          {
+            echo "$verdict"
+            echo
+            echo "Changed files, first 50:"
+            echo '```'
+            printf '%s\n' "${changed:-(nothing to compare)}" | head -n 50
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
         with:
           node-version: "20"
       # npm ci installs exactly what package-lock.json says. Plain `npm install`
@@ -48,13 +101,16 @@ jobs:
       # To move Playwright: change @playwright/test and playwright-core together in
       # package.json, run `npm install`, commit the lockfile, let this check prove it.
       - name: Install dependencies
+        if: steps.scope.outputs.run == 'true'
         run: npm ci --no-audit --no-fund
       - name: Install Playwright browsers
+        if: steps.scope.outputs.run == 'true'
         run: npx playwright install --with-deps chromium webkit
       - name: Run browser E2E
+        if: steps.scope.outputs.run == 'true'
         run: npm run test:e2e
       - name: Upload report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

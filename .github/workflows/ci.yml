@@ -47,3 +47,5 @@ jobs:
         run: bash scripts/ci-pure-tests.sh
       - name: Schema dump workflow (real steps, stub CLI, no secrets)
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/schema_dump_test.mjs
+      - name: E2E workflow's decision step (real step, real git, no network)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/e2e_scope_test.mjs
