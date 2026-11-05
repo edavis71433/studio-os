@@ -21,7 +21,7 @@ ok('CSP keeps default-src self and object-src none', /default-src 'self'/.test(c
 ok('only one CSP in _headers (no rule shadowing this one)', headers.match(/Content-Security-Policy:/g).length === 1);
 
 // ── the apply pack must not narrow the notice kinds ──────────────────────────
-const pack = read('docs/presence/APPLY-0099-0101-prod.sql');
+const pack = read('docs/presence/APPLY-0099-0103-prod.sql');
 const packSql = pack.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
 const beforeVerify = packSql.split('commit;')[0];
 ok('pack never touches presence_plan_notices', !/presence_plan_notices/.test(beforeVerify));
@@ -29,6 +29,7 @@ for (const t of ['presence_appointment_types', 'presence_booking_settings', 'pre
   ok(`pack creates ${t} idempotently, with RLS on`,
     beforeVerify.includes(`create table if not exists public.${t}`) && beforeVerify.includes(`alter table public.${t} enable row level security`));
 }
+ok('pack adds the post tags column GET /posts selects', beforeVerify.includes("alter table public.presence_posts\n  add column if not exists tags text[] not null default '{}'"));
 ok('pack admits no_show on appointments', /presence_appointments_status_check[\s\S]*no_show/.test(beforeVerify));
 ok('pack is one transaction', /^begin;$/m.test(packSql) && /^commit;$/m.test(packSql));
 ok('pack is plain ASCII (the clipboard mangles anything else)', [...pack].every((c) => c.charCodeAt(0) < 128));

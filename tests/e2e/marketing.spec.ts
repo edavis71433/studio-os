@@ -104,6 +104,14 @@ const chromeHrefs = (): string[] => {
   return [...new Set(hrefs.filter((h) => h.startsWith('/')))];
 };
 
+// Chrome links whose pages left this site in the Free Tools rebuild (Oct 2026).
+// The chrome keeps the short path and a forced 301 sends it to exactly this
+// address, so there is no local page to find and nothing here to index.
+const CHROME_MOVED: Record<string, string> = {
+  '/tools': 'https://davisdigitalstudio.com/free-tools',
+  '/audit': 'https://tools.davisdigitalstudio.com/site-review',
+};
+
 // ---------------------------------------------------------------------------
 // Static pins — filesystem truth, one project is enough
 // ---------------------------------------------------------------------------
@@ -167,9 +175,15 @@ test.describe('marketing chrome (static pins)', () => {
     }
   });
 
-  test('_redirects: every chrome destination has a clean-URL 200 rule to a real file', () => {
+  test('_redirects: every chrome destination has a clean-URL 200 rule to a real file, or a pinned move off this site', () => {
     const rules = parseRedirects();
     for (const url of chromeHrefs()) {
+      if (CHROME_MOVED[url]) {
+        const moved = rules.find((x) => x.from === url);
+        expect(moved?.to, `${url} moved to`).toBe(CHROME_MOVED[url]);
+        expect(moved?.code, `${url} forced, the old page file still exists`).toBe('301!');
+        continue;
+      }
       const to = targetOf(rules, url);
       expect(to, `rule for ${url}`).toBeTruthy();
       expect(existsSync(join(ROOT, to!.replace(/^\//, ''))), `${url} -> ${to} exists`).toBe(true);
@@ -191,9 +205,10 @@ test.describe('marketing chrome (static pins)', () => {
     const r301 = (from: string) => rules.find((x) => x.from === from && x.code === '301');
     expect(r301('/start')?.to).toBe('/contact');
     expect(r301('/contact-disclaimer')?.to).toBe('/privacy');
-    expect(r301('/free-site-review')?.to).toBe('/audit');
-    // each 301 lands on a URL that itself resolves
-    for (const from of ['/start', '/contact-disclaimer', '/free-site-review']) {
+    // straight to the tool: pointing at /audit would add a second hop
+    expect(r301('/free-site-review')?.to).toBe(CHROME_MOVED['/audit']);
+    // each 301 that stays on this site lands on a URL that itself resolves
+    for (const from of ['/start', '/contact-disclaimer']) {
       const to = targetOf(rules, r301(from)!.to);
       expect(to && existsSync(join(ROOT, to.replace(/^\//, ''))), `${from} chain`).toBe(true);
     }
@@ -211,9 +226,10 @@ test.describe('marketing chrome (static pins)', () => {
       expect(existsSync(join(ROOT, to!.replace(/^\//, ''))), `sitemap ${path} -> ${to}`).toBe(true);
     }
     // chrome destinations belong in the sitemap — except /portal (app door,
-    // deliberately unindexed) and the legal-utility 404 target set
+    // deliberately unindexed), the legal-utility 404 target set, and the links
+    // that moved off this site (the 200-rule check above keeps those out)
     for (const url of chromeHrefs()) {
-      if (url === '/portal') continue;
+      if (url === '/portal' || CHROME_MOVED[url]) continue;
       expect(locs, `sitemap lists ${url}`).toContain(url);
     }
   });
@@ -231,7 +247,11 @@ test.describe('marketing chrome (static pins)', () => {
       expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeGreaterThanOrEqual(2);
       expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeLessThanOrEqual(3);
       const [from, to, status] = parts;
-      expect(from, `"${line}": source is a path`).toMatch(/^\//);
+      // Host-scoped sources are real Netlify syntax and the Free Tools rules need
+      // them. Only the two hosts this site aliases pass, so a typo'd host fails.
+      expect(from, `"${line}": source is a path, optionally on the app or tools host`).toMatch(
+        /^(https:\/\/(app|tools)\.davisdigitalstudio\.com)?\//
+      );
       expect(to, `"${line}": status glued to the target`).not.toMatch(/\.html\d/);
       if (status !== undefined) expect(status, `"${line}": valid status`).toMatch(/^\d{3}!?$/);
       if (/^\/[^*:]+\.html$/.test(to)) {
@@ -258,6 +278,36 @@ test.describe('marketing chrome (static pins)', () => {
     for (const path of locs) {
       expect(blocks.get(path)?.includes('no-cache'), `_headers: ${path} has a no-cache entry`).toBe(true);
     }
+  });
+
+  test('the tools host answers /sitemap.xml and /robots.txt from its own files; no other host does', () => {
+    const TOOLS = 'https://tools.davisdigitalstudio.com';
+    const rules = parseRedirects();
+    // Forced: both names exist as real files in dist/, and an unforced rule
+    // never overrides a file on disk, so without ! this would silently do nothing.
+    expect(rules.find((r) => r.from === `${TOOLS}/sitemap.xml`)).toMatchObject({ to: '/tools-sitemap.xml', code: '200!' });
+    expect(rules.find((r) => r.from === `${TOOLS}/robots.txt`)).toMatchObject({ to: '/tools-robots.txt', code: '200!' });
+    // ...and only there: the app host and every preview keep the root files
+    const elsewhere = rules.filter((r) => /\/(sitemap\.xml|robots\.txt)$/.test(r.from) && !r.from.startsWith(`${TOOLS}/`));
+    expect(elsewhere, 'no rule moves the root sitemap or robots.txt on another host').toEqual([]);
+    expect(read('robots.txt')).toContain('Sitemap: https://davisdigitalstudio.com/sitemap.xml');
+    expect(read('sitemap.xml')).not.toContain('tools.davisdigitalstudio.com');
+
+    // A sitemap only vouches for its own host, and exactly the two public tools
+    // belong in it: /report/* is private, and the bare root redirects away.
+    const sitemap = read('tools-sitemap.xml');
+    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    const locs = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([`${TOOLS}/site-review`, `${TOOLS}/ai-visibility`]);
+    for (const loc of locs) {
+      const to = targetOf(rules, loc.slice(TOOLS.length));
+      expect(to, `${loc} has a 200 rule`).toBeTruthy();
+      expect(read(to!.replace(/^\//, '')), `${to} declares ${loc} as canonical`).toContain(`<link rel="canonical" href="${loc}">`);
+    }
+
+    expect(read('tools-robots.txt').match(/^Sitemap:.*$/gm)).toEqual([`Sitemap: ${TOOLS}/sitemap.xml`]);
+    // No Disallow: a crawler blocked from /report/* could never read its noindex
+    expect(read('tools-robots.txt')).not.toMatch(/^Disallow:/im);
   });
 
   test('404.html uses only absolute URLs (it serves at nested paths)', () => {
@@ -902,7 +952,7 @@ test.describe('MS6 entry & legal sweep (static pins)', () => {
       expect(existsSync(join(ROOT, 'dist', f)), `${f} staged into dist/`).toBe(false);
     }
     // ...while the public estate still ships (fail-visible, not fail-open)
-    for (const f of ['index.html', 'privacy.html', '404.html', 'services.html']) {
+    for (const f of ['index.html', 'privacy.html', '404.html', 'services.html', 'robots.txt', 'sitemap.xml', 'tools-robots.txt', 'tools-sitemap.xml']) {
       expect(existsSync(join(ROOT, 'dist', f)), `${f} missing from dist/`).toBe(true);
     }
     // _redirects force-404s both spellings as defense-in-depth (the files

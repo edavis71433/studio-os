@@ -7,7 +7,7 @@ Build Brief step 1. Nothing below touches production except where marked
 
 | Piece | State |
 |---|---|
-| Canonical repo | This folder; remote: https://github.com/edavis71433/studio-os (private) |
+| Canonical repo | This folder; remote: https://github.com/edavis71433/studio-os (public) |
 | Production Supabase | `qksstlqzbhesadrrofgn` — Edge Functions: exactly `clever-api` + `stripe-webhook` (legacy `bright-service` deleted 2026-07-05); `client-files` bucket is PRIVATE |
 | Staging Supabase | `wjlpursnwbmlcdwbeowv` (created 2026-07-05) |
 | Migration runner | Supabase CLI (`supabase migration`/`db push`), files in `supabase/migrations/` |
@@ -38,18 +38,34 @@ Build Brief step 1. Nothing below touches production except where marked
 ## C. Capture the schema baseline (0000_baseline)
 
 The repo already ships `.github/workflows/schema-dump.yml` (manual trigger,
-schema-only, with a data-leak guard). Once the repo is pushed to GitHub and
-`SUPABASE_DB_URL` is set:
+schema-only, with a data-leak guard).
 
-1. Actions → "Schema dump" → Run workflow.
-2. Download the `schema-foundation` artifact.
-3. Save it as `supabase/migrations/0000_baseline.sql`, commit.
+The repo is public, so anyone signed in to GitHub can download a run's artifact
+and read its log. The workflow encrypts the artifact, and it stops before
+reading production if `SCHEMA_DUMP_PASSPHRASE` isn't set. Set it once on the
+Mac. This line creates the passphrase, keeps a copy in Keychain and sends it to
+GitHub without showing it:
+
+    P=$(openssl rand -hex 32) && security add-generic-password -U -a studio-os -s schema-dump-passphrase -w "$P" && printf '%s' "$P" | gh secret set SCHEMA_DUMP_PASSPHRASE --repo edavis71433/studio-os; unset P
+
+Then, once `SUPABASE_DB_URL` is set:
+
+1. Actions → "Schema dump" → Run workflow. If the data-leak guard fails, nothing
+   is uploaded. Its log names the check and the line numbers, never the text.
+2. Download the artifact and decrypt it outside the repo, with the run's id:
+
+       gh run download <run-id> --repo edavis71433/studio-os -n schema-foundation-encrypted -D ~/schema-dump
+
+       SCHEMA_DUMP_PASSPHRASE="$(security find-generic-password -a studio-os -s schema-dump-passphrase -w)" openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -pass env:SCHEMA_DUMP_PASSPHRASE -in ~/schema-dump/00-schema-foundation.sql.enc -out ~/schema-dump/00-schema-foundation.sql
+
+3. Read it first, because this repo is public. Then save it as
+   `supabase/migrations/0000_baseline.sql`, commit.
 4. Rollback note (required header for every migration): baseline has none to
    roll back to; its header says "baseline — restore from backup only".
 
-Local alternative (no GitHub needed):
+Local alternative (no GitHub needed; it needs Docker and skips the guard):
 
-    npx supabase db dump --db-url "<SUPABASE_DB_URL>" --schema public -f supabase/migrations/0000_baseline.sql
+    npx supabase@2.122.0 db dump --db-url "<SUPABASE_DB_URL>" --schema public -f supabase/migrations/0000_baseline.sql
 
 **Connection-string lesson (2026-07-05, hard-won — do not re-debug):**
 

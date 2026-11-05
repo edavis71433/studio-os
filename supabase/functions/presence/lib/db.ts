@@ -6,6 +6,8 @@
 //            "caller-JWT" pattern (defense in depth): ownership is proven by
 //            the database on every read/write, not re-implemented in code.
 // siteDb() picks between them for site content. See below.
+import { seesFullWorkspace, type SiteRole } from './site_roles.ts';
+
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || '';
@@ -77,6 +79,12 @@ export async function asUser(jwt: string, path: string, init: RequestInit = {}) 
 // entitlement and edition gates that only exist in index.ts. So an authorised
 // scope uses the service role, and pinViolation stands in for the RLS predicate:
 // a query it can't prove is confined to the authorised site never leaves here.
+//
+// An invited member hits the same wall for the same reason: no policy mentions
+// presence_site_members, and adding them to my_presence_site_ids() would let their
+// JWT hard-delete rows directly, past the role table in lib/site_roles.ts. So a
+// member's seat uses this path too, unless the role is limited to what's shared
+// (client_reviewer), which stays under RLS.
 export type SiteDb = (path: string, init?: RequestInit) => Promise<{ ok: boolean; status: number; json: any; text: string }>;
 
 /** Why a service-role query is NOT provably confined to `siteId`, else null. Pure.
@@ -109,16 +117,21 @@ export function pinViolation(siteId: string, path: string, init: RequestInit = {
 }
 
 /** Build the request's data path. `principal.scope` is stamped only by index.ts,
- *  only after resolveScopedSite authorised this exact site; anything short of that
- *  stays under the caller's JWT, where RLS refuses it. Checks scope rather than
- *  actsForClient: platform staff can hold an agency seat, and their scope is just
- *  as authorised, they are only attributed differently. */
-export function siteDb(jwt: string, site: { id: string }, principal: { scope?: { site_id: string } | null }): SiteDb {
-  if (!principal.scope?.site_id || principal.scope.site_id !== site.id) return (path, init = {}) => asUser(jwt, path, init);
+ *  only after resolveScopedSite authorised this exact site, and `principal.member`
+ *  only from the caller's own active seat on it; anything short of that stays under
+ *  the caller's JWT, where RLS refuses it. Checks scope rather than actsForClient:
+ *  platform staff can hold an agency seat, and their scope is just as authorised,
+ *  they are only attributed differently. A member's write also needs memberWriteGate
+ *  to have cleared it, so a write that gate doesn't know about fails closed. */
+export function siteDb(jwt: string, site: { id: string }, principal: { scope?: { site_id: string } | null; member?: { site_id: string; role: string; cleared?: boolean } | null }): SiteDb {
+  const scoped = !!principal.scope?.site_id && principal.scope.site_id === site.id;
+  const member = principal.member?.site_id === site.id && seesFullWorkspace(principal.member.role as SiteRole) ? principal.member : null;
+  if (!scoped && !member) return (path, init = {}) => asUser(jwt, path, init);
   return (path, init = {}) => {
-    const why = pinViolation(site.id, path, init);
+    const uncleared = member && !member.cleared && (init.method || 'GET').toUpperCase() !== 'GET';
+    const why = pinViolation(site.id, path, init) ?? (uncleared ? 'write_not_cleared' : null);
     if (!why) return svc(path, init);
-    console.error(`[db] refused a scoped query on ${path.split('?')[0]}: ${why}`);
+    console.error(`[db] refused a ${member ? 'member' : 'scoped'} query on ${path.split('?')[0]}: ${why}`);
     return Promise.resolve({ ok: false, status: 403, json: null, text: why });
   };
 }

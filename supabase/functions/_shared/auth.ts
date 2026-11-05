@@ -154,6 +154,11 @@ export interface Principal {
    *  publish or connection is recorded as the studio's, never the client's.
    *  Absent/undefined on every un-scoped call. */
   scope?: { site_id: string; name: string } | null;
+  /** An invited member's own active seat, stamped by presence/index.ts ONLY from
+   *  their presence_site_members row, when they own no site. Unlike `scope` this is
+   *  the business's side, not the studio's, so attribution stays 'client'. `cleared`
+   *  is set by memberWriteGate for a write their role allows on this request. */
+  member?: { site_id: string; role: string; cleared?: boolean } | null;
 }
 
 // Decode the iat (issued-at) claim from a JWT payload WITHOUT signature

@@ -7,7 +7,8 @@
 import { svc } from './db.ts';
 import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
-import { isSiteRole } from './site_roles.ts';
+import { isSiteRole, seesFullWorkspace } from './site_roles.ts';
+import type { SiteRow } from './site.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 import type { EmailBrand } from './email_brand.ts';
 
@@ -37,18 +38,36 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
   return row.role as SiteRole;
 }
 
+/** The site an invited member reaches: their oldest active seat. They own no site,
+ *  so RLS can't find it. `member` is that seat as the row states it, and is null for
+ *  a role this code doesn't know, which leaves the caller under RLS. */
+export async function resolveMemberSite(principal: { userId: string | null; email: string | null }): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null> {
+  const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+  const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role&order=created_at.asc&limit=1`);
+  const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
+  if (!seat?.site_id) return null;
+  const s = await svc(`presence_sites?id=eq.${seat.site_id}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
+  const site = Array.isArray(s.json) ? (s.json as any[])[0] : null;
+  if (!site) return null;
+  return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role } : null };
+}
+
 // D1 (perf): a request-scoped memo so the site-role is resolved ONCE per request.
 // Keyed by the principal object, which is created fresh per request and GC'd after,
 // so there is no cross-request staleness. The reviewer-boundary gate and the P2-D
 // handlers both resolve the same role otherwise — this collapses that to one lookup
 // (which, on the client-portal path, is a full external /auth/v1/user round-trip).
 const roleCache = new WeakMap<object, Map<string, SiteRole>>();
-export async function resolveSiteRoleCached(principal: { kind: string }, jwt: string, siteId: string): Promise<SiteRole> {
+export async function resolveSiteRoleCached(principal: { kind: string; member?: { site_id: string; role: string } | null }, jwt: string, siteId: string): Promise<SiteRole> {
   let m = roleCache.get(principal as object);
   if (!m) { m = new Map(); roleCache.set(principal as object, m); }
   const hit = m.get(siteId);
   if (hit) return hit;
-  const role = await resolveSiteRole(jwt, siteId, principal.kind);
+  // Always resolve, because this also learns a member's user_id on first sight. But
+  // the seat that admitted them outranks the answer: resolveSiteRole says
+  // business_owner after a failed read, a default meant for the site's owner.
+  const resolved = await resolveSiteRole(jwt, siteId, principal.kind);
+  const role = principal.member?.site_id === siteId ? principal.member.role as SiteRole : resolved;
   m.set(siteId, role);
   return role;
 }
@@ -70,7 +89,10 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
  *  one — signed by GoTrue, landing on `next` on the Site URL. Returns '' when no
  *  link can be minted (missing env, GoTrue refused), so callers can fall back
  *  honestly (a set-password link, or the plain portal door). Shared by the site/
- *  agency member invites here and the client-portal welcome in routes/sales.ts. */
+ *  agency member invites here and the client-portal welcome in routes/sales.ts.
+ *  `redirect_to` belongs at the top of this body. `options` is the JS SDK's shape,
+ *  and GoTrue ignores it here: the link then lands on the project's Site URL, the
+ *  marketing home page, which has no sign-in code, so the person isn't signed in. */
 export async function mintSignInLink(email: string, next: string): Promise<string> {
   const base = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -80,7 +102,7 @@ export async function mintSignInLink(email: string, next: string): Promise<strin
     try {
       const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
         method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, email, options: { redirect_to: `${site}${next}` } }),
+        body: JSON.stringify({ type, email, redirect_to: `${site}${next}` }),
       });
       const j = await r.json().catch(() => null);
       return String((r.ok && j && (j.action_link || j.properties?.action_link)) || '');
@@ -100,13 +122,16 @@ export async function sendInviteLink(email: string, opts: { subject: string; int
   return sent !== false;
 }
 
-/** The site-membership flavor: the business's own brand + name, landing on the portal. */
-async function sendSiteInvite(email: string, siteId: string): Promise<boolean> {
+/** The site-membership flavor: the business's own brand + name. A reviewer lands on
+ *  the client door. A seat with the full workspace lands on the studio door, because
+ *  the workspace pages read the operator session ('dds-portal-auth'), and a session
+ *  from the client door ('dds-client-auth') would leave them signed out there. */
+async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Promise<boolean> {
   const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
   const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
-  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: '/portal.html' });
+  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
 }
 
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string; emailed?: boolean }> {
@@ -118,7 +143,7 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),
   });
   if (!r.ok) return { ok: false, error: 'write_failed' };
-  const emailed = await sendSiteInvite(clean, siteId).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
+  const emailed = await sendSiteInvite(clean, siteId, role).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
   return { ok: true, emailed };
 }
 

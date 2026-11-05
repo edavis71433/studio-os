@@ -1,14 +1,17 @@
 -- ===========================================================================
---  APPLY PACK - migrations 0099, 0100, 0101  (owner-apply, prod)
+--  APPLY PACK - migrations 0099, 0100, 0101, 0103  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor). ADDITIVE and IDEMPOTENT ("if not
 --  exists" tables and indexes), so it is safe to re-run. It adds four empty
 --  tables and changes no existing row:
 --    presence_appointment_types, presence_booking_settings,
 --    presence_appointments, presence_reviews
+--  It also adds presence_posts.tags (0103), empty on every existing row.
 --
 --  Why: the Website > Bookings and Reviews tabs have answered 503 in production
 --  because these were never applied (checked 2026-11-05: the tables do not exist).
+--  GET /posts answers 502 on every site because it selects a tags column that
+--  was never added (checked 2026-11-05: the column does not exist).
 --
 --  NOT a plain copy of the three migrations. Each of them also re-declares the
 --  CHECK on presence_plan_notices.kind with the list of kinds as it stood THEN.
@@ -136,10 +139,16 @@ honest schema.org (AggregateRating + Review) is baked from approved rows at seri
 contact reuses presence_contacts. Deny-all RLS;
 function-mediated.';
 
+-- --- 0103 - post tags ---------------------------------------------------
+alter table public.presence_posts
+  add column if not exists tags text[] not null default '{}';
+comment on column public.presence_posts.tags is
+  'Phase SEARCH: flat update tags (normalized at API via normalizeTags). Feeds tag chips, the on-site search index, and RSS <category>.';
+
 commit;
 
--- VERIFY: expect 6 rows. Four tables with detail = RLS on: true, then the two
--- constraints with detail = true.
+-- VERIFY: expect 7 rows. Four tables with detail = RLS on: true, the two
+-- constraints with detail = true, and the tags column with detail = ARRAY.
 select 'table' as kind, c.relname as name, 'RLS on: ' || c.relrowsecurity::text as detail
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
  where n.nspname = 'public'
@@ -154,4 +163,8 @@ select 'constraint', conname,
          else (pg_get_constraintdef(oid) like '%no_show%')::text
        end
   from pg_constraint
- where conname in ('presence_plan_notices_kind_check','presence_appointments_status_check');
+ where conname in ('presence_plan_notices_kind_check','presence_appointments_status_check')
+union all
+select 'column', column_name::name, data_type::text
+  from information_schema.columns
+ where table_schema = 'public' and table_name = 'presence_posts' and column_name = 'tags';

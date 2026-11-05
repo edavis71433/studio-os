@@ -15,7 +15,7 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { siteCan } from '../lib/site_roles.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
-import { resolveSiteRole } from '../lib/workspace.ts';
+import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { svc } from '../lib/db.ts';
 import { ALLOWED_TOKENS, buildCustomization, projectFiles, validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from '../lib/devmode.ts';
 import { sanitizeBrandKit, deriveBrandTokens } from '../lib/brand_kit.ts';
@@ -37,7 +37,7 @@ export function designAllowed(role: SiteRole, principalKind: string): boolean {
 }
 
 async function requireDeveloper(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (!devModeAllowed(role, principal.kind)) {
     return json({ error: 'forbidden', message: 'Developer Mode is available to developers on this account. Ask your studio to grant developer access.' }, 403, cors);
   }
@@ -56,7 +56,7 @@ export async function handleDevFiles(jwt: string, site: SiteRow, principal: Prin
 export async function handleDevCustomizationGet(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   // Phase COMP: owners may READ the customization (the Design card shows the
   // current palette); full Developer Mode still gates the editor surface.
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (!designAllowed(role, principal.kind)) {
     return json({ error: 'forbidden', message: 'Developer Mode is available to developers on this account. Ask your studio to grant developer access.' }, 403, cors);
   }
@@ -82,14 +82,14 @@ export async function handleDevCustomizationGet(jwt: string, site: SiteRow, prin
 // same theme tokens Design Studio writes, so buttons/forms/links (all var(--accent))
 // rebrand at once. No second theme engine; publishes through the normal flow.
 export async function handleBrandKitGet(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
   const r = await svc(`presence_settings?site_id=eq.${site.id}&select=brand_kit&limit=1`);
   return json({ data: { brand_kit: (r.ok && r.json?.[0]?.brand_kit) || null } }, 200, cors);
 }
 
 export async function handleBrandKitPut(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const kit = sanitizeBrandKit(body?.brand_kit ?? body);
@@ -134,7 +134,7 @@ async function applyKitTokens(site: SiteRow, kit: BrandKit, principal: Principal
 // them through /visual/generate with the brand palette is real; pixel-recoloring
 // an uploaded photograph would misrepresent it, so we never offer that.
 export async function handleBrandKitApply(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (!designAllowed(role, principal.kind)) return json({ error: 'forbidden', message: 'Design is available to the account owner or a developer.' }, 403, cors);
   const r = await svc(`presence_settings?site_id=eq.${site.id}&select=brand_kit&limit=1`);
   const kit = sanitizeBrandKit((r.ok && r.json?.[0]?.brand_kit) || null);
@@ -188,7 +188,7 @@ export async function handleDevCustomizationPut(req: Request, jwt: string, site:
   // a business owner edits THEME TOKENS ONLY (the Design card's curated
   // palettes). An owner's request never touches css/html: whatever a developer
   // saved there is preserved verbatim.
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isDev = devModeAllowed(role, principal.kind);
   if (!isDev && !designAllowed(role, principal.kind)) {
     return json({ error: 'forbidden', message: 'Developer Mode is available to developers on this account. Ask your studio to grant developer access.' }, 403, cors);
