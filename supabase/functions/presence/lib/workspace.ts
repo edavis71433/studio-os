@@ -8,6 +8,7 @@ import { svc } from './db.ts';
 import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
 import { isSiteRole } from './site_roles.ts';
+import type { SiteRow } from './site.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 import type { EmailBrand } from './email_brand.ts';
 
@@ -37,18 +38,36 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
   return row.role as SiteRole;
 }
 
+/** The site an invited member reaches: their oldest active seat. They own no site,
+ *  so RLS can't find it. `member` is that seat as the row states it, and is null for
+ *  a role this code doesn't know, which leaves the caller under RLS. */
+export async function resolveMemberSite(principal: { userId: string | null; email: string | null }): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null> {
+  const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+  const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role&order=created_at.asc&limit=1`);
+  const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
+  if (!seat?.site_id) return null;
+  const s = await svc(`presence_sites?id=eq.${seat.site_id}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
+  const site = Array.isArray(s.json) ? (s.json as any[])[0] : null;
+  if (!site) return null;
+  return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role } : null };
+}
+
 // D1 (perf): a request-scoped memo so the site-role is resolved ONCE per request.
 // Keyed by the principal object, which is created fresh per request and GC'd after,
 // so there is no cross-request staleness. The reviewer-boundary gate and the P2-D
 // handlers both resolve the same role otherwise — this collapses that to one lookup
 // (which, on the client-portal path, is a full external /auth/v1/user round-trip).
 const roleCache = new WeakMap<object, Map<string, SiteRole>>();
-export async function resolveSiteRoleCached(principal: { kind: string }, jwt: string, siteId: string): Promise<SiteRole> {
+export async function resolveSiteRoleCached(principal: { kind: string; member?: { site_id: string; role: string } | null }, jwt: string, siteId: string): Promise<SiteRole> {
   let m = roleCache.get(principal as object);
   if (!m) { m = new Map(); roleCache.set(principal as object, m); }
   const hit = m.get(siteId);
   if (hit) return hit;
-  const role = await resolveSiteRole(jwt, siteId, principal.kind);
+  // Always resolve, because this also learns a member's user_id on first sight. But
+  // the seat that admitted them outranks the answer: resolveSiteRole says
+  // business_owner after a failed read, a default meant for the site's owner.
+  const resolved = await resolveSiteRole(jwt, siteId, principal.kind);
+  const role = principal.member?.site_id === siteId ? principal.member.role as SiteRole : resolved;
   m.set(siteId, role);
   return role;
 }
