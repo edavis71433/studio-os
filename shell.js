@@ -1501,7 +1501,9 @@
     scanHints();
     ensureSupabase().then(function () {
       if (!window.supabase) { minimalShell(); return; }
-      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+      // Reuse the page's client when it made one for the same project: two clients on
+      // one storage key both auto-refresh, and a refresh token only works once.
+      sb = window.__ddsSb || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
       // Keep TOKEN fresh: the SDK auto-refreshes the session (~hourly) and fires
       // this — without it the captured token goes stale and every call 401s.
       sb.auth.onAuthStateChange(function (_evt, session) { if (session && session.access_token) TOKEN = session.access_token; });

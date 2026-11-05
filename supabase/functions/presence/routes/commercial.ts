@@ -126,9 +126,15 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   //    the SAME inbox + CRM + follow-up flow. The fixed contact form is untouched.
   const formId = String((rawMap as any)?.form_id ?? b?.form_id ?? '').trim();
   if (formId) {
-    const settings = await svc(`presence_settings?site_id=eq.${siteId}&select=blocks&limit=1`);
-    const blocks = validateBlocks(settings.json?.[0]?.blocks);
-    const def = blocks.find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+    // A form can sit on the home page or on any of the owner's own pages.
+    const settings = await svc(`presence_settings?site_id=eq.${siteId}&select=blocks,pages&limit=1`);
+    const stored = settings.json?.[0];
+    const lists = [stored?.blocks, ...(Array.isArray(stored?.pages) ? stored.pages.map((p: any) => p?.blocks) : [])];
+    let def: FormDefinition | undefined;
+    for (const list of lists) {
+      def = validateBlocks(list).find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+      if (def) break;
+    }
     if (!def) {   // unknown form — treat as a plain contact fallback (never leak internals)
       if (isFormPost && siteOrigin) return redirectTo('/contact/');
       return json({ error: 'not_found', message: 'That form is no longer available.' }, 404, cors);
