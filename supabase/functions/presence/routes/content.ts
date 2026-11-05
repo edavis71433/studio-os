@@ -1,7 +1,8 @@
 // ── Section content CRUD (M7) — additive routes for the Client Room ─────────
-// One declarative spec per entity; every write goes through the caller's JWT
-// (RLS proves ownership), validates a closed field set, and records exactly
-// one provenance event with field NAMES only. Deletes are soft; visibility is
+// One declarative spec per entity; every write goes through siteDb (the owner's
+// JWT, where RLS proves ownership; an authorised scope pinned to its site),
+// validates a closed field set, and records exactly one provenance event with
+// field NAMES only. Deletes are soft; visibility is
 // a toggle ("on the menu", never "gone").
 //
 //   GET    /offerings|testimonials|faqs|posts        — list (draft view)
@@ -12,7 +13,7 @@
 //   GET|PUT /voice                                   — never rendered
 //   GET|PUT /settings                                — section order, cover
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { suggestedBlocksFor, suggestionNoteFor } from '../lib/vertical_presets.ts';
@@ -216,7 +217,7 @@ const slugify = (s: string): string =>
   clean(s).toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'update';
 
 // ═══ collections ═══
-export async function handleCollection(req: Request, jwt: string, site: SiteRow, principal: Principal, entity: string, id: string | null, cors: Record<string, string>) {
+export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, principal: Principal, entity: string, id: string | null, cors: Record<string, string>) {
   const spec = SPECS[entity];
   if (!spec) return null;
   const method = req.method.toUpperCase();
@@ -230,7 +231,7 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
   }
 
   if (method === 'GET' && !id) {
-    const r = await asUser(jwt, `${spec.table}?site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}&order=${spec.order}`);
+    const r = await db(`${spec.table}?site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}&order=${spec.order}`);
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${spec.noun}s just now.` }, 502, cors);
     return json({ data: r.json ?? [] }, 200, cors);
   }
@@ -247,7 +248,7 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
       if (v.cleanBody.status && !['draft', 'published'].includes(String(v.cleanBody.status))) v.cleanBody.status = 'draft';
       if (v.cleanBody.status === 'published' && !v.cleanBody.published_at) v.cleanBody.published_at = new Date().toISOString();
     }
-    const w = await asUser(jwt, `${spec.table}?select=${spec.select}`, {
+    const w = await db(`${spec.table}?select=${spec.select}`, {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ site_id: site.id, ...v.cleanBody }),
     });
@@ -269,7 +270,7 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
       const cur = await svc(`presence_posts?id=eq.${id}&site_id=eq.${site.id}&select=published_at&limit=1`);
       if (!cur.json?.[0]?.published_at && !v.cleanBody.published_at) { v.cleanBody.published_at = new Date().toISOString(); v.fields.push('published_at'); }
     }
-    const w = await asUser(jwt, `${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}`, {
+    const w = await db(`${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}`, {
       method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(v.cleanBody),
     });
     if (!w.ok) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
@@ -282,7 +283,7 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
 
   if (method === 'DELETE' && id) {
     if (!UUID_RE.test(id)) return json({ error: 'bad_request', message: 'Invalid reference.' }, 400, cors);
-    const w = await asUser(jwt, `${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, {
+    const w = await db(`${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, {
       method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: new Date().toISOString(), is_visible: false }),
     });
     if (!w.ok) return json({ error: 'write_failed', message: 'That didn’t work — nothing was changed.' }, 502, cors);
@@ -295,13 +296,13 @@ export async function handleCollection(req: Request, jwt: string, site: SiteRow,
 }
 
 // ═══ singletons ═══
-async function singleton(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, cfg: {
+async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>, cfg: {
   table: string; entityType: string; noun: string; fields: Record<string, FieldRule>; select: string; conflict: string; summary: string;
 }, preParsed?: Record<string, unknown>) {
   const method = req.method.toUpperCase();
   if (method === 'GET') {
-    let r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
-    if (!r.ok && r.status === 400 && cfg.select.includes(AUTOMATION_SETTINGS_COLS)) r = await asUser(jwt, `${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + AUTOMATION_SETTINGS_COLS, '')}&limit=1`);   // pre-0134
+    let r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
+    if (!r.ok && r.status === 400 && cfg.select.includes(AUTOMATION_SETTINGS_COLS)) r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + AUTOMATION_SETTINGS_COLS, '')}&limit=1`);   // pre-0134
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${cfg.noun} just now.` }, 502, cors);
     return json({ data: r.json?.[0] ?? null }, 200, cors);
   }
@@ -324,7 +325,7 @@ async function singleton(req: Request, jwt: string, site: SiteRow, principal: Pr
       const { id: _i, created_at: _c, updated_at: _u, ...baseFields } = base;
       body = { ...baseFields, site_id: site.id, ...v.cleanBody };
     }
-    const w = await asUser(jwt, `${cfg.table}?on_conflict=${cfg.conflict}&select=${cfg.select}`, {
+    const w = await db(`${cfg.table}?on_conflict=${cfg.conflict}&select=${cfg.select}`, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body),
     });
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
@@ -334,8 +335,8 @@ async function singleton(req: Request, jwt: string, site: SiteRow, principal: Pr
   return null;
 }
 
-export const handleLocation = (req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
-  singleton(req, jwt, site, principal, cors, {
+export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
+  singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
     select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at',
     conflict: 'site_id', summary: 'Updated hours & location',
@@ -345,7 +346,7 @@ export const handleLocation = (req: Request, jwt: string, site: SiteRow, princip
 // ONE canonical voice source — this handler maps tone_notes ↔
 // voice_characteristics and never_claim ↔ never_claims. presence_voice is
 // retired: nothing reads or writes it.
-export async function handleVoice(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handleVoice(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const method = req.method.toUpperCase();
   const SELECT = 'site_id,voice_characteristics,preferred_vocabulary,never_claims,updated_at';
   const shape = (row: Record<string, unknown> | null) => row ? {
@@ -354,7 +355,7 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
     updated_at: row.updated_at,
   } : null;
   if (method === 'GET') {
-    const r = await asUser(jwt, `presence_brand_profile?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
+    const r = await db(`presence_brand_profile?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open your voice profile just now.' }, 502, cors);
     return json({ data: shape(r.json?.[0] ?? null) }, 200, cors);
   }
@@ -368,7 +369,7 @@ export async function handleVoice(req: Request, jwt: string, site: SiteRow, prin
     if ('tone_notes' in v.cleanBody) body.voice_characteristics = v.cleanBody.tone_notes;
     if ('preferred_vocabulary' in v.cleanBody) body.preferred_vocabulary = v.cleanBody.preferred_vocabulary;
     if ('never_claim' in v.cleanBody) body.never_claims = v.cleanBody.never_claim;
-    const w = await asUser(jwt, `presence_brand_profile?on_conflict=site_id&select=${SELECT}`, {
+    const w = await db(`presence_brand_profile?on_conflict=site_id&select=${SELECT}`, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body),
     });
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
@@ -456,8 +457,8 @@ async function withSectionMeta(resp: Response | null, cors: Record<string, strin
   } catch { return resp; }   // decoration is additive — never break the save/read itself
 }
 
-export async function handleSettings(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (req.method.toUpperCase() !== 'PUT') return withSectionMeta(await singleton(req, jwt, site, principal, cors, SETTINGS_CFG), cors);
+export async function handleSettings(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (req.method.toUpperCase() !== 'PUT') return withSectionMeta(await singleton(req, db, site, principal, cors, SETTINGS_CFG), cors);
   let payload: Record<string, unknown> = {};
   try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
   // G7: pull rename markers out of a pages payload (the stored draft never carries them)
@@ -466,7 +467,7 @@ export async function handleSettings(req: Request, jwt: string, site: SiteRow, p
     const d = detectPageRenames(payload.pages);
     payload.pages = d.pages; renames = d.renames;
   }
-  const resp = await singleton(req, jwt, site, principal, cors, SETTINGS_CFG, payload);
+  const resp = await singleton(req, db, site, principal, cors, SETTINGS_CFG, payload);
   if (resp && resp.status === 200 && renames.length) await redirectsForRenames(site, principal, renames);
   return withSectionMeta(resp, cors);
 }
@@ -476,21 +477,21 @@ export async function handleSettings(req: Request, jwt: string, site: SiteRow, p
 /** POST /pages/duplicate { slug } — duplicate one page ('' = the Home canvas)
  *  into a new custom page: deep-copied block list with REGENERATED stable ids,
  *  title "<Title> copy", slug "<slug>-copy" collision-bumped. One settings.pages
- *  write through the caller's JWT (RLS proves ownership), one provenance event —
+ *  write through siteDb (same proof as any /settings save), one provenance event —
  *  the same shape every pages edit already takes. */
-export async function handlePageDuplicate(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handlePageDuplicate(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const stale = await guardStaleDraft(req, site, cors);
   if (stale) return stale;
   let payload: Record<string, unknown> = {};
   try { payload = await req.json(); } catch { /* {} → duplicate Home */ }
   const slug = String(payload?.slug ?? '');
   if (slug && !PAGE_SLUG_RE.test(slug)) return json({ error: 'bad_request', message: 'Which page should be duplicated?' }, 400, cors);
-  const cur = await asUser(jwt, `presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
+  const cur = await db(`presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
   if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pages just now.' }, 502, cors);
   const row = cur.json?.[0] ?? {};
   const dup = duplicatePageInSettings({ blocks: row.blocks, pages: row.pages }, slug);
   if ('error' in dup) return json({ error: dup.error, message: dup.message }, dup.error === 'not_found' ? 404 : 422, cors);
-  const w = await asUser(jwt, `presence_settings?on_conflict=site_id&select=site_id,pages`, {
+  const w = await db(`presence_settings?on_conflict=site_id&select=site_id,pages`, {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify({ site_id: site.id, pages: dup.pages }),
   });

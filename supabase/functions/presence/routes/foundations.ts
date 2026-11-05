@@ -9,7 +9,7 @@
 // provider capabilities, and only on approved plans.
 import { json } from '../../_shared/http.ts';
 import { registrarTip } from '../lib/rdap.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { readZone } from '../platform/dns.ts';
 import { explainRecord } from '../platform/dns.ts';
@@ -155,8 +155,8 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
   return json({ data: ins.json[0] }, 200, cors);
 }
 
-export async function handleFoundationsPlans(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_infra_plans?site_id=eq.${site.id}&select=${PLAN_SELECT}&order=created_at.desc&limit=20`);
+export async function handleFoundationsPlans(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_infra_plans?site_id=eq.${site.id}&select=${PLAN_SELECT}&order=created_at.desc&limit=20`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open the plans just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
 }

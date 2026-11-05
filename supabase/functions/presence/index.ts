@@ -18,6 +18,7 @@ import { resolvePrincipal } from '../_shared/auth.ts';
 import { resolveSite } from './lib/site.ts';
 import type { SiteRow } from './lib/site.ts';
 import { resolveScopedSite } from './lib/scope.ts';
+import { siteDb } from './lib/db.ts';
 import { checkEntitlement } from './middleware/entitlement.ts';
 import { featureForRoute, requireFeature, loadEdition } from './middleware/feature.ts';
 import { loadPlan, draftingDenial } from './commerce/enforce.ts';
@@ -446,8 +447,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (denial) return denial;
   }
 
+  // The data path for site content, chosen once and only now that every gate above
+  // has passed: the owner under their JWT, an authorised scope pinned to its site.
+  const db = siteDb(jwt, site, principal);
+
   // 5. router — exact routes only
-  if (route === '/site' && method === 'GET') return handleGetSite(jwt, site, cors);
+  if (route === '/site' && method === 'GET') return handleGetSite(db, site, cors);
   if (route === '/site/templates' && method === 'GET') return handleTemplatesList(site, cors);            // Phase CP-1
   if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
@@ -457,8 +462,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (rm && method === 'DELETE') return handleRedirectDelete(site, principal, rm[1], cors);
   }
   if (route === '/site/template' && method === 'PUT') return handlePutTemplate(req, jwt, site, principal, cors); // Phase CP-1
-  if (route === '/identity' && method === 'GET') return handleGetIdentity(jwt, site, cors);
-  if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, jwt, site, principal, cors);
+  if (route === '/identity' && method === 'GET') return handleGetIdentity(db, site, cors);
+  if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, db, site, principal, cors);
   if (route === '/preview' && method === 'GET') return handlePreview(req, site, cors);
   // ── FD-T20/T21: Draft → Preview → Live management (authed) ──
   if (route === '/preview/status' && method === 'GET') return handlePreviewStatus(site, cors);
@@ -949,7 +954,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
 
   // ── M9.3: Business Moments (client read + dismiss; generation is operator/system) ──
-  if (route === '/moments' && method === 'GET') return handleMomentsList(jwt, site, cors);
+  if (route === '/moments' && method === 'GET') return handleMomentsList(db, site, cors);
   {
     const m = route.match(/^\/moments\/([0-9a-f-]{36})\/dismiss$/);
     if (m && method === 'POST') return handleMomentDismiss(site, m[1], cors);
@@ -965,13 +970,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── M9.5C: the AI Reviewer (critique only; no write path to content exists) ──
   if (route === '/review/run' && method === 'POST') return handleReviewRun(req, site, cors);
   // ── M9.5D: the Brand Guardian (protects identity; findings only) ──
-  if (route === '/brand/profile' && method === 'GET') return handleBrandProfileGet(jwt, site, cors);
-  if (route === '/brand/profile' && method === 'PUT') return handleBrandProfilePut(req, jwt, site, principal, cors);
+  if (route === '/brand/profile' && method === 'GET') return handleBrandProfileGet(db, site, cors);
+  if (route === '/brand/profile' && method === 'PUT') return handleBrandProfilePut(req, db, site, principal, cors);
   if (route === '/brand/review' && method === 'POST') return handleBrandReviewRun(req, site, cors);
-  if (route === '/brand/reports' && method === 'GET') return handleBrandReportList(jwt, site, cors);
+  if (route === '/brand/reports' && method === 'GET') return handleBrandReportList(db, site, cors);
   {
     const m = route.match(/^\/brand\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
-    if (m && !m[2] && method === 'GET') return handleBrandReportGet(jwt, site, m[1], cors);
+    if (m && !m[2] && method === 'GET') return handleBrandReportGet(db, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
   }
   // ── M14: Presence Platform Services — ownership, launch, DNS documents, email posture ──
@@ -986,7 +991,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/foundations/zone/records' && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
     return handleZoneRecords(req, method, site, principal, cors);
   }
-  if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(jwt, site, cors);
+  if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(db, site, cors);
   if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);
   if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);
   if (route === '/foundations/email' && method === 'GET') return handleEmailHealth(site, cors);
@@ -1001,7 +1006,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);
   if (route === '/foundations/prepare' && method === 'POST') return handleFoundationsPrepare(req, site, principal, cors);
-  if (route === '/foundations/plans' && method === 'GET') return handleFoundationsPlans(jwt, site, cors);
+  if (route === '/foundations/plans' && method === 'GET') return handleFoundationsPlans(db, site, cors);
   {
     const m = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleFoundationsDecide(req, site, m[1], principal, cors);
@@ -1014,7 +1019,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/monitor/readiness' && method === 'GET') return handleMonitorReadiness(site, cors);
   // ── M10: Business Knowledge Import (knowledge in, evidence out) ──
   if (route === '/knowledge/import' && method === 'POST') return handleKnowledgeImport(req, site, principal, cors);
-  if (route === '/knowledge/docs' && method === 'GET') return handleKnowledgeList(jwt, site, cors);
+  if (route === '/knowledge/docs' && method === 'GET') return handleKnowledgeList(db, site, cors);
   {
     const m = route.match(/^\/knowledge\/docs\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleKnowledgeDelete(site, m[1], principal, cors);
@@ -1072,36 +1077,36 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/coach/health' && method === 'GET') return handleCoachHealth(site, cors);       // PT-6 Business Health Coach
   if (route === '/coach/journey' && method === 'GET') return handleCoachJourney(site, cors);     // PT-7 Customer Timeline
   if (route === '/coach/memory' && method === 'GET') return handleCoachMemory(site, cors);       // PT-9 AI Business Memory
-  if (route === '/coach/opportunities' && method === 'GET') return handleCoachList(jwt, site, cors);
+  if (route === '/coach/opportunities' && method === 'GET') return handleCoachList(db, site, cors);
   {
     const m = route.match(/^\/coach\/opportunities\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleCoachDecide(req, site, m[1], cors);
   }
-  if (route === '/review/reports' && method === 'GET') return handleReviewList(jwt, site, cors);
+  if (route === '/review/reports' && method === 'GET') return handleReviewList(db, site, cors);
   {
     const m = route.match(/^\/review\/reports\/([0-9a-f-]{36})(\/dismiss)?$/);
-    if (m && !m[2] && method === 'GET') return handleReviewGet(jwt, site, m[1], cors);
+    if (m && !m[2] && method === 'GET') return handleReviewGet(db, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleReviewDismiss(req, site, m[1], cors);
   }
-  if (route === '/writer/drafts' && method === 'GET') return handleWriterList(jwt, site, cors);
+  if (route === '/writer/drafts' && method === 'GET') return handleWriterList(db, site, cors);
   {
     const m = route.match(/^\/writer\/drafts\/([0-9a-f-]{36})(\/accept|\/discard)?$/);
-    if (m && !m[2] && method === 'GET') return handleWriterGet(jwt, site, m[1], cors);
+    if (m && !m[2] && method === 'GET') return handleWriterGet(db, site, m[1], cors);
     if (m && m[2] === '/accept' && method === 'POST') return handleWriterAccept(req, site, m[1], principal, cors);
     if (m && m[2] === '/discard' && method === 'POST') return handleWriterDiscard(site, m[1], cors);
   }
   if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
-  if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, jwt, site, principal, cors); if (r) return r; }
-  if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, jwt, site, principal, cors); if (r) return r; }
-  if (route === '/settings' && (method === 'GET' || method === 'PUT')) { const r = await handleSettings(req, jwt, site, principal, cors); if (r) return r; }
+  if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, db, site, principal, cors); if (r) return r; }
+  if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, db, site, principal, cors); if (r) return r; }
+  if (route === '/settings' && (method === 'GET' || method === 'PUT')) { const r = await handleSettings(req, db, site, principal, cors); if (r) return r; }
   // ── Wave-1 G7: page operations on the settings.pages model (duplicate = a
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
-  if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, jwt, site, principal, cors);
+  if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
-    if (m && m[1] in SPECS) { const r = await handleCollection(req, jwt, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }
+    if (m && m[1] in SPECS) { const r = await handleCollection(req, db, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }
   }
 
   return json({ error: 'not_found', message: `No route for ${method} ${route}.` }, 404, cors);

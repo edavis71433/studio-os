@@ -7,7 +7,7 @@
 // prepared handoff to /editor/improve or /writer/generate — through the
 // customer, with the same approvals as always.
 import { json } from '../../_shared/http.ts';
-import { asUser } from '../lib/db.ts';
+import type { SiteDb } from '../lib/db.ts';
 import { runReview, dismissFinding } from '../reviewer/engine.ts';
 import type { ReviewScope } from '../reviewer/engine.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -29,14 +29,14 @@ export async function handleReviewRun(req: Request, site: SiteRow, cors: Record<
   return json({ data: summary }, 200, cors);
 }
 
-export async function handleReviewList(jwt: string, site: SiteRow, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_ai_reviews?site_id=eq.${site.id}&select=id,scope,target,status,open_count,deterministic_only,created_at&order=created_at.desc&limit=10`);
+export async function handleReviewList(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
+  const r = await db(`presence_ai_reviews?site_id=eq.${site.id}&select=id,scope,target,status,open_count,deterministic_only,created_at&order=created_at.desc&limit=10`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t open the reviews just now.' }, 502, cors);
   return json({ data: r.json ?? [] }, 200, cors);
 }
 
-export async function handleReviewGet(jwt: string, site: SiteRow, reviewId: string, cors: Record<string, string>) {
-  const r = await asUser(jwt, `presence_ai_reviews?id=eq.${reviewId}&site_id=eq.${site.id}&select=id,scope,target,status,findings,open_count,deterministic_only,created_at&limit=1`);
+export async function handleReviewGet(db: SiteDb, site: SiteRow, reviewId: string, cors: Record<string, string>) {
+  const r = await db(`presence_ai_reviews?id=eq.${reviewId}&site_id=eq.${site.id}&select=id,scope,target,status,findings,open_count,deterministic_only,created_at&limit=1`);
   if (!r.ok || !r.json?.[0]) return json({ error: 'not_found', message: 'That review isn’t here.' }, 404, cors);
   return json({ data: r.json[0] }, 200, cors);
 }

@@ -9,7 +9,7 @@
 // email_setup, dns_repair. Nothing here changes the world: documents, plans,
 // and reads only — the approval law owns every real change.
 import { json } from '../../_shared/http.ts';
-import { asUser, svc } from '../lib/db.ts';
+import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { readZone, explainRecord } from '../platform/dns.ts';
 import { validateZone, diffZones } from '../platform/zone.ts';
@@ -80,13 +80,13 @@ export async function handleLaunch(site: SiteRow, cors: Record<string, string>) 
   return json({ data: await siteLaunchChecklist(site) }, 200, cors);
 }
 
-export async function handleDnsGet(jwt: string, site: SiteRow, cors: Record<string, string>) {
+export async function handleDnsGet(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
   const now = new Date().toISOString();
   const domain = await siteDomain(site);
   if (!domain) return json({ data: { domain: null, sentence: 'DNS appears here once a domain is connected.', desired: [], observed: [], drift: null } }, 200, cors);
   const [zQ, hQ, observed] = await Promise.all([
-    asUser(jwt, `presence_dns_zones?site_id=eq.${site.id}&select=records,updated_at&limit=1`),
-    asUser(jwt, `presence_dns_zone_history?site_id=eq.${site.id}&select=id,note,saved_at&order=saved_at.desc&limit=10`),
+    db(`presence_dns_zones?site_id=eq.${site.id}&select=records,updated_at&limit=1`),
+    db(`presence_dns_zone_history?site_id=eq.${site.id}&select=id,note,saved_at&order=saved_at.desc&limit=10`),
     fence(readZone(domain, now)),
   ]);
   const desired: DnsRecord[] = zQ.json?.[0]?.records ?? [];

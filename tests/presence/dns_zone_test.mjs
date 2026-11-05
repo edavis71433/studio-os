@@ -448,7 +448,7 @@ ok('behavioral: NO request ever escaped the fake (no live AWS)', world.escaped.l
   ok('pin: DELETE /foundations/zone registered', idx.includes("if (route === '/foundations/zone' && method === 'DELETE') return handleZoneDelete(req, site, principal, cors);"));
   ok('pin: /foundations/zone/records registered for POST/PUT/DELETE', idx.includes("route === '/foundations/zone/records'") && idx.includes('handleZoneRecords(req, method, site, principal, cors)'));
   // the shipped guided surface stays EXACTLY as it was
-  ok('pin: guided /foundations/dns GET untouched', idx.includes("if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(jwt, site, cors);"));
+  ok('pin: guided /foundations/dns GET untouched', idx.includes("if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(db, site, cors);"));
   ok('pin: guided /foundations/dns PUT untouched', idx.includes("if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);"));
   ok('pin: /foundations/dns/rollback untouched', idx.includes("if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);"));
   ok('pin: /foundations GET untouched', idx.includes("if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);"));
