@@ -10,7 +10,7 @@ const BLOCKS = [
 const META = { blocks: [{ sid: 'title', key: 'block_title', src_index: 0 }, { sid: 'richtext', key: 'block_richtext', src_index: 1 }], pages: {} };
 const HTML = '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main"><section class="hero" data-dds-core="hero"><h1>Marlow’s Kitchen</h1></section>'
   + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section>'
-  + '<section id="b" data-dds-sid="richtext" data-dds-key="block_richtext" data-dds-src="1" class="block"><h2 data-dds-field="title">Our story</h2></section></main></body></html>';
+  + '<section id="b" data-dds-sid="richtext" data-dds-key="block_richtext" data-dds-src="1" class="block"><h2 data-dds-field="title">Our story</h2></section></main><div id="presence-preview-badge" role="status" style="position:fixed;left:0;right:0;bottom:0">Preview of this site</div></body></html>';
 const API = {
   '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', description: 'Hello' }, location: { city: 'Burbank' } } },
   '/offerings': { data: [{ id: 'o1', name: 'Soup', category: 'Starters', price_text: '$5', description: '', is_visible: true, sort_order: 0 }] },
@@ -308,9 +308,16 @@ test.describe('the Edit bar and the panels', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await mount(page, '/presence.html#design');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    // Publish fills in when /changes lands, and its background fades there over 200ms
+    // while its text flips at once (a gap of 8, climbing to 217). Wait for the fill and
+    // for the fade to finish: this measures the colors the button rests at, not a frame.
+    await expect(page.locator('#dcBtnPublish')).toHaveClass(/inked/);
     const lum = (rgb: string) => { const [r, g, b] = rgb.match(/\d+/g)!.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
     for (const sel of ['#btnTrayOpen', '#btnNavEdit', '#btnSettingsOpen', '#btnEditExit', '#dcBtnPublish']) {
-      const c = await page.locator(sel).evaluate((n) => { const s = getComputedStyle(n); return [s.color, s.backgroundColor]; });
+      const c = await page.locator(sel).evaluate(async (n) => {
+        await Promise.allSettled(n.getAnimations().map((a) => a.finished));
+        const s = getComputedStyle(n); return [s.color, s.backgroundColor];
+      });
       expect(Math.abs(lum(c[0]) - lum(c[1])), sel).toBeGreaterThan(100);
     }
   });
@@ -357,5 +364,128 @@ test.describe('the Edit bar and the panels', () => {
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     const barBox = await page.locator('.dc-bar').boundingBox();
     expect(barBox!.height).toBeLessThanOrEqual(52);
+  });
+});
+
+// Found by opening Edit mode on a real workspace in Chrome: sample data had hidden all of these.
+test.describe('what a real site showed', () => {
+  const TEMPLATES = { '/site/templates': { data: { current: { slug: 'business-classic', version: '1.0.0' }, templates: [
+    { slug: 'business-classic', name: 'Business Classic', version: '1.0.0' },
+    { slug: 'editorial', name: 'Editorial', version: '1.0.0' },
+    { slug: 'warm', name: 'Warm', version: '1.0.0' },
+  ] } } };
+
+  test('Add section opens at the top of its list, with the search box in view', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    // the search takes focus while the panel is still about 1px wide: the list must not scroll then
+    await page.evaluate(() => {
+      const w = window as any; const f = HTMLElement.prototype.focus; w.__traySeen = [];
+      HTMLElement.prototype.focus = function (this: HTMLElement, o?: FocusOptions) {
+        const r = f.call(this, o); const t = document.getElementById('designTray');
+        if (t && this.matches('.tray-search')) w.__traySeen.push(t.scrollTop);
+        return r;
+      };
+    });
+    await page.locator('#btnTrayOpen').click();
+    const search = page.locator('#designTray .tray-search');
+    await expect(search).toBeFocused();
+    expect(await page.evaluate(() => (window as any).__traySeen)).toEqual([0]);
+    await page.waitForTimeout(400);
+    await expect(search).toBeInViewport();
+    expect(await page.locator('#designTray').evaluate((n) => n.scrollTop)).toBe(0);
+  });
+
+  test('Styles leads with the choices people use: templates are one tidy row until asked for', async ({ page }) => {
+    const previews: string[] = [];
+    page.on('request', (r) => { if (/\/preview\?.*template=/.test(r.url())) previews.push(r.url()); });
+    await mount(page, '/presence.html#design', TEMPLATES);
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await page.locator('#btnSettingsOpen').click();
+    await expect(page.locator('#brandKitCard')).toBeInViewport();
+    const fold = page.locator('#designGallery .tg-fold');
+    await expect(fold).toContainText('Business Classic');
+    await expect(page.locator('#designGallery .tg-card').first()).toBeHidden();
+    expect(previews).toHaveLength(0);                                // each card draws a live preview, so none load until asked
+
+    // the row sits inside the panel's margins, not against its edge. One read, after the
+    // panel has finished sliding in, so both boxes describe the same moment.
+    const margins = async (sel: string) => { await page.waitForTimeout(350); return page.evaluate((q) => {
+      const p = document.getElementById('settingsPanel')!.getBoundingClientRect(); const r = document.querySelector(q)!.getBoundingClientRect();
+      return { left: r.left - p.left, right: p.right - r.right };
+    }, sel); };
+    const row = await margins('#designGallery .tg-fold');
+    expect(row.left).toBeGreaterThanOrEqual(12);
+    expect(row.right).toBeGreaterThanOrEqual(12);
+
+    await fold.locator('summary').click();
+    const card = page.locator('#designGallery .tg-card[data-look="editorial"]');
+    await expect(card).toBeVisible();
+    await expect(page.locator('#designGallery .tg-card')).toHaveCount(3);
+    expect((await margins('#designGallery .tg-card[data-look="editorial"]')).right).toBeGreaterThanOrEqual(12);   // no card runs off the side
+    await expect.poll(() => previews.length).toBe(3);
+    await expect(card.locator('.tg-start')).toHaveText('Start with this');
+    await expect(page.locator('#designGallery .tg-second')).toHaveCount(0);           // it pointed at the panel you're already in
+
+    await fold.locator('summary').click();
+    await fold.locator('summary').click();
+    await expect(card).toBeVisible();
+    expect(previews).toHaveLength(3);                                // reopening doesn't draw them all again
+  });
+
+  test('the purple preview ribbon stays out of Edit mode and shows in Preview', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('[data-dds-sid="richtext"]').waitFor();
+    await expect(frame.locator('#dds-dc-style')).toHaveCount(1);
+    await expect(frame.locator('#presence-preview-badge')).toBeHidden();
+    await page.locator('#dcModeSeg button[data-dcmode="preview"]').click();
+    await expect(frame.locator('#presence-preview-badge')).toBeVisible();
+  });
+
+  test('double-clicking a core section says where its words live, and stays in Edit mode', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('[data-dds-sid="richtext"]').waitFor();
+    const h1 = frame.locator('[data-dds-core="hero"] h1');
+    await h1.dispatchEvent('dblclick');
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    const toast = page.locator('.toast').filter({ hasText: 'Business' }).first();
+    await expect(toast).toBeVisible();
+    // readable, and clear of the on-screen tip that's still up on a first visit
+    await expect(page.locator('.dds-hint.show')).toBeVisible();
+    const [m, tip] = await page.evaluate(() => [document.querySelector('.toast')!, document.querySelector('.dds-hint.show')!].map((n) => { const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width }; }));
+    expect(m.width).toBeGreaterThan(260);                            // it used to be squeezed into a narrow column on a phone
+    expect(m.bottom <= tip.top || tip.bottom <= m.top).toBe(true);
+    // the same for a stamped field inside a core section, which takes the in-place path first
+    await h1.evaluate((n) => n.setAttribute('data-dds-field', 'title'));
+    await h1.dispatchEvent('dblclick');
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await expect(h1).not.toHaveAttribute('contenteditable', /.+/);
+    // the toast's action is the way there, and the way back is offered on arrival
+    await toast.getByRole('button', { name: 'Edit them there' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dc-edit/);
+    await expect(page.locator('#view-business')).toBeVisible();
+    const back = page.getByRole('button', { name: 'Back to your page' });
+    await expect(back).toBeVisible();
+    await back.click();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+  });
+
+  test('double-clicking section text still edits it in place', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    const h2 = frame.locator('[data-dds-sid="richtext"] h2');
+    await h2.waitFor();
+    await h2.dispatchEvent('dblclick');
+    await expect(h2).toHaveAttribute('contenteditable', /.+/);
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+  });
+
+  test('the on-screen tip promises only what works', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const tip = await page.evaluate(() => (0, eval)('VIEW_HINTS.design[1]'));
+    expect(tip).not.toMatch(/any text/);
+    expect(tip).toMatch(/section/);
   });
 });
