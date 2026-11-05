@@ -24,7 +24,7 @@ env:
   # Pinned, not latest: CLI 3.0.0 (2026-11-02) refuses to deploy without a
   # confirmation a CI run can't give (HostedMutationConsentRequiredError).
   # 2.122.0 was the latest when production last deployed. Upgrade on purpose,
-  # in both deploy.yml and rollback.yml.
+  # in deploy.yml, rollback.yml and schema-dump.yml.
   SUPABASE_CLI_VERSION: "2.122.0"
 
 jobs:
