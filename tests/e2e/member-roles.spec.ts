@@ -411,7 +411,7 @@ test.describe('The builder', () => {
 
     test(`${p.who}: the template gallery`, async ({ page }) => {
       await openBuilder(page, p, '#design');
-      await expect(page.locator('#designGallery .tg-card').first()).toBeAttached();
+      await expect(page.locator('#designGallery .tg-fold')).toBeAttached();   // the cards wait inside it until it opens
       await expectDisplay(page, p, '#designGallery', 'owner');
     });
 
