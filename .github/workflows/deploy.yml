@@ -20,6 +20,13 @@ on:
         description: "Type deploy-production to deploy main to PRODUCTION"
         required: true
 
+env:
+  # Pinned, not latest: CLI 3.0.0 (2026-11-02) refuses to deploy without a
+  # confirmation a CI run can't give (HostedMutationConsentRequiredError).
+  # 2.122.0 was the latest when production last deployed. Upgrade on purpose,
+  # in both deploy.yml and rollback.yml.
+  SUPABASE_CLI_VERSION: "2.122.0"
+
 jobs:
   # Pre-deploy quality gate (Ops audit HIGH-3): run the deterministic pure test
   # suites — including the 14 machine-enforced platform invariants — before any
@@ -73,12 +80,12 @@ jobs:
       - name: Deploy clever-api (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy stripe-webhook (staging, no JWT verification)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       # Presence platform function (A2): the function does its own fail-closed
       # auth, so --no-verify-jwt matches production. The benign "sdk.ts" read WARN
@@ -86,7 +93,7 @@ jobs:
       - name: Deploy presence (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       # Free Tools (0136): public report read + unlock, and the internal lead
       # alert. Each does its own gating (send-lead-alert checks the service key),
@@ -94,27 +101,27 @@ jobs:
       - name: Deploy tool-report (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy unlock-report (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy send-lead-alert (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy site-review (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Deploy ai-visibility (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
 
       - name: Smoke test — clever-api version handshake
         run: |
@@ -168,17 +175,17 @@ jobs:
       - name: Deploy clever-api (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy stripe-webhook (PRODUCTION, no JWT verification)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy presence (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       # Free Tools (0136): public report read + unlock, and the internal lead
       # alert. Each does its own gating (send-lead-alert checks the service key),
@@ -186,27 +193,27 @@ jobs:
       - name: Deploy tool-report (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy unlock-report (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy send-lead-alert (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy site-review (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Deploy ai-visibility (PRODUCTION)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes supabase functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
 
       - name: Smoke test — clever-api version handshake
         run: |
