@@ -7007,6 +7007,7 @@ function dcSwitchPage(slug) {
   // date claim must never sit over a freshly-loaded draft. Preview simply stays
   // on: the new page loads chrome-free, which is exactly what Preview means.
   if (DC_MODE === "timewarp") dcSetMode("edit");
+  blocksSaveBeforeLeaving();
   DC_PAGE = slug; dcResetHistory();
   BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
   renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7514,6 +7515,8 @@ async function undoSync(rec, vals, r) {
   }
 }
 function dcUndo() {
+  // an edit still waiting for its save is the newest step, so it's the one to take back
+  if (blocksDirty()) { clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null; dcHistoryRecord(); dcHistoryCommit(); }
   if (!DC_UNDO.length) { toast("Nothing to undo"); return; }
   const top = DC_UNDO.pop();
   if (typeof top !== "string") {
@@ -7525,7 +7528,7 @@ function dcUndo() {
   dcApplyHistory(top); toast("Undone");
 }
 function dcRedo() {
-  if (!DC_REDO.length) { toast("Nothing to redo"); return; }
+  if (blocksDirty() || !DC_REDO.length) { toast("Nothing to redo"); return; }   // a new edit outranks the redo list
   const top = DC_REDO.pop();
   if (typeof top !== "string") {
     DC_UNDO.push(top); updateUndoButtons();
@@ -7548,6 +7551,19 @@ function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
   BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
 }
+// Before the list on screen is replaced: send what's waiting, while DC_PAGE and the list
+// still say where it belongs. saveBlocks reads both before its first await.
+function blocksSaveBeforeLeaving() {
+  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
+  if (IPE) ipeCommit();
+  clearTimeout(IPE_SAVE_T); IPE_SAVE_T = null;
+  if (blocksDirty() && ovConfirmContrastAck()) saveBlocks();
+}
+// For a write built from the saved list (forms): let section edits reach it first.
+async function blocksSettled() {
+  for (let i = 0; i < 100 && BLOCKS_SAVING; i++) await new Promise((r) => setTimeout(r, 50));
+  if (blocksDirty()) await blocksSaveNow();
+}
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
   if (BLOCKS_SAVING) { blocksSaveSoon(); return true; }
@@ -7560,6 +7576,7 @@ async function blocksSaveNow() {
 async function saveBlocks() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
+  const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
   try {
     // CL-LINK: a saved-section edit-in-progress (_clEdit) is NOT page content — it
@@ -7579,8 +7596,11 @@ async function saveBlocks() {
       r = await put;
       S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
     }
-    BLOCKS_WORK = currentBlocks();
-    dcHistoryCommit();   // the new persisted state becomes the history baseline
+    // Typing doesn't stop for a save. If the list moved while this one was on its way,
+    // those edits are newer than what just came back: keep them, and save them next.
+    if (DC_PAGE !== sentPage) { /* the list on screen belongs to another page now */ }
+    else if (histSnap() !== sentSnap) { DC_HIST_LAST = sentSnap; updateUndoButtons(); blocksSaveSoon(); }
+    else { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // the new persisted state becomes the history baseline
     // G13 §3: never rebuild the panel under a focused input — its uncommitted
     // text (panel inputs commit on change = blur) would be destroyed mid-typing.
     // The input's own blur/change re-renders; every other save re-renders here.
@@ -8920,9 +8940,13 @@ function ffSel(options, value, onchange) {
   options.forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if (v === value) o.selected = true; s.appendChild(o); });
   s.addEventListener("change", () => onchange(s.value)); return s;
 }
+let FORMS_SAVING = false;
 async function saveForms() {
   whisper("topWhisper", "saving");
+  FORMS_SAVING = true;
   try {
+    await blocksSettled();
+    const sentForms = JSON.stringify(FORMS_WORK);
     // Forms keep their place on the page (a save used to drag them all to the bottom);
     // a form removed here drops out, a new one lands at the end.
     const work = new Map(FORMS_WORK.map((f) => [f.id, f]));
@@ -8942,18 +8966,25 @@ async function saveForms() {
       r = await api("PUT", "/settings", { blocks: next });
       S.settings = r.data || { ...S.settings, blocks: next };
     }
-    if (typeof BLOCKS_WORK !== "undefined") BLOCKS_WORK = currentBlocks();   // keep the content-block editor in sync
-    FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
-    renderFormsCard();
-    FORMS_BASE = JSON.stringify(FORMS_WORK);
+    if (typeof BLOCKS_WORK !== "undefined") { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // keep the content-block editor in sync
+    const ae = document.activeElement;
+    if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
+    else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
+    else {
+      FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+      renderFormsCard();
+      FORMS_BASE = JSON.stringify(FORMS_WORK);
+    }
     whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+  finally { FORMS_SAVING = false; }
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
 function formsSaveSoon(ms) { clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = setTimeout(formsSaveNow, ms === undefined ? 700 : ms); }
 async function formsSaveNow() {
   clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = null;
+  if (FORMS_SAVING) { formsSaveSoon(); return; }
   if (FORMS_WORK && JSON.stringify(FORMS_WORK) !== FORMS_BASE) await saveForms();
 }
 function mountFormsCard() {
