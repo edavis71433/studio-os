@@ -31,6 +31,7 @@ VISUAL=1 npm run test:e2e                     # enforce
 | CMS | `cms.spec.ts` | edition gating hides Business-OS links for CMS (SKU), "Files" terminology (Architecture v1.0), `#design`/`#business` deep-links (OS) |
 | CRM | `crm.spec.ts` | leads inbox render + prefilled reply + filter + mark-read toast; relationship timeline |
 | Client portal | `portal.spec.ts` | mirrored "needs you" heading + approvals, approve→toast, caught-up state, owner-redirect |
+| Member roles | `member-roles.spec.ts` | owner, studio scoped in, platform staff, staff seat, developer seat: each delete/configure control shows exactly when the role can use it; real capability table |
 | Agency | `agency.spec.ts` | portfolio status row (attention badge, leads, domain+registrar, billing), non-agency turned away |
 | A11y | `a11y.spec.ts` | axe WCAG2A/AA (no serious/critical) on Today/Leads/Portal, accessible names, keyboard palette |
 | Responsive | `responsive.spec.ts` | no horizontal overflow + content present at desktop/tablet/mobile |
