@@ -627,7 +627,7 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
 // ── the session engine + save model: source pins (the impure half) ──
 {
   const inject = extractFn(html, 'dcInjectCanvas');
-  ok(/addEventListener\("dblclick"/.test(inject) && /ipeStart\(/.test(inject) && /eeEditTarget\(el2\)/.test(inject), 'dcInjectCanvas wires dblclick → in-place edit on a stamped field, panel routing otherwise (never a dead double-click)');
+  ok(/addEventListener\("dblclick"/.test(inject) && /ipeStart\(/.test(inject) && /eeDoubleClickTarget\(el2\)/.test(inject), 'dcInjectCanvas wires dblclick → in-place edit on a stamped field; otherwise the section panel, or a message naming the tab that holds a core section\'s words (never a dead double-click)');
   ok(/DC_MODE !== "edit"/.test(inject), 'the dblclick wiring is Edit-mode-gated at EVENT time (Comments-mode chrome never edits)');
   ok(/if \(IPE\) return;/.test(inject), 'the hover toolbar is suppressed while a session is active');
   const start = extractFn(html, 'ipeStart');
