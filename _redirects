@@ -33,9 +33,9 @@
 /provision              /404.html   404!
 /provision.html         /404.html   404!
 
-# Free Site Review maps to the real diagnostic tool specifically
-# (matches the nav label "Free site review" -> audit.html)
-/free-site-review  /audit              301
+# Free Site Review maps to the real diagnostic tool specifically: one hop to
+# its new home, the same place /audit and the main site's own URL go
+/free-site-review  https://tools.davisdigitalstudio.com/site-review   301
 
 # Deleted page: contact notice folded into Privacy
 # (MS6: the file itself is deleted — both spellings answer with the 301)

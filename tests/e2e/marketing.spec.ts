@@ -104,6 +104,14 @@ const chromeHrefs = (): string[] => {
   return [...new Set(hrefs.filter((h) => h.startsWith('/')))];
 };
 
+// Chrome links whose pages left this site in the Free Tools rebuild (Oct 2026).
+// The chrome keeps the short path and a forced 301 sends it to exactly this
+// address, so there is no local page to find and nothing here to index.
+const CHROME_MOVED: Record<string, string> = {
+  '/tools': 'https://davisdigitalstudio.com/free-tools',
+  '/audit': 'https://tools.davisdigitalstudio.com/site-review',
+};
+
 // ---------------------------------------------------------------------------
 // Static pins — filesystem truth, one project is enough
 // ---------------------------------------------------------------------------
@@ -167,9 +175,15 @@ test.describe('marketing chrome (static pins)', () => {
     }
   });
 
-  test('_redirects: every chrome destination has a clean-URL 200 rule to a real file', () => {
+  test('_redirects: every chrome destination has a clean-URL 200 rule to a real file, or a pinned move off this site', () => {
     const rules = parseRedirects();
     for (const url of chromeHrefs()) {
+      if (CHROME_MOVED[url]) {
+        const moved = rules.find((x) => x.from === url);
+        expect(moved?.to, `${url} moved to`).toBe(CHROME_MOVED[url]);
+        expect(moved?.code, `${url} forced, the old page file still exists`).toBe('301!');
+        continue;
+      }
       const to = targetOf(rules, url);
       expect(to, `rule for ${url}`).toBeTruthy();
       expect(existsSync(join(ROOT, to!.replace(/^\//, ''))), `${url} -> ${to} exists`).toBe(true);
@@ -191,9 +205,10 @@ test.describe('marketing chrome (static pins)', () => {
     const r301 = (from: string) => rules.find((x) => x.from === from && x.code === '301');
     expect(r301('/start')?.to).toBe('/contact');
     expect(r301('/contact-disclaimer')?.to).toBe('/privacy');
-    expect(r301('/free-site-review')?.to).toBe('/audit');
-    // each 301 lands on a URL that itself resolves
-    for (const from of ['/start', '/contact-disclaimer', '/free-site-review']) {
+    // straight to the tool: pointing at /audit would add a second hop
+    expect(r301('/free-site-review')?.to).toBe(CHROME_MOVED['/audit']);
+    // each 301 that stays on this site lands on a URL that itself resolves
+    for (const from of ['/start', '/contact-disclaimer']) {
       const to = targetOf(rules, r301(from)!.to);
       expect(to && existsSync(join(ROOT, to.replace(/^\//, ''))), `${from} chain`).toBe(true);
     }
@@ -211,9 +226,10 @@ test.describe('marketing chrome (static pins)', () => {
       expect(existsSync(join(ROOT, to!.replace(/^\//, ''))), `sitemap ${path} -> ${to}`).toBe(true);
     }
     // chrome destinations belong in the sitemap — except /portal (app door,
-    // deliberately unindexed) and the legal-utility 404 target set
+    // deliberately unindexed), the legal-utility 404 target set, and the links
+    // that moved off this site (the 200-rule check above keeps those out)
     for (const url of chromeHrefs()) {
-      if (url === '/portal') continue;
+      if (url === '/portal' || CHROME_MOVED[url]) continue;
       expect(locs, `sitemap lists ${url}`).toContain(url);
     }
   });
@@ -231,7 +247,11 @@ test.describe('marketing chrome (static pins)', () => {
       expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeGreaterThanOrEqual(2);
       expect(parts.length, `"${line}": 2-3 whitespace-separated fields`).toBeLessThanOrEqual(3);
       const [from, to, status] = parts;
-      expect(from, `"${line}": source is a path`).toMatch(/^\//);
+      // Host-scoped sources are real Netlify syntax and the Free Tools rules need
+      // them. Only the two hosts this site aliases pass, so a typo'd host fails.
+      expect(from, `"${line}": source is a path, optionally on the app or tools host`).toMatch(
+        /^(https:\/\/(app|tools)\.davisdigitalstudio\.com)?\//
+      );
       expect(to, `"${line}": status glued to the target`).not.toMatch(/\.html\d/);
       if (status !== undefined) expect(status, `"${line}": valid status`).toMatch(/^\d{3}!?$/);
       if (/^\/[^*:]+\.html$/.test(to)) {
