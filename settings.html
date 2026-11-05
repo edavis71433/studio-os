@@ -118,7 +118,7 @@
   <!-- Studio audit 2026-10, change 5: the plan lives HERE. The card used to send
        the owner to the builder's Business view; now the status line, the agency
        limits and the one way to change the plan sit on Settings. Never while
-       scoped into a client — /commerce/* answers for the CALLER's own account. -->
+       scoped into a client — billing is the account's, and the server refuses it under a scope. -->
   <!-- Studio audit 2026-10, change 6: the agency's TEAM. /agency/members (invite with
        a role, change a role, remove) existed with no page — the only way to add a
        seat was an operator route. Agency members at studio level only; a client's
@@ -362,8 +362,8 @@ function paintScope() {
 }
 document.addEventListener('dds:context', () => { paintScope(); if (SCOPE && $('cards').children.length) renderCards(); });
 
-// ── the plan, inline. /commerce/subscription answers for the caller's OWN account,
-//    so this only ever runs unscoped. Agencies also see their limits (/agency/usage:
+// ── the plan, inline. /commerce/subscription is the caller's OWN account and refuses
+//    a client scope, so this only ever runs unscoped. Agencies also see their limits (/agency/usage:
 //    seats + clients, used and limit). ONE action: Stripe's portal when the plan is
 //    self-serve, else the honest sentence — Agency/Enterprise changes go through us. ──
 const STATUS_WORD = { active: 'Active', paused: 'Paused — payment needs attention', lapsed: 'Ended — update payment to reactivate', deleted: 'Closed' };

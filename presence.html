@@ -5976,9 +5976,9 @@ async function refreshAll() {
   mountDesignCard();
   mountSearchCard();
   // Account cards belong to the WORKSPACE OWNER only. A drilled-in operator
-  // (?client=) is editing the CLIENT's site — but /commerce/* resolves the
-  // caller's OWN account, so these cards would show (and could act on!) the
-  // STUDIO's own billing and deletion inside the client's workspace.
+  // (?client=) is editing the CLIENT's site, and billing and deletion are the
+  // account's, so these cards have nothing to show them. The server refuses the
+  // routes behind them under a scope too (routes/commerce_scoped.ts).
   if (!new URLSearchParams(location.search).get("client")) {
     mountBillingCard();
     mountDeletionCard();
@@ -11835,9 +11835,9 @@ async function renderFirstRun() {
     await refreshAll();
     renderKnowledgeDocs();
     renderMonitorCard();
-    // /commerce/* answers for the signed-in account, so inside ?client= these would
-    // show the studio's own notices and checklist on the client's page (same rule as
-    // the billing and deletion cards in refreshAll).
+    // The plan card and the welcome are the owner's (same rule as the billing and
+    // deletion cards in refreshAll). A drilled-in operator gets the client's notices
+    // from the bell and Today, and the server refuses both routes under a scope.
     if (!new URLSearchParams(location.search).get("client")) {
       renderFirstRun();
       renderPlanNotice();

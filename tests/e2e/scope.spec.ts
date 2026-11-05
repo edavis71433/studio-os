@@ -59,6 +59,77 @@ test.describe('Secure client drill-in', () => {
   });
 });
 
+// What /commerce does on the page while a studio works on a client's site. The server
+// side of this (who gets what, and what is refused) is tests/presence/scoped_commerce_test.mjs.
+test.describe('Commerce in a client drill-in', () => {
+  const NOTICE_ID = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
+  const scoped = (extra: Record<string, unknown> = {}) => ({ api: { '/portal/context': scopedCtx('Joe’s Plumbing'), ...extra } });
+
+  test('the builder asks /commerce for nothing, so it has no account cards to show', async ({ page }) => {
+    const asked: string[] = [];
+    page.on('request', (r) => { if (r.url().includes('/functions/v1/presence/commerce/')) asked.push(r.url()); });
+    await installApp(page, scoped({
+      // what the builder reads on boot (the same shapes as cms.spec's PRESENCE_API)
+      '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Joe’s Plumbing' }, location: {} } },
+      '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
+      '/media': { data: [] }, '/settings': { data: {} }, '/health': { data: {} }, '/notes': { data: [] }, '/moments': { data: [] },
+      '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
+      '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
+    }));
+    await page.goto(`/presence.html?client=${CLIENT}`);
+    await expect(page.locator('h1#siteTitle')).toHaveText('Joe’s Plumbing');
+    await expect(page.locator('#setupCard')).toBeHidden();
+    await expect(page.locator('#billingCard')).toHaveCount(0);
+    await expect(page.locator('#deleteCard')).toHaveCount(0);
+    expect(asked).toEqual([]);
+  });
+
+  test('Today offers Done only where the feed says so, and it reaches the client’s row', async ({ page }) => {
+    const feedRow = (id: string, headline: string, dismissible: boolean) => ({ id, kind: 'domain_expiry', period: '2026-11', headline, body: 'Worth a look.', href: '/presence.html#business', dismissible, tier: 'needs_you', priority: false });
+    await installApp(page, scoped({
+      '/moments': { data: [] },
+      '/portal/feed': { data: { role: 'business_owner', moments: [], pending_approvals: [], last_published: null, notices: [
+        feedRow(NOTICE_ID, 'The domain expires soon', true),
+        feedRow('cccccccc-1111-4111-8111-cccccccccccc', 'Their card failed', false),
+      ] } },
+    }));
+    await page.goto(`/today.html?client=${CLIENT}`);
+    const cleared = page.locator('.moment', { hasText: 'The domain expires soon' });
+    await expect(cleared).toBeVisible();
+    await expect(page.locator('.moment', { hasText: 'Their card failed' }).getByRole('button', { name: /^Done/ })).toHaveCount(0);
+    const [dismiss] = await Promise.all([
+      page.waitForRequest((r) => r.url().includes('/commerce/notices/dismiss')),
+      cleared.getByRole('button', { name: /^Done/ }).click(),
+    ]);
+    expect(dismiss.headers()['x-dds-scope-site']).toBe(CLIENT);
+    expect(dismiss.postDataJSON()).toEqual({ id: NOTICE_ID });
+  });
+
+  test('the bell’s Clear sends only what the feed lets a hand clear, under the client’s scope', async ({ page }) => {
+    const feedRow = (id: string, headline: string, dismissible: boolean) => ({ id, kind: 'domain_expiry', period: '2026-11', headline, body: 'Worth a look.', href: '/presence.html#business', dismissible, tier: 'needs_you', priority: false });
+    const sent: Array<[string, string]> = [];
+    await installApp(page, scoped({
+      '/moments': { data: [] },
+      '/portal/feed': { data: { role: 'business_owner', moments: [], pending_approvals: [], last_published: null, notices: [
+        feedRow(NOTICE_ID, 'The domain expires soon', true),
+        feedRow('cccccccc-1111-4111-8111-cccccccccccc', 'Their card failed', false),
+      ] } },
+    }));
+    await page.route('**/functions/v1/presence/commerce/notices/dismiss', (route) => {
+      sent.push([route.request().headers()['x-dds-scope-site'] || '', route.request().postDataJSON().id]);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { dismissed: true } }) });
+    });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await page.locator('#dds-bell').click();
+    const pop = page.locator('.dds-bell-pop');
+    await expect(pop.locator('.body .row')).toHaveCount(2);
+    await pop.getByRole('button', { name: 'Clear' }).click();
+    await expect.poll(() => sent).toEqual([[CLIENT, NOTICE_ID]]);
+    await expect(pop.locator('.body .row')).toHaveCount(1);
+    await expect(pop.locator('.body .row')).toContainText('Their card failed');
+  });
+});
+
 // ── Batch A (post-redesign audit) — scope-carry regressions (A6) ─────────────
 // The drill-in scope must ride EVERY exit that stays WITHIN the drilled tenant:
 // the two convert redirects are JS navigations (shell.js only rewrites anchors),
