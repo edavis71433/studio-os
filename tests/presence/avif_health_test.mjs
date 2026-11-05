@@ -1,11 +1,13 @@
 // ── AVIF images + Website-Health polish wins (pure) ──────────────────────────
 //   deno run --allow-read --allow-env tests/presence/avif_health_test.mjs
-// Covers: (1) AVIF variant path/format alongside WebP at each width; the published
+// Covers: (0) width-only image transforms scale instead of cropping.
+// (1) AVIF variant path/format alongside WebP at each width; the published
 // <picture> offering avif + webp sources with an <img> fallback (alt/lazy/dims
 // preserved). (2) the "always online" reassurance line. (3) SSL-expiry surfacing
 // that formats a date and degrades cleanly when absent.
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
 import { variantPath, originalPath } from '../../supabase/functions/presence/lib/serializer.ts';
+import { fetchVariants, signThumb, previewUrlMap } from '../../supabase/functions/presence/lib/media.ts';
 import { buildWebsiteHealth } from '../../supabase/functions/presence/lib/website_health.ts';
 
 let pass = 0, fail = 0;
@@ -41,6 +43,58 @@ const SITE = { baseUrl: 'https://vermilionandvine.example' };
   ok('1b original path is NOT an image variant path (distinct namespace)', !op.startsWith('/img/') && op !== variantPath(pdf, 1600));
   // ext derives from the mime, with a sane fallback for anything unmapped
   ok('1b ext follows the mime', originalPath('x/y.pdf', 'application/pdf').endsWith('.pdf') && originalPath('x/y', 'application/octet-stream').endsWith('.bin'));
+}
+
+// ═══ 1c. width-only transforms scale (Storage's default crops to the width instead) ═══
+{
+  const realFetch = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    seen.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+    return new Response(String(url).includes('/object/sign/') ? JSON.stringify({ signedURL: '/signed' }) : new Uint8Array([1, 2, 3]));
+  };
+  try {
+    const img = 'presence-media/site/photo.jpg', pdf = 'presence-media/site/menu.pdf';
+    const manifest = [
+      { media_id: 'a', storage_path: img, variants: [
+        { name: 'w400', width: 400, format: 'webp', output_path: variantPath(img, 400, 'webp') },
+        { name: 'w400_avif', width: 400, format: 'avif', output_path: variantPath(img, 400, 'avif') },
+      ] },
+      { media_id: 'b', storage_path: pdf, variants: [
+        { name: 'original', width: 0, format: 'original', output_path: originalPath(pdf, 'application/pdf') },
+      ] },
+    ];
+
+    const { files, failed } = await fetchVariants(manifest);
+    ok('1c no variant failed', failed.length === 0);
+    const render = seen.filter((c) => c.url.includes('/render/image/authenticated/'));
+    ok('1c one render request per image variant', render.length === 2);
+    ok('1c webp request scales to the width', render.some((c) => /photo\.jpg\?width=400&resize=contain&format=webp&quality=80$/.test(c.url)));
+    ok('1c avif request scales to the width', render.some((c) => /photo\.jpg\?width=400&resize=contain&format=avif&quality=80$/.test(c.url)));
+    ok('1c a document is fetched verbatim, never transformed', seen.some((c) => c.url.endsWith('/object/authenticated/presence-media/site/menu.pdf')));
+    const wantPaths = [variantPath(img, 400, 'webp'), variantPath(img, 400, 'avif'), originalPath(pdf, 'application/pdf')].map((p) => p.replace(/^\//, '')).sort();
+    ok('1c output paths stay deterministic', JSON.stringify(Object.keys(files).sort()) === JSON.stringify(wantPaths));
+
+    seen.length = 0;
+    await signThumb(img, 'image/jpeg');
+    ok('1c thumbnail signs a scaling transform', seen[0]?.body?.transform?.resize === 'contain' && seen[0]?.body?.transform?.width === 320);
+
+    seen.length = 0;
+    await previewUrlMap(manifest);
+    const signed = seen.filter((c) => c.url.includes('/object/sign/'));
+    ok('1c preview signs a scaling transform for images', signed.filter((c) => c.url.endsWith('photo.jpg')).every((c) => c.body?.transform?.resize === 'contain'));
+    ok('1c preview signs no transform for a document', signed.filter((c) => c.url.endsWith('menu.pdf')).every((c) => !c.body?.transform));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  // anything else that signs a width-only transform by hand has to say the same
+  for (const f of ['lib/media.ts', 'routes/room.ts']) {
+    const src = read(`supabase/functions/presence/${f}`);
+    for (const m of src.matchAll(/transform: \{ width[^}]*\}/g)) {
+      if (!/height/.test(m[0])) ok(`1c ${f} names a resize: ${m[0]}`, /resize/.test(m[0]));
+    }
+  }
 }
 
 // ═══ 2. published render → <picture> with avif + webp + <img> fallback ═══

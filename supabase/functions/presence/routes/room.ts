@@ -10,6 +10,7 @@ import { svc } from '../lib/db.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
+import { WIDTH_ONLY_RESIZE } from '../lib/media.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { describeChanges } from '../lib/diff.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
@@ -282,12 +283,11 @@ export async function handleMediaList(site: SiteRow, cors: Record<string, string
     let thumb: string | null = null;
     try {
       const objectPath = m.storage_path.replace(/^presence-media\//, '');
-      // expiresIn belongs in the BODY (a query-string expiresIn 400s), and `format`
-      // is not the output-format selector — both as documented in lib/media.ts
-      // signThumb. Between them this grid signed nothing that could ever load.
+      // expiresIn belongs in the BODY (a query-string expiresIn 400s), and a width-only
+      // transform must say how to resize — both as documented in lib/media.ts.
       const r = await fetch(`${SB_URL}/storage/v1/object/sign/presence-media/${objectPath}`, {
         method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expiresIn: 3600, transform: { width: 320, quality: 70 } }),
+        body: JSON.stringify({ expiresIn: 3600, transform: { width: 320, resize: WIDTH_ONLY_RESIZE, quality: 70 } }),
       });
       const jj = await r.json().catch(() => null);
       if (jj?.signedURL) thumb = `${SB_URL}/storage/v1${jj.signedURL}`;
