@@ -51,7 +51,7 @@ import { handleApprovalCenter } from './routes/approvals_page.ts';
 import { handleBusinessInsights } from './routes/insights_page.ts';
 import { handleSnapshotHistory } from './routes/history_page.ts';
 import { handleMomentsList, handleMomentDismiss } from './routes/moments.ts';
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } from './routes/dev.ts';
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
@@ -61,7 +61,7 @@ import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleF
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
 import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
 import { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } from './routes/comments.ts';
-import { resolveSiteRoleCached } from './lib/workspace.ts';
+import { resolveMemberSite, resolveSiteRoleCached } from './lib/workspace.ts';
 import { handleConciergeAsk } from './routes/concierge.ts';
 import { handleHelpAsk } from './routes/help.ts';
 import { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } from './routes/writer.ts';
@@ -366,16 +366,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns
     // no site of their own — RLS returns nothing. Resolve via their active
     // membership instead; every in-site power still flows through resolveSiteRole
-    // + the reviewer boundary below (fail-closed).
+    // + the reviewer boundary below (fail-closed). Only a client caller carries the
+    // seat onto the data path: platform staff operate as the owner already.
     if (!site && (principal.userId || principal.email)) {
       try {
-        const { svc } = await import('./lib/db.ts');
-        const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
-        const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
-        const siteId = Array.isArray(m.json) && (m.json as any[])[0]?.site_id;
-        if (siteId) {
-          const s = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
-          if (Array.isArray(s.json) && (s.json as any[])[0]) site = (s.json as any[])[0] as SiteRow;
+        const seated = await resolveMemberSite(principal);
+        if (seated) {
+          site = seated.site;
+          if (principal.kind === 'client') principal.member = seated.member;
         }
       } catch { /* fail closed to no_site */ }
     }
@@ -408,6 +406,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
       return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
     }
+  }
+
+  // 4c. A member's content write gets what lib/site_roles.ts gives their role. RLS
+  //     used to refuse all of these, so nothing here narrows what worked before.
+  if (principal.member && isWrite) {
+    const refused = await memberWriteGate(req, route, method, principal.member, cors);
+    if (refused) return refused;
   }
 
   // ── M11 boundary: Monitor sites observe an EXISTING external website.
@@ -448,7 +453,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
 
   // The data path for site content, chosen once and only now that every gate above
-  // has passed: the owner under their JWT, an authorised scope pinned to its site.
+  // has passed: the owner under their JWT, an authorised scope or a member's seat
+  // pinned to its site.
   const db = siteDb(jwt, site, principal);
 
   // 5. router — exact routes only

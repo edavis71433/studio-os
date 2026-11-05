@@ -52,3 +52,33 @@ export function capabilitiesOf(role: SiteRole): SiteCapability[] {
 export function seesFullWorkspace(role: SiteRole): boolean {
   return siteCan(role, 'view_all');
 }
+
+// ── What a member's write on the content data path needs ─────────────────────
+// A member reaches content through the service role (lib/db.ts siteDb), so RLS
+// can't hold them to the table above: routes/workspace.ts memberWriteGate does,
+// with this. Owners and a studio scoped in never pass through it.
+//
+// presence_settings is one row holding two kinds of thing. These fields are the
+// website itself, so 'edit' covers them. Anything else, including a field added
+// later, is account configuration (verification codes, automation switches) and
+// needs 'configure'.
+export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
+  'category_order', 'cover_media_id', 'logo_media_id', 'og_media_id',
+  'announcement_text', 'announcement_url', 'announcement_expires_at',
+  'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
+  'pages_noindex', 'page_seo', 'blocks', 'pages', 'nav',
+]);
+
+/** The capability this write needs, or null when it isn't a write on the content
+ *  data path. Pure. `settingsFields` is the body's keys, for PUT /settings only. */
+export function contentWriteNeeds(route: string, method: string, settingsFields: string[] = []): SiteCapability | null {
+  if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/voice' || route === '/brand/profile')) return 'edit';
+  if (method === 'POST' && route === '/pages/duplicate') return 'edit';
+  if (method === 'PUT' && route === '/settings') return settingsFields.every((f) => SETTINGS_CONTENT_FIELDS.has(f)) ? 'edit' : 'configure';
+  const m = route.match(/^\/(?:offerings|testimonials|faqs|posts)(\/[0-9a-f-]{36})?$/);
+  if (!m) return null;
+  if (method === 'POST' && !m[1]) return 'edit';
+  if ((method === 'PUT' || method === 'PATCH') && m[1]) return 'edit';
+  if (method === 'DELETE' && m[1]) return 'delete';
+  return null;
+}
