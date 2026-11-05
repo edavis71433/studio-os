@@ -274,6 +274,15 @@ h5.rune .whisper.ok{color:var(--sage)}
 .aihint{font-size:12px;color:var(--ink-2);font-style:normal;font-family:var(--sans)}
 .aimark{color:var(--plum);font-style:normal}
 
+/* a watch plan observes: no building tools, no publish queue */
+html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
+#designPreviewEmpty.plan .ea{display:none}
+/* first-run strip: the three steps after the first visit, one line */
+.welcomebar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin:var(--dds-s2,8px) 0 var(--dds-s4,16px);font-size:13.5px}
+.welcomebar .wb-k{color:var(--ink-2)}
+/* the builder's one icon set */
+.ti-ico svg,.dc-tree-ico svg,.pd-ico svg,.dc-tree-acts svg,.cm-badge svg{display:block}
+.tray-grp-h svg{display:inline-block;vertical-align:-3px;margin-right:6px}
 /* first-run envelope */
 .envelope{max-width:520px;margin:var(--dds-s4,16px) 0}
 .envelope h2{font-family:var(--serif);font-weight:500;font-size:26px;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
@@ -450,6 +459,9 @@ h5.rune .whisper.ok{color:var(--sage)}
 .ritual .rsub{color:var(--ink-2);font-size:14px;margin-bottom:var(--dds-s7,32px);max-width:48ch}
 .ritual .blockprose{font-size:14px;color:var(--amber);margin:var(--dds-s6,24px) 0 0;line-height:1.7}
 .ritual .blockprose a{font-style:normal}
+.ritual .blocklist{list-style:none;margin:var(--dds-s3,12px) 0 0;padding:0;border-top:1px solid var(--hair)}
+.ritual .blocklist li{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s4,16px);padding:10px 0;border-bottom:1px solid var(--hair);font-size:14px;color:var(--ink);line-height:1.5}
+.ritual .blocklist button{flex:none;min-height:32px}
 .pubbtn{width:100%;padding:var(--dds-s3,12px);border-radius:var(--r);background:var(--plum);color:var(--fill-ink);font-size:14px;font-weight:600;border:none;margin-top:var(--dds-s7,32px);transition:background var(--dur) var(--ease)}
 .pubbtn:hover{background:color-mix(in srgb,var(--plum) 86%,#000)}
 /* the schedule panel is open: "Schedule it" is the one filled button, publish-now steps back */
@@ -502,6 +514,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .pagewords{display:flex;gap:var(--dds-s4,16px);font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
 .pagewords button{color:rgba(239,234,247,.55)}
 .pagewords button.on{color:#efeaf7;font-weight:600;border-bottom:1px solid rgba(239,234,247,.5)}
+.lookdrawer{flex:none;display:flex;gap:12px;overflow-x:auto;padding:var(--dds-s3,12px) var(--dds-s7,32px)}
 .stagebar .grow{flex:1}
 .deskseg{display:flex;gap:var(--dds-s3,12px);font-size:12.5px;padding-bottom:10px}
 .deskseg button{color:rgba(239,234,247,.55)}
@@ -688,8 +701,8 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tray-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:1px}
 .tray-item .ti-ico{flex:0 0 auto;font-size:15px;width:20px;text-align:center}
 .tray-item .ti-txt{min-width:0}
-.tray-item .ti-name{font-weight:600;line-height:1.2}
-.tray-item .ti-alias{font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
+.tray-item .ti-name{display:block;font-weight:600;line-height:1.2}
+.tray-item .ti-alias{display:block;margin-top:2px;font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
 .tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:var(--dds-s2,8px) 2px}
 
@@ -847,6 +860,17 @@ body.pd-dragging *{cursor:grabbing !important}
   .dc-bar-left{min-width:0;max-width:100%}
   .dpdevseg{display:flex;flex-wrap:wrap;max-width:100%}
   .dpdevseg button{flex:1 1 auto;padding:var(--dds-s2,8px) 10px;font-size:12.5px}
+}
+/* the preview bar beside the sidebar on a tablet: links on one row, controls on the
+   next (the tabs stay on the row that touches the proof). A plain wrap left the
+   page links in a narrow stack and the bar 230px tall. */
+@media(min-width:761px) and (max-width:1180px){
+  .stagebar{flex-wrap:wrap;column-gap:var(--dds-s4,16px);row-gap:var(--dds-s1,4px);padding-left:var(--dds-s5,20px);padding-right:var(--dds-s5,20px)}
+  .stagebar::before{content:"";order:-1;flex:0 0 100%;height:0}
+  #pageWords,#lookSeg{order:-2;flex-wrap:nowrap}
+  #lookSeg{margin-left:auto}
+  .deskprivacy{display:none}
+  .lookdrawer{padding-left:var(--dds-s5,20px);padding-right:var(--dds-s5,20px)}
 }
 @media(max-width:760px){
   .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
@@ -1236,7 +1260,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <div id="dcModeSeg" class="dpdevseg dcmodeseg" role="group" aria-label="Canvas mode">
                     <button type="button" data-dcmode="edit" class="on" aria-pressed="true" title="Build this page — edit, arrange and add sections">Edit</button>
                     <button type="button" data-dcmode="preview" aria-pressed="false" title="Read your page like a visitor, right here — no editing chrome">Preview</button>
-                    <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">💬 Comments</button>
+                    <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">Comments</button>
                     <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked on any past date">Timewarp</button>
                   </div>
                   <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
@@ -1448,6 +1472,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <button data-dev="mobile">Phone</button>
     </div>
   </div>
+  <div class="lookdrawer" id="lookDrawer" hidden></div>
   <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="A proof of your website"></iframe></div></div>
 </div>
 
@@ -1470,6 +1495,7 @@ const ENVS = {
 const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
+if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this page runs one auth client
 
 /* ── helpers ── */
 const $ = (id) => document.getElementById(id);
@@ -1757,9 +1783,19 @@ const VIEW_HINTS = {
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
   business: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
 };
+let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
 function contextHint(view) {
+  // A tip explains the view it opened on, so leaving that view retires it. It was
+  // staying up over the next tab, on top of whatever sat at the bottom of the page.
+  document.querySelectorAll(".dds-hint.dds-live.show .x").forEach((x) => x.click());
   const h = VIEW_HINTS[view];
-  if (h && window.ddsHint) setTimeout(() => window.ddsHint(h[0], h[1]), 400);
+  if (!h || !window.ddsHint || HINT_SHOWN) return;
+  if (view === "design" && S.site && S.site.edition === "monitor") return;   // nothing to pick on a watch plan
+  setTimeout(() => {
+    const on = $("view-" + view);
+    if (HINT_SHOWN || !on || !on.classList.contains("on")) return;
+    if (window.ddsHint(h[0], h[1])) HINT_SHOWN = true;
+  }, 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
 const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
@@ -3191,7 +3227,7 @@ async function loadBookings() {
     wrap.innerHTML = "";
     const box = el("div", "card"); box.style.cssText = "padding:18px;border:1px solid var(--line,#eee);border-radius:12px";
     box.appendChild(el("p", null, err.status === 503
-      ? "Online booking needs a one-time database update before it can be switched on. Your studio applies it once — then this page comes to life."
+      ? "Online booking isn’t switched on yet. Your studio turns it on once — then this page comes to life."
       : nice(err)));
     wrap.appendChild(box);
   }
@@ -3386,7 +3422,7 @@ async function loadReviews() {
     wrap.innerHTML = "";
     const box = el("div", "card"); box.style.cssText = "padding:18px;border:1px solid var(--line,#eee);border-radius:12px";
     box.appendChild(el("p", null, err.status === 503
-      ? "Reviews need a one-time database update before they can be switched on. Your studio applies it once — then this page comes to life."
+      ? "Reviews aren’t switched on yet. Your studio turns them on once — then this page comes to life."
       : nice(err)));
     wrap.appendChild(box);
   }
@@ -3784,6 +3820,7 @@ function carryScopeOnLinks() {
 
 function applyEditionGating() {
   const isMonitor = !!(S.site && S.site.edition === "monitor");
+  document.documentElement.classList.toggle("plan-watch", isMonitor);
   const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
   // Visual Studio makes site imagery — website feature AND a drafting site
   // (matches the nav: a watch-plan can read the site but never generates for it).
@@ -3799,7 +3836,10 @@ function applyEditionGating() {
       const n = document.createElement("div");
       n.id = "monitorNote";
       n.style.cssText = "max-width:900px;margin:10px auto 0;padding:10px 16px;border-radius:10px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px";
-      n.textContent = "This plan watches your website — viewing everything, changing nothing. To edit and publish from here, ask us about upgrading.";
+      const forClient = new URLSearchParams(location.search).get("client");
+      n.textContent = forClient
+        ? "This client’s plan watches their website — it doesn’t include editing or publishing here. To build it from Studio OS, move them to a plan with the website builder."
+        : "This plan watches your website — it doesn’t include editing or publishing here. To build it from Studio OS, ask us about upgrading.";
       const host = document.querySelector(".main") || document.body;
       host.insertBefore(n, host.firstChild);
     }
@@ -4315,14 +4355,36 @@ function renderBizWaiting() {
   rows.forEach((ch) => w.appendChild(el("p", "consequence", "When you publish: " + ch.sentence.charAt(0).toLowerCase() + ch.sentence.slice(1))));
   w.style.marginTop = "-22px"; w.style.marginBottom = "34px";
 }
+let WELCOME_FULL = null;   // decided once per page load: this view re-renders on every refresh
+const siteKey = () => (S.site && S.site.id) || "";
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* private window: the full welcome just shows again */ } };
 function renderWelcome() {
   const w = $("welcomeWrap"); const h = S.health;
-  if (!h || !h.first_run) { w.hidden = true; w.innerHTML = ""; return; }
+  // a watch plan never publishes from here, so "publish when you're ready" is a dead end
+  if (!h || !h.first_run || (S.site && S.site.edition === "monitor")) { w.hidden = true; w.innerHTML = ""; return; }
   w.hidden = false;
   const name = (S.identity && S.identity.business_name) || "your business";
   const step1done = !!(S.identity && S.identity.business_name && S.identity.description);
-  const step2done = localStorage.getItem("presence-previewed") === "1";
+  const step2done = lsGet("presence-previewed:" + siteKey()) === "1";
   w.innerHTML = "";
+  // The full welcome is for the first visit. After that it is one line with the next
+  // step, so the overview's real content isn't below the fold on every return.
+  if (WELCOME_FULL === null) { WELCOME_FULL = lsGet("presence-welcomed:" + siteKey()) !== "1"; lsSet("presence-welcomed:" + siteKey(), "1"); }
+  if (!WELCOME_FULL) {
+    const n = !step1done ? 1 : !step2done ? 2 : 3;
+    const next = {
+      1: ["Look over your facts", () => go("business")],
+      2: ["See your website", () => openPreview("draft")],
+      3: ["Publish when you’re ready", () => openRitual()],
+    }[n];
+    const bar = el("div", "welcomebar");
+    bar.appendChild(el("span", "wb-k", `Getting ${name} online · step ${n} of 3`));
+    const b = el("button", "textact", next[0] + " →"); b.type = "button"; b.addEventListener("click", next[1]);
+    bar.appendChild(b);
+    w.appendChild(bar);
+    return;
+  }
   const env = el("div", "envelope");
   env.appendChild(el("h2", null, `Let’s introduce ${name} to the internet.`));
   env.appendChild(el("p", null, "Three steps, at your pace. Nothing goes public until you say so."));
@@ -4354,19 +4416,24 @@ const LOOK_SWATCH = {
   "editorial": { bg: "#f6f3ec", ink: "#1a1a1c", accent: "#6d232a", font: "'Iowan Old Style',Palatino,Georgia,serif", tag: "Editorial · print serif" },
 };
 function lookSwatch(slug) { return LOOK_SWATCH[slug] || { bg: "#f2f0f5", ink: "#2a2536", accent: "#5b3fa0", font: "system-ui,sans-serif", tag: "Template family" }; }
+let LOOK_OPEN = false;   // the gallery stays folded: it took a third of the screen from the proof
 async function mountLookSeg() {
-  const seg = $("lookSeg"); if (!seg) return;
+  const seg = $("lookSeg"), drawer = $("lookDrawer"); if (!seg || !drawer) return;
   try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
   if (!LOOKS || (LOOKS.templates || []).length < 2) return;   // one look → no chooser
   // PT-2C: a visual preview gallery — each family shows a mini-mock of its look.
   // Data-driven from /site/templates, with a graceful fallback for future families.
-  seg.innerHTML = "";
-  const cards = el("div"); cards.style.cssText = "display:flex;gap:12px;flex-wrap:wrap;align-items:stretch";
+  seg.innerHTML = ""; drawer.innerHTML = ""; drawer.hidden = !LOOK_OPEN;
+  const lookToggle = el("button", null, "Try another look " + (LOOK_OPEN ? "▴" : "▾"));
+  lookToggle.setAttribute("aria-expanded", String(LOOK_OPEN)); lookToggle.setAttribute("aria-controls", "lookDrawer");
+  lookToggle.addEventListener("click", () => { LOOK_OPEN = !LOOK_OPEN; mountLookSeg(); });
+  seg.appendChild(lookToggle);
+  const cards = el("div"); cards.style.cssText = "display:flex;gap:12px;align-items:stretch";
   LOOKS.templates.forEach((t) => {
     const sw = lookSwatch(t.slug);
     const active = (PV.template || LOOKS.current.slug) === t.slug;
     const card = el("button"); card.dataset.look = t.slug;
-    card.style.cssText = "cursor:pointer;text-align:left;padding:0;border:2px solid " + (active ? "var(--plum,#5b3fa0)" : "rgba(0,0,0,.12)") + ";border-radius:12px;overflow:hidden;background:#fff;width:154px;font-family:inherit;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out),transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)";
+    card.style.cssText = "flex:none;display:flex;flex-direction:column;justify-content:flex-start;cursor:pointer;text-align:left;padding:0;border:2px solid " + (active ? "var(--plum,#5b3fa0)" : "rgba(0,0,0,.12)") + ";border-radius:12px;overflow:hidden;background:#fff;width:154px;font-family:inherit;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out),transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)";
     card.onmouseenter = () => { if (!active) card.style.borderColor = "rgba(91,63,160,.45)"; };
     card.onmouseleave = () => { if (!active) card.style.borderColor = "rgba(0,0,0,.12)"; };
     card.innerHTML =
@@ -4380,7 +4447,7 @@ async function mountLookSeg() {
     card.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
     cards.appendChild(card);
   });
-  seg.appendChild(cards);
+  drawer.appendChild(cards);
   if (PV.template) {
     const use = el("button", null, "Use this look");
     use.style.cssText = "font-weight:700";
@@ -4398,12 +4465,13 @@ async function mountLookSeg() {
 }
 async function openPreview(ver) {
   if (ver) PV.ver = ver;
+  LOOK_OPEN = false;
   PV.publishId = null; PV.launchId = null;
   mountLookSeg();
   $("verSeg").style.display = "";
   syncStageChrome();
   openStage();
-  localStorage.setItem("presence-previewed", "1");
+  lsSet("presence-previewed:" + siteKey(), "1");   // per site: one client's proof doesn't tick another's step
   await loadPreview();
 }
 async function openLaunchPreview(launchId) {   // FD-T7: preview a staged launch
@@ -4691,6 +4759,43 @@ function openRitual(opts) {
   loadRitual(!!(opts && opts.schedule === true));
   if (window.ddsHint) setTimeout(() => window.ddsHint("publish-atomic", "Publishing goes live all at once — never halfway — and every version is kept, so anything can come back."), 400);
 }
+// The publish page names what's holding things up, each with a way straight to it.
+// `field` is validateSnapshot's path; an older function without blocker_list keeps
+// the one-sentence fallback above.
+function blockerTarget(field) {
+  const [head, sub] = String(field || "").split(".");
+  const view = { identity: "business", location: "business", locations: "business", redirects: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials", posts: "updates" }[head] || "business";
+  let focus = null;
+  if (head === "identity" && sub) focus = "f-" + sub;
+  else if (head === "location") focus = sub === "hours" ? "hoursGrid" : "f-" + (sub || "address_line1");
+  return { view, focus };
+}
+function renderBlockerList(list) {
+  const rows = Array.isArray(list) ? list.filter((b) => b && b.message) : [];
+  if (!rows.length) return;
+  const seen = new Set();
+  const uniq = rows.filter((b) => { if (seen.has(b.message)) return false; seen.add(b.message); return true; });
+  const box = $("ritBlockers"); box.innerHTML = "";
+  box.appendChild(el("p", "blockprose", uniq.length === 1 ? "One thing to finish before this can publish:" : `${uniq.length} things to finish before this can publish:`));
+  const ul = el("ul", "blocklist");
+  uniq.forEach((b) => {
+    const li = el("li"); li.appendChild(el("span", null, b.message));
+    const fix = el("button", "textact", "Fix"); fix.type = "button";
+    fix.setAttribute("aria-label", "Fix: " + b.message);
+    fix.addEventListener("click", () => {
+      const t = blockerTarget(b.field);
+      closeRitual(); go(t.view);
+      if (t.focus) setTimeout(() => {
+        const n = $(t.focus); if (!n) return;
+        n.scrollIntoView({ block: "center" });
+        const tgt = n.matches("input,textarea,select") ? n : n.querySelector("input,textarea,select,button");
+        if (tgt) tgt.focus();
+      }, 80);
+    });
+    li.appendChild(fix); ul.appendChild(li);
+  });
+  box.appendChild(ul);
+}
 function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
@@ -4742,6 +4847,7 @@ async function loadRitual(toSchedule) {
     if (c.blockers > 0) {
       $("ritBlockers").innerHTML = `<p class="blockprose">Publishing waits until ${c.blockers === 1 ? "one small thing is" : c.blockers + " small things are"} complete — usually a missing business fact. <a class="textact" href="#" id="ritFix">Look in Business</a> — your draft is safe, and this page will be ready when you are.</p>`;
       $("ritFix").addEventListener("click", (e) => { e.preventDefault(); closeRitual(); go("business"); });
+      renderBlockerList(c.blocker_list);
     } else if (c.count > 0 || c.first_publish) {
       $("ritBlockers").innerHTML = "";
       const btn = el("button", "pubbtn", c.first_publish ? "Publish my site" : `Publish ${c.count === 1 ? "this change" : "these " + c.count + " changes"}`);
@@ -5150,7 +5256,7 @@ function openPageSearchPanel() {
 }
 
 /* ── G11: per-section review comments — the operator side of the feedback loop.
-   Toggle 💬 Comments → per-section count badges appear in the Content tree
+   Toggle Comments → per-section count badges appear in the Content tree
    tray; click one to read the thread (newest first), reply, resolve, or remove.
    The client's notes arrive through the shared-draft link (Share draft): the
    /p/s/:token page carries a "Leave feedback" panel keyed by the SAME stable
@@ -5168,13 +5274,13 @@ function cmSyncButton() {
   const n = CM_ON ? cmTotalOpen() : 0;
   // The label (and its open-note count) only — the segment button's on/aria-pressed
   // state has exactly ONE writer, dcModeSync, so the two can never disagree.
-  b.textContent = "💬 Comments" + (CM_ON && n ? " (" + n + ")" : "");
+  b.textContent = "Comments" + (CM_ON && n ? " (" + n + ")" : "");
 }
 function cmToggle() {
   if (CM_BUSY) return CM_PENDING;   // a load is already in flight — join it, never a silent no-op
   if (CM_ON) { CM_ON = false; CM_THREADS = null; cmSyncButton(); closeCommentsPanel(); dcRefreshTree(); return; }
   CM_BUSY = true;
-  const b = $("btnComments"); if (b) b.textContent = "💬 Loading…";
+  const b = $("btnComments"); if (b) b.textContent = "Loading…";
   CM_PENDING = (async () => {
     try {
       await cmLoad(); CM_ON = true;
@@ -5185,11 +5291,12 @@ function cmToggle() {
   return CM_PENDING;
 }
 // The count badge on a tray row: always visible when a thread has open notes;
-// a quiet hover affordance (💬) otherwise, so a thread can be STARTED anywhere.
+// a quiet hover affordance otherwise, so a thread can be STARTED anywhere.
 function cmBadge(slug, bid, name) {
   const n = cmOpenFor(slug, bid);
   const t = cmThreadFor(slug, bid);
-  const btn = el("button", "cm-badge" + (n ? "" : " zero"), n ? String(n) : "💬");
+  const btn = el("button", "cm-badge" + (n ? "" : " zero"), n ? String(n) : undefined);
+  if (!n) btn.innerHTML = uiIcon("message", 13);
   btn.type = "button";
   btn.title = n ? (n === 1 ? "1 open note here — read & reply" : n + " open notes here — read & reply")
     : (t && t.comments.length ? "Resolved notes here — read them" : "Leave a note here");
@@ -5297,7 +5404,7 @@ function cmOrphanRows(host, main) {
   (CM_THREADS || []).filter((t) => t.page_slug === (DC_PAGE || "") && t.block_id && ids.indexOf(t.block_id) === -1).forEach((t) => {
     const row = el("div", "dc-tree-row core under-page");
     const mn = el("button", "dc-tree-main"); mn.type = "button"; mn.title = "Read this feedback";
-    mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "💬" }));
+    mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: uiIcon("message") }));
     const txt = el("span", "dc-tree-txt");
     txt.appendChild(el("span", "dc-tree-name", "Feedback on a removed section"));
     txt.appendChild(el("span", "dc-tree-meta", t.block_id));
@@ -5381,12 +5488,14 @@ async function renderPreviewPanel() {
   card.appendChild(el("div", "hint", "Edit your Draft, publish it to a private Preview to review or share, then promote to Live. Your live site never changes until you promote."));
   const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
   const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
-  const dc = st.draft.unpublished_changes || 0;
+  // the same number the Publish button and the overview show (/changes), not the
+  // raw edit count: 14 edits to one new site is one change waiting to go live
+  const dc = S.changes && typeof S.changes.count === "number" ? S.changes.count : (st.draft.unpublished_changes || 0);
   // one offline label, used by the Live card AND the status row below — the
   // same wording must never drift two lines apart in the same panel
   const offLabel = st.live.offline_since ? "⏸ Offline since " + new Date(st.live.offline_since).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "";
   grid.appendChild(stateCard("Draft", [dc + " unpublished change" + (dc === 1 ? "" : "s")]));
-  grid.appendChild(stateCard("Preview", st.preview.exists ? ["Updated " + new Date(st.preview.updated_at).toLocaleString(), st.preview.has_password ? "🔒 Password-protected" : "🔗 Open link"] : ["Not created yet"]));
+  grid.appendChild(stateCard("Preview", st.preview.exists ? ["Updated " + new Date(st.preview.updated_at).toLocaleString(), st.preview.has_password ? "Password-protected" : "Open link"] : ["Not created yet"]));
   grid.appendChild(stateCard("Live", st.live.published
     ? (st.live.offline_since
       ? [offLabel, "Visitors see a “temporarily offline” page"]
@@ -6659,7 +6768,7 @@ function renderLinkedChip(blk, idx, card) {
   const item = clItemById(blk.ref);
   const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--plum-line,#d9cef0);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--plum-tint,#faf7ff)";
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-  const nm = el("div", null, "🔗 Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
+  const nm = el("div", null, "Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
   const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
@@ -6706,6 +6815,7 @@ const DC_PAGE_RESERVED = new Set(["", "index", "home", "404", "about", "contact"
 function dcResetHistory() { DC_UNDO = []; DC_REDO = []; DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
 function renderPagesBar() {
   if (typeof renderPagesList === "function") renderPagesList();
+  formsFollowPage();
   const host = $("pagesBar"); if (!host) return;
   host.textContent = "";
   dcPageList().forEach((pg) => {
@@ -7509,7 +7619,7 @@ function renderBlocksCard() {
       const isRec = st.key === recKey;
       const b = el("button"); b.type = "button";
       b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid var(--plum,#5b3fa0)" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
-      b.appendChild(Object.assign(el("div", null, (isRec ? "✨ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:var(--plum-deep,#3a2470)" : "") }));
+      b.appendChild(Object.assign(el("div", null, (isRec ? "✦ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:var(--plum-deep,#3a2470)" : "") }));
       b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:11px;color:var(--soft,#888);line-height:1.4" }));
       const n = Array.isArray(st.blocks) ? st.blocks.length : 0;
       b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:10.5px;color:var(--soft,#a99);margin-top:2px" }));
@@ -7828,7 +7938,7 @@ function renderBlocksCard() {
     const recSet = new Set(recTypes);
     if (recTypes.length) {
       const wrap = el("div"); wrap.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:12px";
-      wrap.appendChild(Object.assign(el("div", null, "✨ Recommended for you"), { style: "font-weight:600;font-size:12.5px;color:var(--plum-deep,#3a2470)" }));
+      wrap.appendChild(Object.assign(el("div", null, "✦ Recommended for you"), { style: "font-weight:600;font-size:12.5px;color:var(--plum-deep,#3a2470)" }));
       wrap.appendChild(el("div", "hint", BLOCK_SUGGEST.note || "A good fit for your kind of business."));
       const grid = groupGrid();
       recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) grid.appendChild(addBtn(d)); });
@@ -8461,7 +8571,32 @@ const FORM_PRESETS_UI = [
 let FORMS_WORK = null;
 const FF_IN = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box;background:var(--card,#fff)";
 const FF_BTN = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-function currentForms() { return (Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks : []).filter((b) => b && b.type === "form"); }
+let FORMS_PAGE = "";      // the page FORMS_WORK belongs to ("" = home)
+let FORMS_BASE = "[]";    // FORMS_WORK as last loaded or saved, to spot unsaved edits on a page switch
+function formsHostBlocks(slug) {
+  if (slug) { const p = dcPageObj(slug); return Array.isArray(p && p.blocks) ? p.blocks : []; }
+  return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks : [];
+}
+function currentForms(slug = FORMS_PAGE) { return formsHostBlocks(slug).filter((b) => b && b.type === "form"); }
+// A published form posts only its id, so an id has to be unique across the whole site.
+function allFormIds() {
+  const ids = new Set((FORMS_WORK || []).map((f) => f.id));
+  ["", ...dcPagesArr().map((p) => p && p.slug).filter(Boolean)].forEach((s) => currentForms(s).forEach((f) => ids.add(f.id)));
+  return ids;
+}
+function formsLoad() {
+  FORMS_PAGE = DC_PAGE;
+  FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+  renderFormsCard();
+  FORMS_BASE = JSON.stringify(FORMS_WORK);
+}
+// The Pages bar re-renders on every page switch: bring the Forms card along, saving
+// what was typed on the page being left rather than dropping it.
+function formsFollowPage() {
+  if (!$("formsCard") || FORMS_PAGE === DC_PAGE) return;
+  if (JSON.stringify(FORMS_WORK) !== FORMS_BASE) { saveForms().finally(formsLoad); return; }
+  formsLoad();
+}
 function ffSlug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40); }
 function ffUniqueId(base, taken) { let id = ffSlug(base) || "form"; let n = 1; while (taken.has(id)) id = ffSlug(base) + "_" + (++n); taken.add(id); return id; }
 function ffSel(options, value, onchange) {
@@ -8471,27 +8606,43 @@ function ffSel(options, value, onchange) {
 }
 async function saveForms() {
   try {
-    const others = (Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks : []).filter((b) => !b || b.type !== "form");
-    const next = [...others, ...FORMS_WORK];
-    const r = await api("PUT", "/settings", { blocks: next });
-    S.settings = r.data || { ...S.settings, blocks: next };
+    // Forms keep their place on the page (a save used to drag them all to the bottom);
+    // a form removed here drops out, a new one lands at the end.
+    const work = new Map(FORMS_WORK.map((f) => [f.id, f]));
+    const placed = new Set();
+    const next = [];
+    formsHostBlocks(FORMS_PAGE).forEach((b) => {
+      if (!b || b.type !== "form") { next.push(b); return; }
+      if (work.has(b.id)) { next.push(work.get(b.id)); placed.add(b.id); }
+    });
+    FORMS_WORK.forEach((f) => { if (!placed.has(f.id)) next.push(f); });
+    let r;
+    if (FORMS_PAGE) {
+      const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
+      r = await api("PUT", "/settings", { pages });
+      S.settings = r.data || { ...S.settings, pages };
+    } else {
+      r = await api("PUT", "/settings", { blocks: next });
+      S.settings = r.data || { ...S.settings, blocks: next };
+    }
     if (typeof BLOCKS_WORK !== "undefined") BLOCKS_WORK = currentBlocks();   // keep the content-block editor in sync
     FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
     renderFormsCard();
+    FORMS_BASE = JSON.stringify(FORMS_WORK);
     toast("Forms saved — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
 }
 function mountFormsCard() {
   const host = $("designHost"); if (!host || $("formsCard")) return;
-  FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
   const card = el("div", "field"); card.id = "formsCard"; card.style.marginTop = "18px";
   host.appendChild(card);
-  renderFormsCard();
+  formsLoad();
 }
 function renderFormsCard() {
   const card = $("formsCard"); if (!card) return; card.textContent = "";
-  card.appendChild(el("label", null, "Forms"));
-  card.appendChild(el("div", "hint", "Build any form from typed fields — contact, quote, application or booking. Every form is automatically mobile-friendly, accessible and safe. Each form shows as a section on your home page; reorder or hide it under “Your home page.” Publish to apply."));
+  const formsPage = FORMS_PAGE ? dcPageObj(FORMS_PAGE) : null;
+  card.appendChild(el("label", null, "Forms on " + (FORMS_PAGE ? "“" + ((formsPage && formsPage.title) || FORMS_PAGE) + "”" : "your home page")));
+  card.appendChild(el("div", "hint", "Build any form from typed fields — contact, quote, application or booking. Every form is automatically mobile-friendly, accessible and safe. Each form shows as a section on the page you’re editing. Switch pages above to add one elsewhere. Publish to apply."));
   const commitForm = (fi, patch) => { FORMS_WORK[fi] = { ...FORMS_WORK[fi], ...patch }; };
   const commitField = (fi, xi, patch) => { const fs = FORMS_WORK[fi].fields.slice(); fs[xi] = { ...fs[xi], ...patch }; FORMS_WORK[fi] = { ...FORMS_WORK[fi], fields: fs }; };
 
@@ -8624,7 +8775,7 @@ function renderFormsCard() {
   FORM_PRESETS_UI.forEach((p) => {
     const b = el("button", null, p.name); b.type = "button"; b.style.cssText = FF_BTN;
     b.addEventListener("click", () => {
-      const taken = new Set(FORMS_WORK.map((f) => f.id));
+      const taken = allFormIds();
       const copy = JSON.parse(JSON.stringify(p.def)); copy.id = ffUniqueId(copy.id, taken); copy.rules = copy.rules || [];
       FORMS_WORK.push(copy); renderFormsCard();
     });
@@ -9049,14 +9200,63 @@ async function applyTemplateFromGallery(t) {
 // A plain-language palette of the EXISTING BLOCK_DEFS, grouped by the same purpose
 // taxonomy as the "Add a section" library (SECTION_GROUPS). Click = append; drag =
 // drop at a position (see the drop-lines in #4). Nothing here is a new block type.
-const TRAY_GROUP_ICON = { "Show your work": "🖼", "Build trust": "★", "Get customers to act": "➜", "Text & layout": "¶", "Info & updates": "ℹ" };
-const TRAY_TYPE_ICON = {
-  gallery: "🖼", before_after: "🔀", image: "🖼", image_text: "🖽", video: "▶", team: "👥", partners: "🏷",
-  features: "✦", stats: "№", cards: "▤", reviews_wall: "★", reviews: "★", certifications: "✔", pricing: "＄", process: "⇢",
-  cta: "❗", buttons: "🔘", booking: "🗓", appointment: "🗓", newsletter: "✉", download: "⭳", map: "📍",
-  richtext: "¶", columns: "▥", accordion: "▾", tabs: "🗂", carousel: "🎠", progress: "▰", divider: "―", toc: "☰", service_areas: "📍", events: "📅", social: "◎",
-  title: "H", link_list: "🔗", table: "▦", spotlight: "◈",
+// ── The builder's one icon set: the shell's 24-grid, 2px-stroke family. Emoji render
+// differently on every OS and read as unfinished beside the rest of the product. ──
+const BI_PATHS = {
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/>',
+  gallery: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
+  compare: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M8 10l-2 2 2 2"/><path d="M16 10l2 2-2 2"/>',
+  imagetext: '<rect x="3" y="5" width="9" height="14" rx="1"/><path d="M15 8h6M15 12h6M15 16h4"/>',
+  video: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/>',
+  people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+  spark: '<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  cards: '<rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/>',
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
+  badge: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+  price: '<path d="M12 2v20"/><path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  steps: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+  megaphone: '<path d="M3 10v4l13 5V5z"/><path d="M7 15.5V19a2 2 0 0 0 4 0v-2"/><path d="M19 9a3 3 0 0 1 0 6"/>',
+  button: '<rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8 12h8"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  download: '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/>',
+  pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  text: '<path d="M4 6h16M4 11h16M4 16h10"/>',
+  columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
+  chevrons: '<path d="M4 7h16M4 12h16M4 17h16"/><path d="M17 5l2 2-2 2"/>',
+  tabs: '<path d="M3 9h18v11H3z"/><path d="M3 9V5h7v4"/><path d="M10 5h6v4"/>',
+  carousel: '<rect x="7" y="5" width="10" height="14" rx="1"/><path d="M3 8v8M21 8v8"/>',
+  progress: '<rect x="3" y="9" width="18" height="6" rx="3"/><path d="M6 12h7"/>',
+  divider: '<path d="M3 12h18"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/>',
+  heading: '<path d="M6 4v16M18 4v16M6 12h12"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 10v10M15 10v10"/>',
+  section: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>',
+  clipboard: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0"/>',
+  page: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 14h10l1-14"/>',
+  eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 6.2A9.6 9.6 0 0 1 22 12a15 15 0 0 1-3.2 4"/><path d="M6.6 6.6A15 15 0 0 0 2 12s3.5 6 10 6a9.6 9.6 0 0 0 4.4-1"/>',
+  message: '<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',
 };
+function uiIcon(name, size) {
+  const s = size || 16;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BI_PATHS[name] || BI_PATHS.section}</svg>`;
+}
+const TRAY_GROUP_ICON = { "Show your work": "image", "Build trust": "star", "Get customers to act": "steps", "Text & layout": "text", "Info & updates": "list" };
+const TRAY_TYPE_ICON_NAME = {
+  gallery: "gallery", before_after: "compare", image: "image", image_text: "imagetext", video: "video", team: "people", partners: "tag",
+  features: "spark", stats: "chart", cards: "cards", reviews_wall: "star", reviews: "star", certifications: "badge", pricing: "price", process: "steps",
+  cta: "megaphone", buttons: "button", booking: "calendar", appointment: "calendar", newsletter: "mail", download: "download", map: "pin",
+  richtext: "text", columns: "columns", accordion: "chevrons", tabs: "tabs", carousel: "carousel", progress: "progress", divider: "divider", toc: "list", service_areas: "pin", events: "calendar", social: "share",
+  title: "heading", link_list: "link", table: "table", spotlight: "spark",
+};
+const trayIcon = (type) => uiIcon(TRAY_TYPE_ICON_NAME[type] || "section");
 // PURE + self-contained (no globals) so it can be unit-tested by extraction: does a
 // section (its name / familiar-alias / type) match a plain-text search query?
 function trayItemMatches(name, alias, type, q) {
@@ -9086,7 +9286,9 @@ function renderBlockTray() {
       .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, TRAY_QUERY));
     if (!defs.length) return;
     const wrap = el("div", "tray-grp");
-    wrap.appendChild(el("div", "tray-grp-h", (TRAY_GROUP_ICON[grp.label] ? TRAY_GROUP_ICON[grp.label] + "  " : "") + grp.label));
+    const grpH = el("div", "tray-grp-h", grp.label);
+    if (TRAY_GROUP_ICON[grp.label]) grpH.insertAdjacentHTML("afterbegin", uiIcon(TRAY_GROUP_ICON[grp.label], 14));
+    wrap.appendChild(grpH);
     defs.forEach((d) => { wrap.appendChild(trayItem(d)); shown++; });
     host.appendChild(wrap);
   });
@@ -9095,14 +9297,14 @@ function renderBlockTray() {
 function trayItem(d) {
   const b = el("button", "tray-item"); b.type = "button";
   b.title = "Add “" + d.name + "” — click to append, or drag onto the canvas to place it";
-  b.appendChild(Object.assign(el("span", "ti-ico"), { textContent: TRAY_TYPE_ICON[d.type] || "▧" }));
+  b.appendChild(Object.assign(el("span", "ti-ico"), { innerHTML: trayIcon(d.type) }));
   const txt = el("span", "ti-txt");
   txt.appendChild(el("span", "ti-name", d.name));
   if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
   b.appendChild(txt);
   // click = append (keyboard-accessible fallback); pointer-drag = drop into place
   b.addEventListener("click", () => { if (pdConsumeClick()) return; addBlockAt(d, BLOCKS_WORK.length); });
-  b.addEventListener("pointerdown", (e) => pdStart(e, { kind: "new", type: d.type, label: d.name, icon: TRAY_TYPE_ICON[d.type] || "▧" }, b));
+  b.addEventListener("pointerdown", (e) => pdStart(e, { kind: "new", type: d.type, label: d.name, icon: trayIcon(d.type) }, b));
   return b;
 }
 
@@ -9202,7 +9404,7 @@ function pfPaint(grid, allow, seq) {
     const c = mediaCell(grid, m, false, pfPick);   // the pickers' exact per-cell contract
     c.dataset.mid = String(m.id);                  // anchors the offer popover to THIS photo
     // drag a thumbnail onto the canvas → a new photo section at that gap (pd engine)
-    c.addEventListener("pointerdown", (e) => pdStart(e, { kind: "media", mediaId: m.id, label: m.alt_text || "Photo", icon: "🖼" }, c));
+    c.addEventListener("pointerdown", (e) => pdStart(e, { kind: "media", mediaId: m.id, label: m.alt_text || "Photo", icon: uiIcon("image") }, c));
     grid.appendChild(c);
   });
   if (imgs.length > PF_CAP) {
@@ -9428,7 +9630,8 @@ function pdBegin() {
   // the tree IS the drop zone.
   if (PDRAG.kind === "new") { closeTrayPanel(); PDRAG.closedPanel = true; }
   const g = el("div", "pd-ghost");
-  g.appendChild(Object.assign(el("span", "pd-ico"), { textContent: PDRAG.icon || "▧" }));
+  // PDRAG.icon only ever comes from uiIcon()/trayIcon() (constants), never from content
+  g.appendChild(Object.assign(el("span", "pd-ico"), { innerHTML: PDRAG.icon || uiIcon("section") }));
   g.appendChild(el("span", null, (PDRAG.kind === "move" ? "Move: " : "") + (PDRAG.label || "Section")));
   if (pdReducedMotion()) g.style.transition = "none";
   document.body.appendChild(g); PDRAG.ghost = g;
@@ -9603,7 +9806,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   if (clip) {
     const cdef = BLOCK_DEFS.find((x) => x.type === clip.type);
     const pasteBtn = el("button", "tray-item"); pasteBtn.type = "button"; pasteBtn.style.cssText = "border:1px solid var(--plum,#5b3fa0);margin-bottom:8px";
-    pasteBtn.appendChild(Object.assign(el("span", "ti-ico"), { textContent: "📋" }));
+    pasteBtn.appendChild(Object.assign(el("span", "ti-ico"), { innerHTML: uiIcon("clipboard") }));
     const pt = el("span", "ti-txt"); pt.appendChild(el("span", "ti-name", "Paste copied section"));
     pt.appendChild(el("span", "ti-alias", (cdef && cdef.name) || clip.type)); pasteBtn.appendChild(pt);
     pasteBtn.addEventListener("click", () => { closeInsertMenu(); dcPasteAt(atIndex); });
@@ -9624,7 +9827,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
       wrap.appendChild(el("div", "tray-grp-h", grp.label));
       defs.forEach((d) => {
         const b = el("button", "tray-item"); b.type = "button";
-        b.appendChild(Object.assign(el("span", "ti-ico"), { textContent: TRAY_TYPE_ICON[d.type] || "▧" }));
+        b.appendChild(Object.assign(el("span", "ti-ico"), { innerHTML: trayIcon(d.type) }));
         const txt = el("span", "ti-txt"); txt.appendChild(el("span", "ti-name", d.name));
         if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
         b.appendChild(txt);
@@ -9691,8 +9894,15 @@ function refreshDesignPreview() {
       // in-place session FIRST so typed text is never silently lost.
       if (IPE) ipeCommit();
       frame.srcdoc = html;
-      const box = $("designPreviewEmpty"); if (box) box.hidden = true;
-    } catch (_) {
+      const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
+    } catch (err) {
+      // a plan without the website builder: say that, not "try again" — it can't work
+      if (err && err.status === 403) {
+        frame.srcdoc = "";
+        const box = $("designPreviewEmpty"); if (box) box.classList.add("plan");
+        dpNote("Editing isn’t part of this plan.", "This plan watches a website that lives somewhere else. Design opens up on a plan with the website builder.");
+        return;
+      }
       // the big proof ("See your site") still works — say so rather than staying blank
       if (!frame.srcdoc) dpNote("The proof couldn’t draw just now.",
         "Your content is safe. It’ll appear here on your next change — or open “See your site” above for the full proof.");
@@ -10799,7 +11009,7 @@ function dcBuildInserts(doc, main) {
     const t = doc.createElement("div"); t.className = "dc-ez-t"; t.textContent = "Start building your page";
     const s = doc.createElement("div"); s.className = "dc-ez-s"; s.textContent = "The fastest start: drop in a ready-made layout of real sections you then edit. Or add one section at a time.";
     const acts = doc.createElement("div"); acts.className = "dc-ez-acts";
-    const seed = doc.createElement("button"); seed.type = "button"; seed.className = "dc-ez-btn"; seed.textContent = "✨ Choose a template";
+    const seed = doc.createElement("button"); seed.type = "button"; seed.className = "dc-ez-btn"; seed.textContent = "Choose a template";
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-ez-btn2"; b.textContent = "＋ Add one section";
     acts.appendChild(seed); acts.appendChild(b);
     z.appendChild(t); z.appendChild(s); z.appendChild(acts);
@@ -10853,7 +11063,7 @@ function dcBuildTree(main) {
 function dcPageTreeRow(pg, cur) {
   const row = el("div", "dc-tree-row pagerow" + (cur ? " sel" : ""));
   const mn = el("button", "dc-tree-main"); mn.type = "button"; mn.title = "Open this page to edit it";
-  mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: pg.slug ? "📄" : "🏠" }));
+  mn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: uiIcon(pg.slug ? "page" : "home") }));
   const hidden = pg.slug && dcPageObj(pg.slug) && dcPageObj(pg.slug).hideNav;
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", pg.title + (hidden ? " (hidden)" : "")));
@@ -10903,10 +11113,10 @@ function dcTreeGrab(spec) {
 function dcTreeChildRow(colEl, bi, k, span) {
   const row = el("div", "dc-tree-row child");
   row.dataset.colof = String(bi); row.dataset.k = String(k);
-  const dragSpec = { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: "▯" };
+  const dragSpec = { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: uiIcon("columns") };
   row.appendChild(dcTreeGrab(dragSpec));   // touch drags start on the ⠿ handle; the row keeps pan-y
   const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page — drag to reorder the columns";
-  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: "▯" }));
+  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: uiIcon("columns") }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", "Column " + (k + 1)));
   txt.appendChild(el("span", "dc-tree-meta", "width " + (span || "?") + "/12"));
@@ -10921,7 +11131,7 @@ function dcTreeChildRow(colEl, bi, k, span) {
   });
   row.appendChild(mainBtn);
   const acts = el("span", "dc-tree-acts");
-  const set = el("button", null, "⚙"); set.type = "button"; set.title = "Edit this column"; set.setAttribute("aria-label", "Edit column " + (k + 1));
+  const set = el("button"); set.innerHTML = uiIcon("cog", 14); set.type = "button"; set.title = "Edit this column"; set.setAttribute("aria-label", "Edit column " + (k + 1));
   set.addEventListener("click", (e) => { e.stopPropagation(); eeEditBlock(bi); });
   acts.appendChild(set);
   row.appendChild(acts);
@@ -10935,7 +11145,7 @@ function dcTreeRow(el2, c) {
   const name = isBlock ? ((def && def.name) || b.type || "Section")
     : (heading ? heading.slice(0, 42) : (DC_CORE_NAME[c.view] || "Section"));
   const meta = isBlock ? (SECTION_ALIAS[b.type] || b.type || "section") : "built-in section";
-  const icon = isBlock ? (TRAY_TYPE_ICON[b.type] || "▧") : "◫";
+  const icon = isBlock ? trayIcon(b.type) : uiIcon("section");
   const row = el("div", "dc-tree-row " + (isBlock ? "block" : "core"));
   if (isBlock) row.dataset.bi = String(c.bi);   // slice C: pdTreeGaps reads these
   // Slice C: drag a section row to reorder — the SAME pd engine + dcMove commit
@@ -10946,7 +11156,7 @@ function dcTreeRow(el2, c) {
   if (isBlock) row.appendChild(dcTreeGrab(dragSpec));
   const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button";
   mainBtn.title = isBlock ? "Select this on the page — drag to reorder your sections" : "Select this on the page";
-  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { textContent: icon }));
+  mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: icon }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", name));
   txt.appendChild(el("span", "dc-tree-meta", meta));
@@ -10954,7 +11164,7 @@ function dcTreeRow(el2, c) {
   if (isBlock) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
   mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(el2, row); });
   row.appendChild(mainBtn);
-  // G11: per-section comment badge (count when open notes exist; quiet 💬 to
+  // G11: per-section comment badge (count when open notes exist; quiet icon to
   // start a thread). Block rows only — keyed by the stable section id, so the
   // thread survives reorders and matches the client's shared-draft feedback.
   if (CM_ON && isBlock) {
@@ -10965,18 +11175,19 @@ function dcTreeRow(el2, c) {
   }
   const acts = el("span", "dc-tree-acts");
   const mkA = (label, title, fn, disabled) => {
-    const btn = el("button", null, label); btn.type = "button"; btn.title = title; btn.setAttribute("aria-label", title);
+    const btn = el("button"); if (String(label).startsWith("<svg")) btn.innerHTML = label; else btn.textContent = label;
+    btn.type = "button"; btn.title = title; btn.setAttribute("aria-label", title);
     if (disabled) btn.disabled = true; else btn.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
     return btn;
   };
   if (isBlock) {
     acts.appendChild(mkA("↑", "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
     acts.appendChild(mkA("↓", "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
-    acts.appendChild(mkA("⚙", "Settings for this section", () => eeEditBlock(c.bi)));
-    acts.appendChild(mkA("🗑", "Remove this section", () => dcDelete(c.bi)));
+    acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
+    acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
   } else {
-    acts.appendChild(mkA("⚙", "Edit this section", () => eeEditCore(c.view)));
-    if (c.key) acts.appendChild(mkA("🙈", "Hide this section", () => eeHideKey(c.key)));
+    acts.appendChild(mkA(uiIcon("cog", 14), "Edit this section", () => eeEditCore(c.view)));
+    if (c.key) acts.appendChild(mkA(uiIcon("eyeoff", 14), "Hide this section", () => eeHideKey(c.key)));
   }
   row.appendChild(acts);
   return row;
@@ -11213,8 +11424,13 @@ async function renderFirstRun() {
     await refreshAll();
     renderKnowledgeDocs();
     renderMonitorCard();
-    renderFirstRun();
-    renderPlanNotice();
+    // /commerce/* answers for the signed-in account, so inside ?client= these would
+    // show the studio's own notices and checklist on the client's page (same rule as
+    // the billing and deletion cards in refreshAll).
+    if (!new URLSearchParams(location.search).get("client")) {
+      renderFirstRun();
+      renderPlanNotice();
+    }
     // deep links: presence.html?view=business|offerings|…|preview|publish
     const v = new URLSearchParams(location.search).get("view");
     if (v === "preview") openPreview("draft");
