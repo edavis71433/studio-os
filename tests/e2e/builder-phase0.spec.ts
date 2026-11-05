@@ -176,12 +176,19 @@ test.describe('the preview stage', () => {
   test('the look gallery is folded until asked for, and the proof gets the room', async ({ page }) => {
     await installApp(page, { api: { ...API, ...LOOKS } });
     await page.goto('/presence.html');
-    await page.locator('#btnPreview, button:has-text("Preview")').first().click();
+    // the header's button on a desktop, the dock's on a phone
+    await page.locator('button:visible', { hasText: /^Preview$/ }).first().click();
+    const width = page.viewportSize()!.width;
+    const bar = await page.locator('.stagebar').boundingBox();
+    // one row on a desktop, two on a tablet: it was over 300px with the gallery in it
+    expect(bar!.height).toBeLessThan(width > 1180 ? 90 : 130);
+    if (width <= 760) {                     // a phone changes its look in Design settings
+      await expect(page.locator('#lookSeg')).toBeHidden();
+      return;
+    }
     const toggle = page.getByRole('button', { name: /Try another look/ });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#lookDrawer [data-look]').first()).toBeHidden();
-    const bar = await page.locator('.stagebar').boundingBox();
-    expect(bar!.height).toBeLessThan(90);   // it was over 300px tall with the gallery in it
     await toggle.click();
     await expect(page.locator('#lookDrawer [data-look="editorial"]')).toBeVisible();
     await page.locator('#lookDrawer [data-look="editorial"]').click();

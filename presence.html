@@ -861,6 +861,17 @@ body.pd-dragging *{cursor:grabbing !important}
   .dpdevseg{display:flex;flex-wrap:wrap;max-width:100%}
   .dpdevseg button{flex:1 1 auto;padding:var(--dds-s2,8px) 10px;font-size:12.5px}
 }
+/* the preview bar beside the sidebar on a tablet: links on one row, controls on the
+   next (the tabs stay on the row that touches the proof). A plain wrap left the
+   page links in a narrow stack and the bar 230px tall. */
+@media(min-width:761px) and (max-width:1180px){
+  .stagebar{flex-wrap:wrap;column-gap:var(--dds-s4,16px);row-gap:var(--dds-s1,4px);padding-left:var(--dds-s5,20px);padding-right:var(--dds-s5,20px)}
+  .stagebar::before{content:"";order:-1;flex:0 0 100%;height:0}
+  #pageWords,#lookSeg{order:-2;flex-wrap:nowrap}
+  #lookSeg{margin-left:auto}
+  .deskprivacy{display:none}
+  .lookdrawer{padding-left:var(--dds-s5,20px);padding-right:var(--dds-s5,20px)}
+}
 @media(max-width:760px){
   .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
   .dc-slideover.on{transform:translateY(0)}
