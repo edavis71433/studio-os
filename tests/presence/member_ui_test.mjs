@@ -48,6 +48,8 @@ const CONTROLS = [
   ['DELETE /faqs/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /testimonials/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /posts/:id', 'presence.html', 'api("DELETE", `/posts/${p.id}`)', ['data-act="del" data-needs="delete"']],
+  // Undo: undoing an add removes the row, so a role without delete isn't offered that step
+  ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/${rec.col}/${rec.id}`)', ['window.ddsLacks && window.ddsLacks("delete") ? null : { kind: "create"']],
 
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
   ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain")`, ['rm.dataset.needs = "configure"']],
@@ -116,7 +118,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 4 && sent('presence.html').length === 11 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 4 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');
@@ -153,6 +155,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const builder = SOURCE['presence.html'];
   ok('both ways to change the template are marked', builder.includes('<div id="designGallery" hidden data-needs="owner">') && builder.includes('"Use this look"); use.dataset.needs = "owner"'));
   ok('the template calls are the two that were marked', count(builder, 'api("PUT", "/site/template"') === 2);
+  ok('Styles holds only what staff can\'t use: its button is marked, and the panel says so if reached another way', builder.includes('id="btnSettingsOpen" data-needs="configure"') && builder.includes('id="stylesAsk" hidden data-if-lacks="configure"') && builder.includes('#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}'));
   ok('account deletion is marked', builder.includes('d.id = "deleteCard"; d.dataset.needs = "owner"'));
   ok('the Sharing link in the rail is marked', builder.includes('<a href="/sharing.html" data-needs="owner">'));
   ok('the plan card and its section are marked: /commerce only knows the caller\'s own account', SOURCE['settings.html'].includes("ownerOnly: true, needs: 'owner' }") && SOURCE['settings.html'].includes('id="billing" aria-labelledby="billingHead" hidden data-needs="owner"'));

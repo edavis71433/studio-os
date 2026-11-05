@@ -7,7 +7,7 @@
 import { svc } from './db.ts';
 import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
-import { isSiteRole } from './site_roles.ts';
+import { isSiteRole, seesFullWorkspace } from './site_roles.ts';
 import type { SiteRow } from './site.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 import type { EmailBrand } from './email_brand.ts';
@@ -89,7 +89,10 @@ export async function listSiteMembers(siteId: string): Promise<Array<{ id: strin
  *  one — signed by GoTrue, landing on `next` on the Site URL. Returns '' when no
  *  link can be minted (missing env, GoTrue refused), so callers can fall back
  *  honestly (a set-password link, or the plain portal door). Shared by the site/
- *  agency member invites here and the client-portal welcome in routes/sales.ts. */
+ *  agency member invites here and the client-portal welcome in routes/sales.ts.
+ *  `redirect_to` belongs at the top of this body. `options` is the JS SDK's shape,
+ *  and GoTrue ignores it here: the link then lands on the project's Site URL, the
+ *  marketing home page, which has no sign-in code, so the person isn't signed in. */
 export async function mintSignInLink(email: string, next: string): Promise<string> {
   const base = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -99,7 +102,7 @@ export async function mintSignInLink(email: string, next: string): Promise<strin
     try {
       const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
         method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, email, options: { redirect_to: `${site}${next}` } }),
+        body: JSON.stringify({ type, email, redirect_to: `${site}${next}` }),
       });
       const j = await r.json().catch(() => null);
       return String((r.ok && j && (j.action_link || j.properties?.action_link)) || '');
@@ -119,13 +122,16 @@ export async function sendInviteLink(email: string, opts: { subject: string; int
   return sent !== false;
 }
 
-/** The site-membership flavor: the business's own brand + name, landing on the portal. */
-async function sendSiteInvite(email: string, siteId: string): Promise<boolean> {
+/** The site-membership flavor: the business's own brand + name. A reviewer lands on
+ *  the client door. A seat with the full workspace lands on the studio door, because
+ *  the workspace pages read the operator session ('dds-portal-auth'), and a session
+ *  from the client door ('dds-client-auth') would leave them signed out there. */
+async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Promise<boolean> {
   const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
   const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
-  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: '/portal.html' });
+  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
 }
 
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string; emailed?: boolean }> {
@@ -137,7 +143,7 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),
   });
   if (!r.ok) return { ok: false, error: 'write_failed' };
-  const emailed = await sendSiteInvite(clean, siteId).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
+  const emailed = await sendSiteInvite(clean, siteId, role).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
   return { ok: true, emailed };
 }
 

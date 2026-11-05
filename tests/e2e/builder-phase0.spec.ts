@@ -223,10 +223,9 @@ test.describe('forms on your own pages', () => {
     await expect(page.locator('#formsCard label').first()).toHaveText('Forms on your home page');
     await page.locator('#pagesBar .page-pill', { hasText: 'Visit' }).click();
     await expect(page.locator('#formsCard label').first()).toHaveText('Forms on “Visit”');
-    await page.locator('#btnSettingsOpen').click();
+    await page.evaluate(() => (window as any).openSettingsPanel('forms'));
     await page.locator('#formsCard').getByRole('button', { name: 'Contact form' }).click();
-    await page.locator('#formsCard').getByRole('button', { name: 'Save forms' }).click();
-    await expect.poll(() => puts.length).toBe(1);
+    await expect.poll(() => puts.length).toBe(1);   // forms save themselves
     expect(puts[0].blocks).toBeUndefined();                 // the home page wasn't rewritten
     const visit = puts[0].pages.find((p: any) => p.slug === 'visit');
     const added = visit.blocks.filter((b: any) => b.type === 'form');
@@ -244,8 +243,9 @@ test.describe('forms on your own pages', () => {
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: settings }) });
     });
     await page.goto('/presence.html#design');
-    await page.locator('#btnSettingsOpen').click();
-    await page.locator('#formsCard').getByRole('button', { name: 'Save forms' }).click();
+    await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await page.locator('#formsCard input[placeholder="Form title"]').first().fill('Say hello');
+    await page.locator('#formsCard input[placeholder="Form title"]').first().blur();
     await expect.poll(() => puts.length).toBe(1);
     expect(puts[0].blocks.map((b: any) => b.type)).toEqual(['form', 'richtext']);
   });

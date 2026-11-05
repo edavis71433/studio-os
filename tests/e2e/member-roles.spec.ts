@@ -330,7 +330,6 @@ test.describe('The builder', () => {
       await expectControls(page, p, [
         ['#view-bookings .bk-enabled', 'configure'],
         ['#view-bookings .bk-closed', 'configure'],
-        ['#view-bookings button:has-text("Save booking settings")', 'configure'],
         ['#view-bookings button:has-text("Remove")', 'delete'],
       ]);
       await expect(page.locator('#view-bookings button:has-text("Edit")').first()).toBeVisible();
@@ -398,7 +397,7 @@ test.describe('The builder', () => {
         ['#view-business .field:has(#f-industry)', 'configure'],
         ['#view-business details:has(#f-gsv)', 'configure'],
       ]);
-      await expect(page.locator('#ann-save')).toBeVisible();
+      await expect(page.locator('#ann-text')).toBeVisible();
     });
 
     test(`${p.who}: taking the site offline, from the Page menu`, async ({ page }) => {
@@ -434,6 +433,67 @@ test.describe('The builder', () => {
       await openBuilder(page, p, '#history');
       await builderScript(page, 'LOOK_OPEN = true; PV.template = "editorial"; await mountLookSeg();');
       await expectDisplay(page, p, '#lookSeg button:has-text("Use this look")', 'owner');
+    });
+  }
+});
+
+// ── Undo: undoing an add sends DELETE, which a role without delete can't do ──
+const NEW_ROW = 'dddddddd-4444-4444-8444-dddddddddddd';
+test.describe('Undo in the builder', () => {
+  for (const p of PEOPLE) {
+    test(`${p.who}: adding a service ${p.lacks.includes('delete') ? 'offers no Undo that would be refused' : 'can be undone'}`, async ({ page }) => {
+      await openBuilder(page, p, '#offerings');
+      const deletes: string[] = [];
+      await page.route(/\/functions\/v1\/presence\/offerings/, (r) => {
+        const m = r.request().method();
+        if (m === 'GET') return r.fallback();
+        if (m === 'DELETE') deletes.push(new URL(r.request().url()).pathname.split('/').pop()!);
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: NEW_ROW, name: 'Soup', category: 'Mains', price_text: '' } }) });
+      });
+      await builderScript(page, 'await api("POST", "/offerings", { name: "Soup", category: "Mains", price_text: "" });');
+      const undo = page.locator('#btnUndoTop');
+      if (p.lacks.includes('delete')) {
+        await expect(undo).toHaveAttribute('hidden', '');
+      } else {
+        await expect(undo).toBeEnabled();
+        await undo.evaluate((b) => (b as HTMLElement).click());
+        await expect.poll(() => deletes).toEqual([NEW_ROW]);
+      }
+    });
+  }
+
+  test('a staff member keeps Undo for what they can put back: an edit goes back with PATCH, and an add before it stays off the history', async ({ page }) => {
+    await openBuilder(page, STAFF, '#offerings');
+    const writes: string[] = [];
+    await page.route(/\/functions\/v1\/presence\/offerings/, (r) => {
+      const m = r.request().method();
+      if (m === 'GET') return r.fallback();
+      writes.push(m);
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: NEW_ROW, name: 'Pasta' } }) });
+    });
+    await builderScript(page, 'await api("POST", "/offerings", { name: "Soup", category: "Mains", price_text: "" }); await api("PATCH", "/offerings/o1", { name: "Pasta al forno" });');
+    const undo = page.locator('#btnUndoTop');
+    await expect(undo).toBeEnabled();
+    await undo.evaluate((b) => (b as HTMLElement).click());
+    await expect.poll(() => writes).toEqual(['POST', 'PATCH', 'PATCH']);
+    await expect(undo).toBeDisabled();   // nothing left, and the add was never offered
+  });
+});
+
+// ── Styles: the template and the design cards ────────────────────────────────
+test.describe('The Styles panel', () => {
+  for (const p of PEOPLE) {
+    test(`${p.who}: ${p.lacks.includes('configure') ? 'no way in, and a note if reached another way' : 'opens as it did'}`, async ({ page }) => {
+      // the real answer for staff: routes/dev.ts designAllowed is the owner or a developer
+      const staff = p.lacks.includes('configure');
+      await page.route('**/functions/v1/presence/dev/**', (r) => (staff ? r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"forbidden"}' }) : r.fallback()));
+      await openBuilder(page, p, '#design');
+      await expectDisplay(page, p, '#btnSettingsOpen', 'configure');
+      await builderScript(page, 'openSettingsPanel("styles");');
+      const note = page.locator('#stylesAsk');
+      if (staff) await expect(note).toBeVisible(); else await expect(note).toBeHidden();
+      await builderScript(page, 'openSettingsPanel("forms");');
+      await expect(note).toBeHidden();   // the panel's other modes are staff's to use
     });
   }
 });

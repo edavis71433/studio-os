@@ -17,14 +17,16 @@ on:
     paths:
       - "supabase/functions/**"
       - "tests/presence/**"
+      - "tests/workflows/**"
       - "scripts/ci-pure-tests.sh"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "supabase/functions/**"
       - "tests/presence/**"
+      - "tests/workflows/**"
       - "scripts/ci-pure-tests.sh"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 jobs:
@@ -43,3 +45,5 @@ jobs:
           deno check supabase/functions/stripe-webhook/index.ts
       - name: Pure test sweep (+ golden render)
         run: bash scripts/ci-pure-tests.sh
+      - name: Schema dump workflow (real steps, stub CLI, no secrets)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/schema_dump_test.mjs
