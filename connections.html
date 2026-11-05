@@ -290,23 +290,38 @@ function dataLine(d){
   if(d.tags_installed!=null) bits.push(esc(d.tags_installed)+' tags installed');
   if(d.managed_assets!=null) bits.push(esc(d.managed_assets)+' pages managed');
   if(d.listing_verified!=null) bits.push(d.listing_verified?'Verified':'Not verified');
+  if(d.calls!=null) bits.push(esc(d.calls)+' calls');
+  if(d.direction_requests!=null) bits.push(esc(d.direction_requests)+' direction requests');
   if(!bits.length) return '';
   const asof = d.as_of ? `<span class="asof">as of ${esc(String(d.as_of).slice(0,10))}</span>` : '';
   return `<div class="data">${bits.join(' · ')}${asof}</div>`;
 }
 
-// GA4 only: which Analytics property this connection reads. A Google account
-// usually holds several; the numbers are meaningless until exactly one is
-// chosen. Connected with a choice → say which (and how it was chosen).
-// Connected without one → ask, with the account's real list (loaded after
-// render; see loadGaProperties). Failure states are inline and honest.
+// Which one thing this connection reads: an Analytics property or a Google
+// listing. A Google account usually holds several; the numbers are meaningless
+// until exactly one is chosen. Connected with a choice → say which (and how it was
+// chosen). Connected without one → ask, with the account's real list (loaded after
+// render; see loadPicks). Failure states are inline and honest.
+const PICKS={
+  google_analytics:{loading:'Checking which Analytics properties that account can see…',ask:'Which property is this website?',
+    hint:'Pick the one that measures this website — read-only either way, and changeable any time by reconnecting.',
+    none:'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics.',
+    failed:'We couldn’t list that account’s Analytics properties just now. Nothing changed — refresh in a moment.',
+    chosen:'Reading that property from here on.',reading:(e)=>`the <b>${esc(e.property.name||('property '+e.property.id))}</b> property`,auto:'the only one on that account, picked automatically'},
+  google_business_profile:{loading:'Checking which listings that account manages…',ask:'Which listing is this business?',
+    hint:'Pick the one that is this business — read-only either way, and changeable any time by reconnecting.',
+    none:'That Google account doesn’t manage a business listing yet. Connect the account that does.',
+    failed:'We couldn’t list that account’s listings just now. Nothing changed — refresh in a moment.',
+    chosen:'Reading that listing from here on.',reading:(e)=>`the <b>${esc(e.property.name||'chosen')}</b> listing`,auto:'picked automatically'},
+};
 function propertyBlock(e, s){
-  if(e.key!=='google_analytics' || !s.connected) return '';
+  const pick=PICKS[e.key];
+  if(!pick || !s.connected) return '';
   if(e.property && e.property.id){
-    const how = e.property.auto_selected ? ' — the only one on that account, picked automatically' : '';
-    return `<p class="note" id="pick-note">Reading the <b>${esc(e.property.name||('property '+e.property.id))}</b> property${how}.</p>`;
+    const how = e.property.auto_selected ? ' — '+pick.auto : '';
+    return `<p class="note" id="pick-note">Reading ${pick.reading(e)}${how}.</p>`;
   }
-  return `<div class="pickbox" id="pick-google_analytics"><p class="note">Checking which Analytics properties that account can see…</p></div>`;
+  return `<div class="pickbox" id="pick-${e.key}"><p class="note">${pick.loading}</p></div>`;
 }
 
 function row(e){
@@ -467,39 +482,41 @@ function wire(){
   }));
   const cask=$('cask'), cq=$('cq');
   if(cask){ cask.addEventListener('click', askConcierge); cq.addEventListener('keydown', e=>{ if(e.key==='Enter') askConcierge(); }); }
-  if($('pick-google_analytics')) loadGaProperties();
+  loadPicks();
 }
 
-// ── the GA4 property choice (connected, nothing chosen yet) ──────────────────
-// Four honest states: loading (placeholder above), none (the account has no
-// property — say so, nothing to press), one-or-many (the question with real
-// buttons; one property normally auto-selects on the first read, so reaching
-// the list with one is rare but still answerable), error (inline, stays put).
-async function loadGaProperties(){
-  const box=$('pick-google_analytics'); if(!box) return;
+// ── the choice (connected, nothing chosen yet) ───────────────────────────────
+// Four honest states: loading (placeholder above), none (the account has nothing to
+// pick — say so, nothing to press), one-or-many (the question with real buttons; one
+// normally auto-selects on the first read, so reaching the list with one is rare but
+// still answerable), error (inline, stays put).
+function loadPicks(){ Object.keys(PICKS).forEach(loadPick); }
+async function loadPick(key){
+  const box=$('pick-'+key); if(!box) return;
+  const pick=PICKS[key];
   try{
-    const s=await apiGet('/connections/google_analytics/properties');
+    const s=await apiGet('/connections/'+key+'/properties');
     const d=(s&&s.data)||{};
     if(d.selected&&d.selected.id) return reload();          // chosen elsewhere (or auto) since render
     const props=d.properties||[];
     if(!props.length){
-      box.innerHTML=`<p class="why">${esc(d.note||'That Google account has no Google Analytics property yet — connect the account that owns this website’s Analytics.')}</p>`;
+      box.innerHTML=`<p class="why">${esc(d.note||pick.none)}</p>`;
       return;
     }
-    box.innerHTML=`<p class="note" style="color:var(--ink);font-weight:600;margin-top:8px">Which property is this website?</p>
-      <div class="row2">${props.map(p=>`<button type="button" class="btn sm" data-gaprop="${esc(p.id)}">${esc(p.name)}${p.account?` · ${esc(p.account)}`:''}</button>`).join('')}</div>
-      <p class="note">Pick the one that measures this website — read-only either way, and changeable any time by reconnecting.</p>`;
-    box.querySelectorAll('[data-gaprop]').forEach(b=>b.addEventListener('click',()=>pickGaProperty(b.getAttribute('data-gaprop'),b)));
+    box.innerHTML=`<p class="note" style="color:var(--ink);font-weight:600;margin-top:8px">${pick.ask}</p>
+      <div class="row2">${props.map(p=>`<button type="button" class="btn sm" data-pickprop="${esc(p.id)}">${esc(p.name)}${p.account?` · ${esc(p.account)}`:''}${p.address?` · ${esc(p.address)}`:''}</button>`).join('')}</div>
+      <p class="note">${pick.hint}</p>`;
+    box.querySelectorAll('[data-pickprop]').forEach(b=>b.addEventListener('click',()=>pickProperty(key,b.getAttribute('data-pickprop'),b)));
   }catch(_status){
-    box.innerHTML=`<p class="why">We couldn’t list that account’s Analytics properties just now. Nothing changed — refresh in a moment.</p>`;
+    box.innerHTML=`<p class="why">${pick.failed}</p>`;
   }
 }
-async function pickGaProperty(id,btn){
-  const old=btn.textContent; btn.disabled=true; btn.textContent='Choosing…'; clearProblem('google_analytics');
-  const r=await apiPost('/connections/google_analytics/property',{ property_id:id });
-  if(r.ok){ toast('Reading that property from here on.'); return reload(); }
+async function pickProperty(key,id,btn){
+  const old=btn.textContent; btn.disabled=true; btn.textContent='Choosing…'; clearProblem(key);
+  const r=await apiPost('/connections/'+key+'/property',{ property_id:id });
+  if(r.ok){ toast(PICKS[key].chosen); return reload(); }
   btn.disabled=false; btn.textContent=old;
-  problem('google_analytics', serverMsg(r,'That choice didn’t save — nothing changed. Try again in a moment.'), r.body);
+  problem(key, serverMsg(r,'That choice didn’t save — nothing changed. Try again in a moment.'), r.body);
 }
 async function askConcierge(){
   const cq=$('cq'), box=$('cans'), btn=$('cask');

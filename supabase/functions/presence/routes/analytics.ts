@@ -25,7 +25,7 @@ import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDet
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors, sourceShares,
-  invoiceBuckets, recentWins, oldestAgeDays, DASH_WEEKS,
+  invoiceBuckets, recentWins, oldestAgeDays, priorPeriodVisitors, priorPeriodStart, searchPagePath, DASH_WEEKS,
 } from '../lib/analytics_dashboard.ts';
 
 /** AN-3.1: top queries + pages for a period (from presence_search_terms).
@@ -36,6 +36,15 @@ export async function readSearchTerms(clientId: string, period: string): Promise
   const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&select=dimension,key,clicks,impressions,position&order=clicks.desc&limit=20`);
   const rows = Array.isArray((r as any).json) ? (r as any).json : [];
   return { queries: rows.filter((x: any) => x.dimension === 'query').slice(0, 5), pages: rows.filter((x: any) => x.dimension === 'page').slice(0, 5) };
+}
+/** The pages Google sends people to, for the per-page table: the path alone, since
+ *  Search Console reports whole URLs and a table of one domain repeated says
+ *  nothing. The same store the sync writes and the top terms read. */
+export async function readSearchPages(clientId: string, period: string, limit = 10): Promise<Array<{ path: string; clicks: number; impressions: number }>> {
+  if (!clientId || !period) return [];
+  const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&dimension=eq.page&select=key,clicks,impressions&order=clicks.desc&limit=${limit}`);
+  const rows = Array.isArray((r as any).json) ? (r as any).json : [];
+  return rows.map((x: any) => ({ path: searchPagePath(x.key), clicks: Number(x.clicks) || 0, impressions: Number(x.impressions) || 0 }));
 }
 import type { SiteRow } from '../lib/site.ts';
 
@@ -68,6 +77,8 @@ export async function readGsc(clientId: string | null | undefined): Promise<GscR
     period: cur, hasData: true,
     totalImpressions: sum('search_impressions'), totalClicks: sum('search_clicks'),
     firstImpressionAt: firstWith('search_impressions'), firstSearchClickAt: firstWith('search_clicks'),
+    // oldest first: the trend line for a website whose visitors we can't count
+    monthly: periodsAsc.map((period) => ({ period, clicks: val(period, 'search_clicks') || 0, impressions: val(period, 'search_impressions') || 0 })),
     ok: true,
   };
 }
@@ -479,8 +490,10 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
   const { startMs, days } = dashRange(period, nowMs);
-  // one visits fetch serves the KPIs (period window) AND the 12-week line
-  const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
+  // one visits fetch serves the KPIs (period window), the 12-week line AND the
+  // period before this one, for "up 12% on the period before"
+  const priorStartMs = priorPeriodStart(period, startMs, nowMs);
+  const visitStartIso = new Date(Math.min(priorStartMs ?? startMs, startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 
@@ -580,8 +593,12 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     const agg = aggregateVisits(periodRows, nowMs, days);
     traffic = {
       visitors: agg.visitors, pageviews: agg.pageviews,
+      // null = no honest comparison exists (all time, or the read hit its cap and
+      // the older window is the part that fell off). The page then says nothing.
+      prior_visitors: priorStartMs === null || visits.length >= 5000 ? null : priorPeriodVisitors(visits, priorStartMs, startMs),
       actions: agg.events.phone + agg.events.email + agg.events.cta,
       top_pages: agg.topPages,
+      pages: agg.pages,
       top_sources: sourceShares(agg.topSources, agg.visitors),
       weekly: weeklyVisitors(visits, nowMs),
       has_data: agg.hasData,
@@ -628,10 +645,12 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   } else if (readiness === 'waiting') {
     search = { waiting: true, external: !hosted, domain: externalDomain };
   } else if (gsc.hasData) {
-    const terms = await safe(readSearchTerms(site.client_id || '', gsc.period));
+    const [terms, searchPages] = await Promise.all([safe(readSearchTerms(site.client_id || '', gsc.period)), safe(readSearchPages(site.client_id || '', gsc.period))]);
     search = {
       clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,
       top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),
+      monthly: gsc.monthly || [],
+      top_pages: searchPages || [],
     };
   }
 

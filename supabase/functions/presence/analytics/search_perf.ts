@@ -19,6 +19,7 @@ export interface GscMetrics {
   totalClicks: number;
   firstImpressionAt: string | null;
   firstSearchClickAt: string | null;
+  monthly?: Array<{ period: string; clicks: number; impressions: number }>;   // oldest first
 }
 
 const n = (x: number) => x.toLocaleString('en-US');
