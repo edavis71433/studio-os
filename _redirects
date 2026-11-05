@@ -79,6 +79,11 @@ https://app.davisdigitalstudio.com/ai-visibility https://tools.davisdigitalstudi
 /site-review       /site-review.html   200
 /ai-visibility     /ai-visibility.html 200
 https://tools.davisdigitalstudio.com/   https://davisdigitalstudio.com/   302!
+# The tools host answers for its own pages: the root sitemap.xml and robots.txt
+# name the main domain. Forced (!) because both of those files exist in dist/,
+# and only this host matches, so every other host keeps serving the root files.
+https://tools.davisdigitalstudio.com/sitemap.xml   /tools-sitemap.xml   200!
+https://tools.davisdigitalstudio.com/robots.txt    /tools-robots.txt    200!
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)

@@ -43,7 +43,7 @@ for f in email-signature.html styleguide.html a11y.html provision.html; do
 done
 
 # platform files (exact names — package.json/deno.json are NOT public)
-for f in _redirects _headers robots.txt security.txt sitemap.xml manifest.json manifest-app.json; do
+for f in _redirects _headers robots.txt tools-robots.txt security.txt sitemap.xml tools-sitemap.xml manifest.json manifest-app.json; do
   [ -f "$f" ] && cp "$f" dist/
 done
 

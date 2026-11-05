@@ -280,6 +280,36 @@ test.describe('marketing chrome (static pins)', () => {
     }
   });
 
+  test('the tools host answers /sitemap.xml and /robots.txt from its own files; no other host does', () => {
+    const TOOLS = 'https://tools.davisdigitalstudio.com';
+    const rules = parseRedirects();
+    // Forced: both names exist as real files in dist/, and an unforced rule
+    // never overrides a file on disk, so without ! this would silently do nothing.
+    expect(rules.find((r) => r.from === `${TOOLS}/sitemap.xml`)).toMatchObject({ to: '/tools-sitemap.xml', code: '200!' });
+    expect(rules.find((r) => r.from === `${TOOLS}/robots.txt`)).toMatchObject({ to: '/tools-robots.txt', code: '200!' });
+    // ...and only there: the app host and every preview keep the root files
+    const elsewhere = rules.filter((r) => /\/(sitemap\.xml|robots\.txt)$/.test(r.from) && !r.from.startsWith(`${TOOLS}/`));
+    expect(elsewhere, 'no rule moves the root sitemap or robots.txt on another host').toEqual([]);
+    expect(read('robots.txt')).toContain('Sitemap: https://davisdigitalstudio.com/sitemap.xml');
+    expect(read('sitemap.xml')).not.toContain('tools.davisdigitalstudio.com');
+
+    // A sitemap only vouches for its own host, and exactly the two public tools
+    // belong in it: /report/* is private, and the bare root redirects away.
+    const sitemap = read('tools-sitemap.xml');
+    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    const locs = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([`${TOOLS}/site-review`, `${TOOLS}/ai-visibility`]);
+    for (const loc of locs) {
+      const to = targetOf(rules, loc.slice(TOOLS.length));
+      expect(to, `${loc} has a 200 rule`).toBeTruthy();
+      expect(read(to!.replace(/^\//, '')), `${to} declares ${loc} as canonical`).toContain(`<link rel="canonical" href="${loc}">`);
+    }
+
+    expect(read('tools-robots.txt').match(/^Sitemap:.*$/gm)).toEqual([`Sitemap: ${TOOLS}/sitemap.xml`]);
+    // No Disallow: a crawler blocked from /report/* could never read its noindex
+    expect(read('tools-robots.txt')).not.toMatch(/^Disallow:/im);
+  });
+
   test('404.html uses only absolute URLs (it serves at nested paths)', () => {
     const html = read('404.html');
     for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
@@ -922,7 +952,7 @@ test.describe('MS6 entry & legal sweep (static pins)', () => {
       expect(existsSync(join(ROOT, 'dist', f)), `${f} staged into dist/`).toBe(false);
     }
     // ...while the public estate still ships (fail-visible, not fail-open)
-    for (const f of ['index.html', 'privacy.html', '404.html', 'services.html']) {
+    for (const f of ['index.html', 'privacy.html', '404.html', 'services.html', 'robots.txt', 'sitemap.xml', 'tools-robots.txt', 'tools-sitemap.xml']) {
       expect(existsSync(join(ROOT, 'dist', f)), `${f} missing from dist/`).toBe(true);
     }
     // _redirects force-404s both spellings as defense-in-depth (the files

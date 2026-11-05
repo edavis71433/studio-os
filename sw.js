@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v15'; // bumped: the Free Tools pages (/report/*, /site-review, /ai-visibility) are never served from cache
+const CACHE_NAME = 'dds-v16'; // bumped: the tool paths that moved off this site left NETWORK_FIRST, so no old cached copy may answer them
 const PRECACHE = [
   '/about',
   '/services',
@@ -9,7 +9,7 @@ const PRECACHE = [
 ];
 
 // Pages that must always load fresh (have live API calls or dynamic content)
-const NETWORK_FIRST = ['/audit', '/tools', '/report-card', '/local-visibility', '/pricing-estimator', '/roi-calculator', '/site-review', '/ai-visibility', '/'];
+const NETWORK_FIRST = ['/report-card', '/site-review', '/ai-visibility', '/'];
 // The Free Tools report page carries private data and versioned scripts: never from this cache.
 const NEVER_CACHE = /^\/(report\/|site-review|ai-visibility)/;
 
@@ -71,7 +71,7 @@ self.addEventListener('fetch', function(e) {
       url.pathname.startsWith('/timeline') || url.pathname.startsWith('/upcoming') ||
       url.pathname.startsWith('/website-health') || url.pathname.startsWith('/help') ||
       url.pathname.startsWith('/admin-health') || url.pathname.startsWith('/admin-growth') ||
-      url.pathname === '/pricing' || url.pathname === '/pricing.html' ||   // exact — /pricing-estimator keeps its NETWORK_FIRST rule
+      url.pathname === '/pricing' || url.pathname === '/pricing.html' ||   // exact — this page only; /pricing-estimator 301s off this site
       url.pathname.startsWith('/payment-')) return; // every signed-in/app/money surface — always fresh
 
   // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
