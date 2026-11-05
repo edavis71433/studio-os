@@ -87,7 +87,7 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
   await page.goto('/presence.html#design');
   // visual refresh: the builder sits under the site's top row with the sub-view
   // tab strip marking Design — the canvas itself is unchanged
-  await expect(page.locator('#nav .navitem[data-view="design"]')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('html')).toHaveClass(/dc-edit/);   // the Design view is the full-screen Edit mode
   await expect(page.locator('#btnPublish')).toHaveText('Publish');
   const frame = page.frameLocator('#designPreview');
   await expect(frame.locator('#main > section').first()).toBeVisible();
