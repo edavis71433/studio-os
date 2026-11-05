@@ -13,7 +13,7 @@ import { json } from '../../_shared/http.ts';
 import { projectIdOfApprovalPeriod } from '../lib/approvals.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
-import { capabilitiesOf, contentWriteNeeds, siteCan } from '../lib/site_roles.ts';
+import { capabilitiesOf, contentWriteNeeds, memberWriteNeeds, siteCan } from '../lib/site_roles.ts';
 import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor } from '../lib/navigation.ts';
@@ -70,15 +70,16 @@ export function reviewerAllowed(route: string, method: string): boolean {
   return false;
 }
 
-/** A member's write on the content data path gets what their role allows, or a 403
- *  that says so. Marks the seat cleared, which is what lets siteDb send the write:
- *  a write contentWriteNeeds doesn't recognise is never cleared, so it fails closed
- *  there. Reads a clone of the body, so the handler can still read it. */
+/** A member's write gets what their role allows, or a 403 that says so. A write
+ *  on no list is refused. Marks the seat cleared for a content write, which is what
+ *  lets siteDb send it: a write contentWriteNeeds doesn't recognise is never cleared,
+ *  so it fails closed there. Reads a clone of the body, so the handler can still read it. */
 export async function memberWriteGate(req: Request, route: string, method: string, member: NonNullable<Principal['member']>, cors: Record<string, string>): Promise<Response | null> {
   const fields = route === '/settings' ? Object.keys(await req.clone().json().catch(() => null) ?? {}) : [];
-  const needs = contentWriteNeeds(route, method, fields);
-  if (needs && !siteCan(member.role as SiteRole, needs)) return json({ error: 'forbidden', message: 'Your role on this site doesn’t include that — ask the account owner.' }, 403, cors);
-  member.cleared = !!needs;
+  const content = contentWriteNeeds(route, method, fields);
+  const needs = content ?? memberWriteNeeds(route, method);
+  if (needs !== 'open' && (!needs || !siteCan(member.role as SiteRole, needs))) return json({ error: 'forbidden', message: 'Your role on this site doesn’t include that — ask the account owner.' }, 403, cors);
+  member.cleared = !!content;
   return null;
 }
 

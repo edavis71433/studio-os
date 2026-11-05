@@ -9,7 +9,7 @@ import type { SiteRow } from '../lib/site.ts';
 import { listTemplates, latestTemplateVersion, getTemplate } from '../lib/render.ts';
 import { draftHashForSite } from '../lib/draft_hash.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { resolveSiteRole } from '../lib/workspace.ts';
+import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 // ── Phase CP-1 (FD-T8): template catalog + switch ───────────────────────────
@@ -21,7 +21,7 @@ export function handleTemplatesList(site: SiteRow, cors: Record<string, string>)
 }
 
 export async function handlePutTemplate(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
   if (!isOperator && role !== 'business_owner') return json({ error: 'forbidden', message: 'Only the account owner can change the site’s look.' }, 403, cors);
   let b: any = {}; try { b = await req.json(); } catch { /* */ }

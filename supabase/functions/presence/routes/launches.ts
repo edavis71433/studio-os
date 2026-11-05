@@ -7,7 +7,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runPipeline } from './publish.ts';
-import { resolveSiteRole } from '../lib/workspace.ts';
+import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { siteCan } from '../lib/site_roles.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
@@ -87,7 +87,7 @@ export async function handleLaunchRecapture(site: SiteRow, principal: Principal,
 export async function handleLaunchDecide(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   const l = await getLaunch(site, id);
   if (!l) return json({ error: 'not_found', message: 'That launch isn’t here.' }, 404, cors);
-  const role = await resolveSiteRole(jwt, site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, jwt, site.id);
   if (principal.kind !== 'staff' && !siteCan(role, 'approve')) return json({ error: 'forbidden', message: 'Only someone with approval rights can sign off a launch.' }, 403, cors);
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const decision = String(body?.decision || '').toLowerCase();
