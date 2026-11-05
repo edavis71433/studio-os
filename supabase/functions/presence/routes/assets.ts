@@ -42,7 +42,7 @@ import {
 import { socialCropList } from '../lib/social_crops.ts';
 import { composeSocialCards, HEADLINE_MAX } from '../lib/social_card.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
-import { resolveSiteRole } from '../lib/workspace.ts';
+import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 
@@ -316,7 +316,7 @@ export async function handleAssetsBulk(req: Request, site: SiteRow, principal: P
   const { action, ids } = norm;
 
   // A client reviewer may only approve; anything else is an owner/editor move.
-  const role = await resolveSiteRole(principal.jwt || '', site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, principal.jwt || '', site.id);
   if (role === 'client_reviewer' && action !== 'approve') {
     return json({ error: 'forbidden', message: 'A reviewer can approve — nothing else.' }, 403, cors);
   }
@@ -664,7 +664,7 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
   const action = ['submit', 'approve', 'reject', 'publish', 'archive', 'restore'].includes(raw) ? raw : null;
   if (!action) return json({ error: 'bad_request', message: 'Choose submit, approve, reject, publish, archive, or restore.' }, 400, cors);
   // DAM-2: a client reviewer may ONLY approve or reject (never submit/publish/archive)
-  const role = await resolveSiteRole(principal.jwt || '', site.id, principal.kind);
+  const role = await resolveSiteRoleCached(principal, principal.jwt || '', site.id);
   if (role === 'client_reviewer' && !['approve', 'reject'].includes(action)) {
     return json({ error: 'forbidden', message: 'A reviewer can approve or ask for changes — nothing else.' }, 403, cors);
   }

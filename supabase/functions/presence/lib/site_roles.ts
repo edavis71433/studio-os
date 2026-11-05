@@ -82,3 +82,146 @@ export function contentWriteNeeds(route: string, method: string, settingsFields:
   if (method === 'DELETE' && m[1]) return 'delete';
   return null;
 }
+
+// ── What a member's write anywhere else needs ────────────────────────────────
+// Every other route writes with the service role whoever calls it, so this list is
+// what holds a member to the table above. Owners, a studio scoped in and platform
+// staff never pass through it. Audited route by route and decided 2026-11-05.
+//
+// Only delete and configure refuse anyone today: staff, developer and owner seats
+// all hold the rest, and a reviewer stops at reviewerAllowed first. A write that
+// isn't listed is refused, so a new route is closed to members until it is decided.
+//
+// 'open' needs no capability: a mark on the caller's own reading, a question that
+// writes nothing, or a route that checks the role itself and says why in its answer.
+export type MemberWriteNeed = SiteCapability | 'open';
+
+const ID = '[0-9a-f-]{36}';
+const KEY = '[a-z0-9_]+';
+const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
+  ['delete', [
+    `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
+    `DELETE /sales/(contacts|deals|proposals|contracts|templates)/${ID}`,
+    `DELETE /projects/${ID}/deliverables/${ID}`,
+    `POST /comments/${ID}/delete`,
+    `POST /sales/invoices/${ID}/void`,
+    `POST /sales/deals/${ID}/retainer/cancel`,
+  ]],
+  ['configure', [
+    '(POST|DELETE) /foundations/(domain|zone)',
+    '(POST|PUT|DELETE) /foundations/zone/records',
+    'PUT /foundations/dns',
+    'POST /foundations/(dns/rollback|prepare)',
+    'POST /preview/settings',
+    'POST /site/(offline|online)',
+    'PUT /bookings/settings',
+    'PUT /sales/contacts/fields',
+  ]],
+  ['approve', [
+    `POST /foundations/plans/${ID}/decide`,
+    `POST /connections/${KEY}/write/${ID}/decide`,
+    `POST /launches/${ID}/decide`,
+    `POST /assets/${ID}/status`,
+    `POST /visual/plans/${ID}/decide`,
+    `POST /(client/)?approvals/${ID}/decide`,
+  ]],
+  ['connect', [
+    'POST /connections/ask',
+    `POST /connections/${KEY}/(connect|callback|refresh|disconnect|property)`,
+    `POST /connections/${KEY}/write/(prepare(/(decide|execute|rollback))?|${ID}/(execute|rollback))`,
+    'POST /monitor/(connect|verify)',
+    'DELETE /monitor/connection',
+  ]],
+  ['publish', [
+    'POST /(publish|restore|preview/promote|schedule)',
+    `POST /schedule/${ID}/cancel`,
+    `POST /launches/${ID}/(schedule|promote|rollback)`,
+    `POST /broadcasts/${ID}/send`,
+  ]],
+  ['comment', [
+    'POST /comments',
+    `POST /comments/${ID}/resolve`,
+    `POST /(client/)?projects/${ID}/messages`,
+    `POST /(client/)?support/${ID}/messages`,
+    'POST /client/support',
+    `POST /(client/)?surveys/${ID}/respond`,
+  ]],
+  ['edit', [
+    'POST /redirects',
+    'POST /preview/(publish|share-link)',
+    'POST /publishes/checkpoints',
+    `POST /publishes/checkpoints/${ID}/restore`,
+    `POST /publishes/${ID}/label`,
+    'POST /restore-to-draft',
+    'POST /launches',
+    `POST /launches/${ID}/(recapture|cancel)`,
+    'POST /media/upload-url',
+    `PUT /media/${ID}`,
+    'POST /stock/import',
+    'POST /content-library',
+    `PUT /content-library/${ID}`,
+    'POST /assets/bulk',
+    `PATCH /assets/${ID}`,
+    `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background)`,
+    'POST /visual/generate',
+    `POST /visual/plans/${ID}/(vary|edit)`,
+    `POST /notes/${ID}/(dismiss|accept)`,
+    `POST /moments/${ID}/dismiss`,
+    'POST /broadcasts',
+    'POST /broadcasts/draft-assist',
+    `PATCH /broadcasts/${ID}`,
+    `POST /broadcasts/${ID}/cancel`,
+    'POST /sales/(contacts|customers|deals|templates)',
+    `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
+    `POST /sales/contacts/${ID}/restore`,
+    'PUT /sales/services',
+    `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send)`,
+    `POST /sales/invoices/${ID}/send`,
+    `POST /sales/contracts/${ID}/(term|send)`,
+    `POST /sales/proposals/${ID}/(send|revise)`,
+    'POST /projects',
+    `PATCH /projects/${ID}`,
+    `POST /projects/${ID}/(status|tasks|checklist|milestones|approvals|surveys|deliverables|deliverables/upload-url)`,
+    `PATCH /projects/${ID}/(tasks|milestones|deliverables)/${ID}`,
+    `POST /client/projects/${ID}/tasks/${ID}/done`,
+    `POST /client/projects/${ID}/(upload-url|uploads)`,
+    'POST /support',
+    `PATCH /support/${ID}`,
+    'PUT /service/(saved-replies|faq)',
+    `POST /forms/inbox/${ID}(/reply)?`,
+    'POST /approve/send',
+    'POST /bookings/types',
+    `PATCH /bookings/types/${ID}`,
+    `POST /bookings/appointments/${ID}/(confirm|cancel|complete|no_show)`,
+    'POST /reviews/request',
+    `POST /reviews/${ID}/(approve|hide|reply)`,
+    'POST /writer/(generate|rewrite)',
+    `POST /writer/drafts/${ID}/(accept|discard)`,
+    'POST /editor/improve',
+    'POST /(review/run|brand/review|coach/run|knowledge/import)',
+    `POST /(review|brand)/reports/${ID}/dismiss`,
+    `POST /coach/opportunities/${ID}/decide`,
+  ]],
+  ['open', [
+    'POST /(client/)?notifications/read',
+    'POST /threads/read',
+    'POST /concierge/ask',
+    // these check the role themselves: the owner, a developer, or a studio
+    'POST /portal/(members|shares)',
+    `POST /portal/members/${ID}/revoke`,
+    'PUT /dev/(customization|brand-kit)',
+    'POST /dev/brand-kit/apply',
+    'PUT /site/template',
+    'POST /crm/notes',
+    `POST /crm/notes/${ID}/pin`,
+    `DELETE /crm/notes/${ID}`,
+  ]],
+];
+const MEMBER_WRITE_RULES = MEMBER_WRITES.flatMap(([need, patterns]) => patterns.map((p) => [new RegExp(`^${p}$`), need] as const));
+
+/** What a member's write off the content path needs, or null when it isn't listed.
+ *  Pure. Content routes answer from contentWriteNeeds, not here. */
+export function memberWriteNeeds(route: string, method: string): MemberWriteNeed | null {
+  const asked = `${method} ${route}`;
+  return MEMBER_WRITE_RULES.find(([rule]) => rule.test(asked))?.[1] ?? null;
+}

@@ -408,8 +408,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     }
   }
 
-  // 4c. A member's content write gets what lib/site_roles.ts gives their role. RLS
-  //     used to refuse all of these, so nothing here narrows what worked before.
+  // 4c. A member's write gets what lib/site_roles.ts gives their role, on every route.
+  //     Most routes use the service role, so nothing else holds a member to it.
   if (principal.member && isWrite) {
     const refused = await memberWriteGate(req, route, method, principal.member, cors);
     if (refused) return refused;
