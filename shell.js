@@ -1496,6 +1496,25 @@
     });
   };
 
+  // ── What an invited member's role can't use ──
+  // The server refuses a member's delete or configure write (routes/workspace.ts
+  // memberWriteGate). A page marks those controls data-needs="delete|configure|owner";
+  // this names what the caller lacks on <html> and shell.css hides them, including any
+  // the page draws later. Owners, a studio scoped in and platform staff never meet that
+  // gate, so they lack nothing. Nor does anyone whose context didn't load: the server
+  // still refuses, and a hidden button would be the worse failure for an owner.
+  function markRoleLimits(ctx) {
+    var caps = ctx.capabilities;
+    if (ctx.site_role === 'business_owner' || ctx.scope || ctx.is_operator || !Array.isArray(caps)) return;
+    var lacks = ['owner'];   // a few routes ask for the account owner by role, not by capability
+    if (caps.indexOf('delete') < 0) lacks.push('delete');
+    if (caps.indexOf('configure') < 0) lacks.push('configure');
+    document.documentElement.setAttribute('data-dds-lacks', lacks.join(' '));
+  }
+  window.ddsLacks = function (need) {
+    return (' ' + (document.documentElement.getAttribute('data-dds-lacks') || '') + ' ').indexOf(' ' + need + ' ') >= 0;
+  };
+
   function boot() {
     mountFrame();
     scanHints();
@@ -1514,7 +1533,7 @@
         if (!TOKEN) { minimalShell(); return; }
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
-          CTX = r.body.data; render();
+          CTX = r.body.data; markRoleLimits(CTX); render();
           markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
           try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17

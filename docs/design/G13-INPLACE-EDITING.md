@@ -251,9 +251,11 @@ through the validating save, exactly like every canvas action today.
 
 **No mid-typing saves.** The session model is commit-based, not
 keystroke-based — while typing, nothing fires, so the save→srcdoc-reload
-cycle can never destroy an active contenteditable. After the burst-save
-completes, the normal refreshDesignPreview repaint shows the canonical render
-(markdown re-rendered, scroll preserved via dcCaptureScroll).
+cycle can never destroy an active contenteditable. A repaint already on its way
+when a session opens (an earlier save's, or the first paint's) waits for that
+session to end (dpHoldRepaint). After the burst-save completes, the normal
+refreshDesignPreview repaint shows the canonical render (markdown re-rendered,
+scroll preserved via dcCaptureScroll).
 
 **Panel and canvas cannot clobber each other,** stated precisely:
 

@@ -357,8 +357,9 @@ test.describe('CMS workspace', () => {
       ] } },
     } });
     await page.goto('/presence.html#design');
-    // the template-family gallery lives in the on-demand Design settings panel now
+    // the template-family gallery lives in the Styles panel, one row until asked for
     await page.locator('#btnSettingsOpen').click();
+    await page.locator('#designGallery .tg-fold summary').click();
     await expect(page.locator('#designGallery .tg-card[data-look="business-classic"]')).toBeVisible();
     await expect(page.locator('#designGallery .tg-card[data-look="editorial"]')).toBeVisible();
     await expect(page.locator('#designGallery')).toContainText('Editorial');

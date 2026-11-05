@@ -205,7 +205,7 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
   // exercises the tour; mark it seen for every persona the fixtures use so page
   // tests stay deterministic. A future tour spec should clear its own key.
   await page.addInitScript(() => {
-    for (const role of ['business_owner', 'client_reviewer', 'member']) {
+    for (const role of ['business_owner', 'business_staff', 'developer', 'client_reviewer', 'member']) {
       try { localStorage.setItem('dds-toured:' + role, '1'); } catch { /* storage may be denied */ }
     }
   });

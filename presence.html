@@ -324,7 +324,7 @@ html.dc-edit:not(.plan-watch){--plum:var(--ink);--dds-p:var(--ink);--plum-soft:v
 html.dc-edit:not(.plan-watch) #view-design .dc-actbtn.primary{border-color:var(--hair-2);background:var(--sheet);color:var(--ink) !important}   /* shell.css forces a dark ink on button.primary in dark mode: right for a filled button, unreadable on an outlined one */
 /* the settings panel does one job at a time (openSettingsPanel) */
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
-#settingsPanel:not([data-mode="styles"]) #designGallery{display:none !important}
+#settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
 #settingsPanel[data-mode="section"] #blocksCard{margin-top:0 !important;border:0;padding:0;background:transparent}
 .tray-more{display:flex;flex-direction:column;align-items:flex-start;gap:var(--dds-s2,8px);padding:var(--dds-s4,16px);margin-top:var(--dds-s2,8px);border-top:1px solid var(--hair)}
@@ -344,6 +344,12 @@ html.dc-edit:not(.plan-watch) #view-design .dc-actbtn.primary{border-color:var(-
   html.dc-edit:not(.plan-watch) .dc-bar button{flex:none}
   html.dc-edit:not(.plan-watch) #btnEditExit{position:sticky;left:0;z-index:3;box-shadow:0 0 0 12px var(--sheet)}
   html.dc-edit:not(.plan-watch) #dcBtnPublish{position:sticky;right:0;z-index:3;order:6;box-shadow:0 0 0 12px var(--sheet)}
+}
+/* the tip sits above the message area, so neither ever covers the other */
+html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important}
+@media(max-width:760px){
+  html.dc-edit:not(.plan-watch) .toasts{bottom:72px}   /* no dock here; clear of the floating Add section */
+  html.dc-edit:not(.plan-watch) .dds-hint{bottom:150px !important}
 }
 /* side panels open under the bar, so Exit, Undo and Publish stay in reach */
 @media(min-width:761px){html.dc-edit:not(.plan-watch) .dc-slideover{top:var(--dc-bar-h)}}
@@ -622,7 +628,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .sheetcard .foot{display:flex;gap:var(--dds-s6,24px);justify-content:flex-end;align-items:baseline}
 
 /* toasts */
-.toasts{position:fixed;bottom:calc(84px + 16px);left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
+.toasts{position:fixed;bottom:calc(84px + 16px);left:0;right:0;padding:0 var(--dds-s4,16px);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
 @media(min-width:761px){.toasts{bottom:28px}}
 .toast{background:var(--ink);color:var(--paper);padding:10px var(--dds-s4,16px);border-radius:var(--r-lg);font-size:13px;box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-width:88vw}
 .toast.bad{background:var(--clay)}
@@ -650,14 +656,23 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .content:has(#view-design.on){max-width:none}
 
 /* #1 — template-first, BIG realistic-preview gallery */
-#designGallery{margin:var(--dds-s1,4px) 0 var(--dds-s7,32px)}
-.tg-head{margin-bottom:var(--dds-s4,16px)}
-.tg-head .tg-h{font-weight:600;font-size:16px}
-.tg-head .hint{margin-top:2px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--dds-s6,24px)}
+#designGallery{margin:0;padding:var(--dds-s4,16px) var(--dds-s4,16px) 0}
+.tg-fold{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--sheet,#fff)}
+.tg-fold>summary{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);cursor:pointer;list-style:none;border-radius:var(--r-lg)}
+.tg-fold>summary::-webkit-details-marker{display:none}
+.tg-fold>summary:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
+.tg-cur{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tg-cur .tg-h{font-size:12px;color:var(--ink-2)}
+.tg-cur .tg-curname{font-size:14px;font-weight:600}
+.tg-change{flex:none;font-size:13px;font-weight:500;color:var(--ink)}
+.tg-change::after{content:" \25BE"}
+.tg-fold[open] .tg-change::after{content:" \25B4"}
+.tg-fold>.hint{padding:0 var(--dds-s4,16px);font-size:13px;line-height:1.5;color:var(--ink-2)}
+.tg-fold>.tg-grid{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px)}
+.tg-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--dds-s4,16px)}   /* it lives in a side panel: one column, never wider than the panel */
 .tg-card{border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;background:var(--sheet,#fff);display:flex;flex-direction:column}
 .tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 0 0 1px var(--plum,#5b3fa0)}
-.tg-shot{position:relative;height:430px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
+.tg-shot{position:relative;height:300px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
 .tg-shot iframe{position:absolute;top:0;left:0;width:294%;height:294%;transform:scale(.34);transform-origin:0 0;border:none;pointer-events:none;display:block}
 .tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
@@ -683,7 +698,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-act{margin-top:var(--dds-s3,12px);display:flex;gap:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
 .tg-start{font:inherit;font-size:13px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
 .tg-start.current{background:transparent;color:var(--plum,#5b3fa0);cursor:default}
-.tg-second{font:inherit;font-size:12.5px;padding:6px 2px;background:none;border:none;color:var(--plum,#5b3fa0);cursor:pointer;text-decoration:underline}
 
 /* #2 — CANVAS-DOMINANT workspace: the canvas is full width; tray + settings are
    on-demand slide-over panels, not permanent rails. */
@@ -1126,7 +1140,7 @@ body.pd-dragging *{cursor:grabbing !important}
                 <button type="button" onclick="go('reviews')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Reviews<span class="go" aria-hidden="true">→</span></button>
                 <button type="button" onclick="openFoundationsDesk()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Domain &amp; email<span class="go" aria-hidden="true">→</span></button>
                 <a id="lnkConnections" href="/connections.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7L11.5 6.8"/><path d="M14 10a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 0 0 5.7 5.7l1.3-1.3"/></svg>Connections<span class="go" aria-hidden="true">→</span></a>
-                <a href="/sharing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>Sharing &amp; access<span class="go" aria-hidden="true">→</span></a>
+                <a href="/sharing.html" data-needs="owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>Sharing &amp; access<span class="go" aria-hidden="true">→</span></a>
                 <a href="/client.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Preview client view<span class="go" aria-hidden="true">→</span></a>
               </div>
             </div>
@@ -1150,7 +1164,7 @@ body.pd-dragging *{cursor:grabbing !important}
         <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
         <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
         <h2 class="hb-sub-h">Search &amp; discovery</h2>
-        <div class="field"><label for="f-industry">What kind of business</label><select id="f-industry">
+        <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
           <option value="generic">General / other</option>
           <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
           <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
@@ -1187,7 +1201,7 @@ body.pd-dragging *{cursor:grabbing !important}
         </div>
         <div class="field"><label for="f-seo_title">Search headline (SEO title)</label><input type="text" id="f-seo_title" data-sing="identity" data-field="seo_title" maxlength="120"><div class="cnt" id="cnt-seo_title"></div><div class="hint">What Google shows as your page title.</div></div>
         <div class="field"><label for="f-seo_description">Search description</label><input type="text" id="f-seo_description" data-sing="identity" data-field="seo_description" maxlength="320"><div class="cnt" id="cnt-seo_description"></div><div class="hint">The line under the headline in search results.</div></div>
-        <details style="margin:14px 0;border:1px solid var(--hair,#eee9e0);border-radius:12px;padding:12px 16px">
+        <details data-needs="configure" style="margin:14px 0;border:1px solid var(--hair,#eee9e0);border-radius:12px;padding:12px 16px">
           <summary style="cursor:pointer;font-weight:600;font-size:14px">Verification codes — optional, we handle the rest</summary>
           <div style="margin-top:12px">
         <div class="field"><label for="f-gsv">Google Search Console code</label><input type="text" id="f-gsv" maxlength="100" placeholder='paste the content="…" value'><div class="hint">Search Console → Settings → Ownership verification → HTML tag. Paste just the code, publish, then click Verify at Google — unlocks indexing reports and sitemap submission.</div></div>
@@ -1345,7 +1359,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <div class="dc-bar-acts">
             <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel"><span>＋ Add<span class="dc-wide"> section</span></span></button>
             <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">Menu</button>
-            <button type="button" class="dc-actbtn" id="btnSettingsOpen" aria-haspopup="dialog" aria-controls="settingsPanel">Styles</button>
+            <button type="button" class="dc-actbtn" id="btnSettingsOpen" data-needs="configure" aria-haspopup="dialog" aria-controls="settingsPanel">Styles</button>
             <button type="button" class="pillbtn" id="dcBtnPublish">Publish</button>
           </div>
         </div>
@@ -1404,7 +1418,8 @@ body.pd-dragging *{cursor:grabbing !important}
             <div class="dc-panel-scroll">
               <!-- The site's overall look (theme) lives here now — off the Design page,
                    since starting a page/layout happens through "＋ Page". -->
-              <div id="designGallery" hidden></div>
+              <div class="hint" id="stylesAsk" hidden data-if-lacks="configure" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
+              <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
             </div>
           </aside>
@@ -1573,6 +1588,8 @@ if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this pag
 /* ── helpers ── */
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+// Says who can, where a role without configure would otherwise find a sentence and nothing to press.
+const askOwner = (cls, text) => { const n = el("div", cls, text); n.hidden = true; n.dataset.ifLacks = "configure"; return n; };
 // A small masked/text dialog — replaces native prompt() (no cleartext passwords, and
 // it matches the app's styled surfaces). Resolves the entered value, or null on cancel.
 function askText(title, opts) {
@@ -1857,7 +1874,7 @@ function go(view, early) {
 }
 // PT-2C: one-time contextual education per surface (reuses the shell hint system).
 const VIEW_HINTS = {
-  design: ["edit-doubleclick", "Double-click any text on your page to change it. Everything saves itself, and nothing goes live until you publish."],
+  design: ["edit-doubleclick", "Double-click the words in a section to change them. Everything saves itself, and nothing goes live until you publish."],
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
   business: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
 };
@@ -2174,7 +2191,7 @@ function dishEditor(o) {
       <button class="pillbtn" data-act="save">Done</button>
       <button class="textact" data-act="vis" style="background:none">${o.is_visible === false ? VOCAB.putBack : VOCAB.takeOff}</button>
       <span class="spacer"></span>
-      <button class="danger" data-act="del">Remove for good</button>
+      <button class="danger" data-act="del" data-needs="delete">Remove for good</button>
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/offerings/${o.id}`, { media_id: mediaId }); Object.assign(o, r.data); renderOfferings(); scheduleChangesRefresh(); }
@@ -2267,7 +2284,7 @@ function simpleEditor(entity, collection, fields, rerender, words) {
       <button class="pillbtn" data-act="save">Done</button>
       <button class="textact" data-act="vis" style="background:none">${entity.is_visible === false ? words.show : words.hide}</button>
       <span class="spacer"></span>
-      <button class="danger" data-act="del">Remove for good</button>
+      <button class="danger" data-act="del" data-needs="delete">Remove for good</button>
     </div>`;
   if (collection === "faqs") {
     const improve = el("button", "quietact", "✦ improve with help");
@@ -2390,7 +2407,7 @@ function postEditor(p) {
     <div class="eacts">
       <button class="pillbtn" data-act="save">Done</button>
       <span class="spacer"></span>
-      <button class="danger" data-act="del">Remove for good</button>
+      <button class="danger" data-act="del" data-needs="delete">Remove for good</button>
     </div>`;
   ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
     try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
@@ -2765,7 +2782,7 @@ function renderFoundations(f, plans, launch, dom) {
   domCard.appendChild(el("div", "dol", "your domain"));
   const dstat = (dom && dom.custom_domain) ? dom : null;
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
-  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
+  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
 
   if (dstat && dstat.health === "ok") {
     const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
@@ -2796,12 +2813,13 @@ function renderFoundations(f, plans, launch, dom) {
   } else {
     // No domain yet — the branching intro, plain language, two clear choices.
     domCard.appendChild(stepLine("Right now your site is at a temporary address. Want it on your own domain (like yourbusiness.com)?"));
-    const choose = el("div", "doa"); choose.style.cssText = "gap:8px;margin-top:8px;flex-wrap:wrap";
+    domCard.appendChild(askOwner("aihint", "Ask the account owner to connect it."));
+    const choose = el("div", "doa"); choose.dataset.needs = "configure"; choose.style.cssText = "gap:8px;margin-top:8px;flex-wrap:wrap";
     const haveBtn = el("button", "textact", "I already have a domain"); haveBtn.style.cssText = "border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);border-radius:999px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer";
     const needBtn = el("button", "textact", "I need to get one"); needBtn.style.cssText = "border:1px solid var(--line,#ddd);background:transparent;border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer";
     choose.appendChild(haveBtn); choose.appendChild(needBtn); domCard.appendChild(choose);
 
-    const havePanel = el("div"); havePanel.style.cssText = "display:none;margin-top:10px";
+    const havePanel = el("div"); havePanel.dataset.needs = "configure"; havePanel.style.cssText = "display:none;margin-top:10px";
     havePanel.appendChild(stepLine("Type your domain and we’ll connect it. You’ll get two simple records to add — we handle the rest."));
     const row = el("div", "doa"); row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:6px";
     const inp = el("input"); inp.type = "text"; inp.placeholder = "yourbusiness.com"; inp.setAttribute("autocomplete", "off");
@@ -2817,7 +2835,7 @@ function renderFoundations(f, plans, launch, dom) {
     row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row); domCard.appendChild(havePanel);
 
     if (DESK_DOMAIN_INTENT) { DESK_DOMAIN_INTENT = false; setTimeout(() => { haveBtn.click(); inp.focus(); }, 0); }
-    const needPanel = el("div"); needPanel.style.cssText = "display:none;margin-top:10px";
+    const needPanel = el("div"); needPanel.dataset.needs = "configure"; needPanel.style.cssText = "display:none;margin-top:10px";
     needPanel.appendChild(stepLine("No problem — getting one takes a couple of minutes:"));
     needPanel.appendChild(stepLine("1. Go to a domain company — Namecheap, Porkbun, or GoDaddy (about $12 a year)."));
     needPanel.appendChild(stepLine("2. Search for the name you want and buy it."));
@@ -2847,7 +2865,8 @@ function renderFoundations(f, plans, launch, dom) {
     const s2 = el("p", "aihint", "2. Once it’s set up, come back here — we’ll notice it automatically and help you protect it so your mail never lands in spam."); s2.style.marginTop = "4px"; emailCard.appendChild(s2);
   } else if (!(f.email.spf && f.email.dmarc)) {
     const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
-    const acts = el("div", "doa"); acts.style.marginTop = "6px";
+    emailCard.appendChild(askOwner("aihint", "Ask the account owner to set this up."));
+    const acts = el("div", "doa"); acts.dataset.needs = "configure"; acts.style.marginTop = "6px";
     const b = el("button", "textact", "Set up email protection");
     b.addEventListener("click", async () => {
       try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Set up — the records to add are below."); openFoundationsDesk(); }
@@ -2855,7 +2874,7 @@ function renderFoundations(f, plans, launch, dom) {
     });
     acts.appendChild(b);
     emailCard.appendChild(acts);
-    const after = el("p", "aihint", "You’ll get a short list of records to copy-paste where you bought your domain — same as connecting it. We check the rest."); after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
+    const after = el("p", "aihint", "You’ll get a short list of records to copy-paste where you bought your domain — same as connecting it. We check the rest."); after.dataset.needs = "configure"; after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
   } else {
     const okp = el("p", "aihint", "✓ All set — inboxes can trust mail from your domain. Nothing to do."); okp.style.marginTop = "5px"; okp.style.fontWeight = "600"; emailCard.appendChild(okp);
   }
@@ -3026,7 +3045,7 @@ async function renderKnowledgeDocs() {
       row.appendChild(el("div", "dop", d.filename));
       row.appendChild(el("p", "aihint", d.items ? `${d.items} item${d.items > 1 ? "s" : ""} noticed` : "kept"));
       const acts = el("div", "doa");
-      const del = el("button", "quietact", "Remove");
+      const del = el("button", "quietact", "Remove"); del.dataset.needs = "delete";
       del.addEventListener("click", async () => {
         try { await api("DELETE", `/knowledge/docs/${d.id}`); row.remove(); toast("Removed"); }
         catch (err) { toast(nice(err), true); }
@@ -3377,6 +3396,8 @@ function bkGatherSettings(root) {
 }
 function renderBookings(wrap, appts) {
   const s = BK.settings || {};
+  const askHours = askOwner("hint", "Ask the account owner to change your hours or turn online booking on or off."); askHours.style.marginBottom = "14px";
+  wrap.appendChild(askHours);
   // ── 1. On/off + intro ──────────────────────────────────────────────────────
   const c1 = bkCard("Online booking", "Turn this on when your services and hours are ready. Customers see the booking widget wherever you place the “Online booking” section.");
   const form = el("div"); form.className = "bk-availform";
@@ -3387,7 +3408,7 @@ function renderBookings(wrap, appts) {
   const introI = el("input"); introI.type = "text"; introI.className = "bk-intro"; introI.value = s.intro || ""; introI.style.cssText = BK_ICSS;
   introI.placeholder = "A short welcome line (optional) — e.g. Pick a service and a time that suits you.";
   form.appendChild(bkField("Intro shown above the widget", introI));
-  c1.appendChild(form); wrap.appendChild(c1);
+  c1.dataset.needs = "configure"; c1.appendChild(form); wrap.appendChild(c1);
 
   // ── 2. Availability + window ────────────────────────────────────────────────
   const c2 = bkCard("Your hours", "The days and times you take appointments. Slots are offered inside these hours, minus anything already booked.");
@@ -3420,7 +3441,7 @@ function renderBookings(wrap, appts) {
   const ac = el("input"); ac.type = "checkbox"; ac.className = "bk-autoconfirm"; ac.checked = !!s.auto_confirm; ac.style.width = "auto";
   acWrap.append(ac, el("span", null, "Confirm bookings automatically (otherwise they wait for your OK)"));
   c2.appendChild(acWrap);
-  wrap.appendChild(c2);
+  c2.dataset.needs = "configure"; wrap.appendChild(c2);
   // Saved as you go, like everything else: the two settings cards, not the services below.
   let bkSaved = JSON.stringify(bkGatherSettings(wrap));
   const bkSave = () => debounce("bk-settings", async () => {
@@ -3456,7 +3477,7 @@ function bkServiceRow(t) {
   info.appendChild(el("div", null, t.name)).style.cssText = "font-weight:600";
   info.appendChild(el("div", "hint", meta)).style.margin = "2px 0 0";
   const edit = el("button", null, "Edit"); edit.style.cssText = BK_BTN;
-  const del = el("button", null, "Remove"); del.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
+  const del = el("button", null, "Remove"); del.dataset.needs = "delete"; del.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
   edit.addEventListener("click", () => row.replaceWith(bkServiceForm(t)));
   del.addEventListener("click", async () => {
     if (!confirm("Remove “" + t.name + "”? Existing appointments keep their details.")) return;
@@ -3759,7 +3780,7 @@ function mediaCell(grid, m, manage, onPick) {
     });
     row.appendChild(fp);
     cell.appendChild(row);
-    const del = el("button", "del", "✕"); del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
+    const del = el("button", "del", "✕"); del.dataset.needs = "delete"; del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
     del.addEventListener("click", async () => {
       if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
       try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
@@ -4070,7 +4091,8 @@ function renderDomainCard() {
   const btn = el("button", "pillbtn sm hb-act"); btn.type = "button";
   if (!d) {
     card.appendChild(el("div", "note", "Your site is on a temporary address" + (temp ? " (" + temp.replace(/^https:\/\//, "") + ")" : "") + ". Put it on your own name, like yourbusiness.com."));
-    btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
+    card.appendChild(askOwner("note", "Ask the account owner to connect it."));
+    btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
     card.appendChild(el("div", "note", "✓ " + d.custom_domain + " is live and secure."));
     btn.textContent = "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
@@ -4569,7 +4591,7 @@ async function mountLookSeg() {
   });
   drawer.appendChild(cards);
   if (PV.template) {
-    const use = el("button", null, "Use this look");
+    const use = el("button", null, "Use this look"); use.dataset.needs = "owner";
     use.style.cssText = "font-weight:700";
     use.addEventListener("click", async () => {
       try {
@@ -4718,7 +4740,22 @@ function eeEditBlock(bi) {                       // open this one section's edit
 }
 function eeEditCore(view) {                      // open the core-section tab
   closePreview(); go(view || "design");
-  if ((view || "design") === "design" && typeof openSettingsPanel === "function") openSettingsPanel("styles");
+  if ((view || "design") === "design") { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); return; }
+  toastAction(`You’re on the ${eeTabWord(view)} tab.`, "Back to your page", () => go("design"), 10000);
+}
+function eeTabWord(view) {                       // the tab's own label, which follows the site's vocabulary (Menu/Services)
+  const b = $("nav") && $("nav").querySelector(`[data-view="${view}"]`);
+  return b ? b.textContent : "Business";
+}
+// A double-click never leaves Edit mode by surprise. A core section's words live on
+// another tab until core sections move onto the canvas, so say where and offer the way.
+let EE_CORE_TOAST = null;
+function eeDoubleClickTarget(secEl) {
+  const c = eeClassify(secEl);
+  if (c.kind === "block") { eeEditBlock(c.bi); return; }
+  if (c.view === "design") { eeEditCore(c.view); return; }
+  if (EE_CORE_TOAST) EE_CORE_TOAST.remove();
+  EE_CORE_TOAST = toastAction(`These words come from your ${eeTabWord(c.view)} tab.`, "Edit them there", () => eeEditCore(c.view), 8000);
 }
 function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
   const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
@@ -5292,6 +5329,7 @@ function togglePageInfoMenu() {
   // take offline), and revalidation can bring it back.
   let offAction = null;
   const offBtn = mi("Take offline / bring back…", () => { if (offAction) offAction(); }, { id: "piOffline" });
+  offBtn.dataset.needs = "configure";
   offBtn.disabled = true;
   const setOffState = (live) => {
     if (!PI_OPEN || PI_OPEN.menu !== m) return;
@@ -5489,7 +5527,7 @@ function cmItem(c, slug, bid, name) {
     r.addEventListener("click", () => cmAct("/comments/" + c.id + "/resolve", slug, bid, name, "Resolved."));
     acts.appendChild(r);
   }
-  const d = el("button", null, "Remove"); d.type = "button";
+  const d = el("button", null, "Remove"); d.dataset.needs = "delete"; d.type = "button";
   d.addEventListener("click", () => cmAct("/comments/" + c.id + "/delete", slug, bid, name, "Removed."));
   acts.appendChild(d);
   it.appendChild(acts);
@@ -5636,7 +5674,9 @@ async function renderPreviewPanel() {
     mk("Copy link", () => { if (st.preview.url && navigator.clipboard) { navigator.clipboard.writeText(st.preview.url); toast("Preview link copied"); } });
     mk("Preview in editor", () => openPreview("preview"));
     mk(st.preview.has_password ? "Change / remove password" : "Password-protect", async () => { const pw = await askText(st.preview.has_password ? "Change preview password" : "Set a preview password", { password: true, ok: "Update", hint: st.preview.has_password ? "Leave blank to remove the password." : "Anyone with the link will need this to view the preview." }); if (pw !== null) act("/preview/settings", "Preview access updated", { password: pw }); });
+    acts.lastChild.dataset.needs = "configure";
     mk("Reset link", () => { if (confirm("Reset the preview link? The old link stops working.")) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
+    acts.lastChild.dataset.needs = "configure";
     if (st.live.published) mk("Compare with Live", () => openPreview("live"));
     mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
   }
@@ -5715,6 +5755,7 @@ async function renderCheckpoints() {
       try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
       catch (err) { toast(nice(err), true); }
     });
+    acts.lastChild.dataset.needs = "delete";
     row.appendChild(acts);
     card.appendChild(row);
   });
@@ -5992,7 +6033,7 @@ async function mountBillingCard() {
 // ── CP-10: leaving for good — honest, calm, reversible until executed ──
 function mountDeletionCard() {
   const host = $("view-business"); if (!host || $("deleteCard")) return;
-  const d = el("details"); d.id = "deleteCard"; d.style.cssText = "margin-top:26px";
+  const d = el("details"); d.id = "deleteCard"; d.dataset.needs = "owner"; d.style.cssText = "margin-top:26px";
   d.appendChild(Object.assign(el("summary", null, "Leaving for good? Delete your account"), { style: "cursor:pointer;font-size:12.5px;color:var(--ink-2,#777)" }));
   const p = el("p", "hint", "This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
   const b = el("button", null, "Request deletion");
@@ -6378,7 +6419,7 @@ async function mountSearchCard() {
       rows.forEach((row) => {
         const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
-        const x = el("button", null, "✕"); x.type = "button"; x.title = "Remove this forward";
+        const x = el("button", null, "✕"); x.dataset.needs = "delete"; x.type = "button"; x.title = "Remove this forward";
         x.style.cssText = "border:none;background:none;cursor:pointer;color:var(--ink-2,#888)";
         x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
@@ -7404,7 +7445,8 @@ function undoPlan(method, route, body) {
   if (!m) return null;
   const col = m[1], id = m[2], row = id && (S[col] || []).find((x) => x.id === id);
   if (method === "PATCH" && row) return { kind: "patch", col, id, before: undoPick(row, Object.keys(body || {})), after: undoClone(body) };
-  if (method === "POST" && !id) return { kind: "create", col, id: null, row: undoClone(body) };
+  // Undoing an add removes the row, which a role without delete can't do: no step beats an Undo that gets refused.
+  if (method === "POST" && !id) return window.ddsLacks && window.ddsLacks("delete") ? null : { kind: "create", col, id: null, row: undoClone(body) };
   if (method === "DELETE" && row) return { kind: "remove", col, id, row: undoPick(row, UNDO_LIST_FIELDS[col]) };
   return null;
 }
@@ -7508,7 +7550,9 @@ function blocksSaveSoon(ms) {
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
-  if (BLOCKS_SAVING) { blocksSaveSoon(); return true; }
+  // An in-place commit has its own ~1.2s debounce and saves this same list when it
+  // fires. Saving here too wrote the list twice and repainted the canvas twice.
+  if (BLOCKS_SAVING || IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT) { blocksSaveSoon(); return true; }
   if (!blocksDirty()) return true;
   // G27 §5: unreadable colors still get their one question; "no" puts the list back
   if (!ovConfirmContrastAck()) { BLOCKS_WORK = JSON.parse(DC_HIST_LAST); renderBlocksCard(); return false; }
@@ -7584,7 +7628,9 @@ function applyStarterLayout(starter) {
 }
 function mountBlocksCard() {
   const host = $("designHost"); if (!host || $("blocksCard")) return;
-  BLOCKS_WORK = currentBlocks();
+  // Behind a slow read the canvas lands before this card, so the list may already
+  // hold an in-place commit. Replacing it here saved the old text and said "Saved".
+  if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
   const card = el("div", "field"); card.id = "blocksCard"; card.style.marginTop = "18px";
   host.appendChild(card);
   card.addEventListener("change", () => blocksSaveSoon());   // field handlers run first; this sees their result
@@ -8300,7 +8346,7 @@ function renderBlocksCard() {
           ins.addEventListener("click", () => clInsert(it.block));
           const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
           lnk.addEventListener("click", () => clInsertLink(it));
-          const del = el("button", null, "×"); del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+          const del = el("button", null, "×"); del.dataset.needs = "delete"; del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => {
             // G8: deleting a LIVE-LINKED entry first names the pages it appears on
             if (used.length && !confirm("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?")) return;
@@ -9102,7 +9148,9 @@ function mountSectionsCard() {
   card.appendChild(el("div", "hint", "Choose which sections appear on your home page, and their order. Unchecked sections are kept, never lost."));
   host.appendChild(card);
   mountLookCard();
-  refreshDesignPreview();
+  // On the Design view go() has already asked for this paint. Asking again from
+  // here, a slow read later, replaced a canvas someone could already be working on.
+  if (!$("view-design").classList.contains("on")) refreshDesignPreview();
 }
 // ── CP-2.5: the Look card — the template switcher's discoverable front door ──
 async function mountLookCard() {
@@ -9279,10 +9327,14 @@ function openTrayPanel(tab) {
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   const want = dcRailTabName(tab);
   dcRailTab(want);
+  const tray = $("designTray"); if (tray) tray.scrollTop = 0;
+  // preventScroll: this lands while the panel is still opening, about 1px wide, where
+  // the intro text is hundreds of pixels tall. A plain focus scrolled the list past
+  // its own search box and left it there once the panel had widened.
   setTimeout(() => { try {
     (want === "add" ? (p.querySelector("#designTray .tray-search") || $("tabAdd"))
       : want === "files" ? ($("pfSearch") || $("tabFiles"))
-      : $("tabContents")).focus();
+      : $("tabContents")).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
 // clicking a rail launcher again (same tab) closes it — a clear toggle
@@ -9392,15 +9444,30 @@ async function mountTemplateGallery() {
   host.hidden = false;
   renderTemplateGallery();
 }
+// Styles leads with the choices people make every day. The templates wait in one row
+// until asked for: the list is long, and every card draws a live preview of the site.
+let TG_OPEN = false;
 function renderTemplateGallery() {
   const host = $("designGallery"); if (!host || !LOOKS) return;
   host.textContent = "";
-  const head = el("div", "tg-head");
-  head.appendChild(el("div", "tg-h", "Start with a template"));
-  head.appendChild(el("div", "hint", "Pick the overall design first — it sets your whole layout. Your words stay; only the look and structure change, and nothing goes live until you publish. Fine-tune colours and type afterwards in the Design studio."));
-  host.appendChild(head);
-  const grid = el("div", "tg-grid");
   const curSlug = (LOOKS.current && LOOKS.current.slug) || "";
+  const cur = (LOOKS.templates || []).find((t) => t.slug === curSlug);
+  const fold = el("details", "tg-fold");
+  const sum = el("summary");
+  const label = el("span", "tg-cur");
+  label.appendChild(el("span", "tg-h", "Template"));
+  if (cur) label.appendChild(el("span", "tg-curname", cur.name));
+  sum.appendChild(label);
+  sum.appendChild(el("span", "tg-change", "Change"));
+  fold.appendChild(sum);
+  const draw = () => { if (!fold.querySelector(".tg-grid")) drawTemplateGrid(fold, curSlug); };
+  fold.addEventListener("toggle", () => { TG_OPEN = fold.open; if (fold.open) draw(); });
+  host.appendChild(fold);
+  if (TG_OPEN) { fold.open = true; draw(); }
+}
+function drawTemplateGrid(fold, curSlug) {
+  fold.appendChild(el("div", "hint", "A template sets your whole layout. Your words stay, only the look and structure change, and nothing goes live until you publish."));
+  const grid = el("div", "tg-grid");
   // A cold-start draft has nothing real to render; render the DEMO silhouette so
   // every card shows a designed page. Once there IS real content, we render it in
   // the actual /preview pipeline (the most faithful possible preview of the look).
@@ -9434,15 +9501,11 @@ function renderTemplateGallery() {
     if (active) { start.disabled = true; }
     else start.addEventListener("click", () => applyTemplateFromGallery(t));
     act.appendChild(start);
-    const second = el("button", "tg-second", "Change the look"); second.type = "button";
-    second.title = "Fine-tune colors, type and corners in Styles";
-    second.addEventListener("click", () => openSettingsPanel("styles"));
-    act.appendChild(second);
     body.appendChild(act);
     card.appendChild(body);
     grid.appendChild(card);
   });
-  host.appendChild(grid);
+  fold.appendChild(grid);
 }
 // The demo silhouette: a small, on-brand canned page (nav · hero · cards · split ·
 // footer) painted in the template family's colour + type. Representative sample
@@ -10199,6 +10262,15 @@ function dpNote(title, body) {
   if (b) b.textContent = body;
   box.hidden = false;
 }
+// G13: a repaint replaces the canvas document, and the caret and every later
+// keystroke of an open in-place session would go with it — so it waits for the
+// session to end (ipeEnd runs it). A commit still in its debounce holds it off too:
+// that save repaints when it lands, and a read now would flash the old text back.
+let DP_REPAINT_HELD = false;
+function dpHoldRepaint() {
+  if (IPE) { DP_REPAINT_HELD = true; return true; }
+  return IPE_SAVE_T != null || IPE_SAVE_PENDING;
+}
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   // Slice D: a past version is on the canvas (Timewarp) — leave it there until
@@ -10210,6 +10282,7 @@ function refreshDesignPreview() {
     // landed while this repaint was debouncing or in flight; never paint the
     // draft over it while the banner still claims a past date.
     if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+    if (dpHoldRepaint()) return;
     // ALWAYS render the canvas — even a brand-new draft gets a page to build ON.
     // The render engine returns a valid scaffold (nav · footer · whatever content
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
@@ -10219,9 +10292,7 @@ function refreshDesignPreview() {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
-      // G13 slice 2: a repaint replaces the canvas document — bank any active
-      // in-place session FIRST so typed text is never silently lost.
-      if (IPE) ipeCommit();
+      if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
@@ -10834,7 +10905,7 @@ function ipeStart(doc, fieldEl, secEl) {
   if (IPE) ipeCommit();                       // starting a new session banks the old one
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
-  if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeEditTarget(secEl); return; }   // never a dead double-click
+  if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeDoubleClickTarget(secEl); return; }   // never a dead double-click
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
@@ -10960,6 +11031,7 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
   if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }   // the deferred burst-save resumes
+  if (DP_REPAINT_HELD) { DP_REPAINT_HELD = false; refreshDesignPreview(); }   // the repaint this session held off
   return s;
 }
 function ipeCancel() {
@@ -11132,6 +11204,7 @@ function dcInjectCanvas(doc, main) {
       // every section (and top/bottom), plus a big placeholder on an empty page.
       // Clicking one opens the section picker AT that spot; it's also the drop
       // target the drag ghost snaps to. Purely an editing overlay — never served.
+      "#presence-preview-badge{display:none!important}" +
       ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:system-ui,-apple-system,sans-serif}" +
       ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed rgba(42,111,181,.28);transform:translateY(-50%);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
       ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:#2a6fb5}" +
@@ -11272,7 +11345,7 @@ function dcInjectCanvas(doc, main) {
         if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // inside the live session = word-select
         const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
         e.preventDefault();
-        if (f && el2.contains(f)) ipeStart(doc, f, el2); else eeEditTarget(el2);
+        if (f && el2.contains(f)) ipeStart(doc, f, el2); else eeDoubleClickTarget(el2);
       });
     }
     // keyboard path (a11y contract): every stamped field is Tab-reachable in

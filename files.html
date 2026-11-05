@@ -964,7 +964,7 @@ function renderDetail(){
       <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
       <button class="btn" onclick="download('${a.id}')">Download</button>
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
-      <button class="btn warn" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
+      <button class="btn warn" data-needs="delete" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
   wirePreviews($('panel'));
   const pv2=$('f-private'); if(pv2)pv2.onchange=()=>setPrivate(a.id,pv2.checked,pv2);
