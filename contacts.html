@@ -404,7 +404,7 @@ function tableHtml(list){
       <td class="acts"><div class="rowacts">
         <button class="rowact" data-edit="${esc(c.id)}" title="Edit this contact" aria-label="Edit ${who}">Edit</button>
         <button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
-        <button class="rowact danger" data-del="${esc(c.id)}" title="Remove this contact from your list" aria-label="Delete ${who}">Delete</button>
+        <button class="rowact danger" data-needs="delete" data-del="${esc(c.id)}" title="Remove this contact from your list" aria-label="Delete ${who}">Delete</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -422,7 +422,7 @@ function cardsHtml(list){
         ${c.email?`<a class="reply" href="mailto:${esc(c.email)}">Email</a>`:(c.phone?`<a class="reply" href="tel:${esc(tel)}">Call</a>`:'')}
         <button data-edit="${esc(c.id)}" aria-label="Edit ${who}">Edit</button>
         <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
-        <button class="danger" data-del="${esc(c.id)}" aria-label="Delete ${who}">Delete</button>
+        <button class="danger" data-needs="delete" data-del="${esc(c.id)}" aria-label="Delete ${who}">Delete</button>
       </div></div>`;
   }
   return h;
@@ -440,7 +440,7 @@ function listHtml(rows){
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
     +`<div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,

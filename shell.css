@@ -562,3 +562,13 @@ html.dds-embed .dds-waffle{display:none!important}
 .dds-toast .act:hover{background:rgba(255,255,255,.26)}
 .dds-toast .act:focus-visible{outline:2px solid #fff;outline-offset:1px}
 @media (max-width:760.98px){.dds-toast.has-act{pointer-events:auto}}
+
+/* ── What an invited member's role can't use ─────────────────────────────────
+   shell.js names what the caller lacks on <html> (owners, a studio scoped in and
+   platform staff lack nothing). A control the role can't use is gone, and a note
+   marked data-if-lacks takes its place. Notes carry [hidden], so they stay away
+   from everyone else even on a stale copy of this file. */
+html[data-dds-lacks~="delete"] [data-needs="delete"],
+html[data-dds-lacks~="configure"] [data-needs="configure"],
+html[data-dds-lacks~="owner"] [data-needs="owner"]{display:none!important}
+html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}

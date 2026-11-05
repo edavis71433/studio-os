@@ -898,7 +898,7 @@ function editContact(host){
     ${defs.map(cfField).join('')}
     <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>
     <section><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">Removing a contact takes them off your contact list. Their deals, agreements, invoices and projects are never deleted with them.</p>
-    <button id="ec-del" style="border-color:transparent;color:var(--bad)">Delete this contact</button></div></section>`;
+    <button id="ec-del" data-needs="delete" style="border-color:transparent;color:var(--bad)">Delete this contact</button></div></section>`;
   $('ec-cancel').onclick=()=>loadDetails(host);
   $('ec-save').onclick=async()=>{
     const body={name:$('ec-name').value.trim(),company:$('ec-company').value.trim(),email:$('ec-email').value.trim(),phone:$('ec-phone').value.trim()};
@@ -1015,7 +1015,7 @@ function renderBillingTab(host){
       due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
-      acts+=act(`data-void-inv="${esc(v.id)}"`,'Void','Withdraw this invoice — the payment link stops working');}
+      acts+=act(`data-void-inv="${esc(v.id)}" data-needs="delete"`,'Void','Withdraw this invoice — the payment link stops working');}
     acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View','Open a branded, printable copy (save as PDF)');
     return `<tr class="brow"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
   }).join('')+`</tbody></table></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
@@ -1049,7 +1049,7 @@ function renderBillingTab(host){
   html+=`<section><h2>Retainer</h2><div class="card">`;
   if(r&&r.status&&r.status!=='canceled'){
     const st=r.status==='active'?'<span class="schip good">Active</span>':r.status==='past_due'?'<span class="schip bad">Payment overdue</span>':'<span class="schip warn">Awaiting authorization</span>';
-    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1"','Cancel retainer')}</span></div>`;
+    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1" data-needs="delete"','Cancel retainer')}</span></div>`;
   }else{
     html+=`<p class="muted" style="font-size:13.5px;margin-bottom:10px">Bill this client the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do.</p><button type="button" class="rbtn" data-bform="retainer">Set up a retainer</button><div id="rform"></div>`;
   }
