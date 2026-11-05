@@ -368,11 +368,13 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect(frame.locator('#dds-ipe-live')).toContainText(/^Saved$/);  // announced only after the resolve (survives the repaint)
   });
 
-  test('core sections are NOT editable this slice — double-click routes to their panel tab', async ({ page }) => {
+  test('core sections are NOT editable this slice — double-click says which tab holds their words and offers the way', async ({ page }) => {
     const { frame } = await mountCanvas(page);
     await frame.locator('[data-dds-core="hero"]').dblclick();
-    await expect(page.locator('#view-business')).toBeVisible();      // hero → the Business tab
     await expect(frame.locator('[contenteditable]')).toHaveCount(0); // nothing became editable
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);       // and no surprise jump out of Edit mode
+    await page.locator('.toast').getByRole('button', { name: 'Edit them there' }).click();
+    await expect(page.locator('#view-business')).toBeVisible();      // hero → the Business tab
   });
 
   test('an OLD-function render (no stamps) gets no in-place affordance — the panel editor still works', async ({ page }) => {
