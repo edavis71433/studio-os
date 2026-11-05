@@ -74,7 +74,9 @@ export async function setConnection(siteId: string, providerKey: string, patch: 
   });
 }
 
-export async function markStatus(siteId: string, providerKey: string, status: ConnectionStatus, health: 'ok' | 'attention' | 'down' | 'unknown', error = ''): Promise<void> {
+// `quiet`: the reason shows on the connection's own card, and no notice goes out. For
+// a wait only the studio can end, where a client could do nothing about a notice.
+export async function markStatus(siteId: string, providerKey: string, status: ConnectionStatus, health: 'ok' | 'attention' | 'down' | 'unknown', error = '', opts: { quiet?: boolean } = {}): Promise<void> {
   await svc(`presence_connections?site_id=eq.${encodeURIComponent(siteId)}&provider_key=eq.${encodeURIComponent(providerKey)}`, {
     method: 'PATCH', body: JSON.stringify({ status, health, last_error: error.slice(0, 300) }),
   });
@@ -96,12 +98,17 @@ export async function markStatus(siteId: string, providerKey: string, status: Co
     const s = await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`);
     const clientId = s.json?.[0]?.client_id;
     if (!clientId) return;
+    if (degraded && opts.quiet) return;
     if (degraded) {
       const label = CONN_LABEL[providerKey] || 'A connected service';
+      // A connected service asking for a human step, in a sentence we wrote ("Choose
+      // which listing…", "That account can't see…"): reconnecting wouldn't help, so
+      // the notice says what would.
+      const needsStep = status === 'connected' && health === 'attention' && /^[A-Z]/.test(error) && /\s/.test(error);
       await raiseNotice({
         siteId, clientId, kind: 'connection_expired', period: connExpiredPeriod(providerKey, Date.now()),
-        headline: `${label} needs a quick reconnect`,
-        body: 'It stopped updating — reconnecting keeps your numbers current. Nothing on your website changed.',
+        headline: needsStep ? `${label} needs a look` : `${label} needs a quick reconnect`,
+        body: needsStep ? error : 'It stopped updating — reconnecting keeps your numbers current. Nothing on your website changed.',
       });
     } else if (status === 'connected' && health === 'ok') {
       await clearNoticePrefix(clientId, 'connection_expired', connExpiredPeriodPrefix(providerKey));

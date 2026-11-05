@@ -7,7 +7,7 @@
 // not orphan anything an old analytics.html called).
 import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors,
-  sourceShares, invoiceBuckets, recentWins, oldestAgeDays, DASH_WEEKS,
+  sourceShares, invoiceBuckets, recentWins, oldestAgeDays, priorPeriodStart, priorPeriodVisitors, searchPagePath, DASH_WEEKS,
 } from '../../supabase/functions/presence/lib/analytics_dashboard.ts';
 import { aggregateVisits } from '../../supabase/functions/presence/lib/visits.ts';
 
@@ -152,6 +152,35 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
     ['handleAnalyticsHome', 'handleAnalyticsWebsite', 'handleAnalyticsCustomers', 'handleAnalyticsSearch', 'handleAnalyticsPortfolio'].every((h) => route.includes(`export async function ${h}`)));
   ok('routes/analytics.ts exports handleAnalyticsDashboard', route.includes('export async function handleAnalyticsDashboard'));
   ok('dashboard reuses the pure lib (no forked math in the route)', /from '\.\.\/lib\/analytics_dashboard\.ts'/.test(route) && /summarizePipeline/.test(route));
+}
+
+// ── the period before this one + the per-page table ──
+{
+  const DAY = 86_400_000;
+  const now = Date.UTC(2026, 10, 5, 12), start = Date.UTC(2026, 10, 1);
+  ok('prior: the same stretch of time, immediately before', priorPeriodStart('this_month', start, now) === start - (now - start));
+  ok('prior: all time has nothing before it', priorPeriodStart('all', now - 3650 * DAY, now) === null);
+  const pStart = priorPeriodStart('this_month', start, now);
+  const rows = [
+    { ts: new Date(start - DAY).toISOString(), kind: 'pageview', visitor_hash: 'a' },
+    { ts: new Date(start - DAY).toISOString(), kind: 'pageview', visitor_hash: 'a' },
+    { ts: new Date(start - DAY).toISOString(), kind: 'pageview', visitor_hash: 'b' },
+    { ts: new Date(start - DAY).toISOString(), kind: 'phone', visitor_hash: 'c' },
+    { ts: new Date(start - DAY).toISOString(), kind: 'pageview' },
+    { ts: new Date(start + DAY).toISOString(), kind: 'pageview', visitor_hash: 'd' },
+    { ts: new Date(pStart - DAY).toISOString(), kind: 'pageview', visitor_hash: 'e' },
+  ];
+  ok('prior: distinct people, pageviews only, inside the window only', priorPeriodVisitors(rows, pStart, start) === 2);
+  const agg = aggregateVisits([
+    { ts: new Date(now - 60000).toISOString(), kind: 'pageview', path: '/menu/', ref_host: '', utm_source: '', device: 'mobile', country: 'US', visitor_hash: 'a' },
+    { ts: new Date(now - 60000).toISOString(), kind: 'pageview', path: '/menu/', ref_host: '', utm_source: '', device: 'mobile', country: 'US', visitor_hash: 'a' },
+    { ts: new Date(now - 60000).toISOString(), kind: 'pageview', path: '/menu/', ref_host: '', utm_source: '', device: 'mobile', country: 'US', visitor_hash: 'b' },
+    { ts: new Date(now - 60000).toISOString(), kind: 'pageview', path: '/', ref_host: '', utm_source: '', device: 'mobile', country: 'US', visitor_hash: 'b' },
+  ], now, 7);
+  ok('pages: views AND people per page, busiest first', JSON.stringify(agg.pages) === JSON.stringify([{ path: '/menu/', views: 3, visitors: 2 }, { path: '/', views: 1, visitors: 1 }]));
+  ok('pages: the short list stays as it was for older readers', JSON.stringify(agg.topPages[0]) === JSON.stringify({ path: '/menu/', views: 3 }));
+  ok('search page path: a whole URL becomes the path the counter stores', searchPagePath('https://bacchus.com/menu/?x=1') === '/menu/' && searchPagePath('https://bacchus.com') === '/');
+  ok('search page path: garbage is the home page, never a throw', searchPagePath('nonsense') === '/' && searchPagePath(null) === '/');
 }
 
 const passed = results.filter((r) => r.p).length;

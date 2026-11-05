@@ -97,7 +97,7 @@ test.describe('one set of tabs', () => {
     await mount(page, '/presence.html');
     const strip = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
     const sheet = (await page.locator('#sectionsNav .navitem').allTextContents()).map((s) => s.trim());
-    expect(strip).toEqual(['Overview', 'Services', 'Questions', 'Testimonials', 'Updates', 'Files', 'Bookings', 'Reviews', 'Business', 'Domain & email', 'History']);
+    expect(strip).toEqual(['Overview', 'Services', 'Questions', 'Testimonials', 'Updates', 'Files', 'Bookings', 'Reviews', 'Business', 'Search', 'Analytics', 'Domain & email', 'History']);
     expect(sheet).toEqual(['Edit site', ...strip]);    // plus the way into Edit mode, which the phone header has no room for
     await expect(page.locator('#nav')).toBeVisible();
     await page.locator('#nav .navitem[data-view="faqs"]').click();

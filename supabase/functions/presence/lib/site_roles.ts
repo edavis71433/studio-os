@@ -148,6 +148,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ]],
   ['edit', [
     'POST /redirects',
+    'POST /visibility/check',
     'POST /preview/(publish|share-link)',
     'POST /publishes/checkpoints',
     `POST /publishes/checkpoints/${ID}/restore`,

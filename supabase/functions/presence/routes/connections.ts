@@ -20,12 +20,14 @@ import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
 import { connectionReason } from '../connected/contract.ts';
 import type { EditionKey } from '../connected/contract.ts';
-import { isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens, signAsk, verifyAsk } from '../connected/auth.ts';
+import { APP_URL, isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens, signAsk, verifyAsk } from '../connected/auth.ts';
 import { saveTokens, loadTokens, disconnect as storeDisconnect, getConnectionConfig, setConnectionConfig, markStatus, setConnection } from '../connected/store.ts';
 import { sendEmail, validEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { readProvider, discoverGa4Properties } from '../connected/adapters.ts';
+import { readProvider, discoverGa4Properties, discoverGbpLocations } from '../connected/adapters.ts';
 import { ga4PropertyPath } from '../lib/ga4.ts';
+import { gbpLocationPath, gbpProblem } from '../lib/gbp.ts';
+import { runAfterResponse } from '../lib/after_response.ts';
 import { encryptionConfigured } from '../connected/crypto.ts';
 import { buildWritePlan, writeSpec, writeWorkflowsForProvider } from '../connected/writes.ts';
 import type { WriteWorkflow } from '../connected/writes.ts';
@@ -41,19 +43,20 @@ import { notifyOwnerOfReviewerDecision } from '../lib/notice.ts';
 // the same way connected/auth.ts derives them (CONNECTED_<KEY>_CLIENT_ID /
 // _SECRET), so this can never drift from what the code actually reads.
 // Authoritative list: docs/presence/ENV-AND-SECRETS.md.
-const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
 // Per-provider extra steps beyond the secrets — spoken HERE because the person
 // reading the 503 is the one human who can do them.
 const ACTIVATION_EXTRA: Record<string, string> = {
+  google_search_console: 'Enable the Google Search Console API on the project and add the https://www.googleapis.com/auth/webmasters.readonly scope to its consent screen.',
   google_analytics: 'The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/analytics.readonly scope to its consent screen, and enable the Google Analytics Data API and Google Analytics Admin API on the project.',
+  google_business_profile: 'The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/business.manage scope to its consent screen, request Business Profile API access from Google at support.google.com/business/contact/api_default (the quota stays at zero until they approve it), then enable the My Business Account Management, My Business Business Information, Google My Business and Business Profile Performance APIs on the project.',
 };
 function activationHelp(key: string, providerName: string): { message: string; missing: string[]; redirect_uri: string; docs: string } {
   const K = key.toUpperCase();
   const missing = [`CONNECTED_${K}_CLIENT_ID`, `CONNECTED_${K}_CLIENT_SECRET`, 'CONNECTION_ENC_KEY'];
   const extra = ACTIVATION_EXTRA[key] ? ` ${ACTIVATION_EXTRA[key]}` : '';
   return {
-    message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${SITE_URL}/connections-callback.html.${extra} Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
-    missing, redirect_uri: `${SITE_URL}/connections-callback.html`,
+    message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${APP_URL}/connections-callback.html.${extra} Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
+    missing, redirect_uri: `${APP_URL}/connections-callback.html`,
     docs: 'docs/presence/ENV-AND-SECRETS.md',
   };
 }
@@ -91,6 +94,10 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
       ...(it.key === 'google_analytics' ? { property: (s?.config?.property_id)
         ? { id: String(s.config.property_id), name: String(s.config.property_name || ''), auto_selected: !!s.config.auto_selected }
         : null } : {}),
+      // The Google listing's choice, in the same shape so the page has one picker.
+      ...(it.key === 'google_business_profile' ? { property: (s?.config?.location_id)
+        ? { id: String(s.config.location_id), name: String(s.config.location_name || ''), auto_selected: !!s.config.auto_selected }
+        : null } : {}),
       data: d ? { ...d.data, as_of: d.fetched_at } : null, // the customer's own numbers, plain
     };
     const g = CATEGORY_LABEL[it.category] || it.category;
@@ -112,7 +119,7 @@ export async function handleConnectionsList(site: SiteRow, cors: Record<string, 
 // (status 'pending', 0038 already allows it; the moment + who asked in the 0128
 // config) — one slot per client and provider, so a re-ask replaces the last one
 // and the earlier link stops verifying.
-export const ASKABLE_PROVIDERS = ['google_search_console', 'google_analytics'];
+export const ASKABLE_PROVIDERS = ['google_search_console', 'google_analytics', 'google_business_profile'];
 const rowsOf = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
 const joinPlain = (xs: string[]) => xs.length <= 1 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
@@ -140,13 +147,15 @@ export async function handleConnectionAsk(req: Request, site: SiteRow, principal
   const brand = agencySiteId ? await loadEmailBrand(agencySiteId) : undefined;
   const studio = (brand && brand.name && brand.name !== 'Studio OS') ? brand.name : 'Your studio';
   const token = await signAsk(site.id, askedAt);
-  const url = `${SITE_URL}/client.html?connect=${encodeURIComponent(token)}`;
+  const url = `${APP_URL}/client.html?connect=${encodeURIComponent(token)}`;
   const what = joinPlain(toAsk.map((it) => it.label));
   const first = client?.name ? String(client.name).trim().split(/\s+/)[0] : '';
   const subject = `${studio} would like to connect your Google`;
   const body = `<p>Hi${first ? ' ' + first : ''},</p>`
     + `<p>${studio} would like to read ${what} — straight from your own Google account, so the numbers are yours and stay yours.</p>`
     + `<p>It’s read-only: nothing on your website or your Google account changes, and you can disconnect any time with one tap. It takes about a minute — sign in to your portal and approve it on Google’s own screen.</p>`
+    // the same warning the connect step gives: otherwise "read-only" meets a Google screen saying "manage"
+    + (toAsk.some((it) => it.key === 'google_business_profile') ? `<p>For your Google listing, Google’s screen will say “manage your business listings”. It’s the only permission Google offers for listings; ${studio} only reads yours.</p>` : '')
     + `<p class="cta"><a href="${url}" style="display:inline-block;margin-top:6px;background:${(brand && brand.accent) || '#5b3fa0'};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Connect your Google →</a></p>`
     + `<p>This link works for a week. If it has expired, ask ${studio} to send a fresh one.</p>`;
   const emailed = await sendEmail(email, subject, body, brand, { critical: true, siteId: agencySiteId || undefined }).catch(() => false);
@@ -197,7 +206,13 @@ export async function handleConnectionConnect(req: Request, site: SiteRow, key: 
     }
     const state = await signState(site.id, key);
     const url = authorizeUrl(key, state);
-    return json({ data: { mode: 'oauth', authorize_url: url, state, message: `You’ll approve access to ${p.customerLabel} on ${p.name}’s own screen — read-only, and you can disconnect any time.` } }, 200, cors);
+    // Google has no read-only permission for listings: its screen will say "manage",
+    // whatever we do with it. Saying "read-only" and then showing that is how
+    // someone decides not to trust the rest of the flow, so we say it first.
+    const message = key === 'google_business_profile'
+      ? `You’ll approve this on Google’s own screen. Google only offers one permission for listings, so it will say “manage your business listings”. Studio OS only reads yours, changes nothing, and you can disconnect any time.`
+      : `You’ll approve access to ${p.customerLabel} on ${p.name}’s own screen — read-only, and you can disconnect any time.`;
+    return json({ data: { mode: 'oauth', authorize_url: url, state, message } }, 200, cors);
   }
   if (p.auth === 'api_key') {
     let body: any = {}; try { body = await req.json(); } catch { /* */ }
@@ -235,7 +250,7 @@ export async function handleConnectionCallback(req: Request, site: SiteRow, key:
     const ok = await saveTokens(site.id, key, tokens, p.scopes);
     if (!ok) return json({ error: 'storage', message: 'We couldn’t store the connection securely — please try again.' }, 502, cors);
     await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'connect', detail: 'oauth connected', actor_kind: connectionActorKind(principal) }) });
-    readProvider(site.id, key, p.customerLabel).catch(() => {});
+    runAfterResponse(readProvider(site.id, key, p.customerLabel).catch(() => {}));
     return json({ data: { connected: true, message: `Connected ${p.customerLabel}.` } }, 200, cors);
   } catch (_e) {
     return json({ error: 'connect_failed', message: 'That connection didn’t complete. Nothing changed — please try again.' }, 502, cors);
@@ -262,9 +277,51 @@ async function liveToken(siteId: string, key: string): Promise<string | null> {
   return tokens.access_token || null;
 }
 
+// ── Which Google listing is this business? ───────────────────────────────────
+// The same human choice, in the same two endpoints and response shape: an agency
+// or multi-location account manages many listings and the read is always one.
+async function handleListingOptions(site: SiteRow, cors: Record<string, string>) {
+  const key = 'google_business_profile';
+  const token = await liveToken(site.id, key);
+  if (!token) return json({ error: 'not_connected', message: 'Connect your Google listing first — then pick which one is this business.' }, 409, cors);
+  const found = await discoverGbpLocations(token).catch(() => null);
+  if (!found || !found.ok) {
+    const problem = found && !found.ok ? gbpProblem(found.status, found.body) : null;
+    return json({ error: 'read_failed', message: problem || 'We couldn’t list that account’s listings just now. Nothing changed — try again in a moment.' }, 502, cors);
+  }
+  const cfg = await getConnectionConfig(site.id, key);
+  return json({ data: {
+    properties: found.locations.map((l) => ({ id: l.id, name: l.name, address: l.address })),
+    selected: cfg.location_id ? { id: String(cfg.location_id), name: String(cfg.location_name || ''), auto_selected: !!cfg.auto_selected } : null,
+    note: found.locations.length === 0
+      ? 'That Google account doesn’t manage a business listing yet. Connect the account that does.'
+      : 'Pick the listing that is this business. Read-only either way.',
+  } }, 200, cors);
+}
+
+async function handleListingSelect(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const key = 'google_business_profile';
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const picked = gbpLocationPath(body?.property_id);
+  if (!picked) return json({ error: 'bad_request', message: 'Pick a listing from the list — that didn’t look like one.' }, 422, cors);
+  const token = await liveToken(site.id, key);
+  if (!token) return json({ error: 'not_connected', message: 'Connect your Google listing first — then pick which one is this business.' }, 409, cors);
+  // Verify against what the account can actually read, as the GA4 pick does.
+  const found = await discoverGbpLocations(token).catch(() => null);
+  if (!found || !found.ok) return json({ error: 'read_failed', message: 'We couldn’t confirm that listing with Google just now. Nothing changed — try again in a moment.' }, 502, cors);
+  const match = found.locations.find((x) => x.id === picked);
+  if (!match) return json({ error: 'bad_request', message: 'That listing isn’t on the connected Google account. Pick one from the list — or reconnect with the account that manages it.' }, 422, cors);
+  await setConnectionConfig(site.id, key, { location_id: match.id, account: match.account, location_name: match.name, auto_selected: false });
+  await markStatus(site.id, key, 'connected', 'ok', '').catch(() => {});
+  await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: key, action: 'configure', detail: `listing selected: ${match.name} (${match.id})`, actor_kind: connectionActorKind(principal) }) }).catch(() => {});
+  runAfterResponse(readProvider(site.id, key, providerByKey(key)?.customerLabel || key).catch(() => {}));
+  return json({ data: { selected: { id: match.id, name: match.name }, message: `Reading ${match.name} from here on.` } }, 200, cors);
+}
+
 export async function handleConnectionProperties(site: SiteRow, key: string, cors: Record<string, string>) {
   const p = providerByKey(key);
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  if (key === 'google_business_profile') return handleListingOptions(site, cors);
   if (key !== 'google_analytics') return json({ error: 'not_found', message: `${p.customerLabel} doesn’t choose a property — there’s nothing to pick here.` }, 404, cors);
   const token = await liveToken(site.id, key);
   if (!token) return json({ error: 'not_connected', message: 'Connect Google Analytics first — then pick which property is this website.' }, 409, cors);
@@ -290,6 +347,7 @@ export async function handleConnectionProperties(site: SiteRow, key: string, cor
 export async function handleConnectionPropertySelect(req: Request, site: SiteRow, key: string, principal: Principal, cors: Record<string, string>) {
   const p = providerByKey(key);
   if (!p) return json({ error: 'not_found', message: 'There’s no such connection.' }, 404, cors);
+  if (key === 'google_business_profile') return handleListingSelect(req, site, principal, cors);
   if (key !== 'google_analytics') return json({ error: 'not_found', message: `${p.customerLabel} doesn’t choose a property — there’s nothing to pick here.` }, 404, cors);
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const picked = ga4PropertyPath(body?.property_id);

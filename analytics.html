@@ -117,6 +117,14 @@
   .prow .n{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
   .prow .n small{color:var(--faint);font-weight:400;margin-left:6px}
   .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:600;flex:0 0 auto;background:var(--good-soft);color:var(--good)}
+  /* the per-page table: wide names give way, the numbers line up */
+  .ptable{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
+  .ptable th{font-size:12px;color:var(--faint);font-weight:500;text-align:right;padding:0 0 6px var(--dds-s2,8px);width:60px}
+  .ptable th:first-child,.ptable td:first-child{text-align:left;width:auto;padding-left:0}
+  .ptable td{border-top:1px solid var(--line-2);padding:var(--dds-s2,8px) 0 var(--dds-s2,8px) var(--dds-s2,8px);text-align:right;font-variant-numeric:tabular-nums;font-weight:600;vertical-align:top}
+  .ptable td b,.ptable td span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ptable td b{font-weight:600}
+  .ptable td span{color:var(--faint);font-size:12.5px;font-weight:400}
   .leg{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--soft);font-variant-numeric:tabular-nums;list-style:none;padding:0}
   .leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:var(--dds-s2,8px)}
   .donutwrap{display:flex;align-items:center;gap:var(--dds-s4,16px);flex-wrap:wrap}
@@ -183,6 +191,8 @@
   @media print{.seg,.print,.noprint,#dds-shell,#refreshBtn{display:none!important}.wrap{max-width:100%}.card,.tscroll,.stats{box-shadow:none;break-inside:avoid}}
   /* tablet and phone: tiles pair up, then stack; cards go to one column */
   @media (max-width:1000px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(3){border-left:none}.stat:nth-child(n+3){border-top:1px solid var(--line)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  /* the shell's sidebar takes a quarter of a tablet: two columns would leave a table no room for its names */
+  @media (max-width:1000px){.grid2{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:760px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:560px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.stats{grid-template-columns:minmax(0,1fr)}.stat{border-left:none}.stat+.stat{border-top:1px solid var(--line)}.seg{overflow-x:auto}}
 </style>
@@ -203,6 +213,9 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
+// ?view=website: the builder's Analytics tab. The website band on its own, since a
+// site tab isn't where someone comes for the studio's pipeline.
+const WEBSITE_VIEW=new URLSearchParams(location.search).get('view')==='website';
 async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
@@ -292,7 +305,7 @@ function emptyState(h,line,extraHtml){
 // weekly line — real SVG with the dates of the first, middle and last 7-day
 // bucket (the function buckets back from generated_at, oldest first), the
 // line, the last point; the visible numbers also live in the note below.
-function lineChart(series,color,noun,endIso){
+function lineChart(series,color,noun,endIso,opts){
   const s=(series||[]).map(v=>Number(v)||0);
   if(s.length<2||!s.some(v=>v>0))return null;   // <2 points → the empty state (step math would NaN)
   const W=520,L=20,R=20,T=16,B=30,H=170,max=Math.max.apply(null,s);
@@ -305,13 +318,15 @@ function lineChart(series,color,noun,endIso){
   const startOf=(i)=>new Date(endMs-(s.length-i)*7*86400000);
   const lab=(d)=>d.toLocaleDateString([],{month:'short',day:'numeric'});
   const mid=Math.floor((s.length-1)/2);
+  // opts: a series that isn't weekly brings its own labels, wording and note
+  const at=(i)=>opts&&opts.labels?opts.labels[i]:lab(startOf(i));
   const grid=[0,0.5,1].map(f=>`<line x1="${L}" y1="${y(max*f)}" x2="${W-R}" y2="${y(max*f)}" stroke="var(--line)"${f?' stroke-dasharray="3 4"':''}/>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of weekly ${esc(noun)}, ${lab(startOf(0))} to ${lab(startOf(s.length-1))}: ${s.map(num).join(', ')}" focusable="false">
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of ${opts?'monthly':'weekly'} ${esc(noun)}, ${esc(at(0))} to ${esc(at(s.length-1))}: ${s.map(num).join(', ')}" focusable="false">
     ${grid}
     <polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" points="${pts}"/>
     <circle cx="${x(s.length-1)}" cy="${y(s[s.length-1])}" r="4" fill="${color}"/>
-    <g font-family="Inter, sans-serif" font-size="11" fill="var(--faint)"><text x="${L}" y="${H-8}">${esc(lab(startOf(0)))}</text><text x="${x(mid)}" y="${H-8}" text-anchor="middle">${esc(lab(startOf(mid)))}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${esc(lab(startOf(s.length-1)))}</text></g>
-  </svg><p class="chartnote">${num(s[s.length-1])} ${esc(noun)} this week · ${num(total)} in the last 12 weeks</p>`;
+    <g font-family="Inter, sans-serif" font-size="11" fill="var(--faint)"><text x="${L}" y="${H-8}">${esc(at(0))}</text><text x="${x(mid)}" y="${H-8}" text-anchor="middle">${esc(at(mid))}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${esc(at(s.length-1))}</text></g>
+  </svg><p class="chartnote">${opts&&opts.note?esc(opts.note):`${num(s[s.length-1])} ${esc(noun)} this week · ${num(total)} in the last 12 weeks`}</p>`;
 }
 // stage bars — value on top, stage below (the approved board's chart); every
 // number is also in the accessible label and the note
@@ -433,6 +448,23 @@ function salesBand(d){
   h+=`</div>`;
   return h;
 }
+// "↑ 12% vs the period before". Silent when there's no honest comparison: all time,
+// a read that hit its cap, an older function build, or nothing to compare with.
+function visitorDelta(t){
+  const prior=t&&t.prior_visitors;
+  if(!prior)return'';
+  const pct=Math.round(((t.visitors-prior)/prior)*100);
+  return pct===0?' · same as the period before':` · <b class="${pct>0?'up':'down'}">${pct>0?'↑':'↓'} ${Math.abs(pct)}%</b> vs the period before`;
+}
+const monthShort=(p)=>{const m=/^(\d{4})-(\d{2})$/.exec(String(p||''));return m?new Date(Date.UTC(+m[1],+m[2]-1,1)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}):'';};
+// One row per page. A column only exists when the numbers behind it do, so an older
+// function build (no people per page) or a site with no Search Console data shows a
+// shorter table instead of empty cells.
+function pageTable(rows,cols){
+  const head=cols.map(c=>`<th scope="col" title="${esc(c.title||c.name)}">${esc(c.name)}</th>`).join('');
+  const body=rows.map(p=>`<tr><td title="${esc(p.path)}"><b>${esc(pageName(p.path))}</b><span>${esc(p.path)}</span></td>${cols.map(c=>`<td>${c.value(p)}</td>`).join('')}</tr>`).join('');
+  return `<table class="ptable" id="pageTable"><thead><tr><th scope="col">Page</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
 function websiteBand(d){
   const w=(d&&d.website)||{},t=w.traffic,g=w.search;
   // three honest traffic states: measuring (numbers) · present-but-no-data-yet
@@ -463,7 +495,7 @@ function websiteBand(d){
   const gaOk=!!(ga&&ga.has_data);
   // D1: every business-insights drill carries the active period; the connections CTA never does.
   // the drills land on the Insights section of this page (business-insights.html retired, Oct 2026)
-  const BI='#insights';
+  const BI=WEBSITE_VIEW?'/analytics.html#insights':'#insights';   // this view has no Insights section of its own
   // the one place the "what now?" for a non-measuring search card is decided.
   const searchCta=gOk||gDown?[BI,'View search insights']
     :gNoDom?[(g&&g.record_href)||'/presence.html#monitor','Add their website address']
@@ -503,7 +535,7 @@ function websiteBand(d){
   const win=(flag)=>based(periodLabel(),flag);
   h+=`<div class="stats" id="siteStats">`;
   h+=tile({icon:'people',title:'Visitors',window:external&&gaOk?'':win(tTrunc),link:external?null:[BI,'View'],
-    ...(measuring?{value:num(t.visitors),sub:`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}`}
+    ...(measuring?{value:num(t.visitors),sub:`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}${visitorDelta(t)}`}
       // the external-site state 4d2e866 promised: when a connected Google Analytics holds the numbers, show them — labeled with their source
       :external&&gaOk?{value:num(ga.visitors),sub:`${num(ga.pageviews)} page view${ga.pageviews===1?'':'s'} · via Google Analytics${gscQual(ga.period)}`}
       :external?{empty:offSiteTile('Visitors')}
@@ -524,10 +556,19 @@ function websiteBand(d){
         :{empty:['Not measured yet','Where visitors come from shows up here.']})});
   }
   h+=`</div><div class="grid2">`;
-  h+=card('','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
-    (measuring&&lineChart(t.weekly,'var(--c2)','visitors',d&&d.generated_at))
-      ||(external?offSite('Visits over time'):emptyState('No visits yet','Once people start visiting, the trend shows here.')),
-    external?null:[BI,'View website insights']);
+  // A website we can't count visitors for still has a trend: Google reports on the
+  // domain whoever hosts it, so the line is clicks from Google, and says so.
+  const months=(gOk&&g.monthly)||[];
+  if(!measuring&&external&&months.filter(m=>m.clicks>0).length>=2){
+    const last=months[months.length-1];
+    h+=card('','Clicks from Google over time','Monthly, from Search Console',
+      lineChart(months.map(m=>m.clicks),'var(--c2)','clicks from Google',d&&d.generated_at,{labels:months.map(m=>monthShort(m.period)),note:`${num(last.clicks)} clicks in ${monthShort(last.period)} · ${num(months.reduce((a,m)=>a+m.clicks,0))} across ${months.length} months`}));
+  }else{
+    h+=card('','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
+      (measuring&&lineChart(t.weekly,'var(--c2)','visitors',d&&d.generated_at))
+        ||(external?offSite('Visits over time'):emptyState('No visits yet','Once people start visiting, the trend shows here.')),
+      external?null:[BI,'View website insights']);
+  }
   {
     let body=null;
     if(measuring&&(t.top_sources||[]).length){
@@ -536,10 +577,23 @@ function websiteBand(d){
     h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visitors · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
   }
   {
-    const rows=(measuring&&t.top_pages)||[];
-    const body=rows.length?`<div class="rows">${rows.map(p=>`<div class="prow"><div class="t"><b>${esc(pageName(p.path))}</b><span>${esc(p.path)}</span></div><span class="n">${num(p.views)}</span></div>`).join('')}</div>`
-      :emptyState('No page views yet','Your most-visited pages will be listed here.');
-    h+=card('','Top pages',based(periodLabel(),tTrunc),body,[BI,'View website insights']);
+    const rows=(measuring&&(t.pages||t.top_pages))||[];
+    const googlePages=(gOk&&g.top_pages)||[];
+    let body,sub=based(periodLabel(),tTrunc);
+    if(rows.length){
+      const fromGoogle=new Map(googlePages.map(p=>[p.path,p.clicks]));
+      const cols=[{name:'Views',title:'Page views',value:p=>num(p.views)}];
+      if(rows.some(p=>p.visitors!=null))cols.push({name:'People',title:'Different people who opened this page',value:p=>num(p.visitors)});
+      if(googlePages.length)cols.push({name:'Google',title:`Clicks from Google${gscQual(g.period)}`,value:p=>fromGoogle.has(p.path)?num(fromGoogle.get(p.path)):'—'});
+      body=pageTable(rows,cols);
+    }else if(external&&googlePages.length){
+      // the same table, from what Google can see of a site we don't host
+      sub=`From Search Console${gscQual(g.period)}`;
+      body=pageTable(googlePages,[{name:'Clicks',title:'Clicks from Google',value:p=>num(p.clicks)},{name:'Seen',title:'Times seen in search',value:p=>num(p.impressions)}]);
+    }else{
+      body=external?offSite('Page views'):emptyState('No page views yet','Your most-visited pages will be listed here.');
+    }
+    h+=card('','Top pages',sub,body,external&&!rows.length?null:[BI,'View website insights']);
   }
   {
     // Google search: the connection's state as a chip, the top searches when they
@@ -565,6 +619,13 @@ function headRow(title,subline,withPeriod){
     </header>`;
 }
 function renderDash(d){
+  if(WEBSITE_VIEW){
+    let w=headRow('Website analytics',`<span>Who visits, where they come from, and what they read. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span><span class="dot">·</span><a class="link" href="${esc(withScope('/analytics.html'))}">Sales and enquiries</a>`,true);
+    w+=websiteBand(d);
+    $('main').innerHTML=w;
+    wireDash();
+    return;
+  }
   let h=headRow('Analytics',`<span>Your business at a glance. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span>`,true);
   h+=salesBand(d);
   h+=websiteBand(d);

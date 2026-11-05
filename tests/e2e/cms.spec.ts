@@ -220,7 +220,7 @@ test.describe('CMS workspace', () => {
     await expect(strip.locator('#statHealth .s')).toContainText('verified');   // /search/health (default fixture)
     await expect(strip.locator('#statVisitors .v')).toHaveText('412');
     await expect(strip.locator('#statVisitors .s')).toHaveText('1,180 page views');
-    await expect(strip.locator('#statVisitors')).toHaveAttribute('href', '/analytics.html');
+    await expect(strip.locator('#statVisitors')).toHaveAttribute('href', '/analytics.html?view=website');
     await expect(strip.locator('#statEnquiries .v')).toHaveText('2');        // this month only
     await expect(strip.locator('#statEnquiries .s')).toHaveText('1 still new');
     await expect(strip.locator('#statEnquiries')).toHaveAttribute('href', '/inbox.html#enquiries');
@@ -371,14 +371,13 @@ test.describe('CMS workspace', () => {
   // and a "what's left" list in the search card where each task is a door. ──
   test.describe('Search preview and setup', () => {
     // the Search Console surface, disconnected — the task shows as a door to /connections.html
-    const CONNECTIONS = (status: string) => ({ data: { groups: { 'Being found': [
-      { key: 'google_search_console', label: 'how you show up in Google Search', availability: 'Read-only', connection: { status, health: 'unknown' } },
-    ] } } });
-    const SEO_API = { ...BOARD_API, '/connections': CONNECTIONS('disconnected') };
+    const VISIBILITY = (status: string) => ({ data: { state: 'ready', address: { url: 'https://marlows.example/', domain: 'marlows.example', hosted: true }, score: null, ai: null, ai_check_url: 'https://tools.example.com/ai-visibility',
+      console: { status, health: 'ok', reason: '', readiness: 'waiting', unavailable: false, has_data: false }, listing: { status, health: 'ok', reason: '', property: null, data: null } } });
+    const SEO_API = { ...BOARD_API, '/visibility': VISIBILITY('disconnected') };
 
     test('the preview reads the fixtures: name, address, the headline falls back to the name, the empty description says so', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       const srp = page.locator('#srp');
       await expect(srp.locator('#srpName')).toHaveText('Marlow’s Kitchen');
       await expect(srp.locator('#srpUrl')).toHaveText('marlows.example');   // /site custom_domain
@@ -391,7 +390,7 @@ test.describe('CMS workspace', () => {
 
     test('the preview and the counters follow the keyboard: green up to 60, amber over with "may be cut off", and the title is cut the way Google cuts it', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       const title = page.locator('#f-seo_title');
       await title.fill('Marlow’s Kitchen — Italian restaurant in Burbank');   // 48 chars
       await expect(page.locator('#srpTitle')).toHaveText('Marlow’s Kitchen — Italian restaurant in Burbank');
@@ -417,6 +416,7 @@ test.describe('CMS workspace', () => {
       await installApp(page, { api: SEO_API });
       await page.goto('/presence.html#business');
       await page.locator('#f-business_name').fill('Marlow’s');
+      await page.locator('#nav .navitem[data-view="search"]').click();
       await expect(page.locator('#srpName')).toHaveText('Marlow’s');
       await expect(page.locator('#srpTitle')).toHaveText('Marlow’s');
       await expect(page.locator('#srpFav')).toHaveText('M');
@@ -424,7 +424,7 @@ test.describe('CMS workspace', () => {
 
     test('three questions → one PUT /identity with the headline, the description and where you work; the fields and the preview follow', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       await page.locator('#btnSeoSetup').click();
       const panel = page.locator('#seoSetup');
       await expect(panel).toBeVisible();
@@ -458,7 +458,7 @@ test.describe('CMS workspace', () => {
       await installApp(page, { api: { ...SEO_API,
         '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen | Burbank', seo_description: '', service_area: 'Serving Burbank' } } },
       } });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       await page.locator('#btnSeoSetup').click();
       await expect(page.locator('#sw-places')).toHaveValue('Burbank');   // "Serving Burbank" → the place
       await expect(page.locator('#swReplaceWrap')).toBeVisible();
@@ -483,7 +483,7 @@ test.describe('CMS workspace', () => {
 
     test('"Not now" closes the setup without a save and returns focus to the opener', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       let puts = 0; page.on('request', (r) => { if (r.method() === 'PUT') puts++; });
       await page.locator('#btnSeoSetup').click();
       await page.locator('#swCancel').click();
@@ -494,13 +494,13 @@ test.describe('CMS workspace', () => {
 
     test('the search card lists what is left, each task a door; the setup clears the first two', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
-      const tasks = page.locator('#searchCard #seoTasks');
-      await expect(tasks).toContainText('What’s left');
-      const links = tasks.locator('.seo-tasks a');
-      await expect(links).toHaveText(['Add a search headline', 'Add a search description', 'Connect Google Search Console', 'Publish your changes']);
-      await expect(links.nth(2)).toHaveAttribute('href', '/connections.html');
-      await expect(links.nth(3)).toHaveAttribute('href', '#publish');   // the publish ritual
+      await page.goto('/presence.html#search');
+      const tasks = page.locator('#seoTasks');
+      await expect(tasks).toContainText('1 of 6 done');   // the domain is already connected
+      const links = tasks.locator('a');
+      await expect(links).toHaveText(['Add a search headline', 'Add a search description', 'Connect Google Search Console', 'Connect your Google listing', 'Publish your changes']);
+      await expect(links.nth(2)).toHaveAttribute('href', '#svConsoleCard');
+      await expect(links.nth(4)).toHaveAttribute('href', '#publish');   // the publish ritual
       // the card sits with the search fields, not at the end of the view
       await expect(page.locator('#searchCardSlot #searchCard')).toBeVisible();
       // the headline task is a door to the field
@@ -511,17 +511,18 @@ test.describe('CMS workspace', () => {
       await page.locator('#sw-places').fill('Burbank');
       await page.locator('#sw-words').fill('Italian restaurant');
       await page.locator('#swSave').click();
-      await expect(links).toHaveText(['Connect Google Search Console', 'Publish your changes']);
+      await expect(links).toHaveText(['Connect Google Search Console', 'Connect your Google listing', 'Publish your changes']);
+      await expect(tasks).toContainText('3 of 6 done');   // what's finished stays on the list, ticked
     });
 
     test('every state is honest: connected Search Console drops off the list, a never-published site says "Publish your website", a draft with nothing to do says so', async ({ page }) => {
       await installApp(page, { api: { ...SEO_API,
-        '/connections': CONNECTIONS('connected'),
+        '/visibility': VISIBILITY('connected'),
         '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen — Burbank', seo_description: 'Seasonal Italian plates, natural wine and a sunny patio in Burbank.' } } },
         '/health': { data: { ...BOARD_API['/health'].data, facts: { ...BOARD_API['/health'].data.facts, website: { state: 'none', label: 'Not published yet', detail: '' } } } },
       } });
-      await page.goto('/presence.html#business');
-      const links = page.locator('#searchCard .seo-tasks a');
+      await page.goto('/presence.html#search');
+      const links = page.locator('#seoTasks a');
       await expect(links).toHaveText(['Publish your website']);
       // and the card's own sentence speaks now that it is true
       await expect(page.locator('#searchCard')).toContainText('Your search headline and description are set.');
@@ -529,13 +530,13 @@ test.describe('CMS workspace', () => {
 
     test('nothing left: the list says so', async ({ page }) => {
       await installApp(page, { api: { ...SEO_API,
-        '/connections': CONNECTIONS('connected'),
+        '/visibility': VISIBILITY('connected'),
         '/site': { data: { ...BOARD_API['/site'].data, identity: { business_name: 'Marlow’s Kitchen', seo_title: 'Marlow’s Kitchen — Burbank', seo_description: 'Seasonal Italian plates, natural wine and a sunny patio in Burbank.' } } },
         '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'e2e-draft-hash' } },
       } });
-      await page.goto('/presence.html#business');
-      await expect(page.locator('#searchCard #seoTasks')).toContainText('Nothing left to set up');
-      await expect(page.locator('#searchCard .seo-tasks')).toHaveCount(0);
+      await page.goto('/presence.html#search');
+      await expect(page.locator('#seoTasks')).toContainText('Everything here is done');
+      await expect(page.locator('#seoTasks a')).toHaveCount(0);
     });
 
     test('no domain yet: the address line is a placeholder and "Connect your domain" is a task', async ({ page }) => {
@@ -543,24 +544,24 @@ test.describe('CMS workspace', () => {
         '/site': { data: { ...BOARD_API['/site'].data, site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'restaurant-classic', template_version: 1 } } },
         '/health': { data: { ...BOARD_API['/health'].data, facts: { ...BOARD_API['/health'].data.facts, domain: { label: 'No custom domain', state: 'none', detail: '' } } } },
       } });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       await expect(page.locator('#srpUrl')).toHaveText('yourdomain.com');
       await expect(page.locator('#srpUrl')).toHaveClass(/muted/);
-      const dom = page.locator('#searchCard .seo-tasks a', { hasText: 'Connect your domain' });
+      const dom = page.locator('#seoTasks a', { hasText: 'Connect your domain' });
       await expect(dom).toHaveAttribute('href', '#domain');
     });
 
     test('a plan without search insights keeps its message, and the task list still stands', async ({ page }) => {
       await installApp(page, { api: SEO_API });
       await page.route('**/functions/v1/presence/search/health', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'feature_locked' }) }));
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       await expect(page.locator('#searchCard')).toContainText('Search insights aren’t part of your plan yet');
-      await expect(page.locator('#searchCard .seo-tasks a').first()).toHaveText('Add a search headline');
+      await expect(page.locator('#seoTasks a').first()).toHaveText('Add a search headline');
     });
 
     test('per-page previews: each built-in page shows the default it renders with, and follows its own fields', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#business');
+      await page.goto('/presence.html#search');
       const fine = page.locator('#searchCard details', { hasText: 'Fine-tune how each built-in page reads' });
       await fine.locator('summary').click();
       const about = page.locator('#srp-about');
@@ -575,11 +576,12 @@ test.describe('CMS workspace', () => {
       await expect(page.locator('#cnt-about-description')).toHaveText('Empty — and so is your description, so add one');   // the fixture's identity has no description either
     });
 
-    test('#search deep-links to the preview itself (the Today card’s "Add one")', async ({ page }) => {
+    test('#search opens the Search tab, where the Today card’s "Add one" finds its task and its field', async ({ page }) => {
       await installApp(page, { api: SEO_API });
       await page.goto('/presence.html#search');
-      await expect(page.locator('#view-business')).toBeVisible();
-      await expect(page.locator('#srp')).toBeInViewport();
+      await expect(page.locator('#view-search')).toBeVisible();
+      await page.locator('#seoTasks a', { hasText: 'Add a search description' }).click();
+      await expect(page.locator('#f-seo_description')).toBeFocused();
     });
   });
 });
