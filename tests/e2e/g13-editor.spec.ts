@@ -68,7 +68,7 @@ const API = {
 };
 
 type Mounted = { frame: ReturnType<Page['frameLocator']>; puts: Array<Record<string, unknown>> };
-async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<string, unknown> } = {}): Promise<Mounted> {
+async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<string, unknown>; beforeGoto?: (p: Page) => Promise<unknown> } = {}): Promise<Mounted> {
   const settings = opts.settings ?? SETTINGS;
   await installApp(page, { api: { ...API, '/settings': { data: settings } } });
   const puts: Array<Record<string, unknown>> = [];
@@ -84,6 +84,7 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
   });
   await page.route('**/functions/v1/presence/preview**', (route: Route) =>
     route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: opts.html ?? PAGE_HTML(SECTIONS) }));
+  if (opts.beforeGoto) await opts.beforeGoto(page);
   await page.goto('/presence.html#design');
   // visual refresh: the builder sits under the site's top row with the sub-view
   // tab strip marking Design — the canvas itself is unchanged
@@ -91,7 +92,18 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
   await expect(page.locator('#btnPublish')).toHaveText('Publish');
   const frame = page.frameLocator('#designPreview');
   await expect(frame.locator('#main > section').first()).toBeVisible();
+  await expect(frame.locator('#dds-dc-bar')).toBeAttached();   // sections paint before the frame's load event, which is what wires double-click and hover
   return { frame, puts };
+}
+// A save replaces the canvas document ~350ms after its PUT, so "a section is
+// visible" also passes on the OLD document, whose toolbar is about to go. Mark the
+// document while a session holds it (no repaint can land then), then wait for it to
+// be gone and the fresh one's chrome to be in.
+type Frame = Mounted['frame'];
+const markCanvas = (frame: Frame) => frame.locator('body').evaluate((b) => b.setAttribute('data-e2e-old', ''));
+async function canvasReplaced(frame: Frame) {
+  await expect(frame.locator('body[data-e2e-old]')).toHaveCount(0);
+  await expect(frame.locator('#dds-dc-bar')).toBeAttached();
 }
 
 test.describe('G13 in-place canvas text editor', () => {
@@ -390,12 +402,14 @@ test.describe('G13 in-place canvas text editor', () => {
     const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
     await h2.focus();
     await page.keyboard.press('Enter');
+    await expect(h2).toHaveAttribute('contenteditable', /.+/);
+    await markCanvas(frame);
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText('Edited first');
     await page.keyboard.press('Enter');
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     // the canvas reloaded after the save — the toolbar still drives section ops
-    await expect(frame.locator('#main > section').first()).toBeVisible();
+    await canvasReplaced(frame);
     await frame.locator('section.block-richtext').hover();
     const dup = frame.locator('#dds-dc-bar button', { hasText: 'Duplicate' });
     await expect(dup).toBeVisible();
@@ -405,5 +419,117 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(last.length).toBe(5);                            // duplicated in place
     expect(last[0].title).toBe('Edited first');             // the in-place edit persisted through
     expect(last[2].type).toBe('richtext');
+  });
+
+  // ── Nov 2026: real timing bugs these specs flaked on. A person edits one field and
+  // starts on the next while the first save's repaint is on its way; or the page
+  // is still booting behind a slow read. Each of these held the page at the exact
+  // moment that matters, so none of them depends on how fast the machine is. ──
+  const previewHtml = { status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML(SECTIONS) };
+
+  test('a repaint on its way never lands under an open session: the caret stays and later typing is kept', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    let reads = 0;
+    let releaseRead = () => {};
+    const heldRead = new Promise<void>((r) => { releaseRead = r; });
+    await page.route('**/functions/v1/presence/preview**', async (route: Route) => { reads++; await heldRead; await route.fulfill(previewHtml); });
+    const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
+    await h2.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('Edited first');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await expect.poll(() => reads, { timeout: 6000 }).toBe(1);     // that save's repaint is in flight…
+    const sub = frame.locator('[data-dds-field="subtitle"]');
+    await sub.focus();
+    await page.keyboard.press('Enter');
+    await expect(sub).toHaveAttribute('contenteditable', /.+/);
+    await markCanvas(frame);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('typed before');
+    releaseRead();                                                 // …and comes back now
+    await page.waitForTimeout(500);
+    await expect(sub).toHaveAttribute('contenteditable', /.+/);
+    await page.keyboard.insertText(' and after');
+    await expect(sub).toHaveText('typed before and after');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
+    expect((puts[1].blocks as typeof BLOCKS)[0].subtitle).toBe('typed before and after');
+    await canvasReplaced(frame);                                   // the save's repaint still lands, after the session
+  });
+
+  test('a repaint a session held off still runs when that session ends with nothing to save', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    let reads = 0;
+    let releaseRead = () => {};
+    const heldRead = new Promise<void>((r) => { releaseRead = r; });
+    await page.route('**/functions/v1/presence/preview**', async (route: Route) => { reads++; await heldRead; await route.fulfill(previewHtml); });
+    const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
+    await h2.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('Edited first');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await expect.poll(() => reads, { timeout: 6000 }).toBe(1);
+    const sub = frame.locator('[data-dds-field="subtitle"]');
+    await sub.focus();
+    await page.keyboard.press('Enter');
+    await expect(sub).toHaveAttribute('contenteditable', /.+/);
+    await markCanvas(frame);
+    releaseRead();
+    await page.waitForTimeout(500);
+    await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);   // held
+    await page.keyboard.press('Escape');
+    await canvasReplaced(frame);                                         // the canvas still catches up
+    expect(puts.length).toBe(1);
+  });
+
+  test('one in-place edit is one PUT, even when the section list\'s own save timer fires inside the debounce', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
+    await h2.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('Once');
+    await page.keyboard.press('Enter');
+    // every render of the list arms that 700ms timer, so a commit soon after one meets it
+    await page.evaluate(() => (window as unknown as { blocksSaveSoon: (ms: number) => void }).blocksSaveSoon(0));
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await page.waitForTimeout(1800);                                     // past the 1.2s debounce
+    expect(puts.length).toBe(1);
+    expect((puts[0].blocks as typeof BLOCKS)[0].title).toBe('Once');
+  });
+
+  test('a slow read at boot does not paint the canvas a second time', async ({ page }) => {
+    let reads = 0;
+    const { frame } = await mountCanvas(page, { beforeGoto: async (p) => {
+      await p.route('**/functions/v1/presence/dev/customization**', async (route: Route) => { await new Promise((r) => setTimeout(r, 900)); await route.fallback(); });
+      await p.route('**/functions/v1/presence/preview**', async (route: Route) => { reads++; await route.fallback(); });
+    } });
+    await markCanvas(frame);
+    await expect(page.locator('#sectionsCard')).toBeAttached();          // the mount that used to ask for a second paint
+    await page.waitForTimeout(800);                                      // past the 350ms debounce and the read
+    expect(reads).toBe(1);
+    await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);
+  });
+
+  test('an edit committed before the section panel has mounted is the edit that gets saved', async ({ page }) => {
+    let releaseCard = () => {};
+    const heldCard = new Promise<void>((r) => { releaseCard = r; });
+    const { frame, puts } = await mountCanvas(page, { beforeGoto: (p) =>
+      p.route('**/functions/v1/presence/dev/customization**', async (route: Route) => { await heldCard; await route.fallback(); }) });
+    const sub = frame.locator('[data-dds-field="subtitle"]');
+    await sub.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText('Committed early');
+    await page.keyboard.press('Enter');
+    await expect(sub).not.toHaveAttribute('contenteditable', /.+/);
+    releaseCard();                                                       // the card mounts inside the 1.2s debounce
+    await expect(page.locator('#blocksCard')).toBeAttached();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((puts[0].blocks as typeof BLOCKS)[0].subtitle).toBe('Committed early');
   });
 });

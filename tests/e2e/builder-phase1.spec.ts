@@ -308,9 +308,16 @@ test.describe('the Edit bar and the panels', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await mount(page, '/presence.html#design');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    // Publish fills in when /changes lands, and its background fades there over 200ms
+    // while its text flips at once (a gap of 8, climbing to 217). Wait for the fill and
+    // for the fade to finish: this measures the colors the button rests at, not a frame.
+    await expect(page.locator('#dcBtnPublish')).toHaveClass(/inked/);
     const lum = (rgb: string) => { const [r, g, b] = rgb.match(/\d+/g)!.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
     for (const sel of ['#btnTrayOpen', '#btnNavEdit', '#btnSettingsOpen', '#btnEditExit', '#dcBtnPublish']) {
-      const c = await page.locator(sel).evaluate((n) => { const s = getComputedStyle(n); return [s.color, s.backgroundColor]; });
+      const c = await page.locator(sel).evaluate(async (n) => {
+        await Promise.allSettled(n.getAnimations().map((a) => a.finished));
+        const s = getComputedStyle(n); return [s.color, s.backgroundColor];
+      });
       expect(Math.abs(lum(c[0]) - lum(c[1])), sel).toBeGreaterThan(100);
     }
   });
