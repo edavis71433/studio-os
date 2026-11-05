@@ -94,6 +94,8 @@ const MUST_RUN = [
   'fonts/inter.woff2', 'life/eric-dog.jpg', 'case-studies/example.html', 'vendor/lib.js',
   // Specs run these
   'scripts/build-public.sh', 'scripts/sync-marketing-chrome.mjs', 'scripts/marketing-chrome.template.html',
+  // A spec imports this one from under a skipped folder
+  'supabase/functions/presence/lib/site_roles.ts',
   // The suite and its toolchain
   'tests/e2e/shell.spec.ts', 'tests/e2e/__screenshots__/a.png', 'playwright.config.ts', 'package.json', 'package-lock.json',
   '.github/workflows/e2e.yml',
@@ -110,7 +112,7 @@ for (const file of MUST_RUN) {
 }
 
 const MAY_SKIP = [
-  'docs/plan.md', 'docs/mockup.html', 'docs/café notes.md', 'supabase/functions/presence/index.ts', 'supabase/email.html',
+  'docs/plan.md', 'docs/mockup.html', 'docs/café notes.md', 'supabase/functions/presence/index.ts', 'supabase/functions/presence/lib/other.ts', 'supabase/email.html',
   'runbooks/deploy.md', 'sql/seed.sql', 'templates/PROPOSAL-TEMPLATE.md',
   'tests/presence/render_test.mjs', 'tests/isolation/a.mjs', 'tests/smoke/a.mjs', 'tests/workflows/e2e_scope_test.mjs',
   '.github/workflows/ci.yml', '.github/workflows/deploy.yml', '.github/workflows/rollback.yml', '.github/workflows/schema-dump.yml',
@@ -119,6 +121,36 @@ const MAY_SKIP = [
 for (const file of MAY_SKIP) {
   const r = await pullRequest(edit(file));
   ok(`skips for ${file}`, r.code === 0 && r.run === 'run=false', r.run);
+}
+
+// ── What the specs depend on can't be skipped, wherever it lives ─────────────
+// A spec can import a file or read one by path, which puts that file in the suite's
+// reach even under a skipped folder. A failure here means: give the file its own
+// `run=true` line above `supabase/*` in the step's `case`.
+const isFile = (u) => { try { return Deno.statSync(u).isFile; } catch { return false; } };
+const inRepo = (u) => u.href.slice(ROOT.href.length);
+const tsFiles = (dir) => [...Deno.readDirSync(dir)].flatMap((e) =>
+  e.isDirectory ? tsFiles(new URL(`${e.name}/`, dir)) : e.name.endsWith('.ts') ? [new URL(e.name, dir)] : []);
+
+const reached = new Set();
+const queue = tsFiles(new URL('tests/e2e/', ROOT));
+while (queue.length) {
+  const file = queue.pop();
+  const src = Deno.readTextFileSync(file);
+  const imports = [...src.matchAll(/(?:from|import\()\s*['"`](\.\.?\/[^'"`]+)['"`]/g)]
+    .map(([, s]) => [s, `${s}.ts`].map((p) => new URL(p, file)).find(isFile));
+  const named = [...src.matchAll(/['"`]\/?([\w.-]+(?:\/[\w.-]+)+|[\w.-]+\.(?:md|sql))['"`]/g)]
+    .map(([, s]) => new URL(s, ROOT)).filter(isFile);
+  for (const u of [...imports, ...named]) {
+    if (!u || !u.href.startsWith(ROOT.href) || reached.has(inRepo(u)) || inRepo(u).startsWith('tests/e2e/')) continue;
+    reached.add(inRepo(u));
+    if (/\.m?[jt]s$/.test(u.href)) queue.push(u);
+  }
+}
+ok('the guard finds what a spec imports from the server', reached.has('supabase/functions/presence/lib/site_roles.ts'), `${reached.size} files`);
+for (const file of [...reached].sort()) {
+  const r = await pullRequest(edit(file));
+  ok(`runs for ${file}, which the specs reach`, r.code === 0 && r.run === 'run=true', r.run);
 }
 
 // ── Pull requests: the shape of the change ───────────────────────────────────

@@ -34,8 +34,9 @@ jobs:
       # Run unless every changed file is one the suite cannot reach. The test server
       # publishes the whole repo root and marketing.spec.ts runs build-public.sh, so
       # this names what to skip, not what to run: a new folder or file type gets tested
-      # until someone shows it can't matter. If a spec starts reading a file under a
-      # skipped path, take that path off the list (tests/workflows/e2e_scope_test.mjs).
+      # until someone shows it can't matter. A spec can still reach under a skipped path,
+      # by importing a file or reading one; tests/workflows/e2e_scope_test.mjs fails when
+      # one does, and the fix is a line like the first in this `case`.
       #
       # This is a step, not a separate job the suite `needs`. If a separate job failed,
       # the suite would be skipped, and GitHub counts a skipped job as a pass.
@@ -62,6 +63,8 @@ jobs:
           run=false
           while IFS= read -r file; do
             case "$file" in
+              # member-roles.spec.ts imports this, so a change here changes what the specs expect.
+              supabase/functions/presence/lib/site_roles.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
