@@ -308,14 +308,17 @@ test.describe('the Edit bar and the panels', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await mount(page, '/presence.html#design');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    // Publish fills in when /changes lands, and its background fades there over 200ms
+    // while its text flips at once (a gap of 8, climbing to 217). Wait for the fill and
+    // for the fade to finish: this measures the colors the button rests at, not a frame.
     await expect(page.locator('#dcBtnPublish')).toHaveClass(/inked/);
     const lum = (rgb: string) => { const [r, g, b] = rgb.match(/\d+/g)!.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
     for (const sel of ['#btnTrayOpen', '#btnNavEdit', '#btnSettingsOpen', '#btnEditExit', '#dcBtnPublish']) {
-      // polled: Publish fades to its filled color when the change count arrives
-      await expect.poll(async () => {
-        const c = await page.locator(sel).evaluate((n) => { const s = getComputedStyle(n); return [s.color, s.backgroundColor]; });
-        return Math.abs(lum(c[0]) - lum(c[1]));
-      }, { message: sel }).toBeGreaterThan(100);
+      const c = await page.locator(sel).evaluate(async (n) => {
+        await Promise.allSettled(n.getAnimations().map((a) => a.finished));
+        const s = getComputedStyle(n); return [s.color, s.backgroundColor];
+      });
+      expect(Math.abs(lum(c[0]) - lum(c[1])), sel).toBeGreaterThan(100);
     }
   });
   test('a phone keeps the floating Add section button; a bigger screen has it in the bar', async ({ page }) => {

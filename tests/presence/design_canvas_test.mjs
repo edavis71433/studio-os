@@ -690,7 +690,8 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/addEventListener\('beforeunload'/.test(html) && /IPE_SAVE_T != null \|\| IPE_SAVE_PENDING \|\| IPE_SAVE_INFLIGHT \|\| \(IPE && IPE\.dirty\)/.test(html), 'FIX 10: beforeunload guards the debounce window, an in-flight PUT, and a dirty session');
   ok(/IPE_SAVE_INFLIGHT = true/.test(soon) && /IPE_SAVE_INFLIGHT = false/.test(soon), 'the in-flight flag brackets exactly the saveBlocks call the debounce fires');
   const rdp = extractFn(html, 'refreshDesignPreview');
-  ok(/if \(IPE\) ipeCommit\(\);[\s\S]*?frame\.srcdoc = html/.test(rdp), 'a canvas repaint banks any in-flight session FIRST (text is never silently lost)');
+  ok(/if \(dpHoldRepaint\(\)\) return;[\s\S]*?apiHtml[\s\S]*?if \(dpHoldRepaint\(\)\) return;[\s\S]*?frame\.srcdoc = html/.test(rdp) && !/ipeCommit/.test(rdp), 'a canvas repaint waits out an open in-place session, at fire time AND after its read — it never ends a session to replace the document');
+  ok(/if \(DP_REPAINT_HELD\) \{ DP_REPAINT_HELD = false; refreshDesignPreview\(\); \}/.test(extractFn(html, 'ipeEnd')), 'the repaint a session held off runs when that session ends');
   const sb = extractFn(html, 'saveBlocks');
   ok(/closest\("#blocksCard"\)/.test(sb), 'saveBlocks skips the panel rebuild under a focused panel input (the §3 clobber hazard, closed)');
   ok(!/ipeStart/.test(extractFn(html, 'eeInjectChrome')), 'the read-only stage proof gets NO text editing (its bar is unchanged)');

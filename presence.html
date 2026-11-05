@@ -7550,7 +7550,9 @@ function blocksSaveSoon(ms) {
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
-  if (BLOCKS_SAVING) { blocksSaveSoon(); return true; }
+  // An in-place commit has its own ~1.2s debounce and saves this same list when it
+  // fires. Saving here too wrote the list twice and repainted the canvas twice.
+  if (BLOCKS_SAVING || IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT) { blocksSaveSoon(); return true; }
   if (!blocksDirty()) return true;
   // G27 §5: unreadable colors still get their one question; "no" puts the list back
   if (!ovConfirmContrastAck()) { BLOCKS_WORK = JSON.parse(DC_HIST_LAST); renderBlocksCard(); return false; }
@@ -7626,7 +7628,9 @@ function applyStarterLayout(starter) {
 }
 function mountBlocksCard() {
   const host = $("designHost"); if (!host || $("blocksCard")) return;
-  BLOCKS_WORK = currentBlocks();
+  // Behind a slow read the canvas lands before this card, so the list may already
+  // hold an in-place commit. Replacing it here saved the old text and said "Saved".
+  if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
   const card = el("div", "field"); card.id = "blocksCard"; card.style.marginTop = "18px";
   host.appendChild(card);
   card.addEventListener("change", () => blocksSaveSoon());   // field handlers run first; this sees their result
@@ -9144,7 +9148,9 @@ function mountSectionsCard() {
   card.appendChild(el("div", "hint", "Choose which sections appear on your home page, and their order. Unchecked sections are kept, never lost."));
   host.appendChild(card);
   mountLookCard();
-  refreshDesignPreview();
+  // On the Design view go() has already asked for this paint. Asking again from
+  // here, a slow read later, replaced a canvas someone could already be working on.
+  if (!$("view-design").classList.contains("on")) refreshDesignPreview();
 }
 // ── CP-2.5: the Look card — the template switcher's discoverable front door ──
 async function mountLookCard() {
@@ -10256,6 +10262,15 @@ function dpNote(title, body) {
   if (b) b.textContent = body;
   box.hidden = false;
 }
+// G13: a repaint replaces the canvas document, and the caret and every later
+// keystroke of an open in-place session would go with it — so it waits for the
+// session to end (ipeEnd runs it). A commit still in its debounce holds it off too:
+// that save repaints when it lands, and a read now would flash the old text back.
+let DP_REPAINT_HELD = false;
+function dpHoldRepaint() {
+  if (IPE) { DP_REPAINT_HELD = true; return true; }
+  return IPE_SAVE_T != null || IPE_SAVE_PENDING;
+}
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   // Slice D: a past version is on the canvas (Timewarp) — leave it there until
@@ -10267,6 +10282,7 @@ function refreshDesignPreview() {
     // landed while this repaint was debouncing or in flight; never paint the
     // draft over it while the banner still claims a past date.
     if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+    if (dpHoldRepaint()) return;
     // ALWAYS render the canvas — even a brand-new draft gets a page to build ON.
     // The render engine returns a valid scaffold (nav · footer · whatever content
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
@@ -10276,9 +10292,7 @@ function refreshDesignPreview() {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
-      // G13 slice 2: a repaint replaces the canvas document — bank any active
-      // in-place session FIRST so typed text is never silently lost.
-      if (IPE) ipeCommit();
+      if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
@@ -11017,6 +11031,7 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
   if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }   // the deferred burst-save resumes
+  if (DP_REPAINT_HELD) { DP_REPAINT_HELD = false; refreshDesignPreview(); }   // the repaint this session held off
   return s;
 }
 function ipeCancel() {
