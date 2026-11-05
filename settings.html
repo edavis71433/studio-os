@@ -102,7 +102,7 @@
     <div class="card-h"><h2 id="profileHead">Studio profile</h2><button class="btn sm primary" type="button" id="profileSave">Save</button></div>
     <form class="form2" id="profileForm">
       <div><label for="f-name">Studio name</label><input id="f-name" maxlength="120" autocomplete="organization"></div>
-      <div><label for="f-industry">Kind of business</label><select id="f-industry"><option value="generic">General / other</option>
+      <div data-needs="configure"><label for="f-industry">Kind of business</label><select id="f-industry"><option value="generic">General / other</option>
           <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
           <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
           <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
@@ -133,7 +133,7 @@
     </form>
     <p class="rolehelp" id="roleHelp"></p>
   </section>
-  <section class="card" id="billing" aria-labelledby="billingHead" hidden>
+  <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
     <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
     <div class="plan" id="plan" aria-live="polite"></div>
   </section>
@@ -142,7 +142,7 @@
        sentence it sends; each saves the moment it is flipped (PUT /settings,
        the same row the industry lives on — migration 0134, all off by default).
        Item 13's per-stage "stale after" lives here too. -->
-  <section class="card" id="automations" aria-labelledby="autoHead" hidden>
+  <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Three switches. Each saves as you flip it.</span></div>
     <div class="swrow">
       <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
@@ -220,11 +220,11 @@ const CARDS = [
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
   { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, when it renews, and how to change it.', ownerOnly: true },
+  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, when it renews, and how to change it.', ownerOnly: true, needs: 'owner' },
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
-  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Three switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals. Each shows the sentence it sends.', studioOnly: true },
+  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Three switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
   // an owner lands on the Domain & email desk; only an operator gets the platform-wide domains view (admin-health said "Operators only" to everyone else — Oct 2026 experience review)
   { key: 'domains', href: '/presence.html#domain', hrefOperator: '/admin-health.html', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website', scoped: true },
@@ -248,7 +248,7 @@ function cardHtml(c, status) {
   const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : (agency && c.agencyTitle) ? c.agencyTitle : c.title;
   const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : (agency && c.agencyDesc) ? c.agencyDesc : c.desc;
   const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
-  return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}>` +
+  return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}${c.needs ? ` data-needs="${esc(c.needs)}"` : ''}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.key]}</svg></span>` +
     `<span class="t"><b>${esc(title)}</b><span>${esc(desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span></a>`;
 }
@@ -435,7 +435,9 @@ async function saveProfile() {
   const identity = { business_name: name, email: $('f-email').value.trim(), phone: $('f-phone').value.trim(), service_area: $('f-area').value.trim() };
   const industry = $('f-industry').value || 'generic';
   const writes = [api('/identity', 'PUT', identity)];
-  if (!SETTINGS || SETTINGS.industry_key !== industry) writes.push(api('/settings', 'PUT', { industry_key: industry }));
+  // the select is gone for a role without configure, and it can still read differently from an unset row
+  const mayConfigure = !(window.ddsLacks && window.ddsLacks('configure'));
+  if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) writes.push(api('/settings', 'PUT', { industry_key: industry }));
   const rs = await Promise.all(writes);
   b.disabled = false;
   const bad = rs.find((r) => !r.ok);
