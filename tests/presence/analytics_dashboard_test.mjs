@@ -179,7 +179,7 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
   ], now, 7);
   ok('pages: views AND people per page, busiest first', JSON.stringify(agg.pages) === JSON.stringify([{ path: '/menu/', views: 3, visitors: 2 }, { path: '/', views: 1, visitors: 1 }]));
   ok('pages: the short list stays as it was for older readers', JSON.stringify(agg.topPages[0]) === JSON.stringify({ path: '/menu/', views: 3 }));
-  ok('search page path: a whole URL becomes the path the counter stores', searchPagePath('https://bacchus.com/menu/?x=1') === '/menu/' && searchPagePath('https://bacchus.com') === '/');
+  ok('search page path: a whole URL becomes the path the counter stores', searchPagePath('https://marlows.example/menu/?x=1') === '/menu/' && searchPagePath('https://marlows.example') === '/');
   ok('search page path: garbage is the home page, never a throw', searchPagePath('nonsense') === '/' && searchPagePath(null) === '/');
 }
 
