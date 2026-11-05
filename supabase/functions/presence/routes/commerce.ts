@@ -15,6 +15,10 @@
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
 //   GET  /commerce/example-data     (authed)  are the trial's example rows still here? (benchmark 12)
 //   POST /commerce/example-data/remove (authed) delete exactly those rows
+//
+// handleCommerce answers for the CALLER. A signed-in route asked in a client's
+// context (?client=) never reaches it: index.ts sends it through the scope gate to
+// routes/commerce_scoped.ts instead. Only the public routes ignore a scope.
 import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
 import { raiseNotice, raiseNoticeDetailed } from '../lib/notice.ts';
@@ -665,6 +669,17 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
   } catch (e) {
     return json({ error: 'sync_error', detail: String((e as Error).message || e) }, 502, cors);
   }
+}
+
+/** The routes with no account behind them. Only these ignore a client scope. An
+ *  exact list on purpose: delete-request and delete-cancel sit among the public
+ *  routes below but act on the signed-in caller, so they are not on it. */
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
+  'GET /commerce/plans', 'POST /commerce/signup', 'POST /commerce/verify', 'GET /commerce/checkout-status',
+  'POST /commerce/billing-sync', 'POST /commerce/invoice-paid',
+]);
+export function isPublicCommerceRoute(route: string, method: string): boolean {
+  return PUBLIC_ROUTES.has(`${method} ${route}`);
 }
 
 // ── dispatcher ──────────────────────────────────────────────────────────────

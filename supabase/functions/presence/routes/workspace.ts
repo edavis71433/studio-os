@@ -25,7 +25,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
 import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
-import { shapeClientConversations, studioBellCount, noticeDismissible, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
+import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
 
 // ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
@@ -392,9 +392,11 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
   // not only in the portal card. Each carries the href that resolves it.
   // `dismissible` is derived from the SAME pure rule POST /commerce/notices/dismiss
   // enforces (lib/inbox_feed.noticeDismissible) — the client draws no "Done" button
-  // the server would refuse, and refuses one the client never drew. Synthetic rows
-  // below carry no id/period at all; the client's UUID guard is what excludes them.
-  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period), tier: noticeTier(n.kind), priority: noticePriority(n.kind, n.period) }));
+  // the server would refuse, and refuses one the client never drew. A studio drilled
+  // into a client also gets none on the client's account rows, which that route refuses
+  // too. Synthetic rows below carry no id/period at all; the client's UUID guard is what
+  // excludes them.
+  const notices = (await verifiedNotices(site, (((noticeQ.ok && noticeQ.json) || []) as any[]))).map((n) => ({ id: n.id, kind: n.kind, period: n.period, headline: n.headline, body: n.body, href: noticeHrefFor(n), dismissible: noticeDismissible(n.kind, n.period) && !(principal.scope && NOTICE_ACCOUNT_KINDS.has(n.kind)), tier: noticeTier(n.kind), priority: noticePriority(n.kind, n.period) }));
 
   // FIX 1: a synthetic "new enquiries" row so a brand-new website lead reaches the
   // bell popup + the Inbox the same way every other needs-you item does — nothing

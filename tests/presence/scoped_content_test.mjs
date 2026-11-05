@@ -525,13 +525,17 @@ for (const w of WRITES) {
   ok('index: …and before the first route', at(BUILD) < at("if (route === '/site' && method === 'GET')"));
 
   const handed = [...idx.matchAll(/\b(handle\w+)\((?:req, )?db,/g)].map((m) => m[1]).sort();
-  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDnsGet', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleSettings', 'handleVoice', 'handleWriterGet', 'handleWriterList'].sort();
+  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDnsGet', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleVoice', 'handleWriterGet', 'handleWriterList'].sort();
   ok('index: the handlers on this path are exactly the audited list', JSON.stringify(handed) === JSON.stringify(EXPECTED), handed.join(','));
 
   const reviewerRoutes = idx.split('\n').filter((l) => /'\/portal\/(context|feed)'|\/decide\$\/|\/status\$\/|\/foundations\/plans\/\[|\/launches\/\[/.test(l) || /handle(PortalContext|PortalFeed|FoundationsDecide|WriteDecide|AssetStatus|LaunchDecide)\(/.test(l));
   ok('index: nothing a reviewer may reach is handed this data path', reviewerRoutes.length > 0 && reviewerRoutes.every((l) => !/\(db,|, db,/.test(l)));
 
-  ok('index: /commerce runs before the scope is read, so its asUser reads are the caller\'s own site', at("route.startsWith('/commerce/')") < at(SCOPE_READ));
+  const commerceGate = idx.slice(at("route.startsWith('/commerce/')"), at("route.startsWith('/commerce/')") + 240);
+  ok('index: /commerce only skips the scope gate when there is no scope or the route is public, so its asUser reads are the caller\'s own site',
+    at("route.startsWith('/commerce/')") < at(SCOPE_READ) && commerceGate.includes("if (!req.headers.get('x-dds-scope-site') || isPublicCommerceRoute(route, method)) {"));
+  const scopedCommerce = read('supabase/functions/presence/routes/commerce_scoped.ts');
+  ok('routes: the scoped /commerce file can only reach data through db', !/\b(svc|asUser|resolveSite)\(/.test(scopedCommerce) && !/import \{[^}]*\b(svc|asUser)\b[^}]*\} from '\.\.\/lib\/db\.ts'/.test(scopedCommerce));
 
   const inRoutes = [];
   for (const f of Deno.readDirSync(new URL('supabase/functions/presence/routes/', ROOT))) {

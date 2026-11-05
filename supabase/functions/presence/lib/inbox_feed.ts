@@ -116,6 +116,19 @@ export function noticeDismissible(kind: unknown, period: unknown): boolean {
   return true;
 }
 
+/** A studio drilled into a client (?client=) sees the client's notices, and most
+ *  are shared work: the domain, the enquiry, the follow-up. These are not. They
+ *  talk to the account owner about their own subscription or account, and the
+ *  owner is the only person who can act on them. A studio clearing "your card
+ *  failed" hides it from the one reader who can fix it, so in a drill-in they get
+ *  no Done button (the feed) and a refusal if asked anyway (POST /commerce/notices/
+ *  dismiss). The owner's own dismiss rule above is untouched: their hand stays the
+ *  teardown for two of these. */
+export const NOTICE_ACCOUNT_KINDS: ReadonlySet<string> = new Set([
+  'capacity', 'trial_ending', 'trial_ended', 'payment_trouble', 'account_lapsed',
+  'renewal_reminder', 'winddown_reminder', 'win_back', 'welcome_back', 'deletion_requested',
+]);
+
 // ── The bell grows up (benchmark 8): two tiers, one priority flag ───────────
 // Every feed row is either something that NEEDS the owner (an ask) or an
 // UPDATE (a report — money landed, the studio published, a reviewer decided).

@@ -79,7 +79,8 @@ import { handleExport, handleLaunch, handleDnsGet, handleDnsPut, handleDnsRollba
 import { handleImportInventory } from './routes/monitor.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
-import { handleCommerce } from './routes/commerce.ts';
+import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
+import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 import { handleSystem } from './routes/system.ts';
 import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } from './routes/connections.ts';
 import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
@@ -155,8 +156,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    design (discover, price, buy with no operator). Handled BEFORE the
   //    client/staff 401 so a stranger can sign up; the authed routes inside
   //    (subscription, billing portal, first-run) enforce their own sign-in.
+  //    Those answer for the CALLER, so a signed-in route asked in a client's
+  //    context (?client=) doesn't stop here: it goes through the same gate as any
+  //    other scoped request, then to handleScopedCommerce. A denied scope is
+  //    refused at that gate and never falls back to the caller's own site.
   if (route === '/commerce' || route.startsWith('/commerce/')) {
-    return handleCommerce(req, route, method, principal, cors);
+    if (!req.headers.get('x-dds-scope-site') || isPublicCommerceRoute(route, method)) {
+      return handleCommerce(req, route, method, principal, cors);
+    }
   }
 
   // ── Phase F: PUBLIC commercial routes — a website visitor's form submission
@@ -450,6 +457,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // The data path for site content, chosen once and only now that every gate above
   // has passed: the owner under their JWT, an authorised scope pinned to its site.
   const db = siteDb(jwt, site, principal);
+
+  // Only a scoped, signed-in /commerce request is still here (L1 above): every gate
+  // has passed and `site` is the client the scope authorised.
+  if (route === '/commerce' || route.startsWith('/commerce/')) return handleScopedCommerce(req, db, site, route, method, cors);
 
   // 5. router — exact routes only
   if (route === '/site' && method === 'GET') return handleGetSite(db, site, cors);
