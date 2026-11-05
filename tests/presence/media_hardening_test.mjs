@@ -125,14 +125,13 @@ ok('short: truncated JPEG (2 bytes) declared image/jpeg → REJECTED', magicMatc
   // bad value in order to explain it, so strip comments before matching.
   const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const libCode = code(lib), roomCode = code(room);
-  // 1. `format` is not the output-format selector. Storage accepts one value,
-  //    'origin' (keep the source format); leaving it out is what asks for a
-  //    modern format, and WebP is negotiated from the request. Naming 'webp'
-  //    hands the transformer a value outside its enum.
-  ok('sign: no transform asks for format:\'webp\' — not a value storage accepts',
+  // 1. The signers don't name a format: it follows the request's Accept header, so
+  //    a preview serves what the browser can show. Only the render route in
+  //    fetchVariants names one (see the transform contract in lib/media.ts).
+  ok('sign: no signed transform names format:\'webp\' — the format follows Accept',
     !/format:\s*'webp'/.test(libCode) && !/format:\s*'webp'/.test(roomCode));
-  ok('sign: thumbnails/crops still transform (width + quality), they just don\'t name a format',
-    /transform: \{ width, quality: 72 \}/.test(lib) && /resize: 'cover', quality/.test(lib));
+  ok('sign: thumbnails/crops still transform (width + resize + quality), they just don\'t name a format',
+    /transform: \{ width, resize: WIDTH_ONLY_RESIZE, quality: 72 \}/.test(lib) && /resize: 'cover', quality/.test(lib));
   // 2. expiresIn belongs in the BODY. media.ts has said so in a comment since
   //    signThumb was written — while previewUrlMap and room.ts passed it in the
   //    query string, so every URL they signed came back null.

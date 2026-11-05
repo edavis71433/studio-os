@@ -147,6 +147,10 @@ export async function deleteMedia(siteId: string, mediaId: string) {
   return { ok: true };
 }
 
+/** How a transform that names only a width must resize — see the transform
+ *  contract below. */
+export const WIDTH_ONLY_RESIZE = 'contain';
+
 /** PUBLISH: fetch every required variant via the transform endpoint (EXIF
  *  stripped, resized, encoded to the variant's format — webp AND avif) and return
  *  bytes keyed by output path. The manifest now carries a format per variant, so a
@@ -161,7 +165,7 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
     // and would fail the whole publish). Images use the transform path as before.
     const url = v.format === 'original'
       ? `${SB_URL}/storage/v1/object/authenticated/${BUCKET}/${objectPath}`
-      : `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&format=${v.format}&quality=80`;
+      : `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&resize=${WIDTH_ONLY_RESIZE}&format=${v.format}&quality=80`;
     const label = v.format === 'original' ? `${m.storage_path} (original)` : `${m.storage_path} @${v.width}.${v.format}`;
     try {
       const r = await fetch(url, { headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } });
@@ -173,16 +177,14 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
 }
 
 // ── The transform contract ───────────────────────────────────────────────────
-// Storage's image transformer takes width / height / resize / quality — and a
-// `format` whose ONLY accepted value is 'origin' ("keep the source format").
-// It is NOT the output-format selector it reads like: leaving format out is what
-// asks for a modern format, and the transformer negotiates WebP from the request
-// itself. Passing format:'webp' therefore hands the transformer a value outside
-// its enum. The SIGN call still succeeds — the transform options only ride the
-// token, they aren't executed until the URL is fetched — so the server happily
-// returned a URL that could never resolve, and Files rendered an <img> around it.
-// That is the bug behind "the photos are broken in the preview image": a
-// well-formed src, a 4xx on GET, and the browser's broken-image glyph.
+// Every width-only transform carries resize=contain (WIDTH_ONLY_RESIZE, above).
+// Storage's default, cover, does not scale when only a width is given: on
+// production a 3000x2000 JPEG at width=400 came back 400x2000, the middle 13% of
+// the photo at full height. contain scales to the width and keeps the proportions.
+//
+// `format`: the render route (fetchVariants) validates it against origin, avif and
+// webp and encodes to what it names. The signers below leave it out, so the
+// transformer picks the format from the request's Accept header.
 // Signed at DISPLAY time everywhere (never persisted), so expiry is not in play.
 const THUMB_TTL = 3600;
 
@@ -195,7 +197,7 @@ export async function signThumb(storagePath: string, mime: string, width = 320):
     // expiresIn MUST be in the body (the sign endpoint 400s on a query-string expiresIn)
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: THUMB_TTL, transform: { width, quality: 72 } }),
+      body: JSON.stringify({ expiresIn: THUMB_TTL, transform: { width, resize: WIDTH_ONLY_RESIZE, quality: 72 } }),
     });
     const j = await r.json().catch(() => null);
     return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
@@ -284,8 +286,8 @@ export async function previewUrlMap(manifest: MediaManifestEntry[]): Promise<Rec
     // serve once published. Images are signed with their width transform as before.
     // Two fixes here, both the same fixes signThumb carries: expiresIn belongs in the
     // BODY (a query-string expiresIn 400s, so every preview URL came back null), and
-    // `format` is not the output selector — see THUMB_TTL's note above.
-    const transform = v.format === 'original' ? {} : { transform: { width: v.width, quality: 80 } };
+    // `format` is left to the request's Accept header — see THUMB_TTL's note above.
+    const transform = v.format === 'original' ? {} : { transform: { width: v.width, resize: WIDTH_ONLY_RESIZE, quality: 80 } };
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
       method: 'POST', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: 600, ...transform }),
