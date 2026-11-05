@@ -105,8 +105,8 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#btnLive')).toHaveAttribute('href', 'https://marlows.example');
     // one filled button per screen: the primary is the only .inked control on the board
     await expect(page.locator('#view-today .pillbtn.inked, .topbar .pillbtn.inked')).toHaveCount(1);
-    // the tab strip stays out of the way on the overview
-    await expect(page.locator('#nav')).toBeHidden();
+    // one set of tabs on every view, the overview included
+    await expect(page.locator('#nav .navitem[data-view="offerings"]')).toBeVisible();
   });
 
   // ── Oct 2026 workflow audit, change 2: the overview took in health, the map, the story and the domain ──
