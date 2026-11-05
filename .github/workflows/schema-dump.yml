@@ -3,28 +3,101 @@ name: Schema dump (one-time provisioning foundation)
 # Runs ONLY when you click "Run workflow" in the Actions tab.
 # Produces a schema-ONLY dump of production (structure, no business data)
 # as a downloadable artifact. Nothing is committed to the repo.
+#
+# This repo is public: anyone signed in to GitHub can download its artifacts and
+# read its run logs. So the artifact is encrypted, and no step may print a line
+# of the dump. Setting the passphrase and decrypting are in
+# docs/runbooks/ENVIRONMENTS.md, step C.
 
 on:
   workflow_dispatch:
 
+# No token needed. There is no checkout on purpose, so no repo code runs beside
+# the production URL.
+permissions: {}
+
+env:
+  # Pinned, not latest, same as deploy.yml and rollback.yml. Upgrade on purpose,
+  # in all three. 3.0.0 still takes --db-url but warns it goes away in v4.
+  SUPABASE_CLI_VERSION: "2.122.0"
+
 jobs:
   dump:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
+      - name: Refuse to read production without a passphrase
+        env:
+          SCHEMA_DUMP_PASSPHRASE: ${{ secrets.SCHEMA_DUMP_PASSPHRASE }}
+        run: |
+          # The ciphertext is public, so a short passphrase could be guessed offline.
+          if [ "${#SCHEMA_DUMP_PASSPHRASE}" -lt 32 ]; then
+            echo "::error::Repo secret SCHEMA_DUMP_PASSPHRASE is missing or under 32 characters. Nothing was read. See docs/runbooks/ENVIRONMENTS.md, step C."
+            exit 1
+          fi
+
       - name: Dump schema (structure only, no data)
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          npx --yes supabase db dump --db-url "$DB_URL" --schema public -f 00-schema-foundation.sql
-          echo "── sanity: file size and first lines ──"
-          wc -l 00-schema-foundation.sql
-          head -20 00-schema-foundation.sql
-          echo "── data-leak guard: these greps must find NOTHING ──"
-          ! grep -iE "bacchus|hettie|@gmail|@yahoo" 00-schema-foundation.sql || (echo "POSSIBLE DATA IN DUMP — do not use" && exit 1)
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump --db-url "$DB_URL" --schema public -f 00-schema-foundation.sql
+          echo "── sanity: lines and bytes ──"
+          wc -lc 00-schema-foundation.sql
 
-      - name: Upload as artifact (download from the run page)
+      - name: Data-leak guard (reports the check and line numbers, never the text)
+        run: |
+          dump=00-schema-foundation.sql
+          # An empty or cut-off dump would pass every check below.
+          if ! grep -q '^CREATE TABLE' "$dump"; then
+            echo "::error::The dump has no CREATE TABLE. Nothing was uploaded."
+            exit 1
+          fi
+
+          # The studio's own address is a column default (0000_baseline.sql).
+          scan=$(mktemp)
+          sed -E 's/[[:alnum:]._%+-]+@davisdigitalstudio\.com//g' "$dump" > "$scan"
+
+          # check NAME [grep option] REGEX: passes only if grep ran and found nothing.
+          fail=0
+          check() {
+            name=$1; shift
+            rc=0
+            lines=$(grep -anE "$@" "$scan" | cut -d: -f1; exit "${PIPESTATUS[0]}") || rc=$?
+            case "$rc" in
+              1) echo "ok    $name" ;;
+              0) echo "FAIL  $name: $(wc -w <<<"$lines" | xargs) line(s), first at: $(head -20 <<<"$lines" | xargs)"; fail=1 ;;
+              *) echo "FAIL  $name: grep exited $rc"; fail=1 ;;
+            esac
+          }
+
+          echo "── data-leak guard: every check must find nothing ──"
+          # pg_dump writes row data as these two statements, at the start of a line.
+          check "row data" '^(COPY|INSERT INTO) '
+          check "email addresses" '[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}'
+          # The list from the first dump. Don't add client names: this file is public.
+          check "known names" -i 'bacchus|hettie|@gmail|@yahoo'
+          check "keys and tokens" 'eyJ[[:alnum:]_-]{10,}\.[[:alnum:]_-]{10,}|[sr]k_(live|test)_[[:alnum:]]{8,}|whsec_[[:alnum:]]{8,}|sbp_[[:alnum:]]{16,}|sb_secret_[[:alnum:]_-]{8,}|re_[[:alnum:]]{16,}|AIza[[:alnum:]_-]{30,}'
+          check "passwords in URLs" '[[:alpha:]][[:alnum:]+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@'
+          rm -f "$scan"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::POSSIBLE DATA IN DUMP. Nothing was uploaded, do not use this run."
+            exit 1
+          fi
+
+      - name: Encrypt the dump
+        env:
+          SCHEMA_DUMP_PASSPHRASE: ${{ secrets.SCHEMA_DUMP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -salt -pass env:SCHEMA_DUMP_PASSPHRASE -in 00-schema-foundation.sql -out 00-schema-foundation.sql.enc
+          # Prove it opens before anyone relies on it, then drop the plaintext.
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -pass env:SCHEMA_DUMP_PASSPHRASE -in 00-schema-foundation.sql.enc | cmp - 00-schema-foundation.sql
+          rm 00-schema-foundation.sql
+
+      - name: Upload the encrypted dump (download from the run page)
         uses: actions/upload-artifact@v4
         with:
-          name: schema-foundation
-          path: 00-schema-foundation.sql
+          name: schema-foundation-encrypted
+          path: 00-schema-foundation.sql.enc
+          if-no-files-found: error
           retention-days: 3

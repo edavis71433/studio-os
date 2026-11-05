@@ -44,6 +44,7 @@ production run identical code with different values for the rows below.
 | `SUPABASE_PROJECT_REF_STAGING` | deploy.yml | Set after the staging project exists |
 | `SUPABASE_PROJECT_REF_PROD` | deploy.yml | `qksstlqzbhesadrrofgn` |
 | `SUPABASE_DB_URL` | `schema-dump.yml` (baseline capture) | Production Postgres connection string, schema dump only |
+| `SCHEMA_DUMP_PASSPHRASE` | `schema-dump.yml` | Encrypts the dump artifact, because artifacts on this public repo can be downloaded by anyone signed in. GitHub can't show it back; the copy is in the Mac's Keychain (`schema-dump-passphrase`). Setup: `docs/runbooks/ENVIRONMENTS.md`, step C |
 | `SUPABASE_DB_URL_STAGING` | migration runner | Set after the staging project exists |
 
 ## Netlify
