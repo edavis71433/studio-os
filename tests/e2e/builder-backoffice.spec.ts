@@ -296,7 +296,7 @@ test.describe('Search tab', () => {
     await openSearch(page, VISIBILITY());
     await expect(page.locator('#view-search #searchPreviewWrap')).toBeVisible();
     await expect(page.locator('#view-search #f-seo_title')).toHaveValue('Marlow’s Kitchen — Burbank');
-    await expect(page.locator('#view-search #searchCard')).toContainText('Which pages should show up on Google?');
+    await expect(page.locator('#view-search #searchCard')).toContainText('use its settings button on the Pages tab');
     await page.evaluate(() => (window as any).go('business'));
     await expect(page.locator('#view-business #f-seo_title')).toHaveCount(0);
     await expect(page.locator('#f-industry')).toBeVisible();

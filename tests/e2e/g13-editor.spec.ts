@@ -389,9 +389,9 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(puts.length).toBe(0);
   });
 
-  test('Edit mode is the gate: Preview mode never edits in place', async ({ page }) => {
+  test('Edit mode is the gate: a read-only mode never edits in place', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
-    await page.locator('#dcModeSeg button[data-dcmode="preview"]').click();
+    await page.evaluate(() => (window as any).dcSetMode('timewarp'));
     await expect(frame.locator('#main > section').first()).toBeVisible();  // the view-mode repaint landed
     await frame.locator('section.block-titleonly [data-dds-field="title"]').dblclick();
     await page.waitForTimeout(400);
@@ -855,6 +855,18 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
     expect(sent[1].pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
     expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit on about');
+  });
+
+  test('Moving it on the Pages tab while that page\'s save is out keeps the edit', async ({ page }) => {
+    const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
+    const { sent, release } = await aboutSaveOut(page, frame);
+    await page.evaluate(() => (window as any).go('pages'));
+    await page.getByRole('button', { name: /^Move About/ }).first().focus();
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(300);
+    release();
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
+    expect((sent[1] as any).nav.length).toBeGreaterThan(0);
   });
 
   test('Rename while that page\'s save is out keeps the edit', async ({ page }) => {
