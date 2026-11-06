@@ -8,27 +8,24 @@ name: CI (Deno pure suite + typecheck)
 # sweep, so a renderer change that alters output fails CI until the golden
 # baseline is intentionally updated and committed.
 #
+# There is no `paths:` filter, on purpose. A required check that a path filter
+# skips never reports, so the pull request sits on "Expected" forever. The old
+# filter also hid real dependencies: on Nov 6 2026, 77 of the 268 suites read
+# files it left out, 57 of them served files such as pages, so a pull request
+# changing only a page ran none of their pins.
+#
+# There is no skip list like the one `browser` has, either. This job takes under
+# a minute, and the suites reach pages, migrations, docs and the repo root, so
+# there is little to skip and a wrong skip would read as a pass.
+# tests/workflows/ci_scope_test.mjs holds all this in place.
+#
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
 # "test" (this job) as a required status check.
 
 on:
   push:
     branches: [main, staging]
-    paths:
-      - "supabase/functions/**"
-      - "tests/presence/**"
-      - "tests/workflows/**"
-      - "tests/e2e/**"
-      - "scripts/ci-pure-tests.sh"
-      - ".github/workflows/**"
   pull_request:
-    paths:
-      - "supabase/functions/**"
-      - "tests/presence/**"
-      - "tests/workflows/**"
-      - "tests/e2e/**"
-      - "scripts/ci-pure-tests.sh"
-      - ".github/workflows/**"
   workflow_dispatch:
 
 jobs:
@@ -51,3 +48,5 @@ jobs:
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/schema_dump_test.mjs
       - name: E2E workflow's decision step (real step, real git, no network)
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/e2e_scope_test.mjs
+      - name: This workflow's own shape (nothing can skip or soften this check)
+        run: deno run --allow-read tests/workflows/ci_scope_test.mjs
