@@ -740,6 +740,16 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   }
 }
 
+// ── Nov 2026: /settings writes stay in order only if every one takes a turn. A bare one
+// is built from an S.settings the write before it hasn't reached, and lands on top of it.
+{
+  const outside = ['settingsPut', 'putBlocks', 'putForms'].reduce((src, name) => src.replace(extractFn(src, name), ''), html)
+    .replace('settingsTurn(() => api("PUT", "/settings"', '');
+  ok(!outside.includes('api("PUT", "/settings"'), 'every PUT /settings goes through settingsPut or settingsTurn');
+  ok(extractFn(html, 'saveBlocks').includes('settingsTurn(putBlocks)'), 'a section save takes a turn');
+  ok(extractFn(html, 'saveForms').includes('settingsTurn(putForms)'), 'a form save takes a turn');
+}
+
 const done = fail === 0;
 console.log(`${done ? 'PASS' : 'FAIL'}  live-canvas pure logic — ${pass} assertions${done ? ', 0 failures' : ', ' + fail + ' FAILURES'}`);
 console.log(`\n════ LIVE CANVAS GATE: ${done ? '1/1 PASSED' : 'FAILED'} ════`);
