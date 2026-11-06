@@ -27,7 +27,7 @@ const staff = buildNav({ role: 'business_owner', edition: 'presence', capabiliti
 const scoped = buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, scoped: true, siteLive: true });
 const owner = buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: false, isOperator: false, siteLive: true });
 const visible = (nav) => flatten(nav).filter((i) => !i.hidden);
-ok('the studio menu still lists eight places (PR #52)', visible(studio).length === 8 && visible(studio).map((i) => i.label).join('·') === 'Home·Inbox·Customers·Pipeline·Projects·Files·Your website·Settings');
+ok('the studio menu lists nine places, Analytics back among them', visible(studio).length === 9 && visible(studio).map((i) => i.label).join('·') === 'Home·Inbox·Customers·Pipeline·Projects·Files·Analytics·Your website·Settings');
 ok('inside a client the menu is still the client’s six', visible(scoped).length === 6);
 ok('the plain owner’s menu is unchanged (nine)', visible(owner).length === 9);
 ok('⌘K "billing" (studio) → Pipeline’s Outstanding first, never Customers', hits(studio, 'billing')[0]?.href === '/pipeline.html#outstanding' && !hits(studio, 'billing').some((h) => h.href === '/customers.html'));

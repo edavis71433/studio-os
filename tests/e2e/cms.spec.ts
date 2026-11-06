@@ -28,17 +28,13 @@ test.describe('CMS workspace', () => {
   test('Studio OS shows the Business-OS links (Connections, Visual Studio)', async ({ page }) => {
     await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(ALL_FEATURES) } });
     await page.goto('/presence.html');
-    await expect(page.locator('#lnkConnections')).toBeVisible();
-    await expect(page.locator('#lnkVisual')).toBeVisible();
+    await expect(page.locator('#sectionsNav .navitem[data-link="connections"]')).toHaveJSProperty('hidden', false);
   });
 
   test('CMS edition hides the Business-OS links it does not include (Phase SKU)', async ({ page }) => {
     await installApp(page, { api: { ...PRESENCE_API, '/portal/context': ctx(['website', 'developer', 'forms', 'client_portal', 'reports']) } });
     await page.goto('/presence.html');
-    await expect(page.locator('#lnkConnections')).toBeHidden();   // Business-OS ('connected') — not in a CMS edition
-    // Visual Studio folded under the 'website' feature (it makes site imagery),
-    // so a drafting CMS edition keeps it — only watch-plan (monitor) sites lose it.
-    await expect(page.locator('#lnkVisual')).toBeVisible();
+    await expect(page.locator('#sectionsNav .navitem[data-link="connections"]')).toHaveJSProperty('hidden', true);   // Business-OS ('connected') — not in a CMS edition
   });
 
   test('the media section is called "Files" everywhere (Architecture v1.0 terminology)', async ({ page }) => {
@@ -89,9 +85,9 @@ test.describe('CMS workspace', () => {
     '/portal/context': ctx(ALL_FEATURES),
   };
 
-  test('overview: the top row carries the site name, address, Live chip, last publish, saved state and ONE filled Publish button', async ({ page }) => {
+  test('the top row carries the site name, address, Live chip, last publish, saved state and ONE filled Publish button', async ({ page }) => {
     await installApp(page, { api: BOARD_API });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#faqs');
     await expect(page.locator('h1#siteTitle')).toHaveText('Marlow’s Kitchen');
     const sub = page.locator('#factsWrap');
     await expect(sub.locator('a')).toHaveText('marlows.example');
@@ -104,9 +100,7 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#btnPublish')).toHaveClass(/inked/);
     await expect(page.locator('#btnLive')).toHaveAttribute('href', 'https://marlows.example');
     // one filled button per screen: the primary is the only .inked control on the board
-    await expect(page.locator('#view-today .pillbtn.inked, .topbar .pillbtn.inked')).toHaveCount(1);
-    // one set of tabs on every view, the overview included
-    await expect(page.locator('#nav .navitem[data-view="offerings"]')).toBeVisible();
+    await expect(page.locator('.topbar .pillbtn.inked')).toHaveCount(1);
   });
 
   // ── Oct 2026 workflow audit, change 2: the overview took in health, the map, the story and the domain ──
@@ -128,32 +122,27 @@ test.describe('CMS workspace', () => {
   ] } };
   const EXTRAS = { '/website-health': HEALTH, '/content-tree': TREE, '/website-timeline': TIMELINE, '/foundations/domain': { data: null } };
 
-  test('overview: Health check card shows what needs a look, with its one action', async ({ page }) => {
+  test('Search: Health check card shows what needs a look, with its one action', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#search');
     const card = page.locator('#healthCard');
     await expect(card.getByRole('heading', { name: 'Health check' })).toBeVisible();
     await expect(card).toContainText('1 to look at');
     await expect(card).toContainText('Your site has a description for Google');
     await expect(card.getByRole('link', { name: 'Add one' })).toHaveAttribute('href', '/presence.html#search');
-    // the Site health tile agrees with the card (one answer per screen)
-    await expect(page.locator('#statHealth .v')).toHaveText('Needs a look');
-    // the Site health tile is a door to this card (it used to do nothing)
-    await page.locator('#statHealth').click();
-    await expect(card).toBeFocused();
   });
 
-  test('overview: a page the map says is blocked wears that word instead of "changes waiting"', async ({ page }) => {
+  test('Pages: a page the map says is blocked wears that word instead of "changes waiting"', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#pages');
     const about = page.locator('#pagesList .hb-row[data-page="about"] .hb-chip');
     await expect(about).toHaveText('Needs something before publishing');
     await expect(about).toHaveClass(/warn/);
   });
 
-  test('overview: Recent activity lists the newest five, See all shows the rest in place', async ({ page }) => {
+  test('Versions: Recent activity lists the newest five, See all shows the rest in place', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#history');
     const sec = page.locator('#activitySec');
     await expect(sec.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
     await expect(sec.locator('.hb-row')).toHaveCount(5);
@@ -164,11 +153,11 @@ test.describe('CMS workspace', () => {
     await expect(sec.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('overview: no domain yet → Your domain card → the desk opens on "type your domain", ready', async ({ page }) => {
+  test('Search: no domain yet → Your domain card → the desk opens on "type your domain", ready', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS,
       '/foundations': { data: { dns: { sentence: 'Temporary address.', records: [] }, ssl: { sentence: 'Padlock on.' }, email: { sentence: 'No email yet.', has_mail: false, spf: false, dmarc: false }, hosting: { sentence: 'Hosted.' } } },
       '/foundations/plans': { data: [] }, '/launch': { data: { launched: true, sentence: 'Live.', items: [] } } } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#search');
     const card = page.locator('#domainCard');
     await expect(card).toContainText('temporary address');
     await card.getByRole('button', { name: 'Connect your domain' }).click();
@@ -182,17 +171,18 @@ test.describe('CMS workspace', () => {
   // Oct 2026 audit, gap 5: the rail cards used to be asked for at the end of
   // renderFactsProse(), which returns early when /health carries no `facts` —
   // a fixture without them hid the Domain and Health cards. loadToday() asks now.
-  test('overview: the Domain, Health check and Recent activity cards render even when /health has no facts', async ({ page }) => {
+  test('the Domain, Health check and Recent activity cards render even when /health has no facts', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.' } } } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#search');
     await expect(page.locator('#healthCard').getByRole('heading', { name: 'Health check' })).toBeVisible();
     await expect(page.locator('#domainCard')).toContainText('temporary address');
+    await page.evaluate(() => (window as any).go('history'));
     await expect(page.locator('#activitySec').getByRole('heading', { name: 'Recent activity' })).toBeVisible();
   });
 
-  test('overview: a connected, healthy domain says so — no Connect button', async ({ page }) => {
+  test('Search: a connected, healthy domain says so — no Connect button', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } } } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#search');
     await expect(page.locator('#domainCard')).toContainText('marlows.example is live and secure.');
     await expect(page.locator('#domainCard').getByRole('button', { name: 'Connect your domain' })).toHaveCount(0);
   });
@@ -207,36 +197,9 @@ test.describe('CMS workspace', () => {
     await expect(page.getByPlaceholder(/Services, Gallery/)).toBeVisible();
   });
 
-  test('overview: the stat strip reads changes, health, visitors and enquiries from the real routes', async ({ page }) => {
+  test('Pages: one row per page with a status chip, and Edit opens that page’s editor', async ({ page }) => {
     await installApp(page, { api: BOARD_API });
-    await page.goto('/presence.html');
-    const strip = page.locator('#statStrip');
-    await expect(strip).toBeVisible();
-    await expect(strip.locator('.hb-stat:visible')).toHaveCount(4);
-    await expect(strip.locator('#statWaiting .v')).toHaveText('2');
-    await expect(strip.locator('#statWaiting .s')).toContainText('Home');      // business changes land on Home/About/Contact
-    await expect(strip.locator('#statHealth .v')).toHaveText('Good');
-    await expect(strip.locator('#statHealth .s')).toContainText('Domain connected');
-    await expect(strip.locator('#statHealth .s')).toContainText('verified');   // /search/health (default fixture)
-    await expect(strip.locator('#statVisitors .v')).toHaveText('412');
-    await expect(strip.locator('#statVisitors .s')).toHaveText('1,180 page views');
-    await expect(strip.locator('#statVisitors')).toHaveAttribute('href', '/analytics.html?view=website');
-    await expect(strip.locator('#statEnquiries .v')).toHaveText('2');        // this month only
-    await expect(strip.locator('#statEnquiries .s')).toHaveText('1 still new');
-    await expect(strip.locator('#statEnquiries')).toHaveAttribute('href', '/inbox.html#enquiries');
-  });
-
-  test('overview: a CMS edition without reports/forms drops those two tiles (no empty cells)', async ({ page }) => {
-    await installApp(page, { api: { ...BOARD_API, '/portal/context': ctx(['website', 'developer', 'client_portal']) } });
-    await page.goto('/presence.html');
-    await expect(page.locator('#statStrip .hb-stat:visible')).toHaveCount(2);
-    await expect(page.locator('#statVisitors')).toBeHidden();
-    await expect(page.locator('#statEnquiries')).toBeHidden();
-  });
-
-  test('overview: the Pages list has one row per page with a status chip, and Edit opens that page’s editor', async ({ page }) => {
-    await installApp(page, { api: BOARD_API });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#pages');
     const rows = page.locator('#pagesList .hb-row');
     await expect(rows).toHaveCount(7);   // six template pages + the owner's own page
     await expect(rows.nth(0).locator('b')).toHaveText('Home');
@@ -250,17 +213,16 @@ test.describe('CMS workspace', () => {
     // Edit on Services → the offerings editor; Edit on the owner's page → the Design builder on that page
     await rows.nth(1).getByRole('button', { name: 'Edit Services' }).click();
     await expect(page.locator('#view-offerings')).toBeVisible();
-    await expect(page.locator('#nav')).toBeVisible();
-    await page.locator('#nav .navitem[data-view="today"]').click();
-    await expect(page.locator('#view-today')).toBeVisible();
+    await page.evaluate(() => (window as any).go('pages'));
+    await expect(page.locator('#view-pages')).toBeVisible();
     await page.locator('#pagesList .hb-row').nth(6).getByRole('button', { name: 'Edit Private events' }).click();
     await expect(page.locator('#view-design')).toBeVisible();
     await expect(page.locator('#pagesBar .page-pill.on .pp-name')).toHaveText('Private events');
   });
 
-  test('overview: Waiting to publish lists every pending change with Preview + Edit and the quiet "nothing goes live" row', async ({ page }) => {
+  test('Pages: Waiting to publish lists every pending change with Preview + Edit and the quiet "nothing goes live" row', async ({ page }) => {
     await installApp(page, { api: BOARD_API });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#pages');
     const list = page.locator('#recentList');
     await expect(list.locator('.hb-row:not(.quiet)')).toHaveCount(2);
     await expect(list.locator('.hb-row').nth(0).locator('b')).toHaveText('“Download menu (PDF)” joins Mains.');
@@ -275,18 +237,18 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#pageWords button.on')).toHaveAttribute('data-page', '/services/');   // VOCAB's path for the offerings page
   });
 
-  test('overview: an up-to-date site hides the waiting list and says so in the tile', async ({ page }) => {
+  test('Pages: an up-to-date site hides the waiting list', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, '/changes': PRESENCE_API['/changes'], '/health': { data: { ...BOARD_API['/health'].data, facts: { ...BOARD_API['/health'].data.facts, draft: { state: 'clean', label: 'Up to date', detail: 'no unpublished changes' } } } } } });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#pages');
+    await expect(page.locator('#view-pages')).toBeVisible();
     await expect(page.locator('#recentWrap')).toBeHidden();
-    await expect(page.locator('#statWaiting .v')).toHaveText('0');
-    await expect(page.locator('#statWaiting .s')).toHaveText('Everything is live');
     await expect(page.locator('#btnPublish')).toHaveText('Publish');
   });
 
-  test('overview: the rail — Setup progress from first-run, Design swatches + fonts + template, Photos thumbnails + count', async ({ page }) => {
+  test('overview: the to-do line opens Setup progress from first-run', async ({ page }) => {
     await installApp(page, { api: BOARD_API });
     await page.goto('/presence.html');
+    await page.locator('#ssTodo').click();
     const setup = page.locator('#setupCard');
     await expect(setup).toBeVisible();
     await expect(setup.locator('.meta')).toHaveText('3 of 5 done');
@@ -294,38 +256,20 @@ test.describe('CMS workspace', () => {
     await expect(setup.locator('.hb-task.done')).toHaveCount(3);
     await expect(setup.locator('button.hb-task')).toHaveCount(2);
     await expect(setup.locator('button.hb-task').first().locator('span.t span')).toHaveText('Shows your hours on Google Maps');
-    const design = page.locator('#designRailCard');
-    await expect(design.locator('#designSwatches i')).toHaveCount(3);
-    await expect(design.locator('#designSwatches i').first()).toHaveCSS('background-color', 'rgb(185, 71, 31)');   // the accent token
-    await expect(design.locator('#designSwatches span')).toHaveText('Fraunces and Inter');
-    await expect(design.locator('#designNote')).toContainText('Template: Restaurant classic.');
-    await expect(design.locator('.hb-card-h a')).toHaveText('Change');
-    const photos = page.locator('#photosCard');
-    await expect(photos.locator('#photoThumbs img')).toHaveCount(2);
-    await expect(photos.locator('#photoCount')).toHaveText('2 photos · 1 added this month.');
-    await expect(photos.locator('#lnkVisual')).toHaveAttribute('href', '/visual-studio.html');
   });
 
-  test('overview: a dismissed or complete setup hides the card; a first-run step routes to its editor', async ({ page }) => {
+  test('overview: a dismissed or complete setup has no to-do line; a first-run step routes to its editor', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, '/commerce/first-run': { data: { ...BOARD_API['/commerce/first-run'].data, complete: true } } } });
     await page.goto('/presence.html');
-    await expect(page.locator('#statStrip')).toBeVisible();
-    await expect(page.locator('#setupCard')).toBeHidden();
+    await expect(page.locator('#siteStage')).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(page.locator('#ssTodo')).toBeHidden();
     await installApp(page, { api: BOARD_API });
     await page.goto('/presence.html');
+    await page.locator('#ssTodo').click();
     await page.locator('#setupCard button.hb-task', { hasText: 'Add Google Business Profile' }).click();
-    await expect(page.locator('#view-today')).toBeVisible();   // the connect step stays on the overview
-  });
-
-  test('overview: a site that needs a look shows the health band; a healthy one does not', async ({ page }) => {
-    await installApp(page, { api: { ...BOARD_API, '/health': { data: { ...BOARD_API['/health'].data, state: 'needs_attention', sentence: 'Your domain needs a look.', detail: 'DNS is still pointing elsewhere.' } } } });
-    await page.goto('/presence.html');
-    await expect(page.locator('#healthWrap .hb-band')).toContainText('Your domain needs a look.');
-    await expect(page.locator('#healthWrap .hb-band')).toContainText('DNS is still pointing elsewhere.');
-    await expect(page.locator('#statHealth .v')).toHaveText('Needs a look');
-    await installApp(page, { api: BOARD_API });
-    await page.goto('/presence.html');
-    await expect(page.locator('#healthWrap')).toBeHidden();
+    await expect(page.locator('#view-search')).toBeVisible();   // Google connections live on Search
+    await expect(page.locator('#todoPanel')).toBeHidden();
   });
 
   test('a save on the Business view says "Saving…" then rests back on "Everything saved" in the top row', async ({ page }) => {
@@ -417,7 +361,7 @@ test.describe('CMS workspace', () => {
       await installApp(page, { api: SEO_API });
       await page.goto('/presence.html#business');
       await page.locator('#f-business_name').fill('Marlow’s');
-      await page.locator('#nav .navitem[data-view="search"]').click();
+      await page.evaluate(() => (window as any).go('search'));
       await expect(page.locator('#srpName')).toHaveText('Marlow’s');
       await expect(page.locator('#srpTitle')).toHaveText('Marlow’s');
       await expect(page.locator('#srpFav')).toHaveText('M');

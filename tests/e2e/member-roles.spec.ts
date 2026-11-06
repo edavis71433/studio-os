@@ -353,7 +353,7 @@ test.describe('The builder', () => {
 
   for (const p of PEOPLE.filter((x) => !x.scoped)) {
     test(`${p.who}: the domain card and desk`, async ({ page }) => {
-      await openBuilder(page, p, '');
+      await openBuilder(page, p, '#search');
       const card = page.locator('#domainCard');
       await expect(card).toContainText('temporary address');
       await expectControls(page, p, [['#domainCard button:has-text("Connect your domain")', 'configure']]);
@@ -370,7 +370,7 @@ test.describe('The builder', () => {
       await openBuilder(page, p, '#domain', {
         '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } },
       });
-      await expect(page.getByText('marlows.example is live and secure.').first()).toBeVisible();
+      await expect(page.getByText('marlows.example is live and secure.').locator('visible=true').first()).toBeVisible();
       await expectControls(page, p, [
         ['button:has-text("Remove this domain")', 'configure'],
         ['button:has-text("Set up email protection")', 'configure'],
@@ -383,10 +383,10 @@ test.describe('The builder', () => {
       await expectControls(page, p, [['#deleteCard', 'owner']]);
     });
 
-    test(`${p.who}: the Sharing link in the rail, and they keep Connections`, async ({ page }) => {
+    test(`${p.who}: the Sharing link in the menu, and they keep Connections`, async ({ page }) => {
       await openBuilder(page, p, '');
-      await expectControls(page, p, [['#view-today a[href="/sharing.html"]', 'owner']]);
-      await expect(page.locator('#view-today a[href="/connections.html"]').first()).toBeVisible();
+      await expectDisplay(page, p, '#sectionsNav .navitem[data-link="sharing"]', 'owner');
+      await expect(page.locator('#sectionsNav .navitem[data-link="connections"]')).toHaveJSProperty('hidden', false);
     });
   }
 
@@ -395,7 +395,7 @@ test.describe('The builder', () => {
       await openBuilder(page, p, '#business');
       await expectControls(page, p, [['#view-business .field:has(#f-industry)', 'configure']]);
       await expect(page.locator('#ann-text')).toBeVisible();
-      await page.locator('#nav .navitem[data-view="search"]').click();
+      await page.evaluate(() => (window as any).go('search'));
       await expectControls(page, p, [['#view-search details:has(#f-gsv)', 'configure']]);
     });
 

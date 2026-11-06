@@ -93,9 +93,9 @@ test.describe('Scheduling — one place, inside Publish', () => {
     await cancel;
   });
 
-  test('the overview\'s "Schedule it for later" opens the same block', async ({ page }) => {
+  test('the Pages list\'s "Schedule it for later" opens the same block', async ({ page }) => {
     await installApp(page, { api: PRESENCE });
-    await page.goto('/presence.html');
+    await page.goto('/presence.html#pages');
     await page.getByRole('link', { name: 'Schedule it for later' }).click();
     await expect(page.locator('#ritualWrap').getByLabel('Publish these changes at')).toBeVisible();
   });

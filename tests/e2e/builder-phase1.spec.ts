@@ -93,18 +93,15 @@ test.describe('full-screen Edit mode', () => {
 });
 
 test.describe('one set of tabs', () => {
-  test('the desktop strip and the phone sheet list the same places, on every view', async ({ page }) => {
+  test('the sidebar and the phone sheet list the same places, grouped by job', async ({ page }) => {
     await mount(page, '/presence.html');
-    const strip = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
+    const menu = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
     const sheet = (await page.locator('#sectionsNav .navitem').allTextContents()).map((s) => s.trim());
-    expect(strip).toEqual(['Overview', 'Services', 'Questions', 'Testimonials', 'Updates', 'Files', 'Bookings', 'Reviews', 'Business', 'Search', 'Analytics', 'Domain & email', 'History']);
-    expect(sheet).toEqual(['Edit site', ...strip]);    // plus the way into Edit mode, which the phone header has no room for
-    await expect(page.locator('#nav')).toBeVisible();
-    await page.locator('#nav .navitem[data-view="faqs"]').click();
+    expect(menu).toEqual(['Overview', 'Pages', 'Styles', 'Files', 'Search', 'Services', 'Questions', 'Testimonials', 'Updates', 'Bookings', 'Reviews', 'Analytics', 'Business details', 'Domain & email', 'Versions', 'Connections', 'Sharing & access', 'See the client’s view']);
+    expect(sheet).toEqual(['Edit site', ...menu]);     // plus the way into Edit mode
+    await page.evaluate(() => (window as any).go('faqs'));
     await expect(page.locator('#view-faqs')).toBeVisible();
     await expect(page.locator('#nav .navitem[data-view="faqs"]')).toHaveAttribute('aria-current', 'page');
-    await page.locator('#nav .navitem', { hasText: 'Domain & email' }).click();
-    await expect(page.getByRole('heading', { name: 'Domain & email' })).toBeVisible();
   });
 });
 

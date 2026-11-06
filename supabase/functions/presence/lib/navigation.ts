@@ -116,15 +116,15 @@ export function buildNav(c: NavContext): NavSection[] {
     // Website — their builder (one door; the sub-pages stay in ⌘K)
     if (f.hasWebsite) sections.push({ key: 'website', label: 'Website', items: [{ key: 'content', label: 'Website', href: '/presence.html', desc: WEBSITE_DESC }, ...websiteSubItems()] });
     // Record — deal · billing · details (the shell carries ?client=<site> onto every href)
-    if (f.hasRelationship) sections.push({ key: 'record', label: 'Record', items: [
-      { key: 'record', label: 'Record', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
+    if (f.hasRelationship) sections.push({ key: 'record', label: 'Details & billing', items: [
+      { key: 'record', label: 'Details & billing', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
       // Oct 2026 audit bug 10: ⌘K "billing" lands on money (the record's Billing tab), never on Customers
       hid('billing', 'Billing', '/crm.html?tab=billing', 'This client’s billing — invoices, deposits and the payment schedule.'),
     ] });
     // Project — the work you do for them (projects.html opens the single project directly)
     if (f.hasRelationship) single('project', 'Project', '/projects.html', 'The work you’re doing for this client — tasks, milestones, approvals.');
     // Messages — their conversations
-    single('messages', 'Messages', '/inbox.html', 'Everything this client has sent or is waiting on — messages, approvals, requests.');
+    single('messages', 'Inbox', '/inbox.html', 'Everything this client has sent or is waiting on — messages, approvals, requests.');
     // Files — theirs, including their private files (Visual Studio stays a ⌘K entry + a button on Files)
     if (f.hasWebsite) sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html', desc: 'This client’s photos, brand and documents — including the files private to them.' }, ...(canDraft(c) ? [hid('files_visual', 'Visual Studio', '/visual-studio.html', 'Make an image for their site.')] : [])] });
     // the studio-wide places are one search away while scoped (never drawn)
@@ -147,7 +147,6 @@ export function buildNav(c: NavContext): NavSection[] {
   // the Numbers section, so Analytics is a ⌘K entry under it ("See all numbers").
   if (studioLevel) {
     const home: NavItem[] = [{ key: 'home', label: 'Home', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, your money and your numbers.' }];
-    if (f.hasReports) home.push(hid('analytics', 'Analytics', '/analytics.html', 'All your numbers — visitors, enquiries, money — in plain English.'));
     // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits (a card on Home; agency.html scrolls to #kits)
     home.push(hid('kits', 'Starter kits', '/agency.html#kits', 'Save one client’s setup as a kit and start the next client from it.'));
     sections.push({ key: 'home', label: 'Home', items: home });
@@ -201,8 +200,9 @@ export function buildNav(c: NavContext): NavSection[] {
     sections.push({ key: 'files', label: 'Files', items: files });
   }
 
-  // Analytics — a first-class OUTCOME for a plain owner (the studio's lives on Home).
-  if (f.hasReports && !studioLevel) single('analytics', 'Analytics', '/analytics.html');
+  // Analytics — a first-class place for everyone: it was one of the things you could
+  // only find by searching at studio level.
+  if (f.hasReports) single('analytics', 'Analytics', '/analytics.html', 'All your numbers — visitors, enquiries, money — in plain English.');
 
   // Studio — an agency edition WITHOUT the relationship feature still needs a way
   // to its portfolio; with it, Home above IS the studio.
@@ -229,8 +229,9 @@ export function buildNav(c: NavContext): NavSection[] {
   if (c.isOperator) settings.push(hid('health', 'Health Center', '/admin-health.html', 'Platform health — background jobs, domains, billing, email posture and errors, in ten areas.'));
   sections.push({ key: 'settings', label: 'Settings', items: settings, utility: true });
 
-  // Get started — the guided first run, listed only until the site is live.
-  if (c.siteLive === false && f.hasWebsite && canDraft(c)) utility('get_started', 'Get started', '/get-started.html', 'The first week — your profile, your first customer, your first invoice.');
+  // Get started — the guided first run of a NEW client site, listed only until it is
+  // live. A studio's own draft site is a practice site: never a wizard in its menu.
+  if (c.siteLive === false && f.hasWebsite && canDraft(c) && !studioLevel) utility('get_started', 'Get started', '/get-started.html', 'The first week — your profile, your first customer, your first invoice.');
 
   // Help — the ? icon in every menu's foot; the page stays a ⌘K entry.
   sections.push({ key: 'help', label: 'Help', items: [hid('help', 'Help', '/help.html')], utility: true });

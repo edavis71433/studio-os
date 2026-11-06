@@ -59,11 +59,12 @@ test.describe('a client view shows the client', () => {
     await expect(page.locator('#setupCard')).toBeHidden();
   });
 
-  test('in the studio’s own workspace they still show', async ({ page }) => {
+  test('a sales alert stays off the website page: it belongs to the bell, Home and Pipeline', async ({ page }) => {
     await installApp(page, { api: { ...API, ...FIRST_RUN_HEALTH, ...NOTICE, ...FIRST } });
     await page.goto('/presence.html');
-    await expect(page.getByText('ready to convert Someone Else')).toBeVisible();
-    await expect(page.locator('#setupCard')).toBeVisible();
+    await expect(page.locator('#siteStage')).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(page.getByText('ready to convert Someone Else')).toHaveCount(0);
   });
 });
 
@@ -146,26 +147,11 @@ test.describe('one tip at a time', () => {
     await page.goto('/presence.html#search');
     const tip = page.locator('.dds-hint.dds-live');
     await expect(tip).toContainText('Search settings');
-    await page.locator('#nav .navitem[data-view="media"]').click();
+    await page.evaluate(() => (window as any).go('media'));
     await expect(tip).toHaveCount(0);
     await page.waitForTimeout(700);        // past the tip's own delay
     await expect(tip).toHaveCount(0);      // Files has a tip too, but not on this visit
     await expect(page.locator('#view-media')).toBeVisible();
-  });
-});
-
-test.describe('the first-run welcome', () => {
-  test('full on the first visit, one line after, and per site', async ({ page }) => {
-    await installApp(page, { api: { ...API, ...FIRST_RUN_HEALTH } });
-    await page.goto('/presence.html');
-    await expect(page.locator('.envelope')).toBeVisible();
-    await expect(page.locator('.welcomebar')).toHaveCount(0);
-    await page.reload();
-    await expect(page.locator('.welcomebar')).toContainText('step 2 of 3');
-    await expect(page.locator('.envelope')).toHaveCount(0);
-    await page.evaluate(() => localStorage.setItem('presence-previewed:other', '1'));
-    await page.reload();
-    await expect(page.locator('.welcomebar')).toContainText('step 2 of 3');   // another site's proof doesn't count
   });
 });
 

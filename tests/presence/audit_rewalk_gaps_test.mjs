@@ -61,8 +61,8 @@ ok('gap 4: noted only — the welcome card shows once and is not measured as a r
 // ═══ gap 5 · the rail cards no longer depend on /health carrying facts ═══
 {
   const loadToday = presence.slice(presence.indexOf('async function loadToday()'), presence.indexOf('/* ── the concierge\'s letters'));
-  const facts = presence.slice(presence.indexOf('function renderFactsProse()'), presence.indexOf('function renderNotes('));
-  ok('gap 5: loadToday() asks for the board extras itself', /renderStatement\(\); renderFactsProse\(\);[\s\S]*?hbLoadBoardExtras\(\);/.test(loadToday));
+  const facts = presence.slice(presence.indexOf('function renderFactsProse()'), presence.indexOf('\n}\n', presence.indexOf('function renderFactsProse()')));
+  ok('gap 5: loadToday() asks for the board extras itself', /renderFactsProse\(\);[\s\S]*?hbLoadBoardExtras\(\);/.test(loadToday));
   ok('gap 5: renderFactsProse() no longer gates them behind `facts`', !/hbLoadBoardExtras/.test(facts) && /if \(!f\) return;/.test(facts));
   ok('gap 5: hbLoadBoardExtras still runs once (HB_ASKED.extras guard)', /function hbLoadBoardExtras\(\) \{\n  if \(HB_ASKED\.extras\) return; HB_ASKED\.extras = true;/.test(presence));
 }
