@@ -427,7 +427,7 @@ test.describe('The builder', () => {
 
     test(`${p.who}: the template chooser's "Use this template"`, async ({ page }) => {
       await openBuilder(page, p, '#history');
-      await builderScript(page, 'LOOK_OPEN = true; PV.template = "editorial"; await mountLookSeg();');
+      await builderScript(page, 'await openPreview("draft", { template: "editorial" });');
       await expectDisplay(page, p, '#lookSeg button:has-text("Use this template")', 'owner');
     });
   }

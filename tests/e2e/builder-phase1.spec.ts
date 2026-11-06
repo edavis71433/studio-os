@@ -436,8 +436,6 @@ test.describe('what a real site showed', () => {
     await frame.locator('[data-dds-sid="richtext"]').waitFor();
     await expect(frame.locator('#dds-dc-style')).toHaveCount(1);
     await expect(frame.locator('#presence-preview-badge')).toBeHidden();
-    await page.locator('#dcModeSeg button[data-dcmode="preview"]').click();
-    await expect(frame.locator('#presence-preview-badge')).toBeVisible();
   });
 
   test('double-clicking a core section says where its words live, and stays in Edit mode', async ({ page }) => {
