@@ -7795,19 +7795,17 @@ async function dcSaveNav(nav) {
 // dismisses the host menu before the action runs.
 function dcPageMenuItems(slug, close) {
   const isHome = !slug;
-  const p = isHome ? null : dcPageObj(slug); const idx = dcPagesArr().findIndex((x) => x.slug === slug); const last = dcPagesArr().length - 1;
+  const p = isHome ? null : dcPageObj(slug);
   const items = [];
   const mk = (label, fn, o) => {
     const b = el("button", "pp-pop-item" + (o && o.danger ? " danger" : ""), label); b.type = "button";
-    if (o && o.disabled) b.disabled = true; else b.addEventListener("click", () => { close(); fn(); });
+    b.addEventListener("click", () => { close(); fn(); });
     items.push(b);
   };
   mk("Page settings…", () => pgOpenSettings({ href: isHome ? "/" : "/" + slug + "/" }));
   if (!isHome) {
     mk("Rename", () => dcRenamePage(slug));
     mk((p && p.hideNav) ? "Show in menu" : "Hide from menu", () => dcTogglePageNav(slug));
-    mk("Move left", () => dcMovePage(slug, -1), { disabled: idx <= 0 });
-    mk("Move right", () => dcMovePage(slug, 1), { disabled: idx >= last });
   }
   // G7: duplicate any page (Home too) — a full copy you then edit independently
   mk("Duplicate page", () => dcDuplicatePage(slug));
@@ -7839,16 +7837,6 @@ async function dcTogglePageNav(slug) {
     return body;
   };
   try { await settingsPut(toggled); renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
-}
-async function dcMovePage(slug, dir) {
-  if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const moved = () => {
-    const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
-    if (i < 0 || j < 0 || j >= arr.length) return null;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    return { pages: arr };
-  };
-  try { if (!(await settingsPut(moved))) return; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
 }
 // G7: duplicate a page ('' = Home) server-side — deep copy with fresh section ids,
 // "<Title> copy" + a "-copy" address; the response carries the whole new pages list.
@@ -8109,7 +8097,11 @@ const UNDO_LIST_FIELDS = {
 let UNDO_QUIET = 0;      // >0: this write is an undo, or sections recording their own snapshot
 let UNDO_BEFORE = null;  // for callers that update S before the write goes out
 const undoClone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
-function undoPick(src, keys) { const o = {}; keys.forEach((k) => { o[k] = undoClone(src ? src[k] : undefined); }); return o; }
+function undoPick(src, keys) {
+  const o = {}; keys.forEach((k) => { o[k] = undoClone(src ? src[k] : undefined); });
+  if (o.nav === null) o.nav = [];   // a site with no settings row has no menu to read yet, and the stored one can't be null
+  return o;
+}
 // A write to the page list carries every page's sections, and sections change outside
 // these steps: their saves are quiet and their snapshots go with the page. So a step keeps
 // only what it changed, and taking it back applies that to the list as it is by then.

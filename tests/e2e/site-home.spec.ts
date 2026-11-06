@@ -1,4 +1,4 @@
-import { test, expect, Page, Route } from '@playwright/test';
+import { test, expect, devices, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
@@ -389,7 +389,7 @@ test.describe('Pages: every page and the menu in one place', () => {
   });
 
   test('drag a page up the menu: one write, the menu in its new order', async ({ page }) => {
-    test.skip(isPhone(page), 'the same pointer events; the arrow-key test covers the phone');
+    test.skip(isPhone(page), 'the same pointer events; the finger test covers the phone');
     const writes = await mount(page, '/presence.html#pages', withPages());
     await drag(page, 'Contact', (b) => b.y + 2, row(page, 'About'));
     await expect.poll(() => navWrite(writes)).toBeTruthy();
@@ -400,7 +400,7 @@ test.describe('Pages: every page and the menu in one place', () => {
   });
 
   test('drag a page to Not linked: it leaves the menu and stays live; drag another in and it joins', async ({ page }) => {
-    test.skip(isPhone(page), 'the same pointer events; the arrow-key test covers the phone');
+    test.skip(isPhone(page), 'the same pointer events; the finger test covers the phone');
     const writes = await mount(page, '/presence.html#pages', withPages());
     await drag(page, 'Gallery', (b) => b.y + b.height - 2, page.locator('#pagesUnlinked'));
     await expect.poll(() => navWrite(writes)).toBeTruthy();
@@ -410,6 +410,33 @@ test.describe('Pages: every page and the menu in one place', () => {
     await drag(page, 'Landing', (b) => b.y + 2, row(page, 'About'));
     await expect.poll(() => hrefs(navWrite(writes).nav).indexOf('/landing/')).toBe(2);
     expect(navWrite(writes).pages.find((p: any) => p.slug === 'landing').hideNav).toBeUndefined();
+  });
+
+  // A phone has no arrow keys, so the handle is the only way it has to move a page.
+  test.describe('with a finger', () => {
+    const { defaultBrowserType: _, ...PHONE } = devices['Pixel 7'];
+    test.use(PHONE);
+    test.skip(({ browserName }) => browserName !== 'chromium', 'only Chromium takes a real touch drag from a test');
+
+    test('drag a page up the menu: the row moves and the page stays still', async ({ page, context }) => {
+      const writes = await mount(page, '/presence.html#pages', withPages());
+      await page.waitForLoadState('networkidle');
+      await expect(row(page, 'Contact').locator('.pg-grab')).toBeVisible();
+      await row(page, 'Contact').evaluate((n) => n.scrollIntoView({ block: 'center' }));
+      const h = (await row(page, 'Contact').locator('.pg-grab').boundingBox())!;
+      expect(h.height).toBeGreaterThanOrEqual(44);
+      const to = (await row(page, 'About').boundingBox())!.y + 2, from = h.y + h.height / 2, x = h.x + h.width / 2;
+      const scrolled = await page.evaluate(() => scrollY);
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] });
+      for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from + (to - from) * i / 8 }] });
+      await expect(page.locator('.pg-dropline')).toHaveCount(1);
+      expect(await page.evaluate(() => scrollY)).toBe(scrolled);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect.poll(() => navWrite(writes)).toBeTruthy();
+      expect(hrefs(navWrite(writes).nav)).toEqual(['/', '/services/', '/contact/', '/about/', '/faq/', '/updates/', '/gallery/']);
+      await expect.poll(async () => (await names(page, 'pagesList')).slice(2, 4)).toEqual(['Contact', 'About']);
+    });
   });
 
   test('Escape drops a drag where it started, and writes nothing', async ({ page }) => {
