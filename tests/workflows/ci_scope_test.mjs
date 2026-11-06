@@ -35,12 +35,26 @@ for (const { name } of Deno.readDirSync(WORKFLOWS)) {
 }
 
 // ── What it runs ─────────────────────────────────────────────────────────────
-ok('the typecheck runs', STEPS.some((s) => s.includes('deno check supabase/functions/presence/index.ts')));
 ok('the suites run', runs('bash scripts/ci-pure-tests.sh'));
 // A test of a workflow that no workflow runs protects nothing. This covers this file too.
 for (const { name } of Deno.readDirSync(new URL('tests/workflows/', ROOT))) {
   if (name.endsWith('_test.mjs')) ok(`runs tests/workflows/${name}`, runs(`deno run .*tests/workflows/${name}$`));
 }
+
+// ── Every function is typechecked ────────────────────────────────────────────
+// A function no pull request checks hides a type error until someone deploys, which
+// was five of the eight before Nov 6 2026. A folder with an index.ts is a function.
+// `_shared` has none: the functions that import it bring it into the check.
+const FUNCTIONS = new URL('supabase/functions/', ROOT);
+const hasIndex = (name) => { try { return Deno.statSync(new URL(`${name}/index.ts`, FUNCTIONS)).isFile; } catch { return false; } };
+const functions = [...Deno.readDirSync(FUNCTIONS)].filter((f) => f.isDirectory && hasIndex(f.name)).map((f) => f.name);
+// Every word after `deno check`, on one line or in a block. A commented-out line doesn't match.
+const checked = STEPS.flatMap((s) => [...s.matchAll(/^(?:(?: {8})?run: | {10})deno check (.+)$/gm)]).flatMap((m) => m[1].trim().split(/\s+/));
+
+ok('the folder listing finds the functions', functions.includes('presence'));
+// `|| true` or a flag on that line could turn a failure into a pass.
+ok('the typecheck line holds paths and nothing else', checked.length > 0 && checked.every((word) => word.endsWith('/index.ts')));
+for (const name of functions) ok(`typechecks ${name}`, checked.includes('supabase/functions/*/index.ts') || checked.includes(`supabase/functions/${name}/index.ts`));
 
 const passed = results.filter((x) => x.p).length;
 console.log(`\n════ CI SCOPE: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

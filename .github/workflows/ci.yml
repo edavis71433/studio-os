@@ -2,7 +2,7 @@ name: CI (Deno pure suite + typecheck)
 
 # The automated regression gate for the edge functions and the deterministic
 # render pipeline (Presence CMS Phase 1, M1). Runs the pure test sweep
-# (no network, no live Supabase) and typechecks all three functions. The
+# (no network, no live Supabase) and typechecks every edge function. The
 # integration-tier suites that need live Supabase credentials are skipped here;
 # they run against staging separately. The golden render suite is part of the
 # sweep, so a renderer change that alters output fails CI until the golden
@@ -17,6 +17,11 @@ name: CI (Deno pure suite + typecheck)
 # There is no skip list like the one `browser` has, either. This job takes under
 # a minute, and the suites reach pages, migrations, docs and the repo root, so
 # there is little to skip and a wrong skip would read as a pass.
+#
+# The typecheck takes its list from the folder instead of naming functions, so a
+# new one can't be left out. Before Nov 6 2026 this job named three of the eight,
+# so a type error in the other five passed every pull request and first showed up
+# at deploy. `_shared` has no index.ts: the functions that import it bring it in.
 # tests/workflows/ci_scope_test.mjs holds all this in place.
 #
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
@@ -38,10 +43,7 @@ jobs:
         with:
           deno-version: "2.9.1"
       - name: Typecheck edge functions
-        run: |
-          deno check supabase/functions/presence/index.ts
-          deno check supabase/functions/clever-api/index.ts
-          deno check supabase/functions/stripe-webhook/index.ts
+        run: deno check supabase/functions/*/index.ts
       - name: Pure test sweep (+ golden render)
         run: bash scripts/ci-pure-tests.sh
       - name: Schema dump workflow (real steps, stub CLI, no secrets)
