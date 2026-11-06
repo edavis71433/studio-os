@@ -257,6 +257,14 @@ session to end (dpHoldRepaint). After the burst-save completes, the normal
 refreshDesignPreview repaint shows the canonical render (markdown re-rendered,
 scroll preserved via dcCaptureScroll).
 
+**A page change writes first.** Switching pages, ＋ Page, Duplicate and Delete
+replace BLOCKS_WORK or read the stored draft, so dcSavePendingEdits writes what
+the page still holds while DC_PAGE still says whose it is: an open session, a
+commit in its debounce, a panel edit in its timer, and any save already on its
+way. If that save fails the person stays on the page, with its message on screen
+and their words still in the list. The new page starts at the top (dcOpenPage
+clears DC_SCROLL); a repaint of the same page keeps its place.
+
 **Panel and canvas cannot clobber each other,** stated precisely:
 
 - Both surfaces mutate the ONE working copy (BLOCKS_WORK) and persist through
