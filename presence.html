@@ -1911,6 +1911,31 @@ async function api(method, route, body) {
   if (route === "/settings" && j && j.data && j.data.section_meta) { S.sectionMeta = j.data.section_meta; ddsRebuildSidMap(); }
   return j;
 }
+// One write to the stored settings at a time, in order. A write carries whole columns,
+// so two at once are each built from an S.settings the other hasn't reached: the later
+// undoes the earlier on the server, or is refused for naming a draft version the earlier
+// one moved, which reads as someone else's change. So S.settings is read inside the turn:
+// fn starts once the last write has landed, and the next waits until fn is done with its
+// answer. Nothing inside a turn may wait on a later one (no dcSavePendingEdits).
+let SETTINGS_WRITES = Promise.resolve(), SETTINGS_TURNS = 0;
+function settingsTurn(fn) {
+  SETTINGS_TURNS++;
+  const turn = SETTINGS_WRITES.then(fn).finally(() => { SETTINGS_TURNS--; });
+  SETTINGS_WRITES = turn.catch(() => {});
+  return turn;
+}
+// The body, or a function that builds it when the turn comes (nothing back = no write).
+// landed runs before the next turn, for anything the next write builds on.
+function settingsPut(build, landed) {
+  return settingsTurn(async () => {
+    const body = typeof build === "function" ? build() : build;
+    if (!body) return null;
+    const r = await api("PUT", "/settings", body);
+    S.settings = r.data || { ...S.settings, ...body };
+    if (landed) landed();
+    return r;
+  });
+}
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
@@ -2449,7 +2474,7 @@ async function moveCategory(cat, dir) {
   [cats[i], cats[j]] = [cats[j], cats[i]];
   S.settings = { ...(S.settings || {}), category_order: cats };
   renderOfferings();
-  try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
+  try { await settingsTurn(() => api("PUT", "/settings", { category_order: cats })); scheduleChangesRefresh(); }
   catch (err) { toast(nice(err), true); }
 }
 
@@ -3910,8 +3935,7 @@ function mediaCell(grid, m, manage, onPick) {
         e.stopPropagation();
         try {
           const body = {}; body[field] = on ? null : m.id;
-          const r = await api("PUT", "/settings", body);
-          S.settings = r.data || { ...(S.settings || {}), ...body };
+          await settingsPut(body);
           renderMediaGrid(grid, true);
           toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
           scheduleChangesRefresh();
@@ -6126,9 +6150,9 @@ function seoNoindexRow(key, pageName, rowLabel) {
   const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key.replace(/[^a-z0-9_-]/gi, "-");
   cb.checked = !new Set((S.settings && S.settings.pages_noindex) || []).has(key);
   cb.addEventListener("change", async () => {
-    const nh = new Set((S.settings && S.settings.pages_noindex) || []);
-    cb.checked ? nh.delete(key) : nh.add(key);
-    try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
+    const show = cb.checked;
+    const noindex = () => { const nh = new Set((S.settings && S.settings.pages_noindex) || []); show ? nh.delete(key) : nh.add(key); return { pages_noindex: [...nh] }; };
+    try { await settingsPut(noindex); toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
   });
   const lb = el("label", null, rowLabel || pageName); lb.setAttribute("for", cb.id); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
@@ -6167,15 +6191,14 @@ function seoFieldsBox(key, label, showLabel) {
   };
   [ti, di].forEach((inp) => inp.addEventListener("input", paint));
   const save = async () => {
-    const map = { ...((S.settings && S.settings.page_seo) || {}) };
     const entry = {};
     if (ti.value.trim()) entry.title = ti.value.trim();
     if (di.value.trim()) entry.description = di.value.trim();
     if (sti.value.trim()) entry.share_title = sti.value.trim();
     if (sdi.value.trim()) entry.share_description = sdi.value.trim();
     if (sim.value) entry.share_image = sim.value;
-    if (!Object.keys(entry).length) delete map[key]; else map[key] = entry;
-    try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Saved — publish to apply"); scheduleChangesRefresh(); }
+    const seo = () => { const map = { ...((S.settings && S.settings.page_seo) || {}) }; if (!Object.keys(entry).length) delete map[key]; else map[key] = entry; return { page_seo: map }; };
+    try { await settingsPut(seo); toast("Saved — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   };
   [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
@@ -6973,10 +6996,10 @@ async function mountDesignCard() {
   // each in its own visual voice, so the controls show for all templates (G2).
   const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
   pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-    async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   const navRow = [["Standard", ""], ["Centered", "centered"]];
   pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-    async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -7288,8 +7311,8 @@ function pagesBarReveal() {
 // G13: a page change replaces BLOCKS_WORK or reads the stored draft, so what this page
 // still holds is written first, while DC_PAGE still says whose it is: an open in-place
 // session, a commit in its ~1.2s debounce, a panel edit in its 700ms timer. A save
-// already on its way is waited out too, since a write built from S.settings before it
-// lands would undo it. It loops because the page stays open during the wait. False = a
+// already on its way is waited out too, because the caller needs to know it worked.
+// It loops because the page stays open during the wait. False = a
 // save failed: its message is up and the words are still in the list, so the caller
 // stays on this page. keepSession leaves an open session typing, for a write that isn't
 // a page change (a form's timer can fire while someone types on the canvas).
@@ -7347,10 +7370,8 @@ async function dcAddPage() {
   if (chosen === null) return;   // cancelled
   if (!(await dcSavePendingEdits())) return;
   const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
-  const pages = [...dcPagesArr(), { slug, title, blocks }];
   try {
-    const r = await api("PUT", "/settings", { pages });
-    S.settings = r.data || { ...S.settings, pages };
+    await settingsPut(() => ({ pages: [...dcPagesArr(), { slug, title, blocks }] }));
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during that write stays on its own page
     dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7480,8 +7501,7 @@ async function dcSaveNav(nav) {
       if (kids.length) o.children = kids;
       return o;
     }).filter((it) => it.label && it.href).slice(0, 12) : [];
-    const r = await api("PUT", "/settings", { nav: clean });
-    S.settings = r.data || { ...S.settings, nav: clean };
+    await settingsPut({ nav: clean });
     refreshDesignPreview();
     toast(clean.length ? "Menu saved — publish to update your live site" : "Menu reset to automatic");
   } catch (err) { toast(nice(err), true); }
@@ -7523,24 +7543,31 @@ function dcPageMenu(slug, anchor) {
 }
 async function dcTogglePageNav(slug) {
   if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const pages = dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; });
-  try { const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages }; renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
+  const toggled = () => ({ pages: dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; }) });
+  try { await settingsPut(toggled); renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
 }
 async function dcMovePage(slug, dir) {
   if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
-  if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
-  try { const r = await api("PUT", "/settings", { pages: arr }); S.settings = r.data || { ...S.settings, pages: arr }; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
+  const moved = () => {
+    const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return null;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    return { pages: arr };
+  };
+  try { if (!(await settingsPut(moved))) return; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
 }
 // G7: duplicate a page ('' = Home) server-side — deep copy with fresh section ids,
 // "<Title> copy" + a "-copy" address; the response carries the whole new pages list.
 async function dcDuplicatePage(slug) {
   if (!(await dcSavePendingEdits())) return;   // the server copies the stored page
   try {
-    const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
-    const d = (r && r.data) || {};
-    S.settings = { ...(S.settings || {}), pages: Array.isArray(d.pages) ? d.pages : dcPagesArr() };
+    // the server rewrites the page list from what it has stored, so this takes a turn too
+    const d = await settingsTurn(async () => {
+      const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
+      const copy = (r && r.data) || {};
+      S.settings = { ...(S.settings || {}), pages: Array.isArray(copy.pages) ? copy.pages : dcPagesArr() };
+      return copy;
+    });
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during the copy stays on its own page
     if (d.slug) dcOpenPage(d.slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7565,24 +7592,25 @@ async function dcRenamePage(slug) {
     const taken = new Set(dcPagesArr().filter((x) => x.slug !== slug).map((x) => x.slug));
     if (taken.has(newSlug) || DC_PAGE_RESERVED.has(newSlug)) { toast("That address is already used by another page — pick a different one.", true); return; }
   }
-  const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
-  const body = { pages };
-  if (renamed) {
-    // keep the menu + per-page search settings pointing at the new address
-    const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
-    const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
-    if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
-      body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
+  const build = () => {
+    const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
+    const body = { pages };
+    if (renamed) {
+      // keep the menu + per-page search settings pointing at the new address
+      const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
+      const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
+      if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
+        body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
+      }
+      const pseo = (S.settings && S.settings.page_seo) || {};
+      if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
+      const nix = (S.settings && S.settings.pages_noindex) || [];
+      if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
     }
-    const pseo = (S.settings && S.settings.page_seo) || {};
-    if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
-    const nix = (S.settings && S.settings.pages_noindex) || [];
-    if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
-  }
+    return body;
+  };
   try {
-    const r = await api("PUT", "/settings", body);
-    S.settings = r.data || { ...S.settings, ...body };
-    if (renamed && DC_PAGE === slug) DC_PAGE = newSlug;
+    await settingsPut(build, () => { if (renamed && DC_PAGE === slug) DC_PAGE = newSlug; });   // the next write finds this page under its new address
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast(renamed ? "Renamed — visitors to the old link are redirected to the new address once you publish" : "Renamed — publish to update your live site");
   } catch (err) { toast(nice(err), true); }
@@ -7605,20 +7633,24 @@ async function dcDeletePage(slug) {
   if (!(await dcSavePendingEdits())) return;   // the checkpoint and the Undo below keep the stored page
   // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
   try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
-  const all = dcPagesArr(); const at = all.findIndex((x) => x.slug === slug);
-  const removed = all[at];
-  const pages = all.filter((x) => x.slug !== slug);
-  // take the page's search-appearance entries with it (same "page:<slug>" keys
-  // dcRenamePage migrates) — orphaned entries would silently noindex a FUTURE
-  // page that reuses this slug, and they count against the publish cap.
-  const body = { pages };
-  const dkey = "page:" + slug;
-  const pseo = (S.settings && S.settings.page_seo) || {};
-  if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
-  const nix = (S.settings && S.settings.pages_noindex) || [];
-  if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
+  let at = -1, removed = null;
+  const build = () => {
+    const all = dcPagesArr(); at = all.findIndex((x) => x.slug === slug);
+    removed = all[at];
+    const pages = all.filter((x) => x.slug !== slug);
+    // take the page's search-appearance entries with it (same "page:<slug>" keys
+    // dcRenamePage migrates) — orphaned entries would silently noindex a FUTURE
+    // page that reuses this slug, and they count against the publish cap.
+    const body = { pages };
+    const dkey = "page:" + slug;
+    const pseo = (S.settings && S.settings.page_seo) || {};
+    if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
+    const nix = (S.settings && S.settings.pages_noindex) || [];
+    if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
+    return body;
+  };
   try {
-    const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, pages };
+    await settingsPut(build);
     if (DC_PAGE === slug) { await dcSavePendingEdits(); dcOpenPage(""); }   // anything typed during that write went with the page, not onto Home
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     // G7: an honest Undo — we still hold the full page (it lives in the draft
@@ -7626,11 +7658,14 @@ async function dcDeletePage(slug) {
     // covers anything beyond the toast's window.
     toastAction("Page “" + title + "” deleted", "Undo", async () => {
       if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-      const cur = dcPagesArr().slice();
-      if (cur.some((x) => x.slug === removed.slug)) { toast("That page is already back"); return; }
-      cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
+      const restored = () => {
+        const cur = dcPagesArr().slice();
+        if (cur.some((x) => x.slug === removed.slug)) return null;
+        cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
+        return { pages: cur };
+      };
       try {
-        const rr = await api("PUT", "/settings", { pages: cur }); S.settings = rr.data || { ...S.settings, pages: cur };
+        if (!(await settingsPut(restored))) { toast("That page is already back"); return; }
         renderPagesBar(); renderBlocksCard(); refreshDesignPreview(); toast("Page “" + title + "” restored");
       } catch (err) { toast(nice(err), true); }
     }, 20000);
@@ -7807,16 +7842,18 @@ async function undoStep(rec, dir) {
   const back = dir === "undo";
   whisper("topWhisper", "saving");
   try {
-    UNDO_QUIET++;
-    let call;
-    if (rec.kind === "put") call = api("PUT", rec.route, back ? rec.before : rec.after);
-    else if (rec.kind === "patch") call = api("PATCH", `/${rec.col}/${rec.id}`, back ? rec.before : rec.after);
-    else if ((rec.kind === "create") === back) call = api("DELETE", `/${rec.col}/${rec.id}`);   // undoing an add, or redoing a removal
-    else call = api("POST", `/${rec.col}`, rec.row);
-    UNDO_QUIET--;
-    const r = await call;
-    if (rec.kind === "put") await undoSync(rec, back ? rec.before : rec.after, r);
-    else {
+    if (rec.kind === "put") {
+      const vals = back ? rec.before : rec.after;
+      const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
+      await (rec.route === "/settings" ? settingsTurn(put) : put());
+    } else {
+      UNDO_QUIET++;
+      let call;
+      if (rec.kind === "patch") call = api("PATCH", `/${rec.col}/${rec.id}`, back ? rec.before : rec.after);
+      else if ((rec.kind === "create") === back) call = api("DELETE", `/${rec.col}/${rec.id}`);   // undoing an add, or redoing a removal
+      else call = api("POST", `/${rec.col}`, rec.row);
+      UNDO_QUIET--;
+      const r = await call;
       const rows = S[rec.col] || (S[rec.col] = []);
       if (rec.kind === "patch") { const row = rows.find((x) => x.id === rec.id); if (row) Object.assign(row, r.data || (back ? rec.before : rec.after)); }
       else if ((rec.kind === "create") === back) S[rec.col] = rows.filter((x) => x.id !== rec.id);
@@ -7895,13 +7932,20 @@ async function blocksSaveNow() {
   try { return await saveBlocks(); } finally { BLOCKS_SAVING = false; }
 }
 let BLOCKS_PUT = null;   // the list save on its way; a page change waits it out (dcSavePendingEdits)
+let BLOCKS_PUT_WAITING = false;   // its turn hasn't come, so it will carry anything asked for now
 function saveBlocks() {
-  const put = putBlocks().finally(() => { if (BLOCKS_PUT === put) BLOCKS_PUT = null; });
+  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
+  whisper("topWhisper", "saving");
+  if (BLOCKS_PUT_WAITING) return BLOCKS_PUT;
+  BLOCKS_PUT_WAITING = true;
+  const put = settingsTurn(putBlocks).finally(() => { if (BLOCKS_PUT === put) BLOCKS_PUT = null; });
   BLOCKS_PUT = put;
   return put;
 }
+// Runs when its turn comes, so it writes the list and the pages as they stand by then.
 async function putBlocks() {
-  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
+  BLOCKS_PUT_WAITING = false;
+  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // the save before it may have asked for one more
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
   const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
@@ -9276,38 +9320,50 @@ async function saveForms() {
   try {
     // Built from the saved list below, so section edits reach it first.
     if (!(await dcSavePendingEdits(true))) { whisper("topWhisper", ""); return; }
-    const sentForms = JSON.stringify(FORMS_WORK);
-    // Forms keep their place on the page (a save used to drag them all to the bottom);
-    // a form removed here drops out, a new one lands at the end.
+    await settingsTurn(putForms);
+    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
+  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+  finally { FORMS_SAVING = false; }
+}
+async function putForms() {
+  const sentForms = JSON.stringify(FORMS_WORK);
+  // Forms keep their place on the page (a save used to drag them all to the bottom);
+  // a form removed here drops out, a new one lands at the end.
+  const withForms = (list) => {
     const work = new Map(FORMS_WORK.map((f) => [f.id, f]));
     const placed = new Set();
     const next = [];
-    formsHostBlocks(FORMS_PAGE).forEach((b) => {
+    list.forEach((b) => {
       if (!b || b.type !== "form") { next.push(b); return; }
       if (work.has(b.id)) { next.push(work.get(b.id)); placed.add(b.id); }
     });
     FORMS_WORK.forEach((f) => { if (!placed.has(f.id)) next.push(f); });
-    let r;
-    if (FORMS_PAGE) {
-      const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
-      r = await api("PUT", "/settings", { pages });
-      S.settings = r.data || { ...S.settings, pages };
-    } else {
-      r = await api("PUT", "/settings", { blocks: next });
-      S.settings = r.data || { ...S.settings, blocks: next };
-    }
-    if (typeof BLOCKS_WORK !== "undefined") { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // keep the content-block editor in sync
-    const ae = document.activeElement;
-    if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
-    else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
-    else {
-      FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
-      renderFormsCard();
-      FORMS_BASE = JSON.stringify(FORMS_WORK);
-    }
-    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
-  finally { FORMS_SAVING = false; }
+    return next;
+  };
+  const next = withForms(formsHostBlocks(FORMS_PAGE)), sentList = JSON.stringify(next);
+  let r;
+  if (FORMS_PAGE) {
+    const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
+    r = await api("PUT", "/settings", { pages });
+    S.settings = r.data || { ...S.settings, pages };
+  } else {
+    r = await api("PUT", "/settings", { blocks: next });
+    S.settings = r.data || { ...S.settings, blocks: next };
+  }
+  // Keep the content-block editor in sync. A section edit made while this was out is newer
+  // than what came back: it stays, with the form change under it, and saves next.
+  if (typeof BLOCKS_WORK !== "undefined") {
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }
+    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
+  }
+  const ae = document.activeElement;
+  if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
+  else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
+  else {
+    FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+    renderFormsCard();
+    FORMS_BASE = JSON.stringify(FORMS_WORK);
+  }
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
@@ -9475,8 +9531,7 @@ function renderFormsCard() {
 const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
 async function saveSections(order, hidden) {
   try {
-    const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
-    S.settings = r.data || { ...S.settings, sections_order: order, sections_hidden: hidden };
+    await settingsPut({ sections_order: order, sections_hidden: hidden });
     const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
@@ -10631,6 +10686,9 @@ function dpNote(title, body) {
 // that save repaints when it lands, and a read now would flash the old text back.
 let DP_REPAINT_HELD = false;
 let DP_PAINT_OPEN = 0;   // the page opening (DC_PAGE_OPENS) the last document written to the canvas belongs to
+// Reads are numbered, and one never paints over a newer one's document. Dropping all but
+// the newest would leave a stream of edits with slow reads never painting at all.
+let DP_READS = 0, DP_READ_PAINTED = 0;
 function dpHoldRepaint() {
   if (IPE) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
@@ -10655,21 +10713,22 @@ function refreshDesignPreview() {
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
     // right on it (AEM's "Drag components here" box), so the empty page is a real
     // build surface, not a dead sheet. No early-return-on-empty any more.
-    const opened = DC_PAGE_OPENS;
+    const opened = DC_PAGE_OPENS, read = ++DP_READS;
     try {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (opened !== DC_PAGE_OPENS) return;   // the page changed while this read was out; the new page has its own
+      if (read < DP_READ_PAINTED) return;
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
       if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
-      DP_PAINT_OPEN = opened;
+      DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
-      if (opened !== DC_PAGE_OPENS) return;
+      if (opened !== DC_PAGE_OPENS || read < DP_READ_PAINTED) return;
       // a plan without the website builder: say that, not "try again" — it can't work
       if (err && err.status === 403) {
-        DP_PAINT_OPEN = opened;
+        DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
         frame.srcdoc = "";
         const box = $("designPreviewEmpty"); if (box) box.classList.add("plan");
         dpNote("Editing isn’t part of this plan.", "This plan watches a website that lives somewhere else. Design opens up on a plan with the website builder.");
@@ -11272,7 +11331,7 @@ function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.conte
 // prompt; nothing is blocked outright.
 let IPE_SAVE_INFLIGHT = false;
 window.addEventListener('beforeunload', (e) => {
-  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
 });
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
@@ -12044,8 +12103,7 @@ function dcTreeSelect(el2, row) {
     const m = v.match(/content=["']([^"']+)["']/); if (m) { v = m[1]; $(id).value = v; }
     try {
       const body = {}; body[key] = v;
-      const r = await api("PUT", "/settings", body);
-      S.settings = r.data || { ...(S.settings || {}), ...body };
+      await settingsPut(body);
       toast(v ? "Saved — publish, then verify at the search engine" : "Cleared");
       scheduleChangesRefresh();
     } catch (err) { toast(nice(err), true); }
@@ -12055,8 +12113,7 @@ function dcTreeSelect(el2, row) {
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry");
   try {
-    const r = await api("PUT", "/settings", { industry_key: sel.value });
-    S.settings = r.data || { ...(S.settings || {}), industry_key: sel.value };
+    await settingsPut({ industry_key: sel.value });
     toast("Saved — your site uses the right words when you next publish");
     scheduleChangesRefresh();
   } catch (err) { toast(nice(err), true); }
@@ -12089,7 +12146,7 @@ function mountAnnouncementCard() {
     const body = annBody(), sig = JSON.stringify(body);
     if (sig === annSaved) return;
     whisper("topWhisper", "saving");
-    try { const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, ...body }; annSaved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
+    try { await settingsPut(body); annSaved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
     catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
   };
   ["ann-text", "ann-url", "ann-until"].forEach((id) => $(id).addEventListener("change", annSave));
