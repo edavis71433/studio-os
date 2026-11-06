@@ -7281,18 +7281,43 @@ function pagesBarReveal() {
   const host = $("pagesBar"), cur = host && host.querySelector(".page-pill.on"); if (!cur) return;
   host.scrollLeft += cur.getBoundingClientRect().left - host.getBoundingClientRect().left - 4;
 }
-function dcSwitchPage(slug) {
+// G13: a page change replaces BLOCKS_WORK or reads the stored draft, so what this page
+// still holds is written first, while DC_PAGE still says whose it is: an open in-place
+// session, a commit in its ~1.2s debounce, a panel edit in its 700ms timer. A save
+// already on its way is waited out too, since a write built from S.settings before it
+// lands would undo it. It loops because the page stays open during the wait. False = a
+// save failed: its message is up and the words are still in the list, so the caller
+// stays on this page.
+async function dcSavePendingEdits() {
+  for (;;) {
+    if (IPE) ipeCommit();
+    const put = BLOCKS_PUT || (IPE_SAVE_T != null || IPE_SAVE_PENDING ? ipeSaveNow() : blocksDirty() ? blocksSaveNow() : null);
+    if (!put) return true;
+    if (!(await put)) return false;
+  }
+}
+// Point the editor at a page, canvas at the top. The caller has run dcSavePendingEdits.
+function dcOpenPage(slug) { DC_PAGE = slug; DC_SCROLL = null; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; }
+// Where a switch waiting on its save is headed. Another click only changes this, so the
+// last page asked for wins however slow the save is.
+let DC_SWITCH_TO = null;
+async function dcSwitchPage(slug) {
   slug = slug || "";
-  if (slug === DC_PAGE) return;
+  if (DC_SWITCH_TO != null) { DC_SWITCH_TO = slug; return false; }
+  if (slug === DC_PAGE) return true;
+  DC_SWITCH_TO = slug;
+  const saved = await dcSavePendingEdits();
+  const to = DC_SWITCH_TO; DC_SWITCH_TO = null;
+  if (!saved) return false;
+  if (to === DC_PAGE) return to === slug;
   // Slice D (least-code choice): a page switch leaves Timewarp — the banner's
   // date claim must never sit over a freshly-loaded draft. Preview simply stays
   // on: the new page loads chrome-free, which is exactly what Preview means.
   if (DC_MODE === "timewarp") dcSetMode("edit");
-  blocksSaveBeforeLeaving();
-  DC_PAGE = slug; dcResetHistory();
-  BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
+  dcOpenPage(to);
   renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
   toast("Now editing: " + dcPageTitle(DC_PAGE));
+  return to === slug;
 }
 async function dcAddPage() {
   const name = await askText("Name your new page", { value: "", placeholder: "e.g. Services, Gallery, Pricing", ok: "Next: pick a layout" });
@@ -7304,12 +7329,13 @@ async function dcAddPage() {
   // AEM "Create Page" wizard: choose a starting layout (or blank) for the new page.
   const chosen = await dcChoosePageLayout(title);
   if (chosen === null) return;   // cancelled
+  if (!(await dcSavePendingEdits())) return;
   const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
   const pages = [...dcPagesArr(), { slug, title, blocks }];
   try {
     const r = await api("PUT", "/settings", { pages });
     S.settings = r.data || { ...S.settings, pages };
-    DC_PAGE = slug; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
+    dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast("Page “" + title + "” created — edit any section, then publish");
   } catch (err) { toast(nice(err), true); }
@@ -7491,11 +7517,12 @@ async function dcMovePage(slug, dir) {
 // G7: duplicate a page ('' = Home) server-side — deep copy with fresh section ids,
 // "<Title> copy" + a "-copy" address; the response carries the whole new pages list.
 async function dcDuplicatePage(slug) {
+  if (!(await dcSavePendingEdits())) return;   // the server copies the stored page
   try {
     const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
     const d = (r && r.data) || {};
     S.settings = { ...(S.settings || {}), pages: Array.isArray(d.pages) ? d.pages : dcPagesArr() };
-    if (d.slug) { DC_PAGE = d.slug; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; }
+    if (d.slug) dcOpenPage(d.slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast("Duplicated — now editing “" + (d.title || "the copy") + "”. Publish when it’s ready.");
   } catch (err) { toast(nice(err), true); }
@@ -7554,6 +7581,7 @@ async function dcDeletePage(slug) {
     if (bits.length) warn = "\n\nHeads up — " + bits.join("; ") + ". Those links will stop working until you update them.";
   } catch (_) { /* the check is best-effort — the confirm still asks plainly */ }
   if (!confirm("Delete the page “" + title + "”? Its sections will be removed. Your live site is unchanged until you publish." + warn)) return;
+  if (!(await dcSavePendingEdits())) return;   // the checkpoint and the Undo below keep the stored page
   // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
   try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
   const all = dcPagesArr(); const at = all.findIndex((x) => x.slug === slug);
@@ -7570,7 +7598,7 @@ async function dcDeletePage(slug) {
   if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
   try {
     const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, pages };
-    if (DC_PAGE === slug) { DC_PAGE = ""; dcResetHistory(); BLOCKS_WORK = currentBlocks(); }
+    if (DC_PAGE === slug) dcOpenPage("");
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     // G7: an honest Undo — we still hold the full page (it lives in the draft
     // settings row), so putting it back IS a true restore; a checkpoint (above)
@@ -7588,9 +7616,9 @@ async function dcDeletePage(slug) {
 }
 // Clear a page's sections back to a blank canvas (removes the applied template).
 // Works on Home and custom pages; undoable; live site unchanged until publish.
-function dcClearPage(slug) {
+async function dcClearPage(slug) {
   slug = slug || "";
-  if (slug !== DC_PAGE) dcSwitchPage(slug);   // clear the page you picked
+  if (slug !== DC_PAGE && !(await dcSwitchPage(slug))) return;   // clear the page you picked
   if (!Array.isArray(BLOCKS_WORK) || !BLOCKS_WORK.length) { toast("This page is already blank"); return; }
   if (!confirm("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.")) return;
   dcCaptureScroll(); BLOCKS_WORK = []; BLOCK_FOCUS = null; renderBlocksCard(); saveBlocks();
@@ -7832,14 +7860,6 @@ function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
   BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
 }
-// Before the list on screen is replaced: send what's waiting, while DC_PAGE and the list
-// still say where it belongs. saveBlocks reads both before its first await.
-function blocksSaveBeforeLeaving() {
-  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
-  if (IPE) ipeCommit();
-  clearTimeout(IPE_SAVE_T); IPE_SAVE_T = null;
-  if (blocksDirty() && ovConfirmContrastAck()) saveBlocks();
-}
 // For a write built from the saved list (forms): let section edits reach it first.
 async function blocksSettled() {
   for (let i = 0; i < 100 && BLOCKS_SAVING; i++) await new Promise((r) => setTimeout(r, 50));
@@ -7856,7 +7876,13 @@ async function blocksSaveNow() {
   BLOCKS_SAVING = true;
   try { return await saveBlocks(); } finally { BLOCKS_SAVING = false; }
 }
-async function saveBlocks() {
+let BLOCKS_PUT = null;   // the list save on its way; a page change waits it out (dcSavePendingEdits)
+function saveBlocks() {
+  const put = putBlocks().finally(() => { if (BLOCKS_PUT === put) BLOCKS_PUT = null; });
+  BLOCKS_PUT = put;
+  return put;
+}
+async function putBlocks() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
   const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
@@ -11185,20 +11211,27 @@ function ipeSaveSoon() {
   IPE_SAVE_T = setTimeout(() => {
     IPE_SAVE_T = null;
     if (IPE) { IPE_SAVE_PENDING = true; return; }
-    // Review fix 8 — honest announce: the commit said "Saving…"; "Saved" is
-    // announced only when the PUT actually resolved ok (saveBlocks returns
-    // true). Failures announce alongside the existing failure toast. The
-    // message lands in the current canvas doc AND is stashed so the repaint's
-    // injection re-announces it into the fresh document.
-    IPE_SAVE_INFLIGHT = true;
-    const p = saveBlocks();
-    if (p && p.then) p.then((okz) => {
-      IPE_SAVE_INFLIGHT = false;
-      const msg = okz ? 'Saved' : 'The save failed — see the message on screen.';
-      const d = ipeCanvasDoc(); if (d) ipeAnnounce(d, msg);
-      IPE_LIVE_MSG = msg;
-    }); else IPE_SAVE_INFLIGHT = false;
+    ipeSaveNow();
   }, 1200);
+}
+function ipeSaveNow() {
+  clearTimeout(IPE_SAVE_T); IPE_SAVE_T = null; IPE_SAVE_PENDING = false;
+  // The save's repaint keeps the canvas where the person is now, which may be past
+  // where they committed: the debounce leaves them time to scroll.
+  dcCaptureScroll();
+  // Review fix 8 — honest announce: the commit said "Saving…"; "Saved" is
+  // announced only when the PUT actually resolved ok (saveBlocks returns
+  // true). Failures announce alongside the existing failure toast. The
+  // message lands in the current canvas doc AND is stashed so the repaint's
+  // injection re-announces it into the fresh document.
+  IPE_SAVE_INFLIGHT = true;
+  return saveBlocks().then((okz) => {
+    IPE_SAVE_INFLIGHT = false;
+    const msg = okz ? 'Saved' : 'The save failed — see the message on screen.';
+    const d = ipeCanvasDoc(); if (d) ipeAnnounce(d, msg);
+    IPE_LIVE_MSG = msg;
+    return okz;
+  });
 }
 function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.contentDocument : null; } catch (_) { return null; } }
 // Review fix 10 (finding 11): a committed edit inside the 1.2s debounce
@@ -11346,7 +11379,7 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
   if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }   // the deferred burst-save resumes
-  if (DP_REPAINT_HELD) { DP_REPAINT_HELD = false; refreshDesignPreview(); }   // the repaint this session held off
+  if (DP_REPAINT_HELD) { DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview(); }   // the repaint this session held off
   return s;
 }
 function ipeCancel() {

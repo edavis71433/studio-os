@@ -534,4 +534,256 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     expect((puts[0].blocks as typeof BLOCKS)[0].subtitle).toBe('Committed early');
   });
+
+  // ── Nov 2026: a page change replaces the working list, so whatever the page still
+  // holds is written to that page first. The canvas keeps its place through a save's
+  // repaint, and only a new page starts at the top. ──
+  const ABOUT_BLOCKS = [{ type: 'title', title: 'About us', subtitle: 'The about line' }];
+  const ABOUT_SECTION = '<section id="about-us" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block wrap block-titleonly"><h2 data-dds-field="title">About us</h2><p class="title-sub" data-dds-field="subtitle">The about line</p></section>';
+  const PAGED = { blocks: BLOCKS, pages: [{ slug: 'about', title: 'About', blocks: ABOUT_BLOCKS }], section_meta: META };
+  const FAR_DOWN = '<div style="height:4000px"></div>';
+  type Field = ReturnType<Frame['locator']>;
+  type Paged = { blocks?: typeof BLOCKS; pages?: Array<{ slug: string; blocks: typeof BLOCKS }> };
+
+  // Home and About paint different documents, so a test can tell which one landed. The
+  // draft builds on each save like the real one, so a late save can't undo a delete.
+  async function mountPages(page: Page, spacer = ''): Promise<Mounted> {
+    const draft: Record<string, unknown> = { ...PAGED };
+    const mounted = await mountCanvas(page, { settings: draft, beforeGoto: async (p) => {
+      await p.route('**/functions/v1/presence/preview**', (route: Route) => {
+        const about = new URL(route.request().url()).searchParams.get('page') === '/about/';
+        return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML(spacer + (about ? ABOUT_SECTION : SECTIONS)) });
+      });
+      await p.route('**/functions/v1/presence/settings**', (route: Route) => {
+        if (route.request().method() === 'PUT') Object.assign(draft, route.request().postDataJSON());
+        return route.fallback();
+      });
+    } });
+    await expect(page.locator('#blocksCard')).toBeAttached();
+    return mounted;
+  }
+  const pill = (page: Page, name: string) => page.locator('#pagesBar .page-pill', { hasText: name });
+  const onPill = (page: Page) => page.locator('#pagesBar .page-pill.on .pp-name');
+  async function typeOver(page: Page, field: Field, text: string) {
+    await field.focus();
+    await page.keyboard.press('Enter');
+    await expect(field).toHaveAttribute('contenteditable', /.+/);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(text);
+  }
+  async function openAbout(page: Page, frame: Frame) {
+    await pill(page, 'About').locator('.pp-name').click();
+    await expect(frame.locator('#about-us')).toBeAttached();
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+  }
+  const canvasScrollY = (frame: Frame) => frame.locator('body').evaluate((b) => b.ownerDocument.defaultView!.scrollY);
+  // Holds every PUT at the door until released, and counts what reached it.
+  async function holdPuts(page: Page) {
+    const sent: Paged[] = [];
+    let release = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/settings**', async (route: Route) => {
+      if (route.request().method() === 'PUT') { sent.push(route.request().postDataJSON() as Paged); await held; }
+      await route.fallback();
+    });
+    return { sent, release };
+  }
+
+  test('clicking another page without pressing Enter writes the edit to its own page, then switches', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    const { sent, release } = await holdPuts(page);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Kept across pages');
+    await pill(page, 'About').locator('.pp-name').click();         // the click blurs the field, which commits
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
+    expect(sent[0].blocks?.[0].subtitle).toBe('Kept across pages');
+    await expect(onPill(page)).toHaveText('Home');                 // the list is not replaced while the write is out
+    release();
+    await expect(onPill(page)).toHaveText('About');
+    await expect(frame.locator('#about-us')).toBeAttached();
+    await page.waitForTimeout(1800);                               // past the 1.2s debounce
+    expect(puts.length).toBe(1);                                   // and nothing else was written
+  });
+
+  test('switching inside the debounce after Enter, from a custom page: the words land on that page', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    await openAbout(page, frame);
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'About, edited');
+    await page.keyboard.press('Enter');
+    await pill(page, 'Home').locator('.pp-name').click();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const saved = puts[0] as Paged;
+    expect(saved.blocks).toBeUndefined();
+    expect(saved.pages?.[0].blocks[0].subtitle).toBe('About, edited');
+    await expect(onPill(page)).toHaveText('Home');
+    await expect(frame.locator('#our-story')).toBeAttached();
+    await page.waitForTimeout(1800);
+    expect(puts.length).toBe(1);
+  });
+
+  test('a save already on its way when the page is clicked is waited out', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    const { sent, release } = await holdPuts(page);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Already leaving');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);   // the debounce fired on its own
+    await pill(page, 'About').locator('.pp-name').click();
+    await page.waitForTimeout(300);
+    await expect(onPill(page)).toHaveText('Home');                     // its write isn't in the saved draft yet
+    release();
+    await expect(onPill(page)).toHaveText('About');
+    await page.waitForTimeout(1800);
+    expect(puts.length).toBe(1);
+  });
+
+  test('a session still open when the switch arrives is committed first, not carried to the next page', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Still typing');
+    await page.evaluate(() => (window as unknown as { dcSwitchPage: (s: string) => void }).dcSwitchPage('about'));   // no click, so no blur
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Still typing');
+    await expect(onPill(page)).toHaveText('About');
+    await expect(frame.locator('#about-us')).toBeAttached();
+    await expect(frame.locator('[contenteditable]')).toHaveCount(0);
+  });
+
+  test('a panel edit still in its timer is written before the page changes', async ({ page }) => {
+    const { puts } = await mountPages(page);
+    await page.evaluate(() => (window as unknown as { eeEditBlock: (bi: number) => void }).eeEditBlock(0));
+    const title = page.locator('#blocksCard input[type="text"], #blocksCard input:not([type])').first();
+    await title.fill('Typed in the panel');
+    await title.blur();                                            // panel inputs commit on change, then wait 700ms
+    await page.evaluate(() => (window as unknown as { dcSwitchPage: (s: string) => void }).dcSwitchPage('about'));
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((puts[0] as Paged).blocks?.[0].title).toBe('Typed in the panel');
+    await expect(onPill(page)).toHaveText('About');
+  });
+
+  test('a save that fails keeps the person on the page with their words, and the next click writes them', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    let refusing = true;
+    await page.route('**/functions/v1/presence/settings**', async (route: Route) => {
+      if (refusing && route.request().method() === 'PUT') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'That save was refused.' }) });
+      return route.fallback();
+    });
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Not lost');
+    await pill(page, 'About').locator('.pp-name').click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'That save was refused.' }).first()).toBeVisible();
+    await expect(onPill(page)).toHaveText('Home');
+    expect(puts.length).toBe(0);
+    refusing = false;
+    await pill(page, 'About').locator('.pp-name').click();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Not lost');
+    await expect(onPill(page)).toHaveText('About');
+  });
+
+  test('the last page asked for wins while the save is out, and the edit is written once', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    const { sent, release } = await holdPuts(page);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Changed my mind');
+    await pill(page, 'About').locator('.pp-name').click();
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
+    await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
+    release();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await page.waitForTimeout(600);                                // past the repaint a switch would ask for
+    await expect(onPill(page)).toHaveText('Home');
+    await expect(frame.locator('#about-us')).toHaveCount(0);
+    expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Changed my mind');
+    expect(puts.length).toBe(1);
+  });
+
+  test('Duplicate page copies the words just typed, not the stored page from before them', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    let putsAtCopy = -1;
+    await page.route('**/functions/v1/presence/pages/duplicate**', (route: Route) => {
+      putsAtCopy = puts.length;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { slug: 'home-copy', title: 'Home copy', pages: [...PAGED.pages, { slug: 'home-copy', title: 'Home copy', blocks: BLOCKS }] } }) });
+    });
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'In the copy');
+    await pill(page, 'Home').locator('.pp-menu').click();
+    await page.locator('.pp-pop-item', { hasText: 'Duplicate page' }).click();
+    await expect(onPill(page)).toHaveText('Home copy');
+    expect(putsAtCopy).toBe(1);
+    expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('In the copy');
+  });
+
+  test('＋ Page keeps the edit on the page it was made on', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    await openAbout(page, frame);
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Before the new page');
+    await page.locator('#pagesBar .page-add').click();
+    await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
+    await page.getByRole('button', { name: 'Next: pick a layout' }).click();
+    await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
+    await expect(onPill(page)).toHaveText('Gallery');
+    const created = puts[puts.length - 1] as Paged;
+    expect(created.pages?.map((p) => p.slug)).toEqual(['about', 'gallery']);
+    expect(created.pages?.[0].blocks[0].subtitle).toBe('Before the new page');
+  });
+
+  test('Undo after deleting a page brings it back with the words typed just before', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    page.on('dialog', (d) => d.accept());
+    await openAbout(page, frame);
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Worth keeping');
+    await pill(page, 'About').locator('.pp-menu').click();
+    await page.locator('.pp-pop-item', { hasText: 'Delete page' }).click();
+    await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'restored' }).first()).toBeVisible();
+    const restored = puts[puts.length - 1] as Paged;
+    expect(restored.pages?.[0].blocks[0].subtitle).toBe('Worth keeping');
+  });
+
+  test('an in-place edit far down the page leaves the canvas where it was', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, FAR_DOWN);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Far down');
+    const before = await canvasScrollY(frame);
+    expect(before).toBeGreaterThan(1000);
+    await markCanvas(frame);
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await canvasReplaced(frame);
+    await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
+    await page.waitForTimeout(800);                                // a second repaint would show here
+    expect(await canvasScrollY(frame)).toBeGreaterThan(before - 50);
+  });
+
+  test('a session that held a repaint off and ends with nothing to save keeps the place too', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, FAR_DOWN);
+    let reads = 0;
+    let releaseRead = () => {};
+    const heldRead = new Promise<void>((r) => { releaseRead = r; });
+    await page.route('**/functions/v1/presence/preview**', async (route: Route) => { reads++; await heldRead; await route.fallback(); });
+    await typeOver(page, frame.locator('[data-dds-field="title"]').first(), 'Saved first');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await expect.poll(() => reads, { timeout: 6000 }).toBe(1);
+    const sub = frame.locator('[data-dds-field="subtitle"]');
+    await sub.focus();
+    await page.keyboard.press('Enter');
+    await expect(sub).toHaveAttribute('contenteditable', /.+/);
+    await markCanvas(frame);
+    await frame.locator('body').evaluate((b) => b.ownerDocument.defaultView!.scrollBy(0, -600));   // moved on since that save
+    const before = await canvasScrollY(frame);
+    expect(before).toBeGreaterThan(1000);
+    releaseRead();
+    await page.waitForTimeout(500);
+    await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);   // held
+    await page.keyboard.press('Escape');
+    await canvasReplaced(frame);
+    await expect.poll(async () => Math.abs(await canvasScrollY(frame) - before)).toBeLessThan(50);
+  });
+
+  test('a page switch still starts at the top, even from far down with an edit on its way', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, FAR_DOWN);
+    await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Far down, then away');
+    expect(await canvasScrollY(frame)).toBeGreaterThan(1000);
+    await pill(page, 'About').locator('.pp-name').click();
+    await expect(frame.locator('#about-us')).toBeAttached();
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+    await page.waitForTimeout(600);                                // a restored scroll lands at load
+    expect(await canvasScrollY(frame)).toBe(0);
+    expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Far down, then away');
+  });
 });
