@@ -90,8 +90,8 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
     && /const unpublishedHosted = !monitorEdition && !\(S\.site && S\.site\.last_published_at\);/.test(h)
     && /if \(!monitorEdition && !unpublishedHosted\) \{ \$\("monitorCard"\)\.hidden = true; return; \}/.test(h));
   ok('a hosted rebuild gets its own wording — record the address, building here continues',
-    /Already live somewhere else\? Record that website’s address/.test(h)
-    && /"Record the website’s address"/.test(h));
+    /Already live somewhere else\? Add that website’s address/.test(h)
+    && /"Add the website’s address"/.test(h));
   ok('a PUBLISHED hosted site keeps the card hidden — no second "website" surface competing with the real one',
     /edition 'presence', PUBLISHED\s*→ hidden/.test(h.replace(/\s+/g, ' ')) || /PUBLISHED    → hidden/.test(h));
 

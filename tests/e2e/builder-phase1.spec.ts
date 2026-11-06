@@ -177,7 +177,7 @@ test.describe('one save rule', () => {
   });
 
   test('the announcement bar has no Save button either', async ({ page }) => {
-    const writes = await mount(page, '/presence.html#business');
+    const writes = await mount(page, '/presence.html#updates');
     await expect(page.locator('#ann-save')).toHaveCount(0);
     await page.locator('#ann-text').fill('Closed Monday');
     await page.locator('#ann-text').blur();
@@ -589,6 +589,7 @@ test.describe('nothing typed gets lost', () => {
     await settle(page);
     await holdNextSave(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
@@ -612,6 +613,7 @@ test.describe('nothing typed gets lost', () => {
     await settle(page);
     await holdNextSave(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
@@ -628,6 +630,7 @@ test.describe('nothing typed gets lost', () => {
     const writes = await mount(page, '/presence.html#design', WITH_FORM);
     await settle(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     await title.fill('Say hello');
     await title.blur();

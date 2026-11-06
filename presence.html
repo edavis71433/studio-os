@@ -165,6 +165,8 @@ html.dds-side .dds-nav .sec .site-menu .navitem:hover{background:color-mix(in sr
 html.dds-side .dds-nav .sec .site-menu .navitem.on{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
 html.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
 html.site-home.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+/* the list scrolls inside the column, so the bottom row stays put (also in shell.css, which browsers keep for a day) */
+html.dds-side .dds-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
 /* the sidebar is the map, so the launcher repeating it stays on the phone layout */
 @media(min-width:761px){html.dds-side #dds-waffle{display:none}}
 html.dds-side .dds-nav .sec.has-site-menu > .it .car{display:none}
@@ -300,6 +302,18 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
    (the wordmark hides under the shell and on mobile; section titles are level 2) */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .docsub{color:var(--ink-2);font-size:13.5px;max-width:54ch;margin-bottom:var(--dds-s7,32px)}
+.view>h1.doc{display:inline-block;margin-bottom:var(--dds-s5,20px)}
+.view>.docsub{margin-bottom:var(--dds-s5,20px)}
+.tabhelp{position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:var(--dds-s2,8px);vertical-align:4px;border:1px solid var(--hair);border-radius:50%;background:none;color:var(--ink-3);font-size:12px;line-height:1;cursor:pointer}
+.tabhelp::after{content:"";position:absolute;inset:-12px}
+.tabhelp:hover,.tabhelp[aria-expanded="true"]{color:var(--ink);border-color:var(--ink-3)}
+.biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
+.biz-col{min-width:0}
+.biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
+.ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:11px;font-weight:600;vertical-align:1px}
+.hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
+.ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
+.ver-more>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);margin-bottom:var(--dds-s4,16px)}
 h5.rune{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin:36px 0 var(--dds-s4,16px);display:flex;align-items:center;gap:var(--dds-s4,16px)}
 h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
 h5.rune .whisper{font-family:var(--sans);font-style:normal;font-size:12px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--ink-2)}
@@ -349,7 +363,7 @@ h5.rune .whisper.ok{color:var(--sage)}
    normal page (hence :not(.plan-watch) throughout). */
 html.dc-edit:not(.plan-watch) #dds-shell,html.dc-edit:not(.plan-watch) #dds-ctxbar,html.dc-edit:not(.plan-watch) #dds-mbar,
 html.dc-edit:not(.plan-watch) .topbar,html.dc-edit:not(.plan-watch) #nav,html.dc-edit:not(.plan-watch) #dock,
-html.dc-edit:not(.plan-watch) #view-design>h1.doc,html.dc-edit:not(.plan-watch) #view-design>.docsub,
+html.dc-edit:not(.plan-watch) #view-design>h1.doc,html.dc-edit:not(.plan-watch) #view-design>.docsub,html.dc-edit:not(.plan-watch) #view-design>.tabhelp,
 html.dc-edit:not(.plan-watch) #designPreviewWrap>.hint{display:none !important}
 @media(min-width:761px){html.dc-edit:not(.plan-watch) .dc-fab{display:none !important}}
 html.dc-edit:not(.plan-watch).dds-side body{padding-left:0}
@@ -454,6 +468,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 #bookingsWrap .card,#reviewsWrap .card{background:var(--sheet)}
 .field{margin-bottom:var(--dds-s6,24px);max-width:560px}
 .field label{display:block;font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--ink-3);font-weight:500;margin-bottom:var(--dds-s1,4px)}
+.field select{width:100%;font-family:var(--sans);font-size:14px;height:36px;background:var(--sheet);border:1px solid var(--hair);padding:0 10px;border-radius:var(--r)}
 .field input[type=text],.field input[type=url],.field input[type=email],.field input[type=tel]{
   width:100%;font-family:var(--sans);font-size:14px;height:36px;background:var(--sheet);border:1px solid var(--hair);
   padding:0 10px;caret-color:var(--plum);border-radius:var(--r);transition:border-color var(--dur) var(--ease)}
@@ -640,7 +655,7 @@ html.plan-watch #svWords{display:none}
 .pickerStockBar input{flex:1;padding:var(--dds-s2,8px) var(--dds-s3,12px);font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--ink)}
 
 /* ── history journal ── */
-.hentry{display:flex;gap:var(--dds-s6,24px);padding:var(--dds-s5,20px) 0;border-bottom:1px solid var(--hair)}
+.hentry{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px) var(--dds-s6,24px);padding:var(--dds-s5,20px) 0;border-bottom:1px solid var(--hair)}
 .hentry:last-child{border-bottom:0}
 .hdate{flex:none;width:110px;font-size:12px;color:var(--ink-3);padding-top:2px}
 .hbody{flex:1;min-width:0}
@@ -1234,72 +1249,65 @@ body.pd-dragging *{cursor:grabbing !important}
 
       <!-- BUSINESS -->
       <section class="view" id="view-business">
-        <h1 class="doc" role="heading" aria-level="2">Business</h1>
-        <p class="docsub">The facts customers rely on. Everything here keeps itself saved as you write — nothing reaches your website until you publish.</p>
+        <h1 class="doc" role="heading" aria-level="2">Business details</h1>
+        <p class="docsub">Your name, contact details, address and hours. Changes save as you type and go live when you publish.</p>
         <div id="bizWaiting"></div>
-
-        <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> draft with help</button></h5>
-        <h2 class="hb-sub-h" style="margin-top:4px">The basics</h2>
-        <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
-        <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
-        <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
-        <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
-        <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
-        <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
-        <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
-        <h2 class="hb-sub-h">Your kind of business</h2>
-        <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
-          <option value="generic">General / other</option>
-          <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
-          <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
-          <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
-          <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
-          <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
-          <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
-        </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
-        <h2 class="hb-sub-h">Links &amp; booking</h2>
-        <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
-        <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
-
-        <h5 class="rune">Where to find you <span class="whisper" id="save-location"></span></h5>
-        <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
-        <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
-        <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
-        <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
-        <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
-
-        <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
-        <div class="hoursgrid" id="hoursGrid"></div>
-        <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
-        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+        <div class="biz-grid">
+          <div class="biz-col">
+          <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> Draft with help</button></h5>
+          <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
+          <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
+          <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
+          <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Shown on your About page.</div></div>
+          <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
+            <option value="generic">General / other</option>
+            <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
+            <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
+            <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
+            <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
+            <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
+            <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
+          </select><div class="hint">Sets the words your site uses, like Services or Menu. Applies when you next publish.</div></div>
+          <h5 class="rune">Contact</h5>
+          <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
+          <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
+          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
+          <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
+          <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+          </div>
+          <div class="biz-col">
+          <h5 class="rune">Address <span class="whisper" id="save-location"></span></h5>
+          <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+          <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
+          <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
+          <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
+          <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
+          <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
+          <div class="hoursgrid" id="hoursGrid"></div>
+          <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
+          <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+          </div>
+        </div>
 
         <div id="monitorCard" hidden>
           <h5 class="rune">Your website</h5>
-          <p class="docsub" style="margin-top:6px">Your website stays exactly where it is. Once it’s connected and verified, this room quietly watches over it — nothing on it is ever changed from here.</p>
+          <p class="docsub" style="margin-top:6px">Your website stays where it is. Once it’s connected and verified, we keep an eye on it from here. Nothing on it is ever changed.</p>
           <div id="monitorStatus"></div>
           <div id="monitorAddWrap"></div>
           <button class="addline" id="btnMonitorConnect" hidden>Connect my website</button>
         </div>
 
-        <h5 class="rune">Papers you already have</h5>
-        <p class="docsub" style="margin-top:6px">A menu, a flyer, a price sheet — paste the text in and the site will quietly notice when they disagree. Nothing is rewritten or published.</p>
-        <div id="knowledgeList"></div>
-        <div id="knowledgeAddWrap"></div>
-        <button class="addline" id="btnAddKnowledge">Bring a menu or flyer I already have</button>
-
-        <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
-        <button class="addline" style="border-top:none" onclick="openFoundationsDesk()">The technical side — domain, email, security</button>
+        <button class="addline" style="margin-top:24px" onclick="openStudioDesk()"><span class="aimark">✦</span> Get a review of your wording and brand</button>
       </section>
-
       <!-- SEARCH -->
       <section class="view" id="view-search">
         <h1 class="doc" role="heading" aria-level="2">Search</h1>
-        <p class="docsub">How people find you on Google and in AI answers, and what would help them find you more. Checking and connecting never change your website.</p>
+        <p class="docsub">How people find you on Google and in AI answers, and what would help. Checking and connecting never change your website.</p>
         <div class="hb-cols hb-site-status">
           <div class="hb-card" id="healthCard" tabindex="-1" hidden></div>
           <div class="hb-card" id="domainCard" hidden></div>
         </div>
-        <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Reading how you show up…</div><div class="shimmer"></div></div></div>
+        <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Checking how you show up…</div><div class="shimmer"></div></div></div>
         <div class="sv-grid">
           <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
           <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
@@ -1351,7 +1359,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- MENU -->
       <section class="view" id="view-offerings">
         <h1 class="doc" role="heading" aria-level="2">Menu</h1>
-        <p class="docsub">This page reads the way your menu reads. Choose any line to change it; anything you take off the menu stays kept here, never lost.</p>
+        <p class="docsub">Click any line to change it. Anything you take off stays saved here.</p>
         <div id="offeringsWrap"></div>
         <div id="newSectionWrap"></div>
       </section>
@@ -1359,7 +1367,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- QUESTIONS -->
       <section class="view" id="view-faqs">
         <h1 class="doc" role="heading" aria-level="2">Questions</h1>
-        <p class="docsub">The questions customers actually ask, answered once, in your words.</p>
+        <p class="docsub">The questions customers ask, answered in your words.</p>
         <div id="faqList"></div>
         <button class="addline" id="btnAddFaq">＋ Answer a new question</button>
         <button class="addline" style="border-top:none" onclick="openDesk('faqs','faqs')"><span class="aimark">✦</span> Draft a few with help</button>
@@ -1369,7 +1377,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- KIND WORDS -->
       <section class="view" id="view-testimonials">
         <h1 class="doc" role="heading" aria-level="2">Testimonials</h1>
-        <p class="docsub">What customers have said about you, kept in their words.</p>
+        <p class="docsub">Quotes from customers that you show on your website.</p>
         <div id="tesList"></div>
         <button class="addline" id="btnAddTes">＋ Keep a kind word</button>
         <div id="tesAddWrap"></div>
@@ -1378,7 +1386,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- UPDATES -->
       <section class="view" id="view-updates">
         <h1 class="doc" role="heading" aria-level="2">Updates</h1>
-        <p class="docsub">News, seasonal notes, announcements. Drafts stay private; what you choose to show appears on your Updates page when you publish.</p>
+        <p class="docsub">News and seasonal notes. Drafts stay private. What you choose to show goes on your Updates page when you publish.</p>
         <div id="postList"></div>
         <button class="addline" id="btnAddPost">＋ Write an update</button>
         <button class="addline" style="border-top:none" onclick="openDesk('post','updates')"><span class="aimark">✦</span> Draft one with help</button>
@@ -1388,7 +1396,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- FILES (#180: the full library — collections · search · sort · non-image kinds) -->
       <section class="view" id="view-media">
         <h1 class="doc" role="heading" aria-level="2">Files</h1>
-        <p class="docsub">Your business library — photos, documents and brand files, plus everything you’ve uploaded. Anything marked “on your site” is at work; the rest wait here.</p>
+        <p class="docsub">Your photos, documents and brand files. Anything marked “on your site” is in use.</p>
         <div id="assetHealth" style="margin:2px 0 8px" hidden></div>
         <div style="display:flex;align-items:baseline;gap:20px">
           <button class="textact" id="btnUpload">＋ Add a photograph</button>
@@ -1410,26 +1418,32 @@ body.pd-dragging *{cursor:grabbing !important}
           </div>
         </div>
         <div class="mediagrid" id="mediaGrid"></div>
+
+        <h5 class="rune">Menus and flyers to compare</h5>
+        <p class="docsub" style="margin-top:6px">Paste the text of a menu, flyer or price sheet. We’ll tell you when it disagrees with your website. Nothing on your site is changed.</p>
+        <div id="knowledgeList"></div>
+        <div id="knowledgeAddWrap"></div>
+        <button class="addline" id="btnAddKnowledge">＋ Add a menu or flyer</button>
       </section>
 
       <!-- BOOKINGS (Phase BK) -->
       <section class="view" id="view-bookings">
         <h1 class="doc" role="heading" aria-level="2">Bookings</h1>
-        <p class="docsub">Let customers book real appointments on your website — pick a service, a day, and an open time. Native and calm: no external calendar, nothing to install. Add the “Online booking” section to a page to show the widget.</p>
-        <div id="bookingsWrap"><div class="loadline"><div class="lq">Opening the diary…</div><div class="shimmer"></div></div></div>
+        <p class="docsub">Let customers book appointments on your website: a service, a day and an open time. Add the “Online booking” section to a page to show it.</p>
+        <div id="bookingsWrap"><div class="loadline"><div class="lq">Loading bookings…</div><div class="shimmer"></div></div></div>
       </section>
 
       <!-- REVIEWS (Phase RV) -->
       <section class="view" id="view-reviews">
         <h1 class="doc" role="heading" aria-level="2">Reviews</h1>
-        <p class="docsub">Real reviews from your customers — collected on your own site. Nothing shows until you approve it. Ask a happy customer for one, approve the good ones, and add the “Reviews wall” section to a page to show them (with honest star ratings that help you show up in search).</p>
-        <div id="reviewsWrap"><div class="loadline"><div class="lq">Gathering your reviews…</div><div class="shimmer"></div></div></div>
+        <p class="docsub">Reviews customers leave on your website. Nothing shows until you approve it. Add the “Reviews wall” section to a page to show them.</p>
+        <div id="reviewsWrap"><div class="loadline"><div class="lq">Loading reviews…</div><div class="shimmer"></div></div></div>
       </section>
 
       <!-- DESIGN -->
       <section class="view" id="view-design">
-        <h1 class="doc" role="heading" aria-level="2">Design</h1>
-        <p class="docsub">How your website looks — colors, type, layout, and what appears on your home page. Every choice is designed to stay readable; nothing applies until you publish, and every previous look stays restorable.</p>
+        <h1 class="doc" role="heading" aria-level="2">Edit site</h1>
+        <p class="docsub">Change your site’s words, sections and styles. Nothing goes live until you publish.</p>
         <!-- Edit mode: one bar across the top of the screen; the canvas takes the rest. -->
         <div class="dc-bar">
           <div class="dc-bar-start">
@@ -1487,7 +1501,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
                   <div id="designPreviewEmpty" hidden>
                     <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
-                    <p class="eh" id="dpEmptyBody">The proof draws itself from your real words — nothing is invented. Start with the basics, or add what you offer.</p>
+                    <p class="eh" id="dpEmptyBody">Your preview is built from your real content. Start with the basics, or add what you offer.</p>
                     <div class="ea">
                       <button class="textact" type="button" onclick="go('business')">Start in Business →</button>
                       <button class="textact" type="button" onclick="go('offerings')">Add what you offer →</button>
@@ -1540,18 +1554,21 @@ body.pd-dragging *{cursor:grabbing !important}
       </section>
       <!-- HISTORY -->
       <section class="view" id="view-history">
+        <h1 class="doc" role="heading" aria-level="2">Versions</h1>
+        <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
+        <div id="pubList"></div>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
           <div class="hb-list" id="activityList"></div>
         </section>
-        <h1 class="doc" role="heading" aria-level="2">History</h1>
-        <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
-        <div id="previewBox"></div>
-        <div id="checkpointBox"></div>
-        <div id="versionToolsBox"></div>
-        <div id="launchBox"></div>
-        <div id="pubList"></div>
+        <details class="ver-more" id="versionMore">
+          <summary>More tools: private preview, checkpoints, compare, launches</summary>
+          <div id="previewBox"></div>
+          <div id="checkpointBox"></div>
+          <div id="versionToolsBox"></div>
+          <div id="launchBox"></div>
+        </details>
       </section>
 
     </main>
@@ -1581,12 +1598,12 @@ body.pd-dragging *{cursor:grabbing !important}
 <!-- restore letter -->
 <div class="scrim" id="restoreScrim">
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
-    <h2 id="resSheetTitle">Bring this version back?</h2>
+    <h2 id="resSheetTitle">Restore this version?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version will be laid into your draft so you can look it over. Today’s draft is set aside as a safety copy — nothing is lost, and your live site doesn’t change until you publish.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p></div>
     <div class="foot">
-      <button class="quietact" data-close>Never mind</button>
-      <button class="pillbtn inked" id="btnRestoreGo">Bring it into my draft</button>
+      <button class="quietact" data-close>Cancel</button>
+      <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
     </div>
   </div>
 </div>
@@ -1647,7 +1664,7 @@ body.pd-dragging *{cursor:grabbing !important}
 </div>
 
 <!-- proofing desk -->
-<div class="stage" id="stage" role="dialog" aria-modal="true" aria-label="A private proof of your website">
+<div class="stage" id="stage" role="dialog" aria-modal="true" aria-label="Preview of your website">
   <div class="stagebar">
     <button class="back" id="btnStageClose">← Back</button>
     <div class="papertabs" id="verSeg">
@@ -1662,16 +1679,16 @@ body.pd-dragging *{cursor:grabbing !important}
       <button data-page="/updates/">Updates</button>
       <button data-page="/contact/">Contact</button>
     </div>
-    <div class="pagewords" id="lookSeg" aria-label="Try another look"></div>
+    <div class="pagewords" id="lookSeg" aria-label="Try another template"></div>
     <div class="grow"></div>
-    <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(239,234,247,.55);padding-bottom:11px" class="deskprivacy">A private proof — only you can see it.</span>
+    <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(239,234,247,.55);padding-bottom:11px" class="deskprivacy">Private preview. Only you can see it.</span>
     <div class="deskseg" id="devSeg">
       <button data-dev="desktop" class="on">Desk</button>
       <button data-dev="mobile">Phone</button>
     </div>
   </div>
   <div class="lookdrawer" id="lookDrawer" hidden></div>
-  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="A proof of your website"></iframe></div></div>
+  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -1908,6 +1925,31 @@ async function api(method, route, body) {
   // server's own validate-time truth, never a client recomputation.
   if (route === "/settings" && j && j.data && j.data.section_meta) { S.sectionMeta = j.data.section_meta; ddsRebuildSidMap(); }
   return j;
+}
+// One write to the stored settings at a time, in order. A write carries whole columns,
+// so two at once are each built from an S.settings the other hasn't reached: the later
+// undoes the earlier on the server, or is refused for naming a draft version the earlier
+// one moved, which reads as someone else's change. So S.settings is read inside the turn:
+// fn starts once the last write has landed, and the next waits until fn is done with its
+// answer. Nothing inside a turn may wait on a later one (no dcSavePendingEdits).
+let SETTINGS_WRITES = Promise.resolve(), SETTINGS_TURNS = 0;
+function settingsTurn(fn) {
+  SETTINGS_TURNS++;
+  const turn = SETTINGS_WRITES.then(fn).finally(() => { SETTINGS_TURNS--; });
+  SETTINGS_WRITES = turn.catch(() => {});
+  return turn;
+}
+// The body, or a function that builds it when the turn comes (nothing back = no write).
+// landed runs before the next turn, for anything the next write builds on.
+function settingsPut(build, landed) {
+  return settingsTurn(async () => {
+    const body = typeof build === "function" ? build() : build;
+    if (!body) return null;
+    const r = await api("PUT", "/settings", body);
+    S.settings = r.data || { ...S.settings, ...body };
+    if (landed) landed();
+    return r;
+  });
 }
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
@@ -2447,7 +2489,7 @@ async function moveCategory(cat, dir) {
   [cats[i], cats[j]] = [cats[j], cats[i]];
   S.settings = { ...(S.settings || {}), category_order: cats };
   renderOfferings();
-  try { await api("PUT", "/settings", { category_order: cats }); scheduleChangesRefresh(); }
+  try { await settingsTurn(() => api("PUT", "/settings", { category_order: cats })); scheduleChangesRefresh(); }
   catch (err) { toast(nice(err), true); }
 }
 
@@ -2684,7 +2726,7 @@ function openEditDesk(kind, view, targetId, action) {
 $("deskGo").addEventListener("click", async () => {
   const btn = $("deskGo");
   btn.disabled = true; btn.textContent = DESK.mode === "edit" ? "Reading it over…" : "Writing…";
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">${DESK.mode === "edit" ? "Improving without inventing…" : "Setting words to your facts…"}</div><div class="shimmer"></div></div>`;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">${DESK.mode === "edit" ? "Improving your wording…" : "Writing a draft…"}</div><div class="shimmer"></div></div>`;
   try {
     const r = DESK.mode === "edit"
       ? await api("POST", "/editor/improve", { kind: DESK.kind, action: DESK.action, target_id: DESK.targetId || undefined, instructions: $("deskInstructions").value.trim() })
@@ -2760,17 +2802,17 @@ const WRITE_KIND_VIEW = { faqs: "faqs", identity_copy: "business", post: "update
 // ── M9.5G: ONE door into looking things over — tasks, not tools ──
 function openStudioDesk() {
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
-  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Look things over';
+  $("deskTitle").innerHTML = '<span class="aimark">✦</span> Get a review';
   $("deskSub").textContent = "Pick what you’d like help with. Nothing changes without you.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
   $("deskGo").hidden = true;
   const wrap = $("deskResults"); wrap.innerHTML = "";
   const opts = [
-    ["Review", "A read-through of your writing and your brand — one honest report. Nothing changes.", openCombinedReviewDesk],
+    ["Review", "A read-through of your wording and brand, in one report. Nothing changes.", openCombinedReviewDesk],
   ];
   // "Plan" is the Growth Coach — a Business-OS surface; a standalone CMS omits it.
-  if (hasFeature("business_moments")) opts.push(["Plan", "What’s coming up — holidays, seasons, small openings worth preparing for.", openCoachDesk]);
-  opts.push(["Polish", "One pass over all your written words, improved in place — you approve every change.", () => { closeSheet("deskScrim"); openEditDesk("site_polish", "business", null, "readability"); }]);
+  if (hasFeature("business_moments")) opts.push(["Plan", "What’s coming up: holidays, seasons and busy times worth preparing for.", openCoachDesk]);
+  opts.push(["Polish", "One pass over all your wording. You approve every change.", () => { closeSheet("deskScrim"); openEditDesk("site_polish", "business", null, "readability"); }]);
   opts.forEach(([name, sub, go]) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", name));
@@ -2793,7 +2835,7 @@ async function openCombinedReviewDesk() {
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> A look over your website';
   $("deskSub").textContent = "How it reads, and whether it sounds like you — one report. Nothing changes; every note can be dismissed or handed off for improving.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading it all over…</div><div class="shimmer"></div></div>`;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reviewing your wording…</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
@@ -2809,7 +2851,7 @@ async function openCombinedReviewDesk() {
     const n1 = renderFindingsInto(wrap, rRep.data, "/review/reports", "How it reads");
     const n2 = renderFindingsInto(wrap, bRep.data, "/brand/reports", "Whether it sounds like you");
     if (!n1 && !n2) {
-      wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">It reads well — and it sounds like you.</div><div class="eh">Nothing worth flagging. Your words are doing their job.</div></div>`;
+      wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">Your wording looks good.</div><div class="eh">Nothing to flag.</div></div>`;
     }
   } catch (err) {
     $("deskResults").innerHTML = "";
@@ -2862,7 +2904,7 @@ async function openCoachDesk() {
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> Worth planning for';
   $("deskSub").textContent = "What’s coming up for the business — holidays, seasons, small openings the site is showing. Nothing happens unless you start it; ignoring any of these is always fine.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Looking ahead…</div><div class="shimmer"></div></div>`;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Checking what’s coming up…</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
@@ -2877,7 +2919,7 @@ async function openCoachDesk() {
 function renderCoachOpps(opps) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
   if (!opps.length) {
-    wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">Nothing pressing.</div><div class="eh">No timely opportunities right now — that’s a fine place to be. Check back as seasons and holidays approach.</div></div>`;
+    wrap.innerHTML = `<div class="estate" style="padding:20px 0"><div class="eq">Nothing coming up.</div><div class="eh">Check back as seasons and holidays get closer.</div></div>`;
     return;
   }
   opps.forEach((o) => {
@@ -2942,12 +2984,12 @@ $("btnAddFaq").addEventListener("click", () => inlineAdd("faqAddWrap",
 let DESK_DOMAIN_INTENT = false;   // open the desk with the "I already have a domain" field ready (overview card, nav, setup step)
 async function openFoundationsDesk(opts) {
   DESK_DOMAIN_INTENT = !!(opts && opts.domain);
-  if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "The technical side — domain, email, security — is handled with plans you approve. Nothing changes on its own."), 400);
+  if (window.ddsHint) setTimeout(() => window.ddsHint("foundations", "Any change to your domain, email or security comes as a plan you approve first. Nothing changes on its own."), 400);
   DESK.mode = "review"; DESK.kind = null; DESK.view = "business";
   $("deskTitle").textContent = "Domain & email";
   $("deskSub").textContent = "Your domain, its records, the padlock, email, and hosting — what’s true right now, in plain words. Any change arrives as a plan you approve first.";
   $("deskInstructions").value = ""; $("deskInstructions").parentElement.hidden = true;
-  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Reading the foundations…</div><div class="shimmer"></div></div>`;
+  $("deskResults").innerHTML = `<div class="loadline" style="padding:10px 0"><div class="lq">Loading your domain and email…</div><div class="shimmer"></div></div>`;
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
@@ -3113,7 +3155,7 @@ function renderFoundations(f, plans, launch, dom) {
 
   const open = plans.filter((p) => p.status === "proposed" || p.status === "approved");
   if (open.length) {
-    const h = el("h5", "rune", "Plans waiting on you");
+    const h = el("h5", "rune", "Waiting for your OK");
     h.style.marginTop = "26px";
     wrap.appendChild(h);
     open.forEach((p) => {
@@ -3182,8 +3224,8 @@ async function renderMonitorCard() {
   $("monitorCard").hidden = false;
   if (unpublishedHosted) {
     const sub = document.querySelector("#monitorCard .docsub");
-    if (sub) sub.textContent = "Already live somewhere else? Record that website’s address and its Google search numbers can start arriving while the new site is built here — nothing on it is ever changed from here.";
-    $("btnMonitorConnect").textContent = "Record the website’s address";
+    if (sub) sub.textContent = "Already live somewhere else? Add that website’s address and its Google search numbers can start arriving while the new site is built here. Nothing on it is ever changed.";
+    $("btnMonitorConnect").textContent = "Add the website’s address";
   }
   const wrap = $("monitorStatus"); wrap.innerHTML = "";
   try {
@@ -3299,12 +3341,12 @@ function findLabel() { try { return (VOCAB && VOCAB.label) || "Menu"; } catch (_
 function findDataset() {
   const ds = [];
   [["business", "Business & settings"], ["offerings", findLabel()], ["faqs", "Questions"],
-   ["testimonials", "Kind words"], ["updates", "Updates"], ["media", "Photos"],
-   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "History"]]
+   ["testimonials", "Testimonials"], ["updates", "Updates"], ["media", "Files"],
+   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "Versions"]]
     .forEach(([v, label]) => ds.push({ view: v, kind: "Section", title: label, text: "" }));
   (S.offerings || []).forEach((o) => ds.push({ view: "offerings", kind: findLabel(), title: o.name || "", text: [o.category, o.description, o.price_text].filter(Boolean).join(" ") }));
   (S.faqs || []).forEach((f) => ds.push({ view: "faqs", kind: "Question", title: f.question || "", text: f.answer || "" }));
-  (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Kind words", title: t.author || t.quote || "", text: t.quote || "" }));
+  (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Testimonials", title: t.author || t.quote || "", text: t.quote || "" }));
   (S.posts || []).forEach((p) => ds.push({ view: "updates", kind: "Update", title: p.title || "", text: [p.excerpt, p.body_md, (p.tags || []).join(" ")].filter(Boolean).join(" ") }));
   return ds;
 }
@@ -3554,7 +3596,7 @@ const BK_BTN = "padding:7px 14px;border:1px solid var(--line,#ddd);border-radius
 let BK = { settings: null, types: [] };
 async function loadBookings() {
   const wrap = $("bookingsWrap"); if (!wrap) return;
-  wrap.innerHTML = '<div class="loadline"><div class="lq">Opening the diary…</div><div class="shimmer"></div></div>';
+  wrap.innerHTML = '<div class="loadline"><div class="lq">Loading bookings…</div><div class="shimmer"></div></div>';
   try {
     const [s, t, a] = await Promise.all([api("GET", "/bookings/settings"), api("GET", "/bookings/types"), api("GET", "/bookings/appointments")]);
     BK.settings = s.data || {}; BK.types = (t.data && t.data.types) || [];
@@ -3755,7 +3797,7 @@ function bkApptRow(a) {
 const RV_ICSS = "width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;font:inherit;box-sizing:border-box";
 async function loadReviews() {
   const wrap = $("reviewsWrap"); if (!wrap) return;
-  wrap.innerHTML = '<div class="loadline"><div class="lq">Gathering your reviews…</div><div class="shimmer"></div></div>';
+  wrap.innerHTML = '<div class="loadline"><div class="lq">Loading reviews…</div><div class="shimmer"></div></div>';
   try {
     const r = await api("GET", "/reviews");
     wrap.innerHTML = "";
@@ -3880,7 +3922,7 @@ function renderMediaGrid(grid, manage, onPick) {
   if (manage && FL_takeover(grid)) return;   // #180: once loaded, the Files library owns the view grid (pickers pass manage=false — untouched)
   grid.innerHTML = "";
   if (!S.media.length) {
-    if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">A photograph is worth a paragraph you don’t have to write.</div><div class="eh">Add your best plate, your room, your storefront — they’ll be ready to place anywhere on your site.</div></div>`;
+    if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">No photos yet.</div><div class="eh">Add a few of your best. They’ll be ready to place anywhere on your site.</div></div>`;
     else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photographs in the collection yet.</p>`;
     return;
   }
@@ -3908,8 +3950,7 @@ function mediaCell(grid, m, manage, onPick) {
         e.stopPropagation();
         try {
           const body = {}; body[field] = on ? null : m.id;
-          const r = await api("PUT", "/settings", body);
-          S.settings = r.data || { ...(S.settings || {}), ...body };
+          await settingsPut(body);
           renderMediaGrid(grid, true);
           toast(on ? offLabel + " cleared" : onLabel + " set — publish to apply");
           scheduleChangesRefresh();
@@ -4214,7 +4255,7 @@ function siteLiveUrl() {
 function hbStandardPages() {
   const v = (typeof VOCAB === "object" && VOCAB) || {};
   return [
-    { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, kind words", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
+    { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, testimonials", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
     { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: v.sub ? String(v.sub).split(/[.;—]/)[0] : "What you offer, with prices", view: "offerings", icon: "menu", sections: ["offerings"] },
     { key: "about", path: "/about/", title: "About", sum: "Your story, in your words", view: "business", icon: "about", sections: ["business"] },
     { key: "faq", path: "/faq/", title: "Questions", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
@@ -4397,7 +4438,7 @@ function loadSiteStage(force) {
     if (err && err.status === 403) {
       document.documentElement.classList.add("ss-noplan");
       const nm = S.identity && S.identity.business_name;
-      note.appendChild(el("div", "ssn-h", (nm ? nm + "’s website" : "This website") + " lives somewhere else."));
+      note.appendChild(el("div", "ssn-h", (nm ? nm + (/s$/i.test(nm) ? "’" : "’s") + " website" : "This website") + " lives somewhere else."));
       note.appendChild(el("div", "ssn-p", "Its visitors and search standing are here."));
       const row = el("div", "ssn-acts");
       const go2 = (label, fn) => { const b = el("button", "pillbtn", label); b.type = "button"; b.addEventListener("click", fn); row.appendChild(b); };
@@ -4441,6 +4482,18 @@ function renderTodoLine() {
 }
 function openTodoPanel() { const p = $("todoPanel"); if (p) { p.classList.add("on"); p.setAttribute("aria-hidden", "false"); const c = $("btnTodoClose"); if (c) c.focus(); } }
 function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.contains("on")) { p.classList.remove("on"); p.setAttribute("aria-hidden", "true"); } }
+// Tabs open on their title. What a tab is for sits behind one small help button.
+(function initTabHelp() {
+  document.querySelectorAll(".view > h1.doc + .docsub").forEach((sub) => {
+    const view = sub.parentElement;
+    sub.id = sub.id || view.id + "-help"; sub.hidden = true;
+    const b = el("button", "tabhelp", "?"); b.type = "button";
+    b.title = "What’s this page for?"; b.setAttribute("aria-label", "What’s this page for?");
+    b.setAttribute("aria-expanded", "false"); b.setAttribute("aria-controls", sub.id);
+    b.addEventListener("click", () => { sub.hidden = !sub.hidden; b.setAttribute("aria-expanded", String(!sub.hidden)); });
+    sub.previousElementSibling.after(b);
+  });
+})();
 (function initSiteStage() {
   const seg = $("ssDevSeg"), wrap = $("ssFrameWrap");
   if (seg && wrap) seg.addEventListener("click", (e) => {
@@ -4565,7 +4618,7 @@ function renderRecent() {
   const sch = el("a", null, "Schedule it for later"); sch.href = "#schedule"; sch.addEventListener("click", (e) => { e.preventDefault(); openRitual({ schedule: true }); }); qt.appendChild(sch); qt.appendChild(el("span", null, " — pick a time and it goes live on its own."));
   q.appendChild(qt); list.appendChild(q);
 }
-const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "kind words", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
+const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
 function renderPublishButton() {
   const c = S.changes;
   const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
@@ -4620,7 +4673,7 @@ async function mountLookSeg() {
   // PT-2C: a visual preview gallery — each family shows a mini-mock of its look.
   // Data-driven from /site/templates, with a graceful fallback for future families.
   seg.innerHTML = ""; drawer.innerHTML = ""; drawer.hidden = !LOOK_OPEN;
-  const lookToggle = el("button", null, "Try another look " + (LOOK_OPEN ? "▴" : "▾"));
+  const lookToggle = el("button", null, "Try another template " + (LOOK_OPEN ? "▴" : "▾"));
   lookToggle.setAttribute("aria-expanded", String(LOOK_OPEN)); lookToggle.setAttribute("aria-controls", "lookDrawer");
   lookToggle.addEventListener("click", () => { LOOK_OPEN = !LOOK_OPEN; mountLookSeg(); });
   seg.appendChild(lookToggle);
@@ -4645,7 +4698,7 @@ async function mountLookSeg() {
   });
   drawer.appendChild(cards);
   if (PV.template) {
-    const use = el("button", null, "Use this look"); use.dataset.needs = "owner";
+    const use = el("button", null, "Use this template"); use.dataset.needs = "owner";
     use.style.cssText = "font-weight:700";
     use.addEventListener("click", async () => {
       try {
@@ -5703,7 +5756,7 @@ async function renderPreviewPanel() {
   S.previewStatus = st;   // shared cache — the Page ▾ menu renders its offline item from this
   box.innerHTML = "";
   const card = el("div", "field"); card.style.marginBottom = "18px";
-  card.appendChild(el("label", null, "Draft · Preview · Live"));
+  card.appendChild(el("label", null, "Private preview"));
   card.appendChild(el("div", "hint", "Edit your Draft, publish it to a private Preview to review or share, then promote to Live. Your live site never changes until you promote."));
   const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
   const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
@@ -5724,7 +5777,7 @@ async function renderPreviewPanel() {
   const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px";
   const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:6px 13px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
   const act = async (path, okMsg, body) => { try { await api("POST", path, body || {}); toast(okMsg); renderPreviewPanel(); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } };
-  mk("Update preview from draft", () => act("/preview/publish", "Preview updated — share it or promote when ready"), true);
+  mk("Update preview from draft", () => act("/preview/publish", "Preview updated. Share it, or publish it when ready"), true);
   if (st.preview.exists) {
     mk("Open preview", () => { if (st.preview.url) window.open(st.preview.url, "_blank", "noopener"); });
     mk("Copy link", () => { if (st.preview.url && navigator.clipboard) { navigator.clipboard.writeText(st.preview.url); toast("Preview link copied"); } });
@@ -5734,7 +5787,7 @@ async function renderPreviewPanel() {
     mk("Reset link", () => { if (confirm("Reset the preview link? The old link stops working.")) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
     acts.lastChild.dataset.needs = "configure";
     if (st.live.published) mk("Compare with Live", () => openPreview("live"));
-    mk("Promote to Live", () => { if (confirm("Promote the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Promoting to Live — this usually takes under a minute"); }, true);
+    mk("Publish this preview", () => { if (confirm("Publish the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Publishing. This usually takes under a minute"); }, true);
   }
   card.appendChild(acts);
   // ── G10 → slice B (hard move): the take-offline / bring-back ACTION now lives
@@ -5800,9 +5853,9 @@ async function renderCheckpoints() {
     row.appendChild(top);
     const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
     const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
-    mk("Look", () => openLaunchPreview(c.id));
-    mk("Bring into draft", async () => {
-      if (!confirm("Bring checkpoint “" + c.name + "” into your draft? Today’s draft is set aside as a safety copy.")) return;
+    mk("View", () => openLaunchPreview(c.id));
+    mk("Restore to draft", async () => {
+      if (!confirm("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.")) return;
       try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
       catch (err) { toast(nice(err), true); }
     }, true);
@@ -5822,6 +5875,18 @@ async function renderCheckpoints() {
 // publish sheet uses; Timewarp resolves a date to the version that was live then
 // and opens it in the existing read-only preview. Depends on S.publishes (set by
 // loadHistory before this runs).
+async function showVersionCompare(out, a, b) {
+  out.innerHTML = `<div class="shimmer"></div>`;
+  try {
+    const d = (await api("GET", `/publishes/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)).data;
+    if (d.identical) { out.innerHTML = `<div class="hint">These two versions are identical. Nothing changed between them.</div>`; return; }
+    out.innerHTML = "";
+    out.appendChild(el("div", "hint", `${d.count} change${d.count === 1 ? "" : "s"} from ${fromToWord(d.from)} to ${fromToWord(d.to)}:`));
+    const j = el("div", "journal");
+    d.changes.forEach((ch) => { const jr = el("div", "jrow"); jr.appendChild(el("span", "jsec", sectionWord(ch.section))); jr.appendChild(el("span", null, ch.sentence)); j.appendChild(jr); });
+    out.appendChild(j);
+  } catch (err) { out.innerHTML = `<div class="hint">${esc(nice(err))}</div>`; }
+}
 function versionOptionLabel(p) {
   const d = new Date(p.at);
   const when = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "");
@@ -5839,7 +5904,7 @@ function renderVersionTools() {
   const versions = (S.publishes || []).filter((p) => p.status === "live" && p.restorable);
   const card = el("div", "field"); card.style.marginBottom = "18px";
   card.appendChild(el("label", null, "Compare & look back"));
-  card.appendChild(el("div", "hint", "See what changed between any two versions in plain language, or travel back to see your site as it looked on a chosen date."));
+  card.appendChild(el("div", "hint", "See what changed between any two versions, or see your site as it looked on a chosen date."));
 
   // Compare
   const cmp = el("div"); cmp.style.cssText = "margin-top:10px";
@@ -5863,17 +5928,8 @@ function renderVersionTools() {
     rowc.appendChild(go); cmp.appendChild(rowc);
     const out = el("div"); out.style.cssText = "margin-top:10px"; cmp.appendChild(out);
     go.addEventListener("click", async () => {
-      if (from.value === to.value) { out.innerHTML = `<div class="hint">Those are the same version — pick two different ones.</div>`; return; }
-      out.innerHTML = `<div class="shimmer"></div>`;
-      try {
-        const d = (await api("GET", `/publishes/compare?a=${encodeURIComponent(from.value)}&b=${encodeURIComponent(to.value)}`)).data;
-        if (d.identical) { out.innerHTML = `<div class="hint">These two versions are identical — nothing changed between them.</div>`; return; }
-        out.innerHTML = "";
-        out.appendChild(el("div", "hint", `${d.count} change${d.count === 1 ? "" : "s"} from ${fromToWord(d.from)} to ${fromToWord(d.to)}:`));
-        const j = el("div", "journal");
-        d.changes.forEach((ch) => { const jr = el("div", "jrow"); jr.appendChild(el("span", "jsec", sectionWord(ch.section))); jr.appendChild(el("span", null, ch.sentence)); j.appendChild(jr); });
-        out.appendChild(j);
-      } catch (err) { out.innerHTML = `<div class="hint">${esc(nice(err))}</div>`; }
+      if (from.value === to.value) { out.innerHTML = `<div class="hint">Those are the same version. Pick two different ones.</div>`; return; }
+      showVersionCompare(out, from.value, to.value);
     });
   }
   card.appendChild(cmp);
@@ -5882,11 +5938,11 @@ function renderVersionTools() {
   const tw = el("div"); tw.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#eee)";
   tw.appendChild(el("div", "hint", "See your site as it looked on a chosen date:"));
   const roww = el("div"); roww.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px";
-  const dt = el("input"); dt.type = "date"; dt.setAttribute("aria-label", "Date to travel back to");
+  const dt = el("input"); dt.type = "date"; dt.setAttribute("aria-label", "Date to look back to");
   dt.style.cssText = "font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line,#ddd);border-radius:8px";
   const today = new Date(); const pad = (n) => String(n).padStart(2, "0");
   dt.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  const twGo = el("button", null, "Travel there"); twGo.type = "button";
+  const twGo = el("button", null, "See it"); twGo.type = "button";
   twGo.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line,#ddd);background:transparent";
   roww.appendChild(dt); roww.appendChild(twGo); tw.appendChild(roww);
   twGo.addEventListener("click", async () => {
@@ -5901,84 +5957,118 @@ async function loadHistory() {
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderCheckpoints();    // named draft safety points
   renderLaunches();   // FD-T7: staged launches sit above the version journal
+  const more = $("versionMore");
+  if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
   const list = $("pubList");
-  list.innerHTML = `<div class="loadline"><div class="lq">Opening the journal…</div><div class="shimmer"></div></div>`;
+  list.innerHTML = `<div class="loadline"><div class="lq">Loading versions…</div><div class="shimmer"></div></div>`;
   try {
     const pubs = (await api("GET", "/publishes")).data;
     S.publishes = pubs;
     renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
-    list.innerHTML = "";
-    if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">The journal is empty — for now.</div><div class="eh">When you publish, every version of your site is kept here, forever restorable.</div></div>`; return; }
-    pubs.forEach((p) => {
-      const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
-      const d = new Date(p.at);
-      row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")));
-      const body = el("div", "hbody");
-      const sum = el("div", "hsum");
-      if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
-      // Phase AA (FD-7): a named version leads with its name
-      if (p.label) { const lb = el("strong", null, "“" + p.label + "” — "); sum.appendChild(lb); }
-      sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
-      body.appendChild(sum);
-      body.appendChild(el("div", "hmeta",
-        p.status === "failed" ? "Your site was unchanged and nothing was lost."
-        : p.status === "publishing" ? "Still on its way up."
-        : (p.kind === "restore" ? "A restored version · " : "") + "published"));
-      row.appendChild(body);
-      const acts = el("div", "hacts");
-      if (p.status === "live") {
-        // Phase AA (FD-7): name (or rename) any kept version — inline, no dialog
-        const nameBtn = el("button", "quietact", p.label ? "Rename" : "Name it");
-        nameBtn.addEventListener("click", () => {
-          if (row.querySelector(".labeledit")) return;
-          const inp = el("input", "labeledit");
-          inp.type = "text"; inp.value = p.label || ""; inp.maxLength = 60;
-          inp.placeholder = "e.g. Spring menu"; inp.setAttribute("aria-label", "Version name");
-          inp.style.cssText = "width:100%;margin-top:6px;padding:6px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px";
-          const commit = async () => {
-            const val = inp.value.trim();
-            if (val === (p.label || "")) { inp.remove(); return; }
-            try { await api("POST", `/publishes/${p.id}/label`, { label: val }); p.label = val; loadHistory(); toast(val ? "Version named" : "Name removed"); }
-            catch (err) { toast(nice(err), true); inp.remove(); }
-          };
-          inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
-          inp.addEventListener("blur", commit);
-          body.appendChild(inp); inp.focus(); inp.select();
-        });
-        acts.appendChild(nameBtn);
-      }
-      if (p.status === "live" && p.restorable) {
-        const view = el("button", "quietact", "Look");
-        view.addEventListener("click", () => openPublishPreview(p.id));
-        acts.appendChild(view);
-        const res = el("button", "textact", "Bring back");
-        res.addEventListener("click", () => {
-          S.restoreTarget = p;
-          $("resSheetSub").textContent = `“${p.summary}” — published ${fmtDate(p.at)}.`;
-          openSheet("restoreScrim");
-        });
-        acts.appendChild(res);
-      } else if (p.status === "live" && !p.restorable) {
-        acts.appendChild(el("span", "hghost", "kept for the record"));
-      }
+    renderVersionList();
+  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
+}
+// Who published it, in the words of whoever is reading: a studio working inside a
+// client's site and the client see the same row from opposite sides.
+function versionWho(p) {
+  const scoped = !!new URLSearchParams(location.search).get("client");
+  if (p.by_kind === "client") return scoped ? "the client" : "you";
+  if (p.by_kind === "operator" || p.by_kind === "staff") return scoped ? "your team" : "your studio";
+  return "";
+}
+const VERSIONS_SHOWN = 10;
+function renderVersionList() {
+  const list = $("pubList"); if (!list) return;
+  const pubs = S.publishes || [];
+  list.innerHTML = "";
+  if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  const liveId = (pubs.find((p) => p.status === "live") || {}).id;
+  const shown = S.versionsAll ? pubs : pubs.slice(0, VERSIONS_SHOWN);
+  shown.forEach((p) => {
+    const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
+    const d = new Date(p.at);
+    row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })));
+    const body = el("div", "hbody");
+    const sum = el("div", "hsum");
+    if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
+    // Phase AA (FD-7): a named version leads with its name
+    if (p.label) { const lb = el("strong", null, "“" + p.label + "” — "); sum.appendChild(lb); }
+    sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
+    if (p.id === liveId) sum.appendChild(el("span", "ver-live", "Live now"));
+    body.appendChild(sum);
+    const who = versionWho(p);
+    body.appendChild(el("div", "hmeta",
+      p.status === "failed" ? "Your site was unchanged and nothing was lost."
+      : p.status === "publishing" ? "Still publishing."
+      : (p.kind === "restore" ? "A restored version · " : "") + (who ? "Published by " + who : "Published")));
+    row.appendChild(body);
+    const acts = el("div", "hacts");
+    if (p.status === "live") {
+      // Phase AA (FD-7): name (or rename) any kept version — inline, no dialog
+      const nameBtn = el("button", "quietact", p.label ? "Rename" : "Name it");
+      nameBtn.addEventListener("click", () => {
+        if (row.querySelector(".labeledit")) return;
+        const inp = el("input", "labeledit");
+        inp.type = "text"; inp.value = p.label || ""; inp.maxLength = 60;
+        inp.placeholder = "e.g. Spring menu"; inp.setAttribute("aria-label", "Version name");
+        inp.style.cssText = "width:100%;margin-top:6px;padding:6px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px";
+        const commit = async () => {
+          const val = inp.value.trim();
+          if (val === (p.label || "")) { inp.remove(); return; }
+          try { await api("POST", `/publishes/${p.id}/label`, { label: val }); p.label = val; loadHistory(); toast(val ? "Version named" : "Name removed"); }
+          catch (err) { toast(nice(err), true); inp.remove(); }
+        };
+        inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); commit(); } if (ev.key === "Escape") inp.remove(); });
+        inp.addEventListener("blur", commit);
+        body.appendChild(inp); inp.focus(); inp.select();
+      });
+      acts.appendChild(nameBtn);
+    }
+    if (p.status === "live" && p.restorable) {
+      const view = el("button", "quietact", "View");
+      view.addEventListener("click", () => openPublishPreview(p.id));
+      acts.appendChild(view);
+      const cmp = el("button", "quietact", "Compare");
+      cmp.setAttribute("aria-expanded", "false");
+      const out = el("div", "hcompare"); out.hidden = true;
+      cmp.addEventListener("click", () => {
+        out.hidden = !out.hidden; cmp.setAttribute("aria-expanded", String(!out.hidden));
+        if (!out.hidden && !out.dataset.done) { out.dataset.done = "1"; showVersionCompare(out, p.id, "draft"); }
+      });
+      acts.appendChild(cmp);
+      const res = el("button", "textact", "Restore");
+      res.addEventListener("click", () => {
+        S.restoreTarget = p;
+        $("resSheetSub").textContent = `“${p.summary}”, published ${fmtDate(p.at)}.`;
+        openSheet("restoreScrim");
+      });
+      acts.appendChild(res);
       row.appendChild(acts);
-      list.appendChild(row);
-    });
-  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">The journal wouldn’t open just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
+      row.appendChild(out);
+    } else {
+      if (p.status === "live") { acts.appendChild(el("span", "hghost", "Kept for your records")); row.appendChild(acts); }
+    }
+    list.appendChild(row);
+  });
+  if (shown.length < pubs.length) {
+    const older = el("button", "addline", `Show ${pubs.length - shown.length} older version${pubs.length - shown.length === 1 ? "" : "s"}`);
+    older.addEventListener("click", () => { S.versionsAll = true; renderVersionList(); });
+    list.appendChild(older);
+  }
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
   const btn = $("btnRestoreGo");
-  btn.disabled = true; btn.textContent = "Bringing it back…";
+  btn.disabled = true; btn.textContent = "Restoring…";
   try {
     const r = await api("POST", "/restore-to-draft", { publish_id: p.id });
     closeSheet("restoreScrim");
     toast(r.data.message);
-    btn.disabled = false; btn.textContent = "Bring it into my draft";
+    btn.disabled = false; btn.textContent = "Restore to my draft";
     await refreshAll();
     go("today");
   } catch (err) {
-    btn.disabled = false; btn.textContent = "Bring it into my draft";
+    btn.disabled = false; btn.textContent = "Restore to my draft";
     toast(nice(err), true);
   }
 });
@@ -6021,7 +6111,7 @@ async function refreshAll() {
   // website + drafting surfaces, never the Business-OS "brains" it doesn't include.
   // null = no entitlement recorded → all features (studio_os default, unchanged).
   S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
-  S.upsell = (ctxR && ctxR.data && ctxR.data.upsell) || null;   // the honest next rung (Settings shows it — this tier's one organic offer surface)
+  S.isStudio = !!(ctxR && ctxR.data && ctxR.data.is_agency);   // the studio sees every version tool; a client sees the list
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
@@ -6031,86 +6121,6 @@ async function refreshAll() {
   mountAnnouncementCard();
   mountDesignCard();
   mountSearchCard();
-  // Account cards belong to the WORKSPACE OWNER only. A drilled-in operator
-  // (?client=) is editing the CLIENT's site, and billing and deletion are the
-  // account's, so these cards have nothing to show them. The server refuses the
-  // routes behind them under a scope too (routes/commerce_scoped.ts).
-  if (!new URLSearchParams(location.search).get("client")) {
-    mountBillingCard();
-    mountDeletionCard();
-  }
-}
-// ── P2-E: billing & subscription — status + the door to Stripe's portal ──
-// This is the payment-recovery path the entitlement gate + lifecycle emails
-// promise ("update your card in the billing portal"). Without it, a paused/
-// lapsed customer had no in-app way to fix payment.
-async function mountBillingCard() {
-  const host = $("view-business"); if (!host || $("billingCard")) return;
-  let s = null;
-  try { s = (await api("GET", "/commerce/subscription")).data; } catch (_) { return; } // no subscription → nothing to manage
-  if (!s) return;
-  const card = el("div", "field"); card.id = "billingCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Your plan & billing"));
-  const statusWord = { active: "Active", paused: "Paused — payment needs attention", lapsed: "Ended — update payment to reactivate", deleted: "Closed" }[s.status] || hbCap(String(s.status || "").replace(/_/g, " ")) || "Active";
-  const line = el("div", "hint", `${s.plan_name || s.plan || "Your plan"} · ${statusWord}${s.current_period_end ? " · renews " + new Date(s.current_period_end).toLocaleDateString() : ""}${s.in_grace ? " · a payment didn’t go through — your site stays up while you fix it" : ""}`);
-  card.appendChild(line);
-  if (s.can_manage_billing) {
-    const b = el("button", null, (s.status === "paused" || s.status === "lapsed") ? "Update payment" : "Manage billing");
-    b.type = "button"; b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);color:var(--plum,#5b3fa0);background:transparent;cursor:pointer";
-    b.addEventListener("click", async () => {
-      b.disabled = true; const t = b.textContent; b.textContent = "Opening…";
-      try { const r = await api("POST", "/commerce/portal", {}); if (r.data && r.data.url) location.href = r.data.url; else { toast("Billing management isn’t available right now.", true); b.disabled = false; b.textContent = t; } }
-      catch (err) { toast(err.message ? nice(err) : "Couldn’t open billing.", true); b.disabled = false; b.textContent = t; }
-    });
-    card.appendChild(b);
-  } else if (s.has_service_billing) {
-    card.appendChild(el("div", "hint", "Invoices for project work from your studio are billed separately."));
-  }
-  // The honest next rung — for CMS-only this Settings card is the ONE surface
-  // that organically shows what upgrading adds (gains AND what switches off).
-  if (S.upsell && S.upsell.name) {
-    // Human names for the feature atoms — raw keys never reach the owner's eyes.
-    const NICE = { website: "the website tools", business_moments: "Business Moments", connected: "connected services", ai: "AI help", relationship: "Customers & Pipeline", reports: "Analytics", client_portal: "client sharing", developer: "Developer Mode", forms: "website forms", managed_service: "our managed service", agency: "agency tools", enterprise: "enterprise controls" };
-    const nice = (g) => NICE[String(g)] || String(g).replace(/_/g, " ");
-    const gains = (S.upsell.gains || []).map(nice).join(", ");
-    const losses = (S.upsell.gives_up || []).map(nice).join(", ");
-    const u = el("div", "hint");
-    u.style.marginTop = "10px";
-    u.textContent = `${S.upsell.name}${S.upsell.monthly ? ` (from $${S.upsell.monthly}/mo)` : ""}${gains ? ` adds ${gains}.` : "."}` +
-      (losses ? ` Heads up: it switches off ${losses} — ask us about keeping both.` : "");
-    const a = document.createElement("a");
-    a.href = "mailto:support@davisdigitalstudio.com?subject=" + encodeURIComponent("Upgrading to " + S.upsell.name);
-    a.textContent = " Ask about upgrading →"; a.style.color = "var(--plum,#5b3fa0)";
-    u.appendChild(a);
-    card.appendChild(u);
-  }
-  host.appendChild(card);
-}
-// ── CP-10: leaving for good — honest, calm, reversible until executed ──
-function mountDeletionCard() {
-  const host = $("view-business"); if (!host || $("deleteCard")) return;
-  const d = el("details"); d.id = "deleteCard"; d.dataset.needs = "owner"; d.style.cssText = "margin-top:26px";
-  d.appendChild(Object.assign(el("summary", null, "Leaving for good? Delete your account"), { style: "cursor:pointer;font-size:12.5px;color:var(--ink-2,#777)" }));
-  const p = el("p", "hint", "This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first — that door stays open until deletion.");
-  const b = el("button", null, "Request deletion");
-  b.type = "button";
-  b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--clay,#b3261e);color:var(--clay,#b3261e);background:transparent;cursor:pointer";
-  // Shown after a request is recorded — the cancel affordance the copy promises.
-  const cancelBtn = el("button", null, "Cancel deletion request");
-  cancelBtn.type = "button"; cancelBtn.hidden = true;
-  cancelBtn.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;margin-left:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);color:var(--plum,#5b3fa0);background:transparent;cursor:pointer";
-  const showRequested = (days) => { b.disabled = true; b.textContent = days ? `Scheduled — completes in ${days} day${days === 1 ? "" : "s"}` : "Request recorded — check your email"; cancelBtn.hidden = false; };
-  b.addEventListener("click", async () => {
-    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Are you sure? Click again to confirm"; setTimeout(() => { delete b.dataset.armed; b.textContent = "Request deletion"; }, 6000); return; }
-    try { const r = await api("POST", "/commerce/delete-request", {}); showRequested(r.data && r.data.completes_within_days); toast(r.data && r.data.already_pending ? "You already have a deletion request pending" : (r.data && r.data.emailed ? "Deletion requested — we emailed you the details" : "Deletion requested — the details are on this page")); }
-    catch (err) { toast(nice(err), true); }
-  });
-  cancelBtn.addEventListener("click", async () => {
-    try { const r = await api("POST", "/commerce/delete-cancel", {}); cancelBtn.hidden = true; b.disabled = false; b.textContent = "Request deletion"; delete b.dataset.armed; toast((r.data && r.data.message) || "Deletion request canceled."); }
-    catch (err) { toast(nice(err), true); }
-  });
-  d.append(p, b, cancelBtn);
-  host.appendChild(d);
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
 const PAGE_DEFS = [ ["offerings", "Your offerings page"], ["about", "About"], ["faq", "Questions"], ["updates", "Updates"], ["contact", "Contact"] ];
@@ -6124,9 +6134,9 @@ function seoNoindexRow(key, pageName, rowLabel) {
   const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key.replace(/[^a-z0-9_-]/gi, "-");
   cb.checked = !new Set((S.settings && S.settings.pages_noindex) || []).has(key);
   cb.addEventListener("change", async () => {
-    const nh = new Set((S.settings && S.settings.pages_noindex) || []);
-    cb.checked ? nh.delete(key) : nh.add(key);
-    try { const r = await api("PUT", "/settings", { pages_noindex: [...nh] }); S.settings = r.data || { ...S.settings, pages_noindex: [...nh] }; toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
+    const show = cb.checked;
+    const noindex = () => { const nh = new Set((S.settings && S.settings.pages_noindex) || []); show ? nh.delete(key) : nh.add(key); return { pages_noindex: [...nh] }; };
+    try { await settingsPut(noindex); toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
   });
   const lb = el("label", null, rowLabel || pageName); lb.setAttribute("for", cb.id); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
@@ -6165,15 +6175,14 @@ function seoFieldsBox(key, label, showLabel) {
   };
   [ti, di].forEach((inp) => inp.addEventListener("input", paint));
   const save = async () => {
-    const map = { ...((S.settings && S.settings.page_seo) || {}) };
     const entry = {};
     if (ti.value.trim()) entry.title = ti.value.trim();
     if (di.value.trim()) entry.description = di.value.trim();
     if (sti.value.trim()) entry.share_title = sti.value.trim();
     if (sdi.value.trim()) entry.share_description = sdi.value.trim();
     if (sim.value) entry.share_image = sim.value;
-    if (!Object.keys(entry).length) delete map[key]; else map[key] = entry;
-    try { const r = await api("PUT", "/settings", { page_seo: map }); S.settings = r.data || { ...S.settings, page_seo: map }; toast("Saved — publish to apply"); scheduleChangesRefresh(); }
+    const seo = () => { const map = { ...((S.settings && S.settings.page_seo) || {}) }; if (!Object.keys(entry).length) delete map[key]; else map[key] = entry; return { page_seo: map }; };
+    try { await settingsPut(seo); toast("Saved — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   };
   [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
@@ -6721,11 +6730,11 @@ async function mountSearchCard() {
 // then the industry. Also fixes the preview page-word: it pointed at /menu/,
 // a page that doesn't exist on business-classic sites.
 const OFFER_WORDS = {
-  food:      { label: "Menu",     path: "/menu/",     sub: "This page reads the way your menu reads. Choose any line to change it; anything you take off the menu stays kept here, never lost.", addLine: "＋ Start a new section of the menu", putBack: "Put it back on the menu", takeOff: "Take it off the menu", offTag: "off the menu", addBtn: "Add to the menu" },
-  retail:    { label: "Products", path: "/products/", sub: "What you sell, in your words. Choose any product to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new product group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this product" },
-  fitness:   { label: "Classes",  path: "/classes/",  sub: "Your classes and sessions, in your words. Choose any class to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new class group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this class" },
-  community: { label: "Programs", path: "/programs/", sub: "Your programs, in your words. Choose any one to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new program group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this program" },
-  generic:   { label: "Services", path: "/services/", sub: "What you offer, in your words. Choose any service to change it; anything you hide stays kept here, never lost.", addLine: "＋ Start a new service category", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this service" },
+  food:      { label: "Menu",     path: "/menu/",     sub: "Click any line to change it. Anything you take off stays saved here.", addLine: "＋ Start a new section of the menu", putBack: "Put it back on the menu", takeOff: "Take it off the menu", offTag: "off the menu", addBtn: "Add to the menu" },
+  retail:    { label: "Products", path: "/products/", sub: "Click any product to change it. Anything you hide stays saved here.", addLine: "＋ Start a new product group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this product" },
+  fitness:   { label: "Classes",  path: "/classes/",  sub: "Click any class to change it. Anything you hide stays saved here.", addLine: "＋ Start a new class group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this class" },
+  community: { label: "Programs", path: "/programs/", sub: "Click any program to change it. Anything you hide stays saved here.", addLine: "＋ Start a new program group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this program" },
+  generic:   { label: "Services", path: "/services/", sub: "Click any service to change it. Anything you hide stays saved here.", addLine: "＋ Start a new service category", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this service" },
 };
 let VOCAB = OFFER_WORDS.food;   // matches the pre-load default markup
 function vocabWords() {
@@ -6836,8 +6845,8 @@ async function mountBrandKitCard() {
   };
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Brand kit"));
-  card.appendChild(el("div", "hint", "One brand, everywhere. Set your logo and color once — buttons, links and forms follow. A coordinated starting point; fine-tune below."));
+  card.appendChild(el("label", null, "Logo and brand color"));
+  card.appendChild(el("div", "hint", "Set your logo and color once. Buttons, links and forms follow."));
   // logo
   const logoRow = el("div"); logoRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:8px";
   const logoWrap = el("span"); const paintLogo = () => { logoWrap.textContent = ""; if (st.logo_media_id) logoWrap.appendChild(mediaThumb(st.logo_media_id)); };
@@ -6868,7 +6877,7 @@ async function mountBrandKitCard() {
       DESIGN_TOKENS = (r.data && r.data.applied_tokens) || DESIGN_TOKENS;
       if (st.logo_media_id) S.settings = { ...(S.settings || {}), logo_media_id: st.logo_media_id };
       const c = $("designCard"); if (c) c.remove(); mountDesignCard();
-      toast("Brand kit applied — publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
+      toast("Applied. Publish to take it live"); scheduleChangesRefresh(); refreshDesignPreview();
     } catch (err) { toast(nice(err), true); }
   });
   card.appendChild(apply);
@@ -6945,12 +6954,12 @@ async function mountDesignCard() {
  
   await mountBrandKitCard();   // FD-T9: brand kit is the source of truth, above the granular controls
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Design studio"));
+  card.appendChild(el("label", null, "Colors and fonts"));
   const T = DESIGN_TOKENS;
   // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below).
   // This is the front door the owner reaches for first, so it leads the card and
   // explains itself (a look restyles the whole site; publishing stays approval-first).
-  const looksRow = pillRow(card, "Complete looks", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " look"));
+  const looksRow = pillRow(card, "Ready-made styles", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
   if (looksRow && looksRow.parentNode) {
     looksRow.parentNode.insertBefore(
       el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."),
@@ -6971,10 +6980,10 @@ async function mountDesignCard() {
   // each in its own visual voice, so the controls show for all templates (G2).
   const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
   pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-    async (o) => { try { const r = await api("PUT", "/settings", { hero_layout: o[1] }); S.settings = r.data || { ...S.settings, hero_layout: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   const navRow = [["Standard", ""], ["Centered", "centered"]];
   pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-    async (o) => { try { const r = await api("PUT", "/settings", { nav_style: o[1] }); S.settings = r.data || { ...S.settings, nav_style: o[1] }; const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -6992,7 +7001,7 @@ async function mountDesignCard() {
       card.appendChild(rowEl);
     }
   }
-  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. Every previous look stays restorable."));
+  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. You can restore any earlier version."));
   if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
     card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them."));
   }
@@ -7286,8 +7295,8 @@ function pagesBarReveal() {
 // G13: a page change replaces BLOCKS_WORK or reads the stored draft, so what this page
 // still holds is written first, while DC_PAGE still says whose it is: an open in-place
 // session, a commit in its ~1.2s debounce, a panel edit in its 700ms timer. A save
-// already on its way is waited out too, since a write built from S.settings before it
-// lands would undo it. It loops because the page stays open during the wait. False = a
+// already on its way is waited out too, because the caller needs to know it worked.
+// It loops because the page stays open during the wait. False = a
 // save failed: its message is up and the words are still in the list, so the caller
 // stays on this page. keepSession leaves an open session typing, for a write that isn't
 // a page change (a form's timer can fire while someone types on the canvas).
@@ -7345,10 +7354,8 @@ async function dcAddPage() {
   if (chosen === null) return;   // cancelled
   if (!(await dcSavePendingEdits())) return;
   const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
-  const pages = [...dcPagesArr(), { slug, title, blocks }];
   try {
-    const r = await api("PUT", "/settings", { pages });
-    S.settings = r.data || { ...S.settings, pages };
+    await settingsPut(() => ({ pages: [...dcPagesArr(), { slug, title, blocks }] }));
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during that write stays on its own page
     dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7478,8 +7485,7 @@ async function dcSaveNav(nav) {
       if (kids.length) o.children = kids;
       return o;
     }).filter((it) => it.label && it.href).slice(0, 12) : [];
-    const r = await api("PUT", "/settings", { nav: clean });
-    S.settings = r.data || { ...S.settings, nav: clean };
+    await settingsPut({ nav: clean });
     refreshDesignPreview();
     toast(clean.length ? "Menu saved — publish to update your live site" : "Menu reset to automatic");
   } catch (err) { toast(nice(err), true); }
@@ -7521,24 +7527,31 @@ function dcPageMenu(slug, anchor) {
 }
 async function dcTogglePageNav(slug) {
   if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const pages = dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; });
-  try { const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages }; renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
+  const toggled = () => ({ pages: dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; }) });
+  try { await settingsPut(toggled); renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
 }
 async function dcMovePage(slug, dir) {
   if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
-  if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
-  try { const r = await api("PUT", "/settings", { pages: arr }); S.settings = r.data || { ...S.settings, pages: arr }; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
+  const moved = () => {
+    const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return null;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    return { pages: arr };
+  };
+  try { if (!(await settingsPut(moved))) return; renderPagesBar(); refreshDesignPreview(); toast("Page order updated"); } catch (err) { toast(nice(err), true); }
 }
 // G7: duplicate a page ('' = Home) server-side — deep copy with fresh section ids,
 // "<Title> copy" + a "-copy" address; the response carries the whole new pages list.
 async function dcDuplicatePage(slug) {
   if (!(await dcSavePendingEdits())) return;   // the server copies the stored page
   try {
-    const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
-    const d = (r && r.data) || {};
-    S.settings = { ...(S.settings || {}), pages: Array.isArray(d.pages) ? d.pages : dcPagesArr() };
+    // the server rewrites the page list from what it has stored, so this takes a turn too
+    const d = await settingsTurn(async () => {
+      const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
+      const copy = (r && r.data) || {};
+      S.settings = { ...(S.settings || {}), pages: Array.isArray(copy.pages) ? copy.pages : dcPagesArr() };
+      return copy;
+    });
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during the copy stays on its own page
     if (d.slug) dcOpenPage(d.slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7563,24 +7576,25 @@ async function dcRenamePage(slug) {
     const taken = new Set(dcPagesArr().filter((x) => x.slug !== slug).map((x) => x.slug));
     if (taken.has(newSlug) || DC_PAGE_RESERVED.has(newSlug)) { toast("That address is already used by another page — pick a different one.", true); return; }
   }
-  const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
-  const body = { pages };
-  if (renamed) {
-    // keep the menu + per-page search settings pointing at the new address
-    const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
-    const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
-    if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
-      body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
+  const build = () => {
+    const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
+    const body = { pages };
+    if (renamed) {
+      // keep the menu + per-page search settings pointing at the new address
+      const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
+      const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
+      if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
+        body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
+      }
+      const pseo = (S.settings && S.settings.page_seo) || {};
+      if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
+      const nix = (S.settings && S.settings.pages_noindex) || [];
+      if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
     }
-    const pseo = (S.settings && S.settings.page_seo) || {};
-    if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
-    const nix = (S.settings && S.settings.pages_noindex) || [];
-    if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
-  }
+    return body;
+  };
   try {
-    const r = await api("PUT", "/settings", body);
-    S.settings = r.data || { ...S.settings, ...body };
-    if (renamed && DC_PAGE === slug) DC_PAGE = newSlug;
+    await settingsPut(build, () => { if (renamed && DC_PAGE === slug) DC_PAGE = newSlug; });   // the next write finds this page under its new address
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast(renamed ? "Renamed — visitors to the old link are redirected to the new address once you publish" : "Renamed — publish to update your live site");
   } catch (err) { toast(nice(err), true); }
@@ -7603,20 +7617,24 @@ async function dcDeletePage(slug) {
   if (!(await dcSavePendingEdits())) return;   // the checkpoint and the Undo below keep the stored page
   // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
   try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
-  const all = dcPagesArr(); const at = all.findIndex((x) => x.slug === slug);
-  const removed = all[at];
-  const pages = all.filter((x) => x.slug !== slug);
-  // take the page's search-appearance entries with it (same "page:<slug>" keys
-  // dcRenamePage migrates) — orphaned entries would silently noindex a FUTURE
-  // page that reuses this slug, and they count against the publish cap.
-  const body = { pages };
-  const dkey = "page:" + slug;
-  const pseo = (S.settings && S.settings.page_seo) || {};
-  if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
-  const nix = (S.settings && S.settings.pages_noindex) || [];
-  if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
+  let at = -1, removed = null;
+  const build = () => {
+    const all = dcPagesArr(); at = all.findIndex((x) => x.slug === slug);
+    removed = all[at];
+    const pages = all.filter((x) => x.slug !== slug);
+    // take the page's search-appearance entries with it (same "page:<slug>" keys
+    // dcRenamePage migrates) — orphaned entries would silently noindex a FUTURE
+    // page that reuses this slug, and they count against the publish cap.
+    const body = { pages };
+    const dkey = "page:" + slug;
+    const pseo = (S.settings && S.settings.page_seo) || {};
+    if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
+    const nix = (S.settings && S.settings.pages_noindex) || [];
+    if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
+    return body;
+  };
   try {
-    const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, pages };
+    await settingsPut(build);
     if (DC_PAGE === slug) { await dcSavePendingEdits(); dcOpenPage(""); }   // anything typed during that write went with the page, not onto Home
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     // G7: an honest Undo — we still hold the full page (it lives in the draft
@@ -7624,11 +7642,14 @@ async function dcDeletePage(slug) {
     // covers anything beyond the toast's window.
     toastAction("Page “" + title + "” deleted", "Undo", async () => {
       if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-      const cur = dcPagesArr().slice();
-      if (cur.some((x) => x.slug === removed.slug)) { toast("That page is already back"); return; }
-      cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
+      const restored = () => {
+        const cur = dcPagesArr().slice();
+        if (cur.some((x) => x.slug === removed.slug)) return null;
+        cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
+        return { pages: cur };
+      };
       try {
-        const rr = await api("PUT", "/settings", { pages: cur }); S.settings = rr.data || { ...S.settings, pages: cur };
+        if (!(await settingsPut(restored))) { toast("That page is already back"); return; }
         renderPagesBar(); renderBlocksCard(); refreshDesignPreview(); toast("Page “" + title + "” restored");
       } catch (err) { toast(nice(err), true); }
     }, 20000);
@@ -7783,23 +7804,27 @@ function undoPagesPlan({ pages, ...rest }) {
     order: { before: was.map((p) => p.slug), after: pages.map((p) => p.slug) },
     rest: { before: undoPick(S.settings, Object.keys(rest)), after: undoClone(rest) } };
 }
-// The write that moves a page step from one side to the other, built from the saved list.
 // Taking a page off is a delete, so if it holds words the step didn't put there it gets a
-// delete's question and safety point, and Redo brings it back as it was. Null = they said no.
-async function undoPagesBody(rec, from, to) {
+// delete's question and safety point, and Redo brings it back as it was. False = they said no.
+async function undoPagesAsk(rec, from, to) {
+  for (const c of rec.changes) {
+    const p = !c[to] && dcPageObj(c[from].slug);
+    if (!p || undoSections(p) === c.sections) continue;
+    const title = p.title || p.slug;
+    if (!confirm("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.")) return false;
+    try { await api("POST", "/publishes/checkpoints", { name: ("Before removing “" + title + "”").slice(0, 80) }); } catch (_) {}
+  }
+  return true;
+}
+// The write that moves a page step from one side to the other, built from the saved list.
+function undoPagesBody(rec, from, to) {
   const list = dcPagesArr().slice();
   for (const c of rec.changes) {
     const at = c[from] ? list.findIndex((p) => p.slug === c[from].slug) : -1;
     if (c[to] && list.some((p, i) => p.slug === c[to].slug && i !== at)) throw new Error("Another page uses that address now. Rename it, then try again.");
     if (c[from] && at < 0) continue;
-    if (!c[to]) {
-      if (undoSections(list[at]) !== c.sections) {
-        const title = list[at].title || list[at].slug;
-        if (!confirm("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.")) return null;
-        try { await api("POST", "/publishes/checkpoints", { name: ("Before removing “" + title + "”").slice(0, 80) }); } catch (_) {}
-      }
-      c.page = list[at]; list.splice(at, 1);
-    } else if (!c[from]) list.push({ ...c[to], blocks: c.page.blocks });
+    if (!c[to]) { c.page = list[at]; list.splice(at, 1); }
+    else if (!c[from]) list.push({ ...c[to], blocks: c.page.blocks });
     else list[at] = { ...c[to], blocks: list[at].blocks, ...(c[from].slug !== c[to].slug ? { prev_slug: c[from].slug } : {}) };
   }
   // only the pages this step knows about move, and they share the places they already hold
@@ -7855,21 +7880,29 @@ async function undoStep(rec, dir) {
   const back = dir === "undo";
   whisper("topWhisper", "saving");
   try {
-    let vals = rec.kind === "put" ? (back ? rec.before : rec.after) : null;
     if (rec.kind === "pages") {
-      vals = (await dcSavePendingEdits()) && (await undoPagesBody(rec, back ? "after" : "before", back ? "before" : "after"));   // this list is built from the saved pages
-      if (!vals) { whisper("topWhisper", ""); return false; }
-    }
-    UNDO_QUIET++;
-    let call;
-    if (vals) call = api("PUT", rec.route, vals);
-    else if (rec.kind === "patch") call = api("PATCH", `/${rec.col}/${rec.id}`, back ? rec.before : rec.after);
-    else if ((rec.kind === "create") === back) call = api("DELETE", `/${rec.col}/${rec.id}`);   // undoing an add, or redoing a removal
-    else call = api("POST", `/${rec.col}`, rec.row);
-    UNDO_QUIET--;
-    const r = await call;
-    if (vals) await undoSync(rec, vals, r);
-    else {
+      const from = back ? "after" : "before", to = back ? "before" : "after";
+      // Saves reach the list first and the question comes before the write, so neither sits
+      // inside a turn. The list itself is built when the turn comes, from what the last write left.
+      if (!(await dcSavePendingEdits()) || !(await undoPagesAsk(rec, from, to))) { whisper("topWhisper", ""); return false; }
+      await settingsTurn(() => {
+        const vals = undoPagesBody(rec, from, to);
+        UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--;
+        return call.then((r) => undoSync(rec, vals, r));
+      });
+      if (DC_PAGE && !dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
+    } else if (rec.kind === "put") {
+      const vals = back ? rec.before : rec.after;
+      const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
+      await (rec.route === "/settings" ? settingsTurn(put) : put());
+    } else {
+      UNDO_QUIET++;
+      let call;
+      if (rec.kind === "patch") call = api("PATCH", `/${rec.col}/${rec.id}`, back ? rec.before : rec.after);
+      else if ((rec.kind === "create") === back) call = api("DELETE", `/${rec.col}/${rec.id}`);   // undoing an add, or redoing a removal
+      else call = api("POST", `/${rec.col}`, rec.row);
+      UNDO_QUIET--;
+      const r = await call;
       const rows = S[rec.col] || (S[rec.col] = []);
       if (rec.kind === "patch") { const row = rows.find((x) => x.id === rec.id); if (row) Object.assign(row, r.data || (back ? rec.before : rec.after)); }
       else if ((rec.kind === "create") === back) S[rec.col] = rows.filter((x) => x.id !== rec.id);
@@ -7888,11 +7921,8 @@ async function undoSync(rec, vals, r) {
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
-    if (rec.kind === "pages" && DC_PAGE) {   // the page on screen can have a new address, or be gone
-      const moved = vals.pages.find((p) => p.prev_slug === DC_PAGE);
-      if (moved) DC_PAGE = moved.slug;
-      else if (!dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); }   // anything typed during that write went with the page, not onto Home
-    }
+    const moved = rec.kind === "pages" && DC_PAGE && vals.pages.find((p) => p.prev_slug === DC_PAGE);
+    if (moved) DC_PAGE = moved.slug;   // the next write finds this page under its address
     if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); }   // words typed during that write stay, and save next
     if ($("blocksCard")) renderBlocksCard();
     renderPagesBar();
@@ -7953,13 +7983,20 @@ async function blocksSaveNow() {
   try { return await saveBlocks(); } finally { BLOCKS_SAVING = false; }
 }
 let BLOCKS_PUT = null;   // the list save on its way; a page change waits it out (dcSavePendingEdits)
+let BLOCKS_PUT_WAITING = false;   // its turn hasn't come, so it will carry anything asked for now
 function saveBlocks() {
-  const put = putBlocks().finally(() => { if (BLOCKS_PUT === put) BLOCKS_PUT = null; });
+  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
+  whisper("topWhisper", "saving");
+  if (BLOCKS_PUT_WAITING) return BLOCKS_PUT;
+  BLOCKS_PUT_WAITING = true;
+  const put = settingsTurn(putBlocks).finally(() => { if (BLOCKS_PUT === put) BLOCKS_PUT = null; });
   BLOCKS_PUT = put;
   return put;
 }
+// Runs when its turn comes, so it writes the list and the pages as they stand by then.
 async function putBlocks() {
-  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
+  BLOCKS_PUT_WAITING = false;
+  clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // the save before it may have asked for one more
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
   const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
@@ -8078,7 +8115,7 @@ function blockLookRow(idx, blk, sub) {
   ];
   const det = el("details"); det.style.cssText = "margin-top:10px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
   if (chosen) det.open = true;
-  const sum = el("summary", null, "Look of this section" + (chosen ? "  ·  customised" : ""));
+  const sum = el("summary", null, "Style of this section" + (chosen ? "  ·  customised" : ""));
   sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478)";
   det.appendChild(sum);
   const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
@@ -9110,7 +9147,7 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
     const lb = el("input"); lb.type = "text"; lb.placeholder = "Button label (e.g. Get a quote)"; lb.value = bt.label || ""; lb.style.cssText = inputCss;
     const ur = el("input"); ur.type = "text"; ur.placeholder = "Where it goes (link)"; ur.value = bt.url || ""; ur.style.cssText = inputCss;
-    const stWrap = el("label", "hint", "Look "); const st = el("select");
+    const stWrap = el("label", "hint", "Style "); const st = el("select");
     [["primary", "Filled"], ["outline", "Outline"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((bt.style || "primary") === v) o.selected = true; st.appendChild(o); });
     st.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; stWrap.appendChild(st);
     const commit = () => { blk.buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
@@ -9334,40 +9371,52 @@ async function saveForms() {
   try {
     // Built from the saved list below, so section edits reach it first.
     if (!(await dcSavePendingEdits(true))) { whisper("topWhisper", ""); return; }
-    const sentForms = JSON.stringify(FORMS_WORK);
-    // Forms keep their place on the page (a save used to drag them all to the bottom);
-    // a form removed here drops out, a new one lands at the end.
+    await settingsTurn(putForms);
+    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
+  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+  finally { FORMS_SAVING = false; }
+}
+async function putForms() {
+  const sentForms = JSON.stringify(FORMS_WORK);
+  // Forms keep their place on the page (a save used to drag them all to the bottom);
+  // a form removed here drops out, a new one lands at the end.
+  const withForms = (list) => {
     const work = new Map(FORMS_WORK.map((f) => [f.id, f]));
     const placed = new Set();
     const next = [];
-    formsHostBlocks(FORMS_PAGE).forEach((b) => {
+    list.forEach((b) => {
       if (!b || b.type !== "form") { next.push(b); return; }
       if (work.has(b.id)) { next.push(work.get(b.id)); placed.add(b.id); }
     });
     FORMS_WORK.forEach((f) => { if (!placed.has(f.id)) next.push(f); });
-    let r;
-    if (FORMS_PAGE) {
-      const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
-      UNDO_QUIET++; const put = api("PUT", "/settings", { pages }); UNDO_QUIET--;   // a form is a section: it gets a snapshot like the others, below
-      r = await put;
-      S.settings = r.data || { ...S.settings, pages };
-    } else {
-      UNDO_QUIET++; const put = api("PUT", "/settings", { blocks: next }); UNDO_QUIET--;
-      r = await put;
-      S.settings = r.data || { ...S.settings, blocks: next };
-    }
-    if (typeof BLOCKS_WORK !== "undefined") { BLOCKS_WORK = currentBlocks(); if (FORMS_PAGE === DC_PAGE) dcHistoryRecord(); dcHistoryCommit(); }   // keep the content-block editor in sync
-    const ae = document.activeElement;
-    if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
-    else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
-    else {
-      FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
-      renderFormsCard();
-      FORMS_BASE = JSON.stringify(FORMS_WORK);
-    }
-    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
-  finally { FORMS_SAVING = false; }
+    return next;
+  };
+  const next = withForms(formsHostBlocks(FORMS_PAGE)), sentList = JSON.stringify(next);
+  let r;
+  if (FORMS_PAGE) {
+    const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
+    UNDO_QUIET++; const put = api("PUT", "/settings", { pages }); UNDO_QUIET--;   // a form is a section: it gets a snapshot like the others, below
+    r = await put;
+    S.settings = r.data || { ...S.settings, pages };
+  } else {
+    UNDO_QUIET++; const put = api("PUT", "/settings", { blocks: next }); UNDO_QUIET--;
+    r = await put;
+    S.settings = r.data || { ...S.settings, blocks: next };
+  }
+  // Keep the content-block editor in sync. A section edit made while this was out is newer
+  // than what came back: it stays, with the form change under it, and saves next.
+  if (typeof BLOCKS_WORK !== "undefined") {
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); if (FORMS_PAGE === DC_PAGE) dcHistoryRecord(); dcHistoryCommit(); }
+    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); dcHistoryRecord(); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
+  }
+  const ae = document.activeElement;
+  if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
+  else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
+  else {
+    FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+    renderFormsCard();
+    FORMS_BASE = JSON.stringify(FORMS_WORK);
+  }
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
@@ -9532,11 +9581,10 @@ function renderFormsCard() {
   formsSaveSoon();
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
-const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
+const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
 async function saveSections(order, hidden) {
   try {
-    const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
-    S.settings = r.data || { ...S.settings, sections_order: order, sections_hidden: hidden };
+    await settingsPut({ sections_order: order, sections_hidden: hidden });
     const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { toast(nice(err), true); }
@@ -9576,10 +9624,10 @@ async function mountLookCard() {
   try { looks = (await api("GET", "/site/templates")).data; } catch (_) { return; }
   if (!looks || (looks.templates || []).length < 2) return;
   const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Templates & style"));
+  card.appendChild(el("label", null, "Template"));
   const cur = looks.templates.find((t) => t.slug === looks.current.slug);
-  card.appendChild(el("div", "hint", "Your template sets your whole layout; complete looks, colors and type are in the Design studio just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template — try another safely and preview it with your real content before deciding."));
-  const b = el("button", null, "Try another template in the proof →");
+  card.appendChild(el("div", "hint", "Your template sets your whole layout. Colors and fonts are just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template — try another safely and preview it with your real content before deciding."));
+  const b = el("button", null, "Try another template →");
   b.type = "button";
   b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   b.addEventListener("click", () => openPreview("draft"));
@@ -9798,7 +9846,12 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
-  setTimeout(() => { try { (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus(); } catch (_) {} }, 40);
+  setTimeout(() => { try {
+    // already in a field in this panel: leave them there, or the words go nowhere
+    const ae = document.activeElement;
+    if (ae && ae !== p && ae !== document.body && p.contains(ae)) return;
+    (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus();
+  } catch (_) {} }, 40);
 }
 function exitEditMode() {
   if (IPE) ipeCommit();   // bank in-place text before the canvas goes away
@@ -10686,6 +10739,9 @@ function dpNote(title, body) {
 // that save repaints when it lands, and a read now would flash the old text back.
 let DP_REPAINT_HELD = false;
 let DP_PAINT_OPEN = 0;   // the page opening (DC_PAGE_OPENS) the last document written to the canvas belongs to
+// Reads are numbered, and one never paints over a newer one's document. Dropping all but
+// the newest would leave a stream of edits with slow reads never painting at all.
+let DP_READS = 0, DP_READ_PAINTED = 0;
 function dpHoldRepaint() {
   if (IPE) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
@@ -10710,21 +10766,22 @@ function refreshDesignPreview() {
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
     // right on it (AEM's "Drag components here" box), so the empty page is a real
     // build surface, not a dead sheet. No early-return-on-empty any more.
-    const opened = DC_PAGE_OPENS;
+    const opened = DC_PAGE_OPENS, read = ++DP_READS;
     try {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (opened !== DC_PAGE_OPENS) return;   // the page changed while this read was out; the new page has its own
+      if (read < DP_READ_PAINTED) return;
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
       if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
-      DP_PAINT_OPEN = opened;
+      DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
-      if (opened !== DC_PAGE_OPENS) return;
+      if (opened !== DC_PAGE_OPENS || read < DP_READ_PAINTED) return;
       // a plan without the website builder: say that, not "try again" — it can't work
       if (err && err.status === 403) {
-        DP_PAINT_OPEN = opened;
+        DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
         frame.srcdoc = "";
         const box = $("designPreviewEmpty"); if (box) box.classList.add("plan");
         dpNote("Editing isn’t part of this plan.", "This plan watches a website that lives somewhere else. Design opens up on a plan with the website builder.");
@@ -10732,8 +10789,8 @@ function refreshDesignPreview() {
       }
       // the big proof ("See your site") still works — say so rather than staying blank,
       // or on the page just left
-      if (!frame.srcdoc || frame.inert) dpNote("The proof couldn’t draw just now.",
-        "Your content is safe. It’ll appear here on your next change — or open “See your site” above for the full proof.");
+      if (!frame.srcdoc || frame.inert) dpNote("The preview couldn’t load just now.",
+        "Your content is safe. It’ll appear here on your next change, or use Preview above to see the whole site.");
     }
   }, 350);
 }
@@ -11327,7 +11384,7 @@ function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.conte
 // prompt; nothing is blocked outright.
 let IPE_SAVE_INFLIGHT = false;
 window.addEventListener('beforeunload', (e) => {
-  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
 });
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
@@ -12099,8 +12156,7 @@ function dcTreeSelect(el2, row) {
     const m = v.match(/content=["']([^"']+)["']/); if (m) { v = m[1]; $(id).value = v; }
     try {
       const body = {}; body[key] = v;
-      const r = await api("PUT", "/settings", body);
-      S.settings = r.data || { ...(S.settings || {}), ...body };
+      await settingsPut(body);
       toast(v ? "Saved — publish, then verify at the search engine" : "Cleared");
       scheduleChangesRefresh();
     } catch (err) { toast(nice(err), true); }
@@ -12110,8 +12166,7 @@ function dcTreeSelect(el2, row) {
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry");
   try {
-    const r = await api("PUT", "/settings", { industry_key: sel.value });
-    S.settings = r.data || { ...(S.settings || {}), industry_key: sel.value };
+    await settingsPut({ industry_key: sel.value });
     toast("Saved — your site uses the right words when you next publish");
     scheduleChangesRefresh();
   } catch (err) { toast(nice(err), true); }
@@ -12120,17 +12175,18 @@ $("f-industry").addEventListener("change", async () => {
 function mountAnnouncementCard() {
   // Only for plans that HAVE a website to announce on (and that can publish).
   if (!hasFeature("website") || (S.site && S.site.edition === "monitor")) return;
-  const host = $("view-business"); if (!host || $("annCard")) return;
-  const card = el("div", "field"); card.id = "annCard"; card.style.marginTop = "18px";
-  card.innerHTML = `<label for="ann-text">Announcement bar</label>
-    <input type="text" id="ann-text" maxlength="140" placeholder="e.g. Closed July 4th — back Monday!">
+  const host = $("view-updates"); if (!host || $("annCard")) return;
+  const card = el("div"); card.id = "annCard";
+  card.innerHTML = `<h5 class="rune">Announcement bar</h5>
+    <div class="field"><label for="ann-text">Message</label>
+    <input type="text" id="ann-text" maxlength="140" placeholder="e.g. Closed July 4th, back Monday">
     <div class="hint">One short notice at the top of every page of your website. Leave empty for none.</div>
     <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <input type="url" id="ann-url" aria-label="Announcement link (optional)" placeholder="Link (optional)" style="flex:1;min-width:160px">
       <label for="ann-until" style="margin:0;font-size:12px">Until</label>
       <input type="date" id="ann-until">
     </div>
-    <div class="hint">It appears when you next publish, and drops off publishes after the date you choose.</div>`;
+    <div class="hint">It appears when you next publish, and comes off after the date you choose.</div></div>`;
   host.appendChild(card);
   $("ann-text").value = S.settings.announcement_text || "";
   $("ann-url").value = S.settings.announcement_url || "";
@@ -12144,7 +12200,7 @@ function mountAnnouncementCard() {
     const body = annBody(), sig = JSON.stringify(body);
     if (sig === annSaved) return;
     whisper("topWhisper", "saving");
-    try { const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, ...body }; annSaved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
+    try { await settingsPut(body); annSaved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
     catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
   };
   ["ann-text", "ann-url", "ann-until"].forEach((id) => $(id).addEventListener("change", annSave));
@@ -12159,18 +12215,21 @@ const NOTICE_ACTION = {
   connection_expired:{ label: "Open Connections",       href: "connections.html" },   // reconnecting isn't always the step: the notice says which is
   website_enquiry:  { label: "View enquiries",          href: "inbox.html#enquiries" },
   lead_followup:    { label: "View enquiries",          href: "inbox.html#enquiries" },
-  domain_expiry:    { label: "Manage domain",           href: "presence.html#business" },
+  domain_expiry:    { label: "Manage domain",           href: "presence.html#domain" },
   search_setup:     { label: "Finish search setup",     href: "presence.html#search" },
   renewal_reminder: { label: "See plans",               href: "pricing.html" },
   winddown_reminder:{ label: "Download everything",     href: "presence.html#foundations" },   // the export button lives in the technical desk
   win_back:         { label: "See plans",               href: "pricing.html" },
   trial_ending:     { label: "See plans",               href: "pricing.html" },
   trial_ended:      { label: "See plans",               href: "pricing.html" },
-  payment_trouble:  { label: "Update payment",          href: "presence.html#settings" },
-  account_lapsed:   { label: "Update payment",          href: "presence.html#settings" },
+  payment_trouble:  { label: "Update payment",          href: "settings.html#billing" },
+  account_lapsed:   { label: "Update payment",          href: "settings.html#billing" },
   capacity:         { label: "See plans",               href: "pricing.html" },
 };
-const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "lead_followup", "capacity"];
+// Only alerts about this website or this account reach the website page. Everything
+// else, sales above all, stays in the bell, Home and Pipeline: a deposit or a signed
+// agreement here read as if that client had a site on this page.
+const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "capacity"];
 // The four client-portal notice kinds (migration 0116) belong to the BELL, not
 // to this card. They are in neither table above, so the `notices[0]` fallback
 // below happily rendered "New message from Acme Bakery" as a plum "outgrown your
@@ -12183,7 +12242,6 @@ async function renderPlanNotice() {
   catch (_) { return; }
   let n = null;
   for (const k of NOTICE_PRIORITY) { n = notices.find((x) => x.kind === k); if (n) break; }
-  if (!n) n = notices[0];
   if (!n) return;
   const host = $("welcomeWrap");
   if (!host) return;

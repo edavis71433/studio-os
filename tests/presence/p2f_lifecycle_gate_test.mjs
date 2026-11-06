@@ -45,7 +45,7 @@ step(16, 'A connection-expired notice is deep-linked to reconnect', /connection_
 
 // lifecycle (18, 19)
 step(18, 'Lapsed/read-only denies paid actions but keeps view + export', /status === 'lapsed'\) return \{ mode: 'readonly'/.test(entitlement));
-step(19, 'Recovery is reachable in-app (billing portal button) + reconciled', /\/commerce\/portal/.test(review) && /can_manage_billing/.test(commerce));
+step(19, 'Recovery is reachable in-app (billing portal button) + reconciled', /\/commerce\/portal/.test(read('settings.html')) && /can_manage_billing/.test(commerce));
 
 // tenant isolation (20) — the new seams are all site/client scoped
 step(20, 'New seams are tenant-scoped (forms→deal, inbox, oversight, client billing)', /presence_deals\?site_id=eq\.\$\{site\.id\}&source_submission_id/.test(sales) && /presence_invoices\?customer_client_id=eq\.\$\{me\}/.test(clientd) && /agencySiteIds\(member\.agency_id\)/.test(analytics));

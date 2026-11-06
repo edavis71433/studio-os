@@ -76,6 +76,13 @@
   .plan .line{margin:0 0 6px} .plan .line.warn{color:var(--warn)} .plan .limits{color:var(--soft);margin:0 0 10px}
   .plan .team{color:var(--soft);margin:0} .plan .team a{color:var(--p);text-decoration:none;font-weight:500} .plan .team a:hover{text-decoration:underline}
   .plan .aside{color:var(--faint);font-size:12.5px;margin:10px 0 0}
+  .closeacct{margin-top:var(--dds-s5,20px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
+  .closeacct summary{cursor:pointer;font-size:12.5px;color:var(--faint)}
+  .closeacct p{color:var(--faint);font-size:12.5px;margin:10px 0}
+  .closeacct .btn{margin-right:var(--dds-s2,8px)}
+  .closeacct .btn[hidden]{display:none}
+  .closeacct a,#planUpsell a{color:var(--p)}
+  .btn.danger{color:var(--dds-danger,#b3261e);border-color:currentColor}
   /* ── the Team section (Oct 2026 studio audit, change 6): the agency's seats, over /agency/members ── */
   .people{margin:10px 0 0}
   .member{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
@@ -136,6 +143,12 @@
   <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
     <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
     <div class="plan" id="plan" aria-live="polite"></div>
+    <details class="closeacct" id="deleteCard">
+      <summary>Close your account</summary>
+      <p>This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first, from <a href="/presence.html#export">Domain &amp; email</a>. That stays open until deletion.</p>
+      <button class="btn sm danger" type="button" id="deleteAsk">Request deletion</button>
+      <button class="btn sm" type="button" id="deleteCancel" hidden>Cancel deletion request</button>
+    </details>
   </section>
   <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
        is a system job the studio can see and tune; each shows the exact
@@ -220,7 +233,7 @@ const CARDS = [
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
   { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, when it renews, and how to change it.', ownerOnly: true, needs: 'owner' },
+  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, how to change it, and closing your account.', ownerOnly: true, needs: 'owner' },
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
@@ -369,6 +382,37 @@ document.addEventListener('dds:context', () => { paintScope(); if (SCOPE && $('c
 const STATUS_WORD = { active: 'Active', paused: 'Paused — payment needs attention', lapsed: 'Ended — update payment to reactivate', deleted: 'Closed' };
 const SUPPORT = 'mailto:support@davisdigitalstudio.com';
 const shortDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+// The honest next rung: what upgrading adds, and what it would switch off.
+function paintUpsell(host) {
+  const up = CTX && CTX.upsell; if (!up || !up.name) return;
+  const NICE = { website: 'the website tools', business_moments: 'Business Moments', connected: 'connected services', ai: 'AI help', relationship: 'Customers & Pipeline', reports: 'Analytics', client_portal: 'client sharing', developer: 'Developer Mode', forms: 'website forms', managed_service: 'our managed service', agency: 'agency tools', enterprise: 'enterprise controls' };
+  const word = (g) => NICE[String(g)] || String(g).replace(/_/g, ' ');
+  const gains = (up.gains || []).map(word).join(', '), losses = (up.gives_up || []).map(word).join(', ');
+  const p = document.createElement('p'); p.className = 'aside'; p.id = 'planUpsell';
+  p.textContent = `${up.name}${up.monthly ? ` (from $${up.monthly}/mo)` : ''}${gains ? ` adds ${gains}.` : '.'}` + (losses ? ` It also switches off ${losses}. Ask us about keeping both.` : '') + ' ';
+  const a = document.createElement('a');
+  a.href = SUPPORT + '?subject=' + encodeURIComponent('Upgrading to ' + up.name); a.textContent = 'Ask about upgrading →';
+  p.appendChild(a); host.appendChild(p);
+}
+// Closing the account: two presses to ask, reversible until the cooling-off ends.
+function wireDeletion() {
+  const ask = $('deleteAsk'), cancel = $('deleteCancel'); if (!ask || !cancel) return;
+  const requested = (days) => { ask.disabled = true; ask.textContent = days ? `Scheduled. Completes in ${days} day${days === 1 ? '' : 's'}` : 'Request recorded. Check your email'; cancel.hidden = false; };
+  ask.addEventListener('click', async () => {
+    if (!ask.dataset.armed) { ask.dataset.armed = '1'; ask.textContent = 'Are you sure? Press again to confirm'; setTimeout(() => { if (!ask.disabled) { delete ask.dataset.armed; ask.textContent = 'Request deletion'; } }, 6000); return; }
+    const r = await api('/commerce/delete-request', 'POST', {}).catch(() => null);
+    if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t record that. Nothing changed.'), true); return; }
+    const d = r.body && r.body.data;
+    requested(d && d.completes_within_days);
+    toast(d && d.already_pending ? 'You already have a deletion request pending.' : 'Deletion requested. Check your email.');
+  });
+  cancel.addEventListener('click', async () => {
+    const r = await api('/commerce/delete-cancel', 'POST', {}).catch(() => null);
+    if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t cancel that just now.'), true); return; }
+    cancel.hidden = true; ask.disabled = false; delete ask.dataset.armed; ask.textContent = 'Request deletion';
+    toast((r.body && r.body.data && r.body.data.message) || 'Deletion canceled.');
+  });
+}
 async function loadPlan() {
   if (SCOPE) return;
   const host = $('plan'), sec = $('billing');
@@ -400,6 +444,7 @@ async function loadPlan() {
   }
   if (s.has_service_billing) html += `<p class="aside">Invoices for project work from your studio are billed separately.</p>`;
   host.innerHTML = html;
+  paintUpsell(host);
   const b = $('manageBilling');
   if (b) b.addEventListener('click', async () => {
     b.disabled = true; const t = b.textContent; b.textContent = 'Opening…';
@@ -529,6 +574,7 @@ function signedOut() {
       if (on || attn) setStatus('connections', { text: `${on} connected${named}${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
       else setStatus('connections', { text: 'Nothing connected yet', cls: '' });
     }).catch(() => {});
+    wireDeletion();
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
     if (location.hash === '#team') { const sec = $('team'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
