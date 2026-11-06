@@ -676,14 +676,14 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/ipeCapFor\(/.test(commit), 'commit enforces the client cap (no silent server truncation)');
   const cancel = extractFn(html, 'ipeCancel');
   ok(/\.innerHTML = s\.orig/.test(cancel), 'cancel restores the element\'s ORIGINAL server-rendered DOM');
-  const soon = extractFn(html, 'ipeSaveSoon');
+  const soon = extractFn(html, 'ipeSaveSoon') + extractFn(html, 'ipeSaveNow');   // the debounce, and the save a page change can run early
   ok(/setTimeout/.test(soon) && /1200/.test(soon) && /saveBlocks\(\)/.test(soon), 'the in-place save is the EXISTING saveBlocks, debounced ~1.2s (one undo checkpoint per burst)');
   ok(/IPE_SAVE_PENDING/.test(soon), 'a save landing during a NEW session defers — the reload can never destroy an active contenteditable');
   // ── review fix 8: honest announce — "Saving…" at commit, "Saved" only when
   // the PUT resolves ok; a failure announces alongside the failure toast. ──
   ok(/Saving…/.test(commit) && !/'Saved\.'/.test(commit), 'FIX 8: commit announces "Saving…" — never "Saved" 1.2s before the PUT');
   ok(/okz \? 'Saved' : 'The save failed/.test(soon), 'ipeSaveSoon announces "Saved" only on a true saveBlocks resolve, the failure line otherwise');
-  const sb2 = extractFn(html, 'saveBlocks');
+  const sb2 = extractFn(html, 'putBlocks');
   ok(/return true;/.test(sb2) && /return false;/.test(sb2), 'saveBlocks reports its outcome (true only after the PUT + repaint kick actually succeeded)');
   ok(/IPE_LIVE_MSG/.test(soon) && /IPE_LIVE_MSG/.test(extractFn(html, 'dcInjectCanvas')), 'the outcome announcement survives the repaint (stashed, re-announced once into the fresh document)');
   // ── review fix 10 (finding 11): a committed edit must not die with the tab ──
@@ -691,8 +691,8 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/IPE_SAVE_INFLIGHT = true/.test(soon) && /IPE_SAVE_INFLIGHT = false/.test(soon), 'the in-flight flag brackets exactly the saveBlocks call the debounce fires');
   const rdp = extractFn(html, 'refreshDesignPreview');
   ok(/if \(dpHoldRepaint\(\)\) return;[\s\S]*?apiHtml[\s\S]*?if \(dpHoldRepaint\(\)\) return;[\s\S]*?frame\.srcdoc = html/.test(rdp) && !/ipeCommit/.test(rdp), 'a canvas repaint waits out an open in-place session, at fire time AND after its read — it never ends a session to replace the document');
-  ok(/if \(DP_REPAINT_HELD\) \{ DP_REPAINT_HELD = false; refreshDesignPreview\(\); \}/.test(extractFn(html, 'ipeEnd')), 'the repaint a session held off runs when that session ends');
-  const sb = extractFn(html, 'saveBlocks');
+  ok(/if \(DP_REPAINT_HELD\) \{ DP_REPAINT_HELD = false; dcCaptureScroll\(\); refreshDesignPreview\(\); \}/.test(extractFn(html, 'ipeEnd')), 'the repaint a session held off runs when that session ends, and keeps the scroll');
+  const sb = extractFn(html, 'putBlocks');
   ok(/closest\("#blocksCard"\)/.test(sb), 'saveBlocks skips the panel rebuild under a focused panel input (the §3 clobber hazard, closed)');
   ok(!/ipeStart/.test(extractFn(html, 'eeInjectChrome')), 'the read-only stage proof gets NO text editing (its bar is unchanged)');
   const wrap = extractFn(html, 'ipeWrapSel');
