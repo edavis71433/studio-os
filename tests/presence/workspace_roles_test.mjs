@@ -128,9 +128,9 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const drawnKeys = (nav) => drawn(nav).map(s=>s.key);
   const hiddenHrefs = (nav) => nav.flatMap(s=>s.items.filter(i=>i.hidden).map(i=>i.href));
   const allHrefs = (nav) => nav.flatMap(s=>s.items.map(i=>i.href.split('#')[0]));
-  ok('nav cut: studio level draws exactly Home · Inbox · Customers · Pipeline · Projects · Files · Your website · Settings', drawnKeys(agency).join(',')==='home,inbox,customers,pipeline,projects,files,website,settings');
+  ok('nav: studio level draws exactly Home · Inbox · Customers · Pipeline · Projects · Files · Analytics · Your website · Settings', drawnKeys(agency).join(',')==='home,inbox,customers,pipeline,projects,files,analytics,website,settings');
   ok('nav cut: studio level — Your website and Settings are the utilities (foot of the sidebar), each a plain item', drawn(agency).filter(s=>s.utility).map(s=>s.label).join('·')==='Your website·Settings' && drawn(agency).every(s=>s.items.filter(i=>!i.hidden).length===1));
-  ok('nav cut: nothing is deleted — Contacts, Broadcasts, Visual Studio, Analytics, Add a customer, the builder pages, Sharing, Help stay as ⌘K entries', ['/contacts.html','/broadcasts.html','/visual-studio.html','/analytics.html','/agency.html#add','/presence.html#business','/presence.html#design','/presence.html#addpage','/presence.html#domain','/presence.html#publish','/presence.html#history','/sharing.html','/help.html'].every(h=>hiddenHrefs(agency).includes(h)));
+  ok('nav cut: nothing is deleted — Contacts, Broadcasts, Visual Studio, Analytics, Add a customer, the builder pages, Sharing, Help stay as ⌘K entries', ['/contacts.html','/broadcasts.html','/visual-studio.html','/agency.html#add','/presence.html#business','/presence.html#design','/presence.html#addpage','/presence.html#domain','/presence.html#publish','/presence.html#history','/sharing.html','/help.html'].every(h=>hiddenHrefs(agency).includes(h)));
   ok('nav cut: no page is reachable from two menu entries (drawn hrefs are unique)', (()=>{const hs=drawn(agency).map(s=>s.items.find(i=>!i.hidden).href);return new Set(hs).size===hs.length;})());
   ok('nav cut: Help is never a drawn item (the ? icon owns it)', !drawn(agency).some(s=>s.key==='help') && !drawn(owner).some(s=>s.key==='help'));
   // drilled INTO a client the menu is the CLIENT's six; the studio-wide items hide (⌘K keeps them)
@@ -144,8 +144,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: agency member at studio level has "Add a customer" → /agency.html#add in the Customers group (⌘K finds "add"/"client")', !!addItem && addItem.label==='Add a customer' && addItem.href==='/agency.html#add' && /client/i.test(addItem.desc||'') && addItem.hidden===true);
   ok('nav: the add_client entry is studio-level only (not drilled into a client, not for a plain owner)', !drilled.some(s=>s.items.some(i=>i.key==='add_client')) && !owner.find(s=>s.key==='customers').items.some(i=>i.key==='add_client'));
   // Get started: listed only until the site is live
-  const notLive = buildNav(ctx({ isAgency:true, siteLive:false, capabilities: caps('business_owner') }));
-  const live = buildNav(ctx({ isAgency:true, siteLive:true, capabilities: caps('business_owner') }));
+  const notLive = buildNav(ctx({ siteLive:false, capabilities: caps('business_owner') }));
+  const live = buildNav(ctx({ siteLive:true, capabilities: caps('business_owner') }));
+  const studioNotLive = buildNav(ctx({ isAgency:true, siteLive:false, capabilities: caps('business_owner') }));
+  ok('nav: a studio is never offered the Get started wizard: its own draft is a practice site', !studioNotLive.some(s=>s.key==='get_started'));
   ok('nav cut: "Get started" is a drawn utility only while the site is not live', drawn(notLive).some(s=>s.key==='get_started' && s.utility && s.items[0].href==='/get-started.html') && !live.some(s=>s.key==='get_started') && !agency.some(s=>s.key==='get_started'));
   // the plain owner keeps the outcome areas; the same merges apply (Contacts → Customers, Visual Studio → Files, Broadcasts → Inbox)
   ok('nav cut: plain owner draws Today · Website · Customers · Pipeline · Projects · Inbox · Files · Analytics · Settings', drawnKeys(owner).join(',')==='today,website,customers,pipeline,projects,inbox,files,analytics,settings');

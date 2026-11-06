@@ -103,8 +103,75 @@ a{color:var(--plum);text-decoration:none}
 .pillbtn.ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
 .pillbtn.ghost:hover{background:var(--paper);border-color:transparent;color:var(--ink)}
 .pillbtn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
-/* the sub-view tab strip (#nav) — hidden on the overview, where the board itself
-   is the map */
+/* ── The Overview is the site: the stage ── */
+html.site-home .topbar{display:none}
+html.site-home .hb-tabs:not(.site-menu){display:none}
+html.site-home .content{padding:var(--dds-s3,12px);max-width:none}
+.site-stage{display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--sheet);overflow:hidden;height:calc(100vh - 26px);height:calc(100dvh - 26px)}
+.ss-bar{display:flex;align-items:center;gap:var(--dds-s2,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair);min-height:50px;flex:none}
+.ss-bar .actions{display:contents}
+.ss-bar .findwrap{display:none}
+.ss-bar #btnEditSite{order:-1;background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ss-where{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;padding:0 var(--dds-s2,8px);white-space:nowrap;overflow:hidden}
+.ss-page{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis}
+.ss-status{font-size:12.5px;color:var(--ink-3);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-status.live{color:var(--sage)}
+.ss-status.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sage);margin-right:6px;vertical-align:1px}
+.ss-dev{padding:3px}
+.ss-dev button{padding:5px 9px;display:inline-flex;align-items:center}
+.ss-dev svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ss-frame{flex:1 1 auto;min-height:0;background:var(--paper);position:relative}
+.ss-frame iframe{position:absolute;top:0;left:50%;transform:translateX(-50%);width:100%;height:100%;border:0;background:#fff;display:block}
+.ss-frame.dev-tablet iframe{width:768px;max-width:100%;border-left:1px solid var(--hair);border-right:1px solid var(--hair)}
+.ss-frame.dev-phone iframe{width:390px;max-width:100%;border-left:1px solid var(--hair);border-right:1px solid var(--hair)}
+.ss-note{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:var(--dds-s7,32px);background:var(--sheet)}
+.ss-note[hidden]{display:none}
+.ssn-h{font-family:var(--serif);font-size:19px;line-height:1.4;max-width:30ch}
+.ssn-p{font-size:13.5px;color:var(--ink-2);margin-top:8px;max-width:44ch;line-height:1.6}
+.ssn-acts{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);justify-content:center;margin-top:var(--dds-s4,16px)}
+@media(max-width:760px){
+  html.site-home .content{padding:var(--dds-s2,8px)}
+  .site-stage{height:calc(100vh - var(--dds-shell-h,56px) - 112px);height:calc(100dvh - var(--dds-shell-h,56px) - 112px)}
+  html.site-home .ss-bar #btnPreview,html.site-home .ss-bar #btnPublish,html.site-home .ss-bar #btnLive{display:none}
+}
+@media(max-width:1100px){html.site-home .ss-bar .ss-dev{display:none}}
+.ss-todo{display:flex;align-items:center;gap:10px;width:100%;font:inherit;font-size:13.5px;text-align:left;padding:10px var(--dds-s4,16px);border:0;border-top:1px solid var(--hair);background:var(--sheet);color:var(--ink);cursor:pointer}
+.ss-todo:hover{background:var(--paper)}
+.ss-todo svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--amber,#b7791f);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ss-todo .t{flex:1;min-width:0}
+.ss-todo .go{font-weight:600;white-space:nowrap}
+.todo-body{padding:var(--dds-s4,16px);display:flex;flex-direction:column;gap:var(--dds-s3,12px)}
+.todo-body .hb-card h2{font-size:14px;margin:0 0 6px}
+.todo-body .pillbtn{margin-top:var(--dds-s3,12px)}
+@media(min-width:761px){html.site-home #todoPanel{top:0}}
+.navitem[hidden]{display:none !important}
+.ss-todo[hidden]{display:none}
+html.plan-watch .ss-todo{display:none}
+html.plan-watch .site-stage{height:calc(100vh - 92px);height:calc(100dvh - 92px)}
+html.ss-noplan .ss-dev{visibility:hidden}
+.hb-site-status{margin:0 0 var(--dds-s5,20px)}
+.hb-site-status .hb-card{flex:1 1 300px}
+/* The site menu, drawn into the sidebar under Website as its inline list */
+html.dds-side .dds-nav .sec .site-menu{display:flex;flex-direction:column;position:static;min-width:0;background:transparent;border:0;box-shadow:none;border-radius:0;padding:1px 0 var(--dds-s1,4px);margin:0;gap:1px;max-width:none;overflow:visible}
+html.dds-side .dds-nav .sec .site-menu .grp{display:flex;align-items:center;justify-content:space-between;width:100%;font:inherit;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--dds-soft);text-align:left;margin:0;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer}
+html.dds-side .dds-nav .sec .site-menu .grp::after{content:"\25BE";font-size:11px;color:var(--dds-faint);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+html.dds-side .dds-nav .sec .site-menu .nav-fold.open>.grp::after{transform:rotate(180deg)}
+html.dds-side .dds-nav .sec .site-menu .grp:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+html.dds-side .dds-nav .sec .site-menu .nav-fold:not(.open) .navitem{display:none}
+html.dds-side .dds-nav .sec .site-menu .nav-fold .navitem{padding-left:49px}
+html.dds-side .dds-nav .sec .site-menu .navitem[data-view="today"],html.dds-side .dds-nav .sec .site-menu .navitem.dup{display:none}
+html.dds-side .dds-nav .sec .site-menu .navitem{display:block;width:100%;font:inherit;font-size:13px;font-weight:500;color:var(--dds-soft);text-align:left;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+html.dds-side .dds-nav .sec .site-menu .navitem:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+html.dds-side .dds-nav .sec .site-menu .navitem.on{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+html.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
+html.site-home.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+/* the sidebar is the map, so the launcher repeating it stays on the phone layout */
+@media(min-width:761px){html.dds-side #dds-waffle{display:none}}
+html.dds-side .dds-nav .sec.has-site-menu > .it .car{display:none}
+.site-menu:not(.hb-tabs) .navitem{border-bottom:0}
+#sectionsNav .grp{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:14px 0 2px}
+#sectionsNav .navitem{text-align:left}
+/* the sub-view tab strip (#nav): the fallback when there is no sidebar to join */
 .hb-tabs{display:flex;gap:2px;border-bottom:1px solid var(--hair);margin:var(--dds-s5,20px) var(--dds-s7,32px) 0;max-width:var(--dds-w-app,1280px);overflow-x:auto;scrollbar-width:none}
 .hb-tabs::-webkit-scrollbar{display:none}
 /* Above phone size the tabs wrap: a mouse has no way to reach what a hidden scrollbar hides. */
@@ -362,7 +429,7 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important}
   .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
 }
 /* a watch plan observes: no building tools, no publish queue */
-html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
+html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-link="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
 #designPreviewEmpty.plan .ea{display:none}
 /* first-run strip: the three steps after the first visit, one line */
 .welcomebar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin:var(--dds-s2,8px) 0 var(--dds-s4,16px);font-size:13.5px}
@@ -1097,7 +1164,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <div class="who">
         <h1 class="hb-title" id="siteTitle">Your website</h1>
       </div>
-      <div class="actions">
+      <div class="actions" id="topActions">
         <div class="findwrap">
           <input id="findInput" type="search" placeholder="Find anything…" aria-label="Find anything in your content" autocomplete="off" maxlength="120">
           <div id="findResults" class="findresults" role="listbox" aria-label="Search results" hidden></div>
@@ -1121,85 +1188,47 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- OVERVIEW (the board) -->
       <section class="view on" id="view-today">
         <div id="welcomeWrap" hidden></div>
-        <!-- the site's health, when it needs a look (healthy sites say so in the strip) -->
-        <div id="healthWrap"><div class="loadline"><div class="lq">Setting the table…</div><div class="shimmer"></div></div></div>
-        <div class="hb-stats" id="statStrip" hidden>
-          <button class="hb-stat" id="statWaiting" type="button" title="Review what changes when you publish">
-            <span class="ico warn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
-            <span class="txt"><span class="k">Waiting to publish</span><span class="v">0</span><span class="s">Everything is live</span></span>
-          </button>
-          <button class="hb-stat" id="statHealth" type="button" title="The facts customers rely on">
-            <span class="ico good"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
-            <span class="txt"><span class="k">Site health</span><span class="v">—</span><span class="s"></span></span>
-          </button>
-          <a class="hb-stat" id="statVisitors" href="/analytics.html?view=website">
-            <span class="ico info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-            <span class="txt"><span class="k">Visitors this month</span><span class="v">—</span><span class="s">Not measured yet</span></span>
-          </a>
-          <a class="hb-stat" id="statEnquiries" href="/inbox.html#enquiries">
-            <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
-            <span class="txt"><span class="k">Enquiries this month</span><span class="v">—</span><span class="s">None yet</span></span>
-          </a>
-        </div>
-
-        <div class="hb-cols">
-          <div class="hb-main">
-            <div id="notesWrap" hidden>
-              <div class="hb-sec-h"><h2>From your concierge</h2></div>
-              <div id="notesList"></div>
+        <!-- The Overview is the site itself: the draft, full width, with one line of
+             what's left before it can go live. Numbers live on Analytics, activity on
+             Versions, the health check and your address on Search. -->
+        <div class="site-stage" id="siteStage">
+          <div class="ss-bar" id="ssBar">
+            <span class="ss-where"><span class="ss-page" id="ssPage">Home</span><span class="ss-status" id="ssStatus"></span></span>
+            <div class="dpdevseg ss-dev" id="ssDevSeg" role="group" aria-label="See your page at different screen sizes">
+              <button type="button" data-ssdev="desktop" class="on" aria-pressed="true" aria-label="Desktop" title="Desktop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
+              <button type="button" data-ssdev="tablet" aria-pressed="false" aria-label="Tablet" title="Tablet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
+              <button type="button" data-ssdev="phone" aria-pressed="false" aria-label="Phone" title="Phone"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
             </div>
-
-            <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
-              <div class="hb-sec-h"><h2 id="pagesH">Pages</h2><a href="#design" onclick="go('design');return false">Edit site</a></div>
-              <div class="hb-list" id="pagesList"></div>
-            </section>
-
-            <section class="hb-sec" id="recentWrap" aria-labelledby="recentH">
-              <div class="hb-sec-h"><h2 id="recentH">Waiting to publish</h2><a href="#history" onclick="go('history');return false">History</a></div>
-              <div class="hb-list" id="recentList"></div>
-            </section>
-
-            <!-- what happened to the site, newest first (was its own page: timeline.html) -->
-            <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
-              <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
-              <div class="hb-list" id="activityList"></div>
-            </section>
           </div>
-
-          <div class="hb-rail">
+          <div class="ss-frame" id="ssFrameWrap">
+            <iframe id="siteFrame" title="Your website, as it is now" sandbox="allow-same-origin allow-scripts"></iframe>
+            <div class="ss-note" id="ssNote" hidden></div>
+          </div>
+          <button type="button" class="ss-todo" id="ssTodo" aria-haspopup="dialog" aria-controls="todoPanel" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="t" id="ssTodoText"></span>
+            <span class="go">Show me</span>
+          </button>
+        </div>
+        <aside id="todoPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="What’s left" aria-hidden="true">
+          <div class="dc-panel-head"><span class="dc-panel-t">What’s left</span><button type="button" class="dc-actbtn" id="btnTodoClose">Done</button></div>
+          <div class="dc-panel-scroll todo-body">
+            <div class="hb-card" id="todoBlockers" hidden></div>
             <div class="hb-card" id="setupCard" hidden></div>
-
-            <!-- your address on the internet (was only inside the Domain & email desk) -->
-            <div class="hb-card" id="domainCard" hidden></div>
-
-            <!-- the plain-English check-up (was its own page: website-health.html) -->
-            <div class="hb-card" id="healthCard" tabindex="-1" hidden></div>
-
-            <div class="hb-card" id="designRailCard">
-              <div class="hb-card-h"><h2>Design</h2><a href="#design" onclick="go('design');return false">Change</a></div>
-              <div class="hb-swatches" id="designSwatches" aria-label="Your site's colors and type"></div>
-              <div class="note" id="designNote">Colors, fonts and the logo live here; pages pick them up.</div>
-            </div>
-
-            <div class="hb-card" id="photosCard">
-              <div class="hb-card-h"><h2>Photos</h2><a href="#media" onclick="go('media');return false">All photos</a></div>
-              <div class="hb-thumbs" id="photoThumbs" aria-hidden="true"><span></span><span></span><span></span></div>
-              <div class="note"><span id="photoCount">No photos yet.</span> <a id="lnkVisual" href="/visual-studio.html">Make a new banner in Visual Studio</a></div>
-            </div>
-
-            <div class="hb-card" id="toolsCard">
-              <div class="hb-card-h"><h2>Also here</h2></div>
-              <div class="hb-links presence-links">
-                <button type="button" onclick="go('bookings')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bookings<span class="go" aria-hidden="true">→</span></button>
-                <button type="button" onclick="go('reviews')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Reviews<span class="go" aria-hidden="true">→</span></button>
-                <button type="button" onclick="openFoundationsDesk()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Domain &amp; email<span class="go" aria-hidden="true">→</span></button>
-                <a id="lnkConnections" href="/connections.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7L11.5 6.8"/><path d="M14 10a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 0 0 5.7 5.7l1.3-1.3"/></svg>Connections<span class="go" aria-hidden="true">→</span></a>
-                <a href="/sharing.html" data-needs="owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>Sharing &amp; access<span class="go" aria-hidden="true">→</span></a>
-                <a href="/client.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Preview client view<span class="go" aria-hidden="true">→</span></a>
-              </div>
-            </div>
           </div>
-        </div>
+        </aside>
+      </section>
+      <!-- PAGES -->
+      <section class="view" id="view-pages">
+        <h1 class="doc" role="heading" aria-level="2">Pages</h1>
+        <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
+          <div class="hb-sec-h"><h2 id="pagesH" class="sr-only">Your pages</h2><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></div>
+          <div class="hb-list" id="pagesList"></div>
+        </section>
+        <section class="hb-sec" id="recentWrap" aria-labelledby="recentH" hidden>
+          <div class="hb-sec-h"><h2 id="recentH">Waiting to publish</h2><a href="#history" onclick="go('history');return false">Versions</a></div>
+          <div class="hb-list" id="recentList"></div>
+        </section>
       </section>
 
       <!-- BUSINESS -->
@@ -1265,6 +1294,10 @@ body.pd-dragging *{cursor:grabbing !important}
       <section class="view" id="view-search">
         <h1 class="doc" role="heading" aria-level="2">Search</h1>
         <p class="docsub">How people find you on Google and in AI answers, and what would help them find you more. Checking and connecting never change your website.</p>
+        <div class="hb-cols hb-site-status">
+          <div class="hb-card" id="healthCard" tabindex="-1" hidden></div>
+          <div class="hb-card" id="domainCard" hidden></div>
+        </div>
         <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Reading how you show up…</div><div class="shimmer"></div></div></div>
         <div class="sv-grid">
           <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
@@ -1506,6 +1539,11 @@ body.pd-dragging *{cursor:grabbing !important}
       </section>
       <!-- HISTORY -->
       <section class="view" id="view-history">
+        <!-- what happened to the site, newest first (was its own page: timeline.html) -->
+        <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
+          <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
+          <div class="hb-list" id="activityList"></div>
+        </section>
         <h1 class="doc" role="heading" aria-level="2">History</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
         <div id="previewBox"></div>
@@ -1521,8 +1559,8 @@ body.pd-dragging *{cursor:grabbing !important}
 
 <!-- mobile dock -->
 <nav class="dock" id="dock" aria-label="Editor sections">
-  <button data-tab="today" class="on" aria-pressed="true">Today</button>
-  <button data-tab="sections" aria-pressed="false">Sections</button>
+  <button data-tab="today" class="on" aria-pressed="true">Site</button>
+  <button data-tab="sections" aria-pressed="false">Menu</button>
   <button data-tab="preview" aria-pressed="false">Preview</button>
   <button data-tab="publish" id="dockPublish" aria-pressed="false">Publish</button>
 </nav>
@@ -1914,11 +1952,19 @@ function showGate(title, msg, showBtn, retry) {
 
 /* ── navigation ── */
 let EDIT_RETURN = "today";   // where Exit goes: the view you came to Edit mode from
+// The Overview is the site: the title row steps aside and its buttons join the
+// stage's one bar. They're the same buttons, so every other way to them still works.
+function syncSiteHome(view) {
+  document.documentElement.classList.toggle("site-home", view === "today");
+  const acts = $("topActions"), bar = view === "today" ? $("ssBar") : document.querySelector(".topbar");
+  if (acts && bar && acts.parentElement !== bar) bar.appendChild(acts);
+}
 function go(view, early) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
   if (view !== "design") EDIT_RETURN = view;
+  syncSiteHome(view);
   document.documentElement.classList.toggle("dc-edit", view === "design");
   if (view === "design") pagesBarReveal();
   // Design is the builder — let it use the FULL width (canvas stretches right); every
@@ -1930,17 +1976,19 @@ function go(view, early) {
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     // on a phone the strip scrolls: keep the tab you're on in sight
-    if (on && b.parentElement.scrollWidth > b.parentElement.clientWidth) b.parentElement.scrollLeft = Math.max(0, b.offsetLeft - b.parentElement.offsetLeft - 16);
+    if (on) { const f = b.closest(".nav-fold"); if (f) { f.classList.add("open"); f.firstChild.setAttribute("aria-expanded", "true"); } }
   });
   document.querySelectorAll("#dock button").forEach((b) => { const on = b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   window.scrollTo({ top: 0 });
   if (early) return;   // the pre-data switch: the view is on screen, its loaders run on the real route below
-  if (view === "today") loadToday();
-  if (view === "history") loadHistory();
+  if (view === "today") { loadToday(); }
+  if (view === "pages") { hbLoadBoardExtras(); renderPagesList(); renderRecent(); }
+  closeTodoPanel();
+  if (view === "history") { loadHistory(); hbLoadBoardExtras(); }
   if (view === "media") loadMedia();
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
-  if (view === "search") loadSearch();
+  if (view === "search") { loadSearch(); hbLoadBoardExtras(); }
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
@@ -1967,7 +2015,7 @@ function contextHint(view) {
   }, 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "search", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", pages: "pages", business: "business", settings: "business", search: "search", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
 // Oct 2026 review: the FIRST paint honours the hash. boot() used to await the
 // whole refreshAll() read wave before routeHash(), so a #settings / #business /
 // #design link sat on the Today view's "Setting the table…" loadline for as
@@ -1987,9 +2035,9 @@ function routeHash() {
   if (h === "schedule") { openRitual({ schedule: true }); return; }   // the one place to schedule (schedule.html retired)
   if (h === "domain") { openFoundationsDesk({ domain: true }); return; }   // nav "Domain & email" → straight to "type your domain"
   if (h === "addpage") { go("design"); setTimeout(() => dcAddPage(), 300); return; }   // nav "Add a page"
-  if (h === "health") { hbScrollTo("healthCard"); return; }     // website-health.html retired
-  if (h === "pages") { hbScrollTo("pagesSec"); return; }        // content-tree.html retired
-  if (h === "activity") { hbScrollTo("activitySec"); return; }  // timeline.html retired
+  if (h === "health") { go("search"); setTimeout(() => hbScrollTo("healthCard"), 200); return; }     // website-health.html retired
+  if (h === "pages") { go("pages"); return; }                   // content-tree.html retired
+  if (h === "activity") { go("history"); setTimeout(() => hbScrollTo("activitySec"), 200); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
@@ -2017,10 +2065,16 @@ $("dock").addEventListener("click", (e) => {
 // One set of tabs. The phone's Sections sheet used to list different places from
 // the desktop strip, so Menu, Questions and Updates were missing on a desktop and
 // Bookings and Reviews on a phone.
-const SITE_TABS = [
-  ["today", "Overview"], ["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Updates"],
-  ["media", "Files"], ["bookings", "Bookings"], ["reviews", "Reviews"], ["business", "Business"], ["search", "Search"], ["analytics", "Analytics"], ["domain", "Domain & email"], ["history", "History"],
+// One menu, grouped by job, the way Squarespace groups its Website menu. On a
+// desktop it is drawn INTO the shell's sidebar under Website (mountSiteNav); on a
+// phone it is the Sections sheet. Styles opens Edit mode on its Styles panel.
+const SITE_MENU = [
+  [null, [["today", "Overview"], ["pages", "Pages"], ["styles", "Styles"], ["media", "Files"], ["search", "Search"]]],
+  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Updates"]]],
+  [null, [["bookings", "Bookings"], ["reviews", "Reviews"], ["analytics", "Analytics"]]],
+  ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
 ];
+const SITE_TABS = SITE_MENU.flatMap((g) => g[1]);
 // Keeps a studio drilled into a client inside that client on the way out of this page.
 function withClient(path) {
   const c = new URLSearchParams(location.search).get("client");
@@ -2033,29 +2087,97 @@ function withClient(path) {
 function openSiteTab(view) {
   if (view === "domain") openFoundationsDesk();
   else if (view === "analytics") location.href = withClient("/analytics.html?view=website");
+  else if (view === "connections") location.href = withClient("/connections.html");
+  else if (view === "sharing") location.href = withClient("/sharing.html");
+  else if (view === "clientview") location.href = withClient("/client.html");
+  else if (view === "styles") { go("design"); setTimeout(() => { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); }, 60); }
   else go(view);
 }
-(function buildSiteTabs() {
-  const nav = $("nav"), sheet = $("sectionsNav");
+function gateSiteMenu() {
+  document.querySelectorAll('.navitem[data-link="connections"]').forEach((n) => { n.hidden = !hasFeature("connected"); });   // Business-OS
+  document.querySelectorAll('.navitem[data-link="analytics"]').forEach((n) => { n.hidden = !hasFeature("reports"); });
+}
+function buildSiteTabs() {
+  let nav = $("nav");
+  if (!nav) { nav = el("nav", "hb-tabs"); nav.id = "nav"; nav.setAttribute("aria-label", "Website sections"); }
+  nav.textContent = "";
+  const sheet = $("sectionsNav"); if (sheet) sheet.textContent = "";
+  const cur = document.querySelector(".view.on"); const curView = cur ? cur.id.replace("view-", "") : "today";
   const item = ([view, label]) => {
     const b = el("button", "navitem", label); b.type = "button";
     if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
     else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
+    else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colors, fonts, corners and your template"; }
+    else if (view === "connections") { b.dataset.link = "connections"; b.title = "The services connected to your site"; }
+    else if (view === "sharing") { b.dataset.link = "sharing"; b.dataset.needs = "owner"; b.title = "Who can sign in, and what clients can see"; }
+    else if (view === "clientview") { b.dataset.link = "clientview"; b.title = "See what your client sees when they sign in"; }
     else b.dataset.view = view;   // applyVocab keeps the offerings label (Menu/Services) in sync through this
     return b;
   };
-  SITE_TABS.forEach((t) => {
-    const tab = item(t);
-    if (t[0] === "today") { tab.classList.add("on"); tab.setAttribute("aria-current", "page"); }
-    tab.addEventListener("click", () => openSiteTab(t[0]));
-    nav.appendChild(tab);
-    const row = item(t); row.style.padding = "10px 0"; row.style.fontSize = "15px";
-    row.addEventListener("click", () => { closeSheet("sectionsScrim"); openSiteTab(t[0]); });
-    sheet.appendChild(row);
+  SITE_MENU.forEach(([group, items]) => {
+    // a named group folds in the sidebar, and opens on its own when you're in it
+    let host = nav;
+    if (group) {
+      const fold = el("div", "nav-fold"); fold.dataset.grp = group;
+      const head = el("button", "grp", group); head.type = "button"; head.setAttribute("aria-expanded", "false");
+      head.addEventListener("click", () => { const open = fold.classList.toggle("open"); head.setAttribute("aria-expanded", String(open)); });
+      fold.appendChild(head); nav.appendChild(fold); host = fold;
+      if (sheet) { const g = el("div", "grp", group); g.dataset.grp = group; sheet.appendChild(g); }
+    }
+    items.forEach((t) => {
+      const tab = item(t);
+      if (t[0] === curView) { tab.classList.add("on"); tab.setAttribute("aria-current", "page"); }
+      tab.addEventListener("click", () => openSiteTab(t[0]));
+      host.appendChild(tab);
+      if (t[0] === curView && group) { host.classList.add("open"); host.firstChild.setAttribute("aria-expanded", "true"); }
+      if (!sheet) return;
+      const row = item(t); row.style.padding = "10px 0"; row.style.fontSize = "15px";
+      row.addEventListener("click", () => { closeSheet("sectionsScrim"); openSiteTab(t[0]); });
+      sheet.appendChild(row);
+    });
   });
-  const edit = el("button", "navitem", "Edit site"); edit.type = "button"; edit.style.padding = "10px 0"; edit.style.fontSize = "15px"; edit.style.fontWeight = "600";
-  edit.addEventListener("click", () => { closeSheet("sectionsScrim"); go("design"); });
-  sheet.insertBefore(edit, sheet.firstChild);
+  if (sheet) {
+    const edit = el("button", "navitem", "Edit site"); edit.type = "button"; edit.style.padding = "10px 0"; edit.style.fontSize = "15px"; edit.style.fontWeight = "600";
+    edit.addEventListener("click", () => { closeSheet("sectionsScrim"); go("design"); });
+    sheet.insertBefore(edit, sheet.firstChild);
+  }
+  // a rebuild after the shell redraws keeps the site's word for it (Menu/Services);
+  // on the first build VOCAB isn't initialized yet, and applyVocab sets it at boot
+  try { nav.querySelectorAll('.navitem[data-view="offerings"]').forEach((n) => { n.textContent = VOCAB.label; }); } catch (_) {}
+  return nav;
+}
+buildSiteTabs();
+syncSiteHome("today");   // the page opens on the Overview; a deep link moves it on from here
+// The menu lives in the shell's sidebar, under Website, as the sidebar's own inline
+// list (the same idiom Customers uses). The strip under the title is the fallback
+// when there is no sidebar to join. The shell redraws itself on context changes,
+// which drops the list, so a redraw puts it back.
+function mountSiteNav() {
+  const shell = document.getElementById("dds-shell"); if (!shell) return false;
+  const it = shell.querySelector('.dds-nav .sec > .it[data-href="/presence.html"]'); if (!it) return false;
+  const sec = it.parentElement;
+  let nav = $("nav");
+  if (nav && nav.parentElement === sec) return true;
+  if (!nav || !document.contains(nav)) nav = buildSiteTabs();
+  nav.className = "menu site-menu";
+  sec.classList.add("open", "has-site-menu");
+  it.insertAdjacentElement("afterend", nav);
+  // Website itself is the Overview, so it doesn't reload the page you're on
+  it.addEventListener("click", (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); go("today"); });
+  // A place the sidebar already lists once isn't listed twice
+  const listed = (href) => !!shell.querySelector('.dds-nav .sec > a.it[data-href="' + href + '"]');
+  nav.querySelectorAll('.navitem[data-view="media"]').forEach((n) => n.classList.toggle("dup", listed("/files.html")));
+  nav.querySelectorAll('.navitem[data-link="analytics"]').forEach((n) => n.classList.toggle("dup", listed("/analytics.html")));
+  return true;
+}
+(function watchShellForSiteNav() {
+  // the shell draws after its context loads, and redraws when that changes
+  const obs = new MutationObserver(() => { const n = $("nav"); if (!n || !n.classList.contains("site-menu") || !document.contains(n)) mountSiteNav(); });
+  const startOn = (sh) => { obs.observe(sh, { childList: true }); mountSiteNav(); };
+  const sh0 = document.getElementById("dds-shell");
+  if (sh0) { startOn(sh0); return; }
+  const wait = new MutationObserver(() => { const sh = document.getElementById("dds-shell"); if (sh) { wait.disconnect(); startOn(sh); } });
+  wait.observe(document.documentElement, { childList: true, subtree: true });
 })();
 
 /* ── sheets (focus returns to where you were — keyboard users never get lost) ── */
@@ -3232,7 +3354,7 @@ async function loadMedia() {
   // FL_load is NOT awaited: callers like importStockToBlock await loadMedia only
   // for S.media (the block thumbnail); the library grid refresh rides behind it
   // and never rejects (FL_load handles its own failures).
-  try { const r = await api("GET", "/media"); S.media = r.data || []; PF_S.key = null; PF_S.allow = null; FL_load(); renderPhotosCard(); }   // PF cache invalidated — uploads/deletes repaint the panel Files tab
+  try { const r = await api("GET", "/media"); S.media = r.data || []; PF_S.key = null; PF_S.allow = null; FL_load(); }   // PF cache invalidated — uploads/deletes repaint the panel Files tab
   catch (err) { toast(nice(err), true); }
 }
 
@@ -4039,11 +4161,7 @@ function carryScopeOnLinks() {
 function applyEditionGating() {
   const isMonitor = !!(S.site && S.site.edition === "monitor");
   document.documentElement.classList.toggle("plan-watch", isMonitor);
-  const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
-  document.querySelectorAll('.navitem[data-link="analytics"]').forEach((n) => { n.hidden = !hasFeature("reports"); });
-  // Visual Studio makes site imagery — website feature AND a drafting site
-  // (matches the nav: a watch-plan can read the site but never generates for it).
-  const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("website") || isMonitor;
+  gateSiteMenu();
   // A watch-plan (monitor) site OBSERVES — it never publishes. Hide BOTH publish
   // affordances (desktop button + mobile dock tab) and say so once, calmly,
   // instead of letting every tap end in a server refusal.
@@ -4161,7 +4279,7 @@ function hbTreePage(pg) {
 function hbLoadBoardExtras() {
   if (HB_ASKED.extras) return; HB_ASKED.extras = true;
   api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
-  api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); renderStatTiles(); }).catch(() => {});
+  api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); }).catch(() => {});
   api("GET", "/website-timeline").then((r) => { HB_TIMELINE = r.data || null; renderActivity(); }).catch(() => {});
   api("GET", "/foundations/domain").then((r) => { HB_DOMAIN = (r && r.data) || null; renderDomainCard(); }).catch(() => { HB_DOMAIN = undefined; });
 }
@@ -4239,183 +4357,126 @@ function hbScrollTo(id) {
   setTimeout(() => { const n = $(id); if (n && !n.hidden) { n.scrollIntoView({ behavior: "smooth", block: "start" }); if (n.hasAttribute("tabindex")) n.focus({ preventScroll: true }); } }, 400);
 }
 // the four tiles — each one a door to where the number is dealt with
-function hbStat(id, v, s, ico) {
-  const t = $(id); if (!t) return;
-  t.querySelector(".v").textContent = v; t.querySelector(".s").textContent = s;
-  if (ico !== undefined) t.querySelector(".ico").className = "ico" + (ico ? " " + ico : "");
-}
 let HB_SEARCH = null, HB_ASKED = {};
-function hbStatsLayout() {
-  const strip = $("statStrip"); if (!strip) return;
-  const n = Array.from(strip.children).filter((c) => !c.hidden).length;
-  strip.classList.toggle("three", n === 3); strip.classList.toggle("two", n <= 2);
-}
-function renderStatTiles() {
-  const h = S.health, f = h && h.facts, c = S.changes; if (!h) return;
-  const strip = $("statStrip"); if (!strip) return;
-  strip.hidden = false;
-  // waiting to publish
-  const n = (c && c.count) || 0;
-  const touched = [];
-  if (n && !(c && c.first_publish)) hbStandardPages().forEach((pg) => { if ((c.changes || []).some((ch) => pg.sections.indexOf(ch.section) >= 0)) touched.push(pg.title); });
-  hbStat("statWaiting", String(n),
-    !n ? (f && f.website.state !== "none" ? "Everything is live" : "Nothing waiting")
-      : c.blockers ? `${c.blockers} to fix before publishing`
-      : c.first_publish ? "Your first publish"
-      : touched.length ? (touched.length === 1 ? touched[0] + " page" : touched.join(", ")) : "Ready to publish",
-    n ? "warn" : "good");
-  // site health — the tri-state, with the domain and the search check beneath
-  const word = { healthy: "Good", needs_attention: "Needs a look", outdated: "Out of date" }[h.state] || "—";
-  const bits = [];
-  if (f) bits.push(f.domain.state === "ok" ? "Domain connected" : f.domain.state === "attention" ? "Domain needs a look" : "No custom domain");
-  if (HB_SEARCH) { const sf = HB_SEARCH.seo_fields || {}; if (HB_SEARCH.verification && HB_SEARCH.verification.ok) bits.push("verified"); else if (sf.title === "Set" && sf.description === "Set") bits.push("search fields set"); }
-  // one answer on one screen: when the Health check card has found something, the tile says so too
-  if (HB_HEALTH && HB_HEALTH.overall === "attention" && HB_HEALTH.attention_count) hbStat("statHealth", "Needs a look", `${HB_HEALTH.attention_count} to look at · see Health check`, "warn");
-  else hbStat("statHealth", word, bits.join(" · "), h.state === "healthy" ? "good" : h.state === "needs_attention" ? "warn" : "info");
-  if (!HB_ASKED.search) { HB_ASKED.search = true; api("GET", "/search/health").then((r) => { HB_SEARCH = r.data || null; if (HB_SEARCH) renderStatTiles(); }).catch(() => {}); }
-  // visitors (reports) and enquiries (forms) — only for plans that have them
-  const vis = $("statVisitors"), enq = $("statEnquiries");
-  if (vis) {
-    vis.hidden = !hasFeature("reports");
-    if (!vis.hidden && !HB_ASKED.visitors) {
-      HB_ASKED.visitors = true;
-      api("GET", "/analytics/dashboard?period=this_month").then((r) => {
-        const t = r.data && r.data.website && r.data.website.traffic;
-        if (t && typeof t.visitors === "number") hbStat("statVisitors", t.visitors.toLocaleString("en-US"), `${Number(t.pageviews || 0).toLocaleString("en-US")} page view${t.pageviews === 1 ? "" : "s"}`);
-      }).catch(() => {});
-    }
-  }
-  if (enq) {
-    enq.hidden = !hasFeature("forms");
-    if (!enq.hidden && !HB_ASKED.enquiries) {
-      HB_ASKED.enquiries = true;
-      api("GET", "/forms/inbox").then((r) => {
-        const rows = (r.data && r.data.submissions) || [];
-        const now = new Date(), m = now.getMonth(), y = now.getFullYear();
-        const month = rows.filter((x) => { const d = new Date(x.created_at); return d.getMonth() === m && d.getFullYear() === y; });
-        const fresh = month.filter((x) => x.status === "new").length;
-        hbStat("statEnquiries", String(month.length), month.length ? (fresh ? `${fresh} still new` : "All answered") : "None yet");
-      }).catch(() => {});
-    }
-  }
-  hbStatsLayout();
-}
 // the rail: Design — the site's colors, type and template, as it is dressed now
 let HB_LOOKS_ASKED = false;
-function renderDesignRailCard() {
-  const host = $("designSwatches"); if (!host) return;
-  const T = (typeof DESIGN_TOKENS === "object" && DESIGN_TOKENS) || {};
-  const sw = lookSwatch(S.site && S.site.template_slug);
-  const hex = (x) => (typeof normHexJs === "function" ? normHexJs(x) : null) || x;
-  host.innerHTML = "";
-  [T.accent || sw.accent, T.soft || T.accent_soft || sw.bg, T.ink || sw.ink].forEach((c) => { const i = el("i"); i.style.background = hex(c); host.appendChild(i); });
-  const fontName = (f) => String(f || "").split(",")[0].replace(/['"]/g, "").trim();
-  const fd = fontName(T.font_display), fb = fontName(T.font_body);
-  host.appendChild(el("span", null, fd || fb ? Array.from(new Set([fd, fb].filter(Boolean))).join(" and ") : "Template fonts"));
-  const slug = (S.site && S.site.template_slug) || "";
-  const known = LOOKS && Array.isArray(LOOKS.templates) ? LOOKS.templates.find((t) => t.slug === ((LOOKS.current && LOOKS.current.slug) || slug)) : null;
-  const tname = (known && known.name) || hbCap(slug.replace(/[-_]+/g, " ")) || "the standard look";
-  const note = $("designNote"); if (note) note.textContent = `Template: ${tname}. Colors, fonts and the logo live here; pages pick them up.`;
-  if (!LOOKS && !HB_LOOKS_ASKED) { HB_LOOKS_ASKED = true; api("GET", "/site/templates").then((r) => { if (r.data && Array.isArray(r.data.templates)) { LOOKS = r.data; renderDesignRailCard(); } }).catch(() => {}); }
-}
 // the rail: Photos — three thumbnails and the count
-function renderPhotosCard() {
-  const host = $("photoThumbs"), count = $("photoCount"); if (!host || !count) return;
-  const pics = (S.media || []).filter((m) => m && m.thumb);
-  host.innerHTML = "";
-  for (let i = 0; i < 3; i++) {
-    const cell = el("span");
-    if (pics[i]) { const img = el("img"); img.src = pics[i].thumb; img.alt = ""; img.loading = "lazy"; cell.appendChild(img); }
-    host.appendChild(cell);
-  }
-  const now = new Date();
-  const fresh = pics.filter((m) => { const d = new Date(m.created_at || 0); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
-  count.textContent = pics.length ? `${pics.length} photo${pics.length === 1 ? "" : "s"}${fresh ? ` · ${fresh} added this month` : ""}.` : "No photos yet.";
-}
 
 /* ── today: the board + the concierge's letters ── */
 async function loadToday() {
+  loadSiteStage();
   try {
-    const showMoments = hasFeature("business_moments");   // CMS-Only has no Moments surface
-    const [h, c, n, mo] = await Promise.all([
-      api("GET", "/health"), api("GET", "/changes"), api("GET", "/notes"),
-      showMoments ? api("GET", "/moments").catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-    ]);
-    S.health = h.data; S.changes = c.data; S.moments = mo.data || [];
+    const [h, c] = await Promise.all([api("GET", "/health"), api("GET", "/changes")]);
+    S.health = h.data; S.changes = c.data;
     if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash;   // M9: seed the optimistic-lock version
-    renderStatement(); renderFactsProse();
-    // the Domain · Health check · Recent activity cards and the page map do not
-    // depend on /health carrying `facts` (renderFactsProse returns early without
-    // them) — ask for them here, once, whatever /health said (Oct 2026 audit, gap 5)
-    hbLoadBoardExtras();
-    if (showMoments && S.moments.length) renderMoments(S.moments); else renderNotes(n.data || []);
-    renderRecent(); renderPublishButton(); renderBizWaiting(); renderWelcome();
+    renderFactsProse();
+    hbLoadBoardExtras();   // the health check and your address, for the Search tab; what happened, for Versions
+    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
   } catch (err) { toast(nice(err), true); }
 }
+// ── The Overview is the site ─────────────────────────────────────────────────
+// The draft, as the render engine draws it, in view mode: links and forms are
+// guarded, nothing is editable here. Edit site opens the same page to build on.
+let SS_LOADED = false, SS_STALE = true, SS_SEQ = 0, SS_PATH = "/";
+function loadSiteStage(force) {
+  const frame = $("siteFrame"); if (!frame || !$("view-today").classList.contains("on")) return;
+  if (SS_LOADED && !SS_STALE && !force) return;
+  const seq = ++SS_SEQ;
+  apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).then((html) => {
+    if (seq !== SS_SEQ) return;
+    SS_LOADED = true; SS_STALE = false;
+    frame.srcdoc = html;
+    const note = $("ssNote"); if (note) { note.hidden = true; note.textContent = ""; }
+    document.documentElement.classList.remove("ss-noplan");
+  }).catch((err) => {
+    if (seq !== SS_SEQ) return;
+    const note = $("ssNote"); if (!note) return;
+    note.hidden = false; note.textContent = "";
+    if (err && err.status === 403) {
+      document.documentElement.classList.add("ss-noplan");
+      const nm = S.identity && S.identity.business_name;
+      note.appendChild(el("div", "ssn-h", (nm ? nm + "’s website" : "This website") + " lives somewhere else."));
+      note.appendChild(el("div", "ssn-p", "Its visitors and search standing are here."));
+      const row = el("div", "ssn-acts");
+      const go2 = (label, fn) => { const b = el("button", "pillbtn", label); b.type = "button"; b.addEventListener("click", fn); row.appendChild(b); };
+      go2("Visitors", () => openSiteTab("analytics"));
+      go2("Search and health", () => go("search"));
+      go2("Their address", () => { location.hash = "#monitor"; });
+      note.appendChild(row);
+    } else {
+      note.appendChild(el("div", "ssn-h", "Your site couldn’t be drawn just now."));
+      note.appendChild(el("div", "ssn-p", "Nothing is lost. It will show up on your next visit, or open Preview above."));
+    }
+  });
+}
+function stageStale() { SS_STALE = true; if ($("view-today") && $("view-today").classList.contains("on")) loadSiteStage(); }
+function renderStageStatus() {
+  const st = $("ssStatus"); if (!st) return;
+  const live = siteLiveUrl(); const c = S.changes || {};
+  const n = c.count || 0;
+  st.textContent = live ? (n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : "Live") : "Not live yet";
+  st.classList.toggle("live", !!live);
+}
+// One line for what's left before the site can go live. Nothing to finish, no line.
+let SETUP_LEFT = 0;
+function renderTodoLine() {
+  const b = $("ssTodo"), t = $("ssTodoText"); if (!b || !t) return;
+  if (S.site && S.site.edition === "monitor") { b.hidden = true; return; }
+  const blockers = Number((S.changes || {}).blockers || 0);
+  const box = $("todoBlockers");
+  if (box) {
+    box.hidden = !blockers; box.textContent = "";
+    if (blockers) {
+      box.appendChild(el("h2", null, "Before you can go live"));
+      box.appendChild(el("div", "note", `${blockers} thing${blockers === 1 ? "" : "s"} to finish. The publish page lists each one, with a way straight to it.`));
+      const go2 = el("button", "pillbtn", "See what’s blocking"); go2.type = "button"; go2.addEventListener("click", () => { closeTodoPanel(); openRitual(); });
+      box.appendChild(go2);
+    }
+  }
+  if (blockers) t.textContent = `${blockers} thing${blockers === 1 ? "" : "s"} to finish before you can go live`;
+  else if (SETUP_LEFT) t.textContent = `${SETUP_LEFT} setup step${SETUP_LEFT === 1 ? "" : "s"} left`;
+  b.hidden = !(blockers || SETUP_LEFT);
+}
+function openTodoPanel() { const p = $("todoPanel"); if (p) { p.classList.add("on"); p.setAttribute("aria-hidden", "false"); const c = $("btnTodoClose"); if (c) c.focus(); } }
+function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.contains("on")) { p.classList.remove("on"); p.setAttribute("aria-hidden", "true"); } }
+(function initSiteStage() {
+  const seg = $("ssDevSeg"), wrap = $("ssFrameWrap");
+  if (seg && wrap) seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    seg.querySelectorAll("button").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+    wrap.className = "ss-frame" + (b.dataset.ssdev === "desktop" ? "" : " dev-" + b.dataset.ssdev);
+  });
+  const todo = $("ssTodo"); if (todo) todo.addEventListener("click", openTodoPanel);
+  const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
+  const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
+  const frame = $("siteFrame");
+  if (frame) frame.addEventListener("load", () => {
+    try {
+      const doc = frame.contentDocument; if (!doc || !doc.body) return;
+      // the bar above says whether this is live, so the preview ribbon has nothing to add
+      const st = doc.createElement("style"); st.textContent = "#presence-preview-badge{display:none!important}"; (doc.head || doc.documentElement).appendChild(st);
+      doc.addEventListener("submit", (e) => e.preventDefault(), true);
+      // links walk the site, here in the frame. Anything leading off the site does nothing.
+      doc.addEventListener("click", (e) => {
+        const a = e.target && e.target.closest && e.target.closest("a[href]"); if (!a) return;
+        const href = a.getAttribute("href") || "";
+        if (href.charAt(0) === "#") return;   // a jump on the same page works as it would for a visitor
+        e.preventDefault();
+        if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(href)) return;
+        const path = "/" + href.split(/[?#]/)[0].replace(/^\/+/, "").replace(/index\.html$/, "");
+        const name = (a.textContent || "").trim();
+        SS_PATH = path === "//" ? "/" : path;
+        const pg = $("ssPage"); if (pg) pg.textContent = SS_PATH === "/" ? "Home" : (name.slice(0, 40) || SS_PATH);
+        loadSiteStage(true);
+      }, true);
+    } catch (_) { /* a frame we can't read is still a picture of the site */ }
+  });
+})();
 
 /* ── the concierge's letters: moments + in-letter conversation (M9.4) ──
    One host, five questions, session memory only — the thread lives in this
    page and dies with it. Every answer arrives grounded from the server. */
-const MOMENT_WAX = { good_news: "celebration", celebration: "celebration", needs_attention: "caution", reminder: "suggestion", opportunity: "suggestion", seasonal: "suggestion", business_health: "suggestion", learning: "suggestion" };
-const CHIPS = [
-  ["What does this mean?", "what does this mean"],
-  ["Why does it matter?", "why does this matter"],
-  ["What if I ignore it?", "what happens if I ignore it"],
-  ["How do I fix it?", "how do I fix it"],
-  ["What will change?", "what will change when it goes live"],
-];
-function renderMoments(moments) {
-  $("notesWrap").hidden = !moments.length;
-  const list = $("notesList"); list.innerHTML = "";
-  moments.forEach((m) => {
-    const card = el("div", "letter");
-    card.appendChild(el("span", "wax " + (MOMENT_WAX[m.moment_type] || "suggestion")));
-    card.appendChild(el("div", "lt", m.headline));
-    card.appendChild(el("div", "lr", m.summary));
-    const la = el("div", "la");
-    const more = el("button", "textact", "Tell me more");
-    more.addEventListener("click", () => {
-      const open = card.querySelector(".thread");
-      if (open) { open.remove(); return; }
-      card.appendChild(momentThread(m));
-    });
-    la.appendChild(more);
-    if (m.dismissable) {
-      const dis = el("button", "quietact", "Dismiss");
-      dis.addEventListener("click", async () => {
-        try {
-          await api("POST", `/moments/${m.id}/dismiss`);
-          card.classList.add("away");
-          setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
-        } catch (err) { toast(nice(err), true); }
-      });
-      la.appendChild(dis);
-    }
-    card.appendChild(la);
-    list.appendChild(card);
-  });
-}
-function momentThread(m) {
-  const t = el("div", "thread");
-  const history = []; // current interaction only — never persisted
-  const chips = el("div", "chips");
-  CHIPS.forEach(([label, q]) => {
-    const c = el("button", "chip", label);
-    c.addEventListener("click", () => askInThread(t, m, q, label, history));
-    chips.appendChild(c);
-  });
-  t.appendChild(chips);
-  const row = el("div", "askrow");
-  const inp = el("input"); inp.type = "text"; inp.placeholder = "Ask about this…"; inp.maxLength = 300;
-  inp.setAttribute("aria-label", "Ask the concierge about this note");
-  const go = el("button", "quietact", "Ask");
-  const submit = () => { const q = inp.value.trim(); if (q) { askInThread(t, m, q, q, history); inp.value = ""; } };
-  go.addEventListener("click", submit);
-  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
-  row.append(inp, go);
-  t.appendChild(row);
-  return t;
-}
 async function askInThread(thread, moment, question, shown, history) {
   const row = thread.querySelector(".askrow");
   thread.insertBefore(el("div", "c-you", shown), row);
@@ -4438,19 +4499,6 @@ async function askInThread(thread, moment, question, shown, history) {
   } catch (err) {
     holder.textContent = "That didn’t come through — your note is safe, ask again in a moment.";
   }
-}
-function renderStatement() {
-  const w = $("healthWrap"); const h = S.health; if (!h) return;
-  w.innerHTML = "";
-  // a healthy site says so in the strip; the band is for a site that needs a look
-  if (h.first_run || h.state === "healthy" || !h.sentence) { w.hidden = true; return; }
-  w.hidden = false;
-  const band = el("div", "hb-band " + (h.state || "")); band.setAttribute("role", "status");
-  const lamp = el("span", "lamp"); lamp.innerHTML = HB_ICON.alert; band.appendChild(lamp);
-  const t = el("div", "t"); t.appendChild(el("b", null, h.sentence));
-  if (h.detail) { t.appendChild(document.createTextNode(" ")); t.appendChild(el("span", null, h.detail)); }
-  band.appendChild(t);
-  w.appendChild(band);
 }
 function renderFactsProse() {
   const w = $("factsWrap"); const f = S.health && S.health.facts;
@@ -4478,42 +4526,7 @@ function renderFactsProse() {
   if (f.last_publish.label !== "—") { const lp = el("span", null, "Last published " + String(f.last_publish.label).replace(/^[A-Za-z]{3}, /, "")); lp.title = hbCap(f.last_publish.detail); parts.push(lp); }
   parts.forEach((n, i) => { if (i) w.insertBefore(el("span", "dot", "·"), whisperNode); w.insertBefore(n, whisperNode); });
   if (parts.length) w.insertBefore(el("span", "dot", "·"), whisperNode);
-  renderStatTiles();
   renderPagesList();
-}
-function renderNotes(notes) {
-  $("notesWrap").hidden = !notes.length;
-  const list = $("notesList"); list.innerHTML = "";
-  notes.forEach((n) => {
-    const card = el("div", "letter");
-    card.appendChild(el("span", "wax " + n.kind));
-    card.appendChild(el("div", "lt", n.title));
-    card.appendChild(el("div", "lr", n.reason));
-    const la = el("div", "la");
-    if (n.action && n.action.label) {
-      const act = el("button", "textact", n.action.label);
-      act.addEventListener("click", async () => {
-        try { await api("POST", `/notes/${n.id}/accept`); } catch { /* outcome recording is best-effort */ }
-        const sec = n.action.section;
-        if (sec === "publish") openRitual();
-        else if (sec === "preview") openPreview("live");
-        else if (sec) go(sec);
-        loadToday();
-      });
-      la.appendChild(act);
-    }
-    const dis = el("button", "quietact", "Dismiss");
-    dis.addEventListener("click", async () => {
-      try {
-        await api("POST", `/notes/${n.id}/dismiss`);
-        card.classList.add("away");
-        setTimeout(() => { card.remove(); if (!$("notesList").children.length) $("notesWrap").hidden = true; }, 260);
-      } catch (err) { toast(nice(err), true); }
-    });
-    la.appendChild(dis);
-    card.appendChild(la);
-    list.appendChild(card);
-  });
 }
 function renderRecent() {
   const c = S.changes;
@@ -4567,8 +4580,8 @@ function renderPublishButton() {
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await api("GET", "/changes"); S.changes = c.data; if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash; renderPublishButton(); renderBizWaiting();
-      if ($("view-today").classList.contains("on")) { renderRecent(); renderStatTiles(); renderPagesList(); } }
+    try { const c = await api("GET", "/changes"); S.changes = c.data; if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+      if ($("view-pages").classList.contains("on")) { renderRecent(); renderPagesList(); } }
     catch { /* quiet */ }
   }, 1200);
 }
@@ -4581,54 +4594,9 @@ function renderBizWaiting() {
   rows.forEach((ch) => w.appendChild(el("p", "consequence", "When you publish: " + ch.sentence.charAt(0).toLowerCase() + ch.sentence.slice(1))));
   w.style.marginTop = "-22px"; w.style.marginBottom = "34px";
 }
-let WELCOME_FULL = null;   // decided once per page load: this view re-renders on every refresh
 const siteKey = () => (S.site && S.site.id) || "";
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* private window: the full welcome just shows again */ } };
-function renderWelcome() {
-  const w = $("welcomeWrap"); const h = S.health;
-  // a watch plan never publishes from here, so "publish when you're ready" is a dead end
-  if (!h || !h.first_run || (S.site && S.site.edition === "monitor")) { w.hidden = true; w.innerHTML = ""; return; }
-  w.hidden = false;
-  const name = (S.identity && S.identity.business_name) || "your business";
-  const step1done = !!(S.identity && S.identity.business_name && S.identity.description);
-  const step2done = lsGet("presence-previewed:" + siteKey()) === "1";
-  w.innerHTML = "";
-  // The full welcome is for the first visit. After that it is one line with the next
-  // step, so the overview's real content isn't below the fold on every return.
-  if (WELCOME_FULL === null) { WELCOME_FULL = lsGet("presence-welcomed:" + siteKey()) !== "1"; lsSet("presence-welcomed:" + siteKey(), "1"); }
-  if (!WELCOME_FULL) {
-    const n = !step1done ? 1 : !step2done ? 2 : 3;
-    const next = {
-      1: ["Look over your facts", () => go("business")],
-      2: ["See your website", () => openPreview("draft")],
-      3: ["Publish when you’re ready", () => openRitual()],
-    }[n];
-    const bar = el("div", "welcomebar");
-    bar.appendChild(el("span", "wb-k", `Getting ${name} online · step ${n} of 3`));
-    const b = el("button", "textact", next[0] + " →"); b.type = "button"; b.addEventListener("click", next[1]);
-    bar.appendChild(b);
-    w.appendChild(bar);
-    return;
-  }
-  const env = el("div", "envelope");
-  env.appendChild(el("h2", null, `Let’s introduce ${name} to the internet.`));
-  env.appendChild(el("p", null, "Three steps, at your pace. Nothing goes public until you say so."));
-  const steps = el("div", "steps3");
-  const mk = (n, done, s, d, fn) => {
-    const b = el("button", "step3" + (done ? " done" : ""));
-    b.appendChild(el("span", "sn", done ? "✓" : String(n)));
-    const t = el("span"); t.appendChild(el("span", "st", s)); t.appendChild(document.createElement("br")); t.appendChild(el("span", "sd", d));
-    b.appendChild(t);
-    b.addEventListener("click", fn);
-    return b;
-  };
-  steps.appendChild(mk(1, step1done, "Look over your facts", "Name, hours, address — the things customers look up.", () => go("business")));
-  steps.appendChild(mk(2, step2done, "See your website", "A private proof, for your eyes only.", () => openPreview("draft")));
-  steps.appendChild(mk(3, false, "Publish when you’re ready", "One page shows you exactly what goes up. Then one button.", () => openRitual()));
-  env.appendChild(steps);
-  w.appendChild(env);
-}
 
 /* ── the proofing desk (identical /preview calls) ── */
 const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "", launchId: null };
@@ -4722,7 +4690,11 @@ window.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || !$("stage").classList.contains("on")) return;
   e.stopPropagation(); closePreview();
 }, true);
-$("btnEditSite").addEventListener("click", () => go("design"));
+$("btnEditSite").addEventListener("click", () => {
+  go("design");
+  const slug = SS_PATH.replace(/\//g, "");
+  if ($("view-design").classList.contains("on") && slug && typeof dcPageObj === "function" && dcPageObj(slug)) dcSwitchPage(slug);
+});
 $("btnPreview").addEventListener("click", () => openPreview("draft"));
 function syncStageChrome() {
   const press = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); };
@@ -5045,8 +5017,6 @@ function renderBlockerList(list) {
 function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
-$("statWaiting").addEventListener("click", () => openRitual());
-$("statHealth").addEventListener("click", () => hbScrollTo(HB_HEALTH ? "healthCard" : "pagesSec"));
 async function loadRitual(toSchedule) {
   $("ritTitle").textContent = "One moment.";
   $("ritSub").textContent = "Reading over your draft…";
@@ -6054,7 +6024,7 @@ async function refreshAll() {
   carryScopeOnLinks();
   applyVocab();
   fillSingles(); await loadToday();
-  renderPhotosCard(); renderDesignRailCard();
+ 
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   mountAnnouncementCard();
   mountDesignCard();
@@ -6970,7 +6940,7 @@ async function mountDesignCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
   catch (_) { return; } // not an owner/developer on this site → no card
-  renderDesignRailCard();
+ 
   await mountBrandKitCard();   // FD-T9: brand kit is the source of truth, above the granular controls
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Design studio"));
@@ -7920,7 +7890,7 @@ async function saveBlocks() {
     const ae = document.activeElement;
     if (!(ae && ae.closest && ae.closest("#blocksCard"))) renderBlocksCard();
     if (typeof renderBlockTray === "function" && $("designTray") && $("designTray").childElementCount) renderBlockTray();   // reflect which types are now on the page
-    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
+    whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview(); stageStale();
     return true;   // review fix 8: callers may announce "Saved" only on a real resolve
   } catch (err) {
     whisper("topWhisper", "");
@@ -10615,6 +10585,9 @@ function dpHoldRepaint() {
 }
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
+  // Drawing a canvas nobody can see is a full page render per save. Opening Edit mode
+  // repaints it (go), so it is never stale when it's on screen.
+  if (!$("view-design").classList.contains("on")) return;
   // Slice D: a past version is on the canvas (Timewarp) — leave it there until
   // "Back to today"; the draft repaint happens on the mode change back to Edit.
   if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
@@ -12078,7 +12051,7 @@ const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquir
 // below happily rendered "New message from Acme Bakery" as a plum "outgrown your
 // plan" card with a See plans → pricing.html button. Client chatter is never a
 // plan problem — exclude it from this card's candidates entirely.
-const PLAN_CARD_EXCLUDE = ["client_message", "client_upload", "client_request", "client_approval"];
+const PLAN_CARD_EXCLUDE = ["client_message", "client_upload", "client_request", "client_approval", "deal_signed", "deal_followup", "deal_ready", "proposal_accepted", "lead_followup"];
 async function renderPlanNotice() {
   let notices = [];
   try { const r = await api("GET", "/commerce/notices"); notices = ((r.data && r.data.notices) || []).filter((x) => PLAN_CARD_EXCLUDE.indexOf(x && x.kind) < 0); }
@@ -12125,10 +12098,14 @@ async function renderPlanNotice() {
 async function renderFirstRun() {
   const wrap = $("setupCard");
   if (!wrap) return;
+  // A studio's own site is a practice site: nobody is waiting on its setup steps.
+  const ctx0 = window.__ddsContext;
+  if (ctx0 && ctx0.is_agency && !(ctx0.scope && ctx0.scope.name) && !new URLSearchParams(location.search).get("client")) { wrap.hidden = true; SETUP_LEFT = 0; renderTodoLine(); return; }
   let fr;
   try { const r = await api("GET", "/commerce/first-run"); fr = r.data; }
   catch (_) { return; }
-  if (!fr || fr.dismissed || fr.complete || !Array.isArray(fr.steps) || !fr.steps.length) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+  if (!fr || fr.dismissed || fr.complete || !Array.isArray(fr.steps) || !fr.steps.length) { wrap.hidden = true; wrap.innerHTML = ""; SETUP_LEFT = 0; renderTodoLine(); return; }
+  SETUP_LEFT = Math.max(0, (fr.total || 0) - (fr.done || 0)); renderTodoLine();
   wrap.innerHTML = ""; wrap.hidden = false;
   const head = el("div", "hb-card-h");
   head.appendChild(el("h2", null, "Setup"));
@@ -12138,7 +12115,7 @@ async function renderFirstRun() {
   bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", String(fr.total)); bar.setAttribute("aria-valuenow", String(fr.done)); bar.setAttribute("aria-label", "Setup progress");
   wrap.appendChild(bar);
   const tasks = el("div", "hb-tasks");
-  const viewFor = { details: "business", brand: "business", connect: "today", observe: "today" };
+  const viewFor = { details: "business", brand: "business", connect: "search", observe: "search" };
   for (const s of (fr.steps || [])) {
     const row = el(s.done ? "div" : "button", "hb-task" + (s.done ? " done" : ""));
     if (!s.done) row.type = "button";

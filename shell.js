@@ -269,6 +269,10 @@
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
     // Oct 2026 nav cut: a section whose items are ALL hidden (⌘K-only) is not drawn.
+    // Get started is the first run of a NEW client site. A studio at studio level
+    // keeps its own draft site as a practice site, so the wizard never belongs in
+    // its menu (the server stops sending it; this covers the deployed version).
+    if (CTX && CTX.is_agency && !(CTX.scope && CTX.scope.name)) nav = nav.filter(function (s) { return s.key !== 'get_started'; });
     var drawn = nav.filter(function (s) { return visibleItems(s).length > 0; });
     var primary = drawn.filter(function (s) { return !s.utility; });
     UTILS = drawn.filter(function (s) { return s.utility; });

@@ -476,7 +476,8 @@ html.dds-embed .dds-waffle{display:none!important}
   html.dds-side #dds-search{order:1;height:32px;margin:0 0 var(--dds-s2);border-radius:var(--dds-r);padding:0 10px;background:var(--dds-card)}
   html.dds-side #dds-search span:first-child{display:inline-flex}
   html.dds-side #dds-search kbd{display:inline-block}
-  html.dds-side .dds-nav{order:2;flex:0 0 auto;flex-direction:column;align-items:stretch;align-self:auto;gap:1px}
+  /* the list scrolls inside the column when it's taller than the window, so the bottom row stays put */
+  html.dds-side .dds-nav{order:2;flex:1 1 auto;min-height:0;flex-direction:column;align-items:stretch;align-self:auto;gap:1px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
   html.dds-side .dds-nav .dds-util{display:flex;flex-direction:column;gap:1px;margin-top:var(--dds-s2);padding-top:var(--dds-s2);border-top:1px solid var(--dds-line)}
   html.dds-side .dds-nav .sec{display:block}
   html.dds-side .dds-nav .sec > .it{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 10px;
