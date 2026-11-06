@@ -1059,6 +1059,7 @@ body.pd-dragging *{cursor:grabbing !important}
    grabbable below the now-interactive iframe. Structured/list-order edits only. */
 .dp-frame.dc-live{padding-bottom:var(--dds-s4,16px)}
 .dp-frame.dc-live iframe{pointer-events:auto}
+#designPreview[inert]{opacity:.55}
 .dp-stage.dev-tablet .dp-frame{width:768px;max-width:100%}
 .dp-stage.dev-phone .dp-frame{width:390px;max-width:100%}
 #designPreviewEmpty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:var(--dds-s7,32px) var(--dds-s7,32px);background:var(--sheet)}
@@ -1960,6 +1961,7 @@ function syncSiteHome(view) {
   if (acts && bar && acts.parentElement !== bar) bar.appendChild(acts);
 }
 function go(view, early) {
+  const stays = $("view-" + view) && $("view-" + view).classList.contains("on");
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
@@ -1989,7 +1991,7 @@ function go(view, early) {
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
   if (view === "search") { loadSearch(); hbLoadBoardExtras(); }
-  if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
+  if (view === "design") { if (stays) dcCaptureScroll(); refreshDesignPreview(); }   // CP-2.5: the live proof warms on entry; a section's Edit from the canvas keeps its place
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
   try { history.replaceState(null, "", "#" + view); } catch (_) {}
@@ -7287,17 +7289,29 @@ function pagesBarReveal() {
 // already on its way is waited out too, since a write built from S.settings before it
 // lands would undo it. It loops because the page stays open during the wait. False = a
 // save failed: its message is up and the words are still in the list, so the caller
-// stays on this page.
-async function dcSavePendingEdits() {
+// stays on this page. keepSession leaves an open session typing, for a write that isn't
+// a page change (a form's timer can fire while someone types on the canvas).
+async function dcSavePendingEdits(keepSession) {
   for (;;) {
-    if (IPE) ipeCommit();
+    if (IPE && !keepSession) ipeCommit();
     const put = BLOCKS_PUT || (IPE_SAVE_T != null || IPE_SAVE_PENDING ? ipeSaveNow() : blocksDirty() ? blocksSaveNow() : null);
     if (!put) return true;
     if (!(await put)) return false;
   }
 }
-// Point the editor at a page, canvas at the top. The caller has run dcSavePendingEdits.
-function dcOpenPage(slug) { DC_PAGE = slug; DC_SCROLL = null; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; }
+// Point the editor at a page, canvas at the top. The caller has just run dcSavePendingEdits.
+// The document still on the canvas is the page just left, and its stamps index a list
+// that's gone: whatever it sent would land on this page at the same index. So it stays
+// in view but inert until this page's document loads, and dcFrameDoc stops offering it.
+// A past version in Timewarp stays readable, since no load comes until "Back to today".
+let DC_PAGE_OPENS = 0;   // which opening of a page this is; a read or a load belongs to one
+function dcOpenPage(slug) {
+  DC_PAGE = slug; DC_PAGE_OPENS++; DC_SCROLL = null; DC_FOCUS_BI = null; dcResetHistory(); BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null;
+  const frame = $("designPreview");
+  if (!frame || (DC_MODE === "timewarp" && DC_TW_LOADED)) return;
+  if (PDRAG) pdFinish(false);   // a drag from the old rows or document can't land on this list
+  frame.inert = true; dcRefreshTree();
+}
 // Where a switch waiting on its save is headed. Another click only changes this, so the
 // last page asked for wins however slow the save is.
 let DC_SWITCH_TO = null;
@@ -7335,6 +7349,7 @@ async function dcAddPage() {
   try {
     const r = await api("PUT", "/settings", { pages });
     S.settings = r.data || { ...S.settings, pages };
+    if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during that write stays on its own page
     dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast("Page “" + title + "” created — edit any section, then publish");
@@ -7505,10 +7520,12 @@ function dcPageMenu(slug, anchor) {
   setTimeout(() => document.addEventListener("mousedown", off, true), 0);
 }
 async function dcTogglePageNav(slug) {
+  if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
   const pages = dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; });
   try { const r = await api("PUT", "/settings", { pages }); S.settings = r.data || { ...S.settings, pages }; renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
 }
 async function dcMovePage(slug, dir) {
+  if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
   const arr = dcPagesArr().slice(); const i = arr.findIndex((x) => x.slug === slug); const j = i + dir;
   if (i < 0 || j < 0 || j >= arr.length) return;
   [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -7522,6 +7539,7 @@ async function dcDuplicatePage(slug) {
     const r = await api("POST", "/pages/duplicate", { slug: slug || "" });
     const d = (r && r.data) || {};
     S.settings = { ...(S.settings || {}), pages: Array.isArray(d.pages) ? d.pages : dcPagesArr() };
+    if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during the copy stays on its own page
     if (d.slug) dcOpenPage(d.slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast("Duplicated — now editing “" + (d.title || "the copy") + "”. Publish when it’s ready.");
@@ -7538,6 +7556,7 @@ async function dcRenamePage(slug) {
   const title = name.trim().slice(0, 60);
   const addr = await askText("Page address", { value: slug, ok: "Save", hint: "This page’s link: yoursite.com/…/. Lowercase letters, numbers and dashes. If you change it, visitors to the old link are redirected to the new one automatically." });
   if (addr === null) return;
+  if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
   const newSlug = String(addr || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || slug;
   const renamed = newSlug !== slug;
   if (renamed) {
@@ -7598,12 +7617,13 @@ async function dcDeletePage(slug) {
   if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
   try {
     const r = await api("PUT", "/settings", body); S.settings = r.data || { ...S.settings, pages };
-    if (DC_PAGE === slug) dcOpenPage("");
+    if (DC_PAGE === slug) { await dcSavePendingEdits(); dcOpenPage(""); }   // anything typed during that write went with the page, not onto Home
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     // G7: an honest Undo — we still hold the full page (it lives in the draft
     // settings row), so putting it back IS a true restore; a checkpoint (above)
     // covers anything beyond the toast's window.
     toastAction("Page “" + title + "” deleted", "Undo", async () => {
+      if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
       const cur = dcPagesArr().slice();
       if (cur.some((x) => x.slug === removed.slug)) { toast("That page is already back"); return; }
       cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
@@ -7860,11 +7880,6 @@ function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
   BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
 }
-// For a write built from the saved list (forms): let section edits reach it first.
-async function blocksSettled() {
-  for (let i = 0; i < 100 && BLOCKS_SAVING; i++) await new Promise((r) => setTimeout(r, 50));
-  if (blocksDirty()) await blocksSaveNow();
-}
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
   // An in-place commit has its own ~1.2s debounce and saves this same list when it
@@ -7873,6 +7888,7 @@ async function blocksSaveNow() {
   if (!blocksDirty()) return true;
   // G27 §5: unreadable colors still get their one question; "no" puts the list back
   if (!ovConfirmContrastAck()) { BLOCKS_WORK = JSON.parse(DC_HIST_LAST); renderBlocksCard(); return false; }
+  dcCaptureScroll();   // the save's repaint keeps the canvas where the person is now
   BLOCKS_SAVING = true;
   try { return await saveBlocks(); } finally { BLOCKS_SAVING = false; }
 }
@@ -9256,7 +9272,8 @@ async function saveForms() {
   whisper("topWhisper", "saving");
   FORMS_SAVING = true;
   try {
-    await blocksSettled();
+    // Built from the saved list below, so section edits reach it first.
+    if (!(await dcSavePendingEdits(true))) { whisper("topWhisper", ""); return; }
     const sentForms = JSON.stringify(FORMS_WORK);
     // Forms keep their place on the page (a save used to drag them all to the bottom);
     // a form removed here drops out, a new one lands at the end.
@@ -9610,6 +9627,7 @@ async function dcTimewarpGo() {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // the page open on the canvas
       const html = await apiHtml(`/preview?publish_id=${encodeURIComponent(d.publish_id)}&page=${encodeURIComponent(path)}`);
       if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
+      DP_PAINT_OPEN = DC_PAGE_OPENS;
       frame.srcdoc = html;
     }
     DC_TW_LOADED = true;
@@ -10605,6 +10623,7 @@ function dpNote(title, body) {
 // session to end (ipeEnd runs it). A commit still in its debounce holds it off too:
 // that save repaints when it lands, and a read now would flash the old text back.
 let DP_REPAINT_HELD = false;
+let DP_PAINT_OPEN = 0;   // the page opening (DC_PAGE_OPENS) the last document written to the canvas belongs to
 function dpHoldRepaint() {
   if (IPE) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
@@ -10629,23 +10648,29 @@ function refreshDesignPreview() {
     // exists); dcInjectCanvas then lays a big "add your first section" drop zone
     // right on it (AEM's "Drag components here" box), so the empty page is a real
     // build surface, not a dead sheet. No early-return-on-empty any more.
+    const opened = DC_PAGE_OPENS;
     try {
       const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
+      if (opened !== DC_PAGE_OPENS) return;   // the page changed while this read was out; the new page has its own
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
       if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
+      DP_PAINT_OPEN = opened;
       frame.srcdoc = html;
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
+      if (opened !== DC_PAGE_OPENS) return;
       // a plan without the website builder: say that, not "try again" — it can't work
       if (err && err.status === 403) {
+        DP_PAINT_OPEN = opened;
         frame.srcdoc = "";
         const box = $("designPreviewEmpty"); if (box) box.classList.add("plan");
         dpNote("Editing isn’t part of this plan.", "This plan watches a website that lives somewhere else. Design opens up on a plan with the website builder.");
         return;
       }
-      // the big proof ("See your site") still works — say so rather than staying blank
-      if (!frame.srcdoc) dpNote("The proof couldn’t draw just now.",
+      // the big proof ("See your site") still works — say so rather than staying blank,
+      // or on the page just left
+      if (!frame.srcdoc || frame.inert) dpNote("The proof couldn’t draw just now.",
         "Your content is safe. It’ll appear here on your next change — or open “See your site” above for the full proof.");
     }
   }, 350);
@@ -10667,7 +10692,7 @@ function refreshDesignPreview() {
 // blocks, always auto-responsive, always accessible. Nothing here changes output.
 let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
 let DC_FOCUS_BI = null; // a just-added/dropped block index → scroll the canvas to it + flash it after reload
-function dcFrameDoc() { const f = $("designPreview"); try { return f && f.contentDocument; } catch (_) { return null; } }
+function dcFrameDoc() { const f = $("designPreview"); try { return f && !f.inert ? f.contentDocument : null; } catch (_) { return null; } }   // none while the page just left is still up (dcOpenPage)
 function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.defaultView) ? d.defaultView.scrollY : null; }
 
 // ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
@@ -11250,6 +11275,7 @@ function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   } catch (_) {}
 }
 function ipeStart(doc, fieldEl, secEl) {
+  if (doc !== dcFrameDoc()) return;           // the page just left (dcOpenPage): these stamps index another page's list
   if (IPE) ipeCommit();                       // starting a new session banks the old one
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
@@ -11964,6 +11990,10 @@ function dcTreeSelect(el2, row) {
   frame.addEventListener("load", () => {
     let doc; try { doc = frame.contentDocument; } catch (_) { return; }
     if (!doc || !doc.body) return;
+    // Load waits for a document's images, so the page can change between its write and
+    // here. A document from before that gets no chrome, and the canvas stays inert.
+    if (DP_PAINT_OPEN !== DC_PAGE_OPENS) return;
+    frame.inert = false;
     const wrap = frame.closest(".dp-frame");
     frame.removeAttribute("aria-hidden");   // the canvas is interactive (Edit) or readable (view modes), not decorative
     // Slice D: Preview / Timewarp withhold ALL editing chrome — the injector is
