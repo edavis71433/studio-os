@@ -102,6 +102,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const seesFull = siteCan(role, 'view_all');
   const showApprovals = visibleTo(role, 'approvals');
   const reader = String(principal.userId || principal.email || 'anon'); // same key /notifications(/read) uses
+  // Invited to work on this site, so not the customer a bridged site's client surface is for.
+  const worksOnSite = role === 'business_staff' || role === 'developer';
 
   // ONE concurrent wave for every independent read on this boot path — agency
   // membership, the bridged-customer links, the entitlement plan, and BOTH
@@ -118,7 +120,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     // Bridged-customer links (see isManagedClient below). Fired without waiting on
     // the agency lookup — the old !isAgency guard moved to the CONSUMER, so an
     // agency operator's result is simply discarded, never acted on.
-    site.client_id && !isOperator && !scopedName
+    site.client_id && !isOperator && !scopedName && !worksOnSite
       ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).then((r) => ((r.json as any[]) || [])).catch(() => null)
       : Promise.resolve(null),
     // Phase D: the licensed plan (shared per-request memo — the boundary gate already read this row)
@@ -156,8 +158,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // NOT the operator workspace. Signal: site.client_id set AND ≥1 ACTIVE
   // service_link keyed by THIS customer (customer_client_id) — the CUSTOMER side of
   // the bridge. Guarded so an agency operator who scope-switched INTO this customer
-  // (isAgency / isOperator / scopedName) KEEPS the operator tools, and a plain
-  // studio owner (no customer-side link) is never mistaken for a client.
+  // (isAgency / isOperator / scopedName) KEEPS the operator tools, a staff or
+  // developer seat keeps theirs (worksOnSite), and a plain studio owner (no
+  // customer-side link) is never mistaken for a client.
   // The lookup rides the wave above so the attention block below reuses it (no 2nd query).
   const customerLinks: any[] | null = isAgency ? null : linksQ;
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
