@@ -233,7 +233,7 @@ test.describe('on a phone', () => {
 });
 
 test.describe('a watch-plan site', () => {
-  const WATCH = { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Hettie Test', description: 'Hello' }, location: {} } } };
+  const WATCH = { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Sample Bakery', description: 'Hello' }, location: {} } } };
   const open = async (page: Page) => {
     await page.route('**/functions/v1/presence/preview**', (r: Route) => r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'feature_not_in_plan' }) }));
     await installApp(page, { api: { ...API, ...WATCH, '/settings': { data: { blocks: [], pages: [] } } } });
@@ -244,7 +244,7 @@ test.describe('a watch-plan site', () => {
   test('it says what this plan is, whose site it is, and where to look', async ({ page }) => {
     await open(page);
     const note = page.locator('#ssNote');
-    await expect(note).toContainText('Hettie Test’s website lives somewhere else.');
+    await expect(note).toContainText('Sample Bakery’s website lives somewhere else.');
     await expect(note.getByRole('button', { name: 'Search and health' })).toBeVisible();
     await note.getByRole('button', { name: 'Search and health' }).click();
     await expect(page.locator('#view-search')).toBeVisible();

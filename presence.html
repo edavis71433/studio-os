@@ -9720,7 +9720,12 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
-  setTimeout(() => { try { (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus(); } catch (_) {} }, 40);
+  setTimeout(() => { try {
+    // already in a field in this panel: leave them there, or the words go nowhere
+    const ae = document.activeElement;
+    if (ae && ae !== p && ae !== document.body && p.contains(ae)) return;
+    (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus();
+  } catch (_) {} }, 40);
 }
 function exitEditMode() {
   if (IPE) ipeCommit();   // bank in-place text before the canvas goes away
