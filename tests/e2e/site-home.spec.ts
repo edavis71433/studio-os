@@ -260,3 +260,95 @@ test.describe('a watch-plan site', () => {
     expect(await page.locator('#sectionsNav .navitem[data-view="pages"]').evaluate((n) => getComputedStyle(n).display)).toBe('none');
   });
 });
+
+test.describe('Business details holds only the business', () => {
+  test('its name and contact details, address and hours stay; everything else has a better home', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await expect(page.locator('#view-business h1.doc')).toHaveText('Business details');
+    for (const id of ['f-business_name', 'f-phone', 'f-booking_url', 'f-city', 'hoursGrid', 'closedSwitch']) await expect(page.locator(`#view-business #${id}`)).toBeVisible();
+    await expect(page.locator('#billingCard, #deleteCard')).toHaveCount(0);
+    await expect(page.locator('#view-business #annCard, #view-business #knowledgeList')).toHaveCount(0);
+    await expect(page.getByText('The technical side')).toHaveCount(0);
+    await expect(page.locator('#view-updates #annCard')).toHaveCount(1);
+    await expect(page.locator('#view-media #knowledgeList')).toHaveCount(1);
+  });
+});
+
+test.describe('a tab opens on its title', () => {
+  test('what the tab is for sits behind one small help button', async ({ page }) => {
+    await mount(page, '/presence.html#updates');
+    const sub = page.locator('#view-updates > .docsub');
+    const help = page.locator('#view-updates > .tabhelp');
+    await expect(page.locator('#view-updates > h1.doc')).toHaveText('Updates');
+    await expect(sub).toBeHidden();
+    await expect(help).toHaveAttribute('aria-expanded', 'false');
+    await help.click();
+    await expect(sub).toBeVisible();
+    await expect(help).toHaveAttribute('aria-expanded', 'true');
+    await help.click();
+    await expect(sub).toBeHidden();
+  });
+  test('Edit mode keeps its one bar: no title and no help button', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await expect(page.locator('#view-design > .tabhelp')).toBeHidden();
+  });
+});
+
+test.describe('Versions', () => {
+  const pub = (i: number, more: Record<string, unknown> = {}) => ({ id: 'p' + i, kind: 'publish', status: 'live', summary: 'Version ' + i, label: '', at: new Date(Date.UTC(2026, 9, 30 - i, 15)).toISOString(), restorable: true, by_kind: 'client', ...more });
+  const PUBS = [pub(0), pub(1, { by_kind: 'operator', label: 'Spring menu' }), pub(2, { status: 'failed', restorable: false }), ...Array.from({ length: 10 }, (_, i) => pub(i + 3))];
+  const VERSIONS = {
+    '/publishes': { data: PUBS }, '/publishes/checkpoints': { data: [] }, '/launches': { data: [] },
+    '/preview/status': { data: { draft: { unpublished_changes: 1 }, preview: { exists: false }, live: { published: true, last_published_at: '2026-10-30T15:00:00Z' } } },
+    '/publishes/compare': { data: { count: 1, from: { at: '2026-10-30' }, to: { ref: 'draft' }, changes: [{ section: 'business', sentence: 'Your hours changed.' }] } },
+  };
+  const rows = (page: Page) => page.locator('#pubList .hentry');
+  test('the list leads: when, who, what changed, then View, Compare and Restore', async ({ page }) => {
+    await mount(page, '/presence.html#history', VERSIONS);
+    await expect(rows(page).first()).toContainText('Version 0');
+    await expect(rows(page).first()).toContainText('Live now');
+    await expect(rows(page).first()).toContainText('Published by you');
+    await expect(rows(page).nth(1)).toContainText('“Spring menu”');
+    await expect(rows(page).nth(1)).toContainText('Published by your studio');
+    await expect(rows(page).nth(1)).not.toContainText('Live now');
+    for (const name of ['View', 'Compare', 'Restore']) await expect(rows(page).first().getByRole('button', { name, exact: true })).toBeVisible();
+    // a failed publish says so and offers nothing to do
+    await expect(rows(page).nth(2)).toContainText('didn’t go through');
+    await expect(rows(page).nth(2).locator('button')).toHaveCount(0);
+    // the extra tools are out of the way for a client
+    await expect(page.locator('#versionMore')).not.toHaveAttribute('open', '');
+    await expect(page.getByRole('button', { name: 'Save a checkpoint' })).toBeHidden();
+  });
+  test('Compare opens in place, against the draft', async ({ page }) => {
+    await mount(page, '/presence.html#history', VERSIONS);
+    const asked = page.waitForRequest((r) => /\/publishes\/compare\?/.test(r.url()));
+    await rows(page).first().getByRole('button', { name: 'Compare', exact: true }).click();
+    const q = new URL((await asked).url()).searchParams;
+    expect([q.get('a'), q.get('b')]).toEqual(['p0', 'draft']);
+    await expect(rows(page).first()).toContainText('Your hours changed.');
+    await expect(rows(page).first()).toContainText('your working draft');
+    await rows(page).first().getByRole('button', { name: 'Compare', exact: true }).click();
+    await expect(rows(page).first().locator('.hcompare')).toBeHidden();
+  });
+  test('Restore asks first, and says where it goes', async ({ page }) => {
+    await mount(page, '/presence.html#history', VERSIONS);
+    await rows(page).first().getByRole('button', { name: 'Restore', exact: true }).click();
+    await expect(page.locator('#resSheetTitle')).toHaveText('Restore this version?');
+    await expect(page.locator('#btnRestoreGo')).toHaveText('Restore to my draft');
+  });
+  test('ten at a time: older versions wait behind one button', async ({ page }) => {
+    await mount(page, '/presence.html#history', VERSIONS);
+    await expect(rows(page)).toHaveCount(10);
+    await page.getByRole('button', { name: 'Show 3 older versions' }).click();
+    await expect(rows(page)).toHaveCount(13);
+  });
+  test('the studio sees every tool, and reads the row from its own side', async ({ page }) => {
+    const ctx = (API['/portal/context'] as any).data;
+    await mount(page, '/presence.html?client=s1#history', { ...VERSIONS, '/portal/context': { data: { ...ctx, is_agency: true } } });
+    await expect(page.locator('#versionMore')).toHaveAttribute('open', '');
+    await expect(page.getByRole('button', { name: 'Save a checkpoint' })).toBeVisible();
+    await expect(rows(page).first()).toContainText('Published by the client');
+    await expect(rows(page).nth(1)).toContainText('Published by your team');
+  });
+});

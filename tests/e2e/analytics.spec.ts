@@ -986,7 +986,7 @@ test.describe('External website door (existing client)', () => {
     await expect(page.locator('#monitorCard')).toBeVisible();
     const btn = page.locator('#btnMonitorConnect');
     await expect(btn).toBeVisible();
-    await expect(btn).toHaveText('Record the website’s address');   // not the monitor edition’s "Connect my website"
+    await expect(btn).toHaveText('Add the website’s address');   // not the monitor edition’s "Connect my website"
     await expect(page.locator('#monitorCard .docsub')).toContainText('Already live somewhere else?');
   });
 

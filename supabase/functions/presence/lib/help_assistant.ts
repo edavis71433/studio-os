@@ -35,14 +35,14 @@ export const HELP_TOPICS: HelpTopic[] = [
     q: 'How do I change my opening hours?',
     kw: ['hour', 'opening time', 'open time', 'close time', 'closing', 'when we are open', 'trading hours'],
     a: 'Your hours live with the rest of your business info. Open Business info, update the hours (or flip the temporarily-closed switch near the bottom), then publish — nothing goes live until you do.',
-    links: [{ href: '/presence.html#business', label: 'Open Business info' }],
+    links: [{ href: '/presence.html#business', label: 'Open Business details' }],
   },
   {
     id: 'business_facts',
     q: 'How do I update my business name, address or phone?',
     kw: ['business name', 'address', 'phone number', 'contact detail', 'email address', 'change my name', 'nap', 'location detail'],
     a: 'Your name, address, phone, email and service area are all on the Business info page. Fill them in so they agree everywhere, then publish to apply.',
-    links: [{ href: '/presence.html#business', label: 'Open Business info' }],
+    links: [{ href: '/presence.html#business', label: 'Open Business details' }],
   },
   {
     id: 'add_section',

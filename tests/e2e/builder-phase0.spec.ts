@@ -88,6 +88,7 @@ test('History counts changes the way the Publish button does', async ({ page }) 
     '/preview/status': { data: { draft: { unpublished_changes: 14 }, preview: { exists: false }, live: { published: false } } },
   } });
   await page.goto('/presence.html#history');
+  await page.locator('#versionMore summary').click();
   await expect(page.getByText('1 unpublished change', { exact: true })).toBeVisible();
   await expect(page.getByText('14 unpublished changes')).toHaveCount(0);
 });
@@ -173,7 +174,7 @@ test.describe('the preview stage', () => {
   const LOOKS = { '/site/templates': { data: { current: { slug: 'business-classic' }, templates: [
     { slug: 'business-classic', name: 'Business Classic', version: 1 }, { slug: 'editorial', name: 'Editorial', version: 1 },
   ] } } };
-  test('the look gallery is folded until asked for, and the proof gets the room', async ({ page }) => {
+  test('the template gallery is folded until asked for, and the preview gets the room', async ({ page }) => {
     await installApp(page, { api: { ...API, ...LOOKS } });
     await page.goto('/presence.html');
     // the header's button on a desktop, the dock's on a phone
@@ -182,17 +183,17 @@ test.describe('the preview stage', () => {
     const bar = await page.locator('.stagebar').boundingBox();
     // one row on a desktop, two on a tablet: it was over 300px with the gallery in it
     expect(bar!.height).toBeLessThan(width > 1180 ? 90 : 130);
-    if (width <= 760) {                     // a phone changes its look in Design settings
+    if (width <= 760) {                     // a phone changes its template in Styles
       await expect(page.locator('#lookSeg')).toBeHidden();
       return;
     }
-    const toggle = page.getByRole('button', { name: /Try another look/ });
+    const toggle = page.getByRole('button', { name: /Try another template/ });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#lookDrawer [data-look]').first()).toBeHidden();
     await toggle.click();
     await expect(page.locator('#lookDrawer [data-look="editorial"]')).toBeVisible();
     await page.locator('#lookDrawer [data-look="editorial"]').click();
-    await expect(page.getByRole('button', { name: 'Use this look' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use this template' })).toBeVisible();
   });
 });
 

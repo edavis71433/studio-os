@@ -94,15 +94,15 @@ export function buildNav(c: NavContext): NavSection[] {
   // (the builder's own rail has these); each stays a ⌘K destination.
   const websiteSubItems = (): NavItem[] => {
     const items: NavItem[] = [];
-    items.push(hid('business_info', 'Business info', '/presence.html#business'));
-    if (c.edition !== 'monitor') items.push(hid('design', 'Design', '/presence.html#design'));
+    items.push(hid('business_info', 'Business details', '/presence.html#business'));
+    if (c.edition !== 'monitor') items.push(hid('design', 'Edit site', '/presence.html#design'));
     // the two jobs the audit found unfindable (⌘K "domain"/"page" → nothing): named, one search away
     if (canDraft(c)) items.push(hid('add_page', 'Add a page', '/presence.html#addpage', 'A new page on your site — pick a layout or start blank.'));
     if (canPublish(c)) items.push(hid('domain', 'Domain & email', '/presence.html#domain', 'Put your site on your own domain (yourbusiness.com); email records and the padlock.'));
     // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
     // the desc keeps "schedule" findable from ⌘K, which matches on desc).
     if (canPublish(c)) items.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
-    if (canPublish(c)) items.push(hid('history', 'History', '/presence.html#history'));
+    if (canPublish(c)) items.push(hid('history', 'Versions', '/presence.html#history'));
     return items;
   };
   // the desc keeps "health" findable from ⌘K (website-health.html retired; the

@@ -958,7 +958,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(page.locator('#designPreviewEmpty')).toBeVisible();
-    await expect(page.locator('#dpEmptyTitle')).toContainText('couldn’t draw');
+    await expect(page.locator('#dpEmptyTitle')).toContainText('couldn’t load');
     failing = false;
     await panelEdit(page, 0, 'Typed on About');
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);

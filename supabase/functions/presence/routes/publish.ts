@@ -363,7 +363,7 @@ export async function publishHistoryRows(site: SiteRow) {
   // uses (one implementation, never re-deploys). Was inlined here; now shared.
   await reconcileSitePublishes(site.id);
 
-  const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,version_label,created_at,completed_at,snapshot_id&order=created_at.desc&limit=30`);
+  const r = await svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,version_label,created_at,completed_at,snapshot_id,actor_kind&order=created_at.desc&limit=30`);
   const rows = Array.isArray(r.json) ? r.json : [];
   return rows.map((p: any) => ({
     id: p.id, kind: p.kind,
@@ -373,6 +373,7 @@ export async function publishHistoryRows(site: SiteRow) {
     at: p.created_at, completed_at: p.completed_at,
     restorable: !!p.snapshot_id && p.status === 'live',
     snapshot_id: p.snapshot_id || null,
+    by_kind: p.actor_kind || null,
   }));
 }
 

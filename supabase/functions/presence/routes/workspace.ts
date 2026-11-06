@@ -275,7 +275,7 @@ const NOTICE_HREF: Record<string, string> = {
   publish_failed: '/presence.html#publish',
   studio_published: '/presence.html',   // audit change 2: the client's studio published for them → their Website overview
   site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)
-  domain_expiry: '/presence.html#business',
+  domain_expiry: '/presence.html#domain',
   search_setup: '/presence.html#search',
   welcome_back: '/today.html',
   // account/billing notices land where billing can actually be FIXED — the

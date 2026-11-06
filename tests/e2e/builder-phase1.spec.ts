@@ -177,7 +177,7 @@ test.describe('one save rule', () => {
   });
 
   test('the announcement bar has no Save button either', async ({ page }) => {
-    const writes = await mount(page, '/presence.html#business');
+    const writes = await mount(page, '/presence.html#updates');
     await expect(page.locator('#ann-save')).toHaveCount(0);
     await page.locator('#ann-text').fill('Closed Monday');
     await page.locator('#ann-text').blur();
