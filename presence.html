@@ -8090,7 +8090,10 @@ function dcApplyHistory(snapJson) {
   BLOCKS_WORK = arr; DC_HIST_LAST = snapJson;
   DC_HIST_SILENT = true;
   dcCaptureScroll(); renderBlocksCard();
-  Promise.resolve(saveBlocks()).finally(() => { DC_HIST_SILENT = false; updateUndoButtons(); });
+  Promise.resolve(saveBlocks()).finally(() => {
+    DC_HIST_SILENT = false; updateUndoButtons();
+    if ($("formsCard") && JSON.stringify(FORMS_WORK) === FORMS_BASE) formsLoad();   // a form is a section: the card shows what's saved now
+  });
 }
 // ── One undo history for the whole editor ───────────────────────────────────
 // Every content write goes through api(), so that's where a step is recorded: what
@@ -8107,10 +8110,61 @@ let UNDO_QUIET = 0;      // >0: this write is an undo, or sections recording the
 let UNDO_BEFORE = null;  // for callers that update S before the write goes out
 const undoClone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
 function undoPick(src, keys) { const o = {}; keys.forEach((k) => { o[k] = undoClone(src ? src[k] : undefined); }); return o; }
+// A write to the page list carries every page's sections, and sections change outside
+// these steps: their saves are quiet and their snapshots go with the page. So a step keeps
+// only what it changed, and taking it back applies that to the list as it is by then.
+// Other pages' words stay, and so does a page made since. An address going back rides
+// `prev_slug` like any rename, so the server's forwards follow the page.
+const undoPageMeta = ({ blocks, prev_slug, ...meta }) => undoClone(meta);
+// Stored JSON comes back with its keys reordered, so sections compare by content.
+const undoSections = (p) => JSON.stringify(p.blocks || [], (k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v));
+function undoPagesPlan({ pages, ...rest }) {
+  const was = dcPagesArr(), kept = new Set(), changes = [];
+  const whole = (p, before, after) => ({ before, after, page: undoClone(p), sections: undoSections(p) });
+  pages.forEach((p) => {
+    const old = was.find((x) => x.slug === (p.prev_slug || p.slug));
+    if (!old) { changes.push(whole(p, null, undoPageMeta(p))); return; }
+    kept.add(old);
+    const before = undoPageMeta(old), after = undoPageMeta(p);
+    if (JSON.stringify(before) !== JSON.stringify(after)) changes.push({ before, after });
+  });
+  was.forEach((p) => { if (!kept.has(p)) changes.push(whole(p, undoPageMeta(p), null)); });
+  return { kind: "pages", route: "/settings", changes,
+    order: { before: was.map((p) => p.slug), after: pages.map((p) => p.slug) },
+    rest: { before: undoPick(S.settings, Object.keys(rest)), after: undoClone(rest) } };
+}
+// Taking a page off is a delete, so if it holds words the step didn't put there it gets a
+// delete's question and safety point, and Redo brings it back as it was. False = they said no.
+async function undoPagesAsk(rec, from, to) {
+  for (const c of rec.changes) {
+    const p = !c[to] && dcPageObj(c[from].slug);
+    if (!p || undoSections(p) === c.sections) continue;
+    const title = p.title || p.slug;
+    if (!confirm("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.")) return false;
+    try { await api("POST", "/publishes/checkpoints", { name: ("Before removing “" + title + "”").slice(0, 80) }); } catch (_) {}
+  }
+  return true;
+}
+// The write that moves a page step from one side to the other, built from the saved list.
+function undoPagesBody(rec, from, to) {
+  const list = dcPagesArr().slice();
+  for (const c of rec.changes) {
+    const at = c[from] ? list.findIndex((p) => p.slug === c[from].slug) : -1;
+    if (c[to] && list.some((p, i) => p.slug === c[to].slug && i !== at)) throw new Error("Another page uses that address now. Rename it, then try again.");
+    if (c[from] && at < 0) continue;
+    if (!c[to]) { c.page = list[at]; list.splice(at, 1); }
+    else if (!c[from]) list.push({ ...c[to], blocks: c.page.blocks });
+    else list[at] = { ...c[to], blocks: list[at].blocks, ...(c[from].slug !== c[to].slug ? { prev_slug: c[from].slug } : {}) };
+  }
+  // only the pages this step knows about move, and they share the places they already hold
+  const want = rec.order[to], placed = list.filter((p) => want.includes(p.slug)).sort((a, b) => want.indexOf(a.slug) - want.indexOf(b.slug));
+  return { ...rec.rest[to], pages: list.map((p) => (want.includes(p.slug) ? placed.shift() : p)) };
+}
 function undoPlan(method, route, body) {
   if (UNDO_QUIET) return null;
   const path = String(route).split("?")[0];
   if (method === "PUT" && body) {
+    if (path === "/settings" && Array.isArray(body.pages)) return undoPagesPlan(body);
     const state = { "/identity": S.identity, "/location": S.location, "/settings": S.settings, "/bookings/settings": typeof BK !== "undefined" ? BK.settings : null }[path];
     if (state !== undefined) {
       const before = UNDO_BEFORE || undoPick(state, Object.keys(body));
@@ -8155,7 +8209,18 @@ async function undoStep(rec, dir) {
   const back = dir === "undo";
   whisper("topWhisper", "saving");
   try {
-    if (rec.kind === "put") {
+    if (rec.kind === "pages") {
+      const from = back ? "after" : "before", to = back ? "before" : "after";
+      // Saves reach the list first and the question comes before the write, so neither sits
+      // inside a turn. The list itself is built when the turn comes, from what the last write left.
+      if (!(await dcSavePendingEdits()) || !(await undoPagesAsk(rec, from, to))) { whisper("topWhisper", ""); return false; }
+      await settingsTurn(() => {
+        const vals = undoPagesBody(rec, from, to);
+        UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--;
+        return call.then((r) => undoSync(rec, vals, r));
+      });
+      if (DC_PAGE && !dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
+    } else if (rec.kind === "put") {
       const vals = back ? rec.before : rec.after;
       const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
       await (rec.route === "/settings" ? settingsTurn(put) : put());
@@ -8185,7 +8250,9 @@ async function undoSync(rec, vals, r) {
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
-    BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap();
+    const moved = rec.kind === "pages" && DC_PAGE && vals.pages.find((p) => p.prev_slug === DC_PAGE);
+    if (moved) DC_PAGE = moved.slug;   // the next write finds this page under its address
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); }   // words typed during that write stay, and save next
     if ($("blocksCard")) renderBlocksCard();
     renderPagesBar();
     if ($("formsCard")) formsLoad();
@@ -8202,8 +8269,8 @@ function dcUndo() {
   const top = DC_UNDO.pop();
   if (typeof top !== "string") {
     DC_REDO.push(top); updateUndoButtons();
-    undoRun(top, "undo").then((ok) => { if (!ok) { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
-    toast("Undone"); return;
+    undoRun(top, "undo").then((ok) => { if (ok) toast("Undone"); else { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
+    return;
   }
   DC_REDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
   dcApplyHistory(top); toast("Undone");
@@ -8213,8 +8280,8 @@ function dcRedo() {
   const top = DC_REDO.pop();
   if (typeof top !== "string") {
     DC_UNDO.push(top); updateUndoButtons();
-    undoRun(top, "redo").then((ok) => { if (!ok) { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
-    toast("Redone"); return;
+    undoRun(top, "redo").then((ok) => { if (ok) toast("Redone"); else { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
+    return;
   }
   DC_UNDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
   dcApplyHistory(top); toast("Redone");
@@ -9657,17 +9724,19 @@ async function putForms() {
   let r;
   if (FORMS_PAGE) {
     const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
-    r = await api("PUT", "/settings", { pages });
+    UNDO_QUIET++; const put = api("PUT", "/settings", { pages }); UNDO_QUIET--;   // a form is a section: it gets a snapshot like the others, below
+    r = await put;
     S.settings = r.data || { ...S.settings, pages };
   } else {
-    r = await api("PUT", "/settings", { blocks: next });
+    UNDO_QUIET++; const put = api("PUT", "/settings", { blocks: next }); UNDO_QUIET--;
+    r = await put;
     S.settings = r.data || { ...S.settings, blocks: next };
   }
   // Keep the content-block editor in sync. A section edit made while this was out is newer
   // than what came back: it stays, with the form change under it, and saves next.
   if (typeof BLOCKS_WORK !== "undefined") {
-    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }
-    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); if (FORMS_PAGE === DC_PAGE) dcHistoryRecord(); dcHistoryCommit(); }
+    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); dcHistoryRecord(); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
   }
   const ae = document.activeElement;
   if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next

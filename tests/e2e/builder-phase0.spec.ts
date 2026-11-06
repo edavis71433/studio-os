@@ -247,6 +247,7 @@ test.describe('forms on your own pages', () => {
     });
     await page.goto('/presence.html#design');
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     await page.locator('#formsCard input[placeholder="Form title"]').first().fill('Say hello');
     await page.locator('#formsCard input[placeholder="Form title"]').first().blur();
     await expect.poll(() => puts.length).toBe(1);
