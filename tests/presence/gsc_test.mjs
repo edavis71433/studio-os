@@ -1,6 +1,6 @@
 // ── Phase AN-3.1: Google Search Console — pure parsing + detail composition ───
 //   deno run --allow-read --allow-env tests/presence/gsc_test.mjs
-import { propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor } from '../../supabase/functions/presence/lib/gsc.ts';
+import { gscBackMonths, noPropertySentence, propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor } from '../../supabase/functions/presence/lib/gsc.ts';
 import { searchDetailInsights } from '../../supabase/functions/presence/analytics/search_perf.ts';
 
 const results = [];
@@ -56,4 +56,17 @@ ok('parseTermRows: rows with keys[] → normalized terms', (() => { const r = pa
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ GSC (AN-3.1): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
-if (passed !== results.length) Deno.exit(1);
+if (passed !== results.length) Deno.exit(1)// ── the first-read backfill and the "wrong account" sentence ──
+{
+  const m = gscBackMonths(new Date(Date.UTC(2026, 10, 5)), 3);
+  ok('gscBackMonths: the full months BEFORE the sync\'s own, newest first', m.map((x) => x.period).join() === '2026-09,2026-08,2026-07');
+  ok('gscBackMonths: whole calendar months', m[0].startDate === '2026-09-01' && m[0].endDate === '2026-09-30');
+  ok('gscBackMonths: crosses a year cleanly', gscBackMonths(new Date(Date.UTC(2026, 0, 15)), 2).map((x) => x.period).join() === '2025-11,2025-10');
+  ok('noPropertySentence: names what the account CAN see, in plain addresses',
+    noPropertySentence('marlows.example', { siteEntry: [{ siteUrl: 'sc-domain:other.com' }, { siteUrl: 'https://mine.org/' }] }) === 'That Google account can’t see marlows.example in Search Console. It can see other.com, mine.org. Connect the account that owns it.');
+  ok('noPropertySentence: an account with no sites gets the two real ways forward', /Add the site in Search Console, or connect the account that owns it/.test(noPropertySentence('marlows.example', { })));
+  ok('noPropertySentence: a failed list read is the same honest sentence', /can’t see marlows\.example/.test(noPropertySentence('marlows.example', null)));
+  ok('noPropertySentence: stays inside what the connection card will show', noPropertySentence('a.com', { siteEntry: Array.from({ length: 9 }, (_, i) => ({ siteUrl: `https://a-very-long-example-address-${i}.example.com/` })) }).length <= 200);
+}
+
+;

@@ -42,7 +42,7 @@ Editions below are **technical capability only** (pricing is not set here). Supp
 - **Customer approval:** You approve access on the provider’s sign-in screen, and can revoke it any time.
 - **Supported editions:** monitor, Presence, managed, agency, enterprise
 - **Rate posture:** per-minute limits; batched, backed-off
-- **Status:** Planned
+- **Status:** Read-only
 
 ### Apple Business Connect — *"your place on Apple Maps"*
 - **Purpose:** Make sure people on iPhones and Siri find the right you.

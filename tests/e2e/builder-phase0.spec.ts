@@ -143,7 +143,7 @@ test.describe('the publish page names what is holding it up', () => {
 test.describe('one tip at a time', () => {
   test('leaving a view retires its tip, and a visit gets one', async ({ page }) => {
     await installApp(page, { api: API });
-    await page.goto('/presence.html#business');
+    await page.goto('/presence.html#search');
     const tip = page.locator('.dds-hint.dds-live');
     await expect(tip).toContainText('Search settings');
     await page.locator('#nav .navitem[data-view="media"]').click();

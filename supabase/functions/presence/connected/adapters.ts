@@ -11,6 +11,9 @@ import { loadTokens, saveConnectedData, markStatus, getConnectionConfig, setConn
 import { refreshTokens, isOAuth, oauthConfigured } from './auth.ts';
 import { saveTokens } from './store.ts';
 import { ga4PropertyPath, ga4RunReportBody, ga4RecentWindow, parseGa4Report, parseAccountSummaries, type Ga4Property } from '../lib/ga4.ts';
+import { GBP_READ_MASK, autoPickGbp, gbpAccountPath, gbpLocationPath, gbpPerformanceQuery, gbpProblem, gbpWaitingOnStudio, parseGbpAccounts, parseGbpLocation, parseGbpLocations, parseGbpPerformance, parseGbpReviews, type GbpLocation } from '../lib/gbp.ts';
+import { gscDomainFor } from '../lib/gsc.ts';
+import { syncGscForSite } from '../ops/gsc_sync.ts';
 
 // The one normalized shape. Every field optional — the evidence provider reads
 // whatever a given adapter could supply. Plain business quantities, never raw
@@ -26,6 +29,8 @@ export interface NormalizedConnected {
   tags_installed?: number;       // Google Tag Manager — measurement tags present
   managed_assets?: number;       // Meta Business — pages/accounts managed
   listing_verified?: number;     // Apple Business Connect — 1 if the place card is claimed/verified
+  calls?: number; direction_requests?: number; website_clicks?: number;   // Google listing, last 30 days
+  listing_name?: string; listing_address?: string; listing_maps_uri?: string; listing_review_uri?: string; hours_set?: boolean;
   label: string;                 // the provider's customerLabel, for messages
 }
 
@@ -36,7 +41,12 @@ const num = (v: unknown): number | undefined => { const n = Number(v); return is
 // real mappings; the rest normalize defensively (connected, no numbers yet) so
 // every provider is registered and isolated even before its shape is verified live.
 export const NORMALIZERS: Record<string, (raw: any, label: string) => NormalizedConnected> = {
-  google_business_profile: (r, label) => ({ label, rating: num(r?.rating ?? r?.averageRating), review_count: num(r?.reviewCount ?? r?.totalReviewCount), new_reviews: num(r?.newReviews), unreplied_reviews: num(r?.unreplied) }),
+  // readGbp below assembles this from the listing, reviews and performance reads.
+  google_business_profile: (r, label) => ({
+    label, rating: num(r?.rating ?? r?.averageRating), review_count: num(r?.reviewCount ?? r?.totalReviewCount), new_reviews: num(r?.newReviews), unreplied_reviews: num(r?.unreplied),
+    calls: num(r?.calls), direction_requests: num(r?.directions), website_clicks: num(r?.websiteClicks),
+    ...(r?.location ? { listing_name: r.location.name, listing_address: r.location.address, listing_maps_uri: r.location.maps_uri, listing_review_uri: r.location.review_uri, hours_set: r.location.hours_set } : {}),
+  }),
   google_search_console: (r, label) => ({ label, search_clicks: num(r?.clicks ?? r?.rows?.[0]?.clicks), search_impressions: num(r?.impressions ?? r?.rows?.[0]?.impressions), indexing_issues: num(r?.indexingIssues) }),
   bing_webmaster: (r, label) => ({ label, search_clicks: num(r?.Clicks), search_impressions: num(r?.Impressions) }),
   // GA4 Data API RunReportResponse (metric values matched by header name — see
@@ -68,10 +78,9 @@ export const NORMALIZERS: Record<string, (raw: any, label: string) => Normalized
 // Where each adapter reads from (documented endpoints). The fetch is a bearer GET;
 // the exact query shaping is a per-provider detail set at app registration.
 const READ_ENDPOINT: Record<string, string> = {
-  google_business_profile: 'https://mybusinessbusinessinformation.googleapis.com/v1/accounts',
-  google_search_console: 'https://searchconsole.googleapis.com/webmasters/v3/sites',
-  // google_analytics is deliberately ABSENT: its read is a POST runReport against
-  // a chosen property, which no GET-a-URL entry can express — it reads through
+  // google_analytics, google_search_console and google_business_profile are
+  // deliberately ABSENT: each needs a chosen property or location and more than
+  // one request, which no GET-a-URL entry can express — they read through
   // READ_STRATEGIES below instead.
   youtube: 'https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true',
   google_calendar: 'https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=10',
@@ -128,7 +137,7 @@ export const ADAPTERS: ConnectedAdapter[] = CONNECTED_PROVIDERS.map((p) => ({ ke
 // and status honesty live in ONE place for every provider, strategied or not.
 export type StrategyRead =
   | { ok: true; raw: unknown }
-  | { ok: false; status?: number; attention?: string };  // attention: our own plain sentence — connected, but a human step is needed
+  | { ok: false; status?: number; attention?: string; quiet?: boolean };  // attention: our own plain sentence — connected, but a human step is needed; quiet: no notice (see markStatus)
 
 /** List the GA4 properties this token's Google account can read, via the Admin
  *  API (shape transcribed in lib/ga4.ts):
@@ -173,8 +182,91 @@ export async function readGa4(siteId: string, token: string, now: Date = new Dat
   return { ok: true, raw: await r.json().catch(() => ({})) };
 }
 
+const gbpGet = async (url: string, token: string): Promise<{ ok: boolean; status: number; json: any }> => {
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+  return { ok: r.ok, status: r.status, json: await r.json().catch(() => ({})) };
+};
+
+/** Every listing this token's Google account manages: accounts, then each
+ *  account's locations (one page of 100 per account is far beyond a small
+ *  business's estate). One account failing doesn't hide the others' listings; only
+ *  when nothing could be read at all does the failure come back. */
+export async function discoverGbpLocations(token: string): Promise<{ ok: true; locations: GbpLocation[] } | { ok: false; status: number; body: unknown }> {
+  const accounts = await gbpGet('https://mybusinessaccountmanagement.googleapis.com/v1/accounts?pageSize=20', token);
+  if (!accounts.ok) return { ok: false, status: accounts.status, body: accounts.json };
+  const names = parseGbpAccounts(accounts.json).slice(0, 10);
+  const results = await Promise.all(names.map(async (account) => ({
+    account,
+    res: await gbpGet(`https://mybusinessbusinessinformation.googleapis.com/v1/${account}/locations?pageSize=100&readMask=${encodeURIComponent(GBP_READ_MASK)}`, token),
+  })));
+  const worked = results.filter((x) => x.res.ok);
+  if (names.length && !worked.length) return { ok: false, status: results[0].res.status, body: results[0].res.json };
+  return { ok: true, locations: worked.flatMap((x) => parseGbpLocations(x.res.json, x.account)) };
+}
+
+/** The website address this site reports on, for matching a listing to it. */
+async function siteDomain(siteId: string): Promise<string | null> {
+  const [siteQ, extQ] = await Promise.all([
+    svc(`presence_sites?id=eq.${siteId}&select=id,edition,custom_domain,netlify_site_id&limit=1`).catch(() => null),
+    svc(`presence_monitor_connections?site_id=eq.${siteId}&select=domain&limit=1`).catch(() => null),
+  ]);
+  const row = (siteQ as any)?.json?.[0];
+  return row ? (gscDomainFor(row, (extQ as any)?.json?.[0]?.domain ?? null)?.domain ?? null) : null;
+}
+
+/** The listing read: resolve which location (stored choice, else auto-pick only
+ *  the unambiguous case), then read the listing, its reviews and its performance.
+ *  The three reads are separate APIs a Google project can have partly enabled, so
+ *  whichever answered still counts; the failure only surfaces if all three failed. */
+export async function readGbp(siteId: string, token: string, now: Date = new Date()): Promise<StrategyRead> {
+  const cfg = await getConnectionConfig(siteId, 'google_business_profile');
+  let locationId = gbpLocationPath(cfg.location_id);
+  let account = gbpAccountPath(cfg.account);
+  if (!locationId || !account) {
+    const found = await discoverGbpLocations(token);
+    if (!found.ok) {
+      const attention = gbpProblem(found.status, found.body);
+      return attention ? { ok: false, attention, quiet: gbpWaitingOnStudio(found.status, found.body) } : { ok: false, status: found.status };
+    }
+    if (!found.locations.length) return { ok: false, attention: 'That Google account doesn’t manage a business listing yet. Connect the account that does.' };
+    const pick = autoPickGbp(found.locations, await siteDomain(siteId));
+    if (!pick) return { ok: false, attention: `Choose which Google listing is this business. That account manages ${found.locations.length}.` };
+    await setConnectionConfig(siteId, 'google_business_profile', { location_id: pick.id, account: pick.account, location_name: pick.name, auto_selected: true });
+    locationId = pick.id; account = pick.account;
+  }
+  const accountId = account.replace(/^accounts\//, ''), locId = locationId.replace(/^locations\//, '');
+  const [detail, reviews, perf] = await Promise.all([
+    gbpGet(`https://mybusinessbusinessinformation.googleapis.com/v1/${locationId}?readMask=${encodeURIComponent(GBP_READ_MASK)}`, token),
+    gbpGet(`https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locId}/reviews?pageSize=50`, token),
+    gbpGet(`https://businessprofileperformance.googleapis.com/v1/${locationId}:fetchMultiDailyMetricsTimeSeries?${gbpPerformanceQuery(now)}`, token),
+  ]);
+  if (!detail.ok && !reviews.ok && !perf.ok) {
+    const attention = gbpProblem(detail.status, detail.json);
+    return attention ? { ok: false, attention, quiet: gbpWaitingOnStudio(detail.status, detail.json) } : { ok: false, status: detail.status };
+  }
+  return { ok: true, raw: {
+    ...(reviews.ok ? parseGbpReviews(reviews.json, now.getTime()) : {}),
+    ...(perf.ok ? parseGbpPerformance(perf.json) : {}),
+    location: detail.ok ? parseGbpLocation(detail.json, account) : null,
+  } };
+}
+
+/** The Search Console read IS the sync: it finds the verified property, stores the
+ *  month in `signals`, and gives us the totals for the connection card. The sync
+ *  records its own "attention" reasons, and they come back through here so that
+ *  readProvider keeps the one place status is written. */
+export async function readGscConnection(siteId: string): Promise<StrategyRead> {
+  const site = (await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id,edition,last_published_at&limit=1`) as any)?.json?.[0];
+  if (!site) return { ok: false, status: 404 };
+  const res = await syncGscForSite(site, new Date(), undefined, { backfill: true });
+  if (res.ok) return { ok: true, raw: { clicks: res.totals?.clicks, impressions: res.totals?.impressions } };
+  return res.attention ? { ok: false, attention: res.attention } : { ok: false, status: res.status ?? 0 };
+}
+
 export const READ_STRATEGIES: Record<string, (siteId: string, token: string) => Promise<StrategyRead>> = {
   google_analytics: (siteId, token) => readGa4(siteId, token),
+  google_business_profile: (siteId, token) => readGbp(siteId, token),
+  google_search_console: (siteId) => readGscConnection(siteId),
 };
 
 // Normalize raw JSON for a provider (pure, defensive). Exported for tests.
@@ -203,7 +295,7 @@ export async function readProvider(siteId: string, providerKey: string, label: s
     if (strategy) {
       const res = await strategy(siteId, tokens.access_token);
       if (!res.ok) {
-        if (res.attention) { await markStatus(siteId, providerKey, 'connected', 'attention', res.attention); return null; }
+        if (res.attention) { await markStatus(siteId, providerKey, 'connected', 'attention', res.attention, { quiet: res.quiet }); return null; }
         await markStatus(siteId, providerKey, res.status === 401 ? 'expired' : 'error', res.status === 401 ? 'attention' : 'down', `read ${res.status ?? 0}`);
         return null;
       }

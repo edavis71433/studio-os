@@ -53,12 +53,13 @@ const PENDING_SCOPE = localStorage.getItem('dds-pending-scope') || '';
 // there, not to the studio's Connections page. Same-site paths only — the
 // value comes from localStorage, which is untrusted input.
 const PENDING_RETURN = (function(){ const v = localStorage.getItem('dds-pending-return') || ''; return (/^\/[^\/\\]/.test(v) ? v : ''); })();
+const backLabel = /^\/presence\.html/.test(PENDING_RETURN) ? 'Back to Search' : 'Back to your connections';
 const backHref = PENDING_RETURN || (PENDING_SCOPE ? '/connections.html?client=' + encodeURIComponent(PENDING_SCOPE) : '/connections.html');
 
 function show(icon, title, msg, showBtn){
   $('card').innerHTML = (icon === 'ok' ? '<div class="ok">✓</div>' : '<div class="spin" role="status"></div>')
     + `<h1 style="margin-top:18px" role="status">${esc(title)}</h1><p>${esc(msg)}</p>`
-    + (showBtn ? `<a class="btn" href="${esc(backHref)}">Back to your connections</a>` : '');
+    + (showBtn ? `<a class="btn" href="${esc(backHref)}">${esc(backLabel)}</a>` : '');
   const h = $('card').querySelector('h1'); if (h) h.focus && h.setAttribute('tabindex','-1'), h.focus();
 }
 
@@ -87,7 +88,7 @@ function show(icon, title, msg, showBtn){
     const body = await r.json().catch(()=>({}));
     localStorage.removeItem('dds-pending-connection'); localStorage.removeItem('dds-pending-label'); localStorage.removeItem('dds-pending-scope'); localStorage.removeItem('dds-pending-return');
     if(r.ok){
-      show('ok', 'Connected.', 'We’re now reading from ' + label + ' — read-only, always with your approval, and yours to disconnect any time.', true);
+      show('ok', 'Connected.', 'We’re now reading from ' + label + ' — we only read, nothing changes, and it’s yours to disconnect any time.', true);
     } else {
       // The server sends DISTINCT, actionable messages here — the state window
       // lapsed, the code didn't come back, storage isn't configured, the exchange

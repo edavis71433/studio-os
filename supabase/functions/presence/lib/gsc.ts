@@ -38,13 +38,17 @@ export function propertyCandidates(domain: string): string[] {
  *  a different, honestly-reportable situation from "no numbers yet". */
 export type GscDomainSource = 'external' | 'custom_domain' | 'netlify';
 export function gscDomainFor(
-  site: { edition?: string | null; custom_domain?: string | null; netlify_site_id?: string | null },
+  site: { id?: string | null; edition?: string | null; custom_domain?: string | null; netlify_site_id?: string | null },
   externalDomain?: string | null,
 ): { domain: string; source: GscDomainSource } | null {
   const host = (v: unknown) => String(v ?? '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./i, '').toLowerCase();
   const ext = host(externalDomain);
   const custom = host(site?.custom_domain);
-  const netlify = site?.netlify_site_id ? `${site.netlify_site_id}.netlify.app` : '';
+  // netlify_site_id is Netlify's internal id, not part of the address. The address is
+  // the name the provisioner gives every site (routes/admin.ts), built from our own id.
+  const netlify = !site?.netlify_site_id ? ''
+    : site.id ? `presence-${String(site.id).replace(/-/g, '').slice(0, 12)}.netlify.app`
+    : `${site.netlify_site_id}.netlify.app`;
   const order: Array<[GscDomainSource, string]> = site?.edition === 'monitor'
     ? [['external', ext], ['custom_domain', custom]]
     : [['custom_domain', custom], ['external', ext], ['netlify', netlify]];
@@ -67,6 +71,27 @@ export function gscMonthWindow(now: Date): { startDate: string; endDate: string;
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const period = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
   return { startDate: iso(start), endDate: iso(end), period };
+}
+
+/** The full calendar months before gscMonthWindow's, newest first. Search Console
+ *  keeps about 16 months, so a site with history can show a real trend on the day
+ *  it connects instead of waiting a year for one to build up. Pure. */
+export function gscBackMonths(now: Date, count: number): Array<{ startDate: string; endDate: string; period: string }> {
+  const y = now.getUTCFullYear(), m = now.getUTCMonth();
+  return Array.from({ length: Math.max(0, count) }, (_, i) => gscMonthWindow(new Date(Date.UTC(y, m - 1 - i, 1))));
+}
+
+/** What to tell someone whose Google account can't see this site, naming what it
+ *  CAN see: picking the wrong account is the usual cause, and the list is what
+ *  makes that obvious. Pure; `sites` is the sites.list response. */
+export function noPropertySentence(domain: string, sitesResp: any): string {
+  const seen: string[] = ((sitesResp && Array.isArray(sitesResp.siteEntry) && sitesResp.siteEntry) || [])
+    .map((s: any) => String(s?.siteUrl || '').replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, ''))
+    .filter(Boolean);
+  const start = `That Google account can’t see ${domain} in Search Console.`;
+  if (!seen.length) return `${start} Add the site in Search Console, or connect the account that owns it.`.slice(0, 200);
+  const shown = seen.slice(0, 3).join(', ');
+  return `${start} It can see ${shown}${seen.length > 3 ? ' and others' : ''}. Connect the account that owns it.`.slice(0, 200);
 }
 
 export interface GscTotals { impressions: number; clicks: number; ctr: number | null; position: number | null; }

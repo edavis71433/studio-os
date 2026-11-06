@@ -83,6 +83,7 @@ export interface VisitRow { ts: string; kind: string; path: string; ref_host: st
 export interface VisitAgg {
   visitors: number; priorVisitors: number; pageviews: number;
   topPages: Array<{ path: string; views: number }>;
+  pages: Array<{ path: string; views: number; visitors: number }>;   // the per-page table: more rows, and people as well as views
   topSources: Array<{ source: string; visits: number }>;
   devices: Array<{ device: string; share: number }>;
   countries: Array<{ country: string; visits: number }>;
@@ -101,6 +102,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
   const curVisitors = new Set<string>(), priorVisitors = new Set<string>();
   const pages = new Map<string, number>(), sources = new Map<string, number>(), devices = new Map<string, number>(), countries = new Map<string, number>();
   const srcSeen = new Map<string, Set<string>>(); // source → distinct visitor set
+  const pageSeen = new Map<string, Set<string>>(); // path → distinct visitor set
   const events = { phone: 0, email: 0, cta: 0, download: 0 };
   let pageviews = 0;
   for (const r of rows) {
@@ -114,7 +116,10 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
     if (r.kind === 'pageview') {
       pageviews++;
       if (r.visitor_hash) curVisitors.add(r.visitor_hash);
-      if (r.path) pages.set(r.path, (pages.get(r.path) || 0) + 1);
+      if (r.path) {
+        pages.set(r.path, (pages.get(r.path) || 0) + 1);
+        if (r.visitor_hash) { const seen = pageSeen.get(r.path) || new Set<string>(); seen.add(r.visitor_hash); pageSeen.set(r.path, seen); }
+      }
       const src = sourceLabel(r.ref_host, r.utm_source);
       const set = srcSeen.get(src) || new Set<string>(); set.add(r.visitor_hash || String(ms)); srcSeen.set(src, set);
       if (r.device) devices.set(r.device, (devices.get(r.device) || 0) + 1);
@@ -128,6 +133,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
   return {
     visitors: curVisitors.size, priorVisitors: priorVisitors.size, pageviews,
     topPages: topN(pages, 5).map(([path, views]) => ({ path, views })),
+    pages: topN(pages, 10).map(([path, views]) => ({ path, views, visitors: pageSeen.get(path)?.size || 0 })),
     topSources: topN(sources, 5).map(([source, visits]) => ({ source, visits })),
     devices: topN(devices, 3).map(([device, n]) => ({ device, share: Math.round((n / devTotal) * 100) })),
     countries: topN(countries, 5).map(([country, visits]) => ({ country, visits })),

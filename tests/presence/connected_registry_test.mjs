@@ -71,8 +71,10 @@ const hasConnectPath = (p) => isOAuth(p.key) || p.auth === 'api_key';
 // the real stores).
 const DEFERRED = {
   // ── Google family: the endpoint is a placeholder or the wrong resource ──
-  google_business_profile:
-    'READ_ENDPOINT lists ACCOUNTS (mybusinessbusinessinformation/v1/accounts); the normalizer reads rating/reviewCount, which live on a location’s reviews resource. No location is ever resolved, so a connected customer would see a blank card.',
+  // google_business_profile's entry is DELETED, the way google_analytics's was: its
+  // defect ("lists ACCOUNTS; no location is ever resolved") was fixed by a strategy
+  // (connected/adapters.ts readGbp) and a stored choice of location. Its own audit is
+  // section 1c below.
   // google_analytics's entry is DELETED — its documented defect ("READ_ENDPOINT
   // is the GA4 Data API BASE with no property id; GA4 reporting is a POST
   // runReport against a specific property; the shared bearer GET can only 404")
@@ -170,6 +172,27 @@ const DEFERRED = {
     /source: 'ga4'/.test(src('lib/ga4.ts')));
 }
 
+// ═══ 1c. the listing flip — the same three legs, plus the location choice ═══
+{
+  const gbp = providerByKey('google_business_profile');
+  ok('Listing: google_business_profile is read_only — the read shipped, so the Connect button must render',
+    gbp.status === 'read_only', gbp.status);
+  ok('Listing: asks for the full business.manage scope URL (Google offers no read-only one)',
+    gbp.scopes.length === 1 && gbp.scopes[0] === 'https://www.googleapis.com/auth/business.manage');
+  ok('Listing: reads through a per-provider STRATEGY, not a GET-a-URL endpoint',
+    hasReadStrategy('google_business_profile') && !hasReadEndpoint('google_business_profile'));
+  ok('Listing: resolves a LOCATION (stored config, else account + location discovery)',
+    /getConnectionConfig\(siteId, 'google_business_profile'\)/.test(adaptersSrc) &&
+    /mybusinessaccountmanagement\.googleapis\.com\/v1\/accounts/.test(adaptersSrc));
+  ok('Listing: reviews come from the v4 reviews resource, numbers from the performance API',
+    /mybusiness\.googleapis\.com\/v4\/accounts\/\$\{accountId\}\/locations\/\$\{locId\}\/reviews/.test(adaptersSrc) &&
+    /fetchMultiDailyMetricsTimeSeries/.test(adaptersSrc));
+  ok('Listing: several listings never guess — the human is asked to choose',
+    /Choose which Google listing/.test(adaptersSrc));
+  ok('Search Console: reads through the real sync, so connecting produces numbers rather than a site list',
+    hasReadStrategy('google_search_console') && !hasReadEndpoint('google_search_console'));
+}
+
 // ═══ 2. no shipped read adapter is left 'planned' (the defect that started this) ═══
 {
   const stranded = CONNECTED_PROVIDERS.filter((p) =>
@@ -212,8 +235,8 @@ const DEFERRED = {
     Object.keys(DEFERRED).length + live.length === CONNECTED_PROVIDERS.length,
     `${Object.keys(DEFERRED).length} deferred + ${live.length} live = ${CONNECTED_PROVIDERS.length}`);
   const liveKeys = live.map((p) => p.key).sort().join(',');
-  ok('audit: exactly two providers are live today — Search Console (AN-3.1) and Google Analytics (the GA4 build)',
-    liveKeys === 'google_analytics,google_search_console', liveKeys);
+  ok('audit: exactly three providers are live today — Search Console (AN-3.1), Google Analytics (the GA4 build) and the Google listing',
+    liveKeys === 'google_analytics,google_business_profile,google_search_console', liveKeys);
 }
 
 const failed = results.filter((r) => !r.p);

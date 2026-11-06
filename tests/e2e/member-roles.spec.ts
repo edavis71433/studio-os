@@ -391,13 +391,12 @@ test.describe('The builder', () => {
   }
 
   for (const p of PEOPLE) {
-    test(`${p.who}: industry and verification codes on Business info, and they keep the announcement`, async ({ page }) => {
+    test(`${p.who}: industry on Business info, verification codes on Search, and they keep the announcement`, async ({ page }) => {
       await openBuilder(page, p, '#business');
-      await expectControls(page, p, [
-        ['#view-business .field:has(#f-industry)', 'configure'],
-        ['#view-business details:has(#f-gsv)', 'configure'],
-      ]);
+      await expectControls(page, p, [['#view-business .field:has(#f-industry)', 'configure']]);
       await expect(page.locator('#ann-text')).toBeVisible();
+      await page.locator('#nav .navitem[data-view="search"]').click();
+      await expectControls(page, p, [['#view-search details:has(#f-gsv)', 'configure']]);
     });
 
     test(`${p.who}: taking the site offline, from the Page menu`, async ({ page }) => {
