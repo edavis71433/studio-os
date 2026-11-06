@@ -99,7 +99,7 @@ test.describe('Settings page', () => {
     await expect(page.locator('#planTeam')).toHaveCount(0);            // self-serve: the button, not the sentence
     const btn = page.locator('#manageBilling');
     await expect(btn).toHaveText('Manage billing');
-    await expect(page.locator('#billing button')).toHaveCount(1);      // ONE action
+    await expect(page.locator('#plan button')).toHaveCount(1);         // ONE action
     const posted = page.waitForRequest((r) => r.method() === 'POST' && /\/commerce\/portal$/.test(new URL(r.url()).pathname));
     await btn.click();
     expect((await posted).postDataJSON()).toEqual({});
@@ -116,7 +116,7 @@ test.describe('Settings page', () => {
     await page.goto('/settings.html');
     await expect(page.locator('#planLine')).toHaveText('Agency · Active · renews Nov 3');
     await expect(page.locator('#planLimits')).toHaveText('3 of 10 clients · 1 of 3 seats');   // active clients, not archived ones
-    await expect(page.locator('#billing button')).toHaveCount(0);
+    await expect(page.locator('#plan button')).toHaveCount(0);
     await expect(page.locator('#planTeam')).toContainText('Changes to your Agency plan go through our team.');
     await expect(page.locator('#planTeam a')).toHaveAttribute('href', /^mailto:support@davisdigitalstudio\.com\?subject=/);
     await expect(page.locator('#billing .aside')).toContainText('billed separately');
@@ -222,6 +222,42 @@ test.describe('Settings page', () => {
     await expect(page.locator('#view-today')).toBeHidden();
     release();
     await expect(page.locator('#view-business')).toBeVisible();
+  });
+});
+
+test.describe('Closing the account lives on Settings', () => {
+  test('two presses to ask, and it can be canceled', async ({ page }) => {
+    await installApp(page, { api: API });
+    const posts: string[] = [];
+    await page.route('**/functions/v1/presence/commerce/delete-*', (route) => {
+      posts.push(new URL(route.request().url()).pathname.split('/').pop()!);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { completes_within_days: 14, message: 'Canceled.' } }) });
+    });
+    await page.goto('/settings.html#billing');
+    await page.locator('#deleteCard summary').click();
+    const ask = page.locator('#deleteAsk'), cancel = page.locator('#deleteCancel');
+    await expect(cancel).toBeHidden();
+    await ask.click();
+    await expect(ask).toContainText('Are you sure?');
+    expect(posts).toEqual([]);
+    await ask.click();
+    await expect(ask).toHaveText('Scheduled. Completes in 14 days');
+    await expect(ask).toBeDisabled();
+    await expect(cancel).toBeVisible();
+    await cancel.click();
+    await expect(ask).toHaveText('Request deletion');
+    await expect(ask).toBeEnabled();
+    await expect(cancel).toBeHidden();
+    expect(posts).toEqual(['delete-request', 'delete-cancel']);
+  });
+  test('what upgrading adds is on the plan card', async ({ page }) => {
+    const ctx = (AGENCY_CTX as any).data;
+    await installApp(page, { api: { ...API, '/portal/context': { data: { ...ctx, upsell: { name: 'Studio OS', monthly: 99, gains: ['relationship'], gives_up: ['managed_service'] } } } } });
+    await page.goto('/settings.html#billing');
+    const line = page.locator('#planUpsell');
+    await expect(line).toContainText('Studio OS (from $99/mo) adds Customers & Pipeline.');
+    await expect(line).toContainText('switches off our managed service');
+    await expect(line.getByRole('link', { name: /Ask about upgrading/ })).toHaveAttribute('href', /^mailto:/);
   });
 });
 

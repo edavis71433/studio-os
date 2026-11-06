@@ -337,17 +337,18 @@ test.describe('The builder', () => {
       if (p.lacks.includes('configure')) await expect(note).toBeVisible(); else await expect(note).toBeHidden();
     });
 
-    test(`${p.who}: history — preview password and reset, a checkpoint, and they keep Promote`, async ({ page }) => {
+    test(`${p.who}: history — preview password and reset, a checkpoint, and they keep Publish this preview`, async ({ page }) => {
       await openBuilder(page, p, '#history');
+      await page.evaluate(() => { (document.getElementById('versionMore') as HTMLDetailsElement).open = true; });
       const hist = '#view-history';
       await expectControls(page, p, [
         [`${hist} button:has-text("Password-protect")`, 'configure'],
         [`${hist} button:has-text("Reset link")`, 'configure'],
         [`${hist} button:text-is("Remove")`, 'delete'],
       ]);
-      await expect(page.locator(`${hist} button:has-text("Promote to Live")`)).toBeVisible();
+      await expect(page.locator(`${hist} button:has-text("Publish this preview")`)).toBeVisible();
       await expect(page.locator(`${hist} button:has-text("Update preview from draft")`)).toBeVisible();
-      await expect(page.locator(`${hist} button:has-text("Bring into draft")`)).toBeVisible();
+      await expect(page.locator(`${hist} button:has-text("Restore to draft")`)).toBeVisible();
     });
   }
 
@@ -378,11 +379,6 @@ test.describe('The builder', () => {
       await expect(page.getByText('Ask the account owner to set this up.')).toBeVisible({ visible: p.lacks.includes('configure') });
     });
 
-    test(`${p.who}: account deletion`, async ({ page }) => {
-      await openBuilder(page, p, '#business');
-      await expectControls(page, p, [['#deleteCard', 'owner']]);
-    });
-
     test(`${p.who}: the Sharing link in the menu, and they keep Connections`, async ({ page }) => {
       await openBuilder(page, p, '');
       await expectDisplay(page, p, '#sectionsNav .navitem[data-link="sharing"]', 'owner');
@@ -391,9 +387,10 @@ test.describe('The builder', () => {
   }
 
   for (const p of PEOPLE) {
-    test(`${p.who}: industry on Business info, verification codes on Search, and they keep the announcement`, async ({ page }) => {
+    test(`${p.who}: industry on Business details, verification codes on Search, and they keep the announcement`, async ({ page }) => {
       await openBuilder(page, p, '#business');
       await expectControls(page, p, [['#view-business .field:has(#f-industry)', 'configure']]);
+      await page.evaluate(() => (window as any).go('updates'));
       await expect(page.locator('#ann-text')).toBeVisible();
       await page.evaluate(() => (window as any).go('search'));
       await expectControls(page, p, [['#view-search details:has(#f-gsv)', 'configure']]);
@@ -428,10 +425,10 @@ test.describe('The builder', () => {
       await expect(page.locator('#cmPanelBody .cm-itemacts button:text-is("Resolve")')).toBeAttached();
     });
 
-    test(`${p.who}: the look chooser's "Use this look"`, async ({ page }) => {
+    test(`${p.who}: the template chooser's "Use this template"`, async ({ page }) => {
       await openBuilder(page, p, '#history');
       await builderScript(page, 'LOOK_OPEN = true; PV.template = "editorial"; await mountLookSeg();');
-      await expectDisplay(page, p, '#lookSeg button:has-text("Use this look")', 'owner');
+      await expectDisplay(page, p, '#lookSeg button:has-text("Use this template")', 'owner');
     });
   }
 });
