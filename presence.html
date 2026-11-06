@@ -165,6 +165,8 @@ html.dds-side .dds-nav .sec .site-menu .navitem:hover{background:color-mix(in sr
 html.dds-side .dds-nav .sec .site-menu .navitem.on{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
 html.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
 html.site-home.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+/* the list scrolls inside the column, so the bottom row stays put (also in shell.css, which browsers keep for a day) */
+html.dds-side .dds-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
 /* the sidebar is the map, so the launcher repeating it stays on the phone layout */
 @media(min-width:761px){html.dds-side #dds-waffle{display:none}}
 html.dds-side .dds-nav .sec.has-site-menu > .it .car{display:none}
@@ -1539,18 +1541,18 @@ body.pd-dragging *{cursor:grabbing !important}
       </section>
       <!-- HISTORY -->
       <section class="view" id="view-history">
-        <!-- what happened to the site, newest first (was its own page: timeline.html) -->
-        <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
-          <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
-          <div class="hb-list" id="activityList"></div>
-        </section>
-        <h1 class="doc" role="heading" aria-level="2">History</h1>
+        <h1 class="doc" role="heading" aria-level="2">Versions</h1>
         <p class="docsub">Every version of your site, kept. Look at any of them, or bring one back into your draft — your live site never changes until you publish.</p>
         <div id="previewBox"></div>
         <div id="checkpointBox"></div>
         <div id="versionToolsBox"></div>
         <div id="launchBox"></div>
         <div id="pubList"></div>
+        <!-- what happened to the site, newest first (was its own page: timeline.html) -->
+        <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
+          <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
+          <div class="hb-list" id="activityList"></div>
+        </section>
       </section>
 
     </main>
@@ -3297,12 +3299,12 @@ function findLabel() { try { return (VOCAB && VOCAB.label) || "Menu"; } catch (_
 function findDataset() {
   const ds = [];
   [["business", "Business & settings"], ["offerings", findLabel()], ["faqs", "Questions"],
-   ["testimonials", "Kind words"], ["updates", "Updates"], ["media", "Photos"],
-   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "History"]]
+   ["testimonials", "Testimonials"], ["updates", "Updates"], ["media", "Files"],
+   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "Versions"]]
     .forEach(([v, label]) => ds.push({ view: v, kind: "Section", title: label, text: "" }));
   (S.offerings || []).forEach((o) => ds.push({ view: "offerings", kind: findLabel(), title: o.name || "", text: [o.category, o.description, o.price_text].filter(Boolean).join(" ") }));
   (S.faqs || []).forEach((f) => ds.push({ view: "faqs", kind: "Question", title: f.question || "", text: f.answer || "" }));
-  (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Kind words", title: t.author || t.quote || "", text: t.quote || "" }));
+  (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Testimonials", title: t.author || t.quote || "", text: t.quote || "" }));
   (S.posts || []).forEach((p) => ds.push({ view: "updates", kind: "Update", title: p.title || "", text: [p.excerpt, p.body_md, (p.tags || []).join(" ")].filter(Boolean).join(" ") }));
   return ds;
 }
@@ -4212,7 +4214,7 @@ function siteLiveUrl() {
 function hbStandardPages() {
   const v = (typeof VOCAB === "object" && VOCAB) || {};
   return [
-    { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, kind words", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
+    { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, testimonials", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
     { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: v.sub ? String(v.sub).split(/[.;—]/)[0] : "What you offer, with prices", view: "offerings", icon: "menu", sections: ["offerings"] },
     { key: "about", path: "/about/", title: "About", sum: "Your story, in your words", view: "business", icon: "about", sections: ["business"] },
     { key: "faq", path: "/faq/", title: "Questions", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
@@ -4563,7 +4565,7 @@ function renderRecent() {
   const sch = el("a", null, "Schedule it for later"); sch.href = "#schedule"; sch.addEventListener("click", (e) => { e.preventDefault(); openRitual({ schedule: true }); }); qt.appendChild(sch); qt.appendChild(el("span", null, " — pick a time and it goes live on its own."));
   q.appendChild(qt); list.appendChild(q);
 }
-const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "kind words", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
+const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
 function renderPublishButton() {
   const c = S.changes;
   const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
@@ -9453,7 +9455,7 @@ function renderFormsCard() {
   formsSaveSoon();
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
-const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Kind words"], ["faqs", "Questions"] ];
+const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
 async function saveSections(order, hidden) {
   try {
     const r = await api("PUT", "/settings", { sections_order: order, sections_hidden: hidden });
@@ -12078,7 +12080,10 @@ const NOTICE_ACTION = {
   account_lapsed:   { label: "Update payment",          href: "presence.html#settings" },
   capacity:         { label: "See plans",               href: "pricing.html" },
 };
-const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "lead_followup", "capacity"];
+// Only alerts about this website or this account reach the website page. Everything
+// else, sales above all, stays in the bell, Home and Pipeline: a deposit or a signed
+// agreement here read as if that client had a site on this page.
+const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquiry", "payment_trouble", "account_lapsed", "trial_ended", "trial_ending", "domain_expiry", "renewal_reminder", "winddown_reminder", "search_setup", "win_back", "capacity"];
 // The four client-portal notice kinds (migration 0116) belong to the BELL, not
 // to this card. They are in neither table above, so the `notices[0]` fallback
 // below happily rendered "New message from Acme Bakery" as a plum "outgrown your
@@ -12091,7 +12096,6 @@ async function renderPlanNotice() {
   catch (_) { return; }
   let n = null;
   for (const k of NOTICE_PRIORITY) { n = notices.find((x) => x.kind === k); if (n) break; }
-  if (!n) n = notices[0];
   if (!n) return;
   const host = $("welcomeWrap");
   if (!host) return;

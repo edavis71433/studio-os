@@ -144,6 +144,11 @@ test.describe('where everything else went', () => {
     await expect(page.locator('#view-search')).toBeVisible();
     await page.goto('/presence.html#activity');
     await expect(page.locator('#view-history')).toBeVisible();
+    await expect(page.locator('#view-history h1.doc')).toHaveText('Versions');
+    // the versions come first; what happened to the site follows them
+    const order = await page.evaluate(() => { const k = [...document.querySelectorAll('#view-history > *')].map((n) => n.id); return [k.indexOf('pubList'), k.indexOf('activitySec')]; });
+    expect(order[0]).toBeGreaterThanOrEqual(0);
+    expect(order[1]).toBeGreaterThan(order[0]);
   });
   test('Add a page opens the new-page dialog in Edit mode', async ({ page }) => {
     await mount(page, '/presence.html#pages');

@@ -66,6 +66,20 @@ test.describe('a client view shows the client', () => {
     await page.waitForTimeout(400);
     await expect(page.getByText('ready to convert Someone Else')).toHaveCount(0);
   });
+
+  test('any alert that isn’t about this site or account stays off it too, however new the kind', async ({ page }) => {
+    const notices = (kind: string, headline: string) => ({ '/commerce/notices': { data: { notices: [{ id: 'n2', kind, headline, body: 'b' }] } } });
+    await installApp(page, { api: { ...API, ...notices('deposit_landed', 'Deposit from a client') } });
+    await page.goto('/presence.html');
+    await expect(page.locator('#siteStage')).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Deposit from a client')).toHaveCount(0);
+    // one about the site still shows, with its way to fix it
+    await installApp(page, { api: { ...API, ...notices('publish_failed', 'Your last publish didn’t go through') } });
+    await page.goto('/presence.html?v=2');
+    await expect(page.getByText('Your last publish didn’t go through')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open your website' })).toBeVisible();
+  });
 });
 
 test('History counts changes the way the Publish button does', async ({ page }) => {
