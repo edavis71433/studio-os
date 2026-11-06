@@ -4397,7 +4397,7 @@ function loadSiteStage(force) {
     if (err && err.status === 403) {
       document.documentElement.classList.add("ss-noplan");
       const nm = S.identity && S.identity.business_name;
-      note.appendChild(el("div", "ssn-h", (nm ? nm + "’s website" : "This website") + " lives somewhere else."));
+      note.appendChild(el("div", "ssn-h", (nm ? nm + (/s$/i.test(nm) ? "’" : "’s") + " website" : "This website") + " lives somewhere else."));
       note.appendChild(el("div", "ssn-p", "Its visitors and search standing are here."));
       const row = el("div", "ssn-acts");
       const go2 = (label, fn) => { const b = el("button", "pillbtn", label); b.type = "button"; b.addEventListener("click", fn); row.appendChild(b); };
