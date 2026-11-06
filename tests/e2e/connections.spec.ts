@@ -237,7 +237,7 @@ test.describe('Connections — Google Analytics chooses its property', () => {
     });
     await page.goto('/connections.html');
     await expect(page.getByText('Which property is this website?')).toBeVisible();
-    const btn = page.locator('#pick-google_analytics button[data-gaprop="313646501"]');
+    const btn = page.locator('#pick-google_analytics button[data-pickprop="313646501"]');
     await expect(btn).toContainText('Bacchus Kitchen');
     await btn.click();
     await expect.poll(() => picked).toBe('313646501');
@@ -282,7 +282,7 @@ test.describe('Connections — Google Analytics chooses its property', () => {
     await page.route('**/functions/v1/presence/connections/google_analytics/property', (route) =>
       route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'bad_request', message: 'That property isn’t on the connected Google account. Pick one from the list — or reconnect with the account that owns it.' }) }));
     await page.goto('/connections.html');
-    const btn = page.locator('#pick-google_analytics button[data-gaprop="1"]');
+    const btn = page.locator('#pick-google_analytics button[data-pickprop="1"]');
     await btn.click();
     await expect(page.locator('#prob-google_analytics')).toContainText('isn’t on the connected Google account');
     await expect(btn).toBeEnabled();

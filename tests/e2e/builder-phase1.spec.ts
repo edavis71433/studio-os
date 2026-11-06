@@ -23,7 +23,7 @@ const API = {
 };
 type Write = { method: string; path: string; body: any };
 async function mount(page: Page, url: string, api: Record<string, unknown> = {}) {
-  let settings: Record<string, unknown> = { blocks: BLOCKS, section_meta: META, pages: [] };
+  let settings: Record<string, unknown> = { blocks: BLOCKS, section_meta: META, pages: [], ...((api['/settings'] as any)?.data || {}) };
   await installApp(page, { api: { ...API, ...api, '/settings': { data: settings } } });
   const writes: Write[] = [];
   await page.route('**/functions/v1/presence/**', (route: Route) => {
@@ -97,7 +97,7 @@ test.describe('one set of tabs', () => {
     await mount(page, '/presence.html');
     const strip = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
     const sheet = (await page.locator('#sectionsNav .navitem').allTextContents()).map((s) => s.trim());
-    expect(strip).toEqual(['Overview', 'Services', 'Questions', 'Testimonials', 'Updates', 'Files', 'Bookings', 'Reviews', 'Business', 'Domain & email', 'History']);
+    expect(strip).toEqual(['Overview', 'Services', 'Questions', 'Testimonials', 'Updates', 'Files', 'Bookings', 'Reviews', 'Business', 'Search', 'Analytics', 'Domain & email', 'History']);
     expect(sheet).toEqual(['Edit site', ...strip]);    // plus the way into Edit mode, which the phone header has no room for
     await expect(page.locator('#nav')).toBeVisible();
     await page.locator('#nav .navitem[data-view="faqs"]').click();
@@ -487,5 +487,156 @@ test.describe('what a real site showed', () => {
     const tip = await page.evaluate(() => (0, eval)('VIEW_HINTS.design[1]'));
     expect(tip).not.toMatch(/any text/);
     expect(tip).toMatch(/section/);
+  });
+});
+
+// Found by the real save test: a real server takes a moment to answer, and typing doesn't
+// stop for it. Each of these lost text with no warning while the page said "Everything saved".
+test.describe('nothing typed gets lost', () => {
+  const settle = async (page: Page) => { await expect(page.locator('html')).toHaveClass(/dc-edit/); await page.frameLocator('#designPreview').locator('[data-dds-sid="richtext"]').waitFor(); };
+  const holdNextSave = async (page: Page) => {
+    let holds = 1;
+    await page.route('**/functions/v1/presence/settings', async (route) => {
+      if (route.request().method() === 'PUT' && holds > 0) { holds--; await new Promise((r) => setTimeout(r, 1500)); }
+      return route.fallback();
+    });
+  };
+  const putsOf = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.method === 'PUT');
+
+  test('a field finished while the last save is on its way still saves', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design');
+    await settle(page);
+    await holdNextSave(page);
+    await page.evaluate(() => (window as any).eeEditBlock(1));
+    const title = page.locator('#blocksCard input').first();
+    const body = page.locator('#blocksCard textarea').first();
+    await title.fill('Heading saved first');
+    await title.blur();
+    await page.waitForTimeout(850);                                  // that save has left and hasn't answered yet
+    await body.fill('Body finished during the save');
+    await body.blur();
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
+    expect(putsOf(writes)[1].body.blocks[1]).toMatchObject({ title: 'Heading saved first', body: 'Body finished during the save' });
+    await expect(body).toHaveValue('Body finished during the save');
+    await expect(page.locator('#dcWhisper')).toHaveText(/Saved just now|Everything saved/);
+    // and they stay two separate steps: undo takes back the body and keeps the heading
+    await page.evaluate(() => (window as any).dcUndo());
+    await expect.poll(() => putsOf(writes).length).toBe(3);
+    expect(putsOf(writes)[2].body.blocks[1]).toMatchObject({ title: 'Heading saved first', body: 'Hello' });
+  });
+
+  test('a save coming back leaves the field you are typing in alone', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design');
+    await settle(page);
+    await holdNextSave(page);
+    await page.evaluate(() => (window as any).eeEditBlock(1));
+    const title = page.locator('#blocksCard input').first();
+    const body = page.locator('#blocksCard textarea').first();
+    await title.fill('Heading');
+    await title.blur();
+    await page.waitForTimeout(850);
+    await body.focus();
+    await body.fill('Still typing');
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(1);
+    await page.waitForTimeout(300);
+    await expect(body).toBeFocused();
+    await expect(body).toHaveValue('Still typing');
+    await body.blur();
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
+    expect(putsOf(writes)[1].body.blocks[1]).toMatchObject({ title: 'Heading', body: 'Still typing' });
+  });
+
+  test('switching pages right after an edit saves it to the page it belongs to', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design', { '/settings': { data: { pages: [{ slug: 'visit', title: 'Visit', blocks: [{ type: 'richtext', body: 'Visit page' }] }] } } });
+    await settle(page);
+    await page.evaluate(() => {
+      const w = window as any; w.eeEditBlock(1);
+      const ta = document.querySelector('#blocksCard textarea') as HTMLTextAreaElement;
+      ta.value = 'Typed just before switching';
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+      w.dcSwitchPage('visit');                                       // the same moment: a click on the page pill
+    });
+    await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(1);
+    const put = putsOf(writes)[0].body;
+    expect(put.pages).toBeUndefined();                               // it went to Home, where it was typed
+    expect(put.blocks[1].body).toBe('Typed just before switching');
+    await page.waitForTimeout(1200);
+    expect(await page.evaluate(() => (0, eval)('BLOCKS_WORK')[0].body)).toBe('Visit page');   // and the Visit page is untouched
+    expect(putsOf(writes)).toHaveLength(1);
+    await page.evaluate(() => (window as any).dcSwitchPage(''));
+    expect(await page.evaluate(() => (0, eval)('BLOCKS_WORK')[1].body)).toBe('Typed just before switching');
+  });
+
+  test('Undo right after typing takes back that typing, and Redo brings it back', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design');
+    await settle(page);
+    await page.evaluate(() => {
+      const w = window as any; w.eeEditBlock(1);
+      const ta = document.querySelector('#blocksCard textarea') as HTMLTextAreaElement;
+      ta.value = 'Typed then undone';
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+      w.dcUndo();                                                    // before its save has even left
+    });
+    const work = () => page.evaluate(() => (0, eval)('BLOCKS_WORK')[1].body);
+    await expect.poll(work).toBe('Hello');
+    await page.evaluate(() => (window as any).dcRedo());
+    await expect.poll(work).toBe('Typed then undone');
+    await expect.poll(() => putsOf(writes).at(-1)?.body.blocks[1].body, { timeout: 5000 }).toBe('Typed then undone');
+  });
+
+  const FORM = { type: 'form', id: 'contact', title: 'Contact us', kind: 'contact', fields: [{ key: 'name', label: 'Your name', type: 'text' }], rules: [] };
+  const WITH_FORM = { '/settings': { data: { blocks: [...BLOCKS, FORM] } } };
+
+  test('the form builder never rebuilds under a field you are typing in', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design', WITH_FORM);
+    await settle(page);
+    await holdNextSave(page);
+    await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    const title = page.locator('#formsCard input[placeholder="Form title"]').first();
+    const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
+    await title.fill('Say hello');
+    await title.blur();
+    await page.waitForTimeout(850);
+    await label.focus();
+    await label.fill('Typing a question');
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(1);
+    await page.waitForTimeout(300);
+    await expect(label).toBeFocused();
+    await expect(label).toHaveValue('Typing a question');
+    await label.blur();
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
+    const form = putsOf(writes)[1].body.blocks.find((b: any) => b.type === 'form');
+    expect(form).toMatchObject({ title: 'Say hello' });
+    expect(form.fields[0].label).toBe('Typing a question');
+  });
+
+  test('a form field finished while the last save is on its way still saves', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design', WITH_FORM);
+    await settle(page);
+    await holdNextSave(page);
+    await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    const title = page.locator('#formsCard input[placeholder="Form title"]').first();
+    const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
+    await title.fill('Say hello');
+    await title.blur();
+    await page.waitForTimeout(850);
+    await label.fill('Finished during the save');
+    await label.blur();
+    await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
+    const form = putsOf(writes)[1].body.blocks.find((b: any) => b.type === 'form');
+    expect(form.fields[0].label).toBe('Finished during the save');
+  });
+
+  test('a form save does not make the sections look unsaved', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design', WITH_FORM);
+    await settle(page);
+    await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    const title = page.locator('#formsCard input[placeholder="Form title"]').first();
+    await title.fill('Say hello');
+    await title.blur();
+    await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(1);
+    await page.waitForTimeout(1200);
+    expect(await page.evaluate(() => (0, eval)('blocksDirty()'))).toBe(false);
+    expect(putsOf(writes)).toHaveLength(1);
   });
 });

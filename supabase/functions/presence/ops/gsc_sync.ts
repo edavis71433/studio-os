@@ -18,7 +18,7 @@
 import { svc } from '../lib/db.ts';
 import { loadTokens, saveTokens, markStatus } from '../connected/store.ts';
 import { refreshTokens } from '../connected/auth.ts';
-import { propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor, gscDomainFor } from '../lib/gsc.ts';
+import { propertyCandidates, gscQueryBody, gscMonthWindow, gscBackMonths, noPropertySentence, parseTotals, parseTermRows, signalRowsFor, gscDomainFor, type GscTotals } from '../lib/gsc.ts';
 
 const PROVIDER = 'google_search_console';
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
@@ -53,8 +53,14 @@ async function externalDomainFor(siteId: string): Promise<string | null> {
   return (r && arr(r)[0]?.domain) ? String(arr(r)[0].domain) : null;
 }
 
-/** Sync one site's GSC data → signals (aggregate) + presence_search_terms (detail). */
-export async function syncGscForSite(site: { id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition?: string | null }, now: Date, externalDomain?: string | null): Promise<{ ok: boolean; note: string }> {
+/** How many earlier months a first read fills in. Twelve gives the trend line a
+ *  full year; the sync stays one query per month, well inside Google's quota. */
+const BACKFILL_MONTHS = 12;
+
+/** Sync one site's GSC data → signals (aggregate) + presence_search_terms (detail).
+ *  `backfill` is the first-read path: when this client has almost no history yet,
+ *  the earlier months come too. The daily cron leaves it off. */
+export async function syncGscForSite(site: { id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition?: string | null }, now: Date, externalDomain?: string | null, opts: { backfill?: boolean } = {}): Promise<{ ok: boolean; note: string; totals?: GscTotals; attention?: string; status?: number }> {
   const bundle = await loadTokens(site.id, PROVIDER);
   if (!bundle?.access_token) return { ok: false, note: 'not_connected' };
   const tokenState = { access: bundle.access_token, refresh: bundle.refresh_token || null };
@@ -65,10 +71,11 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
     // don't host it and nobody has told us where their website is. The second is
     // fixable by Eric in a sentence, so it says so where he'll see it.
     if (site.edition === 'monitor') {
-      await markStatus(site.id, PROVIDER, 'connected', 'attention', 'Add this client’s website address — Search Console needs to know which domain to report on').catch(() => {});
-      return { ok: false, note: 'no_external_domain' };
+      const attention = 'Add this client’s website address — Search Console needs to know which domain to report on';
+      await markStatus(site.id, PROVIDER, 'connected', 'attention', attention).catch(() => {});
+      return { ok: false, note: 'no_external_domain', attention };
     }
-    return { ok: false, note: 'no_domain' };
+    return { ok: false, note: 'no_domain', attention: 'Search numbers start once this website is live. Publish it and they’ll follow.' };
   }
   const domain = picked.domain;
   const { startDate, endDate, period } = gscMonthWindow(now);
@@ -76,12 +83,22 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
   // find the verified property (Domain vs URL-prefix), reusing the proven candidates
   let prop = '';
   let totalsResp: any = null;
+  let failure = 0;   // an answer that isn't "not this property": a lapsed token or Google having trouble
   for (const cand of propertyCandidates(domain)) {
     const res = await query(site.id, cand, gscQueryBody(startDate, endDate, [], 1), tokenState);
     if (res.status === 403 || res.status === 404) continue;      // not verified for this account → try next
     if (res.ok) { prop = cand; totalsResp = res.json; break; }
+    failure = res.status;
   }
-  if (!prop) { await markStatus(site.id, PROVIDER, 'connected', 'attention', 'No verified Search Console property for this site’s domain').catch(() => {}); return { ok: false, note: 'no_verified_property' }; }
+  // A lapsed token used to fall through to "no verified property", which sends
+  // someone off to fix Search Console when the fix is one tap on Reconnect.
+  if (!prop && failure) return { ok: false, note: `read_${failure}`, status: failure };
+  if (!prop) {
+    const listed = await fetch('https://www.googleapis.com/webmasters/v3/sites', { headers: { Authorization: `Bearer ${tokenState.access}`, accept: 'application/json' }, signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const attention = noPropertySentence(domain, listed);
+    await markStatus(site.id, PROVIDER, 'connected', 'attention', attention).catch(() => {});
+    return { ok: false, note: 'no_verified_property', attention };
+  }
 
   // aggregate metrics → signals (mapped site → client_id, the store AN-3 reads)
   const totals = parseTotals(totalsResp);
@@ -95,8 +112,22 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
     if (terms.length) await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(terms) }).catch(() => {});
   }
 
+  if (opts.backfill) {
+    const have = arr(await svc(`signals?client_id=eq.${encodeURIComponent(site.client_id)}&source=eq.gsc&metric=eq.search_impressions&select=period&limit=3`).catch(() => ({})));
+    if (have.length < 3) {
+      for (const month of gscBackMonths(now, BACKFILL_MONTHS)) {
+        const res = await query(site.id, prop, gscQueryBody(month.startDate, month.endDate, [], 1), tokenState);
+        if (!res.ok) break;   // keep whatever landed; the next read tries the rest
+        const t = parseTotals(res.json);
+        // Months before the site was on Google are absent, not zero. Storing
+        // zeros would draw a flat year that never happened.
+        if (t.impressions > 0) await svc('signals?on_conflict=client_id,metric,period,source', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(signalRowsFor(site.client_id, month.period, t)) }).catch(() => {});
+      }
+    }
+  }
+
   await markStatus(site.id, PROVIDER, 'connected', 'ok').catch(() => {});
-  return { ok: true, note: `synced ${period} (${totals.impressions} impressions)` };
+  return { ok: true, note: `synced ${period} (${totals.impressions} impressions)`, totals };
 }
 
 /** Scheduled sync across every connected GSC site. Secret-gated via /system/run. */

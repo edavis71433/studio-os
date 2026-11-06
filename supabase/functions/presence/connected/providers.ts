@@ -45,7 +45,12 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
     auth: 'oauth2', approval: 'oauth_consent', scopes: ['https://www.googleapis.com/auth/business.manage'],   // full URL — Google rejects the short form (the AN-3.1 fix, applied to the siblings)
     reads: ['your listing details and hours', 'reviews and their replies', 'how many people called or asked directions'],
     futureWrites: ['update hours and details', 'reply to a review', 'publish a post'], minEdition: 'presence_monitor',
-    rateNote: 'per-minute limits; batched, backed-off', status: 'planned' },
+    // Shipped the way GA4 did: a real read (connected/adapters.ts readGbp: account
+    // and location discovery, listing, reviews and performance), request/response
+    // contracts transcribed from Google's published definitions (cited in
+    // lib/gbp.ts). Never yet run against a real listing: that waits on Google
+    // approving API access for the studio's project.
+    rateNote: 'per-minute limits; batched, backed-off', status: 'read_only' },
   { key: 'apple_business_connect', name: 'Apple Business Connect', customerLabel: 'your place on Apple Maps',
     category: 'local_listing', purpose: 'Make sure people on iPhones and Siri find the right you.',
     auth: 'ownership_verification', approval: 'ownership_verification', scopes: ['place.read'],

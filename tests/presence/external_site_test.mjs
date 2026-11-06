@@ -125,6 +125,8 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
     gscDomainFor(HOSTED, null).source === 'custom_domain');
   ok('hosted site still falls back to the netlify subdomain while a domain is pending',
     gscDomainFor({ edition: 'presence', custom_domain: null, netlify_site_id: 'xyz' }, null).domain === 'xyz.netlify.app');
+  ok('hosted site: the subdomain is the name it really has, never Netlify\'s internal id',
+    gscDomainFor({ id: '11111111-1111-4111-8111-111111111111', edition: 'presence', custom_domain: null, netlify_site_id: 'a-netlify-uuid' }, null).domain === 'presence-111111111111.netlify.app');
   ok('hosted site with a recorded external domain prefers it over the netlify subdomain',
     gscDomainFor({ edition: 'presence', custom_domain: null, netlify_site_id: 'xyz' }, 'oldsite.com').source === 'external');
   ok('knowing nothing returns null — an honest "we don’t know", never a guessed property',
@@ -221,20 +223,20 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 }
 
 // ═══ 8. Google Business Profile — the honest verdict ═══════════════════════
-// Eric named GBP explicitly. It stays 'planned': its READ_ENDPOINT lists
-// ACCOUNTS while its normalizer reads a LOCATION's rating/reviewCount, and no
-// location is ever resolved — a connected customer would see a blank card. That
-// is a defect, not a missing flag, so this pass does not flip it. Pinned here so
-// the claim in the report is checkable and a future flip must fix the adapter.
+// Eric named GBP explicitly. It was held at 'planned' here because its READ_ENDPOINT
+// listed ACCOUNTS while its normalizer read a LOCATION's rating/reviewCount, and no
+// location was ever resolved. That defect is now fixed the way this pin demanded: a
+// real read that resolves a location (tests/presence/gbp_test.mjs). Pinned so the
+// claim stays checkable, and so the placeholder endpoint can't come back.
 {
   const providers = src('connected/providers.ts');
   const adapters = src('connected/adapters.ts');
   const gbp = providers.match(/key: 'google_business_profile'[\s\S]*?status: '(\w+)'/);
-  ok('GBP is still planned (its read is not verified end-to-end)', !!gbp && gbp[1] === 'planned');
-  ok('GBP’s endpoint is still the ACCOUNTS list — no location is resolved',
-    /google_business_profile: 'https:\/\/mybusinessbusinessinformation\.googleapis\.com\/v1\/accounts'/.test(adapters));
-  ok('GBP’s normalizer still reads location-level review fields the endpoint cannot return',
-    /google_business_profile: \(r, label\) => \(\{[^}]*reviewCount/.test(adapters));
+  ok('GBP is live, now its read resolves a location', !!gbp && gbp[1] === 'read_only');
+  ok('GBP’s placeholder ACCOUNTS endpoint is gone',
+    !/google_business_profile: 'https:\/\/mybusinessbusinessinformation\.googleapis\.com\/v1\/accounts'/.test(adapters));
+  ok('GBP’s rating and review count come from the reviews resource of one chosen location',
+    /parseGbpReviews\(reviews\.json/.test(adapters) && /gbpLocationPath\(cfg\.location_id\)/.test(adapters));
 }
 
 const passed = results.filter((r) => r.p).length;

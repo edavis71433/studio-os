@@ -75,7 +75,7 @@ The read path caches a **normalized** snapshot (`presence_connected_data`, hones
 
 ## Setup (owner steps — per provider, dashboard-only)
 
-For each OAuth provider: register an app at the provider's developer console, set the redirect URI to `https://davisdigitalstudio.com/connections-callback.html`, request the least-privilege scopes shown in the inventory, and add `CONNECTED_<KEY>_CLIENT_ID` / `_SECRET` as edge-function secrets. The `CONNECTION_ENC_KEY` (32-byte base64) is already set on staging and prod. API-key providers need nothing — the customer pastes a read-only key. *(This is the same "dashboard steps I can't do for you" pattern as the Stripe/webhook setup.)*
+For each OAuth provider: register an app at the provider's developer console, set the redirect URI to `https://app.davisdigitalstudio.com/connections-callback.html`, request the least-privilege scopes shown in the inventory, and add `CONNECTED_<KEY>_CLIENT_ID` / `_SECRET` as edge-function secrets. The `CONNECTION_ENC_KEY` (32-byte base64) is already set on staging and prod. API-key providers need nothing — the customer pastes a read-only key. *(This is the same "dashboard steps I can't do for you" pattern as the Stripe/webhook setup.)*
 
 ## Tests
 

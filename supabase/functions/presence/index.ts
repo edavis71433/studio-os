@@ -82,6 +82,7 @@ import { handleAgency } from './agency/routes.ts';
 import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 import { handleSystem } from './routes/system.ts';
+import { handleVisibility, handleVisibilityCheck } from './routes/visibility.ts';
 import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } from './routes/connections.ts';
 import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
 import { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } from './routes/enterprise.ts';
@@ -472,6 +473,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/site' && method === 'GET') return handleGetSite(db, site, cors);
   if (route === '/site/templates' && method === 'GET') return handleTemplatesList(site, cors);            // Phase CP-1
   if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD
+  if (route === '/visibility' && method === 'GET') return handleVisibility(site, cors);                   // the Search tab
+  if (route === '/visibility/check' && method === 'POST') return handleVisibilityCheck(site, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   {

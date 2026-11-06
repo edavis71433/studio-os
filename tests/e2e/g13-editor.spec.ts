@@ -628,7 +628,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);   // the debounce fired on its own
     await pill(page, 'About').locator('.pp-name').click();
     await page.waitForTimeout(300);
-    await expect(onPill(page)).toHaveText('Home');                     // landing now would replace the new page's list
+    await expect(onPill(page)).toHaveText('Home');                     // its write isn't in the saved draft yet
     release();
     await expect(onPill(page)).toHaveText('About');
     await page.waitForTimeout(1800);

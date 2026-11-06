@@ -107,6 +107,8 @@ a{color:var(--plum);text-decoration:none}
    is the map */
 .hb-tabs{display:flex;gap:2px;border-bottom:1px solid var(--hair);margin:var(--dds-s5,20px) var(--dds-s7,32px) 0;max-width:var(--dds-w-app,1280px);overflow-x:auto;scrollbar-width:none}
 .hb-tabs::-webkit-scrollbar{display:none}
+/* Above phone size the tabs wrap: a mouse has no way to reach what a hidden scrollbar hides. */
+@media (min-width:761px){.hb-tabs{flex-wrap:wrap;overflow-x:visible}}
 .navitem{position:relative;display:inline-block;padding:var(--dds-s2,8px) var(--dds-s3,12px);font-size:13.5px;font-weight:500;color:var(--ink-2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;border-radius:0;transition:color var(--dur) var(--ease)}
 .navitem:hover{color:var(--ink)}
 .navitem.on{color:var(--plum);border-bottom-color:var(--plum)}
@@ -414,6 +416,58 @@ html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,htm
 .seo-tasks li{display:flex;gap:var(--dds-s2,8px);align-items:baseline;padding:var(--dds-s1,4px) 0;font-size:13px}
 .seo-tasks li::before{content:"•";color:#a05a2c;font-weight:700}
 .seo-tasks a{color:var(--plum)}
+/* The Search tab: one score, then one card per question */
+.sv-card{border:1px solid var(--hair);border-radius:var(--dds-r-xl,14px);background:var(--sheet);padding:var(--dds-s4,16px) var(--dds-s5,20px);min-width:0}
+.sv-card h3{font-size:15px;font-weight:600;margin:0 0 var(--dds-s2,8px)}
+.sv-card p{font-size:13.5px;margin:0 0 var(--dds-s3,12px)}
+.sv-card p.hint{font-size:12.5px;color:var(--ink-2);margin:0 0 var(--dds-s2,8px)}
+.sv-card p.hint + .pillbtn,.sv-card p + div > .pillbtn{margin-top:2px}
+.sv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dds-s4,16px);margin-top:var(--dds-s4,16px);align-items:start}
+.sv-score{display:flex;gap:var(--dds-s5,20px);align-items:flex-start}
+.sv-ring{flex:0 0 auto;width:112px;height:112px;position:relative}
+.sv-ring svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+.sv-ring .n{position:absolute;inset:0;display:grid;place-items:center;font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.sv-body{flex:1;min-width:0}
+.sv-body h3{font-size:18px;margin-bottom:2px}
+.sv-body p{font-size:13.5px;margin:0 0 var(--dds-s2,8px);color:var(--ink-2)}
+.sv-pillars{display:grid;grid-template-columns:max-content minmax(60px,1fr) max-content;gap:6px var(--dds-s3,12px);align-items:center;font-size:13px;margin:var(--dds-s3,12px) 0;max-width:420px}
+.sv-bar{height:6px;border-radius:3px;background:var(--hair);overflow:hidden}
+.sv-bar i{display:block;height:100%;background:var(--plum);border-radius:3px}
+.sv-pn{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.sv-actions{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;align-items:center;margin-top:var(--dds-s3,12px)}
+.sv-actions a{font-size:13px;color:var(--plum)}
+.sv-status{font-size:13px;color:var(--ink-2);margin-top:var(--dds-s2,8px)}
+.sv-why{font-size:13px;color:var(--amber-text);margin:0 0 var(--dds-s2,8px)}
+.sv-problem{font-size:13px;color:var(--clay);margin-top:var(--dds-s2,8px);overflow-wrap:anywhere}
+.sv-check{list-style:none;margin:0;padding:0}
+.sv-check li{display:flex;gap:var(--dds-s2,8px);align-items:baseline;padding:5px 0;font-size:13.5px}
+.sv-check li::before{content:"\25CB";color:var(--ink-3);font-weight:700;flex:0 0 auto}
+.sv-check li.done{color:var(--ink-2)}
+.sv-check li.done::before{content:"\2713";color:var(--sage)}
+.sv-check a{color:var(--plum)}
+.sv-issue{border-top:1px solid var(--hair);padding:var(--dds-s2,8px) 0}
+.sv-issue:first-child{border-top:none;padding-top:0}
+.sv-issue summary{cursor:pointer;font-size:13.5px;font-weight:500;display:flex;gap:var(--dds-s2,8px);align-items:baseline;justify-content:space-between}
+.sv-issue p{font-size:13px;color:var(--ink-2);margin:6px 0 0}
+.sv-issue p b{color:var(--ink);font-weight:600}
+.sv-pri{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--hair);color:var(--ink-2)}
+.sv-pri.now{background:var(--clay-soft);color:var(--ink)}
+.sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
+.sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
+.sv-nums div{min-width:64px}
+.sv-nums b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.sv-nums span{font-size:12px;color:var(--ink-3)}
+.sv-up{color:var(--sage);font-weight:600}
+.sv-down{color:var(--amber-text);font-weight:600}
+.sv-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:var(--dds-s3,12px);table-layout:fixed}
+.sv-table caption{text-align:left;font-size:12px;font-weight:600;color:var(--ink-3);padding-bottom:4px}
+.sv-table th{font-size:12px;font-weight:500;color:var(--ink-3);text-align:right;padding:2px 0 2px 6px;width:52px}
+.sv-table th:first-child,.sv-table td:first-child{text-align:left;width:auto;padding-left:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-table td{border-top:1px solid var(--hair);padding:5px 0 5px 6px;text-align:right;font-variant-numeric:tabular-nums}
+#svWords{margin-top:var(--dds-s6,24px);max-width:720px}
+html.plan-watch #svWords{display:none}
+@media (max-width:1000px){.sv-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.sv-score{flex-direction:column;align-items:center}.sv-body{width:100%}.sv-card{padding:var(--dds-s3,12px) var(--dds-s4,16px)}}
 .consequence{font-size:13px;color:var(--amber-text);margin-top:6px;max-width:56ch}
 /* ── rich-text formatting toolbar (writes plain markdown into the field) ── */
 .rtbar{display:flex;flex-wrap:wrap;gap:var(--dds-s1,4px);margin-bottom:var(--dds-s2,8px)}
@@ -1078,7 +1132,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <span class="ico good"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
             <span class="txt"><span class="k">Site health</span><span class="v">—</span><span class="s"></span></span>
           </button>
-          <a class="hb-stat" id="statVisitors" href="/analytics.html">
+          <a class="hb-stat" id="statVisitors" href="/analytics.html?view=website">
             <span class="ico info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
             <span class="txt"><span class="k">Visitors this month</span><span class="v">—</span><span class="s">Not measured yet</span></span>
           </a>
@@ -1163,7 +1217,7 @@ body.pd-dragging *{cursor:grabbing !important}
         <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
         <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Told on your About page, in your words.</div></div>
         <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
-        <h2 class="hb-sub-h">Search &amp; discovery</h2>
+        <h2 class="hb-sub-h">Your kind of business</h2>
         <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
           <option value="generic">General / other</option>
           <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
@@ -1173,6 +1227,54 @@ body.pd-dragging *{cursor:grabbing !important}
           <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
           <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
         </select><div class="hint">Sets the right words (“Services” vs “Menu”) and the right behind-the-scenes search markup. Applies when you next publish.</div></div>
+        <h2 class="hb-sub-h">Links &amp; booking</h2>
+        <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
+        <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+
+        <h5 class="rune">Where to find you <span class="whisper" id="save-location"></span></h5>
+        <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+        <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
+        <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
+        <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
+        <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
+
+        <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
+        <div class="hoursgrid" id="hoursGrid"></div>
+        <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
+        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+
+        <div id="monitorCard" hidden>
+          <h5 class="rune">Your website</h5>
+          <p class="docsub" style="margin-top:6px">Your website stays exactly where it is. Once it’s connected and verified, this room quietly watches over it — nothing on it is ever changed from here.</p>
+          <div id="monitorStatus"></div>
+          <div id="monitorAddWrap"></div>
+          <button class="addline" id="btnMonitorConnect" hidden>Connect my website</button>
+        </div>
+
+        <h5 class="rune">Papers you already have</h5>
+        <p class="docsub" style="margin-top:6px">A menu, a flyer, a price sheet — paste the text in and the site will quietly notice when they disagree. Nothing is rewritten or published.</p>
+        <div id="knowledgeList"></div>
+        <div id="knowledgeAddWrap"></div>
+        <button class="addline" id="btnAddKnowledge">Bring a menu or flyer I already have</button>
+
+        <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
+        <button class="addline" style="border-top:none" onclick="openFoundationsDesk()">The technical side — domain, email, security</button>
+      </section>
+
+      <!-- SEARCH -->
+      <section class="view" id="view-search">
+        <h1 class="doc" role="heading" aria-level="2">Search</h1>
+        <p class="docsub">How people find you on Google and in AI answers, and what would help them find you more. Checking and connecting never change your website.</p>
+        <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Reading how you show up…</div><div class="shimmer"></div></div></div>
+        <div class="sv-grid">
+          <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
+          <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
+          <section class="sv-card" aria-labelledby="svConsoleH" id="svConsoleCard" hidden><h3 id="svConsoleH">On Google Search</h3><div id="svConsole"></div></section>
+          <section class="sv-card" aria-labelledby="svListingH" id="svListingCard" hidden><h3 id="svListingH">Your Google listing</h3><div id="svListing"></div></section>
+          <section class="sv-card" aria-labelledby="svAiH"><h3 id="svAiH">In AI answers</h3><div id="svAi"><p class="hint">Checking…</p></div></section>
+        </div>
+        <div id="svWords">
+          <h2 class="hb-sub-h">Your wording</h2>
         <div class="field" id="searchPreviewWrap">
           <label id="srpLabel">How you show up on Google</label>
           <div class="srp" id="srp" aria-labelledby="srpLabel">
@@ -1209,38 +1311,7 @@ body.pd-dragging *{cursor:grabbing !important}
           </div>
         </details>
         <div id="searchCardSlot"></div>
-        <h2 class="hb-sub-h">Links &amp; booking</h2>
-        <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
-        <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
-
-        <h5 class="rune">Where to find you <span class="whisper" id="save-location"></span></h5>
-        <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
-        <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
-        <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
-        <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
-        <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
-
-        <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
-        <div class="hoursgrid" id="hoursGrid"></div>
-        <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
-        <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
-
-        <div id="monitorCard" hidden>
-          <h5 class="rune">Your website</h5>
-          <p class="docsub" style="margin-top:6px">Your website stays exactly where it is. Once it’s connected and verified, this room quietly watches over it — nothing on it is ever changed from here.</p>
-          <div id="monitorStatus"></div>
-          <div id="monitorAddWrap"></div>
-          <button class="addline" id="btnMonitorConnect" hidden>Connect my website</button>
         </div>
-
-        <h5 class="rune">Papers you already have</h5>
-        <p class="docsub" style="margin-top:6px">A menu, a flyer, a price sheet — paste the text in and the site will quietly notice when they disagree. Nothing is rewritten or published.</p>
-        <div id="knowledgeList"></div>
-        <div id="knowledgeAddWrap"></div>
-        <button class="addline" id="btnAddKnowledge">Bring a menu or flyer I already have</button>
-
-        <button class="addline" style="margin-top:38px" onclick="openStudioDesk()"><span class="aimark">✦</span> Look things over — review, plan, or polish</button>
-        <button class="addline" style="border-top:none" onclick="openFoundationsDesk()">The technical side — domain, email, security</button>
       </section>
 
       <!-- MENU -->
@@ -1858,6 +1929,8 @@ function go(view, early) {
     const on = b.dataset.view === view;
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    // on a phone the strip scrolls: keep the tab you're on in sight
+    if (on && b.parentElement.scrollWidth > b.parentElement.clientWidth) b.parentElement.scrollLeft = Math.max(0, b.offsetLeft - b.parentElement.offsetLeft - 16);
   });
   document.querySelectorAll("#dock button").forEach((b) => { const on = b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   window.scrollTo({ top: 0 });
@@ -1867,6 +1940,7 @@ function go(view, early) {
   if (view === "media") loadMedia();
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
+  if (view === "search") loadSearch();
   if (view === "design") refreshDesignPreview();   // CP-2.5: the live proof warms on entry
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
@@ -1876,7 +1950,7 @@ function go(view, early) {
 const VIEW_HINTS = {
   design: ["edit-doubleclick", "Double-click the words in a section to change them. Everything saves itself, and nothing goes live until you publish."],
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
-  business: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
+  search: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
 };
 let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
 function contextHint(view) {
@@ -1893,7 +1967,7 @@ function contextHint(view) {
   }, 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "business", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", business: "business", settings: "business", search: "search", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
 // Oct 2026 review: the FIRST paint honours the hash. boot() used to await the
 // whole refreshAll() read wave before routeHash(), so a #settings / #business /
 // #design link sat on the Today view's "Setting the table…" loadline for as
@@ -1917,11 +1991,6 @@ function routeHash() {
   if (h === "pages") { hbScrollTo("pagesSec"); return; }        // content-tree.html retired
   if (h === "activity") { hbScrollTo("activitySec"); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
-  if (h === "search") {   // the Today card's "Add one" → the search preview itself
-    go("business");
-    setTimeout(() => { const n = $("searchPreviewWrap"); if (n) n.scrollIntoView({ behavior: "smooth", block: "start" }); }, 350);
-    return;
-  }
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
   // record_href). The card lives far down the Business view; without the scroll,
@@ -1950,15 +2019,29 @@ $("dock").addEventListener("click", (e) => {
 // Bookings and Reviews on a phone.
 const SITE_TABS = [
   ["today", "Overview"], ["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Updates"],
-  ["media", "Files"], ["bookings", "Bookings"], ["reviews", "Reviews"], ["business", "Business"], ["domain", "Domain & email"], ["history", "History"],
+  ["media", "Files"], ["bookings", "Bookings"], ["reviews", "Reviews"], ["business", "Business"], ["search", "Search"], ["analytics", "Analytics"], ["domain", "Domain & email"], ["history", "History"],
 ];
-function openSiteTab(view) { if (view === "domain") openFoundationsDesk(); else go(view); }
+// Keeps a studio drilled into a client inside that client on the way out of this page.
+function withClient(path) {
+  const c = new URLSearchParams(location.search).get("client");
+  if (!c) return path;
+  const [base, hash] = path.split("#");
+  return base + (base.indexOf("?") >= 0 ? "&" : "?") + "client=" + encodeURIComponent(c) + (hash ? "#" + hash : "");
+}
+// Analytics is one page rather than a second copy of the same charts here: it opens
+// on its website view, without the sales band a site tab has no business showing.
+function openSiteTab(view) {
+  if (view === "domain") openFoundationsDesk();
+  else if (view === "analytics") location.href = withClient("/analytics.html?view=website");
+  else go(view);
+}
 (function buildSiteTabs() {
   const nav = $("nav"), sheet = $("sectionsNav");
   const item = ([view, label]) => {
     const b = el("button", "navitem", label); b.type = "button";
-    if (view !== "domain") b.dataset.view = view;   // applyVocab keeps the offerings label (Menu/Services) in sync through this
-    else b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
+    if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
+    else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
+    else b.dataset.view = view;   // applyVocab keeps the offerings label (Menu/Services) in sync through this
     return b;
   };
   SITE_TABS.forEach((t) => {
@@ -3957,6 +4040,7 @@ function applyEditionGating() {
   const isMonitor = !!(S.site && S.site.edition === "monitor");
   document.documentElement.classList.toggle("plan-watch", isMonitor);
   const c = $("lnkConnections"); if (c) c.hidden = !hasFeature("connected");   // Business-OS
+  document.querySelectorAll('.navitem[data-link="analytics"]').forEach((n) => { n.hidden = !hasFeature("reports"); });
   // Visual Studio makes site imagery — website feature AND a drafting site
   // (matches the nav: a watch-plan can read the site but never generates for it).
   const v = $("lnkVisual"); if (v) v.hidden = !hasFeature("website") || isMonitor;
@@ -6314,13 +6398,15 @@ async function saveSeoSetup() {
   btn.disabled = false; btn.textContent = "Save";
 }
 // ── what's left: the tasks, each a door ──
-let SEO_CONN = null;   // Search Console connection status from GET /connections, null = not known
-function seoConnStatus(d) {
-  const groups = (d && d.groups) || {};
-  for (const k of Object.keys(groups)) for (const row of (groups[k] || [])) if (row && row.key === "google_search_console") return (row.connection && row.connection.status) || "disconnected";
-  return null;
-}
+let SEO_CONN = null, SV_LISTING = null;   // connection statuses from GET /visibility; null = not known
+let SV = null;   // the Search tab's read
 function seoTaskRows() {
+  const conn = hasFeature("connected") ? [
+    { done: SEO_CONN === "connected", label: SEO_CONN === "pending" ? "Finish connecting Google Search Console" : "Connect Google Search Console", href: "#svConsoleCard", card: "svConsoleCard" },
+    { done: SV_LISTING === "connected", label: "Connect your Google listing", href: "#svListingCard", card: "svListingCard" },
+  ] : [];
+  // A watch plan has nothing to word or publish here: its site lives elsewhere.
+  if (S.site && S.site.edition === "monitor") return [{ done: !!(SV && SV.address), label: "Tell us your website’s address", href: "#monitor" }, ...conn];
   const w = seoHomeWords();
   const f = S.health && S.health.facts;
   const rows = [
@@ -6328,7 +6414,7 @@ function seoTaskRows() {
     { done: w.descOwn, label: "Add a search description", focus: "f-seo_description" },
   ];
   if (f && f.domain) rows.push({ done: f.domain.state === "ok", label: f.domain.state === "attention" ? "Finish connecting your domain" : "Connect your domain", href: "#domain" });
-  if (hasFeature("connected")) rows.push({ done: SEO_CONN === "connected", label: SEO_CONN === "pending" ? "Finish connecting Google Search Console" : "Connect Google Search Console", href: "/connections.html" });
+  rows.push(...conn);
   const draft = !!(f && f.website && f.website.state === "none");
   const n = (S.changes && S.changes.count) || 0;
   rows.push({ done: !draft && !n, label: draft ? "Publish your website" : "Publish your changes", href: "#publish" });
@@ -6337,16 +6423,245 @@ function seoTaskRows() {
 function renderSeoTasks() {
   const host = $("seoTasks"); if (!host) return;
   host.innerHTML = "";
-  const left = seoTaskRows().filter((r) => !r.done);
-  host.appendChild(Object.assign(el("div", null, left.length ? "What’s left" : "Nothing left to set up"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
-  if (!left.length) { host.appendChild(el("div", "hint", "Google has your headline, your description and your pages.")); return; }
-  const ul = el("ul", "seo-tasks");
-  left.forEach((r) => {
-    const li = el("li"); const a = el("a", null, r.label); a.href = r.href || "#search";
-    if (r.focus) a.addEventListener("click", (e) => { e.preventDefault(); const n = $(r.focus); if (n) { n.scrollIntoView({ behavior: "smooth", block: "center" }); n.focus({ preventScroll: true }); } });
-    li.appendChild(a); ul.appendChild(li);
+  const rows = seoTaskRows();
+  const left = rows.filter((r) => !r.done).length;
+  host.appendChild(el("p", "hint", left ? `${rows.length - left} of ${rows.length} done` : "Everything here is done. Google has what it needs."));
+  const ul = el("ul", "sv-check");
+  rows.forEach((r) => {
+    const li = el("li", r.done ? "done" : "");
+    if (r.done) li.appendChild(el("span", null, r.label));
+    else {
+      const a = el("a", null, r.label); a.href = r.href || "#search";
+      if (r.focus) a.addEventListener("click", (e) => { e.preventDefault(); const n = $(r.focus); if (n) { n.scrollIntoView({ behavior: "smooth", block: "center" }); n.focus({ preventScroll: true }); } });
+      else if (r.card) a.addEventListener("click", (e) => { e.preventDefault(); const n = $(r.card); if (n) n.scrollIntoView({ behavior: "smooth", block: "center" }); });
+      li.appendChild(a);
+    }
+    ul.appendChild(li);
   });
   host.appendChild(ul);
+}
+
+// ── the Search tab's board: the score, then one card per question ──
+// One read (GET /visibility). A page deploys on merge and the function only when the
+// deploy runs, so an answer of "no such route" reads as still arriving, and the
+// checklist and wording below keep working either way.
+const svWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+const svMonth = (p) => { const m = /^(\d{4})-(\d{2})$/.exec(String(p || "")); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }) : ""; };
+const svNum = (n) => Number(n || 0).toLocaleString("en-US");
+const svPct = (v) => Math.max(0, Math.min(100, Number(v) || 0));
+const svTone = (n) => (n >= 80 ? "var(--sage)" : n >= 60 ? "var(--amber)" : "var(--clay)");
+function svRing(score) {
+  const n = typeof score === "number" ? score : null;
+  const C = 301.59;   // 2πr at r=48
+  const arc = n === null ? "" : `<circle cx="56" cy="56" r="48" fill="none" stroke="${svTone(n)}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(svPct(n) / 100 * C).toFixed(1)} ${C}"/>`;
+  return `<div class="sv-ring" role="img" aria-label="${n === null ? "No score yet" : `Search score: ${n} out of 100`}"><svg viewBox="0 0 112 112" aria-hidden="true" focusable="false"><circle cx="56" cy="56" r="48" fill="none" stroke="var(--hair)" stroke-width="9"/>${arc}</svg><span class="n" aria-hidden="true">${n === null ? "—" : n}</span></div>`;
+}
+function svTable(caption, first, rows) {
+  if (!rows.length) return "";
+  return `<table class="sv-table"><caption>${esc(caption)}</caption><thead><tr><th scope="col">${esc(first)}</th><th scope="col">Clicks</th><th scope="col">Seen</th></tr></thead><tbody>${rows.map((r) => `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td>${svNum(r.clicks)}</td><td>${svNum(r.impressions)}</td></tr>`).join("")}</tbody></table>`;
+}
+// Start a connection from this tab and come back to it. The same hand-off as
+// connections.html, which the return page (connections-callback.html) reads.
+async function svConnect(key, label, btn, problemHost) {
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = "One moment…"; problemHost.textContent = "";
+  try {
+    const r = await api("POST", `/connections/${key}/connect`, {});
+    localStorage.setItem("dds-pending-connection", key);
+    localStorage.setItem("dds-pending-label", label);
+    const c = new URLSearchParams(location.search).get("client");
+    if (c) localStorage.setItem("dds-pending-scope", c); else localStorage.removeItem("dds-pending-scope");
+    localStorage.setItem("dds-pending-return", withClient("/presence.html#search"));
+    location.href = r.data.authorize_url;
+  } catch (e) {
+    btn.disabled = false; btn.textContent = old;
+    problemHost.textContent = e.message;   // the server names what's missing; the owner is the one reading it
+  }
+}
+function svConnectButton(key, label, text) {
+  const wrap = el("div");
+  const b = el("button", "pillbtn inked", text); b.type = "button";
+  const problem = el("p", "sv-problem"); problem.setAttribute("role", "alert");
+  b.addEventListener("click", () => svConnect(key, label, b, problem));
+  wrap.append(b, problem);
+  return wrap;
+}
+function svDoor(href, text) { const a = el("a", "pillbtn", text); a.href = href; return a; }
+
+function renderSvScore() {
+  const host = $("svScore"); if (!host) return;
+  const s = SV && SV.score;
+  const state = SV ? SV.state : "unknown";
+  host.innerHTML = `<div class="sv-score">${svRing(s ? s.overall : null)}<div class="sv-body" id="svScoreBody"></div></div>`;
+  const body = $("svScoreBody");
+  if (!SV) { body.append(el("h3", null, "Still arriving"), el("p", null, "Your search score appears here in a moment. Your checklist and wording below already work.")); return; }
+  if (s) {
+    body.append(el("h3", null, s.label));
+    if (s.summary) body.append(el("p", null, s.summary));
+    const grid = el("div", "sv-pillars");
+    grid.setAttribute("role", "list");
+    s.pillars.forEach((p) => {
+      const name = el("span", null, p.name); name.setAttribute("role", "listitem");
+      const bar = el("div", "sv-bar"); bar.setAttribute("aria-hidden", "true");
+      const fill = el("i"); fill.style.width = svPct(p.score) + "%"; bar.appendChild(fill);
+      grid.append(name, bar, el("span", "sv-pn", p.score === null ? "Not measured" : String(p.score)));
+    });
+    body.appendChild(grid);
+    (s.notes || []).forEach((n) => body.appendChild(el("p", "hint", n)));
+    body.appendChild(el("p", "hint", `Checked ${svWhen(s.checked_at)}${SV.address ? ` · ${SV.address.domain}` : ""}`));
+  } else if (state === "draft") {
+    body.append(el("h3", null, "Publish first"), el("p", null, "The score comes from reading your live pages the way Google does, and a draft has nothing to read yet."));
+  } else if (state === "no_domain") {
+    body.append(el("h3", null, "Where is your website?"), el("p", null, "Tell us its address and it can be checked, wherever it’s hosted."));
+  } else {
+    body.append(el("h3", null, "No check yet"), el("p", null, "Run the check to get your score. It reads your live pages the way Google does and takes about a minute. Nothing on your site changes."));
+  }
+  const actions = el("div", "sv-actions");
+  if (state === "ready") {
+    const b = el("button", "pillbtn inked", s ? "Check again" : "Check my site"); b.type = "button"; b.id = "btnSvCheck";
+    b.addEventListener("click", () => svRunCheck(b));
+    actions.appendChild(b);
+    if (s && s.report_url) { const a = el("a", null, "See the full report"); a.href = s.report_url; a.target = "_blank"; a.rel = "noopener"; actions.appendChild(a); }
+  } else if (state === "draft") {
+    actions.appendChild(svDoor("#publish", "Publish your site"));
+    const alt = el("a", null, "Already live somewhere else?"); alt.href = "#monitor"; actions.appendChild(alt);
+  } else if (state === "no_domain") {
+    actions.appendChild(svDoor("#monitor", "Add your website’s address"));
+  }
+  body.appendChild(actions);
+  const status = el("p", "sv-status"); status.id = "svCheckStatus"; status.setAttribute("role", "status"); body.appendChild(status);
+}
+async function svRunCheck(btn) {
+  btn.disabled = true;
+  const status = $("svCheckStatus");
+  status.className = "sv-status"; status.textContent = "Reading your pages. This takes about a minute…";
+  try {
+    const r = await api("POST", "/visibility/check", {});
+    SV.score = r.data.score;
+    renderSvScore(); renderSvFix();
+    toast("Your search score is up to date.");
+  } catch (e) {
+    btn.disabled = false;
+    status.className = "sv-problem"; status.textContent = e.message;
+  }
+}
+function renderSvFix() {
+  const card = $("svFixCard"), host = $("svFix"); if (!card || !host) return;
+  const s = SV && SV.score;
+  card.hidden = !(s && s.issues.length);
+  if (card.hidden) return;
+  host.innerHTML = "";
+  s.issues.forEach((f) => {
+    const d = el("details", "sv-issue");
+    const sum = el("summary");
+    sum.append(el("span", null, f.title), el("span", "sv-pri" + (f.priority === "Fix now" ? " now" : f.priority === "Important" ? " soon" : ""), f.priority));
+    d.appendChild(sum);
+    if (f.what) d.appendChild(el("p", null, f.what));
+    if (f.why) d.appendChild(el("p", null, f.why));
+    if (f.fix) { const p = el("p"); p.appendChild(el("b", null, "The fix: ")); p.appendChild(document.createTextNode(f.fix)); d.appendChild(p); }
+    host.appendChild(d);
+  });
+  if (s.issue_count > s.issues.length && s.report_url) {
+    const a = el("a", null, `See all ${s.issue_count} in the full report`); a.href = s.report_url; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "font-size:13px;color:var(--plum);display:inline-block;margin-top:8px";
+    host.appendChild(a);
+  }
+}
+function renderSvConsole() {
+  const card = $("svConsoleCard"), host = $("svConsole"); if (!card || !host) return;
+  card.hidden = !hasFeature("connected");
+  if (card.hidden || !SV) return;
+  const c = SV.console; host.innerHTML = "";
+  if (c.has_data) {
+    const delta = c.prior_clicks ? Math.round(((c.clicks - c.prior_clicks) / c.prior_clicks) * 100) : null;
+    const nums = el("div", "sv-nums");
+    nums.innerHTML = `<div><b>${svNum(c.clicks)}</b><span>clicks to your site</span></div><div><b>${svNum(c.impressions)}</b><span>times you were seen</span></div>`;
+    host.appendChild(nums);
+    const when = el("p", "hint");
+    when.innerHTML = `In ${esc(svMonth(c.period))}${delta === null ? "" : delta === 0 ? " · the same clicks as the month before" : ` · <span class="${delta > 0 ? "sv-up" : "sv-down"}">${delta > 0 ? "up" : "down"} ${Math.abs(delta)}%</span> on the month before`}`;
+    host.appendChild(when);
+    host.insertAdjacentHTML("beforeend", svTable("What people searched", "Search", (c.top_terms || []).map((t) => ({ name: t.term, clicks: t.clicks, impressions: t.impressions }))));
+    host.insertAdjacentHTML("beforeend", svTable("Your pages on Google", "Page", (c.top_pages || []).map((p) => ({ name: p.path, clicks: p.clicks, impressions: p.impressions }))));
+  } else if (c.unavailable) {
+    host.appendChild(el("p", "hint", "Search numbers are catching their breath. Check back shortly."));
+  }
+  if (c.reason) host.appendChild(el("p", "sv-why", c.reason));
+  if (c.has_data && c.status === "connected") return;
+  if (c.status === "connected") {
+    if (!c.reason) host.appendChild(el("p", null, "Connected. Google reports on whole past months, so numbers land once the site has been live through one. Nothing to do."));
+    return;
+  }
+  if (c.readiness === "draft") { host.appendChild(el("p", null, "Publish first. Google can’t measure a site it has never been able to visit.")); return; }
+  if (c.readiness === "no_domain") { host.appendChild(el("p", null, "Tell us your website’s address first. Google reports on a domain, whoever hosts it.")); return; }
+  if (!c.reason) host.appendChild(el("p", null, "See what people search to find you and which pages they land on. Read-only, approved on Google’s own screen, and yours to disconnect any time."));
+  host.appendChild(svConnectButton("google_search_console", "how you show up in Google Search", c.status === "expired" || c.status === "error" ? "Reconnect Search Console" : "Connect Search Console"));
+}
+function renderSvListing() {
+  const card = $("svListingCard"), host = $("svListing"); if (!card || !host) return;
+  card.hidden = !hasFeature("connected");
+  if (card.hidden || !SV) return;
+  const l = SV.listing, d = l.data; host.innerHTML = "";
+  SV_LISTING = l.status;
+  if (d && (d.rating != null || d.review_count != null || d.calls != null || d.listing_name)) {
+    if (d.listing_name) { const p = el("p", null); p.style.margin = "0 0 8px"; p.appendChild(el("b", null, d.listing_name)); if (d.listing_address) p.appendChild(document.createTextNode(" · " + d.listing_address)); host.appendChild(p); }
+    const nums = el("div", "sv-nums");
+    const tile = (v, k) => { if (v == null) return; const t = el("div"); t.append(el("b", null, v), el("span", null, k)); nums.appendChild(t); };
+    tile(d.rating != null ? d.rating + "★" : null, d.review_count != null ? `${svNum(d.review_count)} review${d.review_count === 1 ? "" : "s"}` : "rating");
+    tile(d.calls != null ? svNum(d.calls) : null, "calls");
+    tile(d.direction_requests != null ? svNum(d.direction_requests) : null, "direction requests");
+    tile(d.website_clicks != null ? svNum(d.website_clicks) : null, "website clicks");
+    host.appendChild(nums);
+    if (d.calls != null || d.direction_requests != null) host.appendChild(el("p", "hint", "Calls, directions and website clicks are for the last 30 days."));
+    if (d.unreplied_reviews) host.appendChild(el("p", "sv-why", `${svNum(d.unreplied_reviews)} of your latest reviews ${d.unreplied_reviews === 1 ? "has" : "have"} no reply yet.`));
+    if (d.hours_set === false) host.appendChild(el("p", "sv-why", "Your listing has no opening hours. People often check those first."));
+    if (d.listing_maps_uri) { const a = el("a", null, "Open on Google Maps"); a.href = d.listing_maps_uri; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "font-size:13px;color:var(--plum)"; host.appendChild(a); }
+  }
+  if (l.reason) host.appendChild(el("p", "sv-why", l.reason));
+  if (l.status === "connected") {
+    if (/^Choose which/.test(l.reason || "")) host.appendChild(svDoor(withClient("/connections.html"), "Choose your listing"));
+    else if (!d && !l.reason) host.appendChild(el("p", null, "Connected. Your listing’s numbers are on their way."));
+    return;
+  }
+  host.appendChild(el("p", null, "Your rating, your reviews, and how many people called or asked for directions."));
+  host.appendChild(el("p", "hint", "Google’s screen will say “manage your business listings”, the only permission it offers. Studio OS only reads yours."));
+  host.appendChild(svConnectButton("google_business_profile", "your Google listing", l.status === "expired" || l.status === "error" ? "Reconnect your listing" : "Connect your listing"));
+}
+function renderSvAi() {
+  const host = $("svAi"); if (!host) return;
+  host.innerHTML = "";
+  if (!SV) { host.appendChild(el("p", "hint", "This shows once your search score does.")); return; }
+  const a = SV.ai;
+  if (a) {
+    const nums = el("div", "sv-nums");
+    const t = el("div"); t.append(el("b", null, `${a.overall}`), el("span", null, `out of 100${a.label ? " · " + a.label : ""}`)); nums.appendChild(t);
+    host.appendChild(nums);
+    if (a.pillars.length) {
+      const grid = el("div", "sv-pillars");
+      a.pillars.forEach((p) => {
+        const bar = el("div", "sv-bar"); bar.setAttribute("aria-hidden", "true");
+        const fill = el("i"); fill.style.width = svPct(p.score) + "%"; bar.appendChild(fill);
+        grid.append(el("span", null, p.name), bar, el("span", "sv-pn", p.score === null ? "Not measured" : String(p.score)));
+      });
+      host.appendChild(grid);
+    }
+    host.appendChild(el("p", "hint", `Checked ${svWhen(a.checked_at)}${a.business_name ? ` for ${a.business_name}${a.city ? ` in ${a.city}` : ""}` : ""}.`));
+  } else {
+    host.appendChild(el("p", null, "Do ChatGPT-style assistants name you when someone asks for a business like yours? The free AI Visibility Check runs the questions and scores the answers."));
+    if (SV.address) host.appendChild(el("p", "hint", `Enter ${SV.address.domain} as your website there and the result shows up here.`));
+  }
+  const actions = el("div", "sv-actions");
+  const run = el("a", a ? null : "pillbtn", a ? "Run it again" : "Run the free check"); run.href = SV.ai_check_url; run.target = "_blank"; run.rel = "noopener";
+  actions.appendChild(run);
+  if (a && a.report_url) { const r = el("a", null, "See the result"); r.href = a.report_url; r.target = "_blank"; r.rel = "noopener"; actions.appendChild(r); }
+  host.appendChild(actions);
+}
+async function loadSearch() {
+  renderSeoTasks();
+  try {
+    SV = (await api("GET", "/visibility")).data;
+    SEO_CONN = SV.console.status; SV_LISTING = SV.listing.status;
+  } catch (_) { SV = null; }
+  if (!$("view-search").classList.contains("on")) return;
+  renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
 }
 (function wireSeoPreview() {
   ["f-seo_title", "f-seo_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSearchPreview); });
@@ -6360,10 +6675,6 @@ async function mountSearchCard() {
   const host = $("searchCardSlot") || $("view-business"); if (!host || $("searchCard")) return;
   const card = el("div", "field"); card.id = "searchCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Search & visibility"));
-  // what's left — from what the page already knows (fields, health, changes) plus
-  // the Search Console connection, read softly: unknown is shown as a door, never as done
-  const tasks = el("div"); tasks.id = "seoTasks"; tasks.style.marginBottom = "12px"; card.appendChild(tasks); renderSeoTasks();
-  if (hasFeature("connected")) api("GET", "/connections").then((r) => { SEO_CONN = seoConnStatus(r.data); renderSeoTasks(); }).catch(() => {});
   const status = el("div", "hint", "Checking your search setup…"); card.appendChild(status);
   host.appendChild(card);
   let h = null;
@@ -7003,9 +7314,10 @@ function pagesBarReveal() {
 // G13: a page change replaces BLOCKS_WORK or reads the stored draft, so what this page
 // still holds is written first, while DC_PAGE still says whose it is: an open in-place
 // session, a commit in its ~1.2s debounce, a panel edit in its 700ms timer. A save
-// already on its way is waited out too, since it replaces the list when it lands. It
-// loops because the page stays open during the wait. False = a save failed: its message
-// is up and the words are still in the list, so the caller stays on this page.
+// already on its way is waited out too, since a write built from S.settings before it
+// lands would undo it. It loops because the page stays open during the wait. False = a
+// save failed: its message is up and the words are still in the list, so the caller
+// stays on this page.
 async function dcSavePendingEdits() {
   for (;;) {
     if (IPE) ipeCommit();
@@ -7542,6 +7854,8 @@ async function undoSync(rec, vals, r) {
   }
 }
 function dcUndo() {
+  // an edit still waiting for its save is the newest step, so it's the one to take back
+  if (blocksDirty()) { clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null; dcHistoryRecord(); dcHistoryCommit(); }
   if (!DC_UNDO.length) { toast("Nothing to undo"); return; }
   const top = DC_UNDO.pop();
   if (typeof top !== "string") {
@@ -7553,7 +7867,7 @@ function dcUndo() {
   dcApplyHistory(top); toast("Undone");
 }
 function dcRedo() {
-  if (!DC_REDO.length) { toast("Nothing to redo"); return; }
+  if (blocksDirty() || !DC_REDO.length) { toast("Nothing to redo"); return; }   // a new edit outranks the redo list
   const top = DC_REDO.pop();
   if (typeof top !== "string") {
     DC_UNDO.push(top); updateUndoButtons();
@@ -7576,6 +7890,11 @@ function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
   BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
 }
+// For a write built from the saved list (forms): let section edits reach it first.
+async function blocksSettled() {
+  for (let i = 0; i < 100 && BLOCKS_SAVING; i++) await new Promise((r) => setTimeout(r, 50));
+  if (blocksDirty()) await blocksSaveNow();
+}
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
   // An in-place commit has its own ~1.2s debounce and saves this same list when it
@@ -7596,6 +7915,7 @@ function saveBlocks() {
 async function putBlocks() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // this save carries whatever was pending
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
+  const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
   try {
     // CL-LINK: a saved-section edit-in-progress (_clEdit) is NOT page content — it
@@ -7615,8 +7935,11 @@ async function putBlocks() {
       r = await put;
       S.settings = r.data || { ...S.settings, blocks: BLOCKS_WORK };
     }
-    BLOCKS_WORK = currentBlocks();
-    dcHistoryCommit();   // the new persisted state becomes the history baseline
+    // Typing doesn't stop for a save. If the list moved while this one was on its way,
+    // those edits are newer than what just came back: keep them, and save them next.
+    if (DC_PAGE !== sentPage) { /* the list on screen belongs to another page now */ }
+    else if (histSnap() !== sentSnap) { DC_HIST_LAST = sentSnap; updateUndoButtons(); blocksSaveSoon(); }
+    else { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // the new persisted state becomes the history baseline
     // G13 §3: never rebuild the panel under a focused input — its uncommitted
     // text (panel inputs commit on change = blur) would be destroyed mid-typing.
     // The input's own blur/change re-renders; every other save re-renders here.
@@ -8958,9 +9281,13 @@ function ffSel(options, value, onchange) {
   options.forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if (v === value) o.selected = true; s.appendChild(o); });
   s.addEventListener("change", () => onchange(s.value)); return s;
 }
+let FORMS_SAVING = false;
 async function saveForms() {
   whisper("topWhisper", "saving");
+  FORMS_SAVING = true;
   try {
+    await blocksSettled();
+    const sentForms = JSON.stringify(FORMS_WORK);
     // Forms keep their place on the page (a save used to drag them all to the bottom);
     // a form removed here drops out, a new one lands at the end.
     const work = new Map(FORMS_WORK.map((f) => [f.id, f]));
@@ -8980,18 +9307,25 @@ async function saveForms() {
       r = await api("PUT", "/settings", { blocks: next });
       S.settings = r.data || { ...S.settings, blocks: next };
     }
-    if (typeof BLOCKS_WORK !== "undefined") BLOCKS_WORK = currentBlocks();   // keep the content-block editor in sync
-    FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
-    renderFormsCard();
-    FORMS_BASE = JSON.stringify(FORMS_WORK);
+    if (typeof BLOCKS_WORK !== "undefined") { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // keep the content-block editor in sync
+    const ae = document.activeElement;
+    if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
+    else if (ae && ae.matches && ae.matches("#formsCard input, #formsCard textarea, #formsCard select")) FORMS_BASE = sentForms;   // never rebuild under a field being typed in
+    else {
+      FORMS_WORK = currentForms().map((f) => JSON.parse(JSON.stringify(f)));
+      renderFormsCard();
+      FORMS_BASE = JSON.stringify(FORMS_WORK);
+    }
     whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+  finally { FORMS_SAVING = false; }
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
 function formsSaveSoon(ms) { clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = setTimeout(formsSaveNow, ms === undefined ? 700 : ms); }
 async function formsSaveNow() {
   clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = null;
+  if (FORMS_SAVING) { formsSaveSoon(); return; }
   if (FORMS_WORK && JSON.stringify(FORMS_WORK) !== FORMS_BASE) await saveForms();
 }
 function mountFormsCard() {
@@ -11757,7 +12091,7 @@ function mountAnnouncementCard() {
 // nothing dead-ends. Priority: website-attention first, then lifecycle, then capacity.
 const NOTICE_ACTION = {
   publish_failed:   { label: "Open your website",       href: "presence.html#publish" },
-  connection_expired:{ label: "Reconnect",              href: "connections.html" },
+  connection_expired:{ label: "Open Connections",       href: "connections.html" },   // reconnecting isn't always the step: the notice says which is
   website_enquiry:  { label: "View enquiries",          href: "inbox.html#enquiries" },
   lead_followup:    { label: "View enquiries",          href: "inbox.html#enquiries" },
   domain_expiry:    { label: "Manage domain",           href: "presence.html#business" },

@@ -8,8 +8,12 @@ import type { TokenBundle } from './store.ts';
 import { providerByKey } from './providers.ts';
 import { seal, open, encryptionConfigured } from './crypto.ts';
 
-const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
-export const REDIRECT_URI = `${SITE_URL}/connections-callback.html`;
+// The app's own address, not SITE_URL. The marketing domain moved to Squarespace,
+// and its redirect to the app DROPS the query string, so a Google sign-in that
+// returned there lost its ?code= and every connection ended in "That connection
+// didn't finish". Checked live on 2026-11-05 with curl.
+export const APP_URL = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
+export const REDIRECT_URI = `${APP_URL}/connections-callback.html`;
 
 interface OAuthEndpoints { authorize: string; token: string; revoke?: string; extraAuth?: Record<string, string>; }
 // One entry per OAuth provider; API-key providers are absent (they connect by key).

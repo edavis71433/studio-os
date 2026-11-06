@@ -88,6 +88,33 @@ export function sourceShares(
   }));
 }
 
+// ── the period before this one (the "up 12%" on the Visitors tile) ──
+/** Where the comparison window starts: the same length of time, immediately before
+ *  the current period, so the 5th of this month compares with the five days before
+ *  it and never with a whole month. Null for 'all': nothing comes before it. */
+export function priorPeriodStart(period: DashPeriod, startMs: number, nowMs: number): number | null {
+  if (period === 'all') return null;
+  return startMs - Math.max(0, nowMs - startMs);
+}
+
+/** Distinct visitors in [priorStartMs, startMs). The same counting as
+ *  weeklyVisitors: pageviews only, and a row with no hash isn't a person. */
+export function priorPeriodVisitors(rows: Array<{ ts?: string; kind?: string; visitor_hash?: string }>, priorStartMs: number, startMs: number): number {
+  const seen = new Set<string>();
+  for (const r of rows || []) {
+    if (!r || r.kind !== 'pageview' || !r.visitor_hash) continue;
+    const ms = Date.parse(String(r.ts || ''));
+    if (Number.isFinite(ms) && ms >= priorStartMs && ms < startMs) seen.add(r.visitor_hash);
+  }
+  return seen.size;
+}
+
+/** A Search Console page URL as a path, matching what the visit counter stores. */
+export function searchPagePath(url: unknown): string {
+  const raw = String(url ?? '');
+  try { return new URL(raw).pathname || '/'; } catch { return raw.startsWith('/') ? raw : '/'; }
+}
+
 // ── invoice buckets (the donut: paid / sent / overdue, total outstanding in the hole) ──
 export interface InvoiceRowForDash { status?: string | null; amount_cents?: number | null; due_date?: string | null; paid_at?: string | null; }
 export interface InvoiceBuckets {
