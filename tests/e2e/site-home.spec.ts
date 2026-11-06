@@ -352,3 +352,300 @@ test.describe('Versions', () => {
     await expect(rows(page).nth(1)).toContainText('Published by your team');
   });
 });
+
+test.describe('Pages: every page and the menu in one place', () => {
+  const OWN = [
+    { slug: 'gallery', title: 'Gallery', blocks: [] },
+    { slug: 'landing', title: 'Landing', blocks: [], hideNav: true },
+  ];
+  const withPages = (extra: Record<string, unknown> = {}) => ({ '/settings': { data: { pages: OWN, ...extra } } });
+  const names = (page: Page, list: string) => page.locator(`#${list} .pg-row .t b`).allTextContents();
+  const navWrite = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.body.nav).at(-1)?.body;
+  const hrefs = (nav: Array<{ href: string }>) => nav.map((n) => n.href);
+  const AUTO = ['/', '/services/', '/about/', '/faq/', '/updates/', '/contact/', '/gallery/'];
+  const row = (page: Page, name: string) => page.locator('.pg-row').filter({ has: page.locator('b', { hasText: new RegExp(`^${name}$`) }) });
+  async function drag(page: Page, name: string, y: (box: { y: number; height: number }) => number, target: ReturnType<Page['locator']>) {
+    await page.waitForLoadState('networkidle');
+    await expect(row(page, name).locator('.pg-grab')).toBeVisible();
+    await row(page, name).evaluate((n) => n.scrollIntoView({ block: 'center' }));   // clear of the phone and tablet dock
+    const h = (await row(page, name).locator('.pg-grab').boundingBox())!;
+    const box = (await target.boundingBox())!;
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 6);
+    await page.mouse.move(h.x + h.width / 2, y(box), { steps: 6 });
+    await expect(page.locator('.pg-dropline')).toHaveCount(1);
+    await page.mouse.up();
+  }
+
+  test('the menu is listed in the site’s own order, and a hidden page sits under Not linked', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await expect(page.getByRole('heading', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Not linked' })).toBeVisible();
+    await expect.poll(() => page.locator('#pagesList .pg-row').evaluateAll((rows) => rows.map((r) => (r as HTMLElement).dataset.href))).toEqual(AUTO);
+    expect(await names(page, 'pagesUnlinked')).toEqual(['Landing']);
+    await expect(page.locator('#btnNavAuto')).toBeHidden();
+    expect(writes.filter((w) => w.path === '/settings')).toHaveLength(0);   // just looking changes nothing
+  });
+
+  test('drag a page up the menu: one write, the menu in its new order', async ({ page }) => {
+    test.skip(isPhone(page), 'the same pointer events; the arrow-key test covers the phone');
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await drag(page, 'Contact', (b) => b.y + 2, row(page, 'About'));
+    await expect.poll(() => navWrite(writes)).toBeTruthy();
+    expect(hrefs(navWrite(writes).nav)).toEqual(['/', '/services/', '/contact/', '/about/', '/faq/', '/updates/', '/gallery/']);
+    await expect.poll(async () => (await names(page, 'pagesList')).slice(2, 4)).toEqual(['Contact', 'About']);
+    await expect(page.locator('.pg-dropline')).toHaveCount(0);
+    await expect(page.locator('#btnNavAuto')).toBeVisible();
+  });
+
+  test('drag a page to Not linked: it leaves the menu and stays live; drag another in and it joins', async ({ page }) => {
+    test.skip(isPhone(page), 'the same pointer events; the arrow-key test covers the phone');
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await drag(page, 'Gallery', (b) => b.y + b.height - 2, page.locator('#pagesUnlinked'));
+    await expect.poll(() => navWrite(writes)).toBeTruthy();
+    expect(hrefs(navWrite(writes).nav)).not.toContain('/gallery/');
+    expect(navWrite(writes).pages.find((p: any) => p.slug === 'gallery').hideNav).toBe(true);
+    await expect.poll(async () => (await names(page, 'pagesUnlinked')).sort()).toEqual(['Gallery', 'Landing']);
+    await drag(page, 'Landing', (b) => b.y + 2, row(page, 'About'));
+    await expect.poll(() => hrefs(navWrite(writes).nav).indexOf('/landing/')).toBe(2);
+    expect(navWrite(writes).pages.find((p: any) => p.slug === 'landing').hideNav).toBeUndefined();
+  });
+
+  test('Escape drops a drag where it started, and writes nothing', async ({ page }) => {
+    test.skip(isPhone(page), 'needs a keyboard');
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.waitForLoadState('networkidle');
+    await expect(row(page, 'Contact').locator('.pg-grab')).toBeVisible();
+    const h = (await row(page, 'Contact').locator('.pg-grab').boundingBox())!;
+    await page.mouse.move(h.x + 8, h.y + 8); await page.mouse.down(); await page.mouse.move(h.x + 8, h.y - 60, { steps: 4 });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(page.locator('.pg-dragging')).toHaveCount(0);
+    expect(writes.filter((w) => w.path === '/settings')).toHaveLength(0);
+  });
+
+  test('the arrow keys move a row, across the two lists, and the handle keeps focus', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.waitForLoadState('networkidle');
+    await row(page, 'Gallery').locator('.pg-grab').focus();
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(() => hrefs(navWrite(writes)?.nav || []).indexOf('/gallery/')).toBe(5);
+    await expect(row(page, 'Gallery').locator('.pg-grab')).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => hrefs(navWrite(writes).nav).indexOf('/gallery/')).toBe(6);
+    await page.keyboard.press('ArrowDown');   // off the end of the menu: Not linked
+    await expect.poll(() => hrefs(navWrite(writes).nav)).not.toContain('/gallery/');
+    await expect(row(page, 'Gallery').locator('.pg-grab')).toBeFocused();
+    await expect.poll(() => names(page, 'pagesUnlinked')).toContain('Gallery');
+  });
+
+  test('two quick presses both count, each from where the last one left it', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.waitForLoadState('networkidle');
+    await row(page, 'Gallery').locator('.pg-grab').focus();
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body.nav).length).toBe(2);
+    expect(hrefs(navWrite(writes).nav).indexOf('/gallery/')).toBe(4);
+  });
+
+  test('the menu can’t be emptied: that would quietly bring the automatic one back', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages({ nav: [{ label: 'Home', href: '/' }] }));
+    await page.waitForLoadState('networkidle');
+    await row(page, 'Home').locator('.pg-grab').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByText('Keep at least one page in the menu.')).toBeVisible();
+    expect(writes.filter((w) => w.path === '/settings')).toHaveLength(0);
+    expect(await names(page, 'pagesList')).toEqual(['Home']);
+  });
+
+  test('one settings button: name, address, label, dropdown and Google, each saved as it changes', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.getByRole('button', { name: 'Settings for Gallery' }).click();
+    const panel = page.locator('#pageSettings');
+    await expect(panel.getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
+    await expect(panel.getByRole('checkbox', { name: 'Show this page on Google' })).toBeChecked();
+    await expect(panel.getByLabel('Search headline for Gallery')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Delete page' })).toBeVisible();
+    // the name
+    await panel.getByLabel('Page name').fill('Our work');
+    await panel.getByLabel('Page name').blur();
+    await expect.poll(() => writes.at(-1)?.body?.pages?.find((p: any) => p.slug === 'gallery')?.title).toBe('Our work');
+    // the address: the server forwards the old link from prev_slug
+    await panel.getByLabel('Page address').fill('Our Work');
+    await panel.getByLabel('Page address').blur();
+    await expect.poll(() => writes.at(-1)?.body?.pages?.find((p: any) => p.slug === 'our-work')?.prev_slug).toBe('gallery');
+    // the label in the menu makes the menu custom
+    await panel.getByLabel('Label in the menu').fill('Work');
+    await panel.getByLabel('Label in the menu').blur();
+    await expect.poll(() => navWrite(writes)?.nav?.find((n: any) => n.href === '/our-work/')?.label).toBe('Work');
+    // a dropdown under About
+    await panel.getByLabel('Show under').selectOption('/about/');
+    await expect.poll(() => navWrite(writes).nav.find((n: any) => n.href === '/about/')?.children?.[0]?.href).toBe('/our-work/');
+    await panel.getByRole('button', { name: 'Done' }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(row(page, 'Work')).toHaveClass(/child/);
+  });
+
+  test('a built-in page can leave the menu; Home has no address to change', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.getByRole('button', { name: 'Settings for About' }).click();
+    const panel = page.locator('#pageSettings');
+    await expect(panel.getByLabel('Page address')).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: 'Delete page' })).toHaveCount(0);
+    await panel.getByLabel('Show in the menu').uncheck();
+    await expect.poll(() => navWrite(writes)).toBeTruthy();
+    expect(hrefs(navWrite(writes).nav)).not.toContain('/about/');
+    await panel.getByRole('button', { name: 'Done' }).click();
+    await expect.poll(() => names(page, 'pagesUnlinked')).toContain('About');
+    await page.getByRole('button', { name: 'Settings for Home' }).click();
+    await expect(panel).toContainText('search headline and description on the Search tab');
+    await expect(panel.getByLabel('Page address')).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: 'Duplicate page' })).toBeVisible();
+  });
+
+  test('a custom page’s Show in the menu keeps an automatic menu automatic', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.getByRole('button', { name: 'Settings for Landing' }).click();
+    await page.locator('#pageSettings').getByLabel('Show in the menu').check();
+    await expect.poll(() => writes.at(-1)?.body?.pages?.find((p: any) => p.slug === 'landing')).toBeTruthy();
+    expect(writes.at(-1)?.body?.pages?.find((p: any) => p.slug === 'landing').hideNav).toBeUndefined();
+    expect(navWrite(writes)).toBeUndefined();
+    await expect(page.locator('#btnNavAuto')).toBeHidden();
+  });
+
+  test('Add a link: a bad link is refused in place, a bare domain is completed', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#pages', withPages());
+    await page.locator('#btnPagesAddLink').click();
+    const panel = page.locator('#linkSettings');
+    await panel.getByLabel('Label in the menu').fill('Order');
+    await panel.getByLabel('Links to').fill('not a link');
+    await panel.getByRole('button', { name: 'Add to the menu' }).click();
+    await expect(panel.getByRole('alert')).toContainText('won’t work');
+    expect(navWrite(writes)).toBeUndefined();
+    await panel.getByLabel('Links to').fill('order.example.com/now');
+    await panel.getByRole('button', { name: 'Add to the menu' }).click();
+    await expect(panel).toHaveCount(0);
+    expect(navWrite(writes).nav.at(-1)).toEqual({ label: 'Order', href: 'https://order.example.com/now' });
+    await expect(row(page, 'Order').locator('.t span')).toHaveText('https://order.example.com/now');
+    await expect(row(page, 'Order').getByRole('button', { name: /^Edit/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Settings for Order' }).click();
+    await page.locator('#linkSettings').getByRole('button', { name: 'Remove from the menu' }).click();
+    await expect.poll(() => hrefs(navWrite(writes).nav)).not.toContain('https://order.example.com/now');
+    await expect(row(page, 'Order')).toHaveCount(0);
+  });
+
+  test('a saved custom menu is what shows, dropdowns included', async ({ page }) => {
+    const nav = [{ label: 'Start', href: '/' }, { label: 'Our work', href: '/gallery/', children: [{ label: 'Say hello', href: '/contact/' }, { label: 'Booking', href: 'https://book.example.com' }] }];
+    const writes = await mount(page, '/presence.html#pages', withPages({ nav }));
+    await expect.poll(() => names(page, 'pagesList')).toEqual(['Start', 'Our work', 'Say hello', 'Booking']);
+    await expect(row(page, 'Say hello')).toHaveClass(/child/);
+    expect(await names(page, 'pagesUnlinked')).toEqual(expect.arrayContaining(['About', 'Questions', 'Landing']));
+    // a child row's arrow keys stay among its siblings
+    await page.waitForLoadState('networkidle');
+    await row(page, 'Say hello').locator('.pg-grab').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => navWrite(writes)?.nav?.[1]?.children?.map((k: any) => k.label)).toEqual(['Booking', 'Say hello']);
+    // Reset to automatic asks, then clears it
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#btnNavAuto').click();
+    await expect.poll(() => writes.at(-1)?.body?.nav).toEqual([]);
+    await expect(page.locator('#btnNavAuto')).toBeHidden();
+  });
+
+  test('renaming a page keeps a custom menu pointing at it, and its label if that was the name', async ({ page }) => {
+    const nav = [{ label: 'Home', href: '/' }, { label: 'Gallery', href: '/gallery/' }];
+    const writes = await mount(page, '/presence.html#pages', withPages({ nav }));
+    await page.getByRole('button', { name: 'Settings for Gallery' }).click();
+    const panel = page.locator('#pageSettings');
+    await panel.getByLabel('Page name').fill('Portfolio');
+    await panel.getByLabel('Page name').blur();
+    await expect.poll(() => navWrite(writes)?.nav?.[1]?.label).toBe('Portfolio');
+    await panel.getByLabel('Page address').fill('portfolio');
+    await panel.getByLabel('Page address').blur();
+    await expect.poll(() => navWrite(writes)?.nav?.[1]?.href).toBe('/portfolio/');
+  });
+
+  test('deleting a page takes it off a custom menu, its dropdown staying; Undo puts both back', async ({ page }) => {
+    const nav = [{ label: 'Home', href: '/' }, { label: 'Gallery', href: '/gallery/', children: [{ label: 'About', href: '/about/' }] }];
+    const writes = await mount(page, '/presence.html#pages', withPages({ nav }));
+    page.on('dialog', (d) => d.accept());
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Settings for Gallery' }).click();
+    await page.locator('#pageSettings').getByRole('button', { name: 'Delete page' }).click();
+    await expect.poll(() => navWrite(writes)?.nav?.map((n: any) => n.href)).toEqual(['/', '/about/']);
+    expect(navWrite(writes).pages.map((p: any) => p.slug)).toEqual(['landing']);
+    await expect(row(page, 'Gallery')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).last().click();
+    await expect.poll(() => navWrite(writes)?.nav?.map((n: any) => n.href)).toEqual(['/', '/gallery/']);
+    await expect(row(page, 'Gallery')).toHaveCount(1);
+  });
+
+  test('changing the kind of business keeps a custom menu’s link to the offerings page alive', async ({ page }) => {
+    const nav = [{ label: 'Home', href: '/' }, { label: 'Services', href: '/services/' }, { label: 'Book', href: 'https://book.example.com' }];
+    const writes = await mount(page, '/presence.html#business', withPages({ nav, industry_key: 'generic' }));
+    await page.waitForLoadState('networkidle');
+    await page.locator('#f-industry').selectOption('restaurant');
+    await expect.poll(() => navWrite(writes)?.nav).toEqual([{ label: 'Home', href: '/' }, { label: 'Menu', href: '/menu/' }, { label: 'Book', href: 'https://book.example.com' }]);
+  });
+
+  test('Search no longer repeats each page’s settings, so the two can’t disagree', async ({ page }) => {
+    await mount(page, '/presence.html#search', withPages());
+    await expect(page.locator('#searchCard')).toContainText('use its settings button on the Pages tab');
+    await expect(page.locator('#searchCard details', { hasText: 'Fine-tune' })).toHaveCount(0);
+    await page.locator('#searchCard a', { hasText: 'Pages tab' }).click();
+    await expect(page.locator('#view-pages')).toBeVisible();
+  });
+
+  test('from Edit mode, the Pages button and a page’s ⋯ both reach the same place', async ({ page }) => {
+    await mount(page, '/presence.html#design', withPages());
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    if (!isPhone(page)) {
+      await page.locator('#pagesBar .page-pill', { hasText: 'Gallery' }).locator('.pp-menu').click();
+      await page.getByRole('button', { name: 'Page settings…' }).click();
+      await expect(page.locator('#pageSettings').getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
+      await page.keyboard.press('Escape');
+    }
+    await page.evaluate(() => document.getElementById('btnNavEdit')!.click());
+    await expect(page.locator('#view-pages')).toBeVisible();
+    await expect(page.locator('html')).not.toHaveClass(/dc-edit/);
+  });
+});
+
+test.describe('one preview screen', () => {
+  const OWN = { '/settings': { data: { pages: [{ slug: 'gallery', title: 'Gallery', blocks: [] }] } } };
+  test('Edit mode’s Preview opens it on the page being edited, and Back returns to Edit', async ({ page }) => {
+    await mount(page, '/presence.html#design', OWN);
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await expect(page.locator('#dcModeSeg [data-dcmode="preview"]')).toHaveCount(0);
+    await page.evaluate(() => (window as any).dcSwitchPage('gallery'));
+    await expect(page.locator('#pagesBar .page-pill.on')).toContainText('Gallery');
+    const asked = page.waitForRequest((r) => /\/preview\?/.test(r.url()) && /version=draft/.test(r.url()) && /gallery/.test(decodeURIComponent(r.url())));
+    await page.evaluate(() => document.getElementById('dcBtnPreview')!.click());
+    await asked;
+    await expect(page.locator('#stage')).toBeVisible();
+    await page.locator('#btnStageClose').click();
+    await expect(page.locator('#stage')).toBeHidden();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+  });
+  test('it lists every page of the site, the owner’s own included, and has no template chooser', async ({ page }) => {
+    await mount(page, '/presence.html#preview', OWN);
+    await expect(page.locator('#stage')).toBeVisible();
+    await expect(page.locator('#lookDrawer')).toHaveCount(0);
+    await expect(page.locator('#lookSeg button')).toHaveCount(0);
+    const pages = await page.locator('#pageWords button').evaluateAll((b) => b.map((x) => (x as HTMLElement).dataset.page));
+    expect(pages).toContain('/gallery/');
+    expect(pages[0]).toBe('/');
+  });
+  test('past dates are for the studio; a client’s Edit bar has Edit and Comments', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toBeAttached();
+    expect(await page.locator('#dcModeSeg [data-dcmode="timewarp"]').evaluate((n) => getComputedStyle(n).display)).toBe('none');
+  });
+  test('the studio keeps them', async ({ page }) => {
+    const ctx = (API['/portal/context'] as any).data;
+    await mount(page, '/presence.html#design', { '/portal/context': { data: { ...ctx, is_agency: true } } });
+    await expect.poll(() => page.locator('#dcModeSeg [data-dcmode="timewarp"]').evaluate((n) => getComputedStyle(n).display)).not.toBe('none');
+  });
+});

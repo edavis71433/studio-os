@@ -206,7 +206,7 @@ test.describe('CMS workspace', () => {
     await expect(rows.nth(0).locator('.hb-chip')).toHaveText('1 change waiting');   // the business change
     await expect(rows.nth(1).locator('b')).toHaveText('Services');   // the generic industry's vocabulary (VOCAB)
     await expect(rows.nth(1).locator('.hb-chip')).toHaveText('1 change waiting');   // the offerings change
-    await expect(rows.nth(3).locator('b')).toHaveText('Questions');
+    await expect(rows.nth(3).locator('b')).toHaveText('FAQ');   // what the site's menu says
     await expect(rows.nth(3).locator('.hb-chip')).toHaveText('Published');
     await expect(rows.nth(6).locator('b')).toHaveText('Private events');
     await expect(rows.nth(6).locator('.t span')).toHaveText('2 sections');
@@ -506,15 +506,18 @@ test.describe('CMS workspace', () => {
 
     test('per-page previews: each built-in page shows the default it renders with, and follows its own fields', async ({ page }) => {
       await installApp(page, { api: SEO_API });
-      await page.goto('/presence.html#search');
-      const fine = page.locator('#searchCard details', { hasText: 'Fine-tune how each built-in page reads' });
-      await fine.locator('summary').click();
+      await page.goto('/presence.html#pages');
+      await page.getByRole('button', { name: 'Settings for Contact' }).click();
+      await expect(page.locator('#srp-contact .srp-title')).toHaveText('Contact & Hours — Marlow’s Kitchen');
+      await expect(page.locator('#srp-contact .srp-desc')).toHaveText('Address, phone, and hours for Marlow’s Kitchen.');
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Settings for Services' }).click();
+      await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Services — Marlow’s Kitchen');   // the vocabulary word
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Settings for About' }).click();
       const about = page.locator('#srp-about');
       await expect(about.locator('.srp-title')).toHaveText('About — Marlow’s Kitchen');
       await expect(about.locator('.srp-url')).toHaveText('marlows.example › about');
-      await expect(page.locator('#srp-contact .srp-title')).toHaveText('Contact & Hours — Marlow’s Kitchen');
-      await expect(page.locator('#srp-contact .srp-desc')).toHaveText('Address, phone, and hours for Marlow’s Kitchen.');
-      await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Services — Marlow’s Kitchen');   // the vocabulary word (generic here: no site.template, no industry_key in the fixtures)
       await page.getByLabel('Search headline for About').fill('Our story — Marlow’s Kitchen, Burbank');
       await expect(about.locator('.srp-title')).toHaveText('Our story — Marlow’s Kitchen, Burbank');
       await expect(page.locator('#cnt-about-title')).toHaveText('37 of 60');

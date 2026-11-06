@@ -107,7 +107,7 @@ test.describe('a watch plan', () => {
     await installApp(page, { api: WATCH }); await refuse(page);
     await page.goto('/presence.html#design');
     await expect(page.locator('#dpEmptyTitle')).toHaveText('Editing isn’t part of this plan.');
-    await expect(page.getByText('The proof couldn’t draw just now.')).toHaveCount(0);
+    await expect(page.getByText('The preview couldn’t load just now.')).toHaveCount(0);
     for (const sel of ['#pagesBar', '.dc-bar', '#btnAddFab', '#designPreviewEmpty .ea']) await expect(page.locator(sel)).toBeHidden();
     await page.waitForTimeout(600);   // past the tip's delay: "pick a look" means nothing here
     await expect(page.locator('.dds-hint.dds-live')).toHaveCount(0);
@@ -187,12 +187,14 @@ test.describe('the preview stage', () => {
       await expect(page.locator('#lookSeg')).toBeHidden();
       return;
     }
-    const toggle = page.getByRole('button', { name: /Try another template/ });
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('#lookDrawer [data-look]').first()).toBeHidden();
-    await toggle.click();
-    await expect(page.locator('#lookDrawer [data-look="editorial"]')).toBeVisible();
-    await page.locator('#lookDrawer [data-look="editorial"]').click();
+    await expect(page.locator('#lookSeg button')).toHaveCount(0);   // templates are chosen in Styles, not here
+    await page.locator('#btnStageClose').click();
+    await page.evaluate(() => (window as any).go('design'));
+    await page.locator('#btnSettingsOpen').click();
+    await page.locator('#designGallery .tg-fold summary').click();
+    await page.getByRole('button', { name: 'Preview Editorial' }).click();
+    await expect(page.locator('#stage')).toBeVisible();
+    await expect(page.locator('#lookSeg')).toContainText('Trying Editorial');
     await expect(page.getByRole('button', { name: 'Use this template' })).toBeVisible();
   });
 });
@@ -245,6 +247,7 @@ test.describe('forms on your own pages', () => {
     });
     await page.goto('/presence.html#design');
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     await page.locator('#formsCard input[placeholder="Form title"]').first().fill('Say hello');
     await page.locator('#formsCard input[placeholder="Form title"]').first().blur();
     await expect.poll(() => puts.length).toBe(1);

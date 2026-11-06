@@ -307,6 +307,33 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .tabhelp{position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:var(--dds-s2,8px);vertical-align:4px;border:1px solid var(--hair);border-radius:50%;background:none;color:var(--ink-3);font-size:12px;line-height:1;cursor:pointer}
 .tabhelp::after{content:"";position:absolute;inset:-12px}
 .tabhelp:hover,.tabhelp[aria-expanded="true"]{color:var(--ink);border-color:var(--ink-3)}
+.pg-adds{display:inline-flex;gap:var(--dds-s4,16px)}
+#pagesOffSec{margin-top:var(--dds-s6,24px)}
+.pg-list{overflow:visible}
+.pg-row{gap:var(--dds-s3,12px);position:relative}
+.pg-row.child{padding-left:calc(var(--dds-s4,16px) + 28px)}
+.pg-row.pg-dragging{z-index:5;background:var(--sheet);border-radius:var(--r-lg);box-shadow:0 8px 24px rgba(0,0,0,.16);opacity:.95}
+.pg-grab{flex:none;display:grid;place-items:center;width:24px;height:30px;padding:0;border:0;background:none;color:var(--ink-3);border-radius:var(--r-sm);cursor:grab;touch-action:none}
+.pg-grab:hover{color:var(--ink);background:var(--paper)}
+.pg-gear{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--hair);background:none;color:var(--ink-2);border-radius:var(--r);cursor:pointer}
+.pg-gear:hover{color:var(--ink);border-color:var(--ink-3)}
+.pg-dropline{height:2px;margin:-1px var(--dds-s3,12px);background:var(--plum);border-radius:2px;position:relative;z-index:6}
+.pg-empty{padding:var(--dds-s4,16px);color:var(--ink-3);font-size:13px}
+#pageSettings,#linkSettings{z-index:2147483200}  /* the Pages tab keeps the shell on screen, so these sit over it */
+.pg-settings .field{margin-bottom:var(--dds-s4,16px)}
+.pg-settings>.hint{font-size:12px;color:var(--ink-2);margin-bottom:var(--dds-s2,8px)}
+.pg-h{font-size:13px;font-weight:600;margin:var(--dds-s5,20px) 0 var(--dds-s2,8px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--hair)}
+.pg-check{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;margin-bottom:var(--dds-s3,12px);cursor:pointer}
+.pg-check input{accent-color:var(--plum)}
+.pg-foot{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px);align-items:center}
+.pg-foot .dc-modal-cancel{margin-top:0}
+.pg-foot .danger{color:var(--clay)}
+.pg-foot .pg-done{margin-left:auto;background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
+.pg-err{color:var(--clay)}
+@media(max-width:760px){.pg-row .ic,.pg-row .hb-chip{display:none}.pg-row .t{flex:1 1 120px}.pg-grab{width:36px;height:44px}.pg-gear{width:44px;height:44px}}
+html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
+.tg-try{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--hair);border-radius:var(--r);background:none;color:var(--ink-2);cursor:pointer}
+.tg-try:hover{color:var(--ink);border-color:var(--ink-3)}
 .biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
 .biz-col{min-width:0}
 .biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
@@ -735,7 +762,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .pagewords{display:flex;gap:var(--dds-s4,16px);font-size:12.5px;padding-bottom:10px;flex-wrap:wrap}
 .pagewords button{color:rgba(239,234,247,.55)}
 .pagewords button.on{color:#efeaf7;font-weight:600;border-bottom:1px solid rgba(239,234,247,.5)}
-.lookdrawer{flex:none;display:flex;gap:12px;overflow-x:auto;padding:var(--dds-s3,12px) var(--dds-s7,32px)}
 .stagebar .grow{flex:1}
 .deskseg{display:flex;gap:var(--dds-s3,12px);font-size:12.5px;padding-bottom:10px}
 .deskseg button{color:rgba(239,234,247,.55)}
@@ -1100,8 +1126,7 @@ body.pd-dragging *{cursor:grabbing !important}
   #pageWords,#lookSeg{order:-2;flex-wrap:nowrap}
   #lookSeg{margin-left:auto}
   .deskprivacy{display:none}
-  .lookdrawer{padding-left:var(--dds-s5,20px);padding-right:var(--dds-s5,20px)}
-}
+  }
 @media(max-width:760px){
   .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
   .dc-slideover.on{transform:translateY(0)}
@@ -1237,9 +1262,14 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- PAGES -->
       <section class="view" id="view-pages">
         <h1 class="doc" role="heading" aria-level="2">Pages</h1>
+        <p class="docsub">Drag a page to change its place in your site’s top menu. Pages under Not linked stay live, but aren’t in the menu.</p>
         <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
-          <div class="hb-sec-h"><h2 id="pagesH" class="sr-only">Your pages</h2><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></div>
-          <div class="hb-list" id="pagesList"></div>
+          <div class="hb-sec-h"><h2 id="pagesH">Main navigation</h2><span class="pg-adds"><button type="button" class="quietact" id="btnPagesAddLink">＋ Add a link</button><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></span></div>
+          <div class="hb-list pg-list" id="pagesList"></div>
+        </section>
+        <section class="hb-sec" id="pagesOffSec" aria-labelledby="pagesOffH">
+          <div class="hb-sec-h"><h2 id="pagesOffH">Not linked</h2><button type="button" class="quietact" id="btnNavAuto" hidden>Reset the menu to automatic</button></div>
+          <div class="hb-list pg-list" id="pagesUnlinked"></div>
         </section>
         <section class="hb-sec" id="recentWrap" aria-labelledby="recentH" hidden>
           <div class="hb-sec-h"><h2 id="recentH">Waiting to publish</h2><a href="#history" onclick="go('history');return false">Versions</a></div>
@@ -1465,9 +1495,8 @@ body.pd-dragging *{cursor:grabbing !important}
                        Orthogonal to the device segment below (device = viewport). -->
                   <div id="dcModeSeg" class="dpdevseg dcmodeseg" role="group" aria-label="Canvas mode">
                     <button type="button" data-dcmode="edit" class="on" aria-pressed="true" title="Build this page — edit, arrange and add sections">Edit</button>
-                    <button type="button" data-dcmode="preview" aria-pressed="false" title="Read your page like a visitor, right here — no editing chrome">Preview</button>
                     <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">Comments</button>
-                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked on any past date">Timewarp</button>
+                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked on any past date">Past dates</button>
                   </div>
                   <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
                     <button type="button" data-dpdev="desktop" class="on" aria-pressed="true" aria-label="Desktop" title="See your page on a desktop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
@@ -1477,8 +1506,9 @@ body.pd-dragging *{cursor:grabbing !important}
           </div>
           <div class="dc-bar-acts">
             <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel"><span>＋ Add<span class="dc-wide"> section</span></span></button>
-            <button type="button" class="dc-actbtn" id="btnNavEdit" title="Edit the top menu — shown on every page" aria-haspopup="dialog">Menu</button>
+            <button type="button" class="dc-actbtn" id="btnNavEdit" title="Your pages and the top menu">Pages</button>
             <button type="button" class="dc-actbtn" id="btnSettingsOpen" data-needs="configure" aria-haspopup="dialog" aria-controls="settingsPanel">Styles</button>
+            <button type="button" class="dc-actbtn" id="dcBtnPreview" title="See this page the way a visitor will">Preview</button>
             <button type="button" class="pillbtn" id="dcBtnPublish">Publish</button>
           </div>
         </div>
@@ -1671,23 +1701,15 @@ body.pd-dragging *{cursor:grabbing !important}
       <button data-ver="draft" class="on">Draft</button>
       <button data-ver="live">Live</button>
     </div>
-    <div class="pagewords" id="pageWords">
-      <button data-page="/" class="on">Home</button>
-      <button data-page="/menu/">Menu</button>
-      <button data-page="/about/">About</button>
-      <button data-page="/faq/">Questions</button>
-      <button data-page="/updates/">Updates</button>
-      <button data-page="/contact/">Contact</button>
-    </div>
-    <div class="pagewords" id="lookSeg" aria-label="Try another template"></div>
+    <div class="pagewords" id="pageWords"></div>
+    <div class="pagewords" id="lookSeg"></div>
     <div class="grow"></div>
     <span style="font-family:var(--serif);font-style:italic;font-size:12px;color:rgba(239,234,247,.55);padding-bottom:11px" class="deskprivacy">Private preview. Only you can see it.</span>
     <div class="deskseg" id="devSeg">
-      <button data-dev="desktop" class="on">Desk</button>
+      <button data-dev="desktop" class="on">Desktop</button>
       <button data-dev="mobile">Phone</button>
     </div>
   </div>
-  <div class="lookdrawer" id="lookDrawer" hidden></div>
   <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
 </div>
 
@@ -1975,13 +1997,13 @@ async function apiHtml(route) {
   const jwt = data?.session?.access_token;
   const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
   const text = await r.text();
-  if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t draw that page just now."); e.status = r.status; throw e; }
+  if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that page just now."); e.status = r.status; throw e; }
   // A 200 that is not a page (a JSON envelope, an empty body) must never land
   // in a srcdoc as raw text — every caller shows its own "couldn't draw" line
   // instead (experience review #13).
   const type = String(r.headers.get("content-type") || "").toLowerCase();
   const looksHtml = /^\s*<(!doctype|html|head|body|div|section|main|header|nav|p|span|svg)/i.test(text);
-  if (!looksHtml && !type.includes("text/html")) { const e = new Error("We couldn’t draw that page just now."); e.status = r.status; e.notHtml = true; throw e; }
+  if (!looksHtml && !type.includes("text/html")) { const e = new Error("We couldn’t load that page just now."); e.status = r.status; e.notHtml = true; throw e; }
   return text;
 }
 
@@ -4268,14 +4290,14 @@ function siteLiveUrl() {
   if (s.netlify_site_id) return `https://presence-${String(s.id).replace(/-/g, "").slice(0, 12)}.netlify.app`;
   return null;
 }
-// The site's pages: the template's standard pages (the proofing desk's page
-// words) + the owner's own pages from settings. Each standard page knows which
+// The site's pages: the template's standard pages + the owner's own pages from
+// settings. Each standard page knows which
 // diff sections land on it, so a pending change shows on the page it touches.
 function hbStandardPages() {
   const v = (typeof VOCAB === "object" && VOCAB) || {};
   return [
     { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, testimonials", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
-    { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: v.sub ? String(v.sub).split(/[.;—]/)[0] : "What you offer, with prices", view: "offerings", icon: "menu", sections: ["offerings"] },
+    { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: "What you offer", view: "offerings", icon: "menu", sections: ["offerings"] },
     { key: "about", path: "/about/", title: "About", sum: "Your story, in your words", view: "business", icon: "about", sections: ["business"] },
     { key: "faq", path: "/faq/", title: "Questions", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
     { key: "updates", path: "/updates/", title: "Updates", sum: "News and seasonal notes", view: "updates", icon: "updates", sections: ["updates"] },
@@ -4286,7 +4308,7 @@ function hbPageRows() {
   const std = hbStandardPages();
   const own = (typeof dcPagesArr === "function" ? dcPagesArr() : []).map((p) => ({
     key: "page:" + p.slug, path: "/" + p.slug + "/", title: p.title || p.slug, slug: p.slug, view: "design", icon: "page",
-    sum: (Array.isArray(p.blocks) && p.blocks.length ? `${p.blocks.length} section${p.blocks.length === 1 ? "" : "s"}` : "Empty page") + (p.hideNav ? " · not in the menu" : ""),
+    sum: (Array.isArray(p.blocks) && p.blocks.length ? `${p.blocks.length} section${p.blocks.length === 1 ? "" : "s"}` : "Empty page"),
     sections: [],
   }));
   return std.concat(own);
@@ -4308,23 +4330,429 @@ function hbOpenPage(pg) {
   if (pg.view === "design") { go("design"); if (typeof dcSwitchPage === "function") dcSwitchPage(pg.slug || ""); return; }
   go(pg.view);
 }
-function renderPagesList() {
-  const list = $("pagesList"); if (!list) return;
-  const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
-  const changes = (S.changes && S.changes.changes) || [];
-  const firstPublish = !!(S.changes && S.changes.first_publish);
-  list.innerHTML = "";
-  hbPageRows().forEach((pg) => {
-    const row = el("div", "hb-row"); row.dataset.page = pg.key;
-    const ic = el("span", "ic"); ic.innerHTML = HB_ICON[pg.icon] || HB_ICON.page; row.appendChild(ic);
-    const t = el("div", "t"); t.appendChild(el("b", null, pg.title)); t.appendChild(el("span", null, pg.sum)); row.appendChild(t);
-    row.appendChild(hbPageChip(pg, changes, live, firstPublish));
-    const acts = el("div", "acts");
-    const edit = el("button", "pillbtn sm", "Edit"); edit.type = "button"; edit.setAttribute("aria-label", "Edit " + pg.title);
-    edit.addEventListener("click", () => hbOpenPage(pg));
-    acts.appendChild(edit); row.appendChild(acts);
-    list.appendChild(row);
+// ── The Pages tab: every page and the top menu, in one place ──
+// Main navigation is what the site's top menu shows; Not linked is every page that's live
+// but off it. With no custom menu the list is the one the templates build (pgAutoNav keeps
+// their order), so nothing changes on the site until someone moves a row or renames a label.
+// A row is named by { href, parent }, never held across a wait, since the lists are rebuilt
+// from the saved settings once any pending edit has landed.
+const PG_NAV_MAX = 12, PG_KIDS_MAX = 8;
+function pgHasCustomNav() { return Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length > 0; }
+function pgAutoNav() {
+  const v = (typeof VOCAB === "object" && VOCAB) || {};
+  const items = [{ label: "Home", href: "/" }, { label: v.label || "Menu", href: v.path || "/menu/" }, { label: "About", href: "/about/" }, { label: "FAQ", href: "/faq/" }, { label: "Updates", href: "/updates/" }, { label: "Contact", href: "/contact/" }];
+  dcPagesArr().forEach((p) => { if (!p.hideNav) items.push({ label: p.title || p.slug, href: "/" + p.slug + "/" }); });
+  return items;
+}
+function pgNav() { return pgHasCustomNav() ? JSON.parse(JSON.stringify(S.settings.nav)) : pgAutoNav(); }
+function pgModel() {
+  const pages = hbPageRows(), byHref = new Map(pages.map((p) => [p.path, p]));
+  const nav = pgNav(), used = new Set(), menu = [];
+  const add = (it, parent) => { const pg = byHref.get(it.href) || null; if (pg) used.add(it.href); menu.push({ it, pg, parent }); };
+  nav.forEach((it) => { add(it, null); (it.children || []).forEach((k) => add(k, it)); });
+  return { nav, menu, unlinked: pages.filter((p) => !used.has(p.path)) };
+}
+// A row's entry in a fresh model, or null if it has gone. A page that isn't in the menu has no `it`.
+function pgEntry(m, ref) {
+  const hit = m.menu.find((e) => e.it.href === ref.href && (e.parent ? e.parent.href : null) === (ref.parent || null));
+  if (hit) return hit;
+  const pg = m.unlinked.find((p) => p.path === ref.href);
+  return pg ? { it: null, pg, parent: null } : null;
+}
+function pgLabelFor(pg) { const auto = pgAutoNav().find((x) => x.href === pg.path); return auto ? auto.label : pg.title; }
+// Take a row out of the menu (or nowhere, if it was off it), and give back its menu item.
+function pgLift(m, e) {
+  if (!e.it) return { label: pgLabelFor(e.pg), href: e.pg.path };
+  const arr = e.parent ? e.parent.children : m.nav;
+  arr.splice(arr.indexOf(e.it), 1);
+  if (e.parent && !e.parent.children.length) delete e.parent.children;
+  return e.it;
+}
+// Put an item in the menu before a row: before a dropdown's row joins that dropdown,
+// and an item with its own dropdown stays on the top level.
+function pgLand(m, item, before) {
+  if (before && before.parent) {
+    if ((item.children || []).length) { m.nav.splice(m.nav.indexOf(before.parent) + 1, 0, item); return true; }
+    if (before.parent.children.length >= PG_KIDS_MAX) { toast("A dropdown holds " + PG_KIDS_MAX + " links.", true); return false; }
+    before.parent.children.splice(before.parent.children.indexOf(before.it), 0, item); return true;
+  }
+  if (before) m.nav.splice(m.nav.indexOf(before.it), 0, item); else m.nav.push(item);
+  return true;
+}
+function pgFlat(nav) { const out = []; nav.forEach((it) => { out.push(it.href); (it.children || []).forEach((k) => out.push(k.href)); }); return out; }
+// The one write: the menu, with the pages' own "in the menu" flag and order following it, so
+// the page tabs in Edit mode match and Reset to automatic keeps what was hidden.
+async function pgWriteMenu(nav, okMsg, focusRef) {
+  const clean = dcCleanNav(nav);
+  if (!clean.length) { toast("Keep at least one page in the menu.", true); renderPagesList(); return false; }
+  const dropped = nav.length - clean.length;
+  const order = pgFlat(clean), at = (p) => { const i = order.indexOf("/" + p.slug + "/"); return i < 0 ? Infinity : i; };
+  const build = () => {
+    const cur = dcPagesArr();
+    const pages = cur.map((p, i) => ({ p, i })).sort((x, y) => (at(x.p) - at(y.p)) || (x.i - y.i)).map(({ p }) => {
+      const on = order.indexOf("/" + p.slug + "/") >= 0, nx = { ...p };
+      if (on) delete nx.hideNav; else nx.hideNav = true;
+      return nx;
+    });
+    const body = { nav: clean };
+    if (JSON.stringify(pages) !== JSON.stringify(cur)) body.pages = pages;
+    return body;
+  };
+  try {
+    await settingsPut(build);
+    renderPagesBar(); refreshDesignPreview(); scheduleChangesRefresh();
+    toast(dropped > 0 ? "The menu holds " + PG_NAV_MAX + " items, so the last " + dropped + " moved to Not linked." : okMsg || "Menu updated. Publish to put it live.");
+    if (focusRef) pgFocusGrab(focusRef);
+    return true;
+  } catch (err) { toast(nice(err), true); renderPagesList(); return false; }
+}
+function pgFocusGrab(ref) {
+  const row = [...document.querySelectorAll("#view-pages .pg-row")].find((r) => r.dataset.href === ref.href && (r.dataset.parent || null) === (ref.parent || null));
+  const g = row && row.querySelector(".pg-grab"); if (g) g.focus();
+}
+// One menu decision at a time: each reads the menu the last one left, so two quick presses
+// of an arrow key can't both start from the same place. It waits on pending edits, which
+// are settingsTurn writes, so it sits outside that queue and its writes go through settingsPut.
+let PG_WRITES = Promise.resolve();
+function pgTurn(fn) { const t = PG_WRITES.then(fn); PG_WRITES = t.catch(() => {}); return t; }
+// zone "menu": before `beforeRef`, or last when it's null. zone "off": off the menu.
+function pgMove(ref, zone, beforeRef, focus) { return pgTurn(() => pgMoveNow(ref, zone, beforeRef, focus)); }
+async function pgMoveNow(ref, zone, beforeRef, focus) {
+  if (!(await dcSavePendingEdits())) { renderPagesList(); return; }
+  const m = pgModel(), e = pgEntry(m, ref); if (!e) { renderPagesList(); return; }
+  if (zone === "off" && !e.it) { renderPagesList(); return; }   // it's already off the menu
+  const was = JSON.stringify(m.nav), before = beforeRef ? pgEntry(m, beforeRef) : null;
+  const item = pgLift(m, e);
+  if (zone === "off") {
+    (item.children || []).forEach((k) => m.nav.push(k));
+    return pgWriteMenu(m.nav, "Off the menu. It stays live on your site. Publish to apply.", focus ? ref : null);
+  }
+  if (!pgLand(m, item, before && before.it ? before : null)) { renderPagesList(); return; }
+  if (JSON.stringify(m.nav) === was) { renderPagesList(); if (focus) pgFocusGrab(ref); return; }
+  const parent = m.nav.find((x) => (x.children || []).indexOf(item) >= 0);
+  return pgWriteMenu(m.nav, null, focus ? { href: ref.href, parent: parent ? parent.href : null } : null);
+}
+// Arrow keys on a row's handle do what dragging does, one place at a time.
+function pgNudge(ref, dir) {
+  return pgTurn(async () => {
+    if (!(await dcSavePendingEdits())) return;
+    const m = pgModel(), e = pgEntry(m, ref); if (!e) return;
+    if (!e.it) { if (dir < 0) await pgMoveNow(ref, "menu", null, true); return; }
+    const arr = e.parent ? e.parent.children : m.nav, i = arr.indexOf(e.it), j = i + dir;
+    if (j < 0) return;
+    if (j >= arr.length) { if (!e.parent && !(e.it.children || []).length && e.pg) await pgMoveNow(ref, "off", null, true); return; }
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    await pgWriteMenu(m.nav, null, ref);
   });
+}
+const PG_GRIP = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+const PG_GEAR = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
+const PG_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.1 1.1"/><path d="M14 10a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.1-1.1"/></svg>';
+function pgRow(entry, ctx) {
+  const pg = entry.pg, it = entry.it, name = it ? it.label : pg.title;
+  const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
+  const row = el("div", "hb-row pg-row" + (entry.parent ? " child" : "")); row.dataset.page = pg ? pg.key : "link"; row.dataset.href = ref.href;
+  if (ref.parent) row.dataset.parent = ref.parent;
+  const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
+  grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
+  grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
+  grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
+  row.appendChild(grab);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
+  const t = el("div", "t"); t.appendChild(el("b", null, name)); t.appendChild(el("span", null, pg ? pg.sum : it.href)); row.appendChild(t);
+  if (pg) row.appendChild(hbPageChip(pg, ctx.changes, ctx.live, ctx.firstPublish));
+  const acts = el("div", "acts");
+  if (pg) {
+    const edit = el("button", "pillbtn sm", "Edit"); edit.type = "button"; edit.setAttribute("aria-label", "Edit " + name);
+    edit.addEventListener("click", () => hbOpenPage(pg));
+    acts.appendChild(edit);
+  }
+  const gear = el("button", "pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
+  gear.addEventListener("click", () => { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); });
+  acts.appendChild(gear); row.appendChild(acts);
+  return row;
+}
+function renderPagesList() {
+  const list = $("pagesList"), off = $("pagesUnlinked"); if (!list || !off) return;
+  if (PG_DRAG) { PG_DRAG.stale = true; return; }   // a refresh waits for the drop, so it can't pull the row out of someone's hand
+  const ctx = {
+    live: !!(S.health && S.health.facts && S.health.facts.website.state !== "none"),
+    changes: (S.changes && S.changes.changes) || [],
+    firstPublish: !!(S.changes && S.changes.first_publish),
+  };
+  const m = pgModel();
+  list.innerHTML = ""; off.innerHTML = "";
+  m.menu.forEach((e) => list.appendChild(pgRow(e, ctx)));
+  m.unlinked.forEach((pg) => off.appendChild(pgRow({ it: null, pg, parent: null }, ctx)));
+  if (!m.unlinked.length) off.appendChild(el("div", "pg-empty", "Drag a page here to take it off the menu. It stays live on your site."));
+  const auto = $("btnNavAuto"); if (auto) auto.hidden = !pgHasCustomNav();
+}
+// Dragging is pointer events on the handle, so a finger works the same as a mouse. The
+// row follows the pointer; a line shows where it will land; nothing is written until the drop.
+let PG_DRAG = null;
+function pgDragStart(e, row, ref, menuOnly) {
+  if (e.button) return;
+  e.preventDefault();
+  const group = [row];
+  for (let n = row.nextElementSibling; n && !row.classList.contains("child") && n.classList.contains("child"); n = n.nextElementSibling) group.push(n);
+  const h = e.currentTarget;
+  try { h.setPointerCapture(e.pointerId); } catch (_) {}
+  const d = PG_DRAG = { ref, row, group, h, menuOnly, y0: e.clientY, moved: false, zone: "menu", next: null, line: el("div", "pg-dropline") };
+  d.onMove = (ev) => pgDragMove(ev);
+  d.onUp = () => pgDragEnd(null, false);
+  d.onCancel = () => pgDragEnd(null, true);
+  d.onKey = (ev) => { if (ev.key === "Escape") pgDragEnd(null, true); };
+  h.addEventListener("pointermove", d.onMove);
+  h.addEventListener("pointerup", d.onUp);
+  h.addEventListener("pointercancel", d.onCancel);
+  document.addEventListener("keydown", d.onKey, true);
+}
+function pgDragMove(e) {
+  const d = PG_DRAG; if (!d) return;
+  const dy = e.clientY - d.y0;
+  if (!d.moved && Math.abs(dy) < 4) return;
+  if (!d.moved) { d.moved = true; document.body.classList.add("pd-dragging"); d.group.forEach((r) => r.classList.add("pg-dragging")); }
+  d.group.forEach((r) => { r.style.transform = "translateY(" + dy + "px)"; });
+  const offSec = $("pagesOffSec"), offH = offSec.querySelector(".hb-sec-h");
+  const zone = !d.menuOnly && e.clientY >= offH.getBoundingClientRect().top ? "off" : "menu";
+  const host = $(zone === "off" ? "pagesUnlinked" : "pagesList");
+  const next = [...host.querySelectorAll(".pg-row")].filter((r) => d.group.indexOf(r) < 0).find((r) => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; }) || null;
+  d.zone = zone; d.next = next;
+  host.insertBefore(d.line, next);
+  if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > innerHeight - 60) window.scrollBy(0, 12);
+}
+function pgDragEnd(_, cancel) {
+  const d = PG_DRAG; if (!d) return;
+  PG_DRAG = null;
+  d.h.removeEventListener("pointermove", d.onMove);
+  d.h.removeEventListener("pointerup", d.onUp);
+  d.h.removeEventListener("pointercancel", d.onCancel);
+  document.removeEventListener("keydown", d.onKey, true);
+  document.body.classList.remove("pd-dragging");
+  d.group.forEach((r) => { r.classList.remove("pg-dragging"); r.style.transform = ""; });
+  d.line.remove();
+  if (cancel || !d.moved) { if (d.stale) renderPagesList(); return; }
+  const beforeRef = d.zone === "menu" && d.next ? { href: d.next.dataset.href, parent: d.next.dataset.parent || null } : null;
+  pgMove(d.ref, d.zone, beforeRef);
+}
+// The one settings button: name and address, the menu, and how it shows on Google, each saved
+// as it changes. Duplicate, Clear and Delete are the same page actions the Edit tabs use.
+const PG_SEO_KEY = { menu: "offerings", about: "about", faq: "faq", updates: "updates", contact: "contact" };
+function pgField(label, input, hint) {
+  const f = el("div", "field"); const l = el("label", null, label);
+  if (!input.id) input.id = "pgf-" + Math.random().toString(36).slice(2, 8);
+  l.setAttribute("for", input.id); f.append(l, input);
+  if (hint) f.appendChild(el("div", "hint", hint));
+  return f;
+}
+function pgInput(value, max, placeholder) { const i = el("input"); i.type = "text"; i.value = value || ""; if (max) i.maxLength = max; if (placeholder) i.placeholder = placeholder; return i; }
+function pgModal(id, title) {
+  const scrim = el("div", "dc-modal-scrim"); scrim.id = id;
+  const box = el("div", "dc-modal pg-settings"); box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", title);
+  const opener = document.activeElement;
+  const close = () => {
+    if (document.activeElement && box.contains(document.activeElement)) document.activeElement.blur();   // a field saves on change, and blur is what fires it
+    scrim.remove(); document.removeEventListener("keydown", onKey, true);
+    try { if (opener && opener.isConnected) opener.focus(); } catch (_) {}
+  };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); close(); } };
+  document.addEventListener("keydown", onKey, true);
+  scrim.addEventListener("mousedown", (e) => { if (e.target === scrim) close(); });
+  scrim.appendChild(box); document.body.appendChild(scrim);
+  return { box, close };
+}
+// "Show under": top of the menu, or under any other top-level item.
+function pgUnderSelect(m, e) {
+  const sel = el("select");
+  const top = el("option", null, "The top of the menu"); top.value = ""; sel.appendChild(top);
+  m.nav.filter((x) => x !== e.it).forEach((x) => { const o = el("option", null, x.label); o.value = x.href; sel.appendChild(o); });
+  sel.value = e.parent ? e.parent.href : "";
+  return sel;
+}
+function pgSetUnder(ref, parentHref) { return pgTurn(() => pgSetUnderNow(ref, parentHref)); }
+async function pgSetUnderNow(ref, parentHref) {
+  if (!(await dcSavePendingEdits())) return null;
+  const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.it) return null;
+  const home = parentHref ? m.nav.find((x) => x.href === parentHref) : null;
+  if (home && (home.children || []).length >= PG_KIDS_MAX) { toast("A dropdown holds " + PG_KIDS_MAX + " links.", true); return null; }
+  const after = e.parent ? m.nav.indexOf(e.parent) + 1 : m.nav.length;
+  const item = pgLift(m, e);
+  if (home) { home.children = home.children || []; home.children.push(item); } else m.nav.splice(after, 0, item);
+  await pgWriteMenu(m.nav);
+  return { href: ref.href, parent: parentHref || null };
+}
+function pgSetLabel(ref, label) { return pgTurn(() => pgSetLabelNow(ref, label)); }
+async function pgSetLabelNow(ref, label) {
+  label = String(label || "").trim().slice(0, 40); if (!label) return;
+  if (!(await dcSavePendingEdits())) return;
+  const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.it || e.it.label === label) return;
+  e.it.label = label;
+  await pgWriteMenu(m.nav, "Saved. Publish to apply.");
+}
+// The offerings page's address follows the kind of business and the template, and a custom
+// menu's link to it has to as well, or it goes dead.
+function pgFollowOffering(was) {
+  return pgTurn(async () => {
+    const now = vocabWords();
+    if (was.path === now.path || !pgHasCustomNav()) return;
+    const swap = (it) => (it.href === was.path ? { ...it, href: now.path, label: it.label === was.label ? now.label : it.label } : it);
+    const followed = () => {
+      const nav = S.settings.nav.map((it) => { const t = swap(it); return t.children ? { ...t, children: t.children.map(swap) } : t; });
+      return JSON.stringify(nav) === JSON.stringify(S.settings.nav) ? null : { nav };
+    };
+    try { await settingsPut(followed); renderPagesBar(); refreshDesignPreview(); }
+    catch (err) { toast(nice(err), true); }
+  });
+}
+// In the menu or not. With no custom menu a custom page only flips its own flag, which
+// keeps the menu automatic; a built-in page has no flag, so it needs a custom menu.
+function pgSetInMenu(ref, on) { return pgTurn(() => pgSetInMenuNow(ref, on)); }
+async function pgSetInMenuNow(ref, on) {
+  if (!(await dcSavePendingEdits())) return;
+  const m = pgModel(), e = pgEntry(m, ref); if (!e) return;
+  const slug = e.pg && e.pg.slug;
+  if (!pgHasCustomNav() && slug) {
+    const flipped = () => ({ pages: dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (on) delete nx.hideNav; else nx.hideNav = true; return nx; }) });
+    try { await settingsPut(flipped); renderPagesBar(); refreshDesignPreview(); scheduleChangesRefresh(); toast("Saved. Publish to apply."); }
+    catch (err) { toast(nice(err), true); }
+    return;
+  }
+  if (on) { if (!e.it) { m.nav.push({ label: pgLabelFor(e.pg), href: e.pg.path }); await pgWriteMenu(m.nav, "Saved. Publish to apply."); } return; }
+  if (!e.it) return;
+  const item = pgLift(m, e);
+  (item.children || []).forEach((k) => m.nav.push(k));
+  await pgWriteMenu(m.nav, "Off the menu. It stays live on your site. Publish to apply.");
+}
+function pgOpenSettings(startRef) {
+  const start = pgEntry(pgModel(), startRef); if (!start || !start.pg) return;
+  const { box, close } = pgModal("pageSettings", (start.pg.title || "Page") + " settings");
+  let ref = { href: startRef.href, parent: startRef.parent || null };
+  const paint = () => {
+    const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.pg) { close(); return; }
+    const pg = e.pg, slug = pg.slug || "", custom = !!slug;
+    box.textContent = "";
+    box.appendChild(el("h3", "dc-modal-h", pg.title + " settings"));
+    if (custom) {
+      const name = pgInput(pg.title, 60), addr = pgInput(slug, 40);
+      name.addEventListener("change", async () => { if (name.value.trim() && name.value.trim() !== pg.title) { await dcSavePageName(slug, name.value.trim().slice(0, 60), slug); paint(); } });
+      addr.addEventListener("change", async () => {
+        const to = await dcSavePageName(slug, pg.title, addr.value);
+        if (to) ref = { href: "/" + to + "/", parent: ref.parent };
+        paint();
+      });
+      box.appendChild(pgField("Page name", name));
+      box.appendChild(pgField("Page address", addr, "Its link: yoursite.com/" + slug + "/. If you change it, visitors to the old link are sent to the new one."));
+    } else {
+      box.appendChild(el("p", "dc-modal-sub", "Its address is " + pg.path + "."));
+    }
+    box.appendChild(el("h4", "pg-h", "Menu"));
+    const onRow = el("label", "pg-check"); const on = el("input"); on.type = "checkbox"; on.checked = !!e.it; onRow.append(on, document.createTextNode(" Show in the menu"));
+    on.addEventListener("change", async () => {
+      await pgSetInMenu(ref, on.checked);
+      ref = { href: ref.href, parent: null };
+      paint();
+    });
+    box.appendChild(onRow);
+    if (e.it) {
+      const lab = pgInput(e.it.label, 40);
+      lab.addEventListener("change", async () => { await pgSetLabel(ref, lab.value); paint(); });
+      box.appendChild(pgField("Label in the menu", lab));
+      if (!(e.it.children || []).length) {
+        const under = pgUnderSelect(m, e);
+        under.addEventListener("change", async () => { const to = await pgSetUnder(ref, under.value); if (to) ref = to; paint(); });
+        box.appendChild(pgField("Show under", under, "Pick a menu item to make this a link in its dropdown."));
+      }
+    }
+    box.appendChild(el("h4", "pg-h", "On Google"));
+    if (pg.key === "home") {
+      box.appendChild(el("p", "dc-modal-sub", "Your home page uses the search headline and description on the Search tab. It always shows on Google."));
+    } else {
+      const key = custom ? "page:" + slug : PG_SEO_KEY[pg.key];
+      box.appendChild(seoNoindexRow(key, pg.title, "Show this page on Google"));
+      box.appendChild(el("div", "hint", "Hiding it keeps the page on your website. It just stops appearing in search results."));
+      box.appendChild(seoFieldsBox(key, pg.title, false));
+    }
+    const foot = el("div", "pg-foot");
+    const action = (label, fn, danger) => { const b = el("button", "dc-modal-cancel" + (danger ? " danger" : ""), label); b.type = "button"; b.addEventListener("click", () => { close(); fn(); }); foot.appendChild(b); };
+    if (pg.view === "design") {
+      action("Duplicate page", async () => { await dcDuplicatePage(slug); if ($("view-pages").classList.contains("on")) go("design"); });
+      action("Clear page", () => { go("design"); dcClearPage(slug); });
+    }
+    if (custom) action("Delete page", () => dcDeletePage(slug), true);
+    const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
+    foot.appendChild(done);
+    box.appendChild(foot);
+  };
+  paint();
+  setTimeout(() => { const f = box.querySelector("input,select"); if (f) { try { f.focus(); } catch (_) {} } }, 30);
+}
+// What the server accepts in a menu link (lib/serializer.ts navHref), or null. Someone typing
+// a bare domain or an email address means the obvious thing, so it's completed for them.
+function pgHref(raw) {
+  let v = String(raw || "").trim(); if (!v) return null;
+  if (/^[^\s/:@]+@[^\s/:@]+\.[^\s/:@]+$/.test(v)) v = "mailto:" + v;
+  else if (/^[^\s/:]+\.[^\s:]+$/.test(v)) v = "https://" + v;
+  v = v.replace(/^http:\/\//i, "https://");
+  return (v === "/" || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^https:\/\/[^\s<>"']+$/i.test(v) || /^mailto:[^\s<>"']+$/i.test(v) || /^tel:[+0-9()\-.\s]+$/i.test(v)) ? v.slice(0, 300) : null;
+}
+// A link in the menu that isn't one of the site's pages. Adding one asks first; after that it saves as it changes.
+function pgOpenLink(startRef) {
+  const { box, close } = pgModal("linkSettings", startRef ? "Link settings" : "Add a link");
+  let ref = startRef ? { href: startRef.href, parent: startRef.parent || null } : null;
+  const paint = () => {
+    const m = pgModel(), e = ref ? pgEntry(m, ref) : null;
+    if (ref && !e) { close(); return; }
+    box.textContent = "";
+    box.appendChild(el("h3", "dc-modal-h", ref ? "Link settings" : "Add a link"));
+    const lab = pgInput(e ? e.it.label : "", 40, "e.g. Order online"), url = pgInput(e ? e.it.href : "", 300, "yoursite.com, an email or tel:…");
+    box.appendChild(pgField("Label in the menu", lab));
+    box.appendChild(pgField("Links to", url));
+    const msg = el("div", "hint pg-err"); msg.hidden = true; msg.setAttribute("role", "alert"); box.appendChild(msg);
+    const bad = (t) => { msg.textContent = t; msg.hidden = false; };
+    const foot = el("div", "pg-foot");
+    if (!ref) {
+      const add = el("button", "dc-modal-cancel pg-done", "Add to the menu"); add.type = "button";
+      add.addEventListener("click", () => {
+        const label = lab.value.trim().slice(0, 40), href = pgHref(url.value);
+        if (!label) return bad("Give it a label for the menu.");
+        if (!href) return bad("That link won’t work. Use a web address, an email address, or tel: and a phone number.");
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel();
+          if (fresh.nav.length >= PG_NAV_MAX) return bad("The menu holds " + PG_NAV_MAX + " items. Take one off first.");
+          fresh.nav.push({ label, href });
+          if (await pgWriteMenu(fresh.nav)) close();
+        });
+      });
+      const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", close);
+      foot.append(cancel, add);
+    } else {
+      lab.addEventListener("change", () => { pgSetLabel(ref, lab.value); });
+      url.addEventListener("change", async () => {
+        const href = pgHref(url.value);
+        if (!href) return bad("That link won’t work. Use a web address, an email address, or tel: and a phone number.");
+        msg.hidden = true;
+        await pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel(), cur = pgEntry(fresh, ref); if (!cur) return;
+          cur.it.href = href;
+          if (await pgWriteMenu(fresh.nav, "Saved. Publish to apply.")) { ref = { href, parent: ref.parent }; paint(); }
+        });
+      });
+      if (!(e.it.children || []).length) {
+        const under = pgUnderSelect(m, e);
+        under.addEventListener("change", async () => { const to = await pgSetUnder(ref, under.value); if (to) ref = to; paint(); });
+        box.appendChild(pgField("Show under", under));
+      }
+      const rm = el("button", "dc-modal-cancel danger", "Remove from the menu"); rm.type = "button";
+      rm.addEventListener("click", async () => { close(); await pgSetInMenu(ref, false); });
+      const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
+      foot.append(rm, done);
+    }
+    box.appendChild(foot);
+  };
+  paint();
+  setTimeout(() => { const f = box.querySelector("input"); if (f) { try { f.focus(); } catch (_) {} } }, 30);
 }
 // ── Oct 2026 workflow audit, change 2: the overview is the site's one home ──
 // Health (website-health.html), the page map (content-tree.html) and the site's
@@ -4522,6 +4950,8 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   const todo = $("ssTodo"); if (todo) todo.addEventListener("click", openTodoPanel);
   const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
   const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
+  const addLink = $("btnPagesAddLink"); if (addLink) addLink.addEventListener("click", () => pgOpenLink(null));
+  const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", async () => { if (confirm("Remove your custom menu and let the site build it automatically from your pages?")) { await dcSaveNav(null); renderPagesBar(); } });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
   const frame = $("siteFrame");
   if (frame) frame.addEventListener("load", () => {
@@ -4695,78 +5125,51 @@ const LOOK_SWATCH = {
   "editorial": { bg: "#f6f3ec", ink: "#1a1a1c", accent: "#6d232a", font: "'Iowan Old Style',Palatino,Georgia,serif", tag: "Editorial · print serif" },
 };
 function lookSwatch(slug) { return LOOK_SWATCH[slug] || { bg: "#f2f0f5", ink: "#2a2536", accent: "#5b3fa0", font: "system-ui,sans-serif", tag: "Template family" }; }
-let LOOK_OPEN = false;   // the gallery stays folded: it took a third of the screen from the proof
-async function mountLookSeg() {
-  const seg = $("lookSeg"), drawer = $("lookDrawer"); if (!seg || !drawer) return;
-  try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
-  if (!LOOKS || (LOOKS.templates || []).length < 2) return;   // one look → no chooser
-  // PT-2C: a visual preview gallery — each family shows a mini-mock of its look.
-  // Data-driven from /site/templates, with a graceful fallback for future families.
-  seg.innerHTML = ""; drawer.innerHTML = ""; drawer.hidden = !LOOK_OPEN;
-  const lookToggle = el("button", null, "Try another template " + (LOOK_OPEN ? "▴" : "▾"));
-  lookToggle.setAttribute("aria-expanded", String(LOOK_OPEN)); lookToggle.setAttribute("aria-controls", "lookDrawer");
-  lookToggle.addEventListener("click", () => { LOOK_OPEN = !LOOK_OPEN; mountLookSeg(); });
-  seg.appendChild(lookToggle);
-  const cards = el("div"); cards.style.cssText = "display:flex;gap:12px;align-items:stretch";
-  LOOKS.templates.forEach((t) => {
-    const sw = lookSwatch(t.slug);
-    const active = (PV.template || LOOKS.current.slug) === t.slug;
-    const card = el("button"); card.dataset.look = t.slug;
-    card.style.cssText = "flex:none;display:flex;flex-direction:column;justify-content:flex-start;cursor:pointer;text-align:left;padding:0;border:2px solid " + (active ? "var(--plum,#5b3fa0)" : "rgba(0,0,0,.12)") + ";border-radius:12px;overflow:hidden;background:#fff;width:154px;font-family:inherit;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out),transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)";
-    card.onmouseenter = () => { if (!active) card.style.borderColor = "rgba(91,63,160,.45)"; };
-    card.onmouseleave = () => { if (!active) card.style.borderColor = "rgba(0,0,0,.12)"; };
-    card.innerHTML =
-      '<span style="display:block;height:80px;background:' + sw.bg + ';padding:11px 13px">'
-      + '<span style="display:block;height:4px;width:34px;background:' + sw.accent + ';border-radius:2px"></span>'
-      + '<span style="display:block;margin-top:9px;font-family:' + sw.font + ';color:' + sw.ink + ';font-size:20px;font-weight:600;line-height:1">Aa</span>'
-      + '<span style="display:block;margin-top:7px;height:3px;width:70%;background:rgba(0,0,0,.14);border-radius:2px"></span>'
-      + '<span style="display:block;margin-top:4px;height:3px;width:52%;background:rgba(0,0,0,.1);border-radius:2px"></span></span>'
-      + '<span style="display:block;padding:9px 13px 11px"><span style="display:block;font-weight:600;font-size:13.5px;color:#1b1525">' + String(t.name) + (active ? " ✓" : "") + '</span>'
-      + '<span style="display:block;font-size:11px;color:#6b6478;margin-top:2px">' + sw.tag + '</span></span>';
-    card.addEventListener("click", () => { PV.template = t.slug === LOOKS.current.slug ? "" : t.slug; mountLookSeg(); loadPreview(); });
-    cards.appendChild(card);
-  });
-  drawer.appendChild(cards);
-  if (PV.template) {
-    const use = el("button", null, "Use this template"); use.dataset.needs = "owner";
-    use.style.cssText = "font-weight:700";
-    use.addEventListener("click", async () => {
-      try {
-        const r = await api("PUT", "/site/template", { slug: PV.template });
-        toast("Now dressed as " + (r.data.name || PV.template) + " — publish to make it live");
-        LOOKS = null; PV.template = "";
-        const s = await api("GET", "/site"); S.site = s.data.site;
-        mountLookSeg(); loadPreview(); scheduleChangesRefresh(); applyVocab();
-      } catch (err) { toast(nice(err), true); }
-    });
-    seg.appendChild(use);
-  }
+// Trying a template on starts from the gallery in Styles. The preview only says so and
+// offers the one decision.
+function paintStageTemplate() {
+  const seg = $("lookSeg"); if (!seg) return;
+  seg.textContent = "";
+  if (!PV.template) return;
+  const t = ((LOOKS && LOOKS.templates) || []).find((x) => x.slug === PV.template);
+  seg.appendChild(el("span", null, "Trying " + (t ? t.name : "a template")));
+  const use = el("button", null, "Use this template"); use.dataset.needs = "owner"; use.type = "button"; use.style.fontWeight = "700";
+  use.addEventListener("click", async () => { closePreview(); if (t) await applyTemplateFromGallery(t); });
+  seg.appendChild(use);
 }
-async function openPreview(ver) {
+async function openPreview(ver, opts) {
   if (ver) PV.ver = ver;
-  LOOK_OPEN = false;
   PV.publishId = null; PV.launchId = null;
-  mountLookSeg();
-  $("verSeg").style.display = "";
+  PV.template = (opts && opts.template) || "";
+  if (PV.template) PV.ver = "draft";
+  paintStageTemplate();
+  $("verSeg").style.display = PV.template ? "none" : "";
   syncStageChrome();
   openStage();
   lsSet("presence-previewed:" + siteKey(), "1");   // per site: one client's proof doesn't tick another's step
   await loadPreview();
 }
+// Edit mode's Preview is the same screen, on the page being edited, with what was just typed.
+async function dcOpenPreview() {
+  if (IPE) ipeCommit();
+  if (!(await dcSavePendingEdits())) return;
+  PV.page = DC_PAGE ? "/" + DC_PAGE + "/" : "/";
+  await openPreview("draft");
+}
 async function openLaunchPreview(launchId) {   // FD-T7: preview a staged launch
-  PV.launchId = launchId; PV.publishId = null; PV.template = "";
+  PV.launchId = launchId; PV.publishId = null; PV.template = ""; paintStageTemplate();
   $("verSeg").style.display = "none";
   openStage();
   await loadPreview();
 }
 async function openPublishPreview(publishId) {
-  PV.publishId = publishId; PV.launchId = null;
+  PV.publishId = publishId; PV.launchId = null; PV.template = ""; paintStageTemplate();
   $("verSeg").style.display = "none";
   openStage();
   await loadPreview();
 }
 function openStage() { lastFocus = document.activeElement; $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("btnStageClose").focus(); }
-function closePreview() { $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
+function closePreview() { PV.template = ""; $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
 $("btnStageClose").addEventListener("click", closePreview);
 // Escape closes the stage and nothing beneath it: it is the topmost layer, but the Design
 // panels' capture handler and the shell's (an expanded sidebar section reads as an open
@@ -4780,8 +5183,17 @@ $("btnEditSite").addEventListener("click", () => {
   const slug = SS_PATH.replace(/\//g, "");
   if ($("view-design").classList.contains("on") && slug && typeof dcPageObj === "function" && dcPageObj(slug)) dcSwitchPage(slug);
 });
-$("btnPreview").addEventListener("click", () => openPreview("draft"));
+$("btnPreview").addEventListener("click", () => { if (document.documentElement.classList.contains("site-home")) PV.page = SS_PATH || "/"; openPreview("draft"); });
+// Every page of the site, in the menu's order, the ones off the menu after it.
+function renderPageWords() {
+  const host = $("pageWords"), m = pgModel(), seen = new Set(); host.textContent = "";
+  m.menu.filter((e) => e.pg).map((e) => [e.pg.path, e.it.label]).concat(m.unlinked.map((p) => [p.path, p.title])).forEach(([page, name]) => {
+    if (seen.has(page)) return; seen.add(page);
+    const b = el("button", null, name); b.type = "button"; b.dataset.page = page; host.appendChild(b);
+  });
+}
 function syncStageChrome() {
+  renderPageWords();
   const press = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); };
   document.querySelectorAll("#verSeg button").forEach((b) => press(b, b.dataset.ver === PV.ver));
   document.querySelectorAll("#devSeg button").forEach((b) => press(b, b.dataset.dev === PV.dev));
@@ -4797,7 +5209,7 @@ window.addEventListener("message", (e) => {
 });
 async function loadPreview() {
   const frame = $("previewFrame");
-  frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Proofing your ${PV.publishId ? "kept version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
+  frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
   try {
     const q = (PV.launchId ? `launch_id=${PV.launchId}&page=${encodeURIComponent(PV.page)}` : PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`) + (PV.template ? `&template=${encodeURIComponent(PV.template)}` : "");
     let html = await apiHtml(`/preview?${q}`);
@@ -4805,7 +5217,7 @@ async function loadPreview() {
     frame.srcdoc = html;
   } catch (err) {
     // a plain line and one Try again — never raw JSON, never "Proofing…" forever
-    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px 24px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err && err.notHtml ? "We couldn’t draw that page just now." : nice(err))}<p style="margin-top:18px"><button type="button" onclick="parent.postMessage({presenceRetry:1},'*')" style="font:600 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-style:normal;color:#5b3fa0;background:#fff;border:1px solid #5b3fa0;border-radius:8px;padding:12px 18px;min-height:44px;cursor:pointer">Try again</button></p></div>`;
+    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px 24px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err && err.notHtml ? "We couldn’t load that page just now." : nice(err))}<p style="margin-top:18px"><button type="button" onclick="parent.postMessage({presenceRetry:1},'*')" style="font:600 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-style:normal;color:#5b3fa0;background:#fff;border:1px solid #5b3fa0;border-radius:8px;padding:12px 18px;min-height:44px;cursor:pointer">Try again</button></p></div>`;
   }
 }
 
@@ -5497,8 +5909,7 @@ function togglePageInfoMenu() {
     propBtn.textContent = propLabel() + (grp.hidden ? "▸" : "▾");
   });
   m.appendChild(propBtn); m.appendChild(grp);
-  mi("Search & share appearance…", () => openPageSearchPanel(), { id: "piSearchShare", title: "How this page reads on Google and when its link is texted or posted" });
-  mi("View as published", () => openPreview("draft"), { id: "piViewPublished", title: "Read your draft the way visitors will — no editing chrome" });
+  mi("Page settings…", () => pgOpenSettings({ href: DC_PAGE ? "/" + DC_PAGE + "/" : "/" }), { id: "piSearchShare", title: "This page’s name, address, place in the menu and how it shows on Google" });
   document.body.appendChild(m);
   // ≤760px: the bottom-sheet presentation the slide-over panels already use
   if (window.matchMedia && window.matchMedia("(max-width:760px)").matches) {
@@ -5529,37 +5940,6 @@ function togglePageInfoMenu() {
   PI_OPEN = { menu: m, onDown, onKey };
   setTimeout(() => { try { const f = m.querySelector(".pp-pop-item:not(:disabled)"); if (f) f.focus(); } catch (_) {} }, 20);
 }
-// The per-page "Search & share appearance" panel — the page_seo override fields
-// + the show-on-Google toggle for the CURRENT page, in a small sheet. The field
-// builders are the SAME ones the Business card uses (seoNoindexRow/seoFieldsBox).
-function openPageSearchPanel() {
-  const slug = DC_PAGE;
-  const title = dcPageTitle(slug);
-  const scrim = el("div", "dc-modal-scrim"); scrim.id = "pageSearchPanel";
-  const box = el("div", "dc-modal");
-  box.appendChild(el("h3", "dc-modal-h", "Search & share appearance"));
-  box.appendChild(el("p", "dc-modal-sub", slug
-    ? "How “" + title + "” reads in search results and when its link is texted or posted. Blank fields use the good defaults; changes apply when you publish."
-    : "Your home page reads from your site-wide search headline and description — those live in Business, with the rest of your business facts. It always shows on Google, and its share appearance follows the same wording."));
-  if (slug) {
-    const key = "page:" + slug;
-    box.appendChild(seoNoindexRow(key, title, "Show this page on Google"));
-    box.appendChild(el("div", "hint", "Hiding it keeps the page on your website — it just stops appearing in search results."));
-    box.appendChild(seoFieldsBox(key, title, false));
-  }
-  const done = el("button", "dc-modal-cancel", "Done"); done.type = "button";
-  box.appendChild(done); scrim.appendChild(box); document.body.appendChild(scrim);
-  const cleanup = () => {
-    scrim.remove(); document.removeEventListener("keydown", onKey, true);
-    const b = $("btnPageInfo"); if (b) { try { b.focus(); } catch (_) {} }
-  };
-  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cleanup(); } };
-  document.addEventListener("keydown", onKey, true);
-  done.addEventListener("click", cleanup);
-  scrim.addEventListener("click", (e) => { if (e.target === scrim) cleanup(); });
-  setTimeout(() => { try { (box.querySelector("input,select") || done).focus(); } catch (_) {} }, 30);
-}
-
 /* ── G11: per-section review comments — the operator side of the feedback loop.
    Toggle Comments → per-section count badges appear in the Content tree
    tray; click one to read the thread (newest first), reply, resolve, or remove.
@@ -6145,6 +6525,7 @@ async function refreshAll() {
   // null = no entitlement recorded → all features (studio_os default, unchanged).
   S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
   S.isStudio = !!(ctxR && ctxR.data && ctxR.data.is_agency);   // the studio sees every version tool; a client sees the list
+  document.documentElement.classList.toggle("is-studio", S.isStudio);
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
@@ -6156,11 +6537,8 @@ async function refreshAll() {
   mountSearchCard();
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
-const PAGE_DEFS = [ ["offerings", "Your offerings page"], ["about", "About"], ["faq", "Questions"], ["updates", "Updates"], ["contact", "Contact"] ];
-// ── Shared per-page search/share builders (slice B) — ONE implementation, two
-// homes: the Business card below uses them for the BUILT-IN pages (which the
-// canvas can't open), and the Page ▾ menu's "Search & share appearance" panel
-// uses them for the page that's open on the canvas ("page:<slug>" keys). ──
+// ── Per-page search/share builders, for each page's settings panel on the Pages tab
+// (built-in pages by name, the owner's own as "page:<slug>"). ──
 // The show-on-Google toggle: one pages_noindex entry (checked = shows).
 function seoNoindexRow(key, pageName, rowLabel) {
   const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 0";
@@ -6712,19 +7090,12 @@ async function mountSearchCard() {
   if (h.verification.bing) line(true, "Bing is connected too (that powers Copilot search).");
   (h.links || []).forEach((l) => { if (l.ok === false) line(false, "", "Your " + l.kind.replace("social:", "") + " link isn’t answering — check " + l.url.slice(0, 40) + "…"); });
   if ((h.links || []).length && (h.links || []).every((l) => l.ok !== false)) line(true, "All your outside links (booking, social, redirects) are answering.");
-  // 2. page visibility toggles
-  const sec = el("div", null, ""); sec.style.cssText = "margin-top:12px";
-  sec.appendChild(Object.assign(el("div", null, "Which pages should show up on Google?"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
-  PAGE_DEFS.forEach(([key, label]) => sec.appendChild(seoNoindexRow(key, label)));
-  sec.appendChild(el("div", "hint", "Your home page always shows. Hiding a page keeps it on your site — it just stops appearing in search results."));
-  card.appendChild(sec);
-  // 3. per-page search wording + share appearance (page_seo overrides) for the
-  // BUILT-IN pages only. Slice B hard move: the pages YOU build ("page:<slug>")
-  // are tuned from the canvas — Page ▾ → Search & share appearance.
-  const ov = el("details"); ov.style.cssText = "margin-top:10px";
-  ov.appendChild(Object.assign(el("summary", null, "Fine-tune how each built-in page reads in search results and when shared (optional)"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
-  PAGE_DEFS.forEach(([key, label]) => ov.appendChild(seoFieldsBox(key, label)));
-  card.appendChild(ov);
+  // 2. a page's search wording, share image and "show on Google" live in its settings on the Pages tab
+  const each = el("div", "hint"); each.style.marginTop = "12px";
+  each.appendChild(document.createTextNode("To change how one page shows on Google, or to hide it, use its settings button on the "));
+  const toPages = el("a", null, "Pages tab"); toPages.href = "#pages"; toPages.style.textDecoration = "underline"; toPages.addEventListener("click", (e) => { e.preventDefault(); go("pages"); });
+  each.append(toPages, document.createTextNode("."));
+  card.appendChild(each);
   // 4. redirects manager (moved a page? send visitors to the new spot)
   const rd = el("details"); rd.style.cssText = "margin-top:8px";
   rd.appendChild(Object.assign(el("summary", null, "Moved from an old website? Forward old page addresses"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
@@ -6785,8 +7156,6 @@ function applyVocab() {
   document.querySelectorAll('.navitem[data-view="offerings"]').forEach((n) => { n.textContent = VOCAB.label; });   // main tab + sections sheet stay in sync
   const h = document.querySelector("#view-offerings h1.doc"); if (h) h.textContent = VOCAB.label;
   const sub = document.querySelector("#view-offerings .docsub"); if (sub) sub.textContent = VOCAB.sub;
-  const pb = document.querySelector('#pageWords button[data-page="/menu/"]');
-  if (pb && VOCAB.path !== "/menu/") { pb.dataset.page = VOCAB.path; pb.textContent = VOCAB.label; }
 }
 // ── Phase CP-2: the Design Studio — every choice curated, contrast-safe, no code ──
 // All controls write the SAME dev-token layer (one machinery). Owners = tokens
@@ -7388,7 +7757,11 @@ async function dcAddPage() {
   if (!(await dcSavePendingEdits())) return;
   const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
   try {
-    await settingsPut(() => ({ pages: [...dcPagesArr(), { slug, title, blocks }] }));
+    await settingsPut(() => {
+      const body = { pages: [...dcPagesArr(), { slug, title, blocks }] };
+      if (pgHasCustomNav() && S.settings.nav.length < PG_NAV_MAX) body.nav = [...S.settings.nav, { label: title.slice(0, 40), href: "/" + slug + "/" }];
+      return body;
+    });
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during that write stays on its own page
     dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
@@ -7433,91 +7806,17 @@ async function dcChoosePageLayout(title) {
 //    your pages or an external link, and give any item a dropdown of child links.
 //    Saved to settings.nav; the server validates (safe links only) and every template
 //    renders it. Empty / "Reset to automatic" → the site builds the menu from pages. ──
-let NAV_WORK = null;
-function dcNavPages() {   // Home + each custom page → the "links to" picker options
-  return dcPageList().map((p) => ({ href: p.slug ? "/" + p.slug + "/" : "/", title: p.title || (p.slug || "Home") }));
-}
-function dcNavSeed() {
-  const cur = (S.settings && Array.isArray(S.settings.nav)) ? S.settings.nav : [];
-  if (cur.length) return JSON.parse(JSON.stringify(cur));
-  return dcNavPages().map((p) => ({ label: p.title, href: p.href }));   // seed from real pages, never blank
-}
-const NAV_INP = "flex:1;min-width:120px;padding:8px 9px;border:1px solid var(--line,#dcdce3);border-radius:8px;font:inherit;background:var(--bg,#fff);color:inherit";
-const NAV_MINI = "padding:6px 9px;border:1px solid var(--line,#dcdce3);border-radius:7px;background:var(--bg,#fff);color:inherit;cursor:pointer;font:inherit";
-function dcEditNav() {
-  NAV_WORK = dcNavSeed();
-  const scrim = el("div", "dc-modal-scrim");
-  const box = el("div", "dc-modal");
-  box.style.cssText = "max-height:88vh;display:flex;flex-direction:column";
-  box.appendChild(el("h3", "dc-modal-h", "Edit your menu"));
-  box.appendChild(el("p", "dc-modal-sub", "This top menu appears on every page. Drag the arrows to reorder, rename any item, point each at one of your pages or a link, and add a dropdown under any item."));
-  const list = el("div"); list.style.cssText = "flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:2px";
-  box.appendChild(list);
-  const addRow = el("button", null, "＋ Add menu item"); addRow.type = "button";
-  addRow.style.cssText = NAV_MINI + ";margin-top:8px;padding:9px 14px;font-weight:600";
-  addRow.addEventListener("click", () => { NAV_WORK.push({ label: "New item", href: "/" }); renderRows(); });
-  box.appendChild(addRow);
-  const foot = el("div"); foot.style.cssText = "display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#eee)";
-  const reset = el("button", "dc-modal-cancel", "Reset to automatic"); reset.type = "button";
-  reset.title = "Remove your custom menu and let the site build it from your pages";
-  reset.addEventListener("click", async () => { if (confirm("Remove your custom menu and let the site build it automatically from your pages?")) { await dcSaveNav(null); cleanup(); } });
-  const right = el("div"); right.style.cssText = "display:flex;gap:8px";
-  const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", cleanup);
-  const save = el("button", null, "Save menu"); save.type = "button";
-  save.style.cssText = "padding:9px 18px;border:none;border-radius:8px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-weight:700;cursor:pointer;font:inherit";
-  save.addEventListener("click", async () => { await dcSaveNav(NAV_WORK); cleanup(); });
-  right.append(cancel, save); foot.append(reset, right); box.appendChild(foot);
-  scrim.appendChild(box); document.body.appendChild(scrim);
-  function cleanup() { scrim.remove(); document.removeEventListener("keydown", onKey, true); NAV_WORK = null; }
-  function onKey(e) { if (e.key === "Escape") cleanup(); }
-  document.addEventListener("keydown", onKey, true);
-  scrim.addEventListener("click", (e) => { if (e.target === scrim) cleanup(); });
-
-  function renderRows() { list.textContent = ""; NAV_WORK.forEach((it, i) => list.appendChild(row(it, i, false, -1))); }
-  function row(it, i, isChild, parentIdx) {
-    const wrap = el("div");
-    wrap.style.cssText = "border:1px solid var(--line,#e4e4ea);border-radius:10px;padding:9px;margin:0 0 8px " + (isChild ? "24px" : "0") + ";background:var(--sheet," + (isChild ? "rgba(91,63,160,.04)" : "#fff") + ")";
-    const main = el("div"); main.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;align-items:center";
-    const lab = el("input"); lab.type = "text"; lab.value = it.label || ""; lab.maxLength = 40; lab.placeholder = "Label"; lab.style.cssText = NAV_INP;
-    lab.addEventListener("input", () => { it.label = lab.value; });
-    const sel = el("select"); sel.style.cssText = NAV_INP + ";flex:0 0 auto;min-width:0";
-    const pages = dcNavPages();
-    pages.forEach((p) => { const o = el("option", null, "→ " + p.title); o.value = p.href; sel.appendChild(o); });
-    const eo = el("option", null, "External link…"); eo.value = "__ext"; sel.appendChild(eo);
-    const onPage = pages.some((p) => p.href === it.href);
-    sel.value = onPage ? it.href : "__ext";
-    const ext = el("input"); ext.type = "text"; ext.placeholder = "https://…  ·  mailto:…  ·  tel:…"; ext.value = onPage ? "" : (it.href || ""); ext.style.cssText = NAV_INP; ext.hidden = onPage;
-    sel.addEventListener("change", () => { if (sel.value === "__ext") { ext.hidden = false; it.href = ext.value || ""; ext.focus(); } else { ext.hidden = true; it.href = sel.value; } });
-    ext.addEventListener("input", () => { it.href = ext.value; });
-    const ctl = el("div"); ctl.style.cssText = "display:flex;gap:4px";
-    const arr = isChild ? NAV_WORK[parentIdx].children : NAV_WORK;
-    const up = el("button", null, "↑"); up.type = "button"; up.title = "Move up"; up.style.cssText = NAV_MINI;
-    const dn = el("button", null, "↓"); dn.type = "button"; dn.title = "Move down"; dn.style.cssText = NAV_MINI;
-    const del = el("button", null, "✕"); del.type = "button"; del.title = "Remove"; del.style.cssText = NAV_MINI + ";color:var(--clay,#c0392b)";
-    up.addEventListener("click", () => { if (i > 0) { const t = arr[i - 1]; arr[i - 1] = arr[i]; arr[i] = t; renderRows(); } });
-    dn.addEventListener("click", () => { if (i < arr.length - 1) { const t = arr[i + 1]; arr[i + 1] = arr[i]; arr[i] = t; renderRows(); } });
-    del.addEventListener("click", () => { arr.splice(i, 1); renderRows(); });
-    ctl.append(up, dn, del);
-    main.append(lab, sel, ext, ctl);
-    wrap.appendChild(main);
-    if (!isChild) {
-      if ((it.children || []).length) { const kids = el("div"); kids.style.cssText = "margin-top:8px"; it.children.forEach((k, ki) => kids.appendChild(row(k, ki, true, i))); wrap.appendChild(kids); }
-      const addKid = el("button", null, "＋ Add dropdown item"); addKid.type = "button"; addKid.style.cssText = NAV_MINI + ";margin-top:6px;font-size:.9em";
-      addKid.addEventListener("click", () => { it.children = it.children || []; it.children.push({ label: "New link", href: "/" }); renderRows(); });
-      wrap.appendChild(addKid);
-    }
-    return wrap;
-  }
-  renderRows();
+function dcCleanNav(nav) {
+  return Array.isArray(nav) ? nav.map((it) => {
+    const o = { label: String(it.label || "").trim().slice(0, 40), href: String(it.href || "").trim() };
+    const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href).slice(0, 8);
+    if (kids.length) o.children = kids;
+    return o;
+  }).filter((it) => it.label && it.href).slice(0, 12) : [];
 }
 async function dcSaveNav(nav) {
   try {
-    const clean = Array.isArray(nav) ? nav.map((it) => {
-      const o = { label: String(it.label || "").trim().slice(0, 40), href: String(it.href || "").trim() };
-      const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href);
-      if (kids.length) o.children = kids;
-      return o;
-    }).filter((it) => it.label && it.href).slice(0, 12) : [];
+    const clean = dcCleanNav(nav);
     await settingsPut({ nav: clean });
     refreshDesignPreview();
     toast(clean.length ? "Menu saved — publish to update your live site" : "Menu reset to automatic");
@@ -7536,6 +7835,7 @@ function dcPageMenuItems(slug, close) {
     if (o && o.disabled) b.disabled = true; else b.addEventListener("click", () => { close(); fn(); });
     items.push(b);
   };
+  mk("Page settings…", () => pgOpenSettings({ href: isHome ? "/" : "/" + slug + "/" }));
   if (!isHome) {
     mk("Rename", () => dcRenamePage(slug));
     mk((p && p.hideNav) ? "Show in menu" : "Hide from menu", () => dcTogglePageNav(slug));
@@ -7560,7 +7860,17 @@ function dcPageMenu(slug, anchor) {
 }
 async function dcTogglePageNav(slug) {
   if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
-  const toggled = () => ({ pages: dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; }) });
+  const toggled = () => {
+    const pages = dcPagesArr().map((x) => { if (x.slug !== slug) return x; const nx = { ...x }; if (nx.hideNav) delete nx.hideNav; else nx.hideNav = true; return nx; });
+    const body = { pages };
+    if (pgHasCustomNav()) {
+      const href = "/" + slug + "/", hide = !!(pages.find((x) => x.slug === slug) || {}).hideNav, m = pgModel(), e = pgEntry(m, { href });
+      if (hide && e && e.it) { const item = pgLift(m, e); (item.children || []).forEach((k) => m.nav.push(k)); }
+      if (!hide && e && !e.it) m.nav.push({ label: pgLabelFor(e.pg), href });
+      const clean = dcCleanNav(m.nav); if (clean.length) body.nav = clean;
+    }
+    return body;
+  };
   try { await settingsPut(toggled); renderPagesBar(); refreshDesignPreview(); toast(dcPageObj(slug) && dcPageObj(slug).hideNav ? "Hidden from the menu — still reachable by its link" : "Shown in the menu"); } catch (err) { toast(nice(err), true); }
 }
 async function dcMovePage(slug, dir) {
@@ -7600,25 +7910,32 @@ async function dcRenamePage(slug) {
   const name = await askText("Rename this page", { value: p.title || "", ok: "Next" });
   if (!name || !name.trim()) return;
   const title = name.trim().slice(0, 60);
-  const addr = await askText("Page address", { value: slug, ok: "Save", hint: "This page’s link: yoursite.com/…/. Lowercase letters, numbers and dashes. If you change it, visitors to the old link are redirected to the new one automatically." });
+  const addr = await askText("Page address", { value: slug, ok: "Save", hint: "This page’s link: yoursite.com/…/. Lowercase letters, numbers and dashes. If you change it, visitors to the old link are sent to the new one automatically." });
   if (addr === null) return;
-  if (!(await dcSavePendingEdits())) return;   // this list is built from the saved pages
+  await dcSavePageName(slug, title, addr);
+}
+// Gives back the page's address after the save, or null if nothing was saved.
+async function dcSavePageName(slug, title, addr) {
+  if (!(await dcSavePendingEdits())) return null;   // this list is built from the saved pages
+  const old = dcPageObj(slug); if (!old) return null;
   const newSlug = String(addr || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || slug;
   const renamed = newSlug !== slug;
   if (renamed) {
     const taken = new Set(dcPagesArr().filter((x) => x.slug !== slug).map((x) => x.slug));
-    if (taken.has(newSlug) || DC_PAGE_RESERVED.has(newSlug)) { toast("That address is already used by another page — pick a different one.", true); return; }
+    if (taken.has(newSlug) || DC_PAGE_RESERVED.has(newSlug)) { toast("That address is already used by another page — pick a different one.", true); return null; }
   }
   const build = () => {
     const pages = dcPagesArr().map((x) => (x.slug === slug ? (renamed ? { ...x, title, slug: newSlug, prev_slug: slug } : { ...x, title }) : x));
     const body = { pages };
+    if (pgHasCustomNav()) {
+      // keep the menu pointing at the new address, and its label if it was the page's name
+      const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/", oldTitle = old.title || slug;
+      const swap = (it) => (it && it.href === oldHref ? { ...it, href: newHref, label: it.label === oldTitle ? title.slice(0, 40) : it.label } : it);
+      const next = S.settings.nav.map((it) => { const t = swap(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swap) } : t; });
+      if (JSON.stringify(next) !== JSON.stringify(S.settings.nav)) body.nav = next;
+    }
     if (renamed) {
-      // keep the menu + per-page search settings pointing at the new address
-      const oldHref = "/" + slug + "/", newHref = "/" + newSlug + "/";
-      const swapHref = (it) => (it && it.href === oldHref ? { ...it, href: newHref } : it);
-      if (Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length) {
-        body.nav = S.settings.nav.map((it) => { const t = swapHref(it); return (t.children && t.children.length) ? { ...t, children: t.children.map(swapHref) } : t; });
-      }
+      // keep the per-page search settings pointing at the new address
       const pseo = (S.settings && S.settings.page_seo) || {};
       if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
       const nix = (S.settings && S.settings.pages_noindex) || [];
@@ -7630,7 +7947,8 @@ async function dcRenamePage(slug) {
     await settingsPut(build, () => { if (renamed && DC_PAGE === slug) DC_PAGE = newSlug; });   // the next write finds this page under its new address
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
     toast(renamed ? "Renamed — visitors to the old link are redirected to the new address once you publish" : "Renamed — publish to update your live site");
-  } catch (err) { toast(nice(err), true); }
+    return newSlug;
+  } catch (err) { toast(nice(err), true); return null; }
 }
 async function dcDeletePage(slug) {
   const p = dcPageObj(slug); if (!p) return;
@@ -7640,7 +7958,6 @@ async function dcDeletePage(slug) {
   try {
     const refs = (await api("GET", "/pages/refs?slug=" + encodeURIComponent(slug))).data || {};
     const bits = [];
-    if (refs.nav && refs.nav.length) bits.push("your menu links to it (" + refs.nav.join(", ") + ")");
     if (refs.redirects && refs.redirects.length) bits.push((refs.redirects.length === 1 ? "a forward points" : refs.redirects.length + " forwards point") + " to it (" + refs.redirects.join(", ") + ")");
     if (refs.pages && refs.pages.length) bits.push("other pages link to it (" + refs.pages.map((x) => x.title).join(", ") + ")");
     if (refs.library && refs.library.length) bits.push("saved sections link to it (" + refs.library.join(", ") + ")");
@@ -7650,7 +7967,7 @@ async function dcDeletePage(slug) {
   if (!(await dcSavePendingEdits())) return;   // the checkpoint and the Undo below keep the stored page
   // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
   try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
-  let at = -1, removed = null;
+  let at = -1, removed = null, navBefore = null;
   const build = () => {
     const all = dcPagesArr(); at = all.findIndex((x) => x.slug === slug);
     removed = all[at];
@@ -7664,6 +7981,18 @@ async function dcDeletePage(slug) {
     if (pseo[dkey]) { const map = { ...pseo }; delete map[dkey]; body.page_seo = map; }
     const nix = (S.settings && S.settings.pages_noindex) || [];
     if (nix.includes(dkey)) body.pages_noindex = nix.filter((k) => k !== dkey);
+    // and off a custom menu, its dropdown staying on the top level; a menu left empty goes back to automatic
+    navBefore = pgHasCustomNav() ? S.settings.nav : null;
+    if (navBefore) {
+      const gone = "/" + slug + "/", next = [];
+      navBefore.forEach((it) => {
+        const kids = (it.children || []).filter((k) => k.href !== gone);
+        if (it.href === gone) { kids.forEach((k) => next.push(k)); return; }
+        const { children, ...rest } = it;
+        next.push(kids.length ? { ...rest, children: kids } : rest);
+      });
+      body.nav = next;
+    }
     return body;
   };
   try {
@@ -7679,7 +8008,7 @@ async function dcDeletePage(slug) {
         const cur = dcPagesArr().slice();
         if (cur.some((x) => x.slug === removed.slug)) return null;
         cur.splice(Math.min(at < 0 ? cur.length : at, cur.length), 0, removed);
-        return { pages: cur };
+        return navBefore ? { pages: cur, nav: navBefore } : { pages: cur };
       };
       try {
         if (!(await settingsPut(restored))) { toast("That page is already back"); return; }
@@ -7794,7 +8123,10 @@ function dcApplyHistory(snapJson) {
   BLOCKS_WORK = arr; DC_HIST_LAST = snapJson;
   DC_HIST_SILENT = true;
   dcCaptureScroll(); renderBlocksCard();
-  Promise.resolve(saveBlocks()).finally(() => { DC_HIST_SILENT = false; updateUndoButtons(); });
+  Promise.resolve(saveBlocks()).finally(() => {
+    DC_HIST_SILENT = false; updateUndoButtons();
+    if ($("formsCard") && JSON.stringify(FORMS_WORK) === FORMS_BASE) formsLoad();   // a form is a section: the card shows what's saved now
+  });
 }
 // ── One undo history for the whole editor ───────────────────────────────────
 // Every content write goes through api(), so that's where a step is recorded: what
@@ -7811,10 +8143,61 @@ let UNDO_QUIET = 0;      // >0: this write is an undo, or sections recording the
 let UNDO_BEFORE = null;  // for callers that update S before the write goes out
 const undoClone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
 function undoPick(src, keys) { const o = {}; keys.forEach((k) => { o[k] = undoClone(src ? src[k] : undefined); }); return o; }
+// A write to the page list carries every page's sections, and sections change outside
+// these steps: their saves are quiet and their snapshots go with the page. So a step keeps
+// only what it changed, and taking it back applies that to the list as it is by then.
+// Other pages' words stay, and so does a page made since. An address going back rides
+// `prev_slug` like any rename, so the server's forwards follow the page.
+const undoPageMeta = ({ blocks, prev_slug, ...meta }) => undoClone(meta);
+// Stored JSON comes back with its keys reordered, so sections compare by content.
+const undoSections = (p) => JSON.stringify(p.blocks || [], (k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v));
+function undoPagesPlan({ pages, ...rest }) {
+  const was = dcPagesArr(), kept = new Set(), changes = [];
+  const whole = (p, before, after) => ({ before, after, page: undoClone(p), sections: undoSections(p) });
+  pages.forEach((p) => {
+    const old = was.find((x) => x.slug === (p.prev_slug || p.slug));
+    if (!old) { changes.push(whole(p, null, undoPageMeta(p))); return; }
+    kept.add(old);
+    const before = undoPageMeta(old), after = undoPageMeta(p);
+    if (JSON.stringify(before) !== JSON.stringify(after)) changes.push({ before, after });
+  });
+  was.forEach((p) => { if (!kept.has(p)) changes.push(whole(p, undoPageMeta(p), null)); });
+  return { kind: "pages", route: "/settings", changes,
+    order: { before: was.map((p) => p.slug), after: pages.map((p) => p.slug) },
+    rest: { before: undoPick(S.settings, Object.keys(rest)), after: undoClone(rest) } };
+}
+// Taking a page off is a delete, so if it holds words the step didn't put there it gets a
+// delete's question and safety point, and Redo brings it back as it was. False = they said no.
+async function undoPagesAsk(rec, from, to) {
+  for (const c of rec.changes) {
+    const p = !c[to] && dcPageObj(c[from].slug);
+    if (!p || undoSections(p) === c.sections) continue;
+    const title = p.title || p.slug;
+    if (!confirm("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.")) return false;
+    try { await api("POST", "/publishes/checkpoints", { name: ("Before removing “" + title + "”").slice(0, 80) }); } catch (_) {}
+  }
+  return true;
+}
+// The write that moves a page step from one side to the other, built from the saved list.
+function undoPagesBody(rec, from, to) {
+  const list = dcPagesArr().slice();
+  for (const c of rec.changes) {
+    const at = c[from] ? list.findIndex((p) => p.slug === c[from].slug) : -1;
+    if (c[to] && list.some((p, i) => p.slug === c[to].slug && i !== at)) throw new Error("Another page uses that address now. Rename it, then try again.");
+    if (c[from] && at < 0) continue;
+    if (!c[to]) { c.page = list[at]; list.splice(at, 1); }
+    else if (!c[from]) list.push({ ...c[to], blocks: c.page.blocks });
+    else list[at] = { ...c[to], blocks: list[at].blocks, ...(c[from].slug !== c[to].slug ? { prev_slug: c[from].slug } : {}) };
+  }
+  // only the pages this step knows about move, and they share the places they already hold
+  const want = rec.order[to], placed = list.filter((p) => want.includes(p.slug)).sort((a, b) => want.indexOf(a.slug) - want.indexOf(b.slug));
+  return { ...rec.rest[to], pages: list.map((p) => (want.includes(p.slug) ? placed.shift() : p)) };
+}
 function undoPlan(method, route, body) {
   if (UNDO_QUIET) return null;
   const path = String(route).split("?")[0];
   if (method === "PUT" && body) {
+    if (path === "/settings" && Array.isArray(body.pages)) return undoPagesPlan(body);
     const state = { "/identity": S.identity, "/location": S.location, "/settings": S.settings, "/bookings/settings": typeof BK !== "undefined" ? BK.settings : null }[path];
     if (state !== undefined) {
       const before = UNDO_BEFORE || undoPick(state, Object.keys(body));
@@ -7859,7 +8242,18 @@ async function undoStep(rec, dir) {
   const back = dir === "undo";
   whisper("topWhisper", "saving");
   try {
-    if (rec.kind === "put") {
+    if (rec.kind === "pages") {
+      const from = back ? "after" : "before", to = back ? "before" : "after";
+      // Saves reach the list first and the question comes before the write, so neither sits
+      // inside a turn. The list itself is built when the turn comes, from what the last write left.
+      if (!(await dcSavePendingEdits()) || !(await undoPagesAsk(rec, from, to))) { whisper("topWhisper", ""); return false; }
+      await settingsTurn(() => {
+        const vals = undoPagesBody(rec, from, to);
+        UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--;
+        return call.then((r) => undoSync(rec, vals, r));
+      });
+      if (DC_PAGE && !dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
+    } else if (rec.kind === "put") {
       const vals = back ? rec.before : rec.after;
       const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
       await (rec.route === "/settings" ? settingsTurn(put) : put());
@@ -7889,7 +8283,9 @@ async function undoSync(rec, vals, r) {
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
-    BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap();
+    const moved = rec.kind === "pages" && DC_PAGE && vals.pages.find((p) => p.prev_slug === DC_PAGE);
+    if (moved) DC_PAGE = moved.slug;   // the next write finds this page under its address
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); }   // words typed during that write stay, and save next
     if ($("blocksCard")) renderBlocksCard();
     renderPagesBar();
     if ($("formsCard")) formsLoad();
@@ -7906,8 +8302,8 @@ function dcUndo() {
   const top = DC_UNDO.pop();
   if (typeof top !== "string") {
     DC_REDO.push(top); updateUndoButtons();
-    undoRun(top, "undo").then((ok) => { if (!ok) { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
-    toast("Undone"); return;
+    undoRun(top, "undo").then((ok) => { if (ok) toast("Undone"); else { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
+    return;
   }
   DC_REDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
   dcApplyHistory(top); toast("Undone");
@@ -7917,8 +8313,8 @@ function dcRedo() {
   const top = DC_REDO.pop();
   if (typeof top !== "string") {
     DC_UNDO.push(top); updateUndoButtons();
-    undoRun(top, "redo").then((ok) => { if (!ok) { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
-    toast("Redone"); return;
+    undoRun(top, "redo").then((ok) => { if (ok) toast("Redone"); else { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
+    return;
   }
   DC_UNDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
   dcApplyHistory(top); toast("Redone");
@@ -9361,17 +9757,19 @@ async function putForms() {
   let r;
   if (FORMS_PAGE) {
     const pages = dcPagesArr().map((p) => (p && p.slug === FORMS_PAGE ? { ...p, blocks: next } : p));
-    r = await api("PUT", "/settings", { pages });
+    UNDO_QUIET++; const put = api("PUT", "/settings", { pages }); UNDO_QUIET--;   // a form is a section: it gets a snapshot like the others, below
+    r = await put;
     S.settings = r.data || { ...S.settings, pages };
   } else {
-    r = await api("PUT", "/settings", { blocks: next });
+    UNDO_QUIET++; const put = api("PUT", "/settings", { blocks: next }); UNDO_QUIET--;
+    r = await put;
     S.settings = r.data || { ...S.settings, blocks: next };
   }
   // Keep the content-block editor in sync. A section edit made while this was out is newer
   // than what came back: it stays, with the form change under it, and saves next.
   if (typeof BLOCKS_WORK !== "undefined") {
-    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }
-    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
+    if (!blocksDirty()) { BLOCKS_WORK = currentBlocks(); if (FORMS_PAGE === DC_PAGE) dcHistoryRecord(); dcHistoryCommit(); }
+    else if (FORMS_PAGE === DC_PAGE) { BLOCKS_WORK = JSON.parse(JSON.stringify(withForms(BLOCKS_WORK))); dcHistoryRecord(); DC_HIST_LAST = sentList; updateUndoButtons(); blocksSaveSoon(); }
   }
   const ae = document.activeElement;
   if (JSON.stringify(FORMS_WORK) !== sentForms) { FORMS_BASE = sentForms; formsSaveSoon(); }   // newer edits than what came back: keep them, save them next
@@ -9594,7 +9992,7 @@ async function mountLookCard() {
   const b = el("button", null, "Try another template →");
   b.type = "button";
   b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  b.addEventListener("click", () => openPreview("draft"));
+  b.addEventListener("click", () => { TG_OPEN = true; renderTemplateGallery(); const g = $("designGallery"); if (g) g.scrollIntoView({ block: "nearest" }); });
   card.appendChild(b);
   host.appendChild(card);
 }
@@ -9643,12 +10041,12 @@ function dcModeSync() {
     b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
   });
   const canvas = $("designCanvas");
-  if (canvas) canvas.classList.toggle("dc-mode-view", DC_MODE === "preview" || DC_MODE === "timewarp");
-  const dv = $("view-design"); if (dv) dv.classList.toggle("dc-mode-view", DC_MODE === "preview" || DC_MODE === "timewarp");
+  if (canvas) canvas.classList.toggle("dc-mode-view", DC_MODE === "timewarp");
+  const dv = $("view-design"); if (dv) dv.classList.toggle("dc-mode-view", DC_MODE === "timewarp");
   const tw = $("dcTwBar"); if (tw) tw.hidden = DC_MODE !== "timewarp";
 }
 async function dcSetMode(mode) {
-  mode = ["edit", "preview", "comments", "timewarp"].indexOf(mode) >= 0 ? mode : "edit";
+  mode = ["edit", "comments", "timewarp"].indexOf(mode) >= 0 ? mode : "edit";
   if (mode === DC_MODE) { if (mode === "comments") dcSetMode("edit"); return; }   // Comments keeps its G11 toggle-off
   if (IPE) ipeCommit();   // G13 slice 2: leaving Edit banks the in-flight text
   const prev = DC_MODE;
@@ -9665,8 +10063,8 @@ async function dcSetMode(mode) {
     if (DC_MODE !== "comments") { if (CM_ON) cmToggle(); }   // user left while threads loaded — run the OFF path
     else if (!CM_ON) { DC_MODE = "edit"; dcModeSync(); }     // load failed (cmToggle toasted) — fall back honestly
   }
-  const wasView = prev === "preview" || prev === "timewarp";
-  const isView = DC_MODE === "preview" || DC_MODE === "timewarp";
+  const wasView = prev === "timewarp";
+  const isView = DC_MODE === "timewarp";
   if (isView) closeDesignPanels();   // view modes read like a visitor — no editing panels over them
   // Reload the frame only when crossing the editing/viewing boundary (the load
   // handler injects chrome in Edit/Comments, withholds it in Preview/Timewarp) —
@@ -9836,7 +10234,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
     if (!(e.ctrlKey || e.metaKey)) return;
     if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;   // nothing to undo behind these
     const dv = $("view-design");
-    if (dv && dv.classList.contains("on") && (DC_MODE === "preview" || DC_MODE === "timewarp")) return;   // view modes are read-only — no blind undo
+    if (dv && dv.classList.contains("on") && DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
     const k = (e.key || "").toLowerCase();
     if (k === "z" && !e.shiftKey) { e.preventDefault(); dcUndo(); }
@@ -9845,7 +10243,8 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add")); on("tabFiles", () => dcRailTab("files"));
   on("btnSettingsOpen", () => openSettingsPanel("styles")); on("btnSettingsClose", closeDesignPanels);
-  on("btnNavEdit", dcEditNav);
+  on("btnNavEdit", () => go("pages"));
+  on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
   // re-homed — same id, same cmToggle machinery, driven through dcSetMode).
@@ -9869,9 +10268,8 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
 
 // ── #1 — template-first, big-preview gallery ────────────────────────────────
 // Full-width row of LARGE, realistic previews (the real /preview render, scaled).
-// One clear action per card: "Start with this" → the EXISTING PUT /site/template
-// apply path (same as the stage's "Use this look"). Re-dressing / fine styling is
-// the SECONDARY action ("Change the look" → the Design studio card).
+// One clear action per card: "Start with this" → PUT /site/template, or Preview to
+// see it full size first. Fine styling is the card below ("Colors and fonts").
 async function mountTemplateGallery() {
   const host = $("designGallery"); if (!host) return;
   try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
@@ -9936,6 +10334,11 @@ function drawTemplateGrid(fold, curSlug) {
     if (active) { start.disabled = true; }
     else start.addEventListener("click", () => applyTemplateFromGallery(t));
     act.appendChild(start);
+    if (!active) {
+      const tryIt = el("button", "tg-try", "Preview"); tryIt.type = "button"; tryIt.setAttribute("aria-label", "Preview " + t.name);
+      tryIt.addEventListener("click", async () => { if (await dcSavePendingEdits()) openPreview("draft", { template: t.slug }); });
+      act.appendChild(tryIt);
+    }
     body.appendChild(act);
     card.appendChild(body);
     grid.appendChild(card);
@@ -9993,6 +10396,7 @@ async function applyTemplateFromGallery(t) {
   if (!Array.isArray(BLOCKS_WORK)) BLOCKS_WORK = currentBlocks();
   // Non-destructive: switching template keeps content — it re-lays-out + re-styles.
   const hasContent = (BLOCKS_WORK && BLOCKS_WORK.length) || (S.offerings || []).length || (S.identity && S.identity.business_name);
+  const wasWords = vocabWords();
   if (hasContent && !confirm("Start with the “" + t.name + "” template? Your words stay exactly as they are — only the layout and styling change. Nothing goes live until you publish.")) return;
   try {
     const r = await api("PUT", "/site/template", { slug: t.slug });
@@ -10005,9 +10409,10 @@ async function applyTemplateFromGallery(t) {
     if (!hasContent) { try { seeded = await seedStarterIfEmpty(); } catch (_) {} }
     LOOKS = (await api("GET", "/site/templates")).data;
     renderTemplateGallery();
-    // re-dress the Design studio + refresh both proofs, exactly like "Use this look"
+    // re-dress the styles card + refresh the canvas
     const dc = $("designCard"); if (dc) { dc.remove(); mountDesignCard(); }
     if (typeof applyVocab === "function") applyVocab();
+    await pgFollowOffering(wasWords);
     scheduleChangesRefresh(); refreshDesignPreview();
     toast(seeded
       ? "Started on the " + (r.data && r.data.name ? r.data.name : t.name) + " template with a ready-made layout — edit any section, drag to reorder, then publish"
@@ -11834,7 +12239,7 @@ function dcInjectCanvas(doc, main) {
     if (navEl && !navEl.hasAttribute("data-navedit")) {
       navEl.setAttribute("data-navedit", "1");
       navEl.style.cursor = "pointer"; navEl.title = "Click to edit your menu (shown on every page)";
-      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); dcEditNav(); }, true);
+      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); go("pages"); }, true);
     }
   } catch (_) {}
   dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
@@ -12083,7 +12488,7 @@ function dcTreeSelect(el2, row) {
     // simply never called; the page scrolls, links/forms are guarded read-only.
     // This runs BEFORE the #main check: even a document without the landmark (an
     // error page, an old kept version) must get the nav guard and the right class.
-    if (DC_MODE === "preview" || DC_MODE === "timewarp") {
+    if (DC_MODE === "timewarp") {
       if (wrap) { wrap.classList.remove("dc-live"); wrap.classList.add("dc-view"); }
       dcGuardViewNav(doc);
       return;
@@ -12128,10 +12533,12 @@ function dcTreeSelect(el2, row) {
 });
 // ── Phase O: industry selector — drives the template's vocabulary + schema ──
 $("f-industry").addEventListener("change", async () => {
-  const sel = $("f-industry");
+  const sel = $("f-industry"), was = vocabWords();
   try {
     await settingsPut({ industry_key: sel.value });
     toast("Saved — your site uses the right words when you next publish");
+    applyVocab(); renderPagesBar();
+    await pgFollowOffering(was);
     scheduleChangesRefresh();
   } catch (err) { toast(nice(err), true); }
 });

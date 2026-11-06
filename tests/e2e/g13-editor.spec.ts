@@ -389,9 +389,9 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(puts.length).toBe(0);
   });
 
-  test('Edit mode is the gate: Preview mode never edits in place', async ({ page }) => {
+  test('Edit mode is the gate: a read-only mode never edits in place', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
-    await page.locator('#dcModeSeg button[data-dcmode="preview"]').click();
+    await page.evaluate(() => (window as any).dcSetMode('timewarp'));
     await expect(frame.locator('#main > section').first()).toBeVisible();  // the view-mode repaint landed
     await frame.locator('section.block-titleonly [data-dds-field="title"]').dblclick();
     await page.waitForTimeout(400);
@@ -857,6 +857,18 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit on about');
   });
 
+  test('Moving it on the Pages tab while that page\'s save is out keeps the edit', async ({ page }) => {
+    const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
+    const { sent, release } = await aboutSaveOut(page, frame);
+    await page.evaluate(() => (window as any).go('pages'));
+    await page.getByRole('button', { name: /^Move About/ }).first().focus();
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(300);
+    release();
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
+    expect((sent[1] as any).nav.length).toBeGreaterThan(0);
+  });
+
   test('Rename while that page\'s save is out keeps the edit', async ({ page }) => {
     const { frame } = await mountPages(page);
     const { sent, release } = await aboutSaveOut(page, frame);
@@ -895,6 +907,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const { frame } = await mountPages(page, '', [{ ...PAGED.pages[0], blocks: [...ABOUT_BLOCKS, FORM] }]);
     const { sent, release } = await aboutSaveOut(page, frame);
     await page.evaluate(() => (window as unknown as { openSettingsPanel: (m: string) => void }).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();     // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     await title.fill('Write to us');
     await title.blur();
@@ -1714,5 +1727,295 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings', '/settings']);
     expect(v.landed).toEqual([]);
     expect(draft.nav).toBeUndefined();
+  });
+
+  // ── Nov 2026: a page-menu step keeps what it changed, not the whole page list. Section
+  // saves aren't steps and their snapshots go with the page, so a kept list goes stale:
+  // taking the step back used to put every page's sections back as they were then. ──
+  const undo = (page: Page) => page.evaluate(() => (window as unknown as { dcUndo: () => void }).dcUndo());
+  const redo = (page: Page) => page.evaluate(() => (window as unknown as { dcRedo: () => void }).dcRedo());
+  const pageIn = (put: Paged, slug: string) => put.pages?.find((p) => p.slug === slug);
+  const lastPut = (puts: Mounted['puts']) => puts[puts.length - 1] as Paged;
+  // Words on About, saved, then off the page: About's snapshots go, the page step stays on top.
+  async function writeOnAboutAndLeave(page: Page, frame: Frame, puts: Mounted['puts']) {
+    const before = puts.length;
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Written since');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await pill(page, 'Home').locator('.pp-name').click();
+    await expect(onPill(page)).toHaveText('Home');
+  }
+  async function renameContact(page: Page) {
+    await pageMenu(page, 'Contact', 'Rename');
+    await page.locator('dialog input').fill('Help');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.locator('dialog input').fill('help');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(pill(page, 'Help')).toBeVisible();
+  }
+  const WITH_CONTACT = [...PAGED.pages, CONTACT];
+
+  test('Undo and Redo of Hide from menu keep the words written since', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Hide from menu');
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await writeOnAboutAndLeave(page, frame, puts);
+    await undo(page);
+    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    expect(pageIn(lastPut(puts), 'contact')?.hideNav).toBeUndefined();
+    await redo(page);
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    expect(pageIn(lastPut(puts), 'contact')?.hideNav).toBe(true);
+  });
+
+  test('Undo and Redo of Move keep the words written since', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await pageMenu(page, 'About', 'Move right');
+    await expect.poll(() => lastPut(puts)?.pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
+    await writeOnAboutAndLeave(page, frame, puts);
+    const count = puts.length;
+    await undo(page);
+    await expect.poll(() => puts.length).toBe(count + 1);
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'contact']);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await redo(page);
+    await expect.poll(() => puts.length).toBe(count + 2);
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+  });
+
+  test('Undo and Redo of Rename keep the words, and each is a rename the server can forward', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await page.evaluate(() => (0, eval)('S.settings.nav = [{ label: "Contact", href: "/contact/" }]'));
+    await renameContact(page);
+    await writeOnAboutAndLeave(page, frame, puts);
+    await undo(page);
+    await expect(pill(page, 'Contact')).toBeVisible();
+    const undone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
+    expect(pageIn(undone, 'contact')).toMatchObject({ title: 'Contact', prev_slug: 'help', blocks: CONTACT.blocks });
+    expect(undone.nav?.[0].href).toBe('/contact/');
+    expect(aboutIn(undone)?.blocks[0].subtitle).toBe('Written since');
+    await redo(page);
+    await expect(pill(page, 'Help')).toBeVisible();
+    const redone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
+    expect(pageIn(redone, 'help')).toMatchObject({ title: 'Help', prev_slug: 'contact', blocks: CONTACT.blocks });
+    expect(redone.nav?.[0].href).toBe('/help/');
+    expect(aboutIn(redone)?.blocks[0].subtitle).toBe('Written since');
+  });
+
+  test('Undo of a Rename on the page being edited stays on that page, and the next edit lands on it', async ({ page }) => {
+    const { frame, puts } = await mountPages(page);
+    await openAbout(page, frame);
+    await pageMenu(page, 'About', 'Rename');
+    await page.locator('dialog input').fill('Our story');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.locator('dialog input').fill('our-story');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(onPill(page)).toHaveText('Our story');
+    await undo(page);
+    await expect(onPill(page)).toHaveText('About');
+    await expect(frame.locator('#about-us')).toBeAttached();
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+    const count = puts.length;
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Back on about');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(count + 1);
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Back on about');
+  });
+
+  test('Undo of Delete puts the page back where it was, as it was, and leaves other pages\' words alone', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', [CONTACT, ...PAGED.pages]);
+    page.on('dialog', (d) => d.accept());
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Delete page');
+    await expect(pill(page, 'Contact')).toHaveCount(0);
+    await writeOnAboutAndLeave(page, frame, puts);
+    await undo(page);
+    await expect(pill(page, 'Contact')).toBeVisible();
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
+    expect(pageIn(lastPut(puts), 'contact')?.blocks).toEqual(CONTACT.blocks);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await redo(page);
+    await expect(pill(page, 'Contact')).toHaveCount(0);
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
+    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+  });
+
+  // ＋ Page with a blank layout, leaving the person on the new page.
+  async function addGallery(page: Page) {
+    await page.locator('#pagesBar .page-add').click();
+    await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
+    await page.getByRole('button', { name: 'Next: pick a layout' }).click();
+    await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
+    await expect(onPill(page)).toHaveText('Gallery');
+  }
+
+  test('Undo of ＋ Page with nothing on it takes the page away without asking, and moves off it', async ({ page }) => {
+    const { puts } = await mountPages(page);
+    const asked: string[] = [];
+    page.on('dialog', (d) => { asked.push(d.message()); return d.accept(); });
+    await addGallery(page);
+    await undo(page);
+    await expect(pill(page, 'Gallery')).toHaveCount(0);
+    await expect(onPill(page)).toHaveText('Home');
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
+    expect(asked).toEqual([]);
+    await redo(page);
+    await expect(pill(page, 'Gallery')).toBeVisible();
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'gallery']);
+  });
+
+  test('Undo of ＋ Page asks first once the page has words on it; no keeps them, yes keeps a way back', async ({ page }) => {
+    const { puts } = await mountPages(page);
+    const checkpoints: string[] = [];
+    await page.route('**/functions/v1/presence/publishes/checkpoints**', (route: Route) => {
+      checkpoints.push((route.request().postDataJSON() as { name: string }).name);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
+    });
+    let answer = false; const asked: string[] = [];
+    page.on('dialog', (d) => { asked.push(d.message()); return answer ? d.accept() : d.dismiss(); });
+    await addGallery(page);
+    await page.evaluate(() => (0, eval)('BLOCKS_WORK = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; saveBlocks()'));
+    await expect.poll(() => pageIn(lastPut(puts), 'gallery')?.blocks.length).toBe(1);
+    await pill(page, 'Home').locator('.pp-name').click();
+    await expect(onPill(page)).toHaveText('Home');
+    const count = puts.length;
+    await undo(page);
+    await expect.poll(() => asked.length).toBe(1);
+    expect(asked[0]).toContain('Gallery');
+    await page.waitForTimeout(300);
+    expect(puts.length).toBe(count);                               // no: nothing was written
+    await expect(pill(page, 'Gallery')).toBeVisible();
+    answer = true;
+    await undo(page);                                              // and the step is still there to take
+    await expect(pill(page, 'Gallery')).toHaveCount(0);
+    expect(asked.length).toBe(2);
+    expect(checkpoints).toEqual(['Before removing “Gallery”']);
+    await redo(page);
+    await expect(pill(page, 'Gallery')).toBeVisible();
+    expect(pageIn(lastPut(puts), 'gallery')?.blocks[0].subtitle).toBe('Written on the new page');
+    expect(asked.length).toBe(2);
+  });
+
+  test('Undo of a step leaves a page made since by Duplicate on the list', async ({ page }) => {
+    const { frame, puts, draft } = await mountPages(page, '', WITH_CONTACT);
+    await page.route('**/functions/v1/presence/pages/duplicate**', (route: Route) => {
+      draft.pages = [...WITH_CONTACT.slice(0, 1), { slug: 'about-copy', title: 'About copy', blocks: ABOUT_BLOCKS }, ...(draft.pages as unknown[]).slice(1)];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { slug: 'about-copy', title: 'About copy', pages: draft.pages } }) });
+    });
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Hide from menu');
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await pageMenu(page, 'About', 'Duplicate page');
+    await expect(onPill(page)).toHaveText('About copy');
+    await undo(page);
+    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'about-copy', 'contact']);
+    await expect(onPill(page)).toHaveText('About copy');
+  });
+
+  test('Undo that would give a page an address now in use says so and writes nothing', async ({ page }) => {
+    const { frame, puts, draft } = await mountPages(page, '', WITH_CONTACT);
+    await page.route('**/functions/v1/presence/pages/duplicate**', (route: Route) => {
+      draft.pages = [...(draft.pages as unknown[]), { ...CONTACT, title: 'Contact copy' }];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { slug: 'contact', title: 'Contact copy', pages: draft.pages } }) });
+    });
+    await openAbout(page, frame);
+    await renameContact(page);
+    await pageMenu(page, 'About', 'Duplicate page');
+    await expect(onPill(page)).toHaveText('Contact copy');
+    const count = puts.length;
+    await undo(page);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Another page uses that address' }).first()).toBeVisible();
+    expect(puts.length).toBe(count);
+    await expect(pill(page, 'Help')).toBeVisible();
+  });
+
+  test('words typed while an Undo is on its way are kept, and saved after it', async ({ page }) => {
+    const { frame } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Hide from menu');
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    const { sent, release } = await holdPuts(page);
+    await undo(page);
+    await expect.poll(() => sent.length).toBe(1);
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Typed during the undo');
+    await page.keyboard.press('Enter');                            // the commit's debounce runs past the release
+    release();
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
+    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Typed during the undo');
+    expect(pageIn(sent[1], 'contact')?.hideNav).toBeUndefined();
+  });
+
+  test('Undo while a section save is out waits for it, and its list carries those words', async ({ page }) => {
+    const { frame } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Hide from menu');
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    const { sent, release } = await holdPuts(page);
+    await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'On its way');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
+    await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
+    await page.waitForTimeout(200);
+    release();
+    await expect(onPill(page)).toHaveText('Home');
+    await undo(page);
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
+    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('On its way');
+    expect(pageIn(sent[1], 'contact')?.hideNav).toBeUndefined();
+  });
+
+  test('Undo while another page write is out keeps that write: its list is built when its turn comes', async ({ page }) => {
+    const { frame } = await mountPages(page, '', WITH_CONTACT);
+    await openAbout(page, frame);
+    await pageMenu(page, 'Contact', 'Hide from menu');
+    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    const { sent, release } = await holdPuts(page);
+    await pageMenu(page, 'About', 'Hide from menu');
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
+    await undo(page);                                              // takes back the Contact hide, the last step to land
+    await page.waitForTimeout(300);
+    expect(sent.length).toBe(1);                                   // it waits its turn
+    release();
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
+    expect(aboutIn(sent[1])?.hideNav).toBe(true);
+    expect(pageIn(sent[1], 'contact')?.hideNav).toBeUndefined();
+    await expect(pill(page, 'About')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+  });
+
+  test('a form save is a section edit: its Undo takes back the form, and leaving the page leaves later words safe', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', [{ ...PAGED.pages[0], blocks: [...ABOUT_BLOCKS, FORM] }]);
+    type Saved = Array<{ title: string; subtitle?: string }>;
+    await openAbout(page, frame);
+    await page.evaluate(() => (window as unknown as { openSettingsPanel: (m: string) => void }).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();     // the panel takes the focus 40ms after it opens
+    const title = page.locator('#formsCard input[placeholder="Form title"]').first();
+    await title.fill('Write to us');
+    await title.blur();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[1].title).toBe('Write to us');
+    await undo(page);                                              // right away, it takes back the form
+    await expect.poll(() => puts.length).toBe(2);
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[1].title).toBe('Say hello');
+    await expect(title).toHaveValue('Say hello');                  // and the card shows what's saved now
+    await redo(page);
+    await expect.poll(() => puts.length).toBe(3);
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[1].title).toBe('Write to us');
+    await page.keyboard.press('Escape');
+    await writeOnAboutAndLeave(page, frame, puts);
+    const count = puts.length;
+    await undo(page);                                              // off the page, it's gone with the page's snapshots
+    await page.waitForTimeout(300);
+    expect(puts.length).toBe(count);
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[0].subtitle).toBe('Written since');
   });
 });

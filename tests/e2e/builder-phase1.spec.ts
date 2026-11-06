@@ -436,8 +436,6 @@ test.describe('what a real site showed', () => {
     await frame.locator('[data-dds-sid="richtext"]').waitFor();
     await expect(frame.locator('#dds-dc-style')).toHaveCount(1);
     await expect(frame.locator('#presence-preview-badge')).toBeHidden();
-    await page.locator('#dcModeSeg button[data-dcmode="preview"]').click();
-    await expect(frame.locator('#presence-preview-badge')).toBeVisible();
   });
 
   test('double-clicking a core section says where its words live, and stays in Edit mode', async ({ page }) => {
@@ -589,6 +587,7 @@ test.describe('nothing typed gets lost', () => {
     await settle(page);
     await holdNextSave(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
@@ -612,6 +611,7 @@ test.describe('nothing typed gets lost', () => {
     await settle(page);
     await holdNextSave(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
@@ -628,6 +628,7 @@ test.describe('nothing typed gets lost', () => {
     const writes = await mount(page, '/presence.html#design', WITH_FORM);
     await settle(page);
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
+    await expect(page.locator('#btnSettingsClose')).toBeFocused();   // the panel takes the focus 40ms after it opens
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     await title.fill('Say hello');
     await title.blur();

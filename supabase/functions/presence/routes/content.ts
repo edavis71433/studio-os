@@ -405,11 +405,17 @@ async function redirectsForRenames(site: SiteRow, principal: Principal, renames:
     let liveSlugs: Set<string> | null = null;   // null = never published → skip every forward
     if (snapId) {
       const s = await svc(`presence_snapshots?id=eq.${snapId}&site_id=eq.${site.id}&select=content&limit=1`);
-      const livePages = s.json?.[0]?.content?.settings?.pages;
+      const live = s.json?.[0]?.content;
+      const livePages = live?.settings?.pages, liveForwards = live?.redirects;
       liveSlugs = new Set(Array.isArray(livePages) ? livePages.map((p: { slug?: unknown }) => String(p?.slug ?? '')) : []);
+      // a live forward answers at its old address too, so it counts as being on the live site
+      if (Array.isArray(liveForwards)) for (const f of liveForwards) liveSlugs.add(String(f?.from_path ?? '').replace(/^\/|\/$/g, ''));
     }
     for (const rn of renames.slice(0, 5)) {
       const from = `/${rn.from}/`, to = `/${rn.to}/`;
+      // A rename taken back left a forward away from this address, which is the page's
+      // again. Publishing would write it over the page, and the next line would point it at itself.
+      await svc(`presence_redirects?site_id=eq.${site.id}&from_path=eq.${encodeURIComponent(to)}&to_path=eq.${encodeURIComponent(from)}`, { method: 'DELETE' });
       // reference adjust: forwards that landed on the old address follow the page (no chains)
       await svc(`presence_redirects?site_id=eq.${site.id}&to_path=eq.${encodeURIComponent(from)}`, { method: 'PATCH', body: JSON.stringify({ to_path: to }) });
       if (!liveSlugs || !liveSlugs.has(rn.from)) continue;   // never live under the old address → no forward needed
