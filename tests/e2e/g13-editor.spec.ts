@@ -1480,4 +1480,239 @@ test.describe('G13 in-place canvas text editor', () => {
     releases[1]();
     await expect(homeLine(frame)).toHaveText('Second edit');
   });
+
+  // ── Nov 2026: the draft version a write names. The server hashes the whole draft, so a
+  // write landing moves the version whichever route it came by. This is its check
+  // (guardStaleDraft): a write naming a version the draft has left is a 409, and a write
+  // naming none isn't checked. Registered after mountPages, so it sees a PUT before the
+  // store does; holdPuts registered before it holds the answer of a write that has landed,
+  // and registered after it holds the write on its way there. ──
+  async function draftVersion(page: Page) {
+    const v = {
+      hash: 'e2e-draft-hash', reads: 0, refused: [] as string[], landed: [] as string[], business: {} as Record<string, unknown>,
+      slowAnswer: null as Promise<void> | null,   // the next /identity lands, and its answer waits for this
+      slowRead: null as Promise<void> | null,     // the next /changes reads the version, and its answer waits for this
+      someoneElse() { v.hash += '-theirs'; },
+    };
+    const refused = (route: Route, path: string) => {
+      const named = route.request().headers()['if-match'];
+      if (!named || named === v.hash) return false;
+      v.refused.push(path);
+      void route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'stale_draft', current_hash: v.hash, last_change: null }) });
+      return true;
+    };
+    const landed = (path: string) => { v.hash += '+'; v.landed.push(path); };
+    await page.route('**/functions/v1/presence/changes**', async (route: Route) => {
+      v.reads++;
+      const body = JSON.stringify({ data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: v.hash } });
+      const slow = v.slowRead; v.slowRead = null;
+      if (slow) await slow;
+      await route.fulfill({ status: 200, contentType: 'application/json', body });
+    });
+    await page.route('**/functions/v1/presence/settings**', (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      if (refused(route, '/settings')) return;
+      landed('/settings');
+      return route.fallback();
+    });
+    await page.route('**/functions/v1/presence/identity**', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      if (refused(route, '/identity')) return;
+      landed('/identity');
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      Object.assign(v.business, body);
+      const slow = v.slowAnswer; v.slowAnswer = null;
+      if (slow) await slow;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: v.business }) });
+    });
+    return v;
+  }
+  const blocksIn = (draft: Record<string, unknown>) => draft.blocks as typeof BLOCKS;
+  const refusal = (page: Page) => page.getByText('changed by someone else');   // a section save's toast, or the shell's for any other write
+  const editHome = async (page: Page, frame: Frame, text: string) => {
+    await typeOver(page, homeLine(frame), text);
+    await page.keyboard.press('Enter');
+  };
+  // Typing into a Business details field, then waiting past its 0.7s debounce.
+  const typeDetail = async (page: Page, id: string, text: string) => {
+    await page.locator(id).fill(text);
+    await page.waitForTimeout(1000);
+  };
+  const openBusiness = (page: Page) => page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('business'));
+  const duplicate = (page: Page) => page.evaluate(() => (window as unknown as { dcDuplicate: (bi: number) => void }).dcDuplicate(0));
+
+  test('a business detail typed while a section save\'s answer is on its way isn\'t refused', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const held = await holdPuts(page);
+    const v = await draftVersion(page);                            // the save lands, and only its answer is slow
+    await editHome(page, frame, 'My section words');
+    await expect.poll(() => held.sent.length, { timeout: 6000 }).toBe(1);
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'My tagline');
+    held.release();
+    await expect.poll(() => v.business.tagline, { timeout: 6000 }).toBe('My tagline');
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+    expect(blocksIn(draft)[0].subtitle).toBe('My section words');
+  });
+
+  test('a section save slow to arrive isn\'t refused for a business detail that got there first', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const held = await holdPuts(page);                             // the save is still on its way to the server
+    await editHome(page, frame, 'My section words');
+    await expect.poll(() => held.sent.length, { timeout: 6000 }).toBe(1);
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'My tagline');
+    held.release();
+    await expect.poll(() => blocksIn(draft)[0].subtitle, { timeout: 6000 }).toBe('My section words');
+    await expect.poll(() => v.business.tagline, { timeout: 6000 }).toBe('My tagline');
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+  });
+
+  test('two business details typed one after the other on a slow connection are both saved', async ({ page }) => {
+    await mountPages(page);
+    const v = await draftVersion(page);
+    let release = () => {};
+    v.slowAnswer = new Promise<void>((r) => { release = r; });
+    await openBusiness(page);
+    await typeDetail(page, '#f-business_name', 'Marlow and Sons');
+    await typeDetail(page, '#f-tagline', 'Wine and pasta');
+    release();
+    await expect.poll(() => v.business.tagline, { timeout: 6000 }).toBe('Wine and pasta');
+    expect(v.business.business_name).toBe('Marlow and Sons');
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+  });
+
+  test('a /changes answer landing after a later write doesn\'t bring back the version from before it', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    let release = () => {};
+    v.slowRead = new Promise<void>((r) => { release = r; });
+    const reads = v.reads;
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);   // the read is out, and has read this version
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(2);
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 2);   // that write's own read has come and gone
+    await page.waitForTimeout(200);
+    release();                                                     // the older read, last
+    await page.waitForTimeout(300);
+    await duplicate(page);
+    await expect.poll(() => v.landed.length + v.refused.length, { timeout: 6000 }).toBe(3);
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+    await expect.poll(() => blocksIn(draft).length, { timeout: 6000 }).toBe(BLOCKS.length + 3);
+  });
+
+  test('Publish opened as a save lands doesn\'t refuse the next field\'s save', async ({ page }) => {
+    await mountPages(page);
+    const v = await draftVersion(page);
+    await openBusiness(page);
+    let release = () => {};
+    v.slowRead = new Promise<void>((r) => { release = r; });
+    const reads = v.reads;
+    await page.locator('#f-tagline').fill('My tagline');
+    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // the review reads the draft while that field's timer runs
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
+    await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/identity']);
+    await page.locator('#f-phone').fill('555 0100');               // its timer runs out after the review's answer is in
+    release();
+    await expect.poll(() => v.business.phone, { timeout: 6000 }).toBe('555 0100');
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+    expect(v.reads).toBeGreaterThanOrEqual(reads + 2);             // what's reviewed includes the save that landed
+  });
+
+  test('a read dropped for being late is read again, so another person\'s change is still caught', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    let release = () => {};
+    v.slowRead = new Promise<void>((r) => { release = r; });
+    const reads = v.reads;
+    await duplicate(page);
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
+    await pageMenu(page, 'About', 'Hide from menu');               // a write that doesn't ask for a read of its own
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(2);
+    await page.waitForTimeout(1500);                               // nothing else is coming to read the draft
+    expect(v.reads).toBe(reads + 1);
+    release();
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 2);
+    await page.waitForTimeout(200);
+    v.someoneElse();
+    const before = blocksIn(draft).length;
+    await duplicate(page);
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings']);
+    await expect(refusal(page)).toBeVisible();
+    expect(blocksIn(draft).length).toBe(before);
+  });
+
+  test('another person\'s change is still refused, and Load the latest lets the person carry on', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    v.someoneElse();
+    await editHome(page, frame, 'Over their change');
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings']);
+    expect(v.landed).toEqual([]);
+    expect(blocksIn(draft)[0].subtitle).toBe('A quiet sub line');
+    await expect(refusal(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Load the latest' }).click();
+    await expect(page.getByText('Loaded the latest version')).toBeVisible();
+    await duplicate(page);                                         // having loaded it, the next edit goes through
+    await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/settings']);
+    expect(v.refused).toEqual(['/settings']);
+  });
+
+  test('another person\'s change refuses a business detail waiting behind a section save too', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const held = await holdPuts(page);
+    v.someoneElse();
+    await editHome(page, frame, 'Over their change');
+    await expect.poll(() => held.sent.length, { timeout: 6000 }).toBe(1);
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'Over their tagline');
+    held.release();
+    await expect.poll(() => [...v.refused].sort(), { timeout: 6000 }).toEqual(['/identity', '/settings']);
+    expect(v.landed).toEqual([]);
+    expect(v.business).toEqual({});
+    expect(blocksIn(draft)[0].subtitle).toBe('A quiet sub line');
+  });
+
+  test('a read answered while a write is out doesn\'t let the write behind it through', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const held = await holdPuts(page);
+    v.someoneElse();
+    await editHome(page, frame, 'Over their change');
+    await expect.poll(() => held.sent.length, { timeout: 6000 }).toBe(1);
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'Over their tagline');
+    const reads = v.reads;
+    await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('today'));   // reads the draft as it stands, their change and all
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBeGreaterThan(reads);
+    await page.waitForTimeout(200);
+    held.release();
+    await expect.poll(() => [...v.refused].sort(), { timeout: 6000 }).toEqual(['/identity', '/settings']);
+    expect(v.business).toEqual({});
+    expect(blocksIn(draft)[0].subtitle).toBe('A quiet sub line');
+  });
+
+  test('a menu edit waiting behind a refused save is refused too, not let through on the new version', async ({ page }) => {
+    const { frame, draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const held = await holdPuts(page);
+    v.someoneElse();
+    await editHome(page, frame, 'Over their change');
+    await expect.poll(() => held.sent.length, { timeout: 6000 }).toBe(1);
+    await page.evaluate(() => { (window as unknown as { dcSaveNav: (n: unknown[]) => void }).dcSaveNav([{ label: 'Home', href: '/' }]); });
+    await page.waitForTimeout(200);
+    held.release();
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings', '/settings']);
+    expect(v.landed).toEqual([]);
+    expect(draft.nav).toBeUndefined();
+  });
 });

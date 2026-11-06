@@ -87,7 +87,14 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
 
   const html = read('presence.html');
   ok('wiring: the editor sends If-Match through the ONE shared api() helper', /If-Match.*S\.draftHash/.test(html));
-  ok('wiring: the editor handles a stale_draft 409 (reload latest, never overwrite)', /error === "stale_draft"/.test(html) && /S\.draftHash = \(j && j\.current_hash\)/.test(html));
+  ok('wiring: the editor handles a stale_draft 409 (reload latest, never overwrite)', /error === "stale_draft"/.test(html) && /scheduleChangesRefresh\(\);\s+const lc = j\.last_change/.test(html));
+  // a write waiting behind a refused one was built without the other person's change
+  ok('wiring: a refusal doesn\'t hand the page the new version', !/S\.draftHash = \(j && j\.current_hash\)/.test(html));
+  // Two writes out at once name the same version, and the first to land refuses the other
+  const line = new Function('return ' + html.match(/const DRAFT_WRITE = (\/.+\/);/)[1])();
+  for (const r of ['/settings', '/identity', '/location', '/offerings', '/offerings/1', '/faqs/1', '/testimonials/1', '/posts/1', '/pages/duplicate']) ok(`line: ${r} is checked against the version, so it waits its turn`, line.test(r));
+  for (const r of ['/media/1', '/media/upload-url', '/redirects', '/redirects/1', '/dev/customization', '/site/template', '/reviews/1/approve', '/publishes/checkpoints/1/restore', '/restore-to-draft', '/writer/drafts/1/accept']) ok(`line: ${r} moves the version, so it waits its turn`, line.test(r));
+  for (const r of ['/publish', '/writer/generate', '/editor/improve', '/concierge/ask', '/reviews/request', '/publishes/checkpoints', '/writer/drafts/1/discard', '/settings-other']) ok(`line: ${r} stays out of it`, !line.test(r));
   ok('wiring: the editor seeds + refreshes its held hash from /changes', /S\.draftHash = c\.data\.draft_hash|c\.data && c\.data\.draft_hash/.test(html));
 
   const lock = read('supabase/functions/presence/lib/optimistic_lock.ts');
