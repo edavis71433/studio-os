@@ -1899,9 +1899,27 @@ function nice(e) {
 // G7 provenance, one wording: WHO last moved the draft, in plain words. Used by
 // the 409 stale_draft message AND the Page ▾ menu's passive "Last edit" line.
 const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
+// The draft version is a hash of the whole draft, so any of these moves it, whether or
+// not the server checks that route against it. One at a time, in order: a write that goes
+// out while another is on its way names a version that one is about to move, and is
+// refused as someone else's change. Behind a write that lands, the next names no version
+// (see the end of apiSend); behind a refused one, the next names the same version and
+// hears the same. Everything else stays out of the line, so a slow ask (an AI draft) can't
+// hold up a save, and /publish still names the version that was reviewed.
+const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit\/apply|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
+let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
 async function api(method, route, body) {
   const undoRec = undoPlan(method, route, body);   // reads the state BEFORE this write
   if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
+  const send = () => apiSend(method, route, body, undoRec);
+  if (method === "GET" || !DRAFT_WRITE.test(route)) return send();
+  DRAFT_WRITES_OUT++;
+  const turn = DRAFT_LINE.then(send).finally(() => { DRAFT_WRITES_OUT--; });
+  DRAFT_LINE = turn.catch(() => {});
+  return turn;
+}
+async function apiSend(method, route, body, undoRec) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
   if (!jwt) { showGate("Please sign in", "Your room uses your usual sign-in. Sign in and come straight back.", true); throw new Error("no-session"); }
@@ -1914,15 +1932,16 @@ async function api(method, route, body) {
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
       ...(mut && S.draftHash ? { "If-Match": S.draftHash } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }).finally(() => { if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
   let j = null; try { j = JSON.parse(text); } catch {}
   if (!r.ok) {
     if (r.status === 409 && j && j.error === "stale_draft") {
       // someone else (or another tab) changed this site — say WHO when the server
       // knows (G7: the newest provenance event rides the 409), and let the user
-      // load the latest; never overwrite the newer edit.
-      S.draftHash = (j && j.current_hash) || null;
+      // load the latest; never overwrite the newer edit. The version it names isn't held
+      // yet: nothing on this page has loaded that change, and a write waiting behind this
+      // one was built without it, so it has to hear the same.
       scheduleChangesRefresh();
       const lc = j.last_change || null;
       // slice B: keep the newest provenance we've seen — the Page ▾ menu shows it
@@ -4837,9 +4856,8 @@ let HB_LOOKS_ASKED = false;
 async function loadToday() {
   loadSiteStage();
   try {
-    const [h, c] = await Promise.all([api("GET", "/health"), api("GET", "/changes")]);
+    const [h, c] = await Promise.all([api("GET", "/health"), readChanges()]);   // M9: seed the optimistic-lock version
     S.health = h.data; S.changes = c.data;
-    if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash;   // M9: seed the optimistic-lock version
     renderFactsProse();
     hbLoadBoardExtras();   // the health check and your address, for the Search tab; what happened, for Versions
     renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
@@ -5063,9 +5081,21 @@ function renderPublishButton() {
     barPub.classList.toggle("inked", $("btnPublish").classList.contains("inked"));
   }
 }
+// A read names the version the draft had when it got there. One of our writes answered
+// since it left has moved the draft on, and one still out is about to, so that version
+// would refuse our next write as someone else's change: leave it, and read again.
+async function readChanges() {
+  const answered = WRITES_ANSWERED;
+  const c = await api("GET", "/changes");
+  if (c.data && c.data.draft_hash) {
+    if (answered === WRITES_ANSWERED && !DRAFT_WRITES_OUT) S.draftHash = c.data.draft_hash;
+    else scheduleChangesRefresh();
+  }
+  return c;
+}
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await api("GET", "/changes"); S.changes = c.data; if (c.data && c.data.draft_hash) S.draftHash = c.data.draft_hash; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
       if ($("view-pages").classList.contains("on")) { renderRecent(); renderPagesList(); } }
     catch { /* quiet */ }
   }, 1200);
@@ -5489,7 +5519,10 @@ async function loadRitual(toSchedule) {
   $("ritSub").textContent = "Reading over your draft…";
   $("ritBody").innerHTML = `<div class="shimmer"></div>`; $("ritBlockers").innerHTML = ""; $("ritActions").innerHTML = "";
   try {
-    const c = (await api("GET", "/changes")).data;
+    // A save can land while this is out. Read again: what's reviewed should include it, and
+    // the version from before it would refuse the next save as someone else's change.
+    let c, answered;
+    do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);
     S.changes = c; if (c && c.draft_hash) S.draftHash = c.draft_hash;   // M9: publish exactly what you reviewed (If-Match)
     renderPublishButton();
     const body = $("ritBody"); body.innerHTML = "";
@@ -11720,7 +11753,7 @@ function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.conte
 // prompt; nothing is blocked outright.
 let IPE_SAVE_INFLIGHT = false;
 window.addEventListener('beforeunload', (e) => {
-  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
 });
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
