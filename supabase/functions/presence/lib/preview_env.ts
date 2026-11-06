@@ -10,7 +10,7 @@ import type { SnapshotContent } from './render_types.ts';
  *  motion by having none). Announced to assistive tech via role="status". */
 export function previewBadgeHtml(businessName: string): string {
   const name = String(businessName || 'this site').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] || c));
-  return `<div id="presence-preview-badge" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#3a2470;color:#fff;font:600 13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;padding:9px 16px;text-align:center;box-shadow:0 -2px 12px rgba(0,0,0,.18)">🔒 Preview of ${name} — this is not the live site. Changes appear here before you promote them to Live.</div>`;
+  return `<div id="presence-preview-badge" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#3a2470;color:#fff;font:600 13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;padding:9px 16px;text-align:center;box-shadow:0 -2px 12px rgba(0,0,0,.18)">🔒 Preview of ${name} — this is not the live site. Changes appear here before you publish them.</div>`;
 }
 
 /** Inject the preview badge before </body> in every HTML file. Pure. Idempotent
