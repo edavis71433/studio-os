@@ -25,7 +25,7 @@ import { notifLabel } from './notifications.ts';
 export interface RawPublish { id: string; kind?: string; status?: string; change_summary?: string; actor_kind?: string; created_at: string; completed_at?: string }
 export interface RawChange { id: string; entity_type: string; action: string; summary?: string; actor_kind?: string; created_at: string }
 export interface RawConnection { id: string; provider_key: string; action: string; actor_kind?: string; created_at: string; provider_label?: string }
-export interface RawMoment { id: string; headline: string; summary?: string; created_at: string; first_seen_at?: string }
+export interface RawMoment { id: string; headline: string; summary?: string; created_at: string; first_seen_at?: string; moment_key?: string; status?: string }
 export interface RawEnquiry { id: string; form_kind: string; name?: string; email?: string; message?: string; created_at: string }
 export interface RawScheduled { id: string; scheduled_for: string; summary?: string; kind?: string; created_at: string }
 export interface RawLaunch { id: string; name?: string; status?: string; created_at: string; approved_at?: string; updated_at?: string }
@@ -193,8 +193,15 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     events.push({ ...m, category: 'Website', actor: actorOf(r.actor_kind) || 'You', href: '/connections.html', related_page: 'Connections' });
   }
 
-  // Insights (Business Moments) — REUSE mapMoment
+  // Insights (Business Moments) — REUSE mapMoment. Each run of the notes writes the active
+  // set again under the same keys, so one note is many rows: show each key once (the
+  // newest; the route reads newest first), at most eight, and never one held back.
+  const seenNotes = new Set<string>();
   for (const r of input.moments || []) {
+    if (r.status === 'suppressed') continue;
+    const key = r.moment_key || r.id;
+    if (seenNotes.has(key) || seenNotes.size >= 8) continue;
+    seenNotes.add(key);
     const m = item(mapMoment(r));
     events.push({ ...m, category: 'System', actor: 'Automatic', href: '/today.html', related_page: 'Today' });
   }

@@ -77,7 +77,7 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 // Contrast notes (AA): ink #1c1b18 on ivory #fbfaf7 ≈ 15.9:1; soft #5b564c ≈ 7.0:1;
 // bronze TEXT uses the darkened --accent-ink #7a5f3a ≈ 5.7:1 — the lighter #9a7b4f
 // bronze is reserved for 1px rules and decorative leaders only.
-const CSS = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--card:#ffffff;--accent:#9a7b4f;--accent-ink:#7a5f3a;--line:#e5e0d5;--wash:#f4f1e9}
+const CSS = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--card:#ffffff;--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5;--wash:#f4f1e9}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
 picture{display:contents}
@@ -183,9 +183,14 @@ footer.site h2::after{content:"";display:block;width:36px;border-top:1px solid v
 @media print{body{background:#fff;color:#000}.annbar,.skip{display:none}header.site{position:static}}
 @media (max-width:640px){.hero{padding:64px 0 44px}.block{padding:48px 0}.svc-grid{gap:0}}
 ${BLOCK_CSS}
-${SEARCH_CSS}`;
+${SEARCH_CSS}
+/* Item 67: the shared section and search styles colour some text with --accent, which here is
+   the light bronze (3.8:1 on ivory). They take --accent-dark instead (#7a5f3a, 5.7:1), which a
+   chosen palette or a section's own colour still sets. Other templates' accents already pass. */
+.search-hit .sh-kind,.post-tags li,.block-spotlight .sp-eyebrow,.block-linklist ul.linklist a,.block-progress .pgb-pct{color:var(--accent-dark)}
+.tagchip.on,ol.process li::before,.bk-done-ic{background:var(--accent-dark);border-color:var(--accent-dark)}`;
 
-const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding:96px 0 64px;text-align:center}`;
+const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding:96px 0 64px;text-align:center}`;
 
 // ═════════ partials ═════════
 
@@ -486,6 +491,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const siteTitle = i.seo_title || i.business_name;
   const siteDesc = i.seo_description || i.description;
   const ogImg = c.settings?.og_image?.variants?.w1600
+    || c.settings?.cover?.variants?.w1600   // item 67: the owner's chosen cover photo before any auto-pick
     || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
     || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
     || c.settings?.logo?.variants?.w1600;

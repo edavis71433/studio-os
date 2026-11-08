@@ -468,6 +468,7 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
   const siteDesc = i.seo_description || i.description;
   // Phase V FD-N3: the owner's chosen share image wins; then offerings/posts; then the logo
   const ogImg = c.settings?.og_image?.variants?.w1600
+    || c.settings?.cover?.variants?.w1600   // item 67: the owner's chosen cover photo before any auto-pick
     || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
     || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
     || c.settings?.logo?.variants?.w1600;

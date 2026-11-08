@@ -109,6 +109,15 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('not-sent: all eight templates draw it, noindex, one heading, Contact marked in the menu', slugs.length === 8 && each.every(([, good]) => good), each.filter(([, g]) => !g).map(([s]) => s).join(','));
 }
 
+// ═══ 5b++. item 67: the social share image uses the chosen cover photo ═══
+{
+  const cover = { variants: { w400: '/img/cv-400.webp', w800: '/img/cv-800.webp', w1600: '/img/cv-1600.webp' }, alt: 'The dining room', width: 1600, height: 1067 };
+  const home = render('plumber', { cover, og_image: null })['index.html'];
+  ok('share image: the chosen cover photo when no share image is set', /property="og:image" content="[^"]*\/img\/cv-1600\.webp"/.test(home));
+  const own = render('plumber', { cover, og_image: { variants: { w1600: '/img/og-1600.webp' }, alt: '' } })['index.html'];
+  ok('share image: a share image the owner set still wins', /property="og:image" content="[^"]*\/img\/og-1600\.webp"/.test(own));
+}
+
 // ═══ 5c. Phase Z: search-engine verification — a field, not a technical task ═══
 {
   const f = render('plumber', { verification: { google: 'GTOKEN123', bing: 'BTOKEN456' } });

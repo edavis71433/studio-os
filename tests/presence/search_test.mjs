@@ -55,6 +55,23 @@ ok('index: post tags fold into entry (searchable)', (() => { const p = docs.find
   ok('index: NO PII — email never in the index', !blob.includes('hi@bacchus.example'));
   ok('index: is valid JSON, an array', Array.isArray(JSON.parse(blob)));
 }
+// item 67: the owner's own pages are found; a page out of the menu or hidden from Google isn't,
+// and neither is an update hidden from Google
+{
+  const withPages = buildSearchIndex({ ...content,
+    posts: [...content.posts, { id: 'p4', title: 'Staff party notes', slug: 'staff', body_md: 'x', published_at: '2026-04-01T00:00:00Z', noindex: true }],
+    settings: { pages_noindex: ['page:private-dining-draft'], pages: [
+      { slug: 'private-dining', title: 'Private dining', blocks: [{ type: 'richtext', title: 'Rooms', body: 'Two rooms for up to **24 guests**.' }] },
+      { slug: 'spring-offer', title: 'Spring offer', hideNav: true, blocks: [] },
+      { slug: 'private-dining-draft', title: 'Private dining (new)', blocks: [] },
+      { slug: 'gift-cards', title: 'Gift cards', blocks: [] },
+    ] } }, opts);
+  const pd = withPages.find((d) => d.u === '/private-dining/');
+  ok('index: a custom page is found, with words from its first section', !!pd && pd.k === 'page' && pd.t === 'Private dining' && /Two rooms for up to 24 guests/.test(pd.s) && !pd.s.includes('**'));
+  ok('index: a custom page with no words gets a plain line', withPages.find((d) => d.u === '/gift-cards/')?.s === 'Gift cards at Bacchus Kitchen.');
+  ok('index: a page kept out of the menu or hidden from Google is not offered', !withPages.some((d) => d.u === '/spring-offer/' || d.u === '/private-dining-draft/'));
+  ok('index: an update hidden from Google is not offered', !withPages.some((d) => d.u === '/updates/staff/') && withPages.some((d) => d.u === '/updates/winter-menu/'));
+}
 ok('index: FAQ page entry appears only when there are FAQs', (() => {
   const noFaq = buildSearchIndex({ ...content, faqs: [] }, opts);
   return !noFaq.some((d) => d.u === '/faq/') && docs.some((d) => d.k === 'page' && d.u === '/faq/');
