@@ -260,7 +260,7 @@ const COLS=[
   ['name','Name',(c)=>String(c.name||'').toLowerCase()],
   ['email','Email',(c)=>String(c.email||'').toLowerCase()],
   ['project_count','Projects',(c)=>Number(c.project_count||0)],
-  ['open_support','Waiting',(c)=>Number(c.open_support||0)],
+  ['open_support','Needs you',(c)=>Number(c.open_support||0)],
   ['status','Status',(c)=>String(c.status||'active')],
 ];
 let SORT={key:'name',dir:1};
@@ -322,7 +322,7 @@ function tableHtml(list){
       <td><span class="n">${esc(c.name||'Customer')}</span></td>
       <td class="c-email">${esc(c.email||'—')}</td>
       <td class="num">${Number(c.project_count||0)}</td>
-      <td><span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></td>
+      <td><span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></td>
       <td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>
       <td class="acts"><button class="rowact" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="rowact ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</td>
     </tr>`;
@@ -337,7 +337,7 @@ function cardsHtml(list){
     const st=String(c.status||'active');
     h+=`<div class="cust"><div class="crow"><span class="av">${esc(initial(c.name))}</span>
       <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${esc(c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span>
-      <span class="badge ${att?'wait':'ok'}">${att?att+' waiting':'all clear'}</span></div>
+      <span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></div>
       <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
         <span style="flex:1"></span>
         <button class="btn" data-open="${esc(c.client_id)}">Open</button>

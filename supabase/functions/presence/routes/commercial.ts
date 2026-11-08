@@ -194,7 +194,7 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   }
   // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
   // form values stay server-side as before; each row carries `replies` instead.
-  const submissions = rows.map(({ fields, ...s }: any) => ({ ...s, replies: leadReplies(fields), deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
+  const submissions = rows.map(({ fields, ...s }: any) => ({ ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length } }, 200, cors);
 }
 
@@ -213,6 +213,15 @@ const LEAD_REPLIES_KEPT = 20;
 export function leadReplies(fields: unknown): Array<{ body: string; at: string }> {
   const list = fields && typeof fields === 'object' ? (fields as any).__studio_replies : null;
   return Array.isArray(list) ? list.filter((r: any) => r && typeof r.body === 'string').map((r: any) => ({ body: String(r.body), at: String(r.at || '') })) : [];
+}
+// Sales review item 28 (Nov 2026): the studio's own note on an enquiry, before
+// it is a deal ("called back, wants a quote in March"). Kept on the submission
+// as fields.__studio_note — the same reserved-key pattern as __studio_replies,
+// no new column — and never shown to the person who wrote in.
+export const LEAD_NOTE_MAX = 1000;
+export function leadNote(fields: unknown): { body: string; at: string } | null {
+  const n = fields && typeof fields === 'object' ? (fields as any).__studio_note : null;
+  return n && typeof n.body === 'string' && n.body.trim() ? { body: String(n.body), at: String(n.at || '') } : null;
 }
 export function leadReplyHtml(body: string, original: string): string {
   const paras = String(body).split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
@@ -271,10 +280,23 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   // for the same shelf) · Spam (the boolean). Only `new` counts as needs-you, so
   // every other mark takes the enquiry off Today, the bell and the Inbox at once.
   const spamFlag = typeof b?.spam === 'boolean' ? b.spam : null;
-  const status = ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null ? 'read' : null);
+  // item 28: { note } alone saves the studio's note and leaves the status as it is
+  // (a note on a Replied enquiry must not knock it back to Read)
+  const noteOnly = typeof b?.note === 'string' && b?.status === undefined && spamFlag === null;
+  const status = ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null && !noteOnly ? 'read' : null);
   const patch: Record<string, unknown> = {};
   if (status) patch.status = status;
   if (spamFlag !== null) patch.spam = spamFlag;
+  if (typeof b?.note === 'string') {
+    const cur = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=fields&limit=1`);
+    const row = Array.isArray(cur.json) ? cur.json[0] : null;
+    if (!row) return json({ error: 'not_found' }, 404, cors);
+    const body = String(b.note).replace(/\r\n?/g, '\n').trim().slice(0, LEAD_NOTE_MAX);
+    const fields = { ...((row.fields && typeof row.fields === 'object') ? row.fields : {}) } as Record<string, unknown>;
+    if (body) fields.__studio_note = { body, at: new Date().toISOString() }; else delete fields.__studio_note;
+    patch.fields = fields;
+  }
+  if (!Object.keys(patch).length) return json({ data: { ok: true } }, 200, cors);
   const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!(r.ok && r.json?.[0])) return json({ error: 'not_found' }, 404, cors);
   // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the

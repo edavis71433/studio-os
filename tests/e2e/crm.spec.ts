@@ -132,7 +132,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     const sam = rowOf(page, 'Sam Rivera');
     await expect(sam.locator('.unread-dot')).toHaveCount(1);         // unread rows keep their dot
     await expect(sam.locator('.avatar')).toHaveText('SR');
-    await expect(sam.locator('.rchip')).toHaveText('Quote request');
+    await expect(sam.locator('.rchip')).toHaveText('Quote request · New');   // sales review item 28: every enquiry row says where it stands
     await expect(sam.locator('.rwhen')).toContainText('ago');
     await expect(sam.locator('.txt')).toHaveText('Can I get a quote for a patio?');
     const pane = await pick(page, 'Sam Rivera');

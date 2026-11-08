@@ -230,7 +230,7 @@ const IC={
   tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
 };
 function render(){
-  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/customers.html">${IC.back}Customers</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
+  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/inbox.html">${IC.back}Inbox</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
     <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">Write one message and send it to your people. You preview it and press send — nothing ever goes out on its own.</p></header>
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
@@ -545,7 +545,7 @@ async function load(soft){
     api('/broadcasts').catch(()=>({ok:false,status:0,body:{}})),
   ]);
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
-  if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Broadcasts live in your studio workspace.</h2></div>`;return;}
+  if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Sending updates lives in your studio workspace.</h2></div>`;return;}
   if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.');trouble();return;}
   if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
   if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;}

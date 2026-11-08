@@ -79,7 +79,7 @@ test.describe('Agency portfolio', () => {
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
-    await expect(page.getByRole('heading', { level: 1, name: 'Your clients' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Customers' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.lhead .lmeta')).toContainText('3 businesses · Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
