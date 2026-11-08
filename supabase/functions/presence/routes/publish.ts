@@ -4,6 +4,7 @@
 //   publish record → render → variants → Deploy API → brief poll → record/site
 // Restore (business recovery) is the SAME pipeline fed a retained historical
 // snapshot with kind=restore. History never lies; clients get plain language.
+import { fetchLibraryFonts, libraryFontsIn } from '../lib/fonts.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { getTemplate, renderSnapshot } from '../lib/render.ts';
@@ -174,6 +175,11 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
   Object.assign(fileMap, images);
   at('images');
+  // the library fonts the style names, copied into the site so it never loads one from elsewhere
+  const { files: fonts, failed: fontsFailed } = await fetchLibraryFonts(libraryFontsIn(snapshotArg.snapshot?.dev_customization?.theme_tokens));
+  if (fontsFailed.length) return await fail('fonts', `font files couldn't be fetched: ${fontsFailed.join('; ')}`);
+  Object.assign(fileMap, fonts);
+  at('fonts');
 
   // ── Response-level security headers (parity with the marketing site) ────────
   // The tenant HTML already carries a <meta> CSP (defense-in-depth, kept). Ship a
