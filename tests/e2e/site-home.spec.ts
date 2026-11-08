@@ -640,6 +640,69 @@ test.describe('Pages: every page and the menu in one place', () => {
   });
 });
 
+test.describe('a section edited in its panel redraws at once (item 26)', () => {
+  const setup = async (page: Page) => {
+    const writes = await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    await page.waitForLoadState('networkidle');
+    const log: string[] = [];
+    const asked: Array<{ index: number; blocks: any[] }> = [];
+    await page.route('**/functions/v1/presence/preview/section', async (route: Route) => {
+      const body = route.request().postDataJSON(); asked.push(body); log.push('section drawn');
+      const b = body.blocks[body.index];
+      const html = `<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="${body.index}" class="block"><h2 data-dds-field="title">${b.title}</h2></section>`;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { html } }) });
+    });
+    await page.route('**/functions/v1/presence/settings', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 1200)); log.push('save answered'); return route.fallback();
+    });
+    await page.route('**/functions/v1/presence/preview?**', (route: Route) => { log.push('page drawn'); return route.fallback(); });
+    return { writes, frame, log, asked };
+  };
+
+  test('the change shows on the canvas before its save answers, drawn from the list as it stands', async ({ page }) => {
+    const { frame, log, asked, writes } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const title = page.locator('#blocksCard input').first();
+    await title.fill('A fresh heading');
+    await title.blur();
+    const edited = frame.locator('#main > section[data-dds-src="0"]');
+    await expect(edited.locator('h2')).toHaveText('A fresh heading');
+    expect(log).not.toContain('save answered');                       // shown before the save came back
+    expect(asked.at(-1)!.index).toBe(0);
+    expect(asked.at(-1)!.blocks).toHaveLength(2);                      // the whole page's list, so its tags come out right
+    await expect(edited).toHaveAttribute('data-dc', '1');           // the new section is wired for editing
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.method === 'PUT').length).toBe(1);
+    await expect.poll(() => log.slice(log.indexOf('save answered')).includes('page drawn')).toBe(true);   // the save's own redraw still follows
+  });
+
+  test('typing shows on the canvas as you type, and the save still waits for the field to be left', async ({ page }) => {
+    const { frame, writes } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const title = page.locator('#blocksCard input').first();
+    await title.click();
+    await title.press('ControlOrMeta+a');
+    await title.pressSequentially('Typed live', { delay: 30 });
+    const edited = frame.locator('#main > section[data-dds-src="0"]');
+    await expect(edited.locator('h2')).toHaveText('Typed live');           // while the field still has focus
+    await expect(title).toBeFocused();                                      // nothing rebuilt the panel under the cursor
+    await page.waitForTimeout(900);
+    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')).toHaveLength(0);
+    await title.blur();
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.method === 'PUT').length).toBe(1);
+    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')[0].body.blocks[0].title).toBe('Typed live');
+  });
+
+  test('a section added or removed waits for the full redraw instead', async ({ page }) => {
+    const { asked } = await setup(page);
+    await page.evaluate(() => (window as any).dcDuplicate(0));
+    await page.waitForTimeout(700);
+    expect(asked).toHaveLength(0);
+  });
+});
+
 test.describe('one preview screen', () => {
   const OWN = { '/settings': { data: { pages: [{ slug: 'gallery', title: 'Gallery', blocks: [] }] } } };
   test('Edit mode’s Preview opens it on the page being edited, and Back returns to Edit', async ({ page }) => {
@@ -840,69 +903,6 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await frame.locator('section[data-dds-core="about"] h2').dblclick();
     await expect(page.getByText('These words come from your')).toBeVisible();
     expect(identityWrites(writes)).toHaveLength(0);
-  });
-});
-
-test.describe('a section edited in its panel redraws at once (item 26)', () => {
-  const setup = async (page: Page) => {
-    const writes = await mount(page, '/presence.html#design');
-    const frame = page.frameLocator('#designPreview');
-    await frame.locator('#a h2').waitFor();
-    await page.waitForLoadState('networkidle');
-    const log: string[] = [];
-    const asked: Array<{ index: number; blocks: any[] }> = [];
-    await page.route('**/functions/v1/presence/preview/section', async (route: Route) => {
-      const body = route.request().postDataJSON(); asked.push(body); log.push('section drawn');
-      const b = body.blocks[body.index];
-      const html = `<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="${body.index}" class="block"><h2 data-dds-field="title">${b.title}</h2></section>`;
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { html } }) });
-    });
-    await page.route('**/functions/v1/presence/settings', async (route: Route) => {
-      if (route.request().method() !== 'PUT') return route.fallback();
-      log.push('save asked'); await new Promise((r) => setTimeout(r, 1200)); log.push('save answered'); return route.fallback();
-    });
-    await page.route('**/functions/v1/presence/preview?**', (route: Route) => { log.push('page drawn'); return route.fallback(); });
-    return { writes, frame, log, asked };
-  };
-
-  test('the change shows on the canvas before its save answers, drawn from the list as it stands', async ({ page }) => {
-    const { frame, log, asked, writes } = await setup(page);
-    await page.evaluate(() => (window as any).eeEditBlock(0));
-    const title = page.locator('#blocksCard input').first();
-    await title.fill('A fresh heading');
-    await title.blur();
-    const edited = frame.locator('#main > section[data-dds-src="0"]');
-    await expect(edited.locator('h2')).toHaveText('A fresh heading');
-    expect(log).not.toContain('save answered');                       // shown before the save came back
-    expect(asked.at(-1)!.index).toBe(0);
-    expect(asked.at(-1)!.blocks).toHaveLength(2);                      // the whole page's list, so its tags come out right
-    await expect(edited).toHaveAttribute('data-dc', '1');           // the new section is wired for editing
-    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.method === 'PUT').length).toBe(1);
-    await expect.poll(() => log.slice(log.indexOf('save answered')).includes('page drawn')).toBe(true);   // the save's own redraw still follows
-  });
-
-  test('typing shows on the canvas as you type, and the save still waits for the field to be left', async ({ page }) => {
-    const { frame, writes } = await setup(page);
-    await page.evaluate(() => (window as any).eeEditBlock(0));
-    const title = page.locator('#blocksCard input').first();
-    await title.click();
-    await title.press('ControlOrMeta+a');
-    await title.pressSequentially('Typed live', { delay: 30 });
-    const edited = frame.locator('#main > section[data-dds-src="0"]');
-    await expect(edited.locator('h2')).toHaveText('Typed live');           // while the field still has focus
-    await expect(title).toBeFocused();                                      // nothing rebuilt the panel under the cursor
-    await page.waitForTimeout(900);
-    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')).toHaveLength(0);
-    await title.blur();
-    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.method === 'PUT').length).toBe(1);
-    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')[0].body.blocks[0].title).toBe('Typed live');
-  });
-
-  test('a section added or removed waits for the full redraw instead', async ({ page }) => {
-    const { asked } = await setup(page);
-    await page.evaluate(() => (window as any).dcDuplicate(0));
-    await page.waitForTimeout(700);
-    expect(asked).toHaveLength(0);
   });
 });
 
