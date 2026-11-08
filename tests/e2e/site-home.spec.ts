@@ -1296,6 +1296,60 @@ test.describe('Load the latest shows what was loaded', () => {
   });
 });
 
+test.describe('no drawing nobody asked for (item 85)', () => {
+  const drawsAfter = async (page: Page, act: () => Promise<unknown>) => {
+    await page.waitForLoadState('networkidle');
+    const seen: string[] = [];
+    const on = (r: any) => { const u = new URL(r.url()); if (/\/functions\/v1\/presence\/preview$/.test(u.pathname)) seen.push(u.search); };
+    page.on('request', on);
+    await act();
+    await page.waitForTimeout(900);                                   // past the 350 ms the old redraw waited
+    page.off('request', on);
+    return seen;
+  };
+  test('Edit on a section opens its panel without drawing the whole page again', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const draws = await drawsAfter(page, async () => {
+      await frame.locator('#a').hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    });
+    expect(draws).toEqual([]);
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+  });
+  test('Hide from the canvas draws the canvas once, and not the hidden Preview', async ({ page }) => {
+    test.skip(isPhone(page), 'a phone selects by tap, with no hover');
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const previewBefore = await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc);
+    const draws = await drawsAfter(page, async () => {
+      await frame.locator('#a').hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Hide this section"]').click();
+    });
+    expect(draws.length).toBeLessThanOrEqual(1);                        // the canvas's own redraw, no second one
+    expect(await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc)).toBe(previewBefore);
+  });
+  test('Undo of a section move keeps the Styles cards where they were, without reading the colors again', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    const place = () => page.evaluate(() => { const c = document.getElementById('sectionsCard')!; return [...c.parentNode!.children].indexOf(c); });
+    const before = await place();
+    const down = page.locator('#sectionsCard > div').filter({ hasText: 'About' }).locator('button').last();
+    await down.click();
+    await page.waitForLoadState('networkidle');
+    const reads: string[] = [];
+    page.on('request', (r) => { if (/\/dev\/customization$/.test(new URL(r.url()).pathname) && r.method() === 'GET') reads.push(r.url()); });
+    await page.locator('#btnUndo').click();
+    await page.waitForLoadState('networkidle');
+    expect(await place()).toBe(before);
+    expect(reads).toEqual([]);
+  });
+});
+
 test.describe('the Add section menu can always be closed', () => {
   // Item 82: on a phone there is no Escape and no hover, and a tap on the canvas never
   // reached the page's own listener, so the menu stayed open over the canvas.

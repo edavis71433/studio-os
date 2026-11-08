@@ -2138,7 +2138,11 @@ function go(view, early) {
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
   if (view === "search") { loadSearch(); hbLoadBoardExtras(); }
-  if (view === "design") { if (stays) dcCaptureScroll(); refreshDesignPreview(); }   // CP-2.5: the live proof warms on entry; a section's Edit from the canvas keeps its place
+  // CP-2.5: the live proof warms on entry. Item 85: already on a drawn canvas (a section's
+  // Edit, its cog, a double-click on a picture) nothing has changed, so nothing is drawn
+  // again; that full redraw 350 ms later also left sections below a new one resolving one
+  // index off. A canvas never drawn yet (a link that opens straight on it) still is.
+  if (view === "design" && (!stays || !DC_DRAWN)) refreshDesignPreview();
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
   try { history.replaceState(null, "", "#" + view); } catch (_) {}
@@ -5318,6 +5322,9 @@ window.addEventListener("message", (e) => {
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
   if (e.data && e.data.presenceRetry && $("stage").classList.contains("on")) loadPreview();   // the proof's own Try again (experience review #13)
 });
+// Item 85: Hide or a move from the canvas also drew the page into the Preview screen,
+// hidden behind Edit mode: two full renders for one Hide. Opening Preview draws it anyway.
+function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")) loadPreview(); }
 async function loadPreview() {
   const frame = $("previewFrame");
   frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
@@ -5429,11 +5436,11 @@ function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder
   // keep resolving until the save's reload re-stamps them.
   dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, bi, ni));
   if ($("blocksCard")) renderBlocksCard();
-  saveBlocks().then(() => loadPreview());        // persist, then redraw the proof
+  saveBlocks().then(previewIfOpen);              // persist, then redraw the proof if it's on screen (item 85)
 }
 function eeHideKey(key) {                        // reuse the sections-visibility machinery
   if (!key) return;
-  Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => [...new Set([...sectionsHiddenNow(), key])])).then(() => loadPreview());
+  Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => [...new Set([...sectionsHiddenNow(), key])])).then(previewIfOpen);
 }
 // Which editor a clicked section belongs to — G13: read the SERVER STAMPS.
 // A block section carries data-dds-src (its TRUE stored-list index, render
@@ -6667,9 +6674,9 @@ async function refreshAll() {
 // Draw a once-mounted card again from what's loaded, where it was (a placeholder holds its
 // spot while a mount that reads first is out); absent, mount it fresh. If the new one
 // can't be drawn, the old one goes back.
-function remountInPlace(id, mount) {
+function remountInPlace(id, mount, force) {   // force: an Undo redraws it even under the caret
   const old = $(id);
-  if (old && old.contains(document.activeElement)) return;
+  if (!force && old && old.contains(document.activeElement)) return;
   const mark = old ? document.createComment(id) : null;
   if (old) old.replaceWith(mark);
   return Promise.resolve(mount()).catch(() => {}).then(() => {
@@ -7645,12 +7652,16 @@ async function mountDesignCard(fresh = true) {
 // scripts, no <style> breakout, no third-party url()) at save AND at render, and it
 // applies to this owner's own published site, versioned with the snapshot. Saves
 // through the SAME /dev/customization path as Design Studio (one machinery).
+// Item 85: asked once per page. An owner without the capability has no card to find, so
+// every redraw of the Styles cards used to ask the server again.
+let DEV_CSS_ALLOWED = null;
 async function mountDevCssCard() {
-  const host = $("designHost") || $("view-business"); if (!host || $("devCssCard")) return;
+  const host = $("designHost") || $("view-business"); if (!host || $("devCssCard") || DEV_CSS_ALLOWED === false) return;
   let data;
   try { data = (await api("GET", "/dev/customization")).data; }
   catch (_) { return; }
-  if (!data || !data.can_edit_css) return;   // owners see the palette, not the advanced editor
+  DEV_CSS_ALLOWED = !!(data && data.can_edit_css);
+  if (!DEV_CSS_ALLOWED) return;   // owners see the palette, not the advanced editor
 
   const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px";
   const sum = el("summary", null, "Custom CSS (advanced)");
@@ -8496,7 +8507,7 @@ async function undoSync(rec, vals, r) {
   if (rec.route === "/identity") { S.identity = { ...(S.identity || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/location") { S.location = { ...(S.location || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/bookings/settings") { BK.settings = { ...BK.settings, ...vals }; if ($("view-bookings").classList.contains("on")) loadBookings(); }
-  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
+  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
@@ -8506,8 +8517,10 @@ async function undoSync(rec, vals, r) {
     if ($("blocksCard")) renderBlocksCard();
     renderPagesBar();
     if ($("formsCard")) formsLoad();
-    const sc = $("sectionsCard"); if (sc) { sc.remove(); mountSectionsCard(); }
-    const dc = $("designCard"); if (dc) { dc.remove(); mountDesignCard(); }
+    // item 85: in place (they used to drop to the bottom of the Styles panel), and the colors
+    // and fonts card from the tokens it holds: a settings step doesn't change them
+    remountSectionsCard();
+    remountInPlace("designCard", () => mountDesignCard(false), true);
     fillSingles();
     if ($("ann-text")) { $("ann-text").value = S.settings.announcement_text || ""; $("ann-url").value = S.settings.announcement_url || ""; $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10); }
   }
@@ -11459,6 +11472,7 @@ function dpHoldRepaint() {
   if (IPE || IDE || IDE_SAVING) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
 }
+let DC_DRAWN = false;
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   // Drawing a canvas nobody can see is a full page render per save. Opening Edit mode
@@ -11467,6 +11481,7 @@ function refreshDesignPreview() {
   // Slice D: a past version is on the canvas (Timewarp) — leave it there until
   // "Back to today"; the draft repaint happens on the mode change back to Edit.
   if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+  DC_DRAWN = true;   // item 85: asked for at least once on this page
   clearTimeout(designPreviewTimer);
   designPreviewTimer = setTimeout(async () => {
     // Re-check at fire time AND after the fetch — a Timewarp render may have
