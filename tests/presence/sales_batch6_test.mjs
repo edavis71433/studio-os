@@ -63,7 +63,7 @@ ok('Pipeline: Mark as not a fit only moves deals the board could move', /if\(!bo
 ok('Pipeline: won and lost rows are skipped on import', /if\(it\.stage==='won'\|\|it\.stage==='lost'\)return'skipped';/.test(pipe));
 ok('Pipeline: the tools stay at studio level', /if\(scope\(\)\)\{\['importDeals','pvBtn'\]/.test(pipe));
 const shell = read('shell.js');
-ok('one shared kit: views, a name prompt, columns, send-to, the CSV importer', /window\.ddsListKit = \(function \(\) \{/.test(shell) && /return \{ use: function \(fn\) \{ REQ = fn; \}, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style \};/.test(shell));
+ok('one shared kit: views, a name prompt, columns, send-to, the CSV importer', /window\.ddsListKit = \(function \(\) \{/.test(shell) && /return \{ use: function \(fn\) \{ REQ = fn; \}, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce \};/.test(shell));
 ok('send-to opens the composer on the kept list', /location\.href = '\/broadcasts\.html\?list=' \+ encodeURIComponent\(r\.body\.data\.id\)/.test(shell));
 ok('the composer picks the list it was sent', /if\(pick&&!DRAFT&&SEGMENTS\.some\(x=>x\.key==='list:'\+pick\)\)\{SEL='list:'\+pick;/.test(read('broadcasts.html')));
 

@@ -188,6 +188,7 @@
   .trow .late{color:var(--bad)} .trow .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap} .trow .rn.due{color:var(--warn)}
   .trow .tctx{color:var(--soft);font-weight:400}
   .tdone{flex:0 0 auto;font:inherit;font-size:12px;font-weight:600;color:var(--p);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;min-height:32px;cursor:pointer}
+@media (max-width:767px){.tdone{min-height:44px;padding:4px 16px}}   /* final pass, batch C: 44px on a phone */
   .tdone:hover{border-color:var(--p)} .tdone:disabled{opacity:.6;cursor:default}
   .tblk{flex:0 0 auto;font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:3px 10px}
   .rfoot{margin-top:var(--dds-s2,8px);font-size:12.5px} .rfoot a{color:var(--p);text-decoration:none;font-weight:500}
@@ -341,7 +342,7 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 // styled toast via the shared shell (replaces native alert()); bad→error styling
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 let TOKEN="",ME=null,CLIENTS=[],PROJECT_BY_SITE={},CUST_FAILED=false,LOADED_ONCE=false,LOADED_AT=0;
-const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
+const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};   // final pass, batch C: one money format (whole dollars, or with cents)
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
@@ -446,7 +447,7 @@ function lheadHtml(shown){
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
-      <h1 id="pagehead" tabindex="-1">Customers</h1>
+      <h1 id="pagehead" tabindex="-1">Home</h1>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
@@ -842,7 +843,7 @@ function myTasksHtml(){
   const now=items.filter(t=>!t.later);
   const shown=MYT_ALL?items:now.slice(0,MYT_SHOW);
   const hiddenHere=items.length-shown.length,beyond=Math.max(0,total-items.length);
-  let h=`<div class="rcard" id="my-tasks"><p class="rh">My tasks · ${MYT_ALL?total:now.length}</p>`;
+  let h=`<div class="rcard" id="my-tasks"><p class="rh" tabindex="-1">My tasks · ${MYT_ALL?total:now.length}</p>`;
   h+=shown.length?`<div class="trows">${shown.map(myTaskRow).join('')}</div>`:'<p class="quiet">Nothing left on your list.</p>';
   if(hiddenHere>0)h+=`<p class="quiet"><button type="button" class="linkbtn" id="myTasksMore">Show all ${items.length}</button></p>`;
   else if(beyond>0)h+=`<p class="quiet">${beyond} more on your deals and projects.</p>`;
@@ -865,7 +866,11 @@ function wireMyTasks(){
     MYTASKS.items=MYTASKS.items.filter(x=>x!==t);MYTASKS.total=Math.max(0,MYTASKS.total-1);
     // item 53: that project's next step moves up (the lowest place on its checklist)
     if(t.kind==='project_task'&&!t.later){const nx=MYTASKS.items.filter(x=>x.later&&x.parent_id===t.parent_id).sort((a,b)=>(a.order??1e9)-(b.order??1e9))[0];if(nx)nx.later=false;}
+    // batch C: focus moves to the next to-do's Done (or the heading), not to <body>
+    const at=[...card.querySelectorAll('.trow')].findIndex(r=>r.getAttribute('data-task')===key);
     toast('Done: '+t.title);paintMyTasks();
+    const rows=[...document.querySelectorAll('#my-tasks .trow')];const row=rows[Math.min(Math.max(at,0),rows.length-1)];
+    const nx=(row&&(row.querySelector('button.tdone')||row.querySelector('a')))||document.querySelector('#my-tasks .rh');if(nx)nx.focus();
   }));
 }
 let SSEQ=0;
@@ -1086,7 +1091,7 @@ function mountAsk(){
 //    payload names each client's Next on the roster. Failure renders an HONEST
 //    "wouldn't load" line + Try again — never silent absence. ──
 let NSEQ=0,NEEDS=null,NEEDS_EXPANDED=false;
-const initials=(n)=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';
+const initials=(n)=>String(n||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole
 function needRowHtml(r){
   return `<div class="row" data-need="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span>
     <div class="t"><b>${esc(r.name)}</b> — ${esc(r.what)}${r.when?`<span class="when">${esc(r.when)}</span>`:''}</div>

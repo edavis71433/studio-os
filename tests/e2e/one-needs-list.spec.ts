@@ -72,11 +72,11 @@ test.describe('item 11 — one number, one list, at studio level', () => {
 });
 
 test.describe('item 23 — one Home for a studio', () => {
-  test('a studio account on the old Home is sent to Customers', async ({ page }) => {
+  test('a studio account on the old Home is sent to the new Home', async ({ page }) => {
     await installApp(page, { api: HOME_API });
     await page.goto('/today.html');
     await expect(page).toHaveURL(/\/agency\.html$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Customers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // final pass, batch C: headed Home, as the nav says
   });
 
   test('a plain owner keeps their Today', async ({ page }) => {

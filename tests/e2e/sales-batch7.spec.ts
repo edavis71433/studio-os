@@ -114,10 +114,10 @@ test.describe('item 33 — the deal page offers reasons when a deal is not a fit
     await installApp(page, { api: PIPE });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, (route) => { moved = route.request().postDataJSON(); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' }); });
     await page.goto(`/pipeline.html?deal=${DEAL}`);
-    await page.getByRole('button', { name: 'Mark as lost (not a fit)' }).click();
+    await page.getByRole('button', { name: 'Mark as not a fit' }).click();   // batch C: "lost" retired
     const box = page.getByLabel(/^Reason \(optional\)/);
     await expect(box).toHaveAttribute('list', 'lostReasons');
-    expect(await page.locator('#lostReasons option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value))).toEqual(['Price', 'Timing', 'Went with someone else', 'No reply', 'Not a fit for us']);
+    expect(await page.locator('#lostReasons option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value))).toEqual(['Price', 'Timing', 'Went with someone else', 'No reply', 'Outside what we do']);   // batch C: "Not a fit for us" read like the stage
     await box.fill('Price');
     await page.locator('#lostForm').getByRole('button', { name: 'Save' }).click();
     await expect.poll(() => moved).toEqual({ to: 'lost', reason: 'Price' });

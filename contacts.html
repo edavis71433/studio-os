@@ -38,11 +38,16 @@
   /* sales review item 31: saved views in the view menu; the text buttons beside it */
   #viewMenu .vsep{font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
   .lbtn.txt{font-size:13px;font-weight:600;color:var(--p);padding-left:0;padding-right:0}
+  @media (max-width:767px){.lbtn.txt{min-height:44px}}   /* final pass, batch C: 44px on a phone */
   .ltools{display:flex;flex-wrap:wrap;align-items:center;gap:2px var(--dds-s4,16px);margin-top:4px}
   .colsdd{position:relative}
   #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
   #viewBtn .car{font-size:10px;color:var(--faint)}
+  /* final pass, batch C (as Customers since item 59): on a phone the view name stays on one line and trims with … */
+  #viewBtn{max-width:100%;min-width:0}
+  #viewBtn .vl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media (max-width:600px){#viewBtn{font-size:17px;padding-left:6px;padding-right:4px}}
   #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
@@ -366,7 +371,7 @@ function applySaved(v){
 async function saveView(){
   const k=KIT();if(!k)return;
   const cur=SAVED.find(x=>x.id===CURVIEW);
-  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view',back:'#saveView'});
   if(!name)return;
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
   const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
@@ -374,12 +379,16 @@ async function saveView(){
   if(!out){toast('That view didn’t save — try again in a moment.');return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
   render();toast('View saved — it’s in the view menu.');
+  const f=$('saveView');if(f)f.focus();   // batch C: the re-draw had left focus on <body>
 }
 async function dropView(){
   const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  // batch C: a saved view is the whole team's — ask in place first
+  if(!(await k.confirmIn($('dropView'),{text:`Remove “${cur.name}” for everyone?`,yes:'Yes, remove it'})))return;
   const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==cur.id));
   if(!out){toast('That didn’t save — try again in a moment.');return;}
   SAVED=out;CURVIEW='';render();toast('View removed.');
+  const f=$('saveView');if(f)f.focus();   // batch C: focus was left on <body> when the button went
 }
 function bulkHtml(){
   if(!PICKED.size||DISPLAY!=='table')return'';
@@ -420,7 +429,7 @@ function headerHtml(count){
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">👤</span>
       <div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Contacts view: ${esc(viewLabel())}">${esc(viewLabel())} <span class="car" aria-hidden="true">▾</span></button>
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Contacts view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Contact views" hidden></div>
       </div>
       <div class="seg" role="group" aria-label="Display as">
@@ -784,7 +793,7 @@ function openImport(){
     }).filter(x=>x.name||x.email).slice(0,500);
     $('csvPrev').innerHTML=`<p class="muted" style="margin:10px 0 6px">${items.length} contact${items.length===1?'':'s'} found — first few: ${esc(items.slice(0,3).map(i=>i.name||i.email).join(', '))}${items.length>3?'…':''}</p>
       <button class="btn" id="csvGo">Import ${items.length}</button> <button class="btn" id="csvCancel" style="border-color:transparent">Cancel</button>`;
-    $('csvCancel').onclick=()=>{z.innerHTML='';};
+    $('csvCancel').onclick=()=>{z.innerHTML='';const ic=$('importCsv');if(ic)ic.focus();};   // final pass, batch C: focus back to Import, not <body>
     $('csvGo').onclick=async()=>{
       const btn=$('csvGo');btn.disabled=true;let added=0,existed=0,failed=0,done=0;
       // status region so screen readers hear progress (the button text alone isn't announced)

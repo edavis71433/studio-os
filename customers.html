@@ -151,6 +151,11 @@
   .acts{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;align-items:center;margin-top:var(--dds-s3,12px)}
   .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  /* final pass (Nov 8, batch C): in the dark theme the filled buttons read 2.3:1 white on light purple */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
+  /* …and on a phone the text buttons (Save view, Remove view, Columns, Import) are at least 44px tall */
+  @media (max-width:767px){.lbtn.txt{min-height:44px}}
   .btn:hover{filter:brightness(1.05)}
   .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14.5px}
@@ -235,7 +240,7 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // NOT sent here; scope() survives only for outbound links (scoped()).
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
+const initial=(s)=>{const ch=Array.from(String(s||'?').trim())[0]||'?';const up=ch.toUpperCase();return up.length===1?up:ch;};
 // keep any agency drill-in scope on internal links
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
 let TOKEN="",CUSTOMERS=[],LOADED_AT=0;
@@ -274,7 +279,7 @@ const COLS=[
   ['name','Name',(c)=>String(c.name||'').toLowerCase()],
   ['email','Email',(c)=>String(c.email||'').toLowerCase()],
   ['project_count','Projects',(c)=>Number(c.project_count||0)],
-  ['open_support','Needs you',(c)=>Number(c.open_support||0)],
+  ['open_support','Requests',(c)=>Number(c.open_support||0)],   // final pass, batch C: it counts open requests only
   ['status','Status',(c)=>String(c.status||'active')],
 ];
 let SORT={key:'name',dir:1};
@@ -285,7 +290,7 @@ let SAVED=[],CURVIEW='',PICKED=new Set();
 const COLS_KEY='dds-cols:customers';
 let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
 const KIT=()=>window.ddsListKit||null;
-const fmtOwed=(c)=>'$'+Math.round((Number(c)||0)/100).toLocaleString();
+const fmtOwed=(c)=>{const v=(Number(c)||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});}   // batch C: one money format (whole dollars, or with cents — never rounded away);
 const viewLabel=()=>{const v=SAVED.find(x=>x.id===CURVIEW);return v?v.name:VIEW_LABEL[VIEWNAME];};
 const shownCols=()=>COLS.filter(c=>c[0]==='name'||!HIDDEN.has(c[0]));
 function applySaved(v){
@@ -297,7 +302,7 @@ function applySaved(v){
 async function saveView(){
   const k=KIT();if(!k)return;
   const cur=SAVED.find(x=>x.id===CURVIEW);
-  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view',back:'#saveView'});
   if(!name)return;
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
   const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
@@ -305,12 +310,16 @@ async function saveView(){
   if(!out){toast('That view didn’t save — try again in a moment.');return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
   render();toast('View saved — it’s in the view menu.');
+  const f=$('saveView');if(f)f.focus();   // batch C: the re-draw had left focus on <body>
 }
 async function dropView(){
   const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  // batch C: a saved view is the whole team's — ask in place first
+  if(!(await k.confirmIn($('dropView'),{text:`Remove “${cur.name}” for everyone?`,yes:'Yes, remove it'})))return;
   const out=await k.saveViews('customers',SAVED.filter(x=>x.id!==cur.id));
   if(!out){toast('That didn’t save — try again in a moment.');return;}
   SAVED=out;CURVIEW='';render();toast('View removed.');
+  const f=$('saveView');if(f)f.focus();   // batch C: focus was left on <body> when the button went
 }
 function bulkHtml(){
   if(!PICKED.size||DISPLAY!=='table')return'';
@@ -341,7 +350,7 @@ async function bulkMark(to){
 }
 function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
-  k.importPanel(z,{
+  k.importPanel(z,{back:'#importCsv',
     title:'Import customers from a CSV',
     help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest connect when they sign up.',
     noun:'customer',
@@ -569,7 +578,13 @@ function wireList(){
   document.querySelectorAll('[data-pick]').forEach(cb=>cb.addEventListener('change',()=>{const id=cb.getAttribute('data-pick');if(cb.checked)PICKED.add(id);else PICKED.delete(id);renderListZone();refocus('[data-pick="'+id+'"]');}));
   const pa=$('pickAll');if(pa)pa.addEventListener('change',()=>{const ids=sortedRows().map(c=>String(c.client_id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderListZone();refocus('#pickAll');});
   const bs=$('bulkSend');if(bs)bs.addEventListener('click',bulkSend);
-  const bm=$('bulkMark');if(bm)bm.addEventListener('change',()=>{if(bm.value)bulkMark(bm.value);});
+  // batch C: picking a state asks first — it used to act the moment you picked
+  const bm=$('bulkMark');if(bm)bm.addEventListener('change',async()=>{
+    const to=bm.value;if(!to)return;const k=KIT();const n=PICKED.size;
+    const word=to==='on_hold'?'on hold':'active';
+    if(k&&!(await k.confirmIn(bm,{text:`Mark ${n} customer${n===1?'':'s'} ${word}?`,yes:'Yes, mark them'}))){bm.value='';return;}
+    bulkMark(to);
+  });
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
 

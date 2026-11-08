@@ -207,6 +207,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .bempty{font-size:12px;text-align:center;padding:10px var(--dds-s1,4px);opacity:.7}
   /* sales review item 31: the Views menu and the Columns picker beside the toolbar's buttons */
   .pvwrap,.colsdd{position:relative}
+  /* final pass, batch C: on a phone the toolbar wrapped to three rows. Manage services, Import CSV
+     and Columns fold under More, so it's one row of actions above List · Board · Table. */
+  .morewrap{display:none;position:relative}
+  @media (max-width:600px){#mngServicesTop,#importDeals,#colsWrap{display:none!important}.morewrap{display:inline-block}}
   .pvmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:240px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow,0 12px 32px rgba(0,0,0,.14));padding:6px}
   .pvmenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);padding:8px 10px;border-radius:var(--dds-r,8px);cursor:pointer}
   .pvmenu button:hover,.pvmenu button:focus-visible{background:var(--p-soft)}
@@ -316,12 +320,15 @@ html.dds-embed #detailWrap{padding-top:0}
     .stats{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
     .stats .st{flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px}
     .stats .ico{display:none}
-    .stats .v{font-size:16px}
+    .stats .v{font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
     .stats .s{white-space:normal;line-height:1.35}
+    .stats .st{padding:8px}   /* final pass, batch C: "$12,450" was cut off in a quarter of a phone */
     #filters{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px 2px}
     #filters::-webkit-scrollbar{display:none}
     #filters .chip{flex:0 0 auto;white-space:nowrap}
   }
+  @media (max-width:360px){.stats{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}}   /* batch C: too narrow for four in a row */
+  @media (max-width:767px){#seeWon,.linkbtn.big{min-height:44px}}   /* batch C: 44px on a phone */
   @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
   #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 var(--dds-s4,16px);overflow-x:auto;-webkit-overflow-scrolling:touch}
   #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:var(--dds-s2,8px) var(--dds-s3,12px);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
@@ -360,7 +367,7 @@ html.dds-embed #detailWrap{padding-top:0}
   <!-- "Manage services" also lives here: it used to be reachable ONLY from
        inside an open deal's Proposals section, so the catalog that unhides the
        proposal line-item dropdown was effectively undiscoverable. -->
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><span class="pvwrap"><button class="btn ghost" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span><span class="colsdd" id="colsWrap" hidden><button class="btn ghost" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><span class="pvwrap"><button class="btn ghost" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span><span class="colsdd" id="colsWrap" hidden><button class="btn ghost" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span><span class="morewrap"><button class="btn ghost" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu">More ▾</button><div id="moreMenu" class="pvmenu" role="menu" aria-label="More" hidden></div></span><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
   <div id="csvZone"></div>
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
@@ -424,7 +431,14 @@ const listUrl=()=>{const p=new URLSearchParams();if(scope())p.set('client',scope
 const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
-const money=(c)=>c?('$'+(c/100).toLocaleString(undefined,{minimumFractionDigits:0})):'';
+// final pass, batch C: on a phone the four numbers share one row (item 58); a long one
+// ("$12,450.50") shrinks to fit its quarter rather than being cut off
+function fitTiles(host){
+  if(!host||!window.matchMedia||!matchMedia('(max-width:600px)').matches)return;
+  host.querySelectorAll('.stats .v').forEach(v=>{v.style.fontSize='';let fs=15;while(v.scrollWidth>v.clientWidth+1&&fs>11){fs-=1;v.style.fontSize=fs+'px';}});
+}
+addEventListener('resize',()=>{clearTimeout(fitTiles.t);fitTiles.t=setTimeout(()=>fitTiles(document.querySelector('.stats')&&document.querySelector('.stats').parentNode),150);});
+const money=(c)=>c?money0(c):'';   // final pass, batch C: one money format — "$1,234.50", never "$1,234.5" (money0, below)
 // ── Oct 2026 benchmark (item 2): money in four states, ONE formula ──────────
 // Paid · Processing · Upcoming · Overdue come from moneyState — a VERBATIM mirror
 // of supabase/functions/presence/lib/money_state.ts (this page has no bundler).
@@ -548,7 +562,7 @@ const DDS_STARTER_SERVICES=[
 // Sales review item 33: the reasons offered when a deal is marked not a fit, so
 // Analytics' "Won and not a fit" report can group them. A MIRROR of
 // LOST_REASONS in lib/sales_reports.ts (kept in sync by hand; a pure test pins it).
-const LOST_REASONS=['Price','Timing','Went with someone else','No reply','Not a fit for us'];
+const LOST_REASONS=['Price','Timing','Went with someone else','No reply','Outside what we do'];   // batch C: "Not a fit for us" read like the stage itself
 // The Kanban board's open-stage columns (won/lost are OUTCOMES, not columns —
 // exactly like the summary's OPEN_STAGES).
 const BOARD_STAGES=['lead','qualified','proposal','contract'];
@@ -1477,7 +1491,7 @@ async function renderSummary(gen){
   const tile=(k,v,sub,ico,tone,subCls)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s${subCls?' '+subCls:''}">${sub}</div>`:''}</div></div>`;
   const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal'),'open',''):tile('Open','$0','no open deals yet','open','');
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
-  const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','no closed deals yet','rate','info')
+  const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
     :tile('Win rate',wr.pct+'%',`${wr.won} of ${wr.won+wr.lost}${(wr.window_days||0)>=3650?', all time':`, last ${wr.window_days||90} days`}`,'rate','info');
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
   // AR tile — "who owes me money" across all deals, in one glance (open invoices).
@@ -1488,6 +1502,7 @@ async function renderSummary(gen){
   if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+`&nbsp;· <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600;white-space:nowrap">see who →</a>`,'ar','warn','multiline'); }
   host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
     +(open.count?`<div class="sum-stages">${cells}</div>`:'');
+  fitTiles(host);   // final pass, batch C
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
 }
 
@@ -1762,7 +1777,7 @@ function renderList(){
   const list=[...visibleDeals()].sort((a,b)=>{const ac=isClosed(a)?1:0,bc=isClosed(b)?1:0;if(ac!==bc)return ac-bc;const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
   host.innerHTML=list.map(d=>{
     const step=shownStep(d);
-    const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
+    const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(niceDay(d.next_step_at)):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
     const cv=needsConvert(d)?`<div class="m conv">Not a customer yet — open to make them one</div>`:'';
     return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
@@ -1797,7 +1812,7 @@ function applySaved(v){
 async function saveView(){
   const k=KIT();if(!k)return;
   const cur=SAVED.find(x=>x.id===CURVIEW);
-  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view',back:'#pvBtn'});
   if(!name)return;
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
   const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:FILTER||'',q:Q,cols:shownT().map(c=>c[0]),sort:TSORT};
@@ -1805,17 +1820,49 @@ async function saveView(){
   if(!out){toast('That view didn’t save — try again in a moment.',true);return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
   paintViewsMenu();toast('View saved — it’s under Views.');
+  const b=$('pvBtn');if(b)b.focus();   // batch C: focus comes back to Views
 }
 async function dropView(){
   const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  // batch C: a saved view is the whole team's — ask in place first (where the Views button was)
+  if(!(await k.confirmIn($('pvBtn'),{text:`Remove “${cur.name}” for everyone?`,yes:'Yes, remove it'})))return;
   const out=await k.saveViews('pipeline',SAVED.filter(x=>x.id!==cur.id));
   if(!out){toast('That didn’t save — try again in a moment.',true);return;}
   SAVED=out;CURVIEW='';paintViewsMenu();toast('View removed.');
+  const b=$('pvBtn');if(b)b.focus();   // batch C: focus comes back to Views
+}
+// the Columns menu, from the Columns button or (on a phone) from More
+function openCols(anchor){const k=KIT();if(!k)return;k.columnsMenu(anchor,TCOLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderTable();});}
+// final pass, batch C: More (phones) holds Manage services, Import CSV and — in the table — Columns.
+// Each item presses the real button, so nothing behind them changes.
+function paintMore(){
+  const m=$('moreMenu');if(!m)return;const cols=$('colsWrap')&&!$('colsWrap').hidden;
+  const imp=$('importDeals')&&!$('importDeals').hidden;   // not inside a client (the import is the studio's)
+  m.innerHTML='<button type="button" role="menuitem" data-more="services">Manage services</button>'+(imp?'<button type="button" role="menuitem" data-more="import">Import CSV</button>':'')+(cols?'<button type="button" role="menuitem" data-more="cols">Columns</button>':'');
+}
+function closeMore(back){const m=$('moreMenu'),b=$('moreBtn');if(!m||m.hidden)return;m.hidden=true;if(b){b.setAttribute('aria-expanded','false');if(back)b.focus();}}
+function wireMore(){
+  const b=$('moreBtn'),m=$('moreMenu');if(!b||!m)return;
+  b.addEventListener('click',(e)=>{e.stopPropagation();if(!m.hidden){closeMore(false);return;}paintMore();m.hidden=false;b.setAttribute('aria-expanded','true');const k=KIT();if(k&&k.fit)k.fit(m);const f=m.querySelector('button');if(f)f.focus();});
+  m.addEventListener('click',(e)=>{
+    e.stopPropagation();const t=e.target.closest('button[data-more]');if(!t)return;const w=t.dataset.more;
+    closeMore(true);   // focus back on More first, so what opens next returns there
+    if(w==='services'){const x=$('mngServicesTop');if(x)x.click();}
+    else if(w==='import'){const x=$('importDeals');if(x)x.click();}
+    else if(w==='cols')openCols(b);
+  });
+  m.addEventListener('keydown',(e)=>{
+    const opts=[...m.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();closeMore(true);}
+    else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+  });
+  document.addEventListener('click',(e)=>{if(!e.target.closest('.morewrap'))closeMore(false);});
 }
 function wireViews(){
   const b=$('pvBtn'),m=$('pvMenu');if(!b||!m)return;
   paintViewsMenu();
-  b.addEventListener('click',(e)=>{e.stopPropagation();if(!m.hidden){closeViews(false);return;}paintViewsMenu();m.hidden=false;b.setAttribute('aria-expanded','true');const f=m.querySelector('button');if(f)f.focus();});
+  b.addEventListener('click',(e)=>{e.stopPropagation();if(!m.hidden){closeViews(false);return;}paintViewsMenu();m.hidden=false;b.setAttribute('aria-expanded','true');const k=KIT();if(k&&k.fit)k.fit(m);const f=m.querySelector('button');if(f)f.focus();});   // batch C: kept on screen
   m.addEventListener('click',(e)=>{
     e.stopPropagation();
     const t=e.target.closest('button');if(!t)return;
@@ -1830,7 +1877,7 @@ function wireViews(){
     else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
   });
   document.addEventListener('click',(e)=>{if(!e.target.closest('.pvwrap'))closeViews(false);});
-  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{e.stopPropagation();const k=KIT();if(!k)return;k.columnsMenu(cb,TCOLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderTable();});});
+  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{e.stopPropagation();openCols(cb);});
   const im=$('importDeals');if(im)im.addEventListener('click',importDeals);
 }
 function bulkHtml(){
@@ -1847,14 +1894,17 @@ async function bulkSend(){
   if(!(await k.sendTo(people)))if(b)b.disabled=false;
 }
 async function bulkLost(){
+  // final pass, batch C: marking deals not a fit asks in place first
+  const k=KIT(),n=PICKED.size;
+  if(k&&!(await k.confirmIn($('bulkLost'),{text:`Mark ${n} deal${n===1?'':'s'} as not a fit?`,yes:'Yes, mark them'})))return;
   const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
   PICKED.clear();renderTable();   // the bar goes at once: picks made while this runs are new picks, never wiped at the end
   let ok=0,skip=0,fail=0;
   for(const d of picked){
-    if(!boardCanMove(d.stage,'lost')){skip++;continue;}   // won, already closed, or a customer
+    if(!boardCanMove(d.stage,'lost')){skip++;continue;}   // won, already not a fit, or a customer
     try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to:'lost'});ok++;}catch(_){fail++;}
   }
-  toast(`${ok} marked not a fit${skip?` · ${skip} already closed`:''}${fail?` · ${fail} couldn’t change`:''}.`,!!fail);
+  toast(`${ok} marked not a fit${skip?` · ${skip} already won or not a fit`:''}${fail?` · ${fail} couldn’t change`:''}.`,!!fail);
   load();
 }
 // item 32: deals from a CSV — the contacts importer's flow (shell.js). Each row
@@ -1862,9 +1912,9 @@ async function bulkLost(){
 const STAGE_WORDS=[[/won|closed ?won/,'won'],[/lost|not a fit|closed ?lost|dead/,'lost'],[/contract|agreement|negotiat|sign/,'contract'],[/proposal|quote|estimate/,'proposal'],[/qualif/,'qualified'],[/lead|new|open|prospect/,'lead']];
 function importDeals(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
-  k.importPanel(z,{
+  k.importPanel(z,{back:'#importDeals',
     title:'Import deals from a CSV',
-    help:'One row per deal: a deal name (or the company), and if you have them the value, stage, contact name and email, and close date. Won and lost deals are skipped; a contact already in your list (by email) is reused. Nobody is emailed.',
+    help:'One row per deal: a deal name (or the company), and if you have them the value, stage, contact name and email, and close date. Won and not-a-fit deals are skipped; a contact already in your list (by email) is reused. Nobody is emailed.',
     noun:'deal',
     mapHeader:(h)=>{h=String(h).toLowerCase().trim();
       if(/e-?mail/.test(h))return'email';if(/stage|status/.test(h))return'stage';if(/close|due/.test(h))return'close';
@@ -1930,8 +1980,8 @@ function renderTable(){
     const step=shownStep(d);
     const overdue=step&&!isClosed(d)&&d.next_step_at&&d.next_step_at<=today;
     const ns=step
-      ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(d.next_step_at)}</span>`
-               :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(d.next_step_at)}</span>`:''}`)
+      ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(niceDay(d.next_step_at))}</span>`
+               :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(niceDay(d.next_step_at))}</span>`:''}`)
       :'—';
     const CELL={title:()=>`<td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>`,contact:()=>`<td>${esc(cn)}</td>`,
       stage:()=>`<td>${stageBadge(d.stage,d.agreement_signed)}${needsConvert(d)?' <span class="mut conv">· not a customer yet</span>':''}</td>`,
@@ -2013,7 +2063,7 @@ function wonColInner(){
 function outcomeColsHtml(){
   const lost=DEALS.filter(d=>d.stage==='lost').length;
   return `<section class="col col-out col-won" id="wonCol" aria-label="Won column">${wonColInner()}</section>`
-    +`<section class="col col-out col-lost" id="lostCol" aria-label="Not a fit column"><header class="col-h"><span class="col-t">Not a fit</span>${lost?`<span class="col-n">${lost}</span>`:''}</header><div class="col-tip mut">Drop a deal here to close it</div><div class="col-body lost-drop" data-drop="lost"><div class="bempty mut">Drop here</div></div></section>`;
+    +`<section class="col col-out col-lost" id="lostCol" aria-label="Not a fit column"><header class="col-h"><span class="col-t">Not a fit</span>${lost?`<span class="col-n">${lost}</span>`:''}</header><div class="col-tip mut">Drag a deal here, or open it and choose Not a fit</div><div class="col-body lost-drop" data-drop="lost"><div class="bempty mut">Drop here</div></div></section>`;
 }
 function renderBoard(){
   const host=$('board');
@@ -2033,7 +2083,7 @@ function renderBoard(){
   const terminal=DEALS.length-open.length;
   host.innerHTML=`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
     +(open.length?'':'<div class="mut" style="margin-top:12px">No open deals yet. Add one to start the pipeline.</div>')
-    +(terminal>0?`<div class="mut board-foot">${terminal} won or closed deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
+    +(terminal>0?`<div class="mut board-foot">${terminal} won or not-a-fit deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
   wireBoard();
   const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});
 }
@@ -2409,8 +2459,8 @@ async function openDeal(id){
       <div class="dbody">
         <div class="sec life" id="dealLife"><h3>Move stage</h3><div id="pathHost"></div>
           ${d.converted_client_id?'<div class="mut" style="margin-top:10px">Won ✓ — converted to a customer</div>'
-            :d.stage==='lost'?`<div class="row2" style="margin-top:10px"><span class="mut">Marked as lost.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button></div>`
-            :nextStages.includes('lost')?`<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button class="btn ghost" id="markLost" style="border-color:transparent;color:var(--soft)">Mark as lost (not a fit)</button></div>`:''}
+            :d.stage==='lost'?`<div class="row2" style="margin-top:10px"><span class="mut">Marked as not a fit.${d.lost_reason?' '+esc(d.lost_reason):''}</span> <button class="btn ghost" data-stage="lead">Reopen this deal</button></div>`
+            :nextStages.includes('lost')?`<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button class="btn ghost" id="markLost" style="border-color:transparent;color:var(--soft)">Mark as not a fit</button></div>`:''}
           <div id="lostForm"></div></div>
         <div class="tabs" role="tablist" aria-label="Deal sections">${dtabBtn('overview','Overview','')}${dtabBtn('billing','Billing',billN)}${dtabBtn('activity','Activity',tlN)}</div>
         ${dpanel('overview')}<div class="dcols"><div class="dcol-main">
@@ -2568,7 +2618,7 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});PENDING_BACK='';toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
-    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
+    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as not a fit');openDeal(id);load();}catch(e){toast(nice(e),true);}});
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     // Saving Details saves the CONTACT too. An existing contact is patched in
@@ -2997,8 +3047,8 @@ async function boot(){
     if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;if(urlStage==='won'||urlStage==='lost')VIEW='list';}
     renderFilters();
     // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
-    if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});}
-    else{wireViews();loadSavedViews();
+    if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
+    else{wireViews();wireMore();loadSavedViews();
       // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
       api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
