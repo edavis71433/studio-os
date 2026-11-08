@@ -2561,9 +2561,10 @@ async function moveCategory(cat, dir) {
   const i = cats.indexOf(cat), j = i + dir;
   if (j < 0 || j >= cats.length) return;
   [cats[i], cats[j]] = [cats[j], cats[i]];
+  const before = { category_order: undoClone((S.settings || {}).category_order || []) };   // S moves ahead of the write, so Undo is told what it was
   S.settings = { ...(S.settings || {}), category_order: cats };
   renderOfferings();
-  try { await settingsTurn(() => api("PUT", "/settings", { category_order: cats })); scheduleChangesRefresh(); }
+  try { await settingsPut(() => { UNDO_BEFORE = before; return { category_order: cats }; }); scheduleChangesRefresh(); }
   catch (err) { toast(nice(err), true); }
 }
 

@@ -790,3 +790,18 @@ test.describe('Publish waits for what was just typed', () => {
     expect(saved.at(-1)!.body.blocks[0].title).toBe('Fresh heading');
   });
 });
+
+test.describe('Undo takes back a menu-category move', () => {
+  test('move a category earlier, then Undo: the order goes back', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#offerings', { '/offerings': { data: [
+      { id: 'o1', name: 'Soup', category: 'Starters', price_text: '$5', description: '', is_visible: true, sort_order: 0 },
+      { id: 'o2', name: 'Steak', category: 'Mains', price_text: '$25', description: '', is_visible: true, sort_order: 1 },
+    ] } });
+    const orders = () => writes.filter((w) => w.path === '/settings' && w.body && 'category_order' in w.body).map((w) => w.body.category_order);
+    await page.getByRole('button', { name: 'Move Mains earlier' }).click();
+    await expect.poll(orders).toEqual([['Mains', 'Starters']]);
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(orders).toEqual([['Mains', 'Starters'], []]);   // the usual order, as before any move
+  });
+});
