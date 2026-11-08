@@ -26,7 +26,12 @@ for f in tests/presence/*_test.mjs; do
   elif printf '%s' "$out" | grep -qiE "need SB|SB, SR_KEY, ANON|SR_KEY, ANON|need .*SR_KEY"; then
     skip=$((skip+1)); echo "SKIP  $f (integration-only — needs live Supabase)"
   else
-    fail=$((fail+1)); failed="$failed\n  $f"; echo "FAIL  $f"; printf '%s\n' "$out" | tail -6
+    fail=$((fail+1)); failed="$failed\n  $f"; echo "FAIL  $f"
+    # Every failed assertion, wherever it sits in the output, then the end of the
+    # output for a crash or a summary. The tail alone hid which one of 70 failed
+    # in gbp_test.mjs on Nov 6 2026.
+    printf '%s\n' "$out" | grep -E '^FAIL'
+    printf '%s\n' "$out" | tail -6
   fi
 done
 
