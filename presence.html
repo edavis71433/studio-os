@@ -12672,13 +12672,23 @@ function dcInjectCanvas(doc, main) {
   if (IPE_LIVE_MSG) { ipeAnnounce(doc, IPE_LIVE_MSG); IPE_LIVE_MSG = null; }
   if (!doc.body.hasAttribute("data-dc-touch")) {
     doc.body.setAttribute("data-dc-touch", "1");
-    doc.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") doc.__dcTouchAt = Date.now(); }, true);
-    // a tap off every section puts the toolbar away
-    doc.addEventListener("click", (e) => {
-      if (!byTouch() || !doc.__dcSel) return;
+    doc.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      doc.__dcTouchAt = Date.now();
+      doc.__dcTapFrom = { x: e.clientX, y: e.clientY, at: Date.now() };
+    }, true);
+    // A tap off every section puts the toolbar away. It's read from the finger lifting, not
+    // from a click: Safari sends no click for a tap on something that takes none (a footer,
+    // the page's background), so on an iPhone the toolbar stayed up. A finger that moved or
+    // stayed down is a scroll or a hold, not a tap.
+    doc.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      const from = doc.__dcTapFrom; doc.__dcTapFrom = null;
+      if (!from || Math.abs(e.clientX - from.x) > 10 || Math.abs(e.clientY - from.y) > 10 || Date.now() - from.at > 600) return;
+      if (!doc.__dcSel) return;
       if (e.target.closest && e.target.closest("main > section, main > nav.block-toc, #dds-dc-bar, #dds-ipe-bar, .dc-ins, .dc-colh, .dc-emptyzone")) return;
       hideBar();
-    });
+    }, true);
   }
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {

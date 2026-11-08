@@ -282,6 +282,31 @@ const touchChecks = () => {
     await expect(bar).not.toHaveClass(/\bon\b/);
     await expect(frame.locator('.dc-hot')).toHaveCount(0);
   });
+  // Safari sends no click for a tap on something that takes none, like the footer: only the
+  // finger going down and up. The toolbar stayed up on an iPhone, and in the Linux browsers
+  // GitHub runs the checks in.
+  const fingerOn = (frame: any, sel: string, dy = 0) => frame.locator(sel).evaluate((el: Element, move: number) => {
+    const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const at = (type: string, py: number) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true, clientX: x, clientY: py }));
+    at('pointerdown', y); at('pointerup', y + move);
+  }, dy);
+  test('a tap that brings no click still puts the toolbar away', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').tap();
+    await expect(bar).toHaveClass(/\bon\b/);
+    await fingerOn(frame, '#ft');
+    await expect(bar).not.toHaveClass(/\bon\b/);
+  });
+  test('a finger that scrolls off the sections leaves the toolbar up', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').tap();
+    await expect(bar).toHaveClass(/\bon\b/);
+    await fingerOn(frame, '#ft', 80);
+    await page.waitForTimeout(300);
+    await expect(bar).toHaveClass(/\bon\b/);
+  });
   test('a second tap on the selected section’s words edits them in place', async ({ page }) => {
     const { frame } = await touchCanvas(page);
     const h = frame.locator('section#a h2[data-dds-field="title"]');
