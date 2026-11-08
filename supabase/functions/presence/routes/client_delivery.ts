@@ -6,7 +6,7 @@
 // agency workspace; a customer can only ever reach their own linked, client-
 // visible records. Internal notes/tasks/files/approvals never appear here.
 import { newestPerRequest, supportActivityAt, clientSupportNews, lastLine } from '../lib/support_activity.ts';
-import { customerNames } from '../lib/customer_names.ts';
+import { customerNames, loadCustomerNames } from '../lib/customer_names.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
@@ -853,16 +853,11 @@ export async function handleStudioCustomers(_req: Request, jwt: string, site: Si
   ]);
   const clientById: Record<string, any> = {}; for (const c of rows(clientsR)) clientById[String(c.id)] = c;
   const projectById: Record<string, any> = {}; for (const p of rows(projectsR)) projectById[String(p.id)] = p;
-  // Sales review item 22 (second half): a customer is a business AND a person —
-  // the business from their own site's identity or their contact's company, the
-  // person from that contact (lib/customer_names.ts). Best-effort reads.
-  const siteIds = [...new Set(links.map((l) => l.customer_site_id).filter(Boolean).map(String))];
-  const [identR, contactR] = await Promise.all([
-    siteIds.length ? svc(`presence_identity?site_id=in.(${siteIds.join(',')})&select=site_id,business_name`).catch(() => ({ json: [] })) : Promise.resolve({ json: [] }),
-    clientIds.length ? svc(`presence_contacts?site_id=eq.${site.id}&client_id=in.(${clientIds.join(',')})&deleted_at=is.null&select=client_id,name,company,updated_at&order=updated_at.desc&limit=500`).catch(() => ({ json: [] })) : Promise.resolve({ json: [] }),
-  ]);
-  const bizBySite: Record<string, string> = {}; for (const i of rows(identR as any)) bizBySite[String(i.site_id)] = String(i.business_name || '');
-  const contactByClient: Record<string, any> = {}; for (const c of rows(contactR as any)) { const k = String(c.client_id || ''); if (k && !contactByClient[k]) contactByClient[k] = c; }
+  // Sales review item 22 (second half) + item 49: a customer is a business AND a
+  // person — the business from their own site (unless that only repeats the
+  // person) or their contact's company, the person from that contact, found
+  // through the won deal or a stamp (lib/customer_names.ts). Best-effort reads.
+  const namesByClient = await loadCustomerNames(String(site.id), links.map((l) => ({ clientId: String(l.customer_client_id || ''), clientName: (clientById[String(l.customer_client_id)] || {}).name, customerSiteId: l.customer_site_id ? String(l.customer_site_id) : null })), (path) => svc(path).then((r) => rows(r as any))).catch(() => ({} as Record<string, any>));
   const supportByProject: Record<string, number> = {};
   // Sales review B2: a project-less request counts against its customer by its
   // stamp (healed from the requester's sign-in when missing). Before this only
@@ -886,8 +881,7 @@ export async function handleStudioCustomers(_req: Request, jwt: string, site: Si
     if (!byCustomer.has(cid)) {
       const c = clientById[cid] || {};
       const proj = projectById[String(l.project_id)] || null;
-      const ct = contactByClient[cid] || {};
-      const names = customerNames({ clientName: c.name, siteBusinessName: l.customer_site_id ? bizBySite[String(l.customer_site_id)] : '', contactName: ct.name, contactCompany: ct.company });
+      const names = namesByClient[cid] || customerNames({ clientName: c.name });
       byCustomer.set(cid, {
         client_id: cid,
         name: clean(names.name, 200) || 'Customer',

@@ -34,11 +34,15 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as 
 // deliberately excluded — they are studio/platform-global (no per-site key), so
 // including them could leak another tenant's audience. Everything here is scoped
 // by site_id, so a broadcast can only ever reach the sender's own people.
-export type SegmentKey = 'contacts' | 'enquiries' | 'enquiries_30d';
+export type SegmentKey = 'customers' | 'contacts' | 'enquiries' | 'enquiries_30d';
 
 export interface SegmentDef { key: SegmentKey; label: string; description: string }
 
 export const SEGMENTS: SegmentDef[] = [
+  // Second walk (Nov 8, item 56): a studio writing to the people it works for had
+  // to pick them on Customers first. Only a studio has customers; the route hides
+  // this list when it would reach no one.
+  { key: 'customers',     label: 'Your customers',            description: 'Everyone you work for — each customer on your Customers page.' },
   { key: 'contacts',      label: 'All contacts',              description: 'Everyone saved in your contacts.' },
   { key: 'enquiries',     label: 'All website enquiries',     description: 'Everyone who has messaged you through your website.' },
   { key: 'enquiries_30d', label: 'Recent enquiries (30 days)', description: 'People who enquired through your website in the last month.' },
@@ -166,6 +170,13 @@ export async function fetchAudienceRows(siteId: string, key: AudienceKey): Promi
   if (isListKey(key)) {
     const l = (await loadPickedLists(siteId)).find((x) => `list:${x.id}` === key);
     return l ? l.people.slice(0, RECIPIENT_CAP) : [];   // a removed list reaches no one
+  }
+  if (key === 'customers') {
+    // the studio's active service links prove who is a customer of THIS site
+    const links = rows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&select=customer_client_id&limit=${RECIPIENT_CAP}`));
+    const ids = [...new Set(links.map((l: any) => String(l.customer_client_id || '')).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))];
+    if (!ids.length) return [];
+    return rows(await svc(`clients?id=in.(${ids.join(',')})&select=name,email,contact_email`)).map((c: any) => ({ email: c.email || c.contact_email || '', name: c.name || '' }));
   }
   if (key === 'contacts') {
     return rows(await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`));

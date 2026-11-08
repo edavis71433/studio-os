@@ -119,7 +119,10 @@ export interface ClientProfileSummary {
 
 /** Derive a calm health word from aggregated signals. No numbers, no ranking. */
 export function deriveClientHealth(p: Omit<ClientProfileSummary, 'health'>, nowIso: string): HealthLevel {
-  if (!p.live && !p.last_published_at) return 'new';
+  // Second walk (Nov 8, item 51): a monitor-plan site is the client's own website
+  // hosted elsewhere — Home and Analytics say so — so "never published here" is
+  // not "getting set up". Bacchus, live for months, read "nothing published yet".
+  if (!p.live && !p.last_published_at && p.edition !== 'monitor') return 'new';
   if (p.connected_needing_attention > 0) return 'attention';
   if (p.pending_approvals > 0) return 'attention';
   return 'healthy';
@@ -130,7 +133,8 @@ export function deriveClientHealth(p: Omit<ClientProfileSummary, 'health'>, nowI
 export function relationshipSummary(p: ClientProfileSummary, lastActivityAt: string | null, nowIso: string): string {
   const name = p.business_name || 'This business';
   const parts: string[] = [];
-  if (p.health === 'new') parts.push(`${name} is getting set up — nothing has been published yet.`);
+  if (p.edition === 'monitor' && !p.live) parts.push(`${name}’s website is hosted elsewhere.`);
+  else if (p.health === 'new') parts.push(`${name} is getting set up — nothing has been published yet.`);
   else if (p.live) parts.push(`${name}’s website is live.`);
   else parts.push(`${name}’s website isn’t live right now.`);
 

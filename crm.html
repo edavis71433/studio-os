@@ -425,6 +425,24 @@ const PIPELINE_GUIDANCE={
     todos:['Note why it didn’t fit','Set a reminder to check back']},
 };
 const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
+// Second walk (Nov 8): a won deal's tip said "kick things off" on a project 70%
+// along (item 52), and its "Sign Contract · Aug 6" stayed the Next step after
+// it was won and paid (item 50). Once won, the tip reads the project; a closed
+// deal's next step with no date or a past date is history, not what's next.
+// item 51: what the record calls the website — the same words as Home and Analytics
+const siteWord=(p)=>p.live?'Live':(p.edition==='monitor'?'Hosted elsewhere':(p.last_published_at?'Offline':'Not yet'));
+function guideNow(stage){
+  if(stage!=='won')return guidanceFor(stage);
+  const proj=(PROJ&&PROJ.project)||null; const pct=Number(PROJ&&PROJ.progress&&PROJ.progress.pct)||0;
+  if(proj&&proj.status==='complete')return {...PIPELINE_GUIDANCE.won,tip:'Their project is done.',action:'Check in with them, or ask for a review'};
+  if(proj&&pct>0)return {...PIPELINE_GUIDANCE.won,tip:`Their project is ${pct}% along.`,action:'Open their project to see what’s left'};
+  return guidanceFor('won');
+}
+function liveNextStep(d){
+  const ns=String((d&&d.next_step)||'').trim(); if(!ns)return '';
+  if(d.stage==='won'||d.stage==='lost'){const at=String(d.next_step_at||'').slice(0,10);if(!at||at<recTodayYmd())return '';}
+  return ns;
+}
 // forward one · back one · →lost; never →won (convert-only — server re-checks)
 const BOARD_NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost'],proposal:['contract','qualified','lost'],contract:['proposal','lost'],won:[],lost:['lead']};
 const PATH_STEPS=['lead','qualified','proposal','contract'];   // won/lost are terminal outcomes, not steps
@@ -582,12 +600,18 @@ function renderDetailsCard(){
   if(hd.email)rows.push([svg('mail'),`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`]);
   if(hd.phone)rows.push([svg('phone'),`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`]);
   if(hd.company)rows.push([svg('company'),esc(hd.company)]);
-  if(p)rows.push([svg('site'),'Website: '+esc(p.live?'live':(p.last_published_at?'offline':'not yet'))]);
+  // item 49: a customer with no business name on file gets one line asking for it —
+  // it saves as their contact's company, and Customers then leads with it
+  else if(hd.status==='customer'&&s.details&&REC.identity&&REC.identity.contact_id)rows.push([svg('company'),'<button type="button" class="link-btn" data-add-biz>Add their business name</button>']);
+  if(p)rows.push([svg('site'),'Website: '+esc(siteWord(p).toLowerCase())]);
   if(p&&p.health)rows.push([svg('health'),'Health: '+esc(p.health==='attention'?'needs attention':p.health==='new'?'getting set up':p.health)]);
   if(!rows.length)rows.push(['<span></span>','<span class="muted">No details yet — add them under Edit.</span>']);
   host.innerHTML=`<div class="card dcard"><div class="card-h"><span class="t">Customer details</span>${s.details?'<button type="button" class="link-btn" data-edit-details>Edit</button>':''}</div><div class="dkv">${rows.map(r=>r[0]+'<span>'+r[1]+'</span>').join('')}</div></div>`;
   const eb=host.querySelector('[data-edit-details]');
-  if(eb)eb.addEventListener('click',()=>{showTab('details');const f=document.querySelector('#tabbody [data-edit]');if(f)f.click();});
+  // the Edit used to look for a [data-edit] the contact card never had, so it only switched tabs
+  if(eb)eb.addEventListener('click',()=>{WANT_EDIT='ec-name';showTab('details');});
+  const ab=host.querySelector('[data-add-biz]');
+  if(ab)ab.addEventListener('click',()=>{WANT_EDIT='ec-company';showTab('details');});
 }
 
 // ── the action bar: every common thing you do for a client, one click from the
@@ -677,7 +701,7 @@ async function loadPanels(){
   const jobs=[];
   if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();renderDetailsCard();if(TAB==='details')showTab(TAB,true);}));
   if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
-  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
+  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();renderHighlights();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
 }
@@ -703,13 +727,13 @@ function renderHighlights(){
     tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
   const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
   if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':(mb.processing.count?'info':''),s:esc(owedSub)});
-  const ns=(d.id?d.next_step:hl.next_step)||'';
+  const ns=(d.id?liveNextStep(d):hl.next_step)||'';
   // Phase 3 (stage-aware): with no next step set, the tile suggests the stage's
   // own "do next" (a won deal says "open their project", never a blank dash)
-  const suggested=(d.id&&!ns&&d.stage)?guidanceFor(d.stage).action:'';
-  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:d.next_step_at?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
+  const suggested=(d.id&&!ns&&d.stage)?guideNow(d.stage).action:'';
+  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:(ns&&d.next_step_at)?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
-  if(!d.id&&p)tiles.push({k:'Website',v:esc(p.live?'Live':(p.last_published_at?'Offline':'Not yet')),ico:'site',tone:'',s:''});
+  if(!d.id&&p)tiles.push({k:'Website',v:esc(siteWord(p)),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
   host.innerHTML=`<div class="hl-panel">${tiles.slice(0,4).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
   const eb=host.querySelector('[data-hledit]');
@@ -770,7 +794,7 @@ function renderPath(){
     if(stage==='lost')return '';
     return mk('Won',won?'done':'')+mk('Project',projDone?'done':projCur?'current':'')+mk('Growth',projDone?'current':'');
   })();
-  const g=guidanceFor(stage);
+  const g=guideNow(stage);
   // the right-side action: forward = "Mark Stage as Complete" (BOARD_NEXT[stage][0]
   // when it's a forward move); at contract+signed it becomes Convert (won is
   // convert-only — the heavy machinery stays on pipeline.html, we don't rebuild it).
@@ -790,6 +814,10 @@ function renderPath(){
     ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button class="primary" id="backGo">Move back</button><button id="backNo">Cancel</button></div>`:''}
     ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${esc(g.action)}</div>`:''}
   </div>`;
+  // item 57: on a phone the strip scrolls sideways — open it on the current
+  // stage, not on a cut-off "New lead" with the current one out of sight
+  const pth=host.querySelector('.path'),curStep=host.querySelector('.path .pstep.current');
+  if(pth&&curStep&&pth.scrollWidth>pth.clientWidth){const dx=curStep.getBoundingClientRect().left-pth.getBoundingClientRect().left;pth.scrollLeft=Math.max(0,pth.scrollLeft+dx-(pth.clientWidth-curStep.offsetWidth)/2);}
   const mc=$('markComplete');
   if(mc)mc.addEventListener('click',()=>moveStage(fwd,mc));
   host.querySelectorAll('.pstep.canback').forEach(b=>b.addEventListener('click',()=>{
@@ -835,6 +863,7 @@ function showTab(tab,initial){
 // when PROFILE lands, and without the cache that duplicated the /sales/contacts/:id
 // read and flashed the pane back to a spinner mid-paint.
 let CONTACT_CACHE=null;   // {cid, promise}
+let WANT_EDIT='';        // item 49: the details card's Edit / "Add their business name" open the editor on that box once the tab draws
 async function loadDetails(host){
   const cid=(REC.identity&&REC.identity.contact_id)||'';
   let d=null;
@@ -851,7 +880,7 @@ async function loadDetails(host){
   if(d){
     const c=d.contact||{}; const cf=d.custom_fields||[]; const cv=c.custom||{};
     DETAIL={cid,c,cf};
-    const rows=[['Name',c.name],['Company',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
+    const rows=[['Name',c.name],['Business',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
     html+=`<section><h2>Contact <button class="link" id="editContact" style="border:none;background:none;font-size:13px;color:var(--p);cursor:pointer;padding:0;text-transform:none;letter-spacing:0">Edit</button></h2><div class="card"><div class="kv">`+(rows.length?rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join(''):'<div class="muted">No details yet — tap Edit to add them.</div>')+`</div></div></section>`;
     if(cf.length){
       html+=`<section><h2>Custom fields</h2><div class="card"><div class="kv">`+cf.map(f=>`<div class="k">${esc(f.label||f.key)}</div><div>${esc(cv[f.key]!=null&&cv[f.key]!==''?cv[f.key]:'—')}</div>`).join('')+`</div></div></section>`;
@@ -867,7 +896,7 @@ async function loadDetails(host){
   if(PROFILE){
     const p=PROFILE.profile||{}; const h=p.health;
     const facts=[
-      ['Website', p.live?'Live':(p.last_published_at?'Offline':'Not yet'), p.last_published_at?('published '+when(p.last_published_at)):''],
+      ['Website', siteWord(p), p.last_published_at?('published '+when(p.last_published_at)):''],
       ['Approvals', String(p.pending_approvals||0), p.pending_approvals?'waiting':'all clear'],
       ['Connected', String(p.connected||0), p.connected_needing_attention?(p.connected_needing_attention+' need a look'):'healthy'],
       ['Moments', String(p.active_moments||0), 'worth a look'],
@@ -884,6 +913,7 @@ async function loadDetails(host){
   if(!html)html='<p class="muted">No contact on file yet.</p>';
   host.innerHTML=html;
   const eb=$('editContact'); if(eb)eb.onclick=()=>editContact(host);
+  if(WANT_EDIT&&eb){const f=WANT_EDIT;WANT_EDIT='';editContact(host);const box=$(f);if(box)box.focus();}
   const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
 }
 // Edit the contact inline (PATCH /sales/contacts/:id — the existing path, kept).
@@ -907,7 +937,7 @@ function editContact(host){
     return lab(id,esc(f.label||f.key))+inp(id,v,f.type==='number'?'number':(f.type==='date'?'date':'text'),` data-cf="${esc(f.key)}"`);
   };
   host.innerHTML=`<section><h2>Edit contact</h2><div class="card">
-    ${field('ec-name','Name',c.name)}${field('ec-company','Company',c.company)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}
+    ${field('ec-name','Name',c.name)}${field('ec-company','Business name',c.company)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}
     ${defs.map(cfField).join('')}
     <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>
     <section><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">Removing a contact takes them off your contact list. Their deals, agreements, invoices and projects are never deleted with them.</p>
@@ -1328,7 +1358,7 @@ async function loadActivityFallback(q,seq){
   const dealHref=ids.deal?agHref('pipeline.html','deal='+encodeURIComponent(ids.deal)):null;
   for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),href:dealHref});
   const d=DEAL&&DEAL.deal;
-  if(d&&d.next_step)upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),href:dealHref});
+  if(d&&liveNextStep(d))upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),href:dealHref});
   // item 2: only an invoice still WAITING on the client belongs here, and its
   // overdue flag is the one formula's word (a processing payment is on its way)
   for(const iv of invWaiting((DEAL&&DEAL.invoices)||[]))upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:invState(iv)==='overdue',href:dealHref});

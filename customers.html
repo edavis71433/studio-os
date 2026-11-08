@@ -35,6 +35,11 @@
   .viewdd{position:relative;min-width:0;flex:1}
   #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
+  /* Second walk (Nov 8, item 59): on a phone "All customers" broke onto two centred
+     lines beside the icon. The view name stays on one line and trims with … */
+  #viewBtn{max-width:100%;min-width:0}
+  #viewBtn .vl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media (max-width:600px){#viewBtn{font-size:17px;padding-left:6px;padding-right:4px}}
   #viewBtn .car{font-size:10px;color:var(--faint)}
   #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
@@ -382,7 +387,7 @@ function headerHtml(count){
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🏢</span>
       <div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}">${esc(viewLabel())} <span class="car" aria-hidden="true">▾</span></button>
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
       </div>
       <div class="seg" role="group" aria-label="Display as">

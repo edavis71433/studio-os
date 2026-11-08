@@ -68,7 +68,7 @@ export async function handleBroadcastSegments(site: SiteRow, cors: Record<string
   const lists = (await loadPickedLists(site.id).catch(() => [])).slice().reverse().map((l) => ({
     key: `list:${l.id}`, label: l.name, description: `A list you picked · ${l.people.length} ${l.people.length === 1 ? 'person' : 'people'}`, count: l.people.length, list: true,
   }));
-  return json({ data: { segments: [...SEGMENTS.map((s) => ({ ...s, count: counts[s.key] ?? 0 })), ...lists] } }, 200, cors);
+  return json({ data: { segments: [...SEGMENTS.filter((s) => s.key !== 'customers' || (counts[s.key] ?? 0) > 0).map((s) => ({ ...s, count: counts[s.key] ?? 0 })), ...lists] } }, 200, cors);   // item 56: no customers, no customers list
 }
 
 /** A list key must name one of THIS site's lists; a segment key is always fine. */

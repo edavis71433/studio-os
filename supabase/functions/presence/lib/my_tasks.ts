@@ -14,6 +14,8 @@ export interface MyTask {
   context: string;       // the deal title or project name
   href: string;
   blocked: boolean;      // a blocked project task cannot be ticked done from Home
+  later: boolean;        // item 53: an undated project step behind that project's next open step
+  order: number | null;  // a project step's place on its checklist (sort_order), so Home can move the next one up
 }
 export const MY_TASKS_OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
 export const MY_TASKS_MAX = 50;
@@ -33,7 +35,7 @@ export function buildMyTasks(input: {
     if (!d || !d.id || !MY_TASKS_OPEN_STAGES.includes(String(d.stage))) continue;
     const t = String(d.next_step || '').trim();
     if (!t) continue;
-    out.push({ kind: 'next_step', id: String(d.id), parent_id: String(d.id), title: t, due: ymd(d.next_step_at), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false });
+    out.push({ kind: 'next_step', id: String(d.id), parent_id: String(d.id), title: t, due: ymd(d.next_step_at), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
   }
   const dealById = new Map((input.taskDeals || []).filter((d) => d && d.id).map((d) => [String(d.id), d]));
   for (const t of input.dealTasks || []) {
@@ -42,9 +44,20 @@ export function buildMyTasks(input: {
     if (!d || String(d.stage) === 'lost') continue;   // a deleted deal, or one marked not a fit
     const title = String(t.title || '').trim();
     if (!title) continue;
-    out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false });
+    out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
   }
   const projById = new Map((input.projects || []).filter((p) => p && p.id).map((p) => [String(p.id), p]));
+  // Second walk (Nov 8, item 53): Home listed 20 undated project steps — every
+  // unticked line of four checklists. Only each project's NEXT open step (the
+  // lowest sort_order) counts as now; the steps behind it, unless dated, are
+  // `later`: Home hides them until Show all.
+  const nextOf: Record<string, any> = {};
+  for (const t of input.projectTasks || []) {
+    if (!t || !t.id || t.client_action_required === true || !t.project_id) continue;
+    const k = String(t.project_id), cur = nextOf[k];
+    const so = Number(t.sort_order ?? Infinity), cso = cur ? Number(cur.sort_order ?? Infinity) : Infinity;
+    if (!cur || so < cso || (so === cso && String(t.title || '') < String(cur.title || ''))) nextOf[k] = t;
+  }
   for (const t of input.projectTasks || []) {
     if (!t || !t.id || t.client_action_required === true) continue;
     const st = String(t.status || 'todo');
@@ -54,10 +67,11 @@ export function buildMyTasks(input: {
     if (!p || !(p.status === 'active' || p.status === 'on_hold')) continue;
     const title = String(t.title || '').trim();
     if (!title) continue;
-    out.push({ kind: 'project_task', id: String(t.id), parent_id: String(p.id), title, due: ymd(t.due_date), context: String(p.name || 'A project'), href: `/projects.html?project=${p.id}`, blocked: st === 'blocked' });
+    out.push({ kind: 'project_task', id: String(t.id), parent_id: String(p.id), title, due: ymd(t.due_date), context: String(p.name || 'A project'), href: `/projects.html?project=${p.id}`, blocked: st === 'blocked', later: !ymd(t.due_date) && nextOf[String(p.id)] !== t, order: Number.isFinite(Number(t.sort_order)) && t.sort_order !== null ? Number(t.sort_order) : null });
   }
-  // dated first, soonest (so overdue) first; then undated, next steps before to-dos before project tasks
-  out.sort((a, b) => (a.due ? 0 : 1) - (b.due ? 0 : 1)
+  // now before later; dated first, soonest (so overdue) first; then undated, next steps before to-dos before project tasks
+  out.sort((a, b) => (a.later ? 1 : 0) - (b.later ? 1 : 0)
+    || (a.due ? 0 : 1) - (b.due ? 0 : 1)
     || String(a.due || '').localeCompare(String(b.due || ''))
     || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
     || a.context.localeCompare(b.context) || a.title.localeCompare(b.title));

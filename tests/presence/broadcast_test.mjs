@@ -18,7 +18,7 @@ const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
 
 // ═══ Segments ═══
-ok('segments: three site-scoped presets exist', SEGMENTS.length === 3 && SEGMENTS.every((s) => s.key && s.label && s.description));
+ok('segments: four site-scoped presets exist (Your customers joined in Nov 2026, item 56)', SEGMENTS.length === 4 && SEGMENTS.every((s) => s.key && s.label && s.description));
 ok('segments: isSegmentKey guards the whitelist', isSegmentKey('contacts') && isSegmentKey('enquiries_30d') && !isSegmentKey('audit_leads') && !isSegmentKey('') && !isSegmentKey(null));
 ok('segments: label lookup, safe fallback', segmentLabel('contacts') === 'All contacts' && segmentLabel('nope') === 'your audience');
 

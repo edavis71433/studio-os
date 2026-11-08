@@ -309,6 +309,19 @@ html.dds-embed #detailWrap{padding-top:0}
   :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
   .path-guide{margin-top:10px;font-size:13px}
   .terminal-chip{font-weight:600;padding:var(--dds-s1,4px) 10px;font-size:12px}
+  /* Second walk (Nov 8, item 58): on a phone the first deal sat below a whole
+     screen of stacked number tiles and two lines of stage chips. The numbers go
+     in one short row (no icons) and the chips in one row that scrolls sideways. */
+  @media (max-width:600px){
+    .stats{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+    .stats .st{flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px}
+    .stats .ico{display:none}
+    .stats .v{font-size:16px}
+    .stats .s{white-space:normal;line-height:1.35}
+    #filters{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px 2px}
+    #filters::-webkit-scrollbar{display:none}
+    #filters .chip{flex:0 0 auto;white-space:nowrap}
+  }
   @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
   #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 var(--dds-s4,16px);overflow-x:auto;-webkit-overflow-scrolling:touch}
   #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:var(--dds-s2,8px) var(--dds-s3,12px);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
@@ -1752,7 +1765,7 @@ function renderList(){
     const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
     const cv=needsConvert(d)?`<div class="m conv">Not a customer yet — open to make them one</div>`:'';
-    return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>{if(c.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(c.dataset.id);};c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
@@ -2388,7 +2401,7 @@ async function openDeal(id){
           <div class="dh-sub">${stageBadge(d.stage,signedNow)}
             <span>${c?(c.name?esc(c.name):(c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Contact')):'No contact'}${(c&&c.name&&c.email)?` · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span>
             ${d.expected_value_cents?`<span class="fact"><strong>${money(d.expected_value_cents)}</strong> value</span>`:''}
-            ${d.expected_close?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
+            ${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
             ${data.last_contacted_at?`<span>Last contacted ${esc(ago(data.last_contacted_at))}</span>`:''}
           </div></div></div>

@@ -151,7 +151,7 @@ export function mergeActivity(groups: (ActivityItem | null)[][], limit = 400): A
 // invoices. `now` is passed in (pure); date-only strings compare on the day.
 const dayOf = (iso: string) => str(iso).slice(0, 10);
 export function buildUpcoming(
-  inp: { tasks?: any[]; deal?: { id?: string; next_step?: string; next_step_at?: string | null } | null; invoices?: any[] },
+  inp: { tasks?: any[]; deal?: { id?: string; stage?: string; next_step?: string; next_step_at?: string | null } | null; invoices?: any[] },
   nowIso: string,
 ): UpcomingItem[] {
   const today = dayOf(nowIso);
@@ -163,8 +163,13 @@ export function buildUpcoming(
     out.push({ kind: 'task', id: str(t.id) || null, title: str(t.title) || 'To-do', due, overdue: !!(due && dayOf(due) < today), href: dealHref });
   }
   const ns = str(inp.deal?.next_step).trim();
-  if (ns) {
-    const due = inp.deal?.next_step_at ? str(inp.deal.next_step_at) : null;
+  const due0 = inp.deal?.next_step_at ? str(inp.deal.next_step_at) : null;
+  // Second walk (Nov 8, item 50): Bacchus was won and paid, and its "Sign
+  // Contract · Aug 6" still sat here in red. On a closed deal (won or not a fit)
+  // a next step with no date or a past date is history, not something due.
+  const closed = inp.deal?.stage === 'won' || inp.deal?.stage === 'lost';
+  if (ns && !(closed && (!due0 || dayOf(due0) < today))) {
+    const due = due0;
     out.push({ kind: 'next_step', id: null, title: `Next step — ${ns}`, due, overdue: !!(due && dayOf(due) < today), href: dealHref });
   }
   for (const iv of (Array.isArray(inp.invoices) ? inp.invoices : [])) {

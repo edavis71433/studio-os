@@ -673,7 +673,7 @@ export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal
   const [deals, dealTasks, projectTasks] = await Promise.all([
     read(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
     read(`presence_deal_tasks?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
-    read(`presence_tasks?site_id=eq.${site.id}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required&limit=300`),
+    read(`presence_tasks?site_id=eq.${site.id}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300`),
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
