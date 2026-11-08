@@ -80,9 +80,9 @@ function installFake(cfg = {}) {
       return jr(cfg.retainer ? [{ id: DEAL, site_id: AGENCY }] : []);
     }
     if (url.includes('presence_deals')) {
-      return jr([{ id: DEAL, site_id: AGENCY, title: 'Bacchus website', stage: 'proposal', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', converted_client_id: cfg.converted ? OWNER_CLIENT : null, retainer: cfg.retainer || null }]);
+      return jr([{ id: DEAL, site_id: AGENCY, title: 'Larkspur website', stage: 'proposal', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', converted_client_id: cfg.converted ? OWNER_CLIENT : null, retainer: cfg.retainer || null }]);
     }
-    if (url.includes('presence_contacts')) return jr([{ name: 'Claud Beltran', email: cfg.contactEmail === undefined ? 'claud@client.test' : cfg.contactEmail }]);
+    if (url.includes('presence_contacts')) return jr([{ name: 'Jordan Ellis', email: cfg.contactEmail === undefined ? 'jordan@client.test' : cfg.contactEmail }]);
     if (url.includes('presence_sites')) return jr([{ id: AGENCY, client_id: OWNER_CLIENT }]);
     if (url.includes('presence_identity')) return jr([{ business_name: 'Davis Digital Studio', email: 'studio@davisdigitalstudio.com' }]);
     if (url.includes(`clients?id=eq.${OWNER_CLIENT}`)) return jr([{ id: OWNER_CLIENT, name: 'Davis Digital Studio', email: 'eric@davisdigitalstudio.com', contact_email: '' }]);
@@ -117,7 +117,7 @@ try {
     const { sent } = installFake();
     const out = await (await echo()).json();
     ok('A1: a fresh echo answers notice:true, already:false', out.data?.notice === true && out.data?.already === false);
-    const receipt = sent.find((s) => s?.to === 'claud@client.test');
+    const receipt = sent.find((s) => s?.to === 'jordan@client.test');
     ok('A1: the CLIENT gets the promised receipt (branded thank-you with the amount and what it was for)',
       out.data?.receipted === true && !!receipt && /\$500\.00/.test(String(receipt?.html || '')) && /Deposit/.test(String(receipt?.html || '')));
     ok('A1: the receipt says the studio has been notified (the payment-success promise, kept)',
@@ -199,9 +199,9 @@ try {
   ok('C0: pending→active (first authorization) is calm — good news is the deal drawer’s job',
     retainerTransition('pending', 'active') === null);
   {
-    const c = retainerNoticeCopy('past_due', 'Bacchus care plan', 45000, 'month');
+    const c = retainerNoticeCopy('past_due', 'Larkspur care plan', 45000, 'month');
     ok('C0: the past_due copy names the client, the amount, and what to do (plain voice, no jargon)',
-      /Bacchus care plan/.test(c.subject) && /\$450\.00\/month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
+      /Larkspur care plan/.test(c.subject) && /\$450\.00\/month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
     const k = retainerNoticeCopy('canceled', '', 120000, 'year');
     ok('C0: the canceled copy degrades gracefully with no title and says it won’t bill again',
       /a retainer client/.test(k.subject) && /\$1,200\.00\/year/.test(k.body) && /won’t bill again/.test(k.body));
@@ -279,7 +279,7 @@ try {
   {
     const { calls, sent } = installFake({
       dealTasks: [{ id: TASK, site_id: AGENCY, deal_id: DEAL, title: 'Send the contract', due_date: '2020-01-02' }],
-      nextStepDeals: [{ id: DEAL, site_id: AGENCY, title: 'Bacchus website', stage: 'proposal', next_step_at: '2020-01-05', next_step: 'Call Claud' }],
+      nextStepDeals: [{ id: DEAL, site_id: AGENCY, title: 'Larkspur website', stage: 'proposal', next_step_at: '2020-01-05', next_step: 'Call Jordan' }],
     });
     const r = await runDealTaskReminders(10);
     await settle();
@@ -292,7 +292,7 @@ try {
     ok('D1: both nudges email the operator with a deep link to the deal',
       r.nudged === 2 && sent.length === 2 && sent.every((s) => s?.to === 'studio@davisdigitalstudio.com' && new RegExp(`pipeline\\.html\\?deal=${DEAL}`).test(String(s?.html || ''))));
     ok('D1: the copy names the to-do / the step and the date it slipped',
-      sent.some((s) => /Send the contract/.test(String(s?.html))) && sent.some((s) => /Call Claud/.test(String(s?.html)) && /2020-01-05/.test(String(s?.html))));
+      sent.some((s) => /Send the contract/.test(String(s?.html))) && sent.some((s) => /Call Jordan/.test(String(s?.html)) && /2020-01-05/.test(String(s?.html))));
     restore();
   }
   {
