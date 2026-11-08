@@ -1219,6 +1219,43 @@ test.describe('Undo takes back a menu-category move', () => {
   });
 });
 
+test.describe('a save that fails says so', () => {
+  // Item 81: a failed Business-details save left "Saving…" in the top bar for good, other
+  // failures said "Everything saved", and the closed switch stayed flipped after a failure.
+  const failing = (page: Page, path: string) => page.route(`**/functions/v1/presence${path}`, (route: Route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }) })
+    : route.fallback());
+  test('a business detail that fails to save says “Not saved, try again”', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await failing(page, '/identity');
+    await page.locator('#f-phone').fill('555-0199');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveClass(/\bbad\b/);
+  });
+  test('the closed switch goes back to what’s saved when its save fails', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await failing(page, '/location');
+    const sw = page.locator('#closedSwitch');
+    await expect(sw).not.toBeChecked();
+    await sw.click();
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(sw).not.toBeChecked();
+    await expect(page.locator('#f-closednote')).toBeHidden();
+  });
+  test('a section field still being typed in says “Unsaved changes”, and the save says it saved', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a').hover();
+    await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    const field = page.locator('#blocksCard input[type=text]').first();
+    await field.click();
+    await field.pressSequentially(' more');
+    await expect(page.locator('#topWhisper')).toHaveText('Unsaved changes');
+    await field.blur();
+    await expect(page.locator('#topWhisper')).toHaveText(/Saved just now|Everything saved/);
+  });
+});
+
 test.describe('Load the latest shows what was loaded', () => {
   // Item 80: the announcement bar and the Styles cards mount once and returned early on a
   // reload, so a restored or newer announcement and section order stayed hidden until a refresh.
