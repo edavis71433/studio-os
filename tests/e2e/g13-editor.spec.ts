@@ -543,7 +543,7 @@ test.describe('G13 in-place canvas text editor', () => {
   const PAGED = { blocks: BLOCKS, pages: [{ slug: 'about', title: 'About', blocks: ABOUT_BLOCKS }], section_meta: META };
   const FAR_DOWN = '<div style="height:4000px"></div>';
   type Field = ReturnType<Frame['locator']>;
-  type Paged = { blocks?: typeof BLOCKS; pages?: Array<{ slug: string; title?: string; hideNav?: boolean; blocks: typeof BLOCKS }> };
+  type Paged = { blocks?: typeof BLOCKS; pages?: Array<{ slug: string; title?: string; hideNav?: boolean; blocks: typeof BLOCKS }>; nav?: Array<{ label?: string; href: string }> };
 
   // Home and About paint different documents, so a test can tell which one landed. The
   // draft builds on each save like the real one, so a late save can't undo a delete.
@@ -551,7 +551,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const draft: Record<string, unknown> = { ...PAGED, pages };
     const mounted = await mountCanvas(page, { settings: draft, beforeGoto: async (p) => {
       await p.route('**/functions/v1/presence/preview**', (route: Route) => {
-        const about = new URL(route.request().url()).searchParams.get('page') === '/about/';
+        const about = ['/about/', '/story/'].includes(new URL(route.request().url()).searchParams.get('page') || '');
         return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML(spacer + (about ? ABOUT_SECTION : SECTIONS)) });
       });
       await p.route('**/functions/v1/presence/settings**', (route: Route) => {
@@ -571,8 +571,8 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText(text);
   }
-  async function openAbout(page: Page, frame: Frame) {
-    await pill(page, 'About').locator('.pp-name').click();
+  async function openAbout(page: Page, frame: Frame, name = 'About') {
+    await pill(page, name).locator('.pp-name').click();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
   }
@@ -805,8 +805,8 @@ test.describe('G13 in-place canvas text editor', () => {
     return { release, reads: () => reads };
   }
   // An edit on About whose save has reached the door, with every later PUT held there too.
-  async function aboutSaveOut(page: Page, frame: Frame) {
-    await openAbout(page, frame);
+  async function aboutSaveOut(page: Page, frame: Frame, name = 'About') {
+    await openAbout(page, frame, name);
     const held = await holdPuts(page);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Edit on about');
     await page.keyboard.press('Enter');
@@ -818,6 +818,25 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.locator('.pp-pop-item', { hasText: item }).click();
   };
   const aboutIn = (put: Paged) => put.pages?.find((p) => p.slug === 'about');
+  // About and Contact are built-in addresses, so the Pages tab lists them twice over.
+  // Moving a page there uses pages of its own. Story paints the About section.
+  const STORY = { slug: 'story', title: 'Story', blocks: ABOUT_BLOCKS };
+  const GALLERY = { slug: 'gallery', title: 'Gallery', blocks: [{ type: 'title', title: 'Gallery', subtitle: 'The gallery line' }] };
+  const OWN_PAGES = [STORY, GALLERY];
+  const slugs = (put?: Paged) => put?.pages?.map((p) => p.slug);
+  const storyIn = (put: Paged) => put.pages?.find((p) => p.slug === 'story');
+  // The arrow keys on a row's handle do what dragging does, one place at a time.
+  async function nudge(page: Page, name: string, key: 'ArrowUp' | 'ArrowDown') {
+    await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
+    await page.getByRole('button', { name: new RegExp(`^Move ${name}\\.`) }).focus();
+    await page.keyboard.press(key);
+  }
+  // Opening Edit mode repaints the canvas, since it isn't drawn while another tab is on.
+  async function backToCanvas(page: Page, frame: Frame) {
+    await markCanvas(frame);
+    await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('design'));
+    await canvasReplaced(frame);
+  }
 
   test('a second in-place edit committed while the first save is out is saved too', async ({ page }) => {
     const { frame } = await mountPages(page);
@@ -846,27 +865,16 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect(pill(page, 'About')).toContainText('(hidden)');
   });
 
-  test('Move right while that page\'s save is out keeps the edit', async ({ page }) => {
-    const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    const { sent, release } = await aboutSaveOut(page, frame);
-    await pageMenu(page, 'About', 'Move right');
-    await page.waitForTimeout(300);
-    release();
-    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
-    expect(sent[1].pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
-    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit on about');
-  });
-
   test('Moving it on the Pages tab while that page\'s save is out keeps the edit', async ({ page }) => {
-    const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    const { sent, release } = await aboutSaveOut(page, frame);
-    await page.evaluate(() => (window as any).go('pages'));
-    await page.getByRole('button', { name: /^Move About/ }).first().focus();
-    await page.keyboard.press('ArrowUp');
+    const { frame } = await mountPages(page, '', OWN_PAGES);
+    const { sent, release } = await aboutSaveOut(page, frame, 'Story');
+    await nudge(page, 'Story', 'ArrowDown');
     await page.waitForTimeout(300);
     release();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
-    expect((sent[1] as any).nav.length).toBeGreaterThan(0);
+    expect(slugs(sent[1])).toEqual(['gallery', 'story']);
+    expect(sent[1].nav?.map((n) => n.href).slice(-2)).toEqual(['/gallery/', '/story/']);
+    expect(storyIn(sent[1])?.blocks[0].subtitle).toBe('Edit on about');
   });
 
   test('Rename while that page\'s save is out keeps the edit', async ({ page }) => {
@@ -1242,17 +1250,18 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(aboutIn(stored(draft))?.hideNav).toBe(true);
   });
 
-  test('an edit saved while Move right is out keeps the new order', async ({ page }) => {
-    const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    await openAbout(page, frame);
+  test('an edit saved while a move on the Pages tab is out keeps the new order', async ({ page }) => {
+    const { frame } = await mountPages(page, '', OWN_PAGES);
+    await openAbout(page, frame, 'Story');
     const { sent, release } = await holdPuts(page);
-    await pageMenu(page, 'About', 'Move right');
+    await nudge(page, 'Story', 'ArrowDown');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
+    await backToCanvas(page, frame);
     await editAndWaitOut(page, frame, 'Edit while moving');
     release();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
-    expect(sent[1].pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
-    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit while moving');
+    expect(slugs(sent[1])).toEqual(['gallery', 'story']);
+    expect(storyIn(sent[1])?.blocks[0].subtitle).toBe('Edit while moving');
   });
 
   test('an edit saved while Rename is out stays on the renamed page, and so do later edits', async ({ page }) => {
@@ -1737,12 +1746,12 @@ test.describe('G13 in-place canvas text editor', () => {
   const pageIn = (put: Paged, slug: string) => put.pages?.find((p) => p.slug === slug);
   const lastPut = (puts: Mounted['puts']) => puts[puts.length - 1] as Paged;
   // Words on About, saved, then off the page: About's snapshots go, the page step stays on top.
-  async function writeOnAboutAndLeave(page: Page, frame: Frame, puts: Mounted['puts']) {
+  async function writeOnAboutAndLeave(page: Page, frame: Frame, puts: Mounted['puts'], slug = 'about') {
     const before = puts.length;
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Written since');
     await page.keyboard.press('Enter');
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
-    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    expect(pageIn(lastPut(puts), slug)?.blocks[0].subtitle).toBe('Written since');
     await pill(page, 'Home').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('Home');
   }
@@ -1772,21 +1781,161 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(pageIn(lastPut(puts), 'contact')?.hideNav).toBe(true);
   });
 
-  test('Undo and Redo of Move keep the words written since', async ({ page }) => {
-    const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
-    await openAbout(page, frame);
-    await pageMenu(page, 'About', 'Move right');
-    await expect.poll(() => lastPut(puts)?.pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
-    await writeOnAboutAndLeave(page, frame, puts);
+  // The Pages tab writes { nav, pages }, or just one of them. A menu left behind keeps a
+  // page where it was moved to, so Undo owes the menu as much as it owes the order.
+  const menuRows = (page: Page) => page.locator('#pagesList .pg-row .t b').allTextContents();
+  const pillNames = (page: Page) => page.locator('#pagesBar .page-pill .pp-name').allTextContents();
+  const lastTwo = async (page: Page) => (await menuRows(page)).slice(-2);
+  const OWN_MENU = [{ label: 'Home', href: '/' }, { label: 'Story', href: '/story/' }, { label: 'Gallery', href: '/gallery/' }];
+  // A move on the Pages tab, then words on Story, then off that page so the page step is on top.
+  async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['puts'], name: string, key: 'ArrowUp' | 'ArrowDown') {
+    await openAbout(page, frame, 'Story');
+    await nudge(page, name, key);
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const moved = lastPut(puts);
+    await backToCanvas(page, frame);
+    await writeOnAboutAndLeave(page, frame, puts, 'story');
+    await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
+    return { moved, count: puts.length };
+  }
+
+  test('Undo and Redo of a move on the Pages tab keep the words, and put back the order and the menu', async ({ page }) => {
+    const { frame, puts, draft } = await mountPages(page, '', OWN_PAGES);
+    const { moved, count } = await moveThenWrite(page, frame, puts, 'Story', 'ArrowDown');
+    expect(slugs(moved)).toEqual(['gallery', 'story']);
+    await expect.poll(() => lastTwo(page)).toEqual(['Gallery', 'Story']);
+    await expect(page.locator('#btnNavAuto')).toBeVisible();
+    await page.locator('#btnUndoTop').click();
+    await expect.poll(() => puts.length).toBe(count + 1);
+    expect(slugs(lastPut(puts))).toEqual(['story', 'gallery']);
+    expect(lastPut(puts).nav).toEqual([]);                         // automatic again; the stored menu can't be null
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect.poll(() => lastTwo(page)).toEqual(['Story', 'Gallery']);
+    await expect(page.locator('#btnNavAuto')).toBeHidden();
+    expect(await pillNames(page)).toEqual(['Home', 'Story', 'Gallery']);
+    await page.locator('#btnRedoTop').click();
+    await expect.poll(() => puts.length).toBe(count + 2);
+    expect(slugs(lastPut(puts))).toEqual(['gallery', 'story']);
+    expect(lastPut(puts).nav).toEqual(moved.nav);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect.poll(() => lastTwo(page)).toEqual(['Gallery', 'Story']);
+    await expect(page.locator('#btnNavAuto')).toBeVisible();
+    expect(await pillNames(page)).toEqual(['Home', 'Gallery', 'Story']);
+    expect(storyIn(draft as Paged)?.blocks[0].subtitle).toBe('Written since');
+  });
+
+  test('Undo of a move puts a custom menu back as it was', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    await page.evaluate((nav) => { (0, eval)('S.settings.nav = ' + JSON.stringify(nav)); }, OWN_MENU);
+    const { moved, count } = await moveThenWrite(page, frame, puts, 'Story', 'ArrowDown');
+    expect(moved.nav?.map((n) => n.href)).toEqual(['/', '/gallery/', '/story/']);
+    await undo(page);
+    await expect.poll(() => puts.length).toBe(count + 1);
+    expect(lastPut(puts).nav).toEqual(OWN_MENU);
+    expect(slugs(lastPut(puts))).toEqual(['story', 'gallery']);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect.poll(() => menuRows(page)).toEqual(['Home', 'Story', 'Gallery']);
+    await redo(page);
+    await expect.poll(() => puts.length).toBe(count + 2);
+    expect(lastPut(puts).nav).toEqual(moved.nav);
+    expect(slugs(lastPut(puts))).toEqual(['gallery', 'story']);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect.poll(() => menuRows(page)).toEqual(['Home', 'Gallery', 'Story']);
+  });
+
+  test('Undo and Redo of taking a page off the menu keep the words', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    const { moved, count } = await moveThenWrite(page, frame, puts, 'Gallery', 'ArrowDown');
+    expect(moved.pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
+    await expect(page.locator('#pagesUnlinked .pg-row .t b', { hasText: 'Gallery' })).toBeVisible();
+    await undo(page);
+    await expect.poll(() => puts.length).toBe(count + 1);
+    expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBeUndefined();
+    expect(lastPut(puts).nav).toEqual([]);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect.poll(() => lastTwo(page)).toEqual(['Story', 'Gallery']);
+    await redo(page);
+    await expect.poll(() => puts.length).toBe(count + 2);
+    expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
+    expect(lastPut(puts).nav).toEqual(moved.nav);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect(page.locator('#pagesUnlinked .pg-row .t b', { hasText: 'Gallery' })).toBeVisible();
+  });
+
+  test('Undo and Redo of moving a built-in page, a write with no pages in it, leave the words alone', async ({ page }) => {
+    const { frame, puts, draft } = await mountPages(page, '', OWN_PAGES);
+    const { moved, count } = await moveThenWrite(page, frame, puts, 'Contact', 'ArrowUp');
+    expect(moved.pages).toBeUndefined();
+    await undo(page);
+    await expect.poll(() => puts.length).toBe(count + 1);
+    expect(lastPut(puts)).toEqual({ nav: [] });
+    expect(storyIn(draft as Paged)?.blocks[0].subtitle).toBe('Written since');
+    await expect(page.locator('#btnNavAuto')).toBeHidden();
+    await redo(page);
+    await expect.poll(() => puts.length).toBe(count + 2);
+    expect(lastPut(puts)).toEqual({ nav: moved.nav });
+    expect(storyIn(draft as Paged)?.blocks[0].subtitle).toBe('Written since');
+    await expect(page.locator('#btnNavAuto')).toBeVisible();
+  });
+
+  test('Undo and Redo of Show in the menu, a write with no menu in it, keep the words and write no menu', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    await openAbout(page, frame, 'Story');
+    await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
+    await page.getByRole('button', { name: 'Settings for Gallery' }).click();
+    await page.locator('#pageSettings').getByLabel('Show in the menu').uncheck();
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
+    await page.locator('#pageSettings').getByRole('button', { name: 'Done' }).click();
+    await backToCanvas(page, frame);
+    await writeOnAboutAndLeave(page, frame, puts, 'story');
     const count = puts.length;
     await undo(page);
     await expect.poll(() => puts.length).toBe(count + 1);
-    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'contact']);
-    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBeUndefined();
+    expect(lastPut(puts)).not.toHaveProperty('nav');
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect(pill(page, 'Gallery')).not.toContainText('(hidden)');
     await redo(page);
     await expect.poll(() => puts.length).toBe(count + 2);
-    expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
-    expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
+    expect(lastPut(puts)).not.toHaveProperty('nav');
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+    await expect(pill(page, 'Gallery')).toContainText('(hidden)');
+  });
+
+  test('Undo walks back through the words and then the move, and Redo walks forward again', async ({ page }) => {
+    const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    await openAbout(page, frame, 'Story');
+    await nudge(page, 'Story', 'ArrowDown');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    const moved = lastPut(puts);
+    await backToCanvas(page, frame);
+    await typeOver(page, aboutField(frame), 'Written since');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
+    await undo(page);                                              // the words
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(3);
+    expect(slugs(lastPut(puts))).toEqual(['gallery', 'story']);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('The about line');
+    await undo(page);                                              // the move
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(4);
+    expect(slugs(lastPut(puts))).toEqual(['story', 'gallery']);
+    expect(lastPut(puts).nav).toEqual([]);
+    await redo(page);                                              // the move
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(5);
+    expect(slugs(lastPut(puts))).toEqual(['gallery', 'story']);
+    expect(lastPut(puts).nav).toEqual(moved.nav);
+    await redo(page);                                              // the words
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(6);
+    expect(slugs(lastPut(puts))).toEqual(['gallery', 'story']);
+    expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
+  });
+
+  test('the page menu has no Move: a page moves on the Pages tab', async ({ page }) => {
+    await mountPages(page, '', WITH_CONTACT);
+    await pill(page, 'About').locator('.pp-menu').click();
+    await expect(page.locator('.pp-pop-item')).toHaveText(['Page settings…', 'Rename', 'Hide from menu', 'Duplicate page', 'Clear page (start blank)', 'Delete page']);
   });
 
   test('Undo and Redo of Rename keep the words, and each is a rename the server can forward', async ({ page }) => {
