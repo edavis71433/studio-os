@@ -60,6 +60,7 @@ const CONTROLS = [
   ['POST /site/online', 'presence.html', `siteSetState("/site/online"`, ['offBtn.dataset.needs = "configure"']],
   ['PUT /bookings/settings', 'presence.html', `api("PUT", "/bookings/settings", payload)`, ['c1.dataset.needs = "configure"', 'c2.dataset.needs = "configure"']],
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
+  ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
 ];
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
@@ -94,7 +95,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 31, String(routes.length));
+  ok('the decided delete and configure lists were read', routes.length === 32, String(routes.length));
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -172,7 +173,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
   const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
-  ok('the six pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'settings.html']), marked.join(', '));
+  ok('the seven pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['broadcasts.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'settings.html']), marked.join(', '));   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
 

@@ -43,6 +43,7 @@ const { handlePreviewSettings } = await import(`${P}/routes/preview_env.ts`);
 const { handlePutTemplate } = await import(`${P}/routes/site.ts`);
 const { handleDevCustomizationPut, handleBrandKitPut } = await import(`${P}/routes/dev.ts`);
 const { handleLaunchDecide } = await import(`${P}/routes/launches.ts`);
+const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -130,7 +131,7 @@ const DECIDED = {
     'DELETE /media/:id', 'DELETE /projects/:id/deliverables/:id2', 'DELETE /publishes/checkpoints/:id',
     'DELETE /redirects/:id', 'DELETE /sales/contacts/:id', 'DELETE /sales/contracts/:id', 'DELETE /sales/deals/:id',
     'DELETE /sales/proposals/:id', 'DELETE /sales/templates/:id', 'POST /comments/:id/delete',
-    'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void',
+    'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
   ],
   configure: [
     'DELETE /foundations/domain', 'DELETE /foundations/zone', 'DELETE /foundations/zone/records',
@@ -168,7 +169,7 @@ const DECIDED = {
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk',
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
-    'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/:id/cancel',
+    'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
     'POST /broadcasts/draft-assist', 'POST /client/projects/:id/tasks/:id2/done',
     'POST /client/projects/:id/upload-url', 'POST /client/projects/:id/uploads',
     'POST /coach/opportunities/:id/decide', 'POST /coach/run', 'POST /content-library', 'POST /editor/improve',
@@ -191,7 +192,7 @@ const DECIDED = {
     'POST /visual/generate', 'POST /visual/plans/:id/edit', 'POST /visual/plans/:id/vary',
     'POST /writer/drafts/:id/accept', 'POST /writer/drafts/:id/discard', 'POST /writer/generate',
     'POST /writer/rewrite', 'PUT /content-library/:id', 'PUT /media/:id', 'PUT /sales/services', 'PUT /service/faq',
-    'PUT /service/saved-replies',
+    'PUT /service/saved-replies', 'PUT /sales/views',
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -277,6 +278,7 @@ const CHANGED = [
   { name: 'DELETE /sales/templates/:id', run: (r, p) => handleSalesTemplateDelete(A, ROW, cors) },
   { name: 'DELETE /projects/:id/deliverables/:id2', run: (r, p) => handleDeliverable(r, p.jwt, A, p, ROW, ROW2, cors) },
   { name: 'POST /sales/invoices/:id/void', run: (r, p) => handleSalesInvoiceVoid(A, p, ROW, cors) },
+  { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
   { name: 'POST /sales/deals/:id/retainer/cancel', fx: { rows: { presence_deals: { retainer: { status: 'pending' } } } }, run: (r, p) => handleSalesRetainerCancel(r, A, p, ROW, cors) },
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
@@ -386,7 +388,7 @@ const WRITE_HANDLERS = [
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
   'handleBookingTypeDelete', 'handleBookingTypeUpdate', 'handleBrandKitApply', 'handleBrandKitPut',
   'handleBrandProfilePut', 'handleBrandReportDismiss', 'handleBrandReviewRun', 'handleBroadcastCancel',
-  'handleBroadcastCreate', 'handleBroadcastDraftAssist', 'handleBroadcastSend', 'handleBroadcastUpdate',
+  'handleBroadcastCreate', 'handleBroadcastDraftAssist', 'handleBroadcastListCreate', 'handleBroadcastListDelete', 'handleBroadcastSend', 'handleBroadcastUpdate',
   'handleCheckpointDelete', 'handleCheckpointRestore', 'handleCheckpointSave', 'handleClientApprovalDecide',
   'handleClientMessages', 'handleClientNotificationsRead', 'handleClientSupport', 'handleClientSupportMessage',
   'handleClientSurveyRespond', 'handleClientTaskDone', 'handleClientUploadCreate', 'handleClientUploadUrl',
@@ -414,7 +416,7 @@ const WRITE_HANDLERS = [
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',
   'handleSalesProposalCreate', 'handleSalesProposalDelete', 'handleSalesProposalRevise', 'handleSalesProposalSend',
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
-  'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesTemplates', 'handleSavedReplies',
+  'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

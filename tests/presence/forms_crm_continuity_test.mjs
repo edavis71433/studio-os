@@ -21,7 +21,7 @@ ok('convert: the originating enquiry is marked converted (system status)', /pres
 // so PostgREST 400'd the insert and the best-effort catch swallowed it: the
 // 'created' event never actually wrote. The enquiry text rides along too
 // (sales_price_flow_test.mjs pins that half).
-ok('convert: the created event carries the source submission (deep-link provenance)', /dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: 'lead', detail: \{ source_submission_id: srcSub/.test(sales));
+ok('convert: the created event carries the source submission (deep-link provenance)', /dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: startStage, detail: \{ source_submission_id: srcSub/.test(sales) && /const startStage = \(!srcSub &&/.test(sales));
 
 // inbox: link each enquiry to its deal, tenant-scoped, bounded
 ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /deal_id: dealMap\.get\(String\(s\.id\)\) \|\| null, converted: s\.status === 'converted' \|\| dealMap\.has/.test(commercial));

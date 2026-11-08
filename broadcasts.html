@@ -235,7 +235,7 @@ function render(){
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
       <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
-      <div class="segs" id="segs">${segsHtml()}</div>${SEL.startsWith('list:')&&SEG_OK?'<p class="muted" style="margin:6px 0 0;font-size:12.5px">A list you picked. <button class="ghost sm" id="dropList" type="button">Remove this list</button></p>':''}
+      <div class="segs" id="segs">${segsHtml()}</div>${SEL.startsWith('list:')&&SEG_OK?'<p class="muted" style="margin:6px 0 0;font-size:12.5px">A list you picked. <button class="ghost sm" id="dropList" data-needs="delete" type="button">Remove this list</button></p>':''}
     </div>
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2>Your message</h2></div>
