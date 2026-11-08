@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Customer — Studio OS</title>
+<title>Record — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="One client record — the whole relationship from first enquiry through delivery, in one place.">
 <link rel="stylesheet" href="/fonts/brand.css">
@@ -967,6 +967,15 @@ function renderDealTab(host){
     +sum('Agreement',0,(DEAL.contracts||[]).length?(DEAL.contracts||[]).map(c=>esc(c.title||'Agreement')+' · '+esc(c.status||'draft')).join(' · '):'None yet')
     +sum('Invoices',0,inv.length?`${inv.length} · ${fmtC(inv.reduce((a,b)=>a+(b.amount_cents||0),0))} total${owed?' · '+fmtC(owed)+' open':''}`:'None yet')
     +`</div></section>`;
+  // Sales review item 26: a repeat customer's deals as a list when there is more than one.
+  const relD=(REC&&Array.isArray(REC.related_deals))?REC.related_deals:[];
+  if(relD.length>1){
+    html+=`<section id="allDeals"><h2>All deals · ${relD.length}</h2><div class="card">`+relD.map(r=>{
+      const cur=String(r.id)===String(d.id||'');
+      const bits=[stageLabel(r.stage)]; if(r.value_cents)bits.push(fmtC(r.value_cents));
+      return `<div class="rrow"><span class="rt">${esc(r.title||'Deal')}<span class="s">${esc(bits.join(' · '))}${cur?' · shown above':''}</span></span><a class="link" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(r.id)))}">Open →</a></div>`;
+    }).join('')+`</div></section>`;
+  }
   host.innerHTML=html;
   host.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-go'))));
 }
@@ -1176,9 +1185,19 @@ function renderDeliveryTab(host){
     <div class="kv">
       <div class="k">Status</div><div><span class="word">${esc(String(p.status||'').replace('_',' '))}</span></div>
       ${progress.pct!=null?`<div class="k">Progress</div><div>${esc(String(progress.pct))}% along</div>`:''}
-      <div class="k">Waiting on client</div><div>${waiting?waiting+' task'+(waiting===1?'':'s'):'nothing'}</div>
+      <div class="k">Waiting on them</div><div>${waiting?waiting+' task'+(waiting===1?'':'s'):'nothing'}</div>
       <div class="k">Files shared</div><div>${dl.filter(x=>x.status==='shared').length}</div>
     </div></div></section>`;
+  // Sales review item 26: a customer with more than one project sees them all here,
+  // not only the newest one the record opened on.
+  const rel=(REC&&Array.isArray(REC.related_projects))?REC.related_projects:[];
+  if(rel.length>1){
+    html+=`<section id="allProjects"><h2>All projects · ${rel.length}</h2><div class="card">`+rel.map(r=>{
+      const cur=String(r.id)===String(ids.project);
+      const st=String(r.status||'active').replace('_',' ');
+      return `<div class="rrow"><span class="rt">${esc(r.name||'Project')}${cur?'<span class="s">shown above</span>':''}</span><span style="display:flex;gap:8px;align-items:center"><span class="schip${r.status==='complete'||r.status==='completed'?' good':''}">${esc(st)}</span><a class="link" href="${esc(agHref('projects.html','project='+encodeURIComponent(r.id)))}">Open →</a></span></div>`;
+    }).join('')+`</div></section>`;
+  }
   if(ms.length){
     const cur=ms.find(m=>m.status!=='complete');
     html+=`<section><h2>Milestones</h2><div class="card">`+ms.map(m=>{
