@@ -91,7 +91,7 @@ h1{font-size:clamp(2.1rem,5vw,3.15rem);font-weight:800}h2{font-size:clamp(1.45re
 .notice{background:#fdf3e4;color:#6b4c12;text-align:center;padding:10px 16px;font-size:.95rem}
 header.site{background:var(--paper);border-top:4px solid var(--accent);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}
-.brand{font-weight:800;font-size:1.18rem;letter-spacing:-.02em;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center}
+.brand{font-family:var(--font-display,inherit);font-weight:800;font-size:1.18rem;letter-spacing:-.02em;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:6px}
 nav.primary ul{display:flex;gap:18px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.93rem;border-bottom:2px solid transparent}

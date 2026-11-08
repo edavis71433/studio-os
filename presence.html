@@ -7275,16 +7275,43 @@ const SUGGEST = { restaurant:["terracotta","classic_serif"], coffee_shop:["espre
   medical:["harbor","modern_sans"], dental:["harbor","modern_sans"], veterinary:["evergreen","friendly"],
   retail:["plum","modern_sans"], nonprofit:["evergreen","editorial"], church:["espresso","classic_serif"], professional:["slate","editorial"] };
 let DESIGN_TOKENS = {};
+// The canvas shows a style the moment it's picked: the same :root variables the server
+// writes into #presence-dev (render.ts devLayerFragments), set in place. Custom CSS in
+// that element stays, and a cleared choice falls back to the template's own default.
+// False when there's no canvas to patch.
+function dcPatchTokens(tokens) {
+  const doc = dcFrameDoc(); if (!doc || !doc.head) return false;
+  const vars = Object.entries(tokens || {}).flatMap(([k, v]) => {
+    const key = k.replace(/[^a-z0-9_]/gi, ""), val = String(v).replace(/[^#0-9a-zA-Z_.,%()\-\s]/g, "");
+    return key.includes("_") ? [`--${key}:${val}`, `--${key.replace(/_/g, "-")}:${val}`] : [`--${key}:${val}`];
+  }).join(";");
+  let st = doc.getElementById("presence-dev");
+  const rest = st ? st.textContent.replace(/^:root\{[^}]*\}/, "") : "";
+  if (!vars && !rest) { if (st) st.remove(); return true; }
+  if (!st) { st = doc.createElement("style"); st.id = "presence-dev"; doc.head.appendChild(st); }
+  st.textContent = (vars ? `:root{${vars}}` : "") + rest;
+  return true;
+}
+// A pick shows at once and saves behind. The next pick builds on it before it has saved,
+// so two quick picks keep both; a failed save puts the page back if nothing came after.
+let TOKENS_SEQ = 0;
 async function saveTokens(change, msg) {
-  const next = { ...DESIGN_TOKENS };
+  const before = DESIGN_TOKENS, next = { ...DESIGN_TOKENS };
   for (const [k, v] of Object.entries(change)) { if (v === "" || v == null) delete next[k]; else next[k] = v; }
+  const seq = ++TOKENS_SEQ;
+  const put = api("PUT", "/dev/customization", { theme_tokens: next });   // Undo reads the tokens from before, here
+  DESIGN_TOKENS = next;
+  const shown = dcPatchTokens(next);
+  const remount = () => { const card = $("designCard"); if (card) card.remove(); mountDesignCard(false); };
   try {
-    await api("PUT", "/dev/customization", { theme_tokens: next });
-    DESIGN_TOKENS = next;
-    const card = $("designCard"); if (card) card.remove();
-    mountDesignCard();
-    toast(msg + " — publish to see it live"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(nice(err), true); }
+    await put;
+    if (seq === TOKENS_SEQ) remount();
+    toast(msg + " — publish to see it live"); scheduleChangesRefresh(); stageStale();
+    if (!shown) refreshDesignPreview();
+  } catch (err) {
+    if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); remount(); }
+    toast(nice(err), true);
+  }
 }
 function pillRow(host, label, opts, isOn, onPick) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
@@ -7421,10 +7448,15 @@ function renderBrandImageryReport(host, d) {
   }
   host.appendChild(box);
 }
-async function mountDesignCard() {
+// Templates that keep their own colours (see the template's CSS): the palettes and the
+// Background choice are written for light pages.
+const FIXED_COLOR_TEMPLATES = new Set(["slate"]);
+async function mountDesignCard(fresh = true) {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
-  try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
-  catch (_) { return; } // not an owner/developer on this site → no card
+  if (fresh) {   // a remount right after this page's own save already holds the tokens
+    try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
+    catch (_) { return; } // not an owner/developer on this site → no card
+  }
  
   await mountBrandKitCard();   // FD-T9: brand kit is the source of truth, above the granular controls
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
@@ -7439,8 +7471,10 @@ async function mountDesignCard() {
       el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."),
       looksRow);
   }
+  const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
+  if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do."));
   // colors
-  pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
+  if (!fixedColors) pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
     (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"));
   // type
   pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
@@ -7448,7 +7482,7 @@ async function mountDesignCard() {
   // size / corners / background / density
   pillRow(card, "Text size", SIZE_OPTS, (o) => String(T.font_scale || "") === o[1], (o) => saveTokens({ font_scale: o[1] }, "Text size: " + o[0]));
   pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0]));
-  pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0]));
+  if (!fixedColors) pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0]));
   pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0]));
   // DS-6/DS-7: layout choices — every template family renders both variants,
   // each in its own visual voice, so the controls show for all templates (G2).

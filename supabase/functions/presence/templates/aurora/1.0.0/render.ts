@@ -90,7 +90,7 @@ h1{font-size:clamp(2.4rem,6vw,4rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);marg
 .notice{background:#fdf3e4;color:#6b4c12;text-align:center;padding:10px 16px;font-size:.95rem}
 header.site{background:rgba(255,255,255,.82);backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;flex-wrap:wrap}
-.brand{font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
+.brand{font-family:var(--font-display,inherit);font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:8px}
 nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:9px 14px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.94rem;border-radius:999px}
