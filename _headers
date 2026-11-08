@@ -216,3 +216,11 @@
   Cache-Control: no-cache, must-revalidate
 /ai-visibility
   Cache-Control: no-cache, must-revalidate
+
+# The font library and the template pictures (list item 88): a font file keeps one name per
+# family and weight, and the pictures are reshot rarely, so they needn't be asked for again
+# on every visit to the builder.
+/fonts/library/*
+  Cache-Control: public, max-age=2592000
+/thumbs/*
+  Cache-Control: public, max-age=86400

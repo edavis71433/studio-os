@@ -280,8 +280,8 @@ export async function handleMediaList(site: SiteRow, cors: Record<string, string
   // short-lived signed thumbnails for the room's grid (the library is private)
   const SB_URL = Deno.env.get('SUPABASE_URL') || '';
   const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  const rows = [];
-  for (const m of media.json ?? []) {
+  // Item 88: all at once; one after another, sixty photos was sixty round trips in a row.
+  const rows = await Promise.all((media.json ?? []).map(async (m: any) => {
     let thumb: string | null = null;
     try {
       const objectPath = m.storage_path.replace(/^presence-media\//, '');
@@ -294,7 +294,7 @@ export async function handleMediaList(site: SiteRow, cors: Record<string, string
       const jj = await r.json().catch(() => null);
       if (jj?.signedURL) thumb = `${SB_URL}/storage/v1${jj.signedURL}`;
     } catch { /* thumb optional */ }
-    rows.push({ id: m.id, alt_text: m.alt_text, width: m.width, height: m.height, created_at: m.created_at, used_by: uses.get(m.id) || [], thumb });
-  }
+    return { id: m.id, alt_text: m.alt_text, width: m.width, height: m.height, created_at: m.created_at, used_by: uses.get(m.id) || [], thumb };
+  }));
   return json({ data: rows }, 200, cors);
 }
