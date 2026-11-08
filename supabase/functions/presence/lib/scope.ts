@@ -104,6 +104,19 @@ async function logScopedAccess(row: ScopeAuditRow): Promise<void> {
   }
 }
 
+// Item 87: the client's name labels the scope and its audit row; it isn't authorization, so
+// it is kept a minute per site instead of read on each of a page's thirty-odd requests.
+// Who may act inside the client is still decided afresh every request.
+const CLIENT_NAMES = new Map<string, { at: number; name: string }>();
+async function clientName(siteId: string): Promise<string> {
+  const kept = CLIENT_NAMES.get(siteId);
+  if (kept && Date.now() - kept.at < 60_000) return kept.name;
+  const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
+  const name = (ident.json && ident.json[0]?.business_name) || 'Client';
+  CLIENT_NAMES.set(siteId, { at: Date.now(), name });
+  return name;
+}
+
 export type ScopeResult =
   | { ok: true; site: SiteRow; scoped: { site_id: string; name: string } }
   | { ok: false; status: number; reason: string };
@@ -151,8 +164,7 @@ export async function resolveScopedSite(jwt: string, requestedSiteId: string, au
   const r = await svc(`presence_sites?id=eq.${requestedSiteId}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
   const site = (r.json && r.json[0]) as SiteRow | undefined;
   if (!site) { await finish({ ok: false, status: 404, reason: 'deleted' }, agencyId, ''); return { ok: false, status: 404, reason: 'deleted' }; }
-  const ident = await svc(`presence_identity?site_id=eq.${requestedSiteId}&select=business_name&limit=1`);
-  const name = (ident.json && ident.json[0]?.business_name) || 'Client';
+  const name = await clientName(requestedSiteId);
   await finish({ ok: true, status: 200, reason: 'ok' }, agencyId, name);
   return { ok: true, site, scoped: { site_id: requestedSiteId, name } };
 }

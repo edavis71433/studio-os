@@ -403,6 +403,13 @@ for (const w of WRITES) {
   const out = await answer(await handleGetIdentity(siteDb('jwt-studio', live.site, stamped), live.site, cors));
   ok('end to end: an authorised scope reads the client through the real resolver', out.body.data?.business_name === 'Alpha Cafe');
 
+  // item 87: what a request inside a client no longer costs, with authorisation still fresh
+  reset();
+  await resolveScopedSite('jwt-studio', SITE_A, audit);
+  ok('item 87: a member whose user id is on file isn’t written to on each request', !calls.some((c) => c.table === 'presence_agency_members' && c.method === 'PATCH'));
+  ok('item 87: the client’s name isn’t read again within the minute', !calls.some((c) => c.table === 'presence_identity'));
+  ok('item 87: who may act is still checked on this request', calls.some((c) => c.table === 'presence_agency_members') && calls.some((c) => c.table === 'presence_agency_clients'));
+
   // authorisation is recomputed each request: archive the client and the next one is denied
   T.presence_agency_clients.find((c) => c.agency_id === AGENCY && c.site_id === SITE_A).status = 'archived';
   const after = await resolveScopedSite('jwt-studio', SITE_A, audit);
