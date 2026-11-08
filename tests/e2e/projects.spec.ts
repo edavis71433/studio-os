@@ -385,7 +385,7 @@ test.describe('Project record page', () => {
     await expect(page.locator('.crumbs [aria-current="page"]')).toHaveText('Acme website build');
     await expect(page.locator('#dtitle')).toHaveText('Acme website build');
     await expect(page.locator('.rec-sub .pill')).toHaveText('active');
-    // highlights: Customer · Target date · Progress · Waiting on client · Files
+    // highlights: Customer · Target date · Progress · Waiting on them · Files
     const hl = page.locator('.hl-panel');
     await expect(hl).toContainText('Acme Bakery');
     await expect(hl).toContainText('Aug 1, 2026');   // dates read as words (Oct 2026 experience review)

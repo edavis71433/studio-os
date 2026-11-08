@@ -38,7 +38,7 @@ ok('slice 9: sortable roster table in its own scroll container (aria-sort + th b
 ok('slice 9: Table ⇄ Cards display toggle persisted (customers.html mobile pattern)', /dds-display:projects/.test(h) && /id="dispTable"/.test(h) && /id="dispCards"/.test(h));
 ok('slice 9: roster enrichment uses EXISTING routes only (per-project /report + /studio/customers), no fake numbers', /ensureReports/.test(h) && /ensureCustomers/.test(h) && /\/studio\/customers/.test(h) && /if\(!\(r&&r\.progress\)\)return '<span class="mutcell">—<\/span>'/.test(h));
 ok('slice 9: record page breadcrumb (Projects › name)', /class="crumbs" aria-label="Breadcrumb"/.test(h) && /aria-current="page"/.test(h));
-ok('slice 9: highlights panel tiles (Customer · Target · Progress · Waiting · Files)', /class="hl-panel"/.test(h) && /Waiting on client/.test(h) && /class="hl-k"/.test(h));
+ok('slice 9: highlights panel tiles (Customer · Target · Progress · Waiting · Files)', /class="hl-panel"/.test(h) && /Waiting on them/.test(h) && /class="hl-k"/.test(h));
 ok('slice 9: the Path IS the milestones — rendered only when milestones exist, single aria-current step', /pathHtml/.test(h) && /if\(!milestones\.length\)return ''/.test(h) && /aria-current="step"/.test(h) && /findIndex\(m=>m\.status!=='complete'\)/.test(h));
 ok('slice 9: the Path action completes the CURRENT milestone via the existing PATCH', /id="msComplete"/.test(h) && /Mark milestone complete/.test(h));
 ok('slice 9: Status ▾ popup carries the slice-2 contract (aria-haspopup + aria-expanded + Escape + delegated outside-click closer)', /aria-haspopup="menu"/.test(h) && /id="statusMenu"/.test(h) && /aria-expanded/.test(h) && /e\.key==='Escape'/.test(h) && /closest\('\.statusdd'\)/.test(h));

@@ -754,14 +754,14 @@ async function openProject(id){
     const recLink=(STUDIO&&p.client_id)?`<a class="btn ghost sm" href="/crm.html?project=${encodeURIComponent(p.id)}&client_id=${encodeURIComponent(p.client_id)}&tab=billing" data-noscope="1" style="text-decoration:none">Customer record →</a>`:'';
     const acts=STUDIO?`<div class="rhead-acts">${statusDd}${recLink}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
 
-    // ── highlights: Customer · Target date · Progress · Waiting on client · Files
+    // ── highlights: Customer · Target date · Progress · Waiting on them · Files
     //    (+ the old overview's remaining stats: open client actions when any
     //    exist, CSAT when the report carries ratings — omitted honestly otherwise) ──
     const hl=[
       ['Customer',esc(cust)],
       ['Target date',p.target_date?esc(niceDay(p.target_date)):'—'],
       ['Progress',rp&&rp.progress?`${Number(rp.progress.pct||0)}% <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">· ${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)} tasks</span>`:'—'],
-      ['Waiting on client',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
+      ['Waiting on them',rp?String(Number(rp.pending_approvals||0))+(Number(rp.pending_approvals||0)===1?' approval':' approvals'):'—'],
       ['Files',rp?String(Number(rp.shared_files||0))+' shared':'—'],
     ];
     if(rp&&Number(rp.open_client_actions||0)>0)hl.push(['Client actions',String(Number(rp.open_client_actions))+' open']);
@@ -772,7 +772,7 @@ async function openProject(id){
       'Customer':['','<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M4 21a8 8 0 0 1 16 0"/>'],
       'Target date':['info','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
       'Progress':['','<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>'],
-      'Waiting on client':['warn','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+      'Waiting on them':['warn','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
       'Files':['good','<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>'],
       'Client actions':['warn','<path d="M20 6L9 17l-5-5"/>'],
       'CSAT':['good','<path d="M12 3l2.5 5.2 5.5.8-4 3.9 1 5.6L12 16l-5 2.6 1-5.6-4-3.9 5.5-.8z"/>'],

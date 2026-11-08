@@ -115,6 +115,9 @@
   .rchip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--p-soft);color:var(--p);white-space:nowrap}
   .rchip.support{background:var(--warn-soft);color:var(--warn)}
   .rchip.lead{background:var(--good-soft);color:var(--good)}
+  .lnote{margin-top:var(--dds-s4,16px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
+  .lnote label{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px}
+  .lnote textarea{width:100%;min-height:64px;box-sizing:border-box;font:inherit;font-size:14px;padding:var(--dds-s2,8px) var(--dds-s3,12px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .cmbadge{flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--faint);color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
   .row.sysrow{opacity:.72}
   .row.sysrow.isread .rname{font-weight:400;color:var(--soft)}
@@ -323,8 +326,6 @@ const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').sl
 // SC-1: keep the agency drill-in scope on every internal link so a scoped operator
 // stays inside the client they opened.
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
-// map a derived notification's source to a real Studio page (deep link resolves)
-function notifLink(n){const h=String(n.href||'');const m=h.match(/^\/projects\/([0-9a-f-]{36})/);if(m){const anc=h.split('#')[1];return '/projects.html?project='+m[1]+(anc?'#'+anc:'');}if(h&&h.charAt(0)==='/')return h;return '/today.html';}
 
 // ── state ─────────────────────────────────────────────────────────────────────
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
@@ -484,16 +485,13 @@ function buildSystem(feed,notifs){
   // The feed carries a synthetic 'website_enquiry' aggregate row for the BELL;
   // the Inbox lists each lead as its own row, so drop the aggregate here to
   // avoid a double listing.
-  const notices=(feed.notices||[]).filter(n=>n.kind!=='website_enquiry');
+  // Sales review item 18 (Nov 2026): the Inbox lists what people said or asked.
+  // "A task moved" / "Project started" (the studio's own worklog) stays on the
+  // project; a reminder ABOUT a conversation already listed here (support_aging,
+  // lead_followup) is not a second row.
+  const DUP_NUDGES=new Set(['website_enquiry','support_aging','lead_followup']);
+  const notices=(feed.notices||[]).filter(n=>!DUP_NUDGES.has(n.kind));
   const moments=(feed.moments||[]);
-  // Project activity = the studio's OWN worklog; support/client messages already
-  // have first-class rows above, so they're filtered out here (as before).
-  const activity=(Array.isArray(notifs)?notifs:[]).filter(n=>n.kind!=='support_message'&&n.kind!=='message').slice(0,12);
-  // project_id rides along so the project lens keeps that project's OWN worklog
-  // rows in view. It is only ever used to MATCH — never to name a lens option
-  // (a notification carries no project name, and an unnamed dropdown entry is
-  // exactly the dead affordance we're avoiding).
-  activity.forEach((n,i)=>rows.push({sys:true,id:'sys:act:'+i,icon:si('cog'),label:n.label||'Activity',tag:'Project activity',when:String(n.created_at||''),read:!!n.read,project_id:String(n.project_id||''),href:scoped(notifLink(n))}));
   for(const n of notices)rows.push({sys:true,notice:true,id:'sys:not:'+n.id,icon:si('eye'),label:n.headline||'Something needs a look',tag:'Worth a look',when:'',read:false,href:scoped(n.href||'/today.html')});
   // moments render ACTIVE (undimmed, no ✓) — the feed only carries the still-open
   // ones, and the old page listed them as live items; they stay counted in TOTAL.
@@ -514,7 +512,7 @@ function renderConsole(){
             <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false">${esc(VIEW_LABEL[VIEW])} <span class="car" aria-hidden="true">▾</span></button>
             <div id="viewMenu" role="listbox" aria-label="Inbox views" hidden></div>
           </div>
-          <a class="lbtn lsend" id="sendUpdate" href="/broadcasts.html" title="Send an update to many customers at once (Broadcasts)">Send an update</a>
+          <a class="lbtn lsend" id="sendUpdate" href="/broadcasts.html" title="Send an update to many customers at once">Send an update</a>
           <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
           <div class="ovf">
             <button class="lbtn" id="ovfBtn" aria-haspopup="true" aria-expanded="false" aria-label="More tools" title="More tools">⋯</button>
@@ -701,10 +699,14 @@ function enqMatch(r){
 // Phase 4 (triage): where an enquiry went, in plain words. `new` and `read`
 // show nothing (the dot says "new"); in the pipeline shows the deal link.
 const STATUS_LABEL={replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit'};
-// a queue row's chip says the kind AND where it went, so All reads at a glance
+// sales review item 28: every enquiry row's chip says the kind AND where it
+// stands — New, Read, Replied, Not a fit, or In pipeline (starting a deal is
+// how an enquiry is qualified) — in every view, not only the queue
+const LEAD_STATE={new:'New',read:'Read',replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit',converted:'In pipeline'};
+const leadState=(l)=>l?(l.converted?'In pipeline':(LEAD_STATE[String(l.status||'new')]||'')):'';
 function rowChip(r){
-  if(!(r.queue&&r.lead))return r.chip||'';
-  const st=r.lead.converted?'In pipeline':STATUS_LABEL[r.lead.status];
+  if(!r.lead)return r.chip||'';
+  const st=leadState(r.lead);
   return (KIND[r.lead.form_kind]||'Message')+(st?' · '+st:'');
 }
 // The lenses narrow by IDENTITY, not by text — a client row answers to its own
@@ -1164,11 +1166,15 @@ function paneLead(host,it){
   const sent=Array.isArray(l.replies)?l.replies:[];
   const st=String(l.status||'new');
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
-  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${STATUS_LABEL[st]?`<span class="pchip plain stchip ${esc(st)}">${STATUS_LABEL[st]}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
+  const note=(l.note&&typeof l.note.body==='string')?l.note:null;
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(l.converted?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
+      <div class="lnote"><label for="leadNote">Your note <span class="muted">— never sent to them</span></label>
+        <textarea id="leadNote" maxlength="1000" placeholder="e.g. Called back — wants a quote in March">${esc(note?note.body:'')}</textarea>
+        <div class="crow"><span class="muted" id="leadNoteAt" style="font-size:12px">${note&&note.at?'Saved '+esc(when(note.at)):''}</span><span class="spacer"></span><button type="button" id="leadNoteSave">Save note</button></div></div>
       <div class="acts">
         ${l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${(l.converted||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
@@ -1182,6 +1188,16 @@ function paneLead(host,it){
       <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
+  // item 28: the studio's private note (saved on the enquiry; the status is left as it is)
+  const ns=$('leadNoteSave');
+  if(ns)ns.addEventListener('click',async()=>{
+    const body=($('leadNote').value||'').trim();
+    ns.disabled=true;
+    const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{note:body});
+    ns.disabled=false;
+    if(r.ok){l.note=body?{body,at:new Date().toISOString()}:null;const at=$('leadNoteAt');if(at)at.textContent=body?'Saved just now':'';toast(body?'Note saved.':'Note cleared.');}
+    else toast('Couldn’t save the note just now — try again in a moment.');
+  });
   // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
   const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
   const lf=$('leadForm');

@@ -9,7 +9,7 @@
 // customer" entirely; website nags about the studio's practice site rode along.
 // The rule now: ONE list (agency/needs_you.ts), one row per thing, and the bell
 // at studio level shows its total. This pins the rule and the wiring.
-import { buildNeedsYou, needsYouPayload, NEEDS_WEBSITE_KINDS, NEEDS_NUDGE_KINDS } from '../../supabase/functions/presence/agency/needs_you.ts';
+import { buildNeedsYou, needsYouPayload, NEEDS_WEBSITE_KINDS, NEEDS_NUDGE_KINDS, dealNoticeIds, staleDealNotices } from '../../supabase/functions/presence/agency/needs_you.ts';
 const W = await import('../../supabase/functions/presence/routes/workspace.ts').catch(() => null);
 
 let pass = 0, fail = 0; const failed = [];
@@ -82,7 +82,7 @@ eq('…opening the newest', harbor?.href, '/inbox.html#enquiries?sel=lead:e3');
 eq('a quote form names itself', rows.find((r) => r.name === 'A tester')?.what, 'new quote request through your website');
 eq('the longest wait comes first', rows.filter((r) => r.kind === 'enquiry').map((r) => r.name), ['Sam', 'Dana', 'Harbor Lane Bakery', 'A tester']);
 const signed = rows.find((r) => r.key === `deal:signed:${D1}`);
-eq('signed: named by the deal, verb Convert, opens the deal', [signed?.name, signed?.what, signed?.verb, signed?.href], ['Willow Day Spa', 'signed the agreement — make them a customer', 'Convert', `/pipeline.html?deal=${D1}`]);
+eq('signed: named by the deal, verb Convert, opens the deal', [signed?.name, signed?.what, signed?.verb, signed?.href], ['Willow Day Spa', 'signed the agreement — make them a customer', 'Convert', `/pipeline.html?deal=${D1}#convert`]);
 eq('accepted: send the agreement', rows.find((r) => r.key === `deal:accepted:${D2}`)?.what, 'accepted your proposal — send the agreement');
 eq('quiet: named from "Follow up on …"', rows.find((r) => r.key === `deal:quiet:${D3}`)?.name, 'Birch Cafe');
 const msg = rows.find((r) => r.kind === 'message');
@@ -98,6 +98,28 @@ const lateAndQuiet = buildNeedsYou({ ...base(), deals: [{ id: D3, title: 'Birch 
 eq('late step + quiet nudge on one deal → one row', lateAndQuiet.map((r) => r.key), [`deal:${D3}`]);
 // nothing at all
 eq('no own rows → nothing added', buildNeedsYou(base()).length, 0);
+
+// ── a deal notice only counts while its deal still waits on that step (found live Nov 8) ──
+{
+  const CONV = 'c0c0c0c0-0000-4000-8000-0000000000c0', GONE = 'e0e0e0e0-0000-4000-8000-0000000000e0', OPEN = 'f0f0f0f0-0000-4000-8000-0000000000f0', WON = 'a0a0a0a0-0000-4000-8000-0000000000a0', LOST = 'b0b0b0b0-0000-4000-8000-0000000000b0';
+  const ns = [
+    { id: 's-conv', kind: 'deal_signed', period: `signed:${CONV}`, tier: 'needs_you', headline: 'Agreement signed — ready to convert Already Done' },
+    { id: 's-open', kind: 'deal_signed', period: `signed:${WON}`, tier: 'needs_you', headline: 'Agreement signed — ready to convert Still Waiting' },
+    { id: 'a-lost', kind: 'deal_signed', period: `accepted:${LOST}`, tier: 'needs_you', headline: 'Proposal accepted — Went Elsewhere' },
+    { id: 'q-gone', kind: 'deal_followup', period: `deal:${GONE}:w2955`, tier: 'needs_you', headline: 'Follow up on Deleted Co' },
+    { id: 'q-won', kind: 'deal_followup', period: `deal:${WON}:w2955`, tier: 'needs_you', headline: 'Follow up on Still Waiting' },
+    { id: 'q-open', kind: 'deal_followup', period: `deal:${OPEN}:w2955`, tier: 'needs_you', headline: 'Follow up on Quiet Co' },
+    { id: 'inv', kind: 'deal_followup', period: `invremind:${OPEN}:due`, tier: 'needs_you', headline: 'Still unpaid' },
+  ];
+  eq('the deal ids the deal notices name (not invoice reminders)', dealNoticeIds(ns).sort(), [CONV, GONE, OPEN, WON, LOST].sort());
+  const deals = { [CONV]: { stage: 'won', converted_client_id: 'cl' }, [WON]: { stage: 'won', converted_client_id: null }, [LOST]: { stage: 'lost' }, [OPEN]: { stage: 'proposal' } };
+  eq('stale: converted, lost, deleted, and "quiet" on a won deal', staleDealNotices(ns, deals).map((n) => n.id), ['s-conv', 'a-lost', 'q-gone', 'q-won']);
+  eq('a failed deals read keeps everything', staleDealNotices(ns, null).length, 0);
+  const r = buildNeedsYou({ ...base(), own: { notices: ns, deals } });
+  eq('only the still-waiting steps are rows', r.map((x) => x.key), [`deal:signed:${WON}`, `deal:quiet:${OPEN}`]);
+  const ag2 = read('supabase/functions/presence/agency/routes.ts');
+  ok('the list reads those deals and clears the stale notices', /dealNoticeIds\(ownFeed\.notices/.test(ag2) && /staleDealNotices\(ownFeed\.notices \|\| \[\], ownDeals\)/.test(ag2) && /clearNotice\(String\(own\.client_id\), String\(n\.kind\), String\(n\.period\)\)/.test(ag2));
+}
 
 // the kind lists the two filters share
 for (const k of ['missing_required', 'site_down', 'publish_failed', 'connection_expired', 'domain_expiry', 'client_feedback']) ok(`website kind: ${k}`, NEEDS_WEBSITE_KINDS.has(k));

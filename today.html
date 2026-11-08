@@ -377,7 +377,7 @@ function comingUp(deals,appts,nowMs){
 function customerRows(list){
   return (Array.isArray(list)?list:[]).filter(c=>c&&c.client_id).slice(0,5).map(c=>{
     const st=String(c.status||'active').replace(/_/g,' ');const n=Number(c.open_support)||0;
-    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+' waiting':'All clear'),
+    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+(n===1?' request':' requests'):'All clear'),
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
@@ -389,6 +389,8 @@ const SVG={
   won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
   open:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  task:'<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
+  site:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/>',
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
 
@@ -451,6 +453,44 @@ function alertBandHtml(rcv){
   const buckets=keys.map(k=>`<span class="mb ${MONEY_TONE[k]||''}" data-bucket="${k}"><b>${esc(money(b[k].cents))}</b> ${esc(MONEY_WORD[k])}${k==='paid'?` <i>(${esc(String(rcv.paid_window_days||30))} days)</i>`:''}</span>`).join('');
   return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}<div class="mbuckets" aria-label="Money by state">${buckets}</div></div><div class="aacts">${acts}</div></div>`;
 }
+// ── Sales review item 24 (Nov 2026): a studio drilled into a client (?client=)
+// sees the CLIENT's facts first — their project, what waits on them, what they
+// owe the studio, their website — not sales tiles read against the client's own
+// site (all zeros for a site the studio builds). Reads: /crm/record under the
+// client's scope (exactly as crm.html reads it) and the project at studio level
+// (no scope header), as the record's Project tab does. Each tile exists only
+// when its read came back; a failed record read leaves the page as it was.
+async function apiGetStudio(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'' } }); return r.ok ? r.json() : Promise.reject(r.status); }
+function clientFacts(rec,proj,ctx){
+  if(!rec||!rec.identity)return null;
+  const id=rec.identity; const site=new URLSearchParams(location.search).get('client')||id.customer_site_id||'';
+  const recHref=(tab)=>'/crm.html?client='+encodeURIComponent(site)+(tab?'&tab='+tab:'');
+  const t=[];
+  if(id.project_id){
+    const p=proj&&proj.project;
+    if(p){   // a failed project read drops both project tiles — never a fake "nothing waiting"
+      const pct=proj.progress&&proj.progress.pct!=null?Number(proj.progress.pct):null;
+      const href='/projects.html?project='+encodeURIComponent(id.project_id)+'&client=';   // the studio's own Projects (blank scope), as the record links it
+      t.push({id:'cf-project',k:'Project',v:pct!=null?pct+'% along':String(p.status||'active').replace(/_/g,' '),s:p.name||'Project',ico:'open',tone:'',href});
+      const n=(proj.tasks||[]).filter(x=>x&&x.client_action_required&&x.status!=='done').length;
+      t.push({id:'cf-waiting',k:'Waiting on them',v:String(n),s:n?(n===1?'1 task for them':n+' tasks for them'):'Nothing waiting',ico:'task',tone:n?'warn':'',href});
+    }
+  }else{
+    t.push({id:'cf-project',k:'Project',v:'None yet',s:'Nothing in delivery',ico:'open',tone:'',href:recHref('')});
+  }
+  const owed=Number(rec.highlights&&rec.highlights.owed_cents)||0;
+  t.push({id:'cf-owed',k:'Owed to you',v:money(owed),s:owed?'Open invoices':'Nothing owed',ico:'owed',tone:owed?'warn':'good',href:recHref('billing')});
+  const ed=ctx&&ctx.edition;
+  if(ed==='monitor')t.push({id:'cf-site',k:'Website',v:'Hosted elsewhere',s:'We watch it; it isn’t built here',ico:'site',tone:'',href:scopeHref('/presence.html')});
+  else if(ctx&&typeof ctx.site_live==='boolean')t.push({id:'cf-site',k:'Website',v:ctx.site_live?'Live':'Not live yet',s:ctx.site_live?'Published':'Not published yet',ico:'site',tone:ctx.site_live?'good':'',href:scopeHref('/presence.html')});
+  return t;
+}
+function clientFactsHtml(tiles){
+  if(!tiles||!tiles.length)return'';
+  return `<section class="hl-panel" id="client-facts" aria-label="This client at a glance">${tiles.map(t=>`<a class="hl" id="${esc(t.id)}" href="${esc(t.href)}"><span class="ico ${esc(t.tone)}" aria-hidden="true">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${esc(t.k)}</div><div class="hl-v">${esc(t.v)}</div><div class="hl-s">${esc(t.s)}</div></div></a>`).join('')}</section>`;
+}
+// The client's OWN sales tiles stay only when that site has sales of its own.
+function salesActivity(s){ return !!(s&&((Number(s.total)||0)>0||(s.ar&&((Number(s.ar.count)||0)>0||(Number(s.ar.outstanding_cents)||0)>0))||(s.won_month&&(Number(s.won_month.count)||0)>0))); }
 function statStripHtml(tiles){
   if(!tiles.length)return'';
   return `<section class="hl-panel" id="stat-strip" aria-label="Your numbers">${tiles.map(t=>`<a class="hl" id="${esc(t.id)}" href="${esc(scopeHref(t.href))}"><span class="ico ${esc(t.tone)}" aria-hidden="true">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${esc(t.k)}</div><div class="hl-v">${esc(t.v)}</div><div class="hl-s">${esc(t.s)}</div></div></a>`).join('')}</section>`;
@@ -586,7 +626,7 @@ const NOTICE_FYI_KINDS = ['invoice_paid'];
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
 const SI={mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',heart:'<path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"/>',alert:'<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 18h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
-function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers, example){
+function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers, example, facts){
   $('greeting').textContent = greet();
   // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
   // three times (three "Walk me through it" cards about one publish step)
@@ -724,7 +764,10 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   const rail = railCards + '<div id="rail-waiting" hidden></div>';
   // Above the columns, full width: the money band (only when something is due)
   // and the stat strip (only the tiles whose read came back honest).
-  const top = alertBandHtml(rcv) + statStripHtml(statTiles(summary, feed && feed.enquiries));
+  // A client's Overview (item 24): their facts lead; their own sales tiles show
+  // only when that site has sales, and the enquiries tile only when one waits.
+  const enq = feed && feed.enquiries;
+  const top = clientFactsHtml(facts) + alertBandHtml(rcv) + statStripHtml(statTiles(facts && !salesActivity(summary) ? null : summary, facts && !(Array.isArray(enq) && enq.length) ? null : enq));
   $('main').innerHTML = top + `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
   // "what comes with your business" — the Industry Pack, made invisible. Secondary
   // context, so it opens inside the collapsible "More about your business" below.
@@ -908,7 +951,7 @@ function trouble(){
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
     let feedFailed = false;
-    const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example] = await Promise.all([
+    const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example, rec] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
@@ -921,15 +964,22 @@ function trouble(){
       apiGet('/sales/receivables').catch(()=>null),          // the money band — hidden on a failed read (a 5xx must never paint "nothing is due")
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)),   // the Customers card — the studio's own roster, never for a drilled-in operator (D7: the scope header would blank it)
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/commerce/example-data').catch(()=>null)),   // benchmark 12: are the trial's example rows still here? (never for a drilled-in operator; hidden on a failed/404 read)
+      (new URLSearchParams(location.search).get('client')?apiGet('/crm/record?client='+encodeURIComponent(new URLSearchParams(location.search).get('client'))).catch(()=>null):Promise.resolve(null)),   // item 24: a client's Overview leads with their facts (studio only — anyone else gets a 403 → null)
     ]);
-    // Sales review item 23 (Nov 2026): a studio has ONE Home — Your clients
+    // Sales review item 23 (Nov 2026): a studio has ONE Home — Customers
     // (agency.html). This page stays the plain owner's Today and a client's
     // Overview (?client=); a studio account at studio level is sent home.
     const c0 = ctx && ctx.data;
     if(c0 && c0.is_agency && !(c0.scope && c0.scope.site_id) && !new URLSearchParams(location.search).get('client')){ location.replace('/agency.html'); return; }
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
-    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data, summary && summary.data, rcv && rcv.data, customers && customers.data, example && example.data);
+    let facts = null;
+    if(c0 && (c0.is_agency || c0.is_operator) && rec && rec.data && rec.data.identity){
+      const pid = rec.data.identity.project_id;
+      const proj = pid ? await apiGetStudio('/projects/'+encodeURIComponent(pid)).then((r)=>r&&r.data).catch(()=>null) : null;
+      facts = clientFacts(rec.data, proj, c0);
+    }
+    render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data, summary && summary.data, rcv && rcv.data, customers && customers.data, example && example.data, facts);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);

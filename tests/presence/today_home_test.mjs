@@ -97,7 +97,7 @@ function comingUp(deals,appts,nowMs){
 function customerRows(list){
   return (Array.isArray(list)?list:[]).filter(c=>c&&c.client_id).slice(0,5).map(c=>{
     const st=String(c.status||'active').replace(/_/g,' ');const n=Number(c.open_support)||0;
-    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+' waiting':'All clear'),
+    return {id:String(c.client_id),name:c.name||'Customer',sub:st.charAt(0).toUpperCase()+st.slice(1)+' · '+(n?n+(n===1?' request':' requests'):'All clear'),
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
@@ -611,7 +611,7 @@ const DEALS=[
   ]);
   ok('customerRows: by site when they have one, else by client id; status + open support in words',
     r.length===2 && r[0].href==='/crm.html?client=s1' && r[0].sub==='Active · All clear'
-    && r[1].href==='/crm.html?client_id=c2' && r[1].sub==='On hold · 2 waiting' && r[1].name==='Hettie Orange Designs');
+    && r[1].href==='/crm.html?client_id=c2' && r[1].sub==='On hold · 2 requests' && r[1].name==='Hettie Orange Designs');
   ok('customerRows: capped at five; junk yields empty',
     customerRows(Array.from({length:8},(_,i)=>({client_id:'c'+i,name:'n'}))).length===5 && customerRows(null).length===0 && customerRows('x').length===0);
   ok('initials: first letters of the first two words, "?" when blank',
@@ -631,7 +631,7 @@ ok('today: the money band renders NOTHING on an empty list or a failed read (fai
 ok('today: Resend on the band opens the deal\'s billing tab; Open record opens the deal',
   today.includes("'/crm.html?deal='+encodeURIComponent(i.deal_id)+'&tab=billing'") && today.includes("'/crm.html?deal='+encodeURIComponent(i.deal_id))"));
 ok('today: the strip renders only the tiles whose read came back honest (statTiles over summary + the feed\'s enquiries)',
-  today.includes('statStripHtml(statTiles(summary, feed && feed.enquiries))') && /function statStripHtml\(tiles\)\{\s*if\(!tiles\.length\)return''/.test(today));
+  today.includes('statStripHtml(statTiles(facts && !salesActivity(summary) ? null : summary, facts && !(Array.isArray(enq) && enq.length) ? null : enq))') && today.includes('const enq = feed && feed.enquiries;') && /function statStripHtml\(tiles\)\{\s*if\(!tiles\.length\)return''/.test(today));
 ok('today: This week / Coming up hide entirely when empty',
   /function weekHtml\(todos\)\{\s*if\(!todos\.length\)return''/.test(today) && /function comingHtml\(items\)\{\s*if\(!items\.length\)return''/.test(today));
 ok('today: Done on a This-week row PATCHes the deal\'s next step through the existing per-deal route — the row leaves only after the write succeeds',

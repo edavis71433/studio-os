@@ -751,8 +751,11 @@ function renderPortfolio(d,roster){
       h+=tile({icon:'warn',tone:'warn',title:'Needs attention',value:num(att),mod:att?'warn':'',sub:att?'worth a look today':'all clear'});
       const enq=ws.reduce((a,w)=>a+(Number(w&&w.leads_waiting)||0),0);
       h+=tile({icon:'mail',tone:'info',title:'Enquiries waiting',value:num(enq),mod:enq?'warn':'',sub:enq?'not yet answered':'nothing waiting'});
-      const live=ws.filter(w=>w&&w.draft_live==='live').length;
-      h+=tile({icon:'live',tone:'good',title:'Sites live',value:num(live),sub:ws.length-live?`${num(ws.length-live)} still in draft`:'every site is live'});
+      // item 15: three honest states (site_state); an older function build only sends draft_live
+      const stOf=(w)=>w&&(w.site_state||(w.draft_live==='live'?'live':'draft'));
+      const live=ws.filter(w=>stOf(w)==='live').length, away=ws.filter(w=>stOf(w)==='elsewhere').length, draft=ws.length-live-away;
+      const subs=[away?`${num(away)} hosted elsewhere`:'',draft?`${num(draft)} still in draft`:''].filter(Boolean);
+      h+=tile({icon:'live',tone:'good',title:'Sites live',value:num(live),sub:subs.length?subs.join(' · '):'every site is live'});
     }
     h+=`</div>`;
   }

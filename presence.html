@@ -1782,6 +1782,7 @@ function toast(msg, bad) {
   // P2-B: prefer the ONE shared toast (success/error/conflict) from the shell;
   // fall back to the local toast if the shell hasn't loaded. Same call sites,
   // including the M9 stale-draft conflict path — now a consistent shared state.
+  if (bad && STALE_TOAST && STALE_TOAST.parentNode && STALE_TOAST.firstChild && STALE_TOAST.firstChild.textContent === msg) return;   // offered with its button already
   if (typeof window.ddsToast === "function") { window.ddsToast(msg, bad ? "err" : "ok"); return; }
   const t = el("div", "toast" + (bad ? " bad" : ""), msg);
   $("toasts").appendChild(t);
@@ -1790,6 +1791,23 @@ function toast(msg, bad) {
 // Wave-1 G7: a toast that carries ONE action (Undo a page delete, Load the latest
 // after an edit conflict). Always local (never ddsToast — it can't hold a button);
 // stays up `ms` (default 20s) so the action is genuinely reachable.
+// A save refused because the site changed elsewhere is refused again until the page
+// loads that change, whichever save it was. So every such refusal offers the one way
+// out, once while it's up, from apiSend; a caller's own copy of the sentence is dropped.
+let STALE_TOAST = null;
+function offerLoadLatest(msg) {
+  if (STALE_TOAST && STALE_TOAST.parentNode) return;
+  STALE_TOAST = toastAction(msg, "Load the latest", loadLatest, 30000);
+}
+async function loadLatest() {
+  STALE_TOAST = null;
+  try {
+    await refreshAll();
+    BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; dcResetHistory();
+    renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
+    toast("Loaded the latest version — your unsaved edit was set aside, reapply what you still want");
+  } catch (e2) { toast(nice(e2), true); }
+}
 function toastAction(msg, label, fn, ms) {
   const t = el("div", "toast");
   t.style.cssText = "display:flex;gap:12px;align-items:center;pointer-events:auto";
@@ -1955,7 +1973,9 @@ async function apiSend(method, route, body, undoRec, named) {
       if (lc) S.lastChange = lc;
       const who = lcWho(lc);
       const e = new Error("This site was changed by " + who + " while you had it open — nothing was overwritten. Load the latest, then reapply your change.");
-      e.status = 409; e.stale = true; e.lastChange = lc; e.who = who; throw e;
+      e.status = 409; e.stale = true; e.lastChange = lc; e.who = who;
+      if (DRAFT_WRITE.test(route)) offerLoadLatest(e.message);   // Publish has its own Try again, which reads the review afresh
+      throw e;
     }
     const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e;
   }
@@ -2549,9 +2569,10 @@ async function moveCategory(cat, dir) {
   const i = cats.indexOf(cat), j = i + dir;
   if (j < 0 || j >= cats.length) return;
   [cats[i], cats[j]] = [cats[j], cats[i]];
+  const before = { category_order: undoClone((S.settings || {}).category_order || []) };   // S moves ahead of the write, so Undo is told what it was
   S.settings = { ...(S.settings || {}), category_order: cats };
   renderOfferings();
-  try { await settingsTurn(() => api("PUT", "/settings", { category_order: cats })); scheduleChangesRefresh(); }
+  try { await settingsPut(() => { UNDO_BEFORE = before; return { category_order: cats }; }); scheduleChangesRefresh(); }
   catch (err) { toast(nice(err), true); }
 }
 
@@ -5548,6 +5569,10 @@ async function loadRitual(toSchedule) {
     // the version from before it would refuse the next save as someone else's change.
     // Publish names the version reviewed here (If-Match), and only Publish does: it can hold
     // someone else's change the page hasn't loaded, so the page's next save doesn't take it.
+    // What was just typed, and any save still waiting in line, goes in first: otherwise the
+    // review leaves it out, and Publish names a version that save is about to move.
+    await dcSavePendingEdits();
+    await DRAFT_LINE;
     let c, answered;
     do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);
     S.changes = c; REVIEWED = (c && c.draft_hash) || null;
@@ -8458,16 +8483,7 @@ async function putBlocks() {
     whisper("topWhisper", "");
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
-    if (err && err.stale) {
-      toastAction(nice(err), "Load the latest", async () => {
-        try {
-          await refreshAll();
-          BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; dcResetHistory();
-          renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
-          toast("Loaded the latest version — your unsaved edit was set aside, reapply what you still want");
-        } catch (e2) { toast(nice(e2), true); }
-      }, 30000);
-    } else toast(nice(err), true);
+    if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
     return false;
   }
 }
