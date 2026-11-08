@@ -18,6 +18,7 @@ import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { signPreviewToken, verifyPreviewToken, previewLinkSecret, clampTtlSeconds } from '../lib/preview_link.ts';
 import { injectFeedbackPanel } from '../lib/section_comments.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
@@ -116,9 +117,9 @@ async function renderStagedPreview(req: Request, siteId: string, snapshotId: str
   if (!hit) {
     const loaded = await loadStagedSnapshot(snapshotId);
     if (!loaded || !snapshotContentUsable(loaded.snapshot.content)) return htmlResp(shell('This preview can’t be shown.'), 410);
-    const site = await svc(`presence_sites?id=eq.${siteId}&select=custom_domain,netlify_site_id&limit=1`);
+    const site = await svc(`presence_sites?id=eq.${siteId}&select=id,custom_domain,netlify_site_id&limit=1`);
     const s = site.json?.[0] || {};
-    const baseUrl = s.custom_domain ? `https://${s.custom_domain}` : (s.netlify_site_id ? `https://${s.netlify_site_id}.netlify.app` : 'https://preview.invalid');
+    const baseUrl = siteOrigin(s) || 'https://preview.invalid';
     let fileMap: Record<string, string | Uint8Array>;
     try { fileMap = renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return htmlResp(shell('We couldn’t draw this preview.'), 500); }
     hit = { fileMap, mediaManifest: loaded.mediaManifest, blockers: 0, warnings: 0, businessName: (loaded.snapshot.content as any)?.identity?.business_name || '' };

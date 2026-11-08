@@ -33,6 +33,7 @@ import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { hostedName } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 
@@ -104,7 +105,7 @@ async function handleProvision(req: Request, principal: Principal, cors: Record<
 
   // Netlify site: adopt existing, repair a dangling id, or create fresh —
   // the deterministic name makes reruns converge instead of duplicating
-  const desiredName = `presence-${site.id.replace(/-/g, '').slice(0, 12)}`;
+  const desiredName = hostedName(site.id);
   let netlifyId = site.netlify_site_id as string | null;
   if (netlifyId) {
     const found = await getSite(netlifyId);

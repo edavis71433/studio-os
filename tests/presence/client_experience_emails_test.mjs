@@ -49,7 +49,8 @@ const liveEnd = bridge.indexOf('\n}', liveStart) + 2;
 const liveFn = bridge.slice(liveStart, liveEnd);
 ok('site-live: helper exists in the ONE bridge-email home (service_bridge.ts)', liveStart > 0);
 ok('site-live: resolves the ACTIVE service link (tenant-safe — unbridged sites send nothing)', /presence_service_links\?customer_site_id=eq\.\$\{customerSiteId\}&status=eq\.active/.test(liveFn));
-ok('site-live: includes the real live URL (custom domain, else the netlify host)', /custom_domain/.test(liveFn) && /netlify_site_id/.test(liveFn) && /https:\/\/\$\{host\}/.test(liveFn));
+// item 63: the address comes from the one helper (own domain, else the Netlify name), never from Netlify's internal id
+ok('site-live: includes the real live URL (custom domain, else the netlify host)', /select=id,custom_domain,netlify_site_id/.test(liveFn) && /const liveUrl = siteOrigin\(siteRow\)/.test(liveFn) && /href="\$\{escHtml\(liveUrl\)\}"/.test(liveFn));
 ok('site-live: reuses emailBridgedCustomer (studio brand + critical + project deep link)', /return await emailBridgedCustomer\(String\(link\.agency_site_id\), String\(link\.project_id\)/.test(liveFn));
 ok('site-live: subject is the celebration — "Your website is live — here’s the link"', /'Your website is live — here’s the link'/.test(liveFn));
 ok('site-live: one warm what-happens-next sentence (the walkthrough), never "the system"', /walk through everything together/.test(liveFn) && !/the system/i.test(liveFn));

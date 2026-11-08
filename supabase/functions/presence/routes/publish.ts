@@ -33,6 +33,7 @@ import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -161,7 +162,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // <form> posting to the public capture endpoint (was a mailto CTA when absent).
   const fnBase = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
   const siteCfg = {
-    baseUrl: site.custom_domain ? `https://${site.custom_domain}` : `https://${site.netlify_site_id}.netlify.app`,
+    baseUrl: siteOrigin(site),
     siteId: site.id,   // AN-2: baked into the injected first-party analytics tracker
     ...(fnBase ? { formEndpoint: `${fnBase}/functions/v1/presence/forms/${site.id}/submit` } : {}),
     // Phase BK: the native-booking API base — the booking block's first-party enhancer

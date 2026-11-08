@@ -6,6 +6,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { siteOrigin as siteAddress } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -117,7 +118,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   const site = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id&limit=1`);
   if (!site.json?.[0]) return json({ error: 'not_found' }, 404, cors);
   const siteRow = site.json[0];
-  const siteOrigin = siteRow.custom_domain ? `https://${siteRow.custom_domain}` : (siteRow.netlify_site_id ? `https://${siteRow.netlify_site_id}.netlify.app` : '');
+  const siteOrigin = siteAddress(siteRow);
   const redirectTo = (path: string) => new Response(null, { status: 303, headers: { ...cors, Location: /^https?:\/\//i.test(path) ? path : `${siteOrigin}${path}` } });
   // Item 62: a message that didn't send lands on the site's own "didn't send" page, which says
   // why and goes back to the form, where the browser still holds what was typed. A site
