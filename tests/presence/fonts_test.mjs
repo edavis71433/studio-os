@@ -55,11 +55,18 @@ ok('a style without library fonts loads none', !devLayerFragments({ theme_tokens
     if (String(url).endsWith('inter-700.woff2')) return Promise.resolve(new Response('<!doctype html>not here', { status: 200 }));
     return Promise.resolve(new Response(new Uint8Array([0x77, 0x4f, 0x46, 0x32, 1, 2, 3]), { status: 200 }));
   };
-  const got = await fetchLibraryFonts([pf, inter]);
+  const got = await fetchLibraryFonts([pf, inter], { pauseMs: 0 });
+  ok('publish asks the app for each weight of each picked family', new Set(asked).size === 4 && asked.every((u) => /^https:\/\/[^/]+\/fonts\/library\/[a-z-]+-(400|700)\.woff2$/.test(u)), asked.join(' '));
+  // item 89: a file that isn't a font is tried three times; the good ones are kept for next time
+  ok('a file that fails is tried three times before it counts as failed', asked.filter((u) => u.endsWith('inter-700.woff2')).length === 3 && asked.length === 6);
+  asked.length = 0;
+  const again = await fetchLibraryFonts([pf, inter], { pauseMs: 0 });
+  ok('a second publish takes the fonts it already has without asking again', !asked.some((u) => !u.endsWith('inter-700.woff2')) && Object.keys(again.files).length === 3);
   globalThis.fetch = realFetch;
-  ok('publish asks the app for each weight of each picked family', asked.length === 4 && asked.every((u) => /^https:\/\/[^/]+\/fonts\/library\/[a-z-]+-(400|700)\.woff2$/.test(u)), asked.join(' '));
   ok('the files land at the same path on the site', Object.keys(got.files).sort().join() === 'fonts/library/inter-400.woff2,fonts/library/playfair-display-400.woff2,fonts/library/playfair-display-700.woff2');
-  ok('a page that isn’t a font is refused, so the publish says so', got.failed.join() === 'fonts/library/inter-700.woff2');
+  ok('a page that isn’t a font is never published as one', got.failed.join() === 'fonts/library/inter-700.woff2' && !('fonts/library/inter-700.woff2' in got.files));
+  const pub = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/publish.ts', import.meta.url));
+  ok('a font that can’t be copied doesn’t stop the publish (item 89)', !/fail\('fonts'/.test(pub) && /font files not copied/.test(pub));
 }
 
 const failed = results.filter((r) => !r.p);
