@@ -55,7 +55,8 @@
   .bar{display:flex;gap:var(--dds-s2,8px);margin-bottom:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
   /* sales review item 31: saved views in the view menu; the text buttons beside it */
   #viewMenu .vsep{font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
-  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p)}
+  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p);padding-left:0;padding-right:0}
+  .ltools{display:flex;flex-wrap:wrap;align-items:center;gap:2px var(--dds-s4,16px);margin-top:4px}
   .colsdd{position:relative}
   .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
@@ -317,6 +318,7 @@ async function bulkSend(){
 // the client a one-question survey.
 async function bulkMark(to){
   const picked=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id)));
+  PICKED.clear();renderListZone();   // the bar goes at once: picks made while this runs are new picks, never wiped at the end
   let ok=0,fail=0,none=0;
   for(const c of picked){
     if(!c.project_id){none++;continue;}
@@ -325,7 +327,7 @@ async function bulkMark(to){
   }
   const word=to==='on_hold'?'on hold':'active';
   toast(`${ok} marked ${word}${fail?` · ${fail} couldn’t change from where they are`:''}${none?` · ${none} with no project`:''}.`);
-  PICKED.clear();await load();
+  await load();
 }
 function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
@@ -382,10 +384,10 @@ function headerHtml(count){
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
-      ${TAB==='customers'?`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}`:''}
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
+    ${TAB==='customers'?`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}</div>`:''}
   </div>`;
 }
 

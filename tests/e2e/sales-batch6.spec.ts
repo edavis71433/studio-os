@@ -146,7 +146,9 @@ test.describe('item 31 — Pipeline: views and pick-and-act in the Table', () =>
     const bar = page.getByRole('region', { name: 'Selected deals' });
     await expect(bar).toContainText('2 selected');
     await bar.getByRole('button', { name: 'Mark as not a fit' }).click();
+    await expect(page.getByRole('region', { name: 'Selected deals' })).toHaveCount(0);   // the picks clear the moment it starts
     await expect.poll(() => moved).toEqual([OPEN]);
+    await expect(page.locator('#table tbody tr')).toHaveCount(2);                         // the reload has painted
     await page.getByLabel('Select Acme website').check();
     await page.getByLabel('Select Maple Street Studio').check();
     await page.getByRole('region', { name: 'Selected deals' }).getByRole('button', { name: 'Send an update' }).click();

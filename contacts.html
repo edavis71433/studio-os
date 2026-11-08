@@ -37,7 +37,8 @@
   .viewdd{position:relative;min-width:0;flex:1}
   /* sales review item 31: saved views in the view menu; the text buttons beside it */
   #viewMenu .vsep{font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
-  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p)}
+  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p);padding-left:0;padding-right:0}
+  .ltools{display:flex;flex-wrap:wrap;align-items:center;gap:2px var(--dds-s4,16px);margin-top:4px}
   .colsdd{position:relative}
   #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
@@ -426,10 +427,10 @@ function headerHtml(count){
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
-      ${scope()?'':`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}`}
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
+    ${scope()?'':`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}</div>`}
   </div>`;
 }
 // The quiet "possible duplicate" note. The server annotates the roster read

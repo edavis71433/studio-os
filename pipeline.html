@@ -1831,13 +1831,14 @@ async function bulkSend(){
 }
 async function bulkLost(){
   const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
+  PICKED.clear();renderTable();   // the bar goes at once: picks made while this runs are new picks, never wiped at the end
   let ok=0,skip=0,fail=0;
   for(const d of picked){
     if(!boardCanMove(d.stage,'lost')){skip++;continue;}   // won, already closed, or a customer
     try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to:'lost'});ok++;}catch(_){fail++;}
   }
   toast(`${ok} marked not a fit${skip?` · ${skip} already closed`:''}${fail?` · ${fail} couldn’t change`:''}.`,!!fail);
-  PICKED.clear();load();
+  load();
 }
 // item 32: deals from a CSV — the contacts importer's flow (shell.js). Each row
 // makes (or reuses, by email) its contact, then the deal at its open stage.
