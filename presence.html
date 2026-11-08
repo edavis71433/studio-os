@@ -6643,9 +6643,27 @@ async function refreshAll() {
   fillSingles(); await loadToday();
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
-  mountAnnouncementCard();
-  mountDesignCard();
+  // Item 80: these cards mount once. On a reload (Load the latest, a restore, an accepted
+  // draft) the ones already on screen are drawn again from what just loaded, in place,
+  // so a restored announcement or section order shows; never while someone types in one.
+  remountInPlace("annCard", mountAnnouncementCard);
+  remountSectionsCard();
+  remountInPlace("designCard", mountDesignCard);
   mountSearchCard();
+}
+// Draw a once-mounted card again from what's loaded, where it was (a placeholder holds its
+// spot while a mount that reads first is out); absent, mount it fresh. If the new one
+// can't be drawn, the old one goes back.
+function remountInPlace(id, mount) {
+  const old = $(id);
+  if (old && old.contains(document.activeElement)) return;
+  const mark = old ? document.createComment(id) : null;
+  if (old) old.replaceWith(mark);
+  return Promise.resolve(mount()).catch(() => {}).then(() => {
+    if (!mark || !mark.parentNode) return;
+    const nu = $(id);
+    mark.replaceWith(nu && nu !== old ? nu : old);
+  });
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
 // ── Per-page search/share builders, for each page's settings panel on the Pages tab

@@ -1219,6 +1219,34 @@ test.describe('Undo takes back a menu-category move', () => {
   });
 });
 
+test.describe('Load the latest shows what was loaded', () => {
+  // Item 80: the announcement bar and the Styles cards mount once and returned early on a
+  // reload, so a restored or newer announcement and section order stayed hidden until a refresh.
+  const LOADED = { blocks: BLOCKS, section_meta: META, pages: [], announcement_text: 'Open late Fridays', sections_order: ['hero', 'faqs', 'about', 'offerings', 'testimonials'] };
+  const serveLoaded = (page: Page) => page.route('**/functions/v1/presence/settings', (route: Route) => route.request().method() === 'GET'
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: LOADED }) })
+    : route.fallback());
+  test('the announcement and the home page’s section order show the loaded values, in their places', async ({ page }) => {
+    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th');
+    await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'About', 'What you offer', 'Testimonials', 'Questions']);
+    const placeBefore = await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!));
+    await serveLoaded(page);
+    await page.evaluate(() => (window as any).loadLatest());
+    await expect(page.locator('#ann-text')).toHaveValue('Open late Fridays');
+    await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'Questions', 'About', 'What you offer', 'Testimonials']);
+    expect(await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!))).toBe(placeBefore);
+  });
+  test('words being typed in the announcement aren’t replaced by a reload', async ({ page }) => {
+    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    await page.locator('#ann-text').fill('Closed July 4th and 5th');
+    await serveLoaded(page);
+    await page.evaluate(() => (window as any).loadLatest());
+    await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th and 5th');
+    await expect(page.locator('#ann-text')).toBeFocused();
+  });
+});
+
 test.describe('the section panel’s arrows keep the canvas pointing at the right section', () => {
   // Item 79: the panel's own up, down and Remove changed the list without shifting the
   // canvas's stamps, so until the redraw a canvas Edit opened the neighbour now at that index.
