@@ -28,6 +28,7 @@ import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thr
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners } from '../lib/service_bridge.ts';
+import { supportActivityAt } from '../lib/support_activity.ts';
 
 // ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
 // RENDERS are the same rows. Drops the client_* throttle notices (their counted
@@ -545,12 +546,18 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
       // site-scoped messages read; null on failure → the rows below fall back to
       // the old updated_at behavior rather than failing the feed (best-effort).
       let supClientAt: Record<string, string> | null = null;
+      const supAnyAt: Record<string, string> = {};
       if (sup.length) {
         try {
           const mr = await svc(`presence_support_messages?site_id=eq.${site.id}&request_id=in.(${sup.map((r) => String(r.id)).join(',')})&deleted_at=is.null&select=request_id,author_kind,created_at&order=created_at.desc&limit=500`);
-          if (mr.ok && Array.isArray(mr.json)) supClientAt = newestClientMessageAt(mr.json as any[]);
+          if (mr.ok && Array.isArray(mr.json)) {
+            supClientAt = newestClientMessageAt(mr.json as any[]);
+            // the newest message by anyone: a support row's time is real activity, not updated_at (portal walk, Nov 8)
+            for (const m of mr.json as any[]) { const k = String(m.request_id || ''), at = String(m.created_at || ''); if (k && at && !(supAnyAt[k] > at)) supAnyAt[k] = at; }
+          }
         } catch { supClientAt = null; }
       }
+      const supWhen = (r: any): string => supportActivityAt(r, supAnyAt[String(r.id)] || null) || String(r.updated_at || '');
       const supLatestClient = (r: any): string => {
         if (!supClientAt) return String(r.updated_at || '');   // read failed → today's behavior
         const reply = supClientAt[String(r.id)] || '';
@@ -623,7 +630,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
       // NAME. Stamping the id makes the lens whole. Purely additive: the page
       // falls back to matching a support row by project name when this is absent
       // (an older function build), so neither deploy order drops a row.
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), priority: String(r.priority || 'normal'), assigned_to: r.assigned_to ? String(r.assigned_to) : null, project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client || owners.emailOf[String(r.id)] || '', created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), priority: String(r.priority || 'normal'), assigned_to: r.assigned_to ? String(r.assigned_to) : null, project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client || owners.emailOf[String(r.id)] || '', created_at: supWhen(r), thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = cv.needsReply; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClientAt, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20).map((r) => ({ ...r, tier: (r.type === 'support' ? (r.status === 'open' || r.status === 'in_progress') : !!r.needs_reply) ? 'needs_you' : 'update', priority: false }));

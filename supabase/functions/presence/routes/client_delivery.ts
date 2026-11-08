@@ -5,6 +5,7 @@
 // to the target project BEFORE reading agency-site data. No membership in the
 // agency workspace; a customer can only ever reach their own linked, client-
 // visible records. Internal notes/tasks/files/approvals never appear here.
+import { newestPerRequest, supportActivityAt, clientSupportNews, lastLine } from '../lib/support_activity.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
@@ -488,10 +489,22 @@ export async function handleClientNotifications(req: Request, site: SiteRow, pri
   const limit = clampLimit(new URL(req.url).searchParams.get('limit'));
   const [evR, supR, seenR] = await Promise.all([
     ids.length ? svc(`presence_project_events?site_id=eq.${s}&project_id=in.(${ids.join(',')})&client_visible=is.true&select=kind,detail,project_id,created_at&order=created_at.desc&limit=${limit}`) : Promise.resolve({ json: [] }),
-    svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,updated_at&order=updated_at.desc&limit=25`),
+    svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,resolved_at,requester,updated_at&order=updated_at.desc&limit=25`),
     svc(`presence_activity_reads?site_id=eq.${s}&reader=eq.${encodeURIComponent('client:' + me)}&select=last_seen_at&limit=1`),
   ]);
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
+  const supRows = rows(supR);
+  let supportNews: Array<Record<string, unknown>> = [];
+  if (supRows.length) {
+    try {
+      const mr = await svc(`presence_support_messages?site_id=eq.${s}&request_id=in.(${supRows.map((x: any) => String(x.id)).join(',')})&deleted_at=is.null&select=request_id,author,created_at&order=created_at.desc&limit=300`);
+      const newest = newestPerRequest(mr.ok ? rows(mr) : [], Object.fromEntries(supRows.map((x: any) => [String(x.id), String(x.requester || '')])));
+      for (const r of supRows) {
+        const news = clientSupportNews(r, newest[String(r.id)]?.studioAt || null);
+        if (news) supportNews.push({ kind: 'support_message', label: clean(news.label, 90), href: `/client.html?support=${r.id}`, created_at: news.at, read: isRead(news.at, lastSeen) });
+      }
+    } catch { supportNews = []; }
+  }
   const items = [
     // The reader's OWN message sends (kind='message' events stamped
     // detail.from='client' by the client door, the only writer of that stamp)
@@ -500,10 +513,11 @@ export async function handleClientNotifications(req: Request, site: SiteRow, pri
     // keep their existing derivations.
     ...rows(evR).filter((e) => !(e.kind === 'message' && (e.detail || {}).from === 'client'))
       .map((e) => ({ kind: e.kind, label: notifLabel(e.kind), href: notifHref(e.kind, e.project_id, e.detail || {}), created_at: e.created_at, read: isRead(e.created_at, lastSeen) })),
-    // Residual gap (named, accepted): these derived support rows key on the
-    // caller's OWN requests' updated_at — a request the client just opened can
-    // still self-notify here until the bell's read cursor passes it.
-    ...rows(supR).map((r) => ({ kind: 'support_message', label: `Support: ${clean(r.subject, 60)}`, href: `/client.html?support=${r.id}`, created_at: r.updated_at, read: isRead(r.updated_at, lastSeen) })),
+    // Client portal walk (Nov 8): a request is news when the STUDIO replied or it
+    // was resolved — never on updated_at, which the client's own filing, a
+    // one-time customer link or a triage change also move (the July requests
+    // lit "3 updates since you last looked"). lib/support_activity.ts.
+    ...supportNews,
   ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
   return json({ data: items, unread_count: items.filter((i) => !i.read).length }, 200, cors);
 }
@@ -572,7 +586,7 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   const s = links[0].agency_site_id;
   if (req.method === 'GET') {
     const u = new URL(req.url);
-    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,updated_at&order=updated_at.desc&limit=${clampLimit(u.searchParams.get('limit'))}&offset=${clampOffset(u.searchParams.get('offset'))}`);
+    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester&order=updated_at.desc&limit=${clampLimit(u.searchParams.get('limit'))}&offset=${clampOffset(u.searchParams.get('offset'))}`);
     if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
     const list = rows(r);
     // Additive `last_activity_at` = max(updated_at, the newest reply's created_at):
@@ -585,14 +599,18 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
     // the extra field, new portals tolerate its absence).
     if (list.length) {
       try {
-        const mr = await svc(`presence_support_messages?site_id=eq.${s}&request_id=in.(${list.map((x) => String(x.id)).join(',')})&deleted_at=is.null&select=request_id,created_at&order=created_at.desc&limit=300`);
+        const mr = await svc(`presence_support_messages?site_id=eq.${s}&request_id=in.(${list.map((x) => String(x.id)).join(',')})&deleted_at=is.null&select=request_id,author,body,created_at&order=created_at.desc&limit=300`);
         if (mr.ok && Array.isArray(mr.json)) {
-          const newest: Record<string, string> = {};
-          for (const m of mr.json as any[]) { const rid = String(m.request_id || ''); if (rid && !newest[rid]) newest[rid] = String(m.created_at || ''); } // created_at.desc → first seen per request is its newest
-          for (const row of list) { const n = newest[String(row.id)] || ''; const upd = String(row.updated_at || ''); row.last_activity_at = n > upd ? n : upd; }
+          // Client portal walk (Nov 8): activity is opened · written in · resolved —
+          // never updated_at, which a one-time customer link or a triage change
+          // moves too (lib/support_activity.ts). And the list's preview is the
+          // newest line someone actually wrote.
+          const newest = newestPerRequest(mr.json as any[], Object.fromEntries(list.map((x: any) => [String(x.id), String(x.requester || '')])));
+          for (const row of list) { const n = newest[String(row.id)]; row.last_activity_at = supportActivityAt(row, n ? n.at : null) || String(row.updated_at || ''); const ll = lastLine(n); if (ll) row.last_message = ll; }
         }
       } catch { /* omit the field — callers fall back to updated_at */ }
     }
+    for (const row of list) delete row.requester;   // the client's own key — no use on the page
     return json({ data: list }, 200, cors);
   }
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -623,7 +641,11 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   // brief — the portal Requests tab) and project-scoped posts are genuinely
   // TICKETS and keep minting distinct requests. Best-effort: a failed
   // open-thread read falls through to a new request — the message never 500s.
-  if (!serviceName && !hasBrief && !projectId) {
+  // Client portal walk (Nov 8): the Requests tab's "Something else?" form asks for
+  // a subject and sends new_request — the client asked for a NEW request, so it
+  // never folds into an older conversation (it went into "test 2" with its
+  // subject dropped). The Messages composer still continues the conversation.
+  if (!serviceName && !hasBrief && !projectId && b.new_request !== true) {
     try {
       // R4: general chat must never continue INSIDE a service ticket — the
       // Requests tab mints requests titled 'Service request: …' (client.html

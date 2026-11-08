@@ -116,7 +116,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(body.locator('.kchip', { hasText: 'To-do' })).toBeVisible();
     await expect(body.locator('.kchip', { hasText: 'Invoice' })).toBeVisible();
     await expect(body.getByRole('heading', { name: 'Homepage design' })).toBeVisible();
-    await expect(body.getByText('1 thing for you')).toBeVisible();
+    await expect(body.getByText('1 to-do for you')).toBeVisible();   // to-dos are called to-dos (client portal walk, Nov 8)
     // action names include the row title (aria-label) so repeated actions stay
     // distinguishable. Slice 10 (approved mock): the visible CTAs became explicit
     // verbs — "Review & approve" / "View & pay" — and the accessible names follow
@@ -330,7 +330,7 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     // list it counts, so the two adjacent numbers can't read as contradictory
     await expect(strip.locator('#glance-ok .gn')).toHaveText('3');
     await expect(strip.locator('#glance-ok .gl')).toHaveText('in “Needs you”');
-    await expect(page.locator(`#glance-${PID}`)).toContainText('2 things need your OK'); // the per-project card line keeps snapWaiting
+    await expect(page.locator(`#glance-${PID}`)).toContainText('1 needs your OK · 1 to-do for you'); // snapWaiting's two parts, each in its own words (portal walk, Nov 8)
     await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
     await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
     await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
@@ -2160,7 +2160,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
     await expect(paid.locator('.fst.sig')).toHaveText('Paid');
     await expect(paid.locator('.fmeta').first()).toHaveText(`$1,200 · due ${dueLabel(-30)}`);
-    await expect(paid.getByText('Paid — thank you.')).toBeVisible();
+    await expect(paid.getByText(/^Paid( [A-Z][a-z]+ \d+)? — thank you\.$/)).toBeVisible();   // with the day it was paid, when the server says (portal walk, Nov 8)
     await expect(paid.locator('a')).toHaveCount(0);
     // due-yesterday unpaid: the DERIVED Overdue chip (decision D2) + cents kept
     const over = rows.filter({ hasText: 'Design phase' });
@@ -2382,7 +2382,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(3); await settle(page);
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(4);   // this read says paid
     await expect(row().locator('.fst.sig')).toHaveText('Paid');
-    await expect(row().getByText('Paid — thank you.')).toBeVisible();
+    await expect(row().getByText(/^Paid( [A-Z][a-z]+ \d+)? — thank you\.$/)).toBeVisible();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Paid — thank you.' }).first()).toBeVisible();
     await settle(page);
     await page.clock.runFor(60_000); await settle(page);
@@ -3343,7 +3343,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await page.goto('/client.html');
     const body = page.locator('#needs-body');
     await expect(body.locator('.kchip', { hasText: 'To-do' })).toBeVisible();
-    await expect(body.getByText('3 things for you')).toBeVisible();
+    await expect(body.getByText('3 to-dos for you')).toBeVisible();
   });
 
   test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
@@ -3817,5 +3817,70 @@ test.describe('Client portal — connect your Google (the studio asked)', () => 
     await page.goto('/client.html?connect=tok-xyz');
     await expect(page.locator('#main')).toContainText('Sign in to see your updates.');
     expect(await page.evaluate(() => localStorage.getItem('dds-connect-ask'))).toBe('tok-xyz');
+  });
+});
+
+// ── The client portal walk (Nov 8, 2026): what it found, fixed ─────────────────
+test.describe('Client portal walk fixes (Nov 2026)', () => {
+  test('Something else? opens a NEW request — its subject is kept, never folded into an older conversation', async ({ page }) => {
+    let posted: unknown = null;
+    await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/support', (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'new-1' } }) });
+    });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#newReq').click();
+    await page.getByLabel('Subject').fill('A new page for events');
+    await page.getByLabel('What do you need?').fill('Could we add an events page?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect.poll(() => posted).toMatchObject({ subject: 'A new page for events', body: 'Could we add an events page?', new_request: true });
+  });
+
+  test('Book a call with no open times offers Ask for a call, prefilled', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/book/site-1/types': { data: { enabled: false } } } });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await page.locator('#bookCall').click();
+    await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: 'Ask for a call' }).click();
+    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
+    await expect(page.getByLabel('Subject')).toHaveValue('A call');
+    await expect(page.getByLabel('What do you need?')).toHaveValue(/^I’d like to book a call\./);
+  });
+
+  test('a conversation\'s preview is the newest line someone wrote, and says when it was you', async ({ page }) => {
+    const rows = (REQ_API['/client/support'] as { data: Array<Record<string, unknown>> }).data.map((r, i) => i === 0 ? { ...r, last_message: { from: 'you', text: 'Can we use the photos from June?' } } : i === 1 ? { ...r, last_message: { from: 'studio', text: 'Done — have a look.' } } : r);
+    await installApp(page, { api: { ...REQ_API, '/client/support': { data: rows } } });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('#main')).toContainText('You: Can we use the photos from June?');
+    await expect(page.locator('#main')).toContainText('Done — have a look.');
+  });
+
+  test('each tab names itself in the browser tab', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html');
+    await openRequestsTab(page);
+    await expect(page).toHaveTitle('Requests — Your studio');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page).toHaveTitle('Messages — Your studio');
+  });
+
+  test('a to-do\'s status reads in words, never the raw "todo"', async ({ page }) => {
+    const todo = { id: 'tw1', title: 'Send back your project questionnaire', status: 'todo', client_action_required: true, source: 'template', derived: { overdue: false } };
+    await installApp(page, { api: { ...CLIENT_API, [`/client/projects/${PID}`]: { data: { ...(CLIENT_API as any)[`/client/projects/${PID}`].data, tasks: [todo] } } } });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.locator('#sec-todos .card').first()).toContainText('To do');
+    await expect(page.locator('#sec-todos')).not.toContainText(/\btodo\b/);
+  });
+
+  test('a paid invoice says the day it was paid', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/billing': { data: { billing_type: 'service', invoices: [{ id: 'ip', name: 'Deposit', amount: 1, status: 'paid', state: 'paid', due_date: '2026-07-01', paid_at: '2026-07-02T10:00:00Z' }] } } } });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="invoices"]').click();
+    await expect(page.locator('#main')).toContainText('Paid July 2 — thank you.');
   });
 });
