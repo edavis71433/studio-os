@@ -525,3 +525,28 @@ test.describe('Settings — the Connections card status', () => {
     await expect(page.locator('[data-card="connections"] .st')).toContainText('3 connected — Google Analytics, Search Console +1');
   });
 });
+
+// ── Sales review item 38 (Nov 2026): name the four open deal stages ──────────
+test.describe('Settings — deal stage names', () => {
+  const STAGES = { data: { labels: { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' }, custom: {}, defaults: {} } };
+  test('rename two stages: the four boxes save through /sales/stages, and the stalled-deal labels follow', async ({ page }) => {
+    let sent: unknown = null;
+    await installApp(page, { api: { ...API, '/sales/stages': STAGES } });
+    await page.route('**/functions/v1/presence/sales/stages', (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      sent = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { labels: { ...STAGES.data.labels, lead: 'Enquiry', proposal: 'Quote sent' }, custom: { lead: 'Enquiry', proposal: 'Quote sent' } } }) });
+    });
+    await page.goto('/settings.html#automations');
+    await expect(page.locator('#stageNames')).toBeVisible();
+    await expect(page.getByLabel('Your name for New lead')).toHaveValue('');
+    await expect(page.locator('#stageNames input')).toHaveCount(4);                       // Won and Not a fit keep their names
+    await page.getByLabel('Your name for New lead').fill('Enquiry');
+    await page.getByLabel('Your name for Proposal sent').fill('Quote sent');
+    await page.getByRole('button', { name: 'Save stage names' }).click();
+    await expect.poll(() => sent).toEqual({ names: { lead: 'Enquiry', qualified: '', proposal: 'Quote sent', contract: '' } });
+    await expect(page.locator('#snMsg')).toContainText('The Pipeline, records and reports use these names.');
+    await expect(page.locator('[data-stage-label="lead"]')).toHaveText('Enquiry');
+    await expect(page.locator('[data-stage-label="proposal"]')).toHaveText('Quote sent');
+  });
+});

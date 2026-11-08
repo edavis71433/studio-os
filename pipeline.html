@@ -2985,7 +2985,9 @@ async function boot(){
     renderFilters();
     // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
     if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});}
-    else{wireViews();loadSavedViews();}
+    else{wireViews();loadSavedViews();
+      // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
+      api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
     // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"

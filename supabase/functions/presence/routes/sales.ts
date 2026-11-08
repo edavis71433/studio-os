@@ -22,6 +22,7 @@ import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { normalizeStageNames, stageLabels, loadStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -291,6 +292,24 @@ export async function handleSalesContactFields(req: Request, site: SiteRow, prin
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
+// ═══ STAGE NAMES (sales review item 38) ═══════════════════════════════════════
+// The four open stages can be renamed; Won and Not a fit keep their names.
+// GET → { labels (all six), custom (just the renames) }; PUT { names } replaces
+// the renames (an empty name puts the default back). lib/stage_names.ts.
+export async function handleSalesStages(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method === 'GET') {
+    const custom = normalizeStageNames(await readReservedJson(site.id, RESERVED_NAMES.stageNames));
+    return json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors);
+  }
+  if (req.method === 'PUT') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const custom = normalizeStageNames(b?.names);
+    const ok = await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, principal.email || principal.userId || 'system');
+    return ok ? json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors) : json({ error: 'write_failed', message: 'Your stage names didn’t save — please try again.' }, 502, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
 // ═══ SAVED LIST VIEWS (sales review item 31) ══════════════════════════════════
 // Named views on Customers, Contacts and Pipeline — the fixed view they start
 // from, the search, the columns shown and the sort — shared by the studio's team.
@@ -518,7 +537,10 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const ar = { outstanding_cents: b.upcoming.cents + b.overdue.cents, count: b.upcoming.count + b.overdue.count, overdue_cents: b.overdue.cents, overdue_count: b.overdue.count, processing_cents: b.processing.cents, processing_count: b.processing.count };
   // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
   // days — three won deals read "100% (1 of 1)" under the old window.
-  return json({ data: { ...summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS), ar }, truncated: deals.length >= CAP }, 200, cors);
+  const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS);
+  const names = await loadStageLabels(site.id).catch(() => null);   // item 38: the studio's own stage names
+  if (names) sum.by_stage = sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label }));
+  return json({ data: { ...sum, ar }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
@@ -633,7 +655,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   return json({ data: {
     generated_at: now,
     revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
-    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now), partial: failed.has('stages') },
+    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await loadStageLabels(site.id).catch(() => undefined)), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : wonAndLost(deals, now),
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
     overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),
@@ -807,7 +829,8 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // dated note) + system events live in the same presence_deal_events table, so
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
-    const timeline = mergeDealTimeline(eventRows);
+    const stageNames = await loadStageLabels(site.id).catch(() => null);   // item 38: "Moved to <their name for it>"
+    const timeline = mergeDealTimeline(eventRows).map((it) => (stageNames && it.kind === 'stage_change' ? { ...it, text: renameMovedTo(it.text, stageNames) } : it));
     // Sales review B5: one total per proposal, after discount and tax — the
     // record showed the stored pre-discount subtotal while the deal page added
     // up the lines ($0 after a full discount) for the same draft.

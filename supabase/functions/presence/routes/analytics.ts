@@ -8,6 +8,7 @@
 //   GET /analytics/customers  — inquiries detail (AN-3)
 //   GET /analytics/search     — getting-found readiness, honest about GSC (AN-4)
 //   GET /analytics/portfolio  — agency scope: who's growing / needs attention (AN-7)
+import { loadStageLabels } from '../lib/stage_names.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { coachRead } from '../lib/health_coach.ts';
@@ -566,7 +567,8 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   let pipeline: unknown = null, won: unknown = null, recent_wins: unknown[] = [];
   if (deals) {
     const sum = summarizePipeline(deals, nowIso);
-    pipeline = { open: sum.open, stages: sum.by_stage };
+    const names = await loadStageLabels(site.id).catch(() => null);   // sales review item 38: the studio's own stage names
+    pipeline = { open: sum.open, stages: names ? sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label })) : sum.by_stage };
     won = { this_month: sum.won_month, last_month: summarizePipeline(deals, priorMonthIso(nowMs)).won_month };
     recent_wins = recentWins(deals, nowMs);
   }

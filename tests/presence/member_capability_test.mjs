@@ -44,6 +44,7 @@ const { handlePutTemplate } = await import(`${P}/routes/site.ts`);
 const { handleDevCustomizationPut, handleBrandKitPut } = await import(`${P}/routes/dev.ts`);
 const { handleLaunchDecide } = await import(`${P}/routes/launches.ts`);
 const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
+const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -138,7 +139,7 @@ const DECIDED = {
     'POST /foundations/dns/rollback', 'POST /foundations/domain', 'POST /foundations/prepare',
     'POST /foundations/zone', 'POST /foundations/zone/records', 'POST /preview/settings', 'POST /site/offline',
     'POST /site/online', 'PUT /bookings/settings', 'PUT /foundations/dns', 'PUT /foundations/zone/records',
-    'PUT /sales/contacts/fields',
+    'PUT /sales/contacts/fields', 'PUT /sales/stages',
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -293,6 +294,7 @@ const CHANGED = [
   { name: 'POST /preview/settings', body: {}, run: (r, p) => handlePreviewSettings(r, A, p, cors) },
   { name: 'PUT /bookings/settings', body: { enabled: true }, run: (r, p) => handleBookingSettingsPut(r, A, p, cors) },
   { name: 'PUT /sales/contacts/fields', body: { fields: [{ label: 'A' }] }, run: (r, p) => handleSalesContactFields(r, A, p, cors) },
+  { name: 'PUT /sales/stages', body: { names: { lead: 'Enquiry' } }, run: (r, p) => handleSalesStages(r, A, p, cors) },
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
 ];
@@ -416,7 +418,7 @@ const WRITE_HANDLERS = [
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',
   'handleSalesProposalCreate', 'handleSalesProposalDelete', 'handleSalesProposalRevise', 'handleSalesProposalSend',
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
-  'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
+  'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

@@ -429,7 +429,7 @@ const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
 const BOARD_NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost'],proposal:['contract','qualified','lost'],contract:['proposal','lost'],won:[],lost:['lead']};
 const PATH_STEPS=['lead','qualified','proposal','contract'];   // won/lost are terminal outcomes, not steps
 
-let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null;
+let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null, STAGE_NAMES_ASKED=false;
 let ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};
 let FILTER='all', COMPOSER='message', LOGKIND='call', NEWAUD='internal', FOCUS_COMPOSER=false, PENDING_BACK='', GUIDE_OPEN=true;
 const EXPANDED=new Set();
@@ -460,13 +460,23 @@ function availTabs(){
   return out;
 }
 
+// Sales review item 45: the timeline was the record's slowest read, and it only
+// started after the record read came back. Opened by the customer's site alone
+// (?client=<site>, the canonical address), the activity route resolves the same
+// customer, project and deal from the scope header as the record does — so the
+// timeline starts NOW, beside the record read, and the record settles a round
+// trip sooner. Any other address keeps the old order (it needs the record's ids).
+let ACT_EARLY=null;
 async function loadRecord(){
   const rq=recordQuery();
   if(!rq){ picker(); return; }
+  { const q0=QP(); if(q0.get('client')&&!q0.get('deal')&&!q0.get('project')&&!q0.get('contact')&&!q0.get('client_id')) ACT_EARLY=api('/crm/activity?').catch(()=>null); }
   const r=await api('/crm/record'+rq);
   if(r.status===403){ $('main').innerHTML=`<div class="center"><h2>This lives in your studio workspace.</h2><p class="muted">${esc((r.body&&r.body.message)||'Only your studio can open a client record.')}</p></div>`; return; }
   if(!r.ok){ trouble(); return; }
   REC=r.body.data||{};
+  // sales review item 38: the studio's own stage names, read at studio level (they live on the studio's site)
+  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
   // Canonical addressing: a converted customer is addressed by their SITE so the
   // scope (x-dds-scope-site) is right for the profile + notes + activity. If we
   // arrived by ?deal=/?contact= but the canonical key is the customer site and it
@@ -612,12 +622,14 @@ function renderActions(){
   if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
   if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
   if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
-  // visual refresh: one filled verb, three quiet ones, the rest under "More"
-  // (every button keeps its id and handler — only where it sits changed)
+  // visual refresh: one filled verb, two quiet ones, the rest under "More"
+  // (every button keeps its id and handler — only where it sits changed).
+  // Sales review item 41: three in front — Send invoice, Message, Log activity;
+  // Open project went under More, because Project is already a tab.
   const render=(b)=>b.href
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
     :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
-  const FRONT=[both?'act-send-both':'act-invoice','act-message','act-log','act-project'];
+  const FRONT=[both?'act-send-both':'act-invoice','act-message','act-log'];
   const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
   const rest=btns.filter(b=>!FRONT.includes(b.id));
   host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
@@ -1255,7 +1267,8 @@ async function loadActivity(){
   if(ids.deal)q.push('deal='+encodeURIComponent(ids.deal));
   const scopedCustomer=!!(REC.sections&&REC.sections.overview);   // the scope header alone resolves the identity server-side
   if(!q.length&&!scopedCustomer){ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};renderRail();return;}
-  const r=await api('/crm/activity?'+q.join('&'));
+  const early=ACT_EARLY; ACT_EARLY=null;   // item 45: the first load uses the read that started beside the record's
+  const r=(early&&scopedCustomer&&(await early))||await api('/crm/activity?'+q.join('&'));
   if(seq!==ACT_SEQ)return;
   const d=(r.ok&&r.body.data)||{};
   if(r.ok&&Array.isArray(d.items)){

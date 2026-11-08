@@ -136,6 +136,9 @@
   .m{font-size:12.5px;color:var(--faint)}
   .badge{margin-left:auto;font-size:12px;font-weight:600;padding:var(--dds-s1,4px) 10px;border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
+  .facts{display:flex;flex-wrap:wrap;gap:6px 10px;margin:10px 0 0}
+  .fact{font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px}
+  .fact.owe{color:var(--warn);background:var(--warn-soft)} .fact.wait{color:var(--p);background:var(--p-soft)}
   .pill{font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
   .pill.complete{background:var(--good-soft);color:var(--good)}
   .pill.on_hold,.pill.archived{background:var(--warn-soft);color:var(--warn)}
@@ -276,6 +279,7 @@ let SAVED=[],CURVIEW='',PICKED=new Set();
 const COLS_KEY='dds-cols:customers';
 let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
 const KIT=()=>window.ddsListKit||null;
+const fmtOwed=(c)=>'$'+Math.round((Number(c)||0)/100).toLocaleString();
 const viewLabel=()=>{const v=SAVED.find(x=>x.id===CURVIEW);return v?v.name:VIEW_LABEL[VIEWNAME];};
 const shownCols=()=>COLS.filter(c=>c[0]==='name'||!HIDDEN.has(c[0]));
 function applySaved(v){
@@ -412,17 +416,22 @@ function tableHtml(list){
   return `<div class="tscroll"><table aria-label="Customers"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
+// Sales review item 42: a card earns its place with a fact — what they owe you
+// (GET /sales/receivables, the same open invoices as Who owes you) and what is
+// waiting — never the same "all clear" badge on every card.
+let OWED={};
 function cardsHtml(list){
   let h='';
   for(const c of list){
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
+    const owed=Number(OWED[String(c.client_id)]||0);
+    const facts=[owed?`<span class="fact owe">Owes ${esc(fmtOwed(owed))}</span>`:'',att?`<span class="fact wait">${att} ${att===1?'request':'requests'} waiting</span>`:''].filter(Boolean).join('');
     h+=`<div class="cust"><div class="crow"><span class="av">${esc(initial(c.name))}</span>
-      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${esc(c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span>
-      <span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></div>
+      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${esc(c.project_name||c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span></div>
+      ${facts?`<div class="facts">${facts}</div>`:''}
       <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
         <span style="flex:1"></span>
-        <button class="btn" data-open="${esc(c.client_id)}">Open</button>
         <button class="btn" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</div></div>`;
   }
   return h;
@@ -692,8 +701,10 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 let REQ_SEQ=0;
 async function load(){
   const seq=++REQ_SEQ;
-  const r=await api('/studio/customers');
+  const [r,rv]=await Promise.all([api('/studio/customers'),api('/sales/receivables').catch(()=>null)]);
   if(seq!==REQ_SEQ)return;
+  // item 42: what each customer owes, for the cards (best-effort: a failed read just shows no amount)
+  OWED={};for(const i of ((rv&&rv.ok&&rv.body&&rv.body.data&&rv.body.data.items)||[])){if(i&&i.client_id&&(i.state==='upcoming'||i.state==='overdue'))OWED[String(i.client_id)]=(OWED[String(i.client_id)]||0)+(Number(i.amount_cents)||0);}
   if(r.status===401){signedOut();return;}
   if(r.status===403){notStudio();return;}
   if(!r.ok){trouble();return;}

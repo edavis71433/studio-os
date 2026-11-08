@@ -67,6 +67,7 @@
   .swrow .t .how{font-size:12.5px;color:var(--faint);margin-top:2px}
   .swrow .t .say{margin-top:var(--dds-s2,8px);font-size:13px;color:var(--soft);border-left:3px solid var(--line);padding:6px 10px;border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0;background:var(--bg)}
   .swrow .t .say .lbl{display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  .stale.snames input{width:150px}
   .stale{display:flex;flex-wrap:wrap;gap:10px var(--dds-s5,20px);margin-top:10px} .stale label{font-size:13px;color:var(--soft);display:flex;align-items:center;gap:6px} .stale input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;background:var(--card);color:var(--ink)}
   @media (prefers-reduced-motion:reduce){.sw,.sw::after{transition:none}}
   .center{text-align:center;padding:56px var(--dds-s5,20px);color:var(--soft)}
@@ -185,11 +186,23 @@
       <b style="font-weight:600">Flag a deal as stalled after</b>
       <div class="how">The pipeline board marks a deal “Stalled” when nothing has moved for this many days. Per stage; 14 unless you say otherwise.</div>
       <div class="stale">
-        <label>New lead <input type="number" id="st-lead" min="1" max="365" placeholder="14" aria-label="Stale after days — New lead"> days</label>
-        <label>Qualified <input type="number" id="st-qualified" min="1" max="365" placeholder="14" aria-label="Stale after days — Qualified"> days</label>
-        <label>Proposal sent <input type="number" id="st-proposal" min="1" max="365" placeholder="14" aria-label="Stale after days — Proposal sent"> days</label>
-        <label>Agreement out <input type="number" id="st-contract" min="1" max="365" placeholder="14" aria-label="Stale after days — Agreement out"> days</label>
+        <label><span data-stage-label="lead">New lead</span> <input type="number" id="st-lead" min="1" max="365" placeholder="14" aria-label="Stale after days — New lead"> days</label>
+        <label><span data-stage-label="qualified">Qualified</span> <input type="number" id="st-qualified" min="1" max="365" placeholder="14" aria-label="Stale after days — Qualified"> days</label>
+        <label><span data-stage-label="proposal">Proposal sent</span> <input type="number" id="st-proposal" min="1" max="365" placeholder="14" aria-label="Stale after days — Proposal sent"> days</label>
+        <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="st-contract" min="1" max="365" placeholder="14" aria-label="Stale after days — Agreement out"> days</label>
       </div>
+    </div>
+    <!-- sales review item 38: rename the four open stages (Won and Not a fit keep theirs) -->
+    <div class="swrow" style="display:block" id="stageNames">
+      <b style="font-weight:600">Name your deal stages</b>
+      <div class="how">Call the four open stages what you call them; the Pipeline, records and reports all follow. Won and Not a fit keep their names. Leave one blank for its usual name.</div>
+      <div class="stale snames">
+        <label>New lead <input type="text" id="sn-lead" maxlength="30" placeholder="New lead" aria-label="Your name for New lead"></label>
+        <label>Qualified <input type="text" id="sn-qualified" maxlength="30" placeholder="Qualified" aria-label="Your name for Qualified"></label>
+        <label>Proposal sent <input type="text" id="sn-proposal" maxlength="30" placeholder="Proposal sent" aria-label="Your name for Proposal sent"></label>
+        <label>Agreement out <input type="text" id="sn-contract" maxlength="30" placeholder="Agreement out" aria-label="Your name for Agreement out"></label>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="snSave">Save stage names</button><span class="how" id="snMsg" role="status" style="margin:0"></span></div>
     </div>
   </section>
 </div>
@@ -523,6 +536,7 @@ function paintAutomations() {
   const stale = (st.stage_stale_days && typeof st.stage_stale_days === 'object') ? st.stage_stale_days : {};
   for (const k of STAGE_KEYS) { const n = Math.trunc(Number(stale[k])); setVal('st-' + k, (Number.isFinite(n) && n >= 1) ? String(n) : ''); }
   $('automations').hidden = false;
+  loadStageNames();
 }
 async function saveAutomation(patch, undo) {
   const r = await api('/settings', 'PUT', patch);
@@ -532,7 +546,33 @@ async function saveAutomation(patch, undo) {
   toast('Saved.');
   return true;
 }
+// ── sales review item 38: the studio's names for its four open stages (GET/PUT /sales/stages) ──
+let STAGE_NAMES_ASKED = false;
+function paintStageNames(d) {
+  const labels = (d && d.labels) || {}, custom = (d && d.custom) || {};
+  for (const k of STAGE_KEYS) {
+    const i = $('sn-' + k); if (i && document.activeElement !== i) i.value = custom[k] || '';
+    document.querySelectorAll('[data-stage-label="' + k + '"]').forEach((el) => { if (labels[k]) el.textContent = labels[k]; });
+  }
+}
+async function loadStageNames() {
+  if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
+  const r = await api('/sales/stages').catch(() => null);
+  if (r && r.ok) paintStageNames(r.body && r.body.data);
+  else { const box = $('stageNames'); if (box) box.hidden = true; }   // no sales area (or a failed read): the block hides, never a dead form
+}
+async function saveStageNames() {
+  const btn = $('snSave'), msg = $('snMsg'); btn.disabled = true; msg.textContent = '';
+  const names = {}; for (const k of STAGE_KEYS) names[k] = ($('sn-' + k).value || '').trim();
+  const r = await api('/sales/stages', 'PUT', { names });
+  btn.disabled = false;
+  if (!r.ok) { toast(nice(r.body, 'Your stage names didn’t save — nothing was changed.'), true); return; }
+  paintStageNames(r.body && r.body.data);
+  const kept = Object.keys((r.body && r.body.data && r.body.data.custom) || {}).length;
+  msg.textContent = kept ? 'Saved. The Pipeline, records and reports use these names.' : 'Saved — the usual names are back.';
+}
 function wireAutomations() {
+  const sn = $('snSave'); if (sn) sn.addEventListener('click', saveStageNames);
   const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };
   flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
   const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
