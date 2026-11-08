@@ -881,6 +881,23 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     await expect.poll(() => log.slice(log.indexOf('save answered')).includes('page drawn')).toBe(true);   // the save's own redraw still follows
   });
 
+  test('typing shows on the canvas as you type, and the save still waits for the field to be left', async ({ page }) => {
+    const { frame, writes } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const title = page.locator('#blocksCard input').first();
+    await title.click();
+    await title.press('ControlOrMeta+a');
+    await title.pressSequentially('Typed live', { delay: 30 });
+    const edited = frame.locator('#main > section[data-dds-src="0"]');
+    await expect(edited.locator('h2')).toHaveText('Typed live');           // while the field still has focus
+    await expect(title).toBeFocused();                                      // nothing rebuilt the panel under the cursor
+    await page.waitForTimeout(900);
+    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')).toHaveLength(0);
+    await title.blur();
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.method === 'PUT').length).toBe(1);
+    expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')[0].body.blocks[0].title).toBe('Typed live');
+  });
+
   test('a section added or removed waits for the full redraw instead', async ({ page }) => {
     const { asked } = await setup(page);
     await page.evaluate(() => (window as any).dcDuplicate(0));
