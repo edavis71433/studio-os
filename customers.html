@@ -137,6 +137,7 @@
   .badge{margin-left:auto;font-size:12px;font-weight:600;padding:var(--dds-s1,4px) 10px;border-radius:999px;white-space:nowrap}
   .badge.wait{color:var(--warn);background:var(--warn-soft)} .badge.ok{color:var(--good);background:var(--good-soft)}
   .facts{display:flex;flex-wrap:wrap;gap:6px 10px;margin:10px 0 0}
+  td .pn{display:block;font-size:12.5px;color:var(--soft);font-weight:400}   /* item 22: the person behind the business */
   .fact{font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px}
   .fact.owe{color:var(--warn);background:var(--warn-soft)} .fact.wait{color:var(--p);background:var(--p-soft)}
   .pill{font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;background:var(--p-soft);color:var(--p);white-space:nowrap;text-transform:capitalize}
@@ -366,7 +367,7 @@ function manageSite(c){ if(c.customer_site_id) location.href='/presence.html?cli
 
 function sortedRows(){
   const q=Q.trim().toLowerCase();
-  const list=CUSTOMERS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
+  const list=CUSTOMERS.filter(viewMatch).filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.person_name||'').toLowerCase().includes(q)||String(c.email||'').toLowerCase().includes(q));
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
@@ -405,7 +406,7 @@ function tableHtml(list){
   const trs=list.map(c=>{
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
-    const CELL={name:()=>`<td><span class="n">${esc(c.name||'Customer')}</span></td>`,email:()=>`<td class="c-email">${esc(c.email||'—')}</td>`,project_count:()=>`<td class="num">${Number(c.project_count||0)}</td>`,
+    const CELL={name:()=>`<td><span class="n">${esc(c.name||'Customer')}</span>${c.person_name?`<span class="pn">${esc(c.person_name)}</span>`:''}</td>`,email:()=>`<td class="c-email">${esc(c.email||'—')}</td>`,project_count:()=>`<td class="num">${Number(c.project_count||0)}</td>`,
       open_support:()=>`<td><span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></td>`,status:()=>`<td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>`};
     return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Open ${esc(c.name||'Customer')}">
       <td class="pick"><input type="checkbox" data-pick="${esc(c.client_id)}" aria-label="Select ${esc(c.name||'Customer')}"${PICKED.has(String(c.client_id))?' checked':''}></td>
@@ -428,7 +429,7 @@ function cardsHtml(list){
     const owed=Number(OWED[String(c.client_id)]||0);
     const facts=[owed?`<span class="fact owe">Owes ${esc(fmtOwed(owed))}</span>`:'',att?`<span class="fact wait">${att} ${att===1?'request':'requests'} waiting</span>`:''].filter(Boolean).join('');
     h+=`<div class="cust"><div class="crow"><span class="av">${esc(initial(c.name))}</span>
-      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${esc(c.project_name||c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span></div>
+      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${c.person_name?esc(c.person_name)+' · ':''}${esc(c.project_name||c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span></div>
       ${facts?`<div class="facts">${facts}</div>`:''}
       <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
         <span style="flex:1"></span>
