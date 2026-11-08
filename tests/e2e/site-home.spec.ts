@@ -369,6 +369,27 @@ test.describe('Business details holds only the business', () => {
     await expect(page.locator('#view-updates #annCard')).toHaveCount(1);
     await expect(page.locator('#view-media #knowledgeList')).toHaveCount(1);
   });
+  // Item 61: the published site's visit counter, and the privacy page that describes it, follow one switch.
+  test('a Privacy switch turns the visit counter off, and flips back when the save fails', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#business');
+    const sw = page.locator('#visitSwitch');
+    await expect(sw).toBeChecked();
+    await expect(page.locator('#visitHint')).toContainText('no cookies and no outside company');
+    await sw.click();
+    await expect.poll(() => writes.filter((w) => w.path === '/settings').map((w) => w.body)).toContainEqual({ visit_counter: false });
+    await expect(page.locator('#visitHint')).toContainText('Your site counts nothing');
+    await page.route('**/functions/v1/presence/settings', (route: Route) => route.request().method() === 'PUT'
+      ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }) })
+      : route.fallback());
+    await sw.click();
+    await expect(sw).not.toBeChecked();
+    await expect(page.locator('#visitHint')).toContainText('Your site counts nothing');
+  });
+  test('a watched website has no visit counter switch', async ({ page }) => {
+    await mount(page, '/presence.html#business', { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } } });
+    await expect(page.locator('#view-business h1.doc')).toHaveText('Business details');
+    await expect(page.locator('#privacyWrap')).toBeHidden();
+  });
 });
 
 test.describe('a tab opens on its title', () => {
