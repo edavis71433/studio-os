@@ -1,6 +1,6 @@
 // ── Phase T · Preview Environment (FD-T20) — pure helpers ────────────────────
 //   deno run --allow-read --allow-env tests/presence/preview_env_test.mjs
-import { previewBadgeHtml, injectPreviewBadge, hashPreviewPassword, newPreviewToken, shapePreviewStatus, signPreviewImages, absoluteLibraryFonts } from '../../supabase/functions/presence/lib/preview_env.ts';
+import { previewBadgeHtml, injectPreviewBadge, hashPreviewPassword, verifyPreviewPassword, mintPreviewPass, verifyPreviewPass, draftLinkUrl, newPreviewToken, shapePreviewStatus, signPreviewImages, absoluteLibraryFonts } from '../../supabase/functions/presence/lib/preview_env.ts';
 import { renderSiteBlocks } from '../../supabase/functions/presence/lib/site_blocks.ts';
 
 const results = [];
@@ -13,15 +13,24 @@ ok('inject places the badge before </body>', (() => { const h = injectPreviewBad
 ok('inject is idempotent (never doubles the badge)', (() => { let h = injectPreviewBadge('<body></body>', 'A'); h = injectPreviewBadge(h, 'A'); return (h.match(/presence-preview-badge/g) || []).length === 1; })());
 ok('inject with no </body> appends', injectPreviewBadge('<p>bare</p>', 'A').includes('presence-preview-badge'));
 
-// password hashing
+// password hashing (item 74: salted and stretched; passwords set before still work)
 {
   const a = await hashPreviewPassword('open sesame');
   const b = await hashPreviewPassword('open sesame');
-  const c = await hashPreviewPassword('different');
-  ok('password hash is deterministic + 64 hex', a === b && /^[0-9a-f]{64}$/.test(a));
-  ok('different passwords → different hashes', a !== c);
-  ok('empty / whitespace password → "" (open link)', (await hashPreviewPassword('')) === '' && (await hashPreviewPassword('   ')) === '');
+  ok('a stored password is salted: the same password stores differently each time', a !== b && /^pbkdf2\$\d+\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(a));
+  ok('the right password matches either stored form; a wrong one matches neither', await verifyPreviewPassword('open sesame', a) && await verifyPreviewPassword('open sesame', b) && !(await verifyPreviewPassword('open sesam', a)));
+  const legacy = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('open sesame')))).map((x) => x.toString(16).padStart(2, '0')).join('');
+  ok('a password set before item 74 (plain SHA-256) still opens the link', await verifyPreviewPassword('open sesame', legacy) && !(await verifyPreviewPassword('nope', legacy)));
+  ok('empty / whitespace password → "" (open link), and nothing matches an empty one', (await hashPreviewPassword('')) === '' && (await hashPreviewPassword('   ')) === '' && !(await verifyPreviewPassword('', a)) && !(await verifyPreviewPassword('x', '')));
+  ok('a tampered stored form never matches', !(await verifyPreviewPassword('open sesame', a.replace(/.$/, (c) => (c === '0' ? '1' : '0')))) && !(await verifyPreviewPassword('open sesame', 'pbkdf2$1$00$00')));
+  // the pass the viewer keeps instead of the password
+  const NOW = 1_800_000_000;
+  const pass = await mintPreviewPass('tok1', a, 'secret', NOW);
+  ok('a pass opens its own link until it expires', await verifyPreviewPass(pass, 'tok1', a, 'secret', NOW + 60) && !(await verifyPreviewPass(pass, 'tok1', a, 'secret', NOW + 13 * 3600)));
+  ok('a pass is no good for another link, after the password changes, or with another secret', !(await verifyPreviewPass(pass, 'tok2', a, 'secret', NOW)) && !(await verifyPreviewPass(pass, 'tok1', b, 'secret', NOW)) && !(await verifyPreviewPass(pass, 'tok1', a, 'other', NOW)));
+  ok('a made-up pass is refused', !(await verifyPreviewPass('9999999999.' + '0'.repeat(64), 'tok1', a, 'secret', NOW)) && !(await verifyPreviewPass('', 'tok1', a, 'secret', NOW)));
 }
+ok('a shared draft opens on the app, not the function', draftLinkUrl('https://app.example/', 't', 'abcd') === 'https://app.example/draft.html?t=abcd' && draftLinkUrl('https://app.example', 's', 'x.y') === 'https://app.example/draft.html?s=x.y');
 
 // token
 ok('a fresh token is long, hex, unguessable, and unique', (() => { const t1 = newPreviewToken(), t2 = newPreviewToken(); return /^[0-9a-f]{64}$/.test(t1) && t1 !== t2; })());
@@ -32,9 +41,9 @@ ok('a fresh token is long, hex, unguessable, and unique', (() => { const t1 = ne
     draftChanges: 3,
     preview: { token: 'abcd', snapshot_id: 's1', updated_at: '2026-07-09T00:00:00Z', password_hash: 'h' },
     live: { last_published_at: '2026-07-01T00:00:00Z', summary: '2 changes' },
-    baseUrl: 'https://ref.supabase.co/',
+    baseUrl: 'https://app.example/',
   });
-  ok('status: preview exists, url built, password flagged', st.preview.exists && st.preview.url.endsWith('/p/abcd') && st.preview.has_password);
+  ok('status: preview exists, the link opens the viewer, password flagged', st.preview.exists && st.preview.url === 'https://app.example/draft.html?t=abcd' && st.preview.has_password);
   ok('status: draft change count + live published', st.draft.unpublished_changes === 3 && st.live.published && st.live.summary === '2 changes');
   const none = shapePreviewStatus({ draftChanges: 0, preview: null, live: null, baseUrl: 'https://x/' });
   ok('status: no preview → exists false, no url; live unpublished', !none.preview.exists && none.preview.url === null && !none.live.published);

@@ -49,11 +49,60 @@ export function absoluteLibraryFonts(html: string, appUrl: string): string {
 
 /** SHA-256 hex of a preview password. Deterministic → testable. Empty → '' (no
  *  password = an open share link). */
+
+const hex = (b: ArrayBuffer | Uint8Array) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, '0')).join('');
+const unhex = (h: string): Uint8Array<ArrayBuffer> => new Uint8Array((h.match(/../g) || []).map((x) => parseInt(x, 16)));
+const sameText = (a: string, b: string) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+const PW_ITERATIONS = 60_000;
+async function pbkdf2(pw: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256));
+}
+
+/** Item 74: a preview password, stored salted and stretched ("pbkdf2$iterations$salt$hash"),
+ *  never as typed. Empty → '' (no password = an open share link). */
 export async function hashPreviewPassword(pw: string): Promise<string> {
   const clean = String(pw || '').trim();
   if (!clean) return '';
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(clean));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return `pbkdf2$${PW_ITERATIONS}$${hex(salt)}$${await pbkdf2(clean, salt, PW_ITERATIONS)}`;
+}
+
+/** Does this password match what's stored? Reads the salted form, and the plain SHA-256
+ *  hex every password set before item 74 was stored as, so those keep working. */
+export async function verifyPreviewPassword(pw: string, stored: string | null | undefined): Promise<boolean> {
+  const clean = String(pw || '').trim();
+  if (!clean || !stored) return false;
+  const parts = stored.split('$');
+  if (parts[0] === 'pbkdf2' && parts.length === 4) {
+    const n = Number(parts[1]);
+    if (!Number.isInteger(n) || n < 1000 || n > 1_000_000) return false;
+    return sameText(await pbkdf2(clean, unhex(parts[2]), n), parts[3]);
+  }
+  return sameText(hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(clean))), stored);
+}
+
+/** After the right password, the viewer keeps a short-lived pass instead of the password:
+ *  "<expiry>.<signature>" over the link and the stored hash, so changing the password or
+ *  resetting the link ends every pass. */
+export async function mintPreviewPass(token: string, passwordHash: string, secret: string, nowSec: number, ttlSec = 12 * 3600): Promise<string> {
+  const exp = nowSec + ttlSec;
+  return `${exp}.${await hmacHex(secret, `pvpass:${token}:${passwordHash}:${exp}`)}`;
+}
+export async function verifyPreviewPass(pass: string, token: string, passwordHash: string, secret: string, nowSec: number): Promise<boolean> {
+  const m = /^(\d{9,12})\.([0-9a-f]{64})$/.exec(String(pass || ''));
+  if (!m || Number(m[1]) < nowSec) return false;
+  return sameText(await hmacHex(secret, `pvpass:${token}:${passwordHash}:${m[1]}`), m[2]);
+}
+async function hmacHex(secret: string, msg: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
+}
+
+/** Where a shared draft opens: the viewer page on the app (draft.html), never the function's
+ *  own address, which Supabase serves as plain text. `t` is the lasting link, `s` the timed one. */
+export function draftLinkUrl(appUrl: string, kind: 't' | 's', token: string): string {
+  return `${appUrl.replace(/\/$/, '')}/draft.html?${kind}=${encodeURIComponent(token)}`;
 }
 
 /** A fresh, unguessable share token for a preview URL. Runtime (not pure). */
@@ -79,7 +128,7 @@ export function shapePreviewStatus(input: {
     draft: { unpublished_changes: Math.max(0, input.draftChanges | 0) },
     preview: {
       exists: !!(p && p.snapshot_id && p.token),
-      url: p && p.token ? `${input.baseUrl.replace(/\/$/, '')}/functions/v1/presence/p/${p.token}` : null,
+      url: p && p.token ? draftLinkUrl(input.baseUrl, 't', p.token) : null,   // baseUrl is the app's address
       updated_at: p?.updated_at ?? null,
       has_password: !!(p && p.password_hash),
     },

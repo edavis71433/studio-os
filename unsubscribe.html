@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Unsubscribe</title>
+<style>
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478;--plum:#5b3fa0;--warn:#a3423a}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc;--plum:#b79ceb;--warn:#f0a39b}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:480px;margin:14vh auto;padding:0 20px;text-align:center}
+  h1{font-weight:500;font-size:clamp(20px,5vw,26px);margin-bottom:8px}
+  .muted{color:var(--soft);font-size:15px}
+  button{margin-top:18px;min-height:44px;padding:10px 20px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{color:var(--warn);font-size:14px;margin-top:10px;min-height:1.4em}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<main class="center" id="state"><p class="muted">One moment…</p></main>
+<script>
+// The unsubscribe page. An email's footer link lands here with ?e=<address>&t=<token>.
+// The function at *.supabase.co can't show a page (Supabase serves HTML from that address
+// as plain text, so its old page showed code and its button couldn't be pressed), so
+// this page asks it directly: first whether the link is good, then, on the button, to
+// stop the emails. Mail clients' own one-click unsubscribe still goes to the function.
+(function(){
+  var q=new URLSearchParams(location.search);
+  var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
+  var e=q.get('e')||'', t=q.get('t')||'';
+  var url=FN+'/unsubscribe?e='+encodeURIComponent(e)+'&t='+encodeURIComponent(t);
+  var state=document.getElementById('state');
+  function line(tag,cls,text){ var n=document.createElement(tag); if(cls) n.className=cls; n.textContent=text; state.appendChild(n); return n; }
+  function bad(msg){
+    state.innerHTML='';
+    line('h1','','That link didn’t work');
+    var p=line('p','muted',(msg||'The unsubscribe link looks incomplete or expired.')+' ');
+    if(!/support@/.test(msg||'')){ var a=document.createElement('a'); a.href='mailto:support@davisdigitalstudio.com'; a.textContent='Email support@davisdigitalstudio.com'; p.appendChild(a); p.appendChild(document.createTextNode(' and we’ll take care of it.')); }
+  }
+  function offline(){ state.innerHTML=''; line('h1','','This page couldn’t load'); line('p','muted','Check your connection, then reload the page.'); }
+  function call(method){ return fetch(url,{method:method,headers:{Accept:'application/json'}}).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); }); }
+  if(!e||!t){ bad(''); return; }
+  call('GET').then(function(o){
+    if(!o.r.ok){ bad(o.j&&o.j.message); return; }
+    state.innerHTML='';
+    line('h1','','Stop these emails?');
+    var p=line('p','muted','Emails to '); var b0=document.createElement('strong'); b0.textContent=e; p.appendChild(b0); p.appendChild(document.createTextNode(' stop, apart from receipts and security notices.'));
+    var b=document.createElement('button'); b.type='button'; b.textContent='Yes, unsubscribe'; state.appendChild(b);
+    var err=line('p','err',''); err.setAttribute('role','alert');
+    b.addEventListener('click',function(){
+      b.disabled=true; err.textContent='';
+      call('POST').then(function(r2){
+        if(!r2.r.ok){ b.disabled=false; err.textContent=(r2.j&&r2.j.message)||'That didn’t go through. Try again in a moment.'; return; }
+        state.innerHTML='';
+        line('h1','','You’re unsubscribed');
+        var d=line('p','muted',''); var s=document.createElement('strong'); s.textContent=e; d.appendChild(s); d.appendChild(document.createTextNode(' won’t receive marketing or reminder emails from us anymore. Account-critical emails (receipts, security) may still arrive.'));
+      }).catch(function(){ b.disabled=false; err.textContent='That didn’t go through. Check your connection and try again.'; });
+    });
+  }).catch(offline);
+})();
+</script>
+</body>
+</html>
