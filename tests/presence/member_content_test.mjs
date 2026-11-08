@@ -223,7 +223,7 @@ const pinned = (c, site) => c.query.includes(`site_id=eq.${site}`) || c.body?.si
 // ═══ 2. the role table, and what each write needs ═══
 {
   const FIELDS_IN_SOURCE = [...read('supabase/functions/presence/routes/content.ts').split('const SETTINGS_FIELDS')[1].split('\n};')[0].matchAll(/\b([a-z_]+): \{/g)].map((m) => m[1]);
-  const CONFIG = ['industry_key', 'auto_ack_enquiries', 'invoice_reminders', 'invoice_remind_after_days', 'deal_nudges', 'deal_nudge_days', 'stage_stale_days', 'google_site_verification', 'bing_site_verification'];
+  const CONFIG = ['industry_key', 'auto_ack_enquiries', 'invoice_reminders', 'invoice_remind_after_days', 'deal_nudges', 'deal_nudge_days', 'review_requests', 'review_request_after_days', 'stage_stale_days', 'google_site_verification', 'bing_site_verification'];
   ok('fields: the settings field list was read', FIELDS_IN_SOURCE.length >= 25, FIELDS_IN_SOURCE.join(','));
   ok('fields: every settings field is on one side, and the audited split still holds',
     FIELDS_IN_SOURCE.every((f) => SETTINGS_CONTENT_FIELDS.has(f) !== CONFIG.includes(f)), FIELDS_IN_SOURCE.filter((f) => SETTINGS_CONTENT_FIELDS.has(f) === CONFIG.includes(f)).join(','));
