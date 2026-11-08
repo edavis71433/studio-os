@@ -12,6 +12,7 @@
 //   POST /crm/notes                — add { audience, body }
 //   POST /crm/notes/:id/pin        — { pinned }
 //   DELETE /crm/notes/:id          — soft-delete
+import { customerNames } from '../lib/customer_names.ts';
 import { loadStageLabels, renameMovedTo } from '../lib/stage_names.ts';
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -410,6 +411,17 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
     if (clientId) {
       const c = one(await svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`));
       if (c) header = { name: c.name || c.email || 'Client', company: '', email: c.email || c.contact_email || '', phone: '', status: 'customer' };
+      // item 22 (second half): lead with the business, name the person beside it
+      if (c) {
+        try {
+          const [idt, ct] = await Promise.all([
+            customerSiteId ? svc(`presence_identity?site_id=eq.${customerSiteId}&select=business_name&limit=1`).then((r) => one(r)) : Promise.resolve(null),
+            svc(`presence_contacts?site_id=eq.${AS}&client_id=eq.${clientId}&deleted_at=is.null&select=name,company,phone&order=updated_at.desc&limit=1`).then((r) => one(r)),
+          ]);
+          const nm = customerNames({ clientName: c.name, siteBusinessName: idt?.business_name, contactName: ct?.name, contactCompany: ct?.company });
+          header = { ...header, name: nm.name || header.name, company: nm.business_name, person: nm.person_name, phone: (ct && ct.phone) || '' };
+        } catch { /* the plain header stands */ }
+      }
     }
     if (contactId && !header.name) {
       const c = one(await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`));

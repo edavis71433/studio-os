@@ -506,7 +506,8 @@ async function loadRecord(){
 function renderShell(){
   const hd=REC.header||{}; const nm=hd.name||'Client'; const isCust=hd.status==='customer';
   const bits=[];
-  if(hd.company)bits.push(esc(hd.company));
+  if(hd.person)bits.push(esc(hd.person));   // item 22: the business leads, the person beside it
+  if(hd.company&&hd.company!==nm)bits.push(esc(hd.company));
   if(hd.email)bits.push(`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`);
   if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`);
   const avail=availTabs();
