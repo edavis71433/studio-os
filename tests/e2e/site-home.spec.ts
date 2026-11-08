@@ -905,3 +905,67 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     expect(asked).toHaveLength(0);
   });
 });
+
+test.describe('move the welcome section among the others', () => {
+  const page_ = (movable: boolean) => '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
+    + '<section class="hero" data-dds-core="hero"' + (movable ? ' data-dds-movable' : '') + '><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'
+    + '<section class="block" data-dds-core="about"><h2>About us</h2><p data-pr="identity.description">Hello</p></section>'
+    + '<section class="block alt" data-dds-core="offerings"><h2>Menu</h2></section>'
+    + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section></main></body></html>';
+  const canvas = async (page: Page, movable: boolean) => {
+    const writes = await mount(page, '/presence.html#design', { __html: page_(movable) });
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('h1[data-pr]').waitFor();
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+    await page.waitForLoadState('networkidle');
+    return { writes, frame };
+  };
+  const orders = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.body && 'sections_order' in w.body).map((w) => w.body.sections_order);
+  const barButton = (frame: ReturnType<Page['frameLocator']>, label: string) => frame.locator(`#dds-dc-bar button[aria-label="${label}"]`);
+
+  test('the welcome section’s own toolbar moves it below About: one write, in the order the site reads', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);   // already at the top
+    await barButton(frame, 'Move this section down').click();
+    await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs']]);
+    await page.locator('#btnUndo').click();
+    await expect.poll(() => orders(writes).at(-1)).toEqual([]);   // back to the usual order on a site that had none saved
+  });
+
+  test('a built-in section moves past its visible neighbour, and the last one can’t go further down', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await frame.locator('section[data-dds-core="about"]').hover();
+    await barButton(frame, 'Move this section down').click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
+    await frame.locator('section[data-dds-core="offerings"]').hover();
+    await expect(barButton(frame, 'Move this section down')).toHaveClass(/dc-off/);   // added sections follow the built-in ones
+  });
+
+  test('on a template that keeps the welcome section on top, it has no arrows and nothing goes above it', async ({ page }) => {
+    const { writes, frame } = await canvas(page, false);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
+    await expect(barButton(frame, 'Move this section down')).toHaveCount(0);
+    await frame.locator('section[data-dds-core="about"]').hover();
+    await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);
+    // the Styles list says the same
+    const row = (name: string) => page.locator('#sectionsCard > div').filter({ hasText: name });
+    await expect(row('Welcome').locator('button')).toHaveCount(2);
+    await expect(row('Welcome').locator('button').first()).toBeDisabled();
+    await expect(row('Welcome').locator('button').last()).toBeDisabled();
+    await expect(row('About').locator('button').first()).toBeDisabled();
+    await expect(row('About').locator('button').last()).toBeEnabled();
+    expect(orders(writes)).toHaveLength(0);
+  });
+
+  test('the left list moves built-in sections too, and keeps the button in focus after the redraw', async ({ page }) => {
+    const { writes } = await canvas(page, true);
+    await page.evaluate(() => (window as any).openTrayPanel('contents'));   // the list's panel starts closed
+    const row = page.locator('#designTreeList .dc-tree-row[data-core="about"]');
+    await row.hover();
+    await row.locator('button[aria-label="Move down"]').click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
+    await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
+  });
+});

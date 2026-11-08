@@ -8163,7 +8163,8 @@ let UNDO_BEFORE = null;  // for callers that update S before the write goes out
 const undoClone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
 function undoPick(src, keys) {
   const o = {}; keys.forEach((k) => { o[k] = undoClone(src ? src[k] : undefined); });
-  if (o.nav === null) o.nav = [];   // a site with no settings row has no menu to read yet, and the stored one can't be null
+  // a site with no settings row has no menu or section order to read yet, and the stored ones can't be null
+  ["nav", "sections_order", "sections_hidden"].forEach((k) => { if (o[k] === null) o[k] = []; });
   return o;
 }
 // A write to the page list carries every page's sections, and sections change outside
@@ -10013,19 +10014,64 @@ function renderFormsCard() {
   formsSaveSoon();
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
-const HOME_SECTION_DEFS = [ ["hero", "Cover / hero"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
+const HOME_SECTION_DEFS = [ ["hero", "Welcome"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
+// Whether this template lets the welcome section move. Read off the canvas: a template
+// that honors its place stamps data-dds-movable on it. null until a home page with a
+// welcome section has been drawn.
+let DC_HERO_MOVES = null;
+// The home page's built-in sections in their saved order, read the way the templates read
+// it: the saved keys first, the rest in their usual order, and the welcome section first
+// until the saved order names it.
+function homeOrderNow() {
+  const saved = ((S.settings && S.settings.sections_order) || []).filter((k) => HOME_SECTION_DEFS.some(([d]) => d === k));
+  const lead = saved.includes("hero") ? [] : ["hero"];
+  return [...lead, ...saved, ...HOME_SECTION_DEFS.map(([k]) => k).filter((k) => !saved.includes(k) && !lead.includes(k))];
+}
+// The home page's built-in sections that follow the saved order, top to bottom as drawn.
+// Every template orders About, offerings, reviews and questions; the welcome section
+// joins them where the template stamps it movable.
+function dcCoreKeys(main) {
+  if (DC_PAGE || !main) return [];
+  const out = [];
+  Array.prototype.forEach.call(main.querySelectorAll(":scope > [data-dds-core]"), (sec) => {
+    const k = sec.getAttribute("data-dds-core");
+    if (HOME_SECTION_DEFS.some(([d]) => d === k) && (k !== "hero" || sec.hasAttribute("data-dds-movable"))) out.push(k);
+  });
+  return out;
+}
+// One place up or down among the sections on show. Hidden and empty ones keep their
+// place in the saved order, so the move lands next to the neighbour that can be seen.
+let DC_FOCUS_CORE = null;   // the section just moved: the redraw brings it into view, and the left list's button keeps focus
+function dcMoveCore(key, dir, fromTree) {
+  const doc = dcFrameDoc(), shown = dcCoreKeys(doc && doc.getElementById("main"));
+  const i = shown.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= shown.length) return;
+  const order = homeOrderNow().filter((k) => k !== key);
+  const at = order.indexOf(shown[j]);
+  order.splice(dir < 0 ? at : at + 1, 0, key);
+  DC_FOCUS_CORE = { key, dir, tree: !!fromTree };
+  saveSections(order, (S.settings && S.settings.sections_hidden) || []);
+}
+function remountSectionsCard() {   // in place, so the card keeps its spot among the others
+  const old = $("sectionsCard"); if (!old) return;
+  const parent = old.parentNode, next = old.nextSibling;
+  old.remove(); mountSectionsCard();
+  const nu = $("sectionsCard"); if (nu && parent && nu.parentNode === parent) parent.insertBefore(nu, next);
+}
 async function saveSections(order, hidden) {
   try {
     await settingsPut({ sections_order: order, sections_hidden: hidden });
-    const c = $("sectionsCard"); if (c) c.remove(); mountSectionsCard();
+    remountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { toast(nice(err), true); }
+  } catch (err) { DC_FOCUS_CORE = null; toast(nice(err), true); }
 }
 function mountSectionsCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("sectionsCard")) return;
   const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
-  const saved = ((S.settings && S.settings.sections_order) || []).filter((k) => HOME_SECTION_DEFS.some(([d]) => d === k));
-  const order = [...saved, ...HOME_SECTION_DEFS.map(([k]) => k).filter((k) => !saved.includes(k))];
+  let order = homeOrderNow();
+  // A template that keeps the welcome section on top shows it there, with no arrows.
+  const heroPinned = DC_HERO_MOVES === false;
+  if (heroPinned) order = ["hero", ...order.filter((k) => k !== "hero")];
   const card = el("div", "field"); card.id = "sectionsCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Your home page"));
   order.forEach((key, idx) => {
@@ -10034,11 +10080,13 @@ function mountSectionsCard() {
     const cb = el("input"); cb.type = "checkbox"; cb.checked = !hidden.has(key); cb.id = "sec-" + key;
     cb.addEventListener("change", () => { const h = new Set(hidden); cb.checked ? h.delete(key) : h.add(key); saveSections(order, [...h]); });
     const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
-    const up = el("button", null, "↑"); up.type = "button"; up.disabled = idx === 0; up.title = "Move up";
-    const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = idx === order.length - 1; dn.title = "Move down";
+    const still = heroPinned && key === "hero";
+    const up = el("button", null, "↑"); up.type = "button"; up.disabled = still || idx <= (heroPinned ? 1 : 0); up.title = "Move up";
+    const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = still || idx === order.length - 1; dn.title = "Move down";
+    if (still) up.title = dn.title = "This template keeps the welcome section at the top";
     [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
-    up.addEventListener("click", () => { if (idx === 0) return; const o = [...order]; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; saveSections(o, [...hidden]); });
-    dn.addEventListener("click", () => { if (idx === order.length - 1) return; const o = [...order]; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; saveSections(o, [...hidden]); });
+    up.addEventListener("click", () => { if (up.disabled) return; const o = [...order]; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; saveSections(o, [...hidden]); });
+    dn.addEventListener("click", () => { if (dn.disabled) return; const o = [...order]; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; saveSections(o, [...hidden]); });
     rowEl.append(cb, lb, up, dn);
     card.appendChild(rowEl);
   });
@@ -12321,6 +12369,11 @@ function dcInjectCanvas(doc, main) {
       bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
     } else {
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
+      const keys = dcCoreKeys(main), at = c.key ? keys.indexOf(c.key) : -1;
+      if (at >= 0) {
+        bar.appendChild(mkBtn("↑", "Move this section up", () => dcMoveCore(c.key, -1), { cls: at <= 0 ? "dc-off" : "" }));
+        bar.appendChild(mkBtn("↓", "Move this section down", () => dcMoveCore(c.key, 1), { cls: at >= keys.length - 1 ? "dc-off" : "" }));
+      }
       if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Styles → Your home page)", () => eeHideKey(c.key), { cls: "dc-danger" }));
     }
     bar.classList.add("on"); place(el2);
@@ -12410,6 +12463,10 @@ function dcInjectCanvas(doc, main) {
       navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); go("pages"); }, true);
     }
   } catch (_) {}
+  if (!DC_PAGE) {
+    const h = main.querySelector(':scope > [data-dds-core="hero"]');
+    if (h && h.hasAttribute("data-dds-movable") !== DC_HERO_MOVES) { DC_HERO_MOVES = h.hasAttribute("data-dds-movable"); remountSectionsCard(); }
+  }
   dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
   dcBuildTree(main);           // left-rail Content Tree of every component on the page
@@ -12625,6 +12682,12 @@ function dcTreeRow(el2, c) {
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
     acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
   } else {
+    const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
+    if (at >= 0) {
+      row.dataset.core = c.key;
+      acts.appendChild(mkA("↑", "Move up", () => dcMoveCore(c.key, -1, true), at <= 0));
+      acts.appendChild(mkA("↓", "Move down", () => dcMoveCore(c.key, 1, true), at >= keys.length - 1));
+    }
     acts.appendChild(mkA(uiIcon("cog", 14), "Edit this section", () => eeEditCore(c.view)));
     if (c.key) acts.appendChild(mkA(uiIcon("eyeoff", 14), "Hide this section", () => eeHideKey(c.key)));
   }
@@ -12685,6 +12748,17 @@ function dcTreeSelect(el2, row) {
       } catch (_) {}
       DC_FOCUS_BI = null; DC_SCROLL = null;
       if (!landed && doc.defaultView) { try { doc.defaultView.scrollTo({ top: doc.body.scrollHeight, behavior: "smooth" }); } catch (_) {} }
+    } else if (DC_FOCUS_CORE) {
+      const f = DC_FOCUS_CORE; DC_FOCUS_CORE = null; DC_SCROLL = null;
+      const hit = main.querySelector(':scope > [data-dds-core="' + f.key + '"]');
+      if (hit) {
+        try { hit.scrollIntoView({ block: "center", behavior: pdReducedMotion() ? "auto" : "smooth" }); } catch (_) {}
+        hit.classList.add("dc-justadded");
+        setTimeout(() => { try { hit.classList.remove("dc-justadded"); } catch (_) {} }, 1500);
+      }
+      const row = f.tree && document.querySelector('#designTreeList .dc-tree-row[data-core="' + f.key + '"]');
+      const b = row && (row.querySelector('button[aria-label="' + (f.dir < 0 ? "Move up" : "Move down") + '"]:not(:disabled)') || row.querySelector("button:not(:disabled)"));
+      if (b) b.focus();
     } else if (DC_SCROLL != null && doc.defaultView) { try { doc.defaultView.scrollTo(0, DC_SCROLL); } catch (_) {} DC_SCROLL = null; }
   });
 })();
