@@ -19,7 +19,17 @@ export interface RecRow {
   value_dimensions: string[];
   timing: string;
   expires_at: string;
+  // List item 30: the evidence rows behind this recommendation (its
+  // affected_resources), loaded by the engine, so a note can name the real
+  // count. Absent, or cut off at the 50-row cap, the note keeps its fixed words.
+  evidence?: EvidenceFact[];
 }
+
+/** One piece of evidence, as much of it as a note needs to count. */
+export interface EvidenceFact { type: string; resource: string; facts: Record<string, unknown> }
+
+/** A note's words with the real count in them. */
+export interface CountedWords { headline: string; summary?: string; bundleWord?: string }
 
 export interface MomentContext {
   siteId: string;
@@ -40,7 +50,25 @@ export interface MomentTemplate {
   ttlDays: number;
   headline: string;
   summary: string;
+  // List item 30: the words with the real number and the one action, worked
+  // out from the evidence. null keeps the fixed headline and summary.
+  counted?: (ev: EvidenceFact[]) => CountedWords | null;
 }
+
+// ── Counting helpers: numbers only from the evidence, never invented ──
+const num = (v: unknown): number => { const x = Number(v); return Number.isFinite(x) && x > 0 ? Math.round(x) : 0; };
+const plural = (k: number, one: string, many: string) => (k === 1 ? one : many);
+const ofType = (ev: EvidenceFact[], ...types: string[]) => ev.filter((e) => types.includes(e.type));
+const daysOf = (ev: EvidenceFact[], type: string) => num(ofType(ev, type)[0]?.facts.days);
+/** distinct pages named by the evidence (a duplicate names several, comma-separated) */
+const pagesIn = (ev: EvidenceFact[]): number => new Set(ev.flatMap((e) =>
+  String(e.facts.pages ?? e.facts.page ?? '').split(',').map((x) => x.trim()).filter(Boolean))).size;
+const listOf = (items: string[]) => (items.length > 1 ? items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1] : items[0] || '');
+/** which business basic each piece of evidence is about, in the owner's words */
+const BASIC_WORDS: Record<string, string> = {
+  business_name: 'your business name', description: 'a short description', address_line1: 'your street address',
+  city: 'your city', postal_code: 'your ZIP code', hours: 'your opening hours', contact: 'a phone number or email',
+};
 
 /** One template per customer-audience recommendation rule (integrity-tested).
  *  Plain merchant words only — the tone lint test enforces the vocabulary. */
@@ -51,11 +79,21 @@ export const TEMPLATES: MomentTemplate[] = [
 
   { recRule: 'rec_business_facts_incomplete', key: 'missing_basics', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 10,
     headline: 'A few basics are missing.',
-    summary: 'Hours, address, or a way to reach you — the facts customers check first. Filling them in takes a few minutes and clears the way to publishing.' },
+    summary: 'Hours, address, or a way to reach you — the facts customers check first. Filling them in takes a few minutes and clears the way to publishing.',
+    counted: (ev) => {
+      const items = [...new Set(ev.map((e) => BASIC_WORDS[e.resource]).filter(Boolean))];
+      if (!items.length) return null;
+      return { headline: `${items.length} ${plural(items.length, 'basic is', 'basics are')} missing.`,
+        summary: `Add ${listOf(items)} in Business details. Each takes a minute, and together they clear the way to publishing.` };
+    } },
 
   { recRule: 'rec_closed_flag_stale', key: 'closed_notice', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 7,
     headline: 'Your site still says temporarily closed.',
-    summary: 'If the doors are open again, one switch in Business updates it. If you’re still closed, all good — leave it as it is.' },
+    summary: 'If the doors are open again, one switch in Business updates it. If you’re still closed, all good — leave it as it is.',
+    counted: (ev) => {
+      const d = daysOf(ev, 'business_info.closed_longstanding');
+      return d ? { headline: `Your site has said temporarily closed for ${d} days.` } : null;
+    } },
 
   { recRule: 'rec_facts_inconsistent', key: 'facts_disagree', type: 'needs_attention', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 10,
     headline: 'Two phone numbers disagree.',
@@ -63,23 +101,66 @@ export const TEMPLATES: MomentTemplate[] = [
 
   { recRule: 'rec_draft_waiting', key: 'draft_waiting', type: 'reminder', tone: 'attentive', mergeable: false, bundleWord: '', ttlDays: 10,
     headline: 'Changes are waiting to publish.',
-    summary: 'Work you’ve already done hasn’t reached your website yet. Look it over when you have a minute — publishing is one button, and nothing changes until then.' },
+    summary: 'Work you’ve already done hasn’t reached your website yet. Look it over when you have a minute — publishing is one button, and nothing changes until then.',
+    counted: (ev) => {
+      const e = ofType(ev, 'freshness.draft_idle')[0]; if (!e) return null;
+      const c = num(e.facts.count), d = num(e.facts.days);
+      if (!c || !d) return null;
+      return { headline: `${c} ${plural(c, 'change has', 'changes have')} waited ${d} days to go live.`,
+        summary: 'Look them over when you have a minute, then publish. It’s one button, and nothing on your site changes until you press it.' };
+    } },
 
   { recRule: 'rec_public_freshness', key: 'freshness', type: 'reminder', tone: 'encouraging', mergeable: true, bundleWord: 'a small refresh', ttlDays: 21,
     headline: 'Worth confirming things are current.',
-    summary: 'It’s been a while since anything on your site changed. If hours and menu are still right, even a small true update tells customers you’re here.' },
+    summary: 'It’s been a while since anything on your site changed. If hours and menu are still right, even a small true update tells customers you’re here.',
+    counted: (ev) => {
+      const p = daysOf(ev, 'freshness.publish_stale'), u = daysOf(ev, 'freshness.updates_quiet'), m = daysOf(ev, 'freshness.menu_unchanged');
+      if (p) return { headline: `Nothing on your site has changed in ${p} days.`, bundleWord: `a small refresh after ${p} days` };
+      if (u) return { headline: `Your last update was ${u} days ago.`, bundleWord: `a first update in ${u} days` };
+      if (m) return { headline: `What you offer hasn’t changed on your site in ${m} days.`, bundleWord: `a look at what you offer, unchanged for ${m} days` };
+      return null;
+    } },
 
   { recRule: 'rec_search_snippets', key: 'search_listing', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'your search listing', ttlDays: 21,
     headline: 'Your search listing could work harder.',
-    summary: 'The line customers see under your name in search results is thin in places. A sentence or two of your own words makes it yours.' },
+    summary: 'The line customers see under your name in search results is thin in places. A sentence or two of your own words makes it yours.',
+    counted: (ev) => {
+      const k = pagesIn(ev); if (!k) return null;
+      return { headline: `${k} ${plural(k, 'page', 'pages')} could look better in search results.`,
+        summary: `The title or the line under it is missing, too short, or the same as on another page. In Search, give ${plural(k, 'it', 'each one')} a sentence in your own words.`,
+        bundleWord: `the search listing on ${k} ${plural(k, 'page', 'pages')}` };
+    } },
 
   { recRule: 'rec_accessibility_content', key: 'photo_descriptions', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'photo descriptions', ttlDays: 21,
     headline: 'Some photographs need a few words.',
-    summary: 'Short descriptions help customers who can’t see the pictures — and help search engines find your dishes.' },
+    summary: 'Short descriptions help customers who can’t see the pictures — and help search engines find your dishes.',
+    counted: (ev) => {
+      const p = pagesIn(ofType(ev, 'accessibility.img_alt_missing'));
+      const s = ofType(ev, 'media.alt_short').length;
+      if (!p && !s) return null;
+      const how = 'In Files, choose Edit description on a photo. A few words on each helps customers who can’t see the pictures, and helps people searching find you.';
+      if (p) return { headline: `Photos on ${p} ${plural(p, 'page have', 'pages have')} no description.`,
+        summary: s ? `${s} more ${plural(s, 'photo has a description', 'photos have descriptions')} too short to help. ${how}` : how,
+        bundleWord: `descriptions for photos on ${p} ${plural(p, 'page', 'pages')}` };
+      return { headline: `${s} photo ${plural(s, 'description is', 'descriptions are')} too short to help.`, summary: how,
+        bundleWord: `${s} short photo ${plural(s, 'description', 'descriptions')}` };
+    } },
 
   { recRule: 'rec_media_quality', key: 'photographs', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'photographs', ttlDays: 21,
     headline: 'Your photographs could do more.',
-    summary: 'A couple are heavy enough to slow the page down, and some menu items have no picture at all. Both are quick to put right.' },
+    summary: 'A couple are heavy enough to slow the page down, and some menu items have no picture at all. Both are quick to put right.',
+    counted: (ev) => {
+      const heavy = ofType(ev, 'performance.image_oversized').length;
+      const bare = num(ofType(ev, 'media.offering_photo_missing')[0]?.facts.count);
+      const smaller = 'Upload a smaller copy of each in Files. A phone photo is plenty, and your pages load faster for everyone.';
+      if (heavy) return { headline: `${heavy} ${plural(heavy, 'photo is', 'photos are')} slowing your pages down.`,
+        summary: bare ? `${smaller} And ${bare} ${plural(bare, 'item has', 'items have')} no picture yet.` : smaller,
+        bundleWord: `${heavy} heavy ${plural(heavy, 'photo', 'photos')}` };
+      if (bare) return { headline: `${bare} ${plural(bare, 'item has', 'items have')} no picture yet.`,
+        summary: 'A photo beside an item helps it sell itself. Add one from that item’s line in your list.',
+        bundleWord: `pictures for ${bare} ${plural(bare, 'item', 'items')}` };
+      return null;
+    } },
 
   { recRule: 'rec_conversion_paths', key: 'next_step', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a clearer next step', ttlDays: 21,
     headline: 'Give customers a next step.',
@@ -132,7 +213,12 @@ export const TEMPLATES: MomentTemplate[] = [
   // data enriches the customer's list, it doesn't add a fresh interruption.
   { recRule: 'rec_connected_reputation', key: 'reviews_reply', type: 'opportunity', tone: 'encouraging', mergeable: true, bundleWord: 'a reply to a review or two', ttlDays: 21,
     headline: 'A few reviews are waiting for a reply.',
-    summary: 'Some recent reviews on your connected accounts haven’t been answered yet. A short, warm reply — even a simple thank-you — is one of the easiest ways to show customers you’re listening.' },
+    summary: 'Some recent reviews on your connected accounts haven’t been answered yet. A short, warm reply — even a simple thank-you — is one of the easiest ways to show customers you’re listening.',
+    counted: (ev) => {
+      const c = ofType(ev, 'reviews.connected_unreplied').reduce((a, e) => a + num(e.facts.count), 0);
+      return c ? { headline: `${c} ${plural(c, 'review is', 'reviews are')} waiting for a reply.`,
+        bundleWord: `a reply to ${c} ${plural(c, 'review', 'reviews')}` } : null;
+    } },
 
   // Celebration: measured good news, one calm moment however many metrics improved.
   { recRule: 'rec_connected_improved', key: 'connected_win', type: 'celebration', tone: 'celebratory', mergeable: false, bundleWord: '', ttlDays: 7,
@@ -189,13 +275,19 @@ export function momentize(recs: RecRow[], ctx: MomentContext): MomentizeResult {
     if (!eligible.has(r.rule)) eligible.set(r.rule, r);
   }
 
+  // List item 30: the words with the real count, when the evidence gives one
+  const counted = (t: MomentTemplate, r: RecRow): CountedWords | null => {
+    if (!t.counted || !Array.isArray(r.evidence) || !r.evidence.length) return null;
+    try { return t.counted(r.evidence); } catch { return null; }   // odd evidence never costs the note
+  };
+
   // candidates in ladder order
-  type Cand = { t: MomentTemplate; r: RecRow; score: number };
+  type Cand = { t: MomentTemplate; r: RecRow; score: number; w: CountedWords | null };
   const cands: Cand[] = [];
   for (const [rule, r] of eligible) {
     const t = tpl.get(rule);
     if (!t) { untranslated.push(rule); continue; }
-    cands.push({ t, r, score: ladder(r) });
+    cands.push({ t, r, score: ladder(r), w: counted(t, r) });
   }
   cands.sort((a, b) => (b.score - a.score) || a.t.key.localeCompare(b.t.key));
 
@@ -230,11 +322,11 @@ export function momentize(recs: RecRow[], ctx: MomentContext): MomentizeResult {
   const mergeable = cands.filter((c) => c.t.mergeable);
 
   type Seatable = { moment: Moment; key: string; score: number };
-  const seatables: Seatable[] = solo.map((c) => ({
-    moment: build(c.t, c.t.summary, [c.r.recommendation_hash], c.score, c.r), key: c.t.key, score: c.score,
-  }));
+  const alone = (c: Cand): Moment =>
+    build({ ...c.t, headline: c.w?.headline || c.t.headline }, c.w?.summary || c.t.summary, [c.r.recommendation_hash], c.score, c.r);
+  const seatables: Seatable[] = solo.map((c) => ({ moment: alone(c), key: c.t.key, score: c.score }));
   if (mergeable.length >= 2) {
-    const words = mergeable.map((c) => c.t.bundleWord).filter(Boolean);
+    const words = mergeable.map((c) => c.w?.bundleWord || c.t.bundleWord).filter(Boolean);
     // L3.1 calm: name at most three concerns so the bundle reads like a friend's
     // shortlist, not an audit's inventory; the rest fold into "a few more".
     const shown = words.slice(0, 3);
@@ -245,10 +337,11 @@ export function momentize(recs: RecRow[], ctx: MomentContext): MomentizeResult {
     // breadth edge: a bundle carrying N concerns outranks a single concern of
     // equal priority — deterministic (+1 per member), never a class jump
     const score = Math.max(...mergeable.map((c) => c.score)) + mergeable.length;
-    seatables.push({ moment: build(BUNDLE, summary, supporting, score), key: BUNDLE.key, score });
+    // the headline counts the concerns it carries: a real number, not "a few"
+    seatables.push({ moment: build({ ...BUNDLE, headline: `${mergeable.length} small improvements are ready when you are.` }, summary, supporting, score), key: BUNDLE.key, score });
   } else if (mergeable.length === 1) {
     const c = mergeable[0];
-    seatables.push({ moment: build(c.t, c.t.summary, [c.r.recommendation_hash], c.score, c.r), key: c.t.key, score: c.score });
+    seatables.push({ moment: alone(c), key: c.t.key, score: c.score });
   }
 
   // THE THREE-MOMENT LAW: everything competes for three seats by the ladder
