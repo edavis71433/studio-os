@@ -6,7 +6,7 @@ import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
 //            bell's Needs-you tab lists those same rows (not the nudges about
 //            them); news (a payment landed) stays under Updates.
 //   item 23  a studio account opening the old Home (today.html) is sent to
-//            Your clients (agency.html), which now carries Recent wins and the
+//            Customers (agency.html), which now carries Recent wins and the
 //            Ask box. A client's Overview (?client=) and a plain owner keep it.
 
 const STUDIO_CTX = { data: {
@@ -72,11 +72,11 @@ test.describe('item 11 — one number, one list, at studio level', () => {
 });
 
 test.describe('item 23 — one Home for a studio', () => {
-  test('a studio account on the old Home is sent to Your clients', async ({ page }) => {
+  test('a studio account on the old Home is sent to Customers', async ({ page }) => {
     await installApp(page, { api: HOME_API });
     await page.goto('/today.html');
     await expect(page).toHaveURL(/\/agency\.html$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Your clients' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Customers' })).toBeVisible();
   });
 
   test('a plain owner keeps their Today', async ({ page }) => {

@@ -434,6 +434,29 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       }
     } catch { /* highlights are additive — never block the record */ }
 
+    // Sales review item 26 (Nov 2026): a repeat customer's projects as a list —
+    // the record opened one project, so a second (or an archived first) showed
+    // nowhere but the ⌘K palette. Every project actively bridged to this customer
+    // on this studio's site (status=eq.active, the bridge's access convention),
+    // newest first. Additive and best-effort.
+    let related_projects: Array<{ id: string; name: string; status: string }> = [];
+    try {
+      if (clientId) {
+        const pids = [...new Set(arr(await svc(`presence_service_links?customer_client_id=eq.${clientId}&agency_site_id=eq.${AS}&status=eq.active&select=project_id&limit=50`)).map((l) => String(l.project_id || '')).filter((x) => UUID_RE.test(x)))];
+        if (pids.length) related_projects = arr(await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,name,status,created_at&order=created_at.desc&limit=50`))
+          .map((p) => ({ id: String(p.id), name: String(p.name || 'Project'), status: String(p.status || 'active') }));
+      }
+    } catch { related_projects = []; }
+    // …and the same for deals: every deal that became this customer (a second
+    // site, a retainer after a build), newest first.
+    let related_deals: Array<{ id: string; title: string; stage: string; value_cents: number }> = [];
+    try {
+      if (clientId) {
+        related_deals = arr(await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,title,stage,expected_value_cents,updated_at&order=updated_at.desc&limit=50`))
+          .map((d) => ({ id: String(d.id), title: String(d.title || 'Deal'), stage: String(d.stage || 'lead'), value_cents: Number(d.expected_value_cents) || 0 }));
+      }
+    } catch { related_deals = []; }
+
     const sections = { overview: !!customerSiteId, messages: !!(projectId || clientId), deal: !!dealId, delivery: !!projectId, details: !!contactId };
     const default_tab = projectId ? 'delivery' : (dealId ? 'deal' : (customerSiteId ? 'overview' : 'details'));
     // canonical addressing: the most-stable key that exists (customer site → deal → contact)
@@ -441,7 +464,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
 
     return json({ data: {
       identity: { contact_id: contactId || null, deal_id: dealId || null, client_id: clientId || null, customer_site_id: customerSiteId || null, project_id: projectId || null },
-      header, highlights, sections, default_tab, canonical,
+      header, highlights, sections, default_tab, canonical, related_projects, related_deals,
     } }, 200, cors);
   } catch (_e) {
     return json({ error: 'resolve_failed', message: 'We couldn’t open that client record just now.' }, 502, cors);

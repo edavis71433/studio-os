@@ -926,7 +926,7 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(rows.nth(0)).toHaveAttribute('href', '/crm.html?client=s1');       // a customer with a site → by site
     await expect(rows.nth(0).locator('.cav')).toHaveText('BK');
     await expect(rows.nth(1)).toContainText('Hettie Orange Designs');
-    await expect(rows.nth(1)).toContainText('On hold · 1 waiting');
+    await expect(rows.nth(1)).toContainText('On hold · 1 request');
     await expect(rows.nth(1)).toHaveAttribute('href', '/crm.html?client_id=c2');    // no site yet → by client id
     await expect(card.getByRole('link', { name: 'All customers →' })).toHaveAttribute('href', '/customers.html');
     // the rail is the card's home — it comes first, before This month

@@ -116,8 +116,8 @@ export function buildNav(c: NavContext): NavSection[] {
     // Website — their builder (one door; the sub-pages stay in ⌘K)
     if (f.hasWebsite) sections.push({ key: 'website', label: 'Website', items: [{ key: 'content', label: 'Website', href: '/presence.html', desc: WEBSITE_DESC }, ...websiteSubItems()] });
     // Record — deal · billing · details (the shell carries ?client=<site> onto every href)
-    if (f.hasRelationship) sections.push({ key: 'record', label: 'Details & billing', items: [
-      { key: 'record', label: 'Details & billing', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
+    if (f.hasRelationship) sections.push({ key: 'record', label: 'Record', items: [
+      { key: 'record', label: 'Record', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
       // Oct 2026 audit bug 10: ⌘K "billing" lands on money (the record's Billing tab), never on Customers
       hid('billing', 'Billing', '/crm.html?tab=billing', 'This client’s billing — invoices, deposits and the payment schedule.'),
     ] });
@@ -163,7 +163,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // Inbox — THE ONE place for what needs you: messages, approvals, notices, leads.
   // Broadcasts ("Send an update") is a button in its toolbar + a ⌘K entry.
   const inbox: NavItem[] = [{ key: 'inbox', label: 'Inbox', href: '/inbox.html', desc: 'The one place for everything that needs you — messages, approvals, notices, and new enquiries.' }];
-  if (f.hasRelationship) inbox.push(hid('broadcasts', 'Broadcasts', '/broadcasts.html', 'Send an update to many customers at once.'));
+  if (f.hasRelationship) inbox.push(hid('broadcasts', 'Send an update', '/broadcasts.html', 'Send an update (a broadcast) to many customers at once.'));
   // Studio level: Home · Inbox · Customers (the approved order). Owner: Today · Website · Customers · … · Inbox.
   if (studioLevel) sections.push({ key: 'inbox', label: 'Inbox', items: inbox });
 

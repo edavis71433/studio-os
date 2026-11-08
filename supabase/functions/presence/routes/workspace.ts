@@ -257,6 +257,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     site_role: role,
     capabilities: caps,
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
+    site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
     edition_name: EDITION_DEFS[editionKey]?.name || '',
     edition_features: featuresOf(editionKey),
