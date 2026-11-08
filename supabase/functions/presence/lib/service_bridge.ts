@@ -190,6 +190,13 @@ export function unownedSupportRows<T extends { id?: unknown; client_id?: unknown
 }
 
 export interface SupportOwners { clientOf: Record<string, string>; emailOf: Record<string, string> }
+// Final pass (Nov 8, batch B): who each requester turned out to be is kept per
+// studio for OWNER_TTL_MS — the heal runs on every Home, Inbox and record read,
+// and re-asked about requesters nobody could match every time (≈0.5 s). The
+// requesters are looked up side by side, and a match stamps all of that
+// requester's requests in one write.
+const OWNER_TTL_MS = 10 * 60_000;
+const requesterOwners = new Map<string, { at: number; cid: string | null; email: string }>();
 export async function healSupportOwners(agencySiteId: string, rowsIn: Array<{ id?: unknown; client_id?: unknown; project_id?: unknown; requester?: unknown }>): Promise<SupportOwners> {
   const out: SupportOwners = { clientOf: {}, emailOf: {} };
   try {
@@ -197,17 +204,23 @@ export async function healSupportOwners(agencySiteId: string, rowsIn: Array<{ id
     if (!agencySiteId || !todo.length) return out;
     const byRequester = new Map<string, string[]>();
     for (const r of todo) { const k = String(r.requester).trim(); const ids = byRequester.get(k) || []; ids.push(String(r.id)); byRequester.set(k, ids); }
-    for (const [requester, ids] of byRequester) {
-      const isUid = SUPPORT_UUID_RE.test(requester);
-      const email = isUid ? await signInEmail(requester) : (requester.includes('@') ? requester : '');
-      const cid = await clientIdForRequester(agencySiteId, { userId: isUid ? requester : null, email });
-      for (const id of ids) {
-        if (cid) {
-          out.clientOf[id] = cid;
-          if (SUPPORT_UUID_RE.test(id)) await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${agencySiteId}&client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: cid }) }).catch(() => null);
-        } else if (email) out.emailOf[id] = email;
+    if (requesterOwners.size > 2000) requesterOwners.clear();   // a bound, never a correctness rule
+    await Promise.all([...byRequester].map(async ([requester, ids]) => {
+      const key = `${agencySiteId}:${requester}`;
+      let who = requesterOwners.get(key);
+      if (!who || Date.now() - who.at > OWNER_TTL_MS) {
+        const isUid = SUPPORT_UUID_RE.test(requester);
+        const email = isUid ? await signInEmail(requester) : (requester.includes('@') ? requester : '');
+        const cid = await clientIdForRequester(agencySiteId, { userId: isUid ? requester : null, email });
+        who = { at: Date.now(), cid, email };
+        requesterOwners.set(key, who);
       }
-    }
+      if (who.cid) {
+        for (const id of ids) out.clientOf[id] = who.cid;
+        const stamp = ids.filter((id) => SUPPORT_UUID_RE.test(id));
+        if (stamp.length) await svc(`presence_support_requests?id=in.(${stamp.join(',')})&site_id=eq.${agencySiteId}&client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: who.cid }) }).catch(() => {});
+      } else if (who.email) { for (const id of ids) out.emailOf[id] = who.email; }
+    }));
   } catch { /* best-effort — a page still renders with what it had */ }
   return out;
 }

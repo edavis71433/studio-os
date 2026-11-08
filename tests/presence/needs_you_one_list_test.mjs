@@ -134,11 +134,12 @@ if (W && W.studioLevelFeed) {
 
 // ── the wiring: one computation behind Home, the bell and the bell's tab ──
 const ag = read('supabase/functions/presence/agency/routes.ts');
-ok('Home\'s route is the shared computation', /route === '\/agency\/needs-you'[\s\S]{0,200}computeStudioNeeds\(member, principal, jwt, now\)/.test(ag));
+ok('Home\'s route is the shared computation', /route === '\/agency\/needs-you'[\s\S]{0,500}computeStudioNeeds\(member, principal, jwt, now, \{ fresh: /.test(ag));
 ok('…which reads the studio site\'s own Inbox rows from the one feed builder', /buildPortalFeed\(jwt, own, principal\)/.test(ag) && /own: ownFeed \? \{ site_id: own\?\.id \|\| null, enquiries: ownFeed\.enquiries/.test(ag));
 ok('…and keeps its total for the bell (a minute)', /needsTotals\.set\(member\.agency_id/.test(ag) && /NEEDS_TOTAL_TTL_MS = 60_000/.test(ag));
 const ws = read('supabase/functions/presence/routes/workspace.ts');
-ok('the bell at studio level is that total', /if \(agencyMember && !scopedName && seesFull\)[\s\S]{0,200}studioNeedsTotal\(agencyMember as any, principal, jwt\)/.test(ws));
+// final pass (Nov 8, batch B): a page boot shows the KEPT total and never builds the list itself
+ok('the bell at studio level is that total — the kept one; a page boot never builds the list', /if \(agencyMember && !scopedName && seesFull\)[\s\S]{0,900}keptStudioNeedsTotal\(/.test(ws) && !/computeStudioNeeds|studioNeedsTotal\(/.test(ws));
 ok('the feed at studio level drops the website rows', /if \(member\) return studioLevelFeed\(data\)/.test(ws));
 ok('the feed reads enough notices for the list (30, not 10)', /presence_plan_notices\?site_id=eq\.\$\{site\.id\}&status=eq\.active&select=id,kind,period,headline,body,created_at&order=created_at\.desc&limit=30/.test(ws));
 const shell = read('shell.js');

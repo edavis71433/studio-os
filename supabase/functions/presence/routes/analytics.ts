@@ -14,7 +14,7 @@ import { svc } from '../lib/db.ts';
 import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
 import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
-import { gather } from '../agency/routes.ts';
+import { sharedGather } from '../agency/routes.ts';
 import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
   inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights, websiteRows,
@@ -294,11 +294,12 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const member = await resolveAgencyMember(jwt);
   if (!member) return json({ error: 'not_agency', message: 'Analytics across clients is for studio accounts.' }, 403, cors);
   if (!can(member.role, 'read')) return json({ error: 'forbidden', message: 'You don’t have access to the portfolio.' }, 403, cors);
-  const siteIds = await agencySiteIds(member.agency_id);
-  if (!siteIds.length) return json({ data: { headline: 'No clients yet.', insights: [] } }, 200, cors);
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
-  const input = await gather(member.agency_id, nowIso);
+  // batch B (final pass, Nov 8): the site list and the gather side by side, and
+  // the gather shared with any portfolio read arriving at the same moment
+  const [siteIds, input] = await Promise.all([agencySiteIds(member.agency_id), sharedGather(member.agency_id, nowIso)]);
+  if (!siteIds.length) return json({ data: { headline: 'No clients yet.', insights: [] } }, 200, cors);
   // SS7 fix (review-confirmed): gather() is deliberately UNFILTERED (archived
   // links included, for /agency/portfolio?archived=true) — but THIS band must
   // count the SAME clients as client_count (agencySiteIds, active-only) and the
@@ -497,6 +498,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const visitStartIso = new Date(Math.min(priorStartMs ?? startMs, startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+  const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
 
   // ── Whose sales are these? ───────────────────────────────────────────────────
   // Deals and invoices only ever live on the OPERATOR's agency site — sales.ts
@@ -567,7 +569,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   let pipeline: unknown = null, won: unknown = null, recent_wins: unknown[] = [];
   if (deals) {
     const sum = summarizePipeline(deals, nowIso);
-    const names = await loadStageLabels(site.id).catch(() => null);   // sales review item 38: the studio's own stage names
+    const names = await stageNamesP;   // sales review item 38: the studio's own stage names
     pipeline = { open: sum.open, stages: names ? sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label })) : sum.by_stage };
     won = { this_month: sum.won_month, last_month: summarizePipeline(deals, priorMonthIso(nowMs)).won_month };
     recent_wins = recentWins(deals, nowMs);

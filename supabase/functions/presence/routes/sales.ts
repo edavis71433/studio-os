@@ -23,7 +23,7 @@ import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { normalizeStageNames, stageLabels, loadStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
+import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -308,6 +308,7 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     const custom = normalizeStageNames(b?.names);
     const ok = await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, principal.email || principal.userId || 'system');
+    forgetStageLabels(site.id);   // batch B: the kept names go at once
     return ok ? json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors) : json({ error: 'write_failed', message: 'Your stage names didn’t save — please try again.' }, 502, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -519,6 +520,7 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
 // Site-scoped & studio-gated like every authed /sales/* route.
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
+  const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
   // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
@@ -542,7 +544,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
   // days — three won deals read "100% (1 of 1)" under the old window.
   const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS);
-  const names = await loadStageLabels(site.id).catch(() => null);   // item 38: the studio's own stage names
+  const names = await namesP;   // item 38: the studio's own stage names
   if (names) sum.by_stage = sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label }));
   return json({ data: { ...sum, ar }, truncated: deals.length >= CAP }, 200, cors);
 }
@@ -635,6 +637,7 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
 export async function handleSalesReports(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const now = nowIso();
   const failed = new Set<string>();
+  const labelsP = loadStageLabels(site.id).catch(() => undefined);   // item 38 names; batch B: read with the others, not after
   const read = async (key: string, path: string) => { try { const r = await svc(path); if (!r.ok) { failed.add(key); return []; } return rows(r); } catch { failed.add(key); return []; } };
   const since24 = new Date(Date.now() - 2 * 366 * 86400_000).toISOString();
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
@@ -647,11 +650,11 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   // when each open deal last moved INTO its current stage
   const open = deals.filter((d: any) => REPORT_OPEN_STAGES.includes(String(d.stage)) && !d.converted_client_id);
   const lastMoveInto: Record<string, string> = {};
-  for (let i = 0; i < open.length; i += 100) {
-    const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x));
-    if (!ids.length) continue;
-    const ev = await read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`);
-    const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
+  const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
+  const openChunks: string[][] = [];
+  for (let i = 0; i < open.length; i += 100) { const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x)); if (ids.length) openChunks.push(ids); }
+  // batch B (final pass, Nov 8): the batches side by side, like the close dates below
+  for (const ev of await Promise.all(openChunks.map((ids) => read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`)))) {
     for (const e of ev) { const k = String(e.deal_id); if (!lastMoveInto[k] && String(e.to_stage) === stageOf.get(k)) lastMoveInto[k] = String(e.created_at); }
   }
   // F5 (final pass): when each closed deal actually closed — its newest move into
@@ -671,7 +674,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   return json({ data: {
     generated_at: now,
     revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
-    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await loadStageLabels(site.id).catch(() => undefined)), partial: failed.has('stages') },
+    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
     overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),
@@ -689,8 +692,8 @@ export async function loadMyTasks(siteId: string, userId: string | null): Promis
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
   const [deals, dealTasks, projectTasks] = await Promise.all([
     read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
-    read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300`),
+    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&order=due_date.asc.nullslast,created_at.asc&limit=200`),   // batch B: ordered, so the cap keeps the soonest
+    read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&order=due_date.asc.nullslast,created_at.asc&limit=300`),   // batch B: ordered, so the cap keeps the soonest
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
@@ -823,6 +826,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   const deal = await loadDeal(site.id, id);
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
+    const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
     const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
@@ -849,7 +853,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // dated note) + system events live in the same presence_deal_events table, so
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
-    const stageNames = await loadStageLabels(site.id).catch(() => null);   // item 38: "Moved to <their name for it>"
+    const stageNames = await stageNamesP;   // item 38: "Moved to <their name for it>"
     const timeline = mergeDealTimeline(eventRows).map((it) => (stageNames && it.kind === 'stage_change' ? { ...it, text: renameMovedTo(it.text, stageNames) } : it));
     // Sales review B5: one total per proposal, after discount and tax — the
     // record showed the stored pre-discount subtotal while the deal page added

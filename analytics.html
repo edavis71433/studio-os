@@ -649,6 +649,11 @@ function headRow(title,subline,withPeriod){
 // studio's own sales: hidden inside a client (?client=), where deals don't live. ──
 const REPORTS=[['revenue','Revenue by month'],['pipeline','Deals by stage'],['outcomes','Won and not a fit'],['enquiries','Enquiries by page'],['overdue','Overdue invoices']];
 let REP=null,REP_ON=(function(){try{const v=localStorage.getItem('dds-report');return REPORTS.some(r=>r[0]===v)?v:'revenue';}catch(_){return 'revenue';}})();
+// final pass (Nov 8, batch B): the studio's total can land after the page — the
+// shell refreshes it behind the page and says so with 'dds:attention'
+function quietStudio(v){const n=Number(v)||0;const el=document.getElementById('allQuietStudio');if(!el||!n)return;
+  el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/agency.html" data-noscope="1">see Home</a>.`;}
+document.addEventListener('dds:attention',e=>quietStudio(e.detail));
 const reportsShell=()=>scope()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
 async function loadReports(force){
   if(!$('reportsBody'))return;
@@ -867,10 +872,7 @@ function renderPortfolio(d,roster){
   if(!ins.length)h+=clientCount>0
     ?`<div class="quiet" id="allQuiet" style="margin-top:0"><b>All quiet.</b> Every client is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
     :`<div class="quiet" style="margin-top:0"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
-  if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>{
-    const n=ctx&&Number(ctx.attention_count)||0; const el=document.getElementById('allQuietStudio'); if(!el||!n)return;
-    el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/agency.html" data-noscope="1">see Home</a>.`;
-  }).catch(()=>{});
+  if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>quietStudio(ctx&&ctx.attention_count)).catch(()=>{});
   if(ins.length)h+=`<div class="grid3" style="margin-top:0">${ins.map(insightCard).join('')}</div>`;
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
   h+=`<div class="print noprint"><button type="button" class="btn" onclick="window.print()">Print this summary</button></div>`;

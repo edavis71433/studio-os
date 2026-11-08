@@ -103,7 +103,7 @@ const tasks = T.buildMyTasks({ deals: [], dealTasks: [], taskDeals: [], userId: 
   ] });
 eq('only the next step and a dated one are now; the rest wait', tasks.map((t) => `${t.title}:${t.later ? 'later' : 'now'}`), ['Launch party:now', 'Domain connected:now', 'Handover:later', 'Site live:later']);
 eq('each step carries its place, so Home can move the next one up', tasks.map((t) => t.order), [9, 1, 2, 3]);
-ok('the route reads each step\'s place', /select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300/.test(read('supabase/functions/presence/routes/sales.ts')));
+ok('the route reads each step\'s place', /select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order(&order=[a-z_.,]+)?&limit=300/.test(read('supabase/functions/presence/routes/sales.ts')));
 const home = read('agency.html');
 ok('Home shows what\'s next, counts it, and moves the next step up on Done', /const now=items\.filter\(t=>!t\.later\);/.test(home) && /My tasks · \$\{MYT_ALL\?total:now\.length\}/.test(home) && /x\.later&&x\.parent_id===t\.parent_id/.test(home));
 

@@ -62,10 +62,14 @@ export async function handleBroadcastsList(site: SiteRow, cors: Record<string, s
 export async function handleBroadcastSegments(site: SiteRow, cors: Record<string, string>): Promise<Response> {
   // Live audience size per preset (distinct valid addresses, pre-suppression — the
   // honest post-suppression count is shown on the specific broadcast's preview).
-  const counts: Record<string, number> = {};
-  for (const s of SEGMENTS) counts[s.key] = await audienceCount(site.id, s.key).catch(() => 0);
+  // batch B (final pass, Nov 8): every count and the picked lists side by side, not one after another
+  const [pairs, picked] = await Promise.all([
+    Promise.all(SEGMENTS.map(async (s) => [s.key, await audienceCount(site.id, s.key).catch(() => 0)] as const)),
+    loadPickedLists(site.id).catch(() => []),
+  ]);
+  const counts: Record<string, number> = Object.fromEntries(pairs);
   // the studio's picked lists follow the presets, newest first (items 31 + 39)
-  const lists = (await loadPickedLists(site.id).catch(() => [])).slice().reverse().map((l) => ({
+  const lists = picked.slice().reverse().map((l) => ({
     key: `list:${l.id}`, label: l.name, description: `A list you picked · ${l.people.length} ${l.people.length === 1 ? 'person' : 'people'}`, count: l.people.length, list: true,
   }));
   return json({ data: { segments: [...SEGMENTS.filter((s) => s.key !== 'customers' || (counts[s.key] ?? 0) > 0).map((s) => ({ ...s, count: counts[s.key] ?? 0 })), ...lists] } }, 200, cors);   // item 56: no customers, no customers list
