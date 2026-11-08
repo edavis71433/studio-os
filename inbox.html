@@ -332,6 +332,7 @@ const SI={cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
+// item 54: the badge reads `who` (the name alone) — "Eddie · 4 messages" gave "E·"
 const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
 // SC-1: keep the agency drill-in scope on every internal link so a scoped operator
 // stays inside the client they opened.
@@ -475,7 +476,7 @@ function buildItems(feed,leads,notifs){
   }
   for(const {lead:l,count} of byPerson.values()){
     items.push({kind:'lead',id:'lead:'+l.id,lead_id:String(l.id||''),thread_key:l.thread_key||('lead:'+l.id),
-      name:(l.name||l.email||'Someone')+(count>1?` · ${count} messages`:''),when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
+      name:(l.name||l.email||'Someone')+(count>1?` · ${count} messages`:''),who:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'A new enquiry from your website',
       chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:l.unread!=null?!!l.unread:String(l.status||'new')==='new',needs:true,lead:l});
   }
   // the Enquiries queue (the old Enquiries page): EVERY enquiry, one row each,
@@ -816,7 +817,7 @@ function renderList(){
     lastTag='';
     h+=`<li class="row${it.unread?' unread':''}" role="option" id="row-${cssId(it.id)}" data-id="${esc(it.id)}" aria-selected="${SEL===it.id?'true':'false'}">
       ${it.unread?'<span class="unread-dot" role="img" aria-label="Unread"></span>':''}
-      <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
+      <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.who||it.name)}</span>
       <span class="rmain">
         <span class="rtop"><span class="rname">${esc(it.name)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
         <span class="rprev"><span class="rchip ${it.chipCls}">${esc(rowChip(it))}</span>${supBadges(it)}<span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
@@ -883,7 +884,7 @@ function renderPane(){
 }
 const paneHead=(it,subHtml,actsHtml)=>`<div class="phead">
   <button type="button" class="pback" id="paneBack">← Inbox</button>
-  <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
+  <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.who||it.name)}</span>
   <div style="min-width:0"><div class="pname">${esc(it.name)}</div><div class="psub">${subHtml}</div></div>
   ${actsHtml?`<div class="pacts" id="paneActs">${actsHtml}</div>`:''}
 </div>`;

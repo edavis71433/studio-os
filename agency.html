@@ -837,9 +837,12 @@ function myTaskRow(t){
 }
 function myTasksHtml(){
   const items=MYTASKS.items,total=MYTASKS.total;
-  const shown=MYT_ALL?items:items.slice(0,MYT_SHOW);
+  // item 53: a project's steps behind its next one (undated) wait for Show all,
+  // and the heading counts what is next, not every unticked checklist line
+  const now=items.filter(t=>!t.later);
+  const shown=MYT_ALL?items:now.slice(0,MYT_SHOW);
   const hiddenHere=items.length-shown.length,beyond=Math.max(0,total-items.length);
-  let h=`<div class="rcard" id="my-tasks"><p class="rh">My tasks · ${total}</p>`;
+  let h=`<div class="rcard" id="my-tasks"><p class="rh">My tasks · ${MYT_ALL?total:now.length}</p>`;
   h+=shown.length?`<div class="trows">${shown.map(myTaskRow).join('')}</div>`:'<p class="quiet">Nothing left on your list.</p>';
   if(hiddenHere>0)h+=`<p class="quiet"><button type="button" class="linkbtn" id="myTasksMore">Show all ${items.length}</button></p>`;
   else if(beyond>0)h+=`<p class="quiet">${beyond} more on your deals and projects.</p>`;
@@ -860,6 +863,8 @@ function wireMyTasks(){
     let r;try{r=await apiSend(m,path,body);}catch(_){r={ok:false,body:{}};}
     if(!r.ok){b.disabled=false;toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.',true);return;}
     MYTASKS.items=MYTASKS.items.filter(x=>x!==t);MYTASKS.total=Math.max(0,MYTASKS.total-1);
+    // item 53: that project's next step moves up (the lowest place on its checklist)
+    if(t.kind==='project_task'&&!t.later){const nx=MYTASKS.items.filter(x=>x.later&&x.parent_id===t.parent_id).sort((a,b)=>(a.order??1e9)-(b.order??1e9))[0];if(nx)nx.later=false;}
     toast('Done: '+t.title);paintMyTasks();
   }));
 }
