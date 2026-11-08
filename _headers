@@ -45,6 +45,105 @@
   Cache-Control: no-store, no-cache, must-revalidate
   X-Robots-Tag: noindex
 
+# The signed-in app at its clean URLs (Nov 2026, sales review). The /*.html
+# rule above never matched /agency, /inbox, /pipeline…, so every app page fell
+# to /* (one hour in the browser): after a deploy a user kept the old page for
+# up to an hour, and shell.js (the bell, the menu) for a day. These are living
+# pages that load their data from the API — revalidate every time (a 304 is
+# cheap), the same policy the .html paths and the service worker already use.
+/agency
+  Cache-Control: no-cache, must-revalidate
+/today
+  Cache-Control: no-cache, must-revalidate
+/inbox
+  Cache-Control: no-cache, must-revalidate
+/customers
+  Cache-Control: no-cache, must-revalidate
+/contacts
+  Cache-Control: no-cache, must-revalidate
+/crm
+  Cache-Control: no-cache, must-revalidate
+/pipeline
+  Cache-Control: no-cache, must-revalidate
+/projects
+  Cache-Control: no-cache, must-revalidate
+/files
+  Cache-Control: no-cache, must-revalidate
+/analytics
+  Cache-Control: no-cache, must-revalidate
+/settings
+  Cache-Control: no-cache, must-revalidate
+/broadcasts
+  Cache-Control: no-cache, must-revalidate
+/presence
+  Cache-Control: no-cache, must-revalidate
+/connections
+  Cache-Control: no-cache, must-revalidate
+/visual-studio
+  Cache-Control: no-cache, must-revalidate
+/client
+  Cache-Control: no-cache, must-revalidate
+/sharing
+  Cache-Control: no-cache, must-revalidate
+/developer
+  Cache-Control: no-cache, must-revalidate
+/approve
+  Cache-Control: no-cache, must-revalidate
+/leads
+  Cache-Control: no-cache, must-revalidate
+/schedule
+  Cache-Control: no-cache, must-revalidate
+/get-started
+  Cache-Control: no-cache, must-revalidate
+/project-survey
+  Cache-Control: no-cache, must-revalidate
+/welcome
+  Cache-Control: no-cache, must-revalidate
+/provision
+  Cache-Control: no-cache, must-revalidate
+/attention
+  Cache-Control: no-cache, must-revalidate
+/approval-center
+  Cache-Control: no-cache, must-revalidate
+/business-insights
+  Cache-Control: no-cache, must-revalidate
+/content-tree
+  Cache-Control: no-cache, must-revalidate
+/snapshot-history
+  Cache-Control: no-cache, must-revalidate
+/timeline
+  Cache-Control: no-cache, must-revalidate
+/upcoming
+  Cache-Control: no-cache, must-revalidate
+/website-health
+  Cache-Control: no-cache, must-revalidate
+/help
+  Cache-Control: no-cache, must-revalidate
+/admin-health
+  Cache-Control: no-cache, must-revalidate
+/admin-growth
+  Cache-Control: no-cache, must-revalidate
+/portal-workspace
+  Cache-Control: no-cache, must-revalidate
+/payment-success
+  Cache-Control: no-cache, must-revalidate
+/payment-canceled
+  Cache-Control: no-cache, must-revalidate
+# the clean URLs of the four no-store pages above get their .html policy too
+/studio
+  Cache-Control: no-store, no-cache, must-revalidate
+/sign
+  Cache-Control: no-store, no-cache, must-revalidate
+/set-password
+  Cache-Control: no-store, no-cache, must-revalidate
+/portal
+  Cache-Control: no-store, no-cache, must-revalidate
+# the app shell every signed-in page loads (the menu, the bell, search)
+/shell.js
+  Cache-Control: no-cache, must-revalidate
+/shell.css
+  Cache-Control: no-cache, must-revalidate
+
 # Canonical extensionless page URLs (generated from sitemap.xml) — the /*.html
 # no-cache rule does not match these, so each gets the same policy explicitly.
 /

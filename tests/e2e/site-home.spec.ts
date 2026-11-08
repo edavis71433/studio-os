@@ -915,6 +915,49 @@ test.describe('Styles show on the page at once, and save behind', () => {
   });
 });
 
+test.describe('Publish waits for what was just typed', () => {
+  test('a section edit still saving when Publish is pressed lands before the review reads', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2[data-dds-field="title"]').waitFor();
+    await page.waitForLoadState('networkidle');
+    const log: string[] = [];
+    await page.route('**/functions/v1/presence/settings**', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 900)); log.push('save answered'); await route.fallback();
+    });
+    await page.route('**/functions/v1/presence/changes**', (route: Route) => { log.push('review read'); return route.fallback(); });
+    const h2 = frame.locator('#a h2[data-dds-field="title"]');
+    await h2.dblclick();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Fresh heading');
+    await page.keyboard.press('Enter');
+    log.push('publish opened');
+    await page.evaluate(() => { (window as any).openRitual(); });   // at once, inside the save's pause
+    await expect(page.locator('#ritTitle')).not.toHaveText('One moment.');
+    await expect.poll(() => log.includes('save answered')).toBe(true);
+    const firstRead = log.indexOf('review read', log.indexOf('publish opened'));
+    expect(firstRead).toBeGreaterThan(log.indexOf('save answered'));
+    const saved = writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks));
+    expect(saved.at(-1)!.body.blocks[0].title).toBe('Fresh heading');
+  });
+});
+
+test.describe('Undo takes back a menu-category move', () => {
+  test('move a category earlier, then Undo: the order goes back', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#offerings', { '/offerings': { data: [
+      { id: 'o1', name: 'Soup', category: 'Starters', price_text: '$5', description: '', is_visible: true, sort_order: 0 },
+      { id: 'o2', name: 'Steak', category: 'Mains', price_text: '$25', description: '', is_visible: true, sort_order: 1 },
+    ] } });
+    const orders = () => writes.filter((w) => w.path === '/settings' && w.body && 'category_order' in w.body).map((w) => w.body.category_order);
+    await page.getByRole('button', { name: 'Move Mains earlier' }).click();
+    await expect.poll(orders).toEqual([['Mains', 'Starters']]);
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(orders).toEqual([['Mains', 'Starters'], []]);   // the usual order, as before any move
+  });
+});
+
 test.describe('move the welcome section among the others', () => {
   const page_ = (movable: boolean) => '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
     + '<section class="hero" data-dds-core="hero"' + (movable ? ' data-dds-movable' : '') + '><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'

@@ -37,7 +37,7 @@ ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for 
 ok('FIX1: the enquiry feed row is owner-only (reviewers never see leads)',
   /if \(seesFull\) \{[\s\S]*?kind: 'website_enquiry'/.test(workspace));
 ok('FIX1: inbox.html filters the aggregate row so it is not double-listed with /forms/inbox',
-  /feed\.notices\|\|\[\]\)\.filter\(n=>n\.kind!=='website_enquiry'\)/.test(inbox));
+  /const DUP_NUDGES=new Set\(\['website_enquiry'/.test(inbox) && /feed\.notices\|\|\[\]\)\.filter\(n=>!DUP_NUDGES\.has\(n\.kind\)\)/.test(inbox));   // sales review item 18 widened the filter to the other nudges
 
 // ── FIX 2: degraded connections reach the bell + Inbox ───────────────────────
 // (recurrence fix) the period is now WEEKLY-BUCKETED per provider

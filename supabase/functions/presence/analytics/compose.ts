@@ -307,7 +307,14 @@ export function foldPortfolioVisitors(rows: Array<{ site_id?: string; visitor_ha
  *    visitors — unique visitors this week; null = the visits read FAILED
  *               (AN-4: never a fabricated 0), a missing site on a successful
  *               read is an honest 0. */
-export interface WebsiteRowLite { site_id: string; name?: string; last_published_at?: string | null; unpublished_changes?: unknown; leads_waiting?: number; attention?: number }
+export interface WebsiteRowLite { site_id: string; name?: string; edition?: string | null; last_published_at?: string | null; unpublished_changes?: unknown; leads_waiting?: number; attention?: number }
+/** Sales review item 15 (Nov 2026): one rule for "is this client's site live",
+ *  read by Analytics and mirrored by Home (agency.html statusWord). A watch-plan
+ *  (monitor) client's site is hosted elsewhere — never "live" here, never a draft. */
+export function siteState(c: { edition?: string | null; last_published_at?: string | null; status?: string | null }): 'elsewhere' | 'live' | 'draft' {
+  if (c.edition === 'monitor') return 'elsewhere';
+  return c.last_published_at || c.status === 'live' ? 'live' : 'draft';
+}
 export interface WebsiteRowCtx {
   planBySite?: Record<string, string>;                 // site_id → coarse plan status (active|paused|lapsed|…) — never payment details
   failedSites?: string[];                              // sites with a recent failed publish
@@ -323,7 +330,8 @@ export function websiteRows(portfolio: WebsiteRowLite[], ctx: WebsiteRowCtx) {
     return {
       site_id: c.site_id,
       name: c.name,
-      draft_live: c.last_published_at ? 'live' : 'draft',
+      draft_live: c.last_published_at ? 'live' : 'draft',   // kept for older pages; site_state is the honest three-way
+      site_state: siteState(c),
       last_published_at: c.last_published_at || null,
       unpublished_changes: !!c.unpublished_changes,
       leads_waiting: c.leads_waiting || 0,
