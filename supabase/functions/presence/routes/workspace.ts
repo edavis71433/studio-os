@@ -326,7 +326,12 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   const project = n.kind === 'approval_overdue' ? projectIdOfApprovalPeriod(n.period) : null;
   if (project) return `${base}?project=${project}`;
   const id = n.kind === 'lead_followup' ? leadIdOfNoticePeriod(n.period) : null;
-  return id ? `${base}?sel=lead:${id}` : base;
+  if (id) return `${base}?sel=lead:${id}`;
+  // sales review item 22: "Agreement signed — ready to convert" opens that deal at
+  // its Convert step; "Proposal accepted" opens the deal (period signed:/accepted:<deal>)
+  const deal = n.kind === 'deal_signed' ? /^(signed|accepted):([0-9a-f-]{36})$/i.exec(String(n.period || '')) : null;
+  if (deal) return `/pipeline.html?deal=${deal[2]}${deal[1] === 'signed' ? '#convert' : ''}`;
+  return base;
 };
 
 /** The client portal's read: only what's shared with the reviewer — shared

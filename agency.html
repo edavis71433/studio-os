@@ -350,11 +350,14 @@ let VIEWNAME='all',Q='';
 // what each client needs next, from /agency/needs-you (by site, and by client id for bridged-only customers)
 let NEXT={bySite:{},byClient:{}};
 function nextFor(c){return(c.site_id&&NEXT.bySite[c.site_id])||(c.client_id&&NEXT.byClient[c.client_id])||null;}
-const STATUS_RANK={'Needs you':0,'Not live yet':1,'Live':2,'Archived':3};
+const STATUS_RANK={'Needs you':0,'Not live yet':1,'Hosted elsewhere':2,'Live':3,'Archived':4};
+// item 15: the same rule as Analytics (analytics/compose.ts siteState) — a
+// watch-plan client's site lives elsewhere; it is never "Live" here.
 function statusWord(c){
   if(c.archived)return'Archived';
   if(nextFor(c))return'Needs you';
-  if(c.status==='live'||c.last_published_at||c.edition==='monitor')return'Live';
+  if(c.edition==='monitor')return'Hosted elsewhere';
+  if(c.status==='live'||c.last_published_at)return'Live';
   return'Not live yet';
 }
 const viewMatch=(c)=>{

@@ -77,6 +77,9 @@ export interface NeedsInput {
     enquiries?: Array<{ id: string; name?: string | null; email?: string | null; form_kind?: string | null; status?: string | null; tier?: string | null; created_at?: string | null }>;
     messages?: Array<{ type?: string | null; tier?: string | null; client_id?: string | null; client?: string | null; project?: string | null; count?: number | null; created_at?: string | null; href?: string | null; thread_key?: string | null }>;
     notices?: Array<{ id?: string | null; kind?: string | null; period?: string | null; headline?: string | null; body?: string | null; href?: string | null; tier?: string | null }>;
+    /** the deals those notices name (id → the deal now), so a notice about a deal
+     *  since converted, lost or deleted is not a row (dealNoticeIds / staleDealNotices) */
+    deals?: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }>;
   };
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
@@ -261,7 +264,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       push({ key: `deal:${m[1]}:${dealId}`, kind: 'deal', site_id: null, client_id: null, name: title,
         what: signed ? 'signed the agreement — make them a customer' : 'accepted your proposal — send the agreement',
         when: signed ? 'Agreement signed' : 'Proposal accepted', verb: signed ? 'Convert' : 'Open deal',
-        href: `/pipeline.html?deal=${encodeURIComponent(dealId)}` });
+        href: `/pipeline.html?deal=${encodeURIComponent(dealId)}${signed ? '#convert' : ''}` });   // item 22: Convert lands on the Convert step
     } else if (kind === 'deal_followup' && (m = /^deal:([^:]+)(?::.*)?$/.exec(p))) {
       if (seen.has(`deal:${m[1]}`)) continue;                     // its late next step is already a row
       push({ key: `deal:quiet:${m[1]}`, kind: 'deal', site_id: null, client_id: null, name: head.replace(/^Follow up on\s*/, '').trim() || 'A deal',
@@ -355,8 +358,44 @@ export const NEEDS_WEBSITE_KINDS: ReadonlySet<string> = new Set([
 ]);
 export const NEEDS_NUDGE_KINDS: ReadonlySet<string> = new Set(['support_aging', 'lead_followup', 'website_enquiry', 'client_updates']);
 const ACCOUNT_KINDS: ReadonlySet<string> = new Set(['capacity', 'trial_ending', 'trial_ended', 'payment_trouble', 'account_lapsed', 'renewal_reminder', 'winddown_reminder', 'deletion_requested']);
+// ── deal notices that outlived their deal (found live on Nov 8 2026) ─────────
+// Reading 30 notices instead of 10 surfaced two old rows: "make them a
+// customer" for a deal converted months ago, and "no next step" for a deal no
+// longer in the pipeline. A deal notice is only a row while its deal still
+// waits on that step; the caller clears the rest (computeStudioNeeds).
+const DEAL_NOTICE_RE = /^(signed|accepted|deal):([0-9a-f-]{36})(?::.*)?$/i;
+/** The deal ids the studio's deal notices name. Pure. */
+export function dealNoticeIds(notices: Array<{ kind?: string | null; period?: string | null }>): string[] {
+  const out = new Set<string>();
+  for (const n of notices || []) {
+    const kind = String(n?.kind || ''); const m = DEAL_NOTICE_RE.exec(String(n?.period || ''));
+    if (!m) continue;
+    if ((kind === 'deal_signed' && m[1] !== 'deal') || (kind === 'deal_followup' && m[1] === 'deal')) out.add(m[2].toLowerCase());
+  }
+  return [...out];
+}
+/** Deal notices whose deal no longer waits on that step. Pure. `deals` holds
+ *  every deal that could be read; null = the read failed (keep everything). */
+export function staleDealNotices<T extends { kind?: string | null; period?: string | null }>(notices: T[], deals: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }> | null): T[] {
+  if (!deals) return [];
+  const out: T[] = [];
+  for (const n of notices || []) {
+    const kind = String(n?.kind || ''); const m = DEAL_NOTICE_RE.exec(String(n?.period || ''));
+    if (!m) continue;
+    const isSigned = kind === 'deal_signed' && m[1] !== 'deal';
+    const isQuiet = kind === 'deal_followup' && m[1] === 'deal';
+    if (!isSigned && !isQuiet) continue;
+    const d = deals[m[2].toLowerCase()];
+    const gone = !d || !!d.deleted_at || d.stage === 'lost';
+    if (gone || (isSigned && !!d?.converted_client_id) || (isQuiet && d?.stage === 'won')) out.push(n);
+  }
+  return out;
+}
 function ownNotices(i: NeedsInput) {
+  const deals = i.own?.deals;
+  const stale = new Set(deals ? staleDealNotices(i.own?.notices || [], deals) : []);
   return (i.own?.notices || []).filter((n) => {
+    if (stale.has(n)) return false;
     const kind = String(n.kind || ''); const p = String(n.period || '');
     if (n.tier && n.tier !== 'needs_you') return false;                       // news (a payment landed) is not an ask
     if (NEEDS_WEBSITE_KINDS.has(kind) || NEEDS_NUDGE_KINDS.has(kind)) return false;
