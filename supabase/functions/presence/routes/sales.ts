@@ -22,7 +22,7 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
@@ -323,10 +323,11 @@ export async function handleSalesViews(req: Request, site: SiteRow, principal: P
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     if (!isViewList(b?.list)) return json({ error: 'validation', message: 'Which list are these views for?' }, 422, cors);
-    const all = normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews));
-    all[b.list as keyof typeof all] = normalizeViewList(b.views);
-    const ok = await writeReservedJson(site.id, RESERVED_NAMES.savedViews, all, principal.email || principal.userId || 'system');
-    return ok ? json({ data: all }, 200, cors) : json({ error: 'write_failed', message: 'Your view didn’t save — please try again.' }, 502, cors);
+    // F9 (final pass): only THIS list changes, applied to whatever is saved now —
+    // a teammate saving a Pipeline view a moment earlier no longer loses theirs
+    const views = normalizeViewList(b.views);
+    const all = await updateReservedJson(site.id, RESERVED_NAMES.savedViews, (cur) => { const next = normalizeViews(cur); next[b.list as keyof typeof next] = views; return next; }, principal.email || principal.userId || 'system');
+    return all ? json({ data: all }, 200, cors) : json({ error: 'write_failed', message: 'Your view didn’t save — please try again.' }, 502, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
@@ -639,7 +640,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
   const [paid, deals, subs, rcv] = await Promise.all([
     read('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at&limit=5000`),
-    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,lost_reason&limit=2000`),
+    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,converted_at,lost_reason&limit=2000`),
     read('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at&limit=5000`),
     loadReceivables(site).catch(() => { failed.add('overdue'); return null; }),
   ]);
@@ -653,13 +654,25 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
     const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
     for (const e of ev) { const k = String(e.deal_id); if (!lastMoveInto[k] && String(e.to_stage) === stageOf.get(k)) lastMoveInto[k] = String(e.created_at); }
   }
+  // F5 (final pass): when each closed deal actually closed — its newest move into
+  // Won or Not a fit — so a later edit can't pull an old deal into the window.
+  // Chunks run side by side; a failed read marks the report partial, never wrong.
+  const outcomeOf = (d: any) => (d.converted_client_id || d.stage === 'won') ? 'won' : (d.stage === 'lost' ? 'lost' : '');
+  const closed = deals.filter((d: any) => outcomeOf(d) && UUID_RE.test(String(d.id)));
+  const closedAt: Record<string, string> = {};
+  const chunks: string[][] = [];
+  for (let i = 0; i < closed.length; i += 100) chunks.push(closed.slice(i, i + 100).map((d: any) => String(d.id)));
+  const outcome = new Map(closed.map((d: any) => [String(d.id), outcomeOf(d)]));
+  for (const ev of await Promise.all(chunks.map((ids) => read('closes', `presence_deal_events?site_id=eq.${site.id}&kind=in.(stage_change,converted)&to_stage=in.(won,lost)&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`)))) {
+    for (const e of ev) { const k = String(e.deal_id); if (!closedAt[k] && String(e.to_stage) === outcome.get(k)) closedAt[k] = String(e.created_at); }
+  }
   const becameDeal = new Set<string>(deals.map((d: any) => String(d.source_submission_id || '')).filter(Boolean));
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {
     generated_at: now,
     revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
     pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await loadStageLabels(site.id).catch(() => undefined)), partial: failed.has('stages') },
-    outcomes: dealsOff ? { unavailable: true } : wonAndLost(deals, now),
+    outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
     overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),
   } }, 200, cors);

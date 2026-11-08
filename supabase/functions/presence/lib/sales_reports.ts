@@ -75,11 +75,17 @@ function groupBy<T>(list: T[], key: (x: T) => string, value: (x: T) => number, c
   const rest = all.slice(cap - 1);
   return [...all.slice(0, cap - 1), { label: otherLabel, count: rest.reduce((a, g) => a + g.count, 0), value_cents: rest.reduce((a, g) => a + g.value_cents, 0) }];
 }
-export function wonAndLost(deals: Array<Record<string, unknown>>, nowIso: string, windowDays = 365) {
+/** `closedAt` maps a deal id to when it moved into Won or Not a fit (its newest
+ *  stage_change / converted event into its current outcome). Final pass (Nov 8,
+ *  F5): the window used updated_at, which any later edit moves — logging a call
+ *  on a deal won two years ago pulled it into "the last 12 months" and into the
+ *  win rate. Without an event, a converted deal's converted_at is the close;
+ *  only a deal with neither falls back to updated_at. */
+export function wonAndLost(deals: Array<Record<string, unknown>>, nowIso: string, windowDays = 365, closedAt: Record<string, string> = {}) {
   const since = Date.parse(nowIso) - windowDays * DAY;
-  const closedAt = (d: Record<string, unknown>) => Date.parse(String(d.updated_at || ''));
-  const inWindow = (d: Record<string, unknown>) => { const t = closedAt(d); return Number.isFinite(t) && t >= since; };
   const isWon = (d: Record<string, unknown>) => !!d.converted_client_id || d.stage === 'won';
+  const closeTime = (d: Record<string, unknown>) => Date.parse(String(closedAt[String(d.id)] || (isWon(d) && d.converted_at) || d.updated_at || ''));
+  const inWindow = (d: Record<string, unknown>) => { const t = closeTime(d); return Number.isFinite(t) && t >= since; };
   const won = (deals || []).filter((d) => d && isWon(d) && inWindow(d));
   const lost = (deals || []).filter((d) => d && !isWon(d) && d.stage === 'lost' && inWindow(d));
   const v = (d: Record<string, unknown>) => n(d.expected_value_cents);

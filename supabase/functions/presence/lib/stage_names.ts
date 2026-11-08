@@ -22,13 +22,18 @@ export function normalizeStageNames(raw: unknown): Record<string, string> {
     if (taken.has(v.toLowerCase())) continue;
     out[k] = v;
   }
-  // no two stages may read the same once renamed (a rename onto another stage's default included)
-  const final = { ...DEFAULT_STAGE_LABEL, ...out };
-  for (const k of Object.keys(out)) {
-    const clash = Object.entries(final).some(([k2, l]) => k2 !== k && l.toLowerCase() === out[k].toLowerCase());
-    if (clash) delete out[k];
+  // No two stages may read the same once renamed (a rename onto another stage's
+  // default included). Final pass (Nov 8, F4): dropping a clashing rename puts
+  // that stage's default name back, which can clash with a rename that looked
+  // fine a moment ago ({lead:'A', qualified:'A', proposal:'Qualified'} left two
+  // "Qualified"s). So: drop every rename that clashes, then check again, until
+  // nothing does.
+  for (;;) {
+    const final = { ...DEFAULT_STAGE_LABEL, ...out };
+    const clashing = Object.keys(out).filter((k) => Object.entries(final).some(([k2, l]) => k2 !== k && l.toLowerCase() === out[k].toLowerCase()));
+    if (!clashing.length) return out;
+    for (const k of clashing) delete out[k];
   }
-  return out;
 }
 export function stageLabels(custom: Record<string, string> | null | undefined): Record<string, string> {
   return { ...DEFAULT_STAGE_LABEL, ...normalizeStageNames(custom || {}) };

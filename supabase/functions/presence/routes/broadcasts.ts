@@ -27,7 +27,7 @@ import {
   isAudienceKey, isListKey, loadPickedLists, type AudienceKey,
 } from '../lib/broadcast.ts';
 import { normalizeLists, normalizePeople, newId, MAX_LISTS } from '../lib/saved_views.ts';
-import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -91,9 +91,9 @@ export async function handleBroadcastListCreate(req: Request, site: SiteRow, pri
   const day = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const name = String(body?.name || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80) || `Picked on ${day} · ${people.length} ${people.length === 1 ? 'person' : 'people'}`;
   const list = { id: newId(), name, people, created_at: nowIso() };
-  const lists = [...await loadPickedLists(site.id), list].slice(-MAX_LISTS);
-  const ok = await writeReservedJson(site.id, RESERVED_NAMES.broadcastLists, normalizeLists(lists), principal.email || principal.userId || 'owner');
-  if (!ok) return json({ error: 'write_failed', message: 'That list didn’t save — please try again.' }, 502, cors);
+  // F9 (final pass): appended to whatever is saved now, so two lists made at once both stay
+  const saved = await updateReservedJson(site.id, RESERVED_NAMES.broadcastLists, (cur) => normalizeLists([...normalizeLists(cur), list].slice(-MAX_LISTS)), principal.email || principal.userId || 'owner');
+  if (!saved) return json({ error: 'write_failed', message: 'That list didn’t save — please try again.' }, 502, cors);
   return json({ data: { id: list.id, key: `list:${list.id}`, name, count: people.length } }, 201, cors);
 }
 
@@ -101,11 +101,13 @@ export async function handleBroadcastListDelete(site: SiteRow, principal: Princi
   const key = `list:${id}`;
   if (!isListKey(key)) return json({ error: 'not_found' }, 404, cors);
   const busy = await svc(`presence_broadcasts?site_id=eq.${site.id}&audience=eq.${encodeURIComponent(key)}&status=in.(scheduled,sending)&select=id&limit=1`);
+  // F8 (final pass): when "is it in use?" can't be answered, don't delete — a
+  // scheduled update on a removed list would quietly go to no one
+  if (!busy.ok) return json({ error: 'unavailable', message: 'We couldn’t check whether an update is going to this list. Please try again in a moment.' }, 503, cors);
   if (rows(busy)[0]) return json({ error: 'in_use', message: 'A scheduled update is going to this list. Cancel it first.' }, 409, cors);
-  const lists = await loadPickedLists(site.id);
-  if (!lists.some((l) => l.id === id)) return json({ error: 'not_found' }, 404, cors);
-  const ok = await writeReservedJson(site.id, RESERVED_NAMES.broadcastLists, lists.filter((l) => l.id !== id), principal.email || principal.userId || 'owner');
-  return ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  if (!(await loadPickedLists(site.id)).some((l) => l.id === id)) return json({ error: 'not_found' }, 404, cors);
+  const saved = await updateReservedJson(site.id, RESERVED_NAMES.broadcastLists, (cur) => normalizeLists(cur).filter((l) => l.id !== id), principal.email || principal.userId || 'owner');
+  return saved ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
 }
 
 export async function handleBroadcastCreate(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
