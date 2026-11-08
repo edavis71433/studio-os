@@ -21,6 +21,32 @@ export function injectPreviewBadge(html: string, businessName: string): string {
   return html.includes('</body>') ? html.replace('</body>', `${badge}</body>`) : `${html}${badge}`;
 }
 
+/** Item 60: a draft is drawn from the app, where the published site's /img/ files don't
+ *  exist. Swap each image address for its signed one: the plain src, and every candidate
+ *  inside a srcset (a <picture>'s sources and the <img>'s own). A srcset with a candidate
+ *  we couldn't sign is dropped, because a browser never falls back from a broken srcset
+ *  candidate to the src; a picture <source> left with nothing to offer goes too. Pure. */
+export function signPreviewImages(html: string, urls: Record<string, string>): string {
+  if (typeof html !== 'string') return html;
+  let out = html.replace(/\ssrcset="([^"]*)"/g, (_m, set: string) => {
+    const signed = set.split(',').map((c) => c.trim()).filter(Boolean).map((c) => {
+      const [u, ...rest] = c.split(/\s+/);
+      return urls[u] ? [urls[u], ...rest].join(' ') : null;
+    });
+    return signed.length && signed.every(Boolean) ? ` srcset="${signed.join(', ')}"` : '';
+  });
+  out = out.replace(/<source\b(?![^>]*\ssrcset=)[^>]*\stype="image\/[^"]*"[^>]*>/g, '');
+  for (const [outPath, signed] of Object.entries(urls)) out = out.replaceAll(`"${outPath}"`, `"${signed}"`);
+  return out;
+}
+
+/** A shared draft link is served from the functions host, where the site's /fonts/library/
+ *  files don't exist; point them at the app, which serves the same files. Pure. */
+export function absoluteLibraryFonts(html: string, appUrl: string): string {
+  if (typeof html !== 'string') return html;
+  return html.replaceAll('url(/fonts/library/', `url(${appUrl.replace(/\/$/, '')}/fonts/library/`);
+}
+
 /** SHA-256 hex of a preview password. Deterministic → testable. Empty → '' (no
  *  password = an open share link). */
 export async function hashPreviewPassword(pw: string): Promise<string> {

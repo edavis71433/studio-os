@@ -13,7 +13,7 @@ import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { renderSnapshot } from '../lib/render.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
-import { injectPreviewBadge, hashPreviewPassword, newPreviewToken, shapePreviewStatus } from '../lib/preview_env.ts';
+import { injectPreviewBadge, hashPreviewPassword, newPreviewToken, shapePreviewStatus, signPreviewImages, absoluteLibraryFonts } from '../lib/preview_env.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { signPreviewToken, verifyPreviewToken, previewLinkSecret, clampTtlSeconds } from '../lib/preview_link.ts';
 import { injectFeedbackPanel } from '../lib/section_comments.ts';
@@ -131,10 +131,10 @@ async function renderStagedPreview(req: Request, siteId: string, snapshotId: str
   if (!html) return htmlResp(shell('No page at that address in this preview.'), 404);
 
   // signed images (private bucket, fresh per request) + inline the hashed stylesheet
-  const urls = await previewUrlMap(hit.mediaManifest as any[]);
-  for (const [outPath, signed] of Object.entries(urls)) html = html!.replaceAll(`"${outPath}"`, `"${signed}"`);
+  html = signPreviewImages(html!, await previewUrlMap(hit.mediaManifest as any[]));
   const cssKey = Object.keys(hit.fileMap).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
   if (cssKey) html = html!.replace(/<link rel="stylesheet" href="[^"]*">/, `<style>${hit.fileMap[cssKey]}</style>`);
+  html = absoluteLibraryFonts(html!, Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com');
   // keep navigation INSIDE the preview (same door the visitor arrived through)
   html = html!.replace(/href="\/(?!\/)([^"#?]*)"/g, (_m, p1) => `href="${linkPfx}?page=/${p1}"`);
   // noindex + the honest preview badge (the draft watermark)

@@ -16,7 +16,7 @@ import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
-import { injectPreviewBadge } from '../lib/preview_env.ts';
+import { injectPreviewBadge, signPreviewImages } from '../lib/preview_env.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -131,8 +131,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
   if (!html) return json({ error: 'page_not_found', message: `No page at ${page}.` }, 404, cors);
 
   // the contract-permitted wrapper: signed-image substitution + internal link rewrite
-  const urls = await previewUrlMap(mediaManifest);
-  for (const [outPath, signed] of Object.entries(urls)) html = html!.replaceAll(`"${outPath}"`, `"${signed}"`);
+  html = signPreviewImages(html!, await previewUrlMap(mediaManifest));
   html = html!.replaceAll('https://preview.invalid', '');
   // inline the hashed stylesheet (a lone HTML response can't fetch deploy assets)
   const cssKey = Object.keys(fileMap).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
@@ -177,9 +176,7 @@ export async function handlePreviewSection(req: Request, site: SiteRow, cors: Re
   if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
   try {
     const { html, mediaManifest } = await draftSectionHtml(site.id, t.manifest, blocks, index, new Date().toISOString());
-    let out = html;
-    const urls = await previewUrlMap(mediaManifest);
-    for (const [outPath, signed] of Object.entries(urls)) out = out.replaceAll(`"${outPath}"`, `"${signed}"`);
+    const out = signPreviewImages(html, await previewUrlMap(mediaManifest));
     return json({ data: { html: out } }, 200, { ...cors, 'Cache-Control': 'no-store' });
   } catch (e) {
     console.error('preview section failed:', (e as Error)?.message);
