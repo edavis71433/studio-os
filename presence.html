@@ -8626,6 +8626,9 @@ function blocksSaveSoon(ms) {
 // sections stale, so it waits for the full redraw.
 let LIVE_T = null, LIVE_SEQ = 0, LIVE_PROBE = false, LIVE_TYPING = null;
 let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list save clears it
+// Item 85: each section as the live redraw last drew it, by index. Null: the canvas shows the
+// saved list, as after a full redraw.
+let LIVE_DRAWN = null;
 function dcLiveFromPanel() { LIVE_WANTED = true; dcLiveSoon(); }
 const LIVE_TYPE_OK = new Set(["title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
   "features", "stats", "process", "pricing", "certifications", "events", "social", "link_list", "service_areas"]);
@@ -8636,10 +8639,13 @@ async function dcLiveNow() {
   if (!main || IPE || IDE || DDS_SRCMAP || DC_MODE !== "edit" || !BLOCKS_WORK || DC_HIST_LAST == null) return;
   let saved; try { saved = JSON.parse(DC_HIST_LAST); } catch (_) { return; }
   if (!Array.isArray(saved) || saved.length !== BLOCKS_WORK.length) return;
-  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === JSON.stringify(saved[i]) ? -1 : i)).filter((i) => i >= 0);
+  // Against what the canvas shows: leaving a field the live redraw already drew asked for the
+  // same drawing again (item 85).
+  const shown = (i) => (LIVE_DRAWN && LIVE_DRAWN.has(i) ? LIVE_DRAWN.get(i) : JSON.stringify(saved[i]));
+  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === shown(i) ? -1 : i)).filter((i) => i >= 0);
   if (!changed.length || changed.length > 2) return;
   const seq = ++LIVE_SEQ, opened = DC_PAGE_OPENS, list = JSON.parse(JSON.stringify(BLOCKS_WORK));
-  let swapped = false;
+  let swapped = false, cols = false;
   for (const i of changed) {
     let html;
     try { html = (await api("POST", "/preview/section", { blocks: list, index: i })).data.html; } catch (_) { return; }   // the save's redraw still comes
@@ -8651,8 +8657,12 @@ async function dcLiveNow() {
     const nu = tpl.content.firstElementChild;
     if (nu) old.replaceWith(nu); else old.hidden = true;   // an emptied section draws nothing, as on the site
     swapped = true;
+    if (list[i] && list[i].type === "columns") cols = true;
+    (LIVE_DRAWN = LIVE_DRAWN || new Map()).set(i, JSON.stringify(list[i]));
   }
-  if (swapped) try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
+  // The Contents list's rows find a swapped section again when clicked (dcTreeRow); a Columns
+  // section's rows hold its columns too, so that one rebuilds the list.
+  if (swapped) try { dcInjectCanvas(doc, main, true); if (cols) dcBuildTree(main); } catch (_) { /* chrome is best-effort */ }
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
@@ -12572,7 +12582,10 @@ function ideRelease() {   // the redraw a session or its save held off
   DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview();
 }
 // ── inject the editing chrome into the rendered preview document ─────────────
-function dcInjectCanvas(doc, main) {
+// live: one section was swapped in place by the live redraw (dcLiveNow). Its neighbours, the
+// add-section lines between them and the Contents list still stand, so only the new section
+// is wired (item 85); a full redraw rebuilds all of it.
+function dcInjectCanvas(doc, main, live) {
   const win = doc.defaultView;
   if (!doc.getElementById("dds-dc-style")) {
     const st = doc.createElement("style"); st.id = "dds-dc-style";
@@ -12729,8 +12742,11 @@ function dcInjectCanvas(doc, main) {
   // successful save→reload re-stamps and converges. The per-splice
   // compensation (dcComposeSrcMap at every BLOCKS_WORK splice) shrinks that
   // window; worst case is one mis-resolved hover, never a crash.
-  ddsRebuildSidMap();
-  DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
+  if (!live) {
+    ddsRebuildSidMap();
+    DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
+    LIVE_DRAWN = null;   // and it shows the saved list
+  }
   // G13 slice 2: a reload replaced any active session's document — its text was
   // already banked by refreshDesignPreview's pre-repaint commit; the stale
   // handle can't be restored, so drop it and let a deferred burst-save through.
@@ -12841,9 +12857,9 @@ function dcInjectCanvas(doc, main) {
     const h = main.querySelector(':scope > [data-dds-core="hero"]');
     if (h && h.hasAttribute("data-dds-movable") !== DC_HERO_MOVES) { DC_HERO_MOVES = h.hasAttribute("data-dds-movable"); remountSectionsCard(); }
   }
-  dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
+  if (!live) dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
-  dcBuildTree(main);           // left-rail Content Tree of every component on the page
+  if (!live) dcBuildTree(main);           // left-rail Content Tree of every component on the page
 }
 
 // ── AEM insertion targets: a clickable/droppable "＋ Add section" bar at every gap
@@ -13007,6 +13023,13 @@ function dcTreeChildRow(colEl, bi, k, span) {
   row.appendChild(acts);
   return row;
 }
+// Item 85: a live redraw swaps one section's element in place and leaves this list standing,
+// so a row whose element has gone finds the section now drawn at its place in the list.
+function dcTreeEl(el2, c) {
+  if (el2.isConnected || !c || c.kind !== "block") return el2;
+  const doc = dcFrameDoc(), main = doc && doc.getElementById("main");
+  return (main && Array.prototype.find.call(main.children, (n) => { const k = eeClassify(n); return k.kind === "block" && k.bi === c.bi; })) || el2;
+}
 function dcTreeRow(el2, c) {
   const isBlock = c && c.kind === "block";
   const b = isBlock ? (BLOCKS_WORK[c.bi] || {}) : null;
@@ -13032,7 +13055,7 @@ function dcTreeRow(el2, c) {
   txt.appendChild(el("span", "dc-tree-meta", meta));
   mainBtn.appendChild(txt);
   if (isBlock) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
-  mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(el2, row); });
+  mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(dcTreeEl(el2, c), row); });
   row.appendChild(mainBtn);
   // G11: per-section comment badge (count when open notes exist; quiet icon to
   // start a thread). Block rows only — keyed by the stable section id, so the

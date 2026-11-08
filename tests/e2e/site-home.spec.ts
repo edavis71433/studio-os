@@ -912,6 +912,38 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')[0].body.blocks[0].title).toBe('Typed live');
   });
 
+  // Item 85: changed sections were found against the saved list, so leaving a field the live
+  // drawing already showed asked for the same drawing again.
+  test('leaving a field the canvas already shows asks for no second drawing (item 85)', async ({ page }) => {
+    const { frame, asked } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const title = page.locator('#blocksCard input').first();
+    await title.click();
+    await title.press('ControlOrMeta+a');
+    await title.pressSequentially('Typed live', { delay: 30 });
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('Typed live');
+    await page.waitForTimeout(400);   // the last keystroke's drawing is in
+    const drawn = asked.length;
+    await title.blur();
+    await page.waitForTimeout(600);   // past the 200 ms a drawing waits, before the save leaves at 700
+    expect(asked.length).toBe(drawn);
+  });
+  // Each live drawing used to rebuild the whole Contents list and every add-section line.
+  test('a live drawing leaves the Contents list and the add-section lines standing (item 85)', async ({ page }) => {
+    const { frame } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const firstRow = '#designTreeList .dc-tree-row.block';
+    await page.evaluate((sel) => { (document.querySelector(sel) as any).__kept = true; }, firstRow);
+    await frame.locator('.dc-ins').first().evaluate((n: any) => { n.__kept = true; });
+    await page.locator('#blocksCard input').first().fill('A fresh heading');
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('A fresh heading');
+    expect(await page.evaluate((sel) => !!(document.querySelector(sel) as any).__kept, firstRow)).toBe(true);
+    expect(await frame.locator('.dc-ins').first().evaluate((n: any) => !!n.__kept)).toBe(true);
+    // and that row still picks out the section drawn in its place
+    await page.evaluate((sel) => (document.querySelector(sel + ' .dc-tree-main') as HTMLElement).click(), firstRow);
+    await expect(frame.locator('#main > section[data-dds-src="0"]')).toHaveClass(/dc-hot/);
+  });
+
   test('a section added or removed waits for the full redraw instead', async ({ page }) => {
     const { asked } = await setup(page);
     await page.evaluate(() => (window as any).dcDuplicate(0));
