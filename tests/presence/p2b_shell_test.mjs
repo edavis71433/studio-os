@@ -17,10 +17,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // shell's sidebar is the one navigation (no duplicate wordmark can exist).
   ok('presence.html uses the shell sidebar and carries no wordmark of its own', /<html[^>]*class="dds-side"/.test(h) && !/class="wordmark"/.test(h));
   // M9 optimistic-lock behavior PRESERVED (not touched by the shell adoption)
-  ok('M9 PRESERVED: presence.html still sends If-Match from api()', /If-Match.*S\.draftHash/.test(h));
+  ok('M9 PRESERVED: presence.html still sends If-Match from api()', /"If-Match": version/.test(h) && /const version = named !== undefined \? named : S\.draftHash;/.test(h));
   ok('M9 PRESERVED: presence.html still handles the stale_draft 409', /error === "stale_draft"/.test(h));
   ok('M9 PRESERVED: presence.html seeds the held hash from /changes', /c\.data\.draft_hash/.test(h));
-  ok('editor JS intact: api()/whisper()/publish path unchanged', /async function api\(method, route, body\)/.test(h) && /function whisper\(id, state\)/.test(h));
+  ok('editor JS intact: api()/whisper()/publish path unchanged', /async function api\(method, route, body, named\)/.test(h) && /function whisper\(id, state\)/.test(h));
 }
 
 // ── portal-workspace.html retired via a REVERSIBLE redirect (zero inbound links) ──

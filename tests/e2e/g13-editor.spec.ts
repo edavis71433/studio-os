@@ -67,6 +67,9 @@ const API = {
   } },
 };
 
+// What a write's answer carries besides its body (the draft version it left), set by a
+// handler the write passes on its way to the echo below.
+const ANSWER_HEADERS = new WeakMap<object, Record<string, string>>();
 type Mounted = { frame: ReturnType<Page['frameLocator']>; puts: Array<Record<string, unknown>> };
 async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<string, unknown>; beforeGoto?: (p: Page) => Promise<unknown> } = {}): Promise<Mounted> {
   const settings = opts.settings ?? SETTINGS;
@@ -78,7 +81,7 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
     if (route.request().method() === 'PUT') {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       puts.push(body);
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...settings, ...body, section_meta: META } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: ANSWER_HEADERS.get(route.request()), body: JSON.stringify({ data: { ...settings, ...body, section_meta: META } }) });
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: settings }) });
   });
@@ -1497,10 +1500,12 @@ test.describe('G13 in-place canvas text editor', () => {
   // ── Nov 2026: the draft version a write names. The server hashes the whole draft, so a
   // write landing moves the version whichever route it came by. This is its check
   // (guardStaleDraft): a write naming a version the draft has left is a 409, and a write
-  // naming none isn't checked. Registered after mountPages, so it sees a PUT before the
+  // naming none isn't checked. A write that named the version it found is answered with
+  // the version it left (X-Draft-Version, lib/optimistic_lock.ts); { versions: false } is a
+  // server from before that. Registered after mountPages, so it sees a PUT before the
   // store does; holdPuts registered before it holds the answer of a write that has landed,
   // and registered after it holds the write on its way there. ──
-  async function draftVersion(page: Page) {
+  async function draftVersion(page: Page, { versions = true } = {}) {
     const v = {
       hash: 'e2e-draft-hash', reads: 0, refused: [] as string[], landed: [] as string[], business: {} as Record<string, unknown>,
       slowAnswer: null as Promise<void> | null,   // the next /identity lands, and its answer waits for this
@@ -1514,7 +1519,10 @@ test.describe('G13 in-place canvas text editor', () => {
       void route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'stale_draft', current_hash: v.hash, last_change: null }) });
       return true;
     };
-    const landed = (path: string) => { v.hash += '+'; v.landed.push(path); };
+    const landed = (route: Route, path: string) => {
+      v.hash += '+'; v.landed.push(path);
+      if (versions && route.request().headers()['if-match']) ANSWER_HEADERS.set(route.request(), { 'X-Draft-Version': v.hash, 'Access-Control-Expose-Headers': 'X-Draft-Version' });
+    };
     await page.route('**/functions/v1/presence/changes**', async (route: Route) => {
       v.reads++;
       const body = JSON.stringify({ data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: v.hash } });
@@ -1525,18 +1533,18 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.route('**/functions/v1/presence/settings**', (route: Route) => {
       if (route.request().method() !== 'PUT') return route.fallback();
       if (refused(route, '/settings')) return;
-      landed('/settings');
+      landed(route, '/settings');
       return route.fallback();
     });
     await page.route('**/functions/v1/presence/identity**', async (route: Route) => {
       if (route.request().method() !== 'PUT') return route.fallback();
       if (refused(route, '/identity')) return;
-      landed('/identity');
+      landed(route, '/identity');
       const body = route.request().postDataJSON() as Record<string, unknown>;
       Object.assign(v.business, body);
       const slow = v.slowAnswer; v.slowAnswer = null;
       if (slow) await slow;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: v.business }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', headers: ANSWER_HEADERS.get(route.request()), body: JSON.stringify({ data: v.business }) });
     });
     return v;
   }
@@ -1601,7 +1609,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('a /changes answer landing after a later write doesn\'t bring back the version from before it', async ({ page }) => {
     const { draft } = await mountPages(page);
-    const v = await draftVersion(page);
+    const v = await draftVersion(page, { versions: false });     // the page finds the version by reading, as before answers named it
     let release = () => {};
     v.slowRead = new Promise<void>((r) => { release = r; });
     const reads = v.reads;
@@ -1642,7 +1650,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('a read dropped for being late is read again, so another person\'s change is still caught', async ({ page }) => {
     const { draft } = await mountPages(page);
-    const v = await draftVersion(page);
+    const v = await draftVersion(page, { versions: false });     // the page finds the version by reading, as before answers named it
     let release = () => {};
     v.slowRead = new Promise<void>((r) => { release = r; });
     const reads = v.reads;
@@ -1727,6 +1735,96 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings', '/settings']);
     expect(v.landed).toEqual([]);
     expect(draft.nav).toBeUndefined();
+  });
+
+  // ── Nov 2026: after a save lands, the page names the version that save left. It used to
+  // name none until a /changes read about a second later, and that read brought in anyone
+  // else's change from that second without the page loading it, so the next save wasn't
+  // checked. A section save carries the whole list: it put their section back out. ──
+  const THEIRS = { type: 'title', title: 'Their section', subtitle: 'Added by someone else' };
+  const theirSection = (v: { someoneElse: () => void }, draft: Record<string, unknown>) => {
+    v.someoneElse(); draft.blocks = [...blocksIn(draft), THEIRS];
+  };
+  const hasTheirs = (draft: Record<string, unknown>) => blocksIn(draft).some((b) => b.title === THEIRS.title);
+
+  test('another person\'s change just after a save is caught by the next save, not taken in by the refresh', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const reads = v.reads;
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
+    theirSection(v, draft);                                        // theirs lands just after mine
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);   // the read after my save sees it
+    await page.waitForTimeout(300);
+    await duplicate(page);
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings']);
+    await expect(refusal(page)).toBeVisible();
+    expect(v.landed).toEqual(['/settings']);
+    expect(hasTheirs(draft)).toBe(true);
+  });
+
+  test('a save right after another names the version the first one left', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const named: Array<string | undefined> = [];
+    page.on('request', (r) => { if (r.method() === 'PUT' && r.url().includes('/presence/settings')) named.push(r.headers()['if-match']); });
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
+    theirSection(v, draft);
+    await duplicate(page);                                         // before any read of the draft
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings']);
+    expect(named).toEqual(['e2e-draft-hash', 'e2e-draft-hash+']);
+    expect(hasTheirs(draft)).toBe(true);
+  });
+
+  test('a business detail saved just after a section save is checked against the version it left', async ({ page }) => {
+    const { frame } = await mountPages(page);
+    const v = await draftVersion(page);
+    await editHome(page, frame, 'My section words');
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
+    v.someoneElse(); v.business.business_name = 'Their name';
+    await openBusiness(page);
+    await page.locator('#f-business_name').fill('My name');
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/identity']);
+    expect(v.business.business_name).toBe('Their name');
+  });
+
+  test('Publish\'s review doesn\'t hand the next save another person\'s change, and Publish names what was reviewed', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page);
+    const published: Array<string | undefined> = [];
+    await page.route('**/functions/v1/presence/publish', (route: Route) => {
+      published.push(route.request().headers()['if-match']);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { status: 'live' } }) });
+    });
+    theirSection(v, draft);
+    const reads = v.reads;
+    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // reads the draft, their section and all
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
+    await page.evaluate(() => (window as unknown as { runPublish: (b: HTMLButtonElement, f: boolean) => Promise<void> }).runPublish(document.createElement('button'), false));
+    expect(published).toEqual([v.hash]);
+    await page.evaluate(() => (window as unknown as { closeRitual: () => void }).closeRitual());   // back to the overview, which reads it again
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 2);
+    await page.waitForTimeout(200);
+    await duplicate(page);
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/settings']);
+    expect(v.landed).toEqual([]);
+    expect(hasTheirs(draft)).toBe(true);
+  });
+
+  test('with a server that doesn\'t say which version a save left, a run of saves still isn\'t refused', async ({ page }) => {
+    const { draft } = await mountPages(page);
+    const v = await draftVersion(page, { versions: false });
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
+    await duplicate(page);
+    await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(2);
+    await page.waitForTimeout(1500);                               // the read after them finds the version
+    await duplicate(page);
+    await expect.poll(() => v.landed.length + v.refused.length, { timeout: 6000 }).toBe(3);
+    expect(v.refused).toEqual([]);
+    await expect(refusal(page)).toHaveCount(0);
+    expect(blocksIn(draft).length).toBe(BLOCKS.length + 3);
   });
 
   // ── Nov 2026: a page-menu step keeps what it changed, not the whole page list. Section
