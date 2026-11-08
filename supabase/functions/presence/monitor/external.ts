@@ -11,8 +11,29 @@
 // logic is testable without a network.
 import type { LiveFetch } from '../evidence/collect.ts';
 import { detectPlatform } from './adapters.ts';
+import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
 
 const timed = (ms: number) => AbortSignal.timeout(ms);
+
+/** Item 71: every fetch of a watched website passes the public-address guard the Free Tools
+ *  use, on the first address and on every redirect hop. An owner types this address, so
+ *  without it the server could be pointed at a private or internal one: the cloud's metadata
+ *  service, the database, a local network. Throws on a refused address. */
+export async function fetchPublicPage(url: string, init: RequestInit = {}, guard: (u: string) => Promise<unknown> = assertPublicHttpUrl, doFetch: Fetcher = fetch): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= 3; hop++) {
+    await guard(current);
+    const r = await doFetch(current, { ...init, redirect: 'manual' });
+    const loc = r.headers.get('location');
+    if (r.status >= 300 && r.status < 400 && loc) {
+      try { await r.body?.cancel(); } catch { /* the next hop goes ahead either way */ }
+      current = new URL(loc, current).href;
+      continue;
+    }
+    return r;
+  }
+  throw new Error('too_many_redirects');
+}
 const fence = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 
 export interface ExternalSite {
@@ -42,12 +63,13 @@ export function discoverPaths(html: string, baseUrl: string): string[] {
   return out;
 }
 
-export async function fetchExternalSite(url: string): Promise<ExternalSite | null> {
+/** `homeOnly` reads just the homepage: connecting only needs it to tell the platform. */
+export async function fetchExternalSite(url: string, opts: { homeOnly?: boolean } = {}): Promise<ExternalSite | null> {
   const liveFetch: LiveFetch = { attempted: true, url, ok: false, status: 0, https: false, headers: {}, error: '' };
   let homeHtml = '';
   try {
-    const r = await fetch(url, { redirect: 'follow', signal: timed(10_000) });
-    liveFetch.ok = r.ok; liveFetch.status = r.status; liveFetch.https = r.url.startsWith('https://');
+    const r = await fetchPublicPage(url, { signal: timed(10_000) });
+    liveFetch.ok = r.ok; liveFetch.status = r.status; liveFetch.https = (r.url || url).startsWith('https://');
     for (const h of ['strict-transport-security', 'x-content-type-options', 'referrer-policy', 'x-frame-options', 'content-type', 'server', 'x-powered-by']) {
       const v = r.headers.get(h); if (v) liveFetch.headers[h] = v;
     }
@@ -57,9 +79,9 @@ export async function fetchExternalSite(url: string): Promise<ExternalSite | nul
     return { pages: [], liveFetch, platform: 'custom' };
   }
   const pages: ExternalSite['pages'] = [{ path: '/', html: homeHtml }];
-  for (const path of discoverPaths(homeHtml, url)) {
+  for (const path of opts.homeOnly ? [] : discoverPaths(homeHtml, url)) {
     const html = await fence((async () => {
-      const r = await fetch(new URL(path, url).href, { redirect: 'follow', signal: timed(8000) });
+      const r = await fetchPublicPage(new URL(path, url).href, { signal: timed(8000) });
       if (!r.ok || !(r.headers.get('content-type') || '').includes('text/html')) return null;
       return (await r.text()).slice(0, HTML_CAP);
     })());
@@ -84,7 +106,7 @@ export const matchers = {
 
 export async function verifyConnection(
   conn: { url: string; domain: string; method: 'dns' | 'meta' | 'file'; token: string },
-  fetcher: Fetcher = fetch,
+  fetcher: Fetcher = (u, init) => fetchPublicPage(u, init),
 ): Promise<VerifyResult> {
   try {
     if (conn.method === 'meta') {

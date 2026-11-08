@@ -21,6 +21,7 @@
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc, svcCount } from '../lib/db.ts';
+import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
 import { rdapLookup, daysUntil } from '../lib/rdap.ts';
@@ -1350,8 +1351,12 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
       headline: `Review requested — ${p.name || 'a finished project'}`, body: `We asked ${email} for a review, ${sites.get(c.siteId)} days after the project was marked complete.` });
     if (!fresh) continue;
     try {
-      const { sendReviewAsk } = await import('../routes/reviews.ts');
-      if (await sendReviewAsk(c.siteId, email, String(cl?.name || ''))) asked++;
+      const { sendReviewAsk, reviewAskBucket, REVIEW_ASK_WINDOW } = await import('../routes/reviews.ts');
+      if (await sendReviewAsk(c.siteId, email, String(cl?.name || ''))) {
+        asked++;
+        // item 73: counts as this month's ask, so a hand-sent one doesn't follow it within the month
+        await rateAllow(await reviewAskBucket(c.siteId, email), 1, REVIEW_ASK_WINDOW);
+      }
     } catch { /* the ledger row stands: one try per project, never a second email */ }
   }
   return { asked };
