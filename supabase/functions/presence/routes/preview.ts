@@ -10,7 +10,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { getTemplate, renderSnapshot, latestTemplateVersion } from '../lib/render.ts';
-import { serializeDraft } from '../lib/serializer.ts';
+import { serializeDraft, draftSectionHtml } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
@@ -159,4 +159,30 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
       'X-Presence-Preview-Cache': cacheHit ? 'hit' : 'miss',
     },
   });
+}
+
+// Item 26: POST /preview/section {blocks, index} — one section of the page's unsaved list,
+// drawn as the draft would draw it, so the canvas can show a change before its save lands.
+// The list is the page's own (home or a custom page); photos get the same signed preview
+// addresses /preview gives them. Nothing is stored.
+export async function handlePreviewSection(req: Request, site: SiteRow, cors: Record<string, string>) {
+  let body: { blocks?: unknown; index?: unknown } | null = null;
+  try { body = await req.json(); } catch { /* answered below */ }
+  const blocks = Array.isArray(body?.blocks) ? (body!.blocks as unknown[]).slice(0, 64) : null;
+  const index = Number(body?.index);
+  if (!blocks || !Number.isInteger(index) || index < 0 || index >= blocks.length) {
+    return json({ error: 'bad_request', message: 'Send the page’s sections and which one to draw.' }, 400, cors);
+  }
+  const t = getTemplate(site.template_slug, site.template_version);
+  if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  try {
+    const { html, mediaManifest } = await draftSectionHtml(site.id, t.manifest, blocks, index, new Date().toISOString());
+    let out = html;
+    const urls = await previewUrlMap(mediaManifest);
+    for (const [outPath, signed] of Object.entries(urls)) out = out.replaceAll(`"${outPath}"`, `"${signed}"`);
+    return json({ data: { html: out } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  } catch (e) {
+    console.error('preview section failed:', (e as Error)?.message);
+    return json({ error: 'render_failed', message: 'We couldn’t draw that section just now. Your edit is safe and still saving.' }, 500, cors);
+  }
 }

@@ -26,7 +26,7 @@ import { loadPlan, draftingDenial } from './commerce/enforce.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
 import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
-import { handlePreview } from './routes/preview.ts';
+import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
@@ -490,6 +490,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/identity' && method === 'GET') return handleGetIdentity(db, site, cors);
   if (route === '/identity' && method === 'PUT') return handlePutIdentity(req, db, site, principal, cors);
   if (route === '/preview' && method === 'GET') return handlePreview(req, site, cors);
+  if (route === '/preview/section' && method === 'POST') return handlePreviewSection(req, site, cors);   // item 26: the canvas, before the save
   // ── FD-T20/T21: Draft → Preview → Live management (authed) ──
   if (route === '/preview/status' && method === 'GET') return handlePreviewStatus(site, cors);
   if (route === '/preview/publish' && method === 'POST') return handlePreviewPublish(site, principal, cors);

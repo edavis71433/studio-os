@@ -8354,6 +8354,35 @@ function blocksDirty() {
 function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
   BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
+  dcLiveSoon();
+}
+// Item 26: a section edited in its panel redraws on the canvas while its save waits. The
+// server draws just that section from the page's list as it stands (POST /preview/section)
+// and it takes the old one's place; the save's own redraw follows as before. Only for an
+// edit to one or two sections: an add, a delete or a move leaves the stamps on the other
+// sections stale, so it waits for the full redraw.
+let LIVE_T = null, LIVE_SEQ = 0;
+function dcLiveSoon() { clearTimeout(LIVE_T); LIVE_T = setTimeout(dcLiveNow, 200); }
+async function dcLiveNow() {
+  LIVE_T = null;
+  const doc = dcFrameDoc(), main = doc && doc.getElementById("main");
+  if (!main || IPE || IDE || DDS_SRCMAP || DC_MODE !== "edit" || !BLOCKS_WORK || DC_HIST_LAST == null) return;
+  let saved; try { saved = JSON.parse(DC_HIST_LAST); } catch (_) { return; }
+  if (!Array.isArray(saved) || saved.length !== BLOCKS_WORK.length) return;
+  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === JSON.stringify(saved[i]) ? -1 : i)).filter((i) => i >= 0);
+  if (!changed.length || changed.length > 2) return;
+  const seq = ++LIVE_SEQ, opened = DC_PAGE_OPENS, list = JSON.parse(JSON.stringify(BLOCKS_WORK));
+  for (const i of changed) {
+    let html;
+    try { html = (await api("POST", "/preview/section", { blocks: list, index: i })).data.html; } catch (_) { return; }   // the save's redraw still comes
+    if (seq !== LIVE_SEQ || opened !== DC_PAGE_OPENS || dcFrameDoc() !== doc || DDS_SRCMAP) return;   // a newer edit, a page change or a redraw took over
+    const old = Array.prototype.find.call(main.children, (n) => { const c = eeClassify(n); return c.kind === "block" && c.bi === i; });
+    if (!old) continue;
+    const tpl = doc.createElement("template"); tpl.innerHTML = html || "";
+    const nu = tpl.content.firstElementChild;
+    if (nu) old.replaceWith(nu); else old.hidden = true;   // an emptied section draws nothing, as on the site
+  }
+  try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
