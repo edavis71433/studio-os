@@ -65,6 +65,20 @@ ok('verdict: DMARC=fail names the verdict', (() => { const v = L.senderAuthVerdi
 ok('verdict: NO signal at all → fail closed {ok:false, none}', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({}), 'jane@acme.com'); return !v.ok && v.verdict === 'none'; })());
 ok('SA1: forged AR header spf+dkim stanzas do NOT pass (only structured verdicts count)', L.senderAuthVerdict(L.parseAuthResults({ headers: { 'Authentication-Results': 'mx; spf=pass smtp.mailfrom=acme.com; dkim=pass header.d=acme.com' } }), 'jane@acme.com').ok === false);
 ok('parseAuthResults: {result|status|verdict, domain} object shape', (() => { const r = L.parseAuthResults({ dmarc: { status: 'pass', domain: 'acme.com' } }); return r.dmarc.result === 'pass' && r.dmarc.domain === 'acme.com'; })());
+// Resend's received-email API reports the RECEIVING server's verdict as authentication:{spf,dkim,dmarc}
+ok('parseAuthResults: Resend authentication block, dmarc pass → ok', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ authentication: { spf: 'pass', dkim: 'pass', dmarc: 'pass' } }), 'jane@acme.com'); return v.ok && v.verdict === 'dmarc_pass'; })());
+ok('parseAuthResults: Resend authentication block, dmarc fail → not ok, named', (() => { const v = L.senderAuthVerdict(L.parseAuthResults({ authentication: { spf: 'pass', dkim: 'pass', dmarc: 'fail' } }), 'jane@acme.com'); return !v.ok && v.verdict === 'dmarc_fail'; })());
+ok('parseAuthResults: Resend spf+dkim pass but dmarc gray (no domains to align) → not ok', L.senderAuthVerdict(L.parseAuthResults({ authentication: { spf: 'pass', dkim: 'pass', dmarc: 'gray' } }), 'jane@acme.com').ok === false);
+ok('parseAuthResults: Resend authentication null (an older email) → none, fail closed', L.senderAuthVerdict(L.parseAuthResults({ authentication: null }), 'jane@acme.com').verdict === 'none');
+
+// receivedEmailId / envelopeOf / mergeReceived (Resend's envelope-only webhook)
+ok('receivedEmailId: a Resend email id', L.receivedEmailId({ email_id: '4ef9a417-02e9-4d39-ad75-9611e0fcc33c' }) === '4ef9a417-02e9-4d39-ad75-9611e0fcc33c');
+ok('receivedEmailId: absent / not a string / path or query characters → ""', L.receivedEmailId({}) === '' && L.receivedEmailId({ email_id: 42 }) === '' && L.receivedEmailId({ email_id: '../../domains' }) === '' && L.receivedEmailId({ email_id: 'abcdefgh?x=1' }) === '');
+ok('envelopeOf: sender + first site recipient across to and cc', (() => { const e = L.envelopeOf({ from: 'Jane <Jane@Acme.com>', to: ['hello@example.com'], cc: [`${SITE}@${DOMAIN}`] }); return e.from_email === 'jane@acme.com' && e.site_id === SITE; })());
+ok('envelopeOf: no site recipient → null', L.envelopeOf({ from: 'a@b.com', to: 'x@y.com' }).site_id === null);
+ok('mergeReceived: the API body, headers and verdict fill the envelope', (() => { const m = L.mergeReceived({ email_id: 'e1', from: 'a@b.com', to: ['x@y.com'], subject: 'S' }, { text: 'T', html: '<p>T</p>', headers: { 'in-reply-to': '<m@x>' }, authentication: { dmarc: 'pass' } }); return m.text === 'T' && m.html === '<p>T</p>' && m.headers['in-reply-to'] === '<m@x>' && m.authentication.dmarc === 'pass' && m.subject === 'S' && m.email_id === 'e1'; })());
+ok('mergeReceived: a null or empty API field never erases the envelope one', (() => { const m = L.mergeReceived({ subject: 'S', text: 'env' }, { subject: '', text: null }); return m.subject === 'S' && m.text === 'env'; })());
+ok('mergeReceived: an envelope-level dmarc cannot shadow the API verdict', (() => { const m = L.mergeReceived({ dmarc: 'pass' }, { authentication: { dmarc: 'fail' } }); return L.senderAuthVerdict(L.parseAuthResults(m), 'jane@acme.com').verdict === 'dmarc_fail'; })());
 
 // autoResponderSignal
 ok('autoResp: Auto-Submitted≠no flags', L.autoResponderSignal({ 'Auto-Submitted': 'auto-generated' }) === true);
@@ -160,7 +174,9 @@ function installFetch(cfg = {}) {
     const url = typeof input === 'string' ? input : input.url;
     const method = (init.method || (typeof input !== 'string' ? input.method : 'GET') || 'GET').toUpperCase();
     let body = null; try { body = init.body ? JSON.parse(init.body) : null; } catch { /* */ }
-    calls.push({ url, method, body });
+    calls.push({ url, method, body, auth: new Headers(init.headers || {}).get('authorization') || '' });
+    // Resend's received-email API (the full message behind an envelope-only webhook)
+    if (url.includes('api.resend.com/emails/receiving/')) return cfg.received ? cfg.received(url, init) : jr({ message: 'not found' }, 404);
     if (url.includes('api.resend.com/emails')) return jr({ id: 're_1' }, 200);
     if (url.includes('/rpc/rate_hit')) return jr(cfg.rateAllow === false ? false : true);
     if (url.includes('suppressed_emails')) return jr([]);
@@ -562,6 +578,78 @@ try {
     await handleInboundEmail(await sign(emailReceived({ subject: 'Email-login bridged client' })));
     const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
     ok('I1: contact auth_user_id NULL but email-login user exists → requester = portal uid', reqPost && reqPost.body.requester === 'portal-uid-777');
+  }
+
+  // ═══ PART C · Resend's REAL webhook: the envelope only — the route reads the full message ═══
+  // Resend's email.received event carries email_id/from/to/subject/message_id and
+  // NO body, headers or sender-auth verdict. Before this read existed every real
+  // reply failed the verdict gate as 'none' and was silently dropped.
+  const EMAIL_ID = '4ef9a417-02e9-4d39-ad75-9611e0fcc33c';
+  const envelope = (over = {}) => ({
+    type: 'email.received', created_at: '2026-11-08T23:41:12.126Z',
+    data: { email_id: EMAIL_ID, created_at: '2026-11-08T23:41:11.894Z', from: 'Jane <jane@acme.com>', to: [`${SITE}@${DOMAIN}`], cc: [], bcc: [], message_id: '<abc-123@acme.com>', subject: 'Website copy', attachments: [], ...over },
+  });
+  const fullEmail = (over = {}) => ({
+    object: 'email', id: EMAIL_ID, from: 'Jane <jane@acme.com>', to: [`${SITE}@${DOMAIN}`], cc: [], bcc: [], reply_to: [],
+    subject: 'Website copy', text: 'Here are my edits.', html: '<p>Here are my edits.</p>', html_format: 'cid',
+    headers: { 'mime-version': '1.0' }, message_id: '<abc-123@acme.com>',
+    authentication: { spf: 'pass', dkim: 'pass', dmarc: 'pass' }, attachments: [], ...over,
+  });
+  const serve = (body, status = 200) => () => jr(body, status);
+  const landed = (calls) => calls.some((c) => c.method === 'POST' && /presence_support|presence_project_messages/.test(c.url));
+  const readCalls = (calls) => calls.filter((c) => c.url.includes('/emails/receiving/'));
+
+  {
+    const calls = installFetch({ ...BRIDGED, openThreads: [], received: serve(fullEmail()) });
+    const r = await handleInboundEmail(await sign(envelope()));
+    const read = readCalls(calls)[0];
+    const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('Resend: the route reads the full message by email_id (GET, inline images as cid)', !!read && read.method === 'GET' && read.url === `https://api.resend.com/emails/receiving/${EMAIL_ID}?html_format=cid`);
+    ok('Resend: the read carries the API key', !!read && read.auth === 'Bearer test-resend-key');
+    ok('Resend: an envelope-only reply with a dmarc=pass verdict LANDS with its body', r.status === 200 && !!reqPost && reqPost.body.body === 'Here are my edits.' && reqPost.body.subject === 'Website copy' && reqPost.body.external_id === '<abc-123@acme.com>');
+  }
+  {
+    const calls = installFetch({ ...BRIDGED, openThreads: [], received: serve(fullEmail({ subject: 'Html only', text: null, html: '<div>Looks <b>great</b></div><div>Thanks!</div>' })) });
+    await handleInboundEmail(await sign(envelope({ subject: 'Html only' })));
+    const reqPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_requests'));
+    ok('Resend: an html-only reply lands as plain text', !!reqPost && /Looks great/.test(reqPost.body.body) && /Thanks!/.test(reqPost.body.body) && !/</.test(reqPost.body.body));
+  }
+  { const calls = installFetch({ ...BRIDGED, openThreads: [], received: serve(fullEmail({ authentication: { spf: 'pass', dkim: 'pass', dmarc: 'fail' } })) }); const r = await handleInboundEmail(await sign(envelope())); ok('Resend: the full message says dmarc=fail → 200 ack, nothing lands', r.status === 200 && !landed(calls)); }
+  { const calls = installFetch({ ...BRIDGED, openThreads: [], received: serve(fullEmail({ authentication: null })) }); const r = await handleInboundEmail(await sign(envelope())); ok('Resend: no verdict in the full message → 200 ack, nothing lands (fail closed)', r.status === 200 && !landed(calls)); }
+  { const calls = installFetch({ ...BRIDGED, openThreads: [], received: () => { throw new Error('the envelope alone must not land'); } }); const r = await handleInboundEmail(await sign({ type: 'email.received', data: { from: 'Jane <jane@acme.com>', to: [`${SITE}@${DOMAIN}`], subject: 'Website copy' } })); ok('Resend: an envelope with no email_id and no verdict still fails closed', r.status === 200 && !landed(calls) && readCalls(calls).length === 0); }
+  for (const [label, received] of [
+    ['a 500', serve({ message: 'boom' }, 500)],
+    ['a 429', serve({ message: 'slow down' }, 429)],
+    ['a refused key (401)', serve({ message: 'restricted_api_key' }, 401)],
+    ['a network error', () => { throw new TypeError('network'); }],
+    ['a body that is not JSON', () => new Response('<html>oops', { status: 200 })],
+  ]) {
+    const calls = installFetch({ ...BRIDGED, openThreads: [], received });
+    const r = await handleInboundEmail(await sign(envelope()));
+    ok(`Resend: the full-message read hits ${label} → 502 (Resend redelivers), nothing lands`, r.status === 502 && !landed(calls));
+  }
+  { const calls = installFetch({ ...BRIDGED, received: serve({ message: 'not found' }, 404) }); const r = await handleInboundEmail(await sign(envelope())); ok('Resend: the email is gone (404) → 200 ack, nothing lands', r.status === 200 && !landed(calls)); }
+  { Deno.env.delete('RESEND_KEY'); const calls = installFetch({ ...BRIDGED, received: serve(fullEmail()) }); const r = await handleInboundEmail(await sign(envelope())); Deno.env.set('RESEND_KEY', 'test-resend-key'); ok('Resend: RESEND_KEY unset → 502, no read attempted', r.status === 502 && readCalls(calls).length === 0 && !landed(calls)); }
+  { const calls = installFetch({ ...BRIDGED, received: serve(fullEmail()) }); const r = await handleInboundEmail(await sign(envelope({ to: ['hello@example.com'] }))); ok('Resend: no <siteId>@ recipient → 200 ack before any read', r.status === 200 && readCalls(calls).length === 0); }
+  { const calls = installFetch({ ...BRIDGED, received: serve(fullEmail()) }); const r = await handleInboundEmail(await sign(envelope({ from: `bounce@${DOMAIN}` }))); ok('Resend: our own sender → 200 ack before any read', r.status === 200 && readCalls(calls).length === 0); }
+  { const calls = installFetch({ ...BRIDGED, received: serve(fullEmail()) }); const r = await handleInboundEmail(await sign(envelope({ from: 'not-an-address' }))); ok('Resend: no usable sender → 200 ack before any read', r.status === 200 && readCalls(calls).length === 0); }
+  { const calls = installFetch({ ...BRIDGED, openThreads: [], received: serve(fullEmail({ headers: { 'auto-submitted': 'auto-replied' } })) }); const r = await handleInboundEmail(await sign(envelope())); ok('Resend: an out-of-office (Auto-Submitted in the full headers) → 200 ack, nothing lands', r.status === 200 && !landed(calls)); }
+  {
+    const calls = installFetch({
+      ...BRIDGED, openThreads: [],
+      refReqHits: [{ id: 'thr_ref', created_at: '2026-05-02T00:00:00Z' }],
+      reqById: [{ id: 'thr_ref', subject: 'Something else', requester: 'auth-123', status: 'open', project_id: null, created_at: '2026-05-01T00:00:00Z' }],
+      received: serve(fullEmail({ subject: 'A new subject line', headers: { 'in-reply-to': '<orig-1@acme.com>' } })),
+    });
+    const r = await handleInboundEmail(await sign(envelope({ subject: 'A new subject line' })));
+    const msgPost = calls.find((c) => c.method === 'POST' && c.url.includes('presence_support_messages'));
+    ok('Resend: In-Reply-To from the full headers pins the reply to its own thread', r.status === 200 && !!msgPost && msgPost.body.request_id === 'thr_ref');
+  }
+  {
+    const big = JSON.stringify(fullEmail({ html: 'x'.repeat(9 * 1024 * 1024) }));
+    const calls = installFetch({ ...BRIDGED, openThreads: [], received: () => new Response(big, { status: 200 }) });
+    const r = await handleInboundEmail(await sign(envelope()));
+    ok('Resend: a full message over the 8MB cap → 200 ack, nothing lands', r.status === 200 && !landed(calls));
   }
 } finally {
   globalThis.fetch = realFetch;
