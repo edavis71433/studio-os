@@ -16,7 +16,7 @@ import { dbReady, getReport, insert, patch, enc } from '../_shared/tools/db.ts';
 import { clientIp, hashId, isEmail, logUsage, rateHit } from '../_shared/tools/guard.ts';
 import { publicReport } from '../_shared/tools/report_view.ts';
 import { reportReadyEmail, sendEmail } from '../_shared/tools/email.ts';
-import { maySend, unsubscribeUrl } from '../_shared/email_infra.ts';
+import { maySend, unsubscribeUrl, unsubscribePageUrl } from '../_shared/email_infra.ts';
 import { reportPdf } from '../_shared/tools/pdf.ts';
 
 /** "Cedar-Core-Site-Review.pdf" */
@@ -116,7 +116,7 @@ export async function handler(req: Request): Promise<Response> {
       // the email still goes, pointing at the page's "Save as PDF" button.
       let pdf: Uint8Array | null = null;
       try { pdf = reportPdf(view, reportUrl(reportId)); } catch { pdf = null; }
-      const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: unsub, pdfAttached: !!pdf });
+      const msg = reportReadyEmail({ name, toolName: TOOL_NAMES[tool], businessName: view.business.name, score: view.overall, label: view.label, reportUrl: reportUrl(reportId), calendlyUrl: CALENDLY_URL, unsubscribeUrl: await unsubscribePageUrl(email), pdfAttached: !!pdf });
       emailed = (await sendEmail({ to: email, ...msg, unsubscribeUrl: unsub, ...(pdf ? { attachments: [{ filename: pdfName(view.business.name, TOOL_NAMES[tool]), content: pdf }] } : {}) })).ok;
     }
     const alerted = await triggerLeadAlert(reportId);

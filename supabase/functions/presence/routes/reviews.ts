@@ -41,8 +41,13 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 const siteBase = () => (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
-/** the public review page URL a request email links to (first-party, function-served). */
-const reviewPageUrl = (siteId: string) => `${fnBase()}/functions/v1/presence/reviews/${siteId}`;
+const appUrl = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
+/** Where a review request email sends a customer: the viewer page on the app (review.html).
+ *  Supabase serves an HTML answer from the function's own address as plain text, so the
+ *  link to /reviews/:siteId showed the page's code; the viewer asks for it and shows it. */
+const reviewPageUrl = (siteId: string) => `${appUrl()}/review.html?site=${siteId}`;
+/** The function's own address: the page's form posts here, and the viewer asks it for the page. */
+const reviewEndpoint = (siteId: string) => `${fnBase()}/functions/v1/presence/reviews/${siteId}`;
 
 async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
@@ -61,9 +66,11 @@ async function hashIp(req: Request): Promise<string> {
 export async function handleReviewPage(req: Request, siteId: string, cors: Record<string, string>): Promise<Response> {
   const htmlHeaders = { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
   if (!UUID_RE.test(siteId)) return new Response('<!doctype html><meta charset="utf-8"><title>Not found</title><p>This review page could not be found.</p>', { status: 404, headers: htmlHeaders });
+  // a customer opening an older emailed link goes on to the viewer; the viewer asks with ?embed=1
+  if (new URL(req.url).searchParams.get('embed') !== '1') return new Response(null, { status: 302, headers: { ...cors, Location: reviewPageUrl(siteId), 'Cache-Control': 'no-store' } });
   if (!(await rateAllow(`rev:page:ip:${clientIp(req)}`, 60, 60))) return new Response('<!doctype html><meta charset="utf-8"><p>Please slow down and try again in a moment.</p>', { status: 429, headers: htmlHeaders });
   const brand = await loadEmailBrand(siteId);
-  const endpoint = reviewPageUrl(siteId);
+  const endpoint = reviewEndpoint(siteId);
   return new Response(reviewPageHtml(brand, endpoint), { status: 200, headers: htmlHeaders });
 }
 

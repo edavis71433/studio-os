@@ -27,11 +27,22 @@ export async function unsubscribeToken(email: string): Promise<string> {
   return await hmacB64url(`unsub:${email.trim().toLowerCase()}`);
 }
 
-/** The absolute one-click unsubscribe URL for a recipient. */
+/** The absolute one-click unsubscribe URL for a recipient: the List-Unsubscribe header's
+ *  target, which mail clients POST to (RFC 8058). Not for a link a person clicks. */
 export async function unsubscribeUrl(email: string): Promise<string> {
   const base = SB_URL.replace(/\/$/, '');
   const t = await unsubscribeToken(email);
   return `${base}/functions/v1/presence/unsubscribe?e=${encodeURIComponent(email.trim().toLowerCase())}&t=${t}`;
+}
+
+/** The unsubscribe link a person clicks, in an email's footer: the page on the app
+ *  (unsubscribe.html). Supabase serves an HTML answer from the function's own address as
+ *  plain text, so the function's link showed the page's code and its button couldn't be
+ *  pressed; the page asks the function itself. */
+export async function unsubscribePageUrl(email: string): Promise<string> {
+  const app = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
+  const t = await unsubscribeToken(email);
+  return `${app}/unsubscribe.html?e=${encodeURIComponent(email.trim().toLowerCase())}&t=${t}`;
 }
 
 /** Why is this address suppressed — 'opt_out' | 'bounce' | 'complaint' | null.

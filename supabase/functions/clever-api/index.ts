@@ -7083,11 +7083,12 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
         // 1:1 prospecting — commercial mail — so a bounced/opted-out address must
         // never be re-mailed, and CAN-SPAM wants a VISIBLE opt-out + postal
         // address in the body, not just headers.
-        const { isSuppressed, unsubscribeUrl } = await import('../_shared/email_infra.ts');
+        const { isSuppressed, unsubscribeUrl, unsubscribePageUrl } = await import('../_shared/email_infra.ts');
         if (await isSuppressed(to)) return json({ error: 'recipient_suppressed', detail: 'This address unsubscribed or bounced previously. Nothing was sent.' }, 200, reqCors);
-        const unsub = await unsubscribeUrl(to);
-        const footer = `<p style="font-size:12px;color:#8a8198;margin-top:22px;border-top:1px solid #eee9e0;padding-top:12px;">Davis Digital Studio LLC · Burbank, California · <a href="${unsub}" style="color:#8a8198;">unsubscribe</a></p>`;
-        const textFooter = `\n\n—\nDavis Digital Studio LLC · Burbank, California\nUnsubscribe: ${unsub}`;
+        const unsub = await unsubscribeUrl(to);            // the List-Unsubscribe header (one-click POST)
+        const unsubPage = await unsubscribePageUrl(to);    // the link a person clicks (a page that works)
+        const footer = `<p style="font-size:12px;color:#8a8198;margin-top:22px;border-top:1px solid #eee9e0;padding-top:12px;">Davis Digital Studio LLC · Burbank, California · <a href="${unsubPage}" style="color:#8a8198;">unsubscribe</a></p>`;
+        const textFooter = `\n\n—\nDavis Digital Studio LLC · Burbank, California\nUnsubscribe: ${unsubPage}`;
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },

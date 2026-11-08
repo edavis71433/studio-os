@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Preview</title>
+<style>
+  /* Minimal standalone shell: the fetched preview replaces this page entirely.
+     This styles only the loading, password and error states. */
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478;--line:#ddd6e8;--plum:#5b3fa0;--warn:#a3423a}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc;--line:#3a3150;--plum:#b79ceb;--warn:#f0a39b}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:420px;margin:14vh auto;padding:0 20px;text-align:center}
+  h1{font-weight:500;font-size:clamp(20px,5vw,24px);margin-bottom:6px}
+  .muted{color:var(--soft);font-size:15px}
+  form{display:flex;gap:8px;margin-top:16px}
+  input{flex:1;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:transparent;color:inherit}
+  button{min-height:44px;padding:10px 18px;border:0;border-radius:8px;background:var(--plum);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{color:var(--warn);font-size:14px;margin-top:10px;min-height:1.4em}
+</style>
+</head>
+<body>
+<main class="center" id="state"><p class="muted">Opening the preview…</p></main>
+<script>
+// The shared draft viewer. A shared draft link opens here: ?t=<token> for the lasting
+// link (it can carry a password), ?s=<token> for the timed one, and &page=/menu/ for a
+// page inside the draft. The draft itself is drawn by the presence function, but
+// Supabase's default *.supabase.co address serves an HTML answer as plain text, so the
+// link can't open there. This page, on our own address, asks the function and writes
+// what comes back into the document (our own server-rendered HTML; every owner word is
+// escaped there). The draft's links come back pointing here, so moving between its
+// pages stays on this viewer. A password goes in the request body, never the address,
+// and the right one earns a short-lived pass kept for this tab, not the password.
+(function(){
+  var q=new URLSearchParams(location.search);
+  var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
+  var t=q.get('t')||'', s=q.get('s')||'', page=q.get('page')||'/';
+  var state=document.getElementById('state');
+  function say(head,line){
+    state.innerHTML='';
+    var h=document.createElement('h1'); h.textContent=head; state.appendChild(h);
+    if(line){ var p=document.createElement('p'); p.className='muted'; p.textContent=line; state.appendChild(p); }
+  }
+  function show(html){ document.open(); document.write(html); document.close(); }
+  function offline(){ say('This preview couldn’t open','Check your connection, then reload the page.'); }
+
+  if(s){
+    fetch(FN+'/p/s/'+encodeURIComponent(s)+'?embed=1&page='+encodeURIComponent(page))
+      .then(function(r){ return r.text(); }).then(show).catch(offline);
+    return;
+  }
+  if(!/^[0-9a-f]{16,80}$/i.test(t)){ say('This preview link isn’t valid','Ask whoever shared it for an updated link.'); return; }
+
+  var KEY='dds-draft-pass:'+t;
+  function getPass(){ try{ return sessionStorage.getItem(KEY)||''; }catch(_){ return ''; } }
+  function setPass(v){ try{ sessionStorage.setItem(KEY,v); }catch(_){} }
+  function open(body){
+    return fetch(FN+'/p/'+t,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); });
+  }
+  function ask(problem){
+    say('This preview is password-protected','Enter the password you were given.');
+    var f=document.createElement('form');
+    var i=document.createElement('input'); i.type='password'; i.name='pw'; i.autocomplete='off'; i.setAttribute('aria-label','Password'); i.placeholder='Password';
+    var b=document.createElement('button'); b.type='submit'; b.textContent='View';
+    var e=document.createElement('p'); e.className='err'; e.setAttribute('role','alert'); e.textContent=problem||'';
+    f.appendChild(i); f.appendChild(b); state.appendChild(f); state.appendChild(e);
+    i.focus();
+    f.addEventListener('submit',function(ev){
+      ev.preventDefault();
+      if(!i.value.trim()){ e.textContent='Enter the password first.'; return; }
+      b.disabled=true; e.textContent='';
+      open({page:page,pw:i.value}).then(handle).catch(function(){ b.disabled=false; e.textContent='That didn’t go through. Check your connection and try again.'; });
+    });
+  }
+  function handle(o){
+    var j=o.j||{};
+    if(j.data && typeof j.data.html==='string'){ if(j.data.pass) setPass(j.data.pass); show(j.data.html); return; }
+    if(j.error==='password_required'){ ask(''); return; }
+    if(j.error==='wrong_password'||j.error==='rate_limited'){ ask(j.message||'That didn’t work. Try again.'); return; }
+    if(o.r.status===404||o.r.status===410){ say(j.message||'This preview isn’t available','Ask whoever shared it for an updated link.'); return; }
+    offline();
+  }
+  var pass=getPass();
+  open(pass?{page:page,pass:pass}:{page:page}).then(handle).catch(offline);
+})();
+</script>
+</body>
+</html>
