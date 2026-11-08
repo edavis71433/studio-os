@@ -1,6 +1,6 @@
 // ── A customer's two names (sales review item 22, second half, Nov 2026) ─────
 //   deno run --allow-read --allow-env --allow-net tests/presence/customer_names_test.mjs
-// Live: "Bacchus Kitchen" on the deal, "Claud Beltran" on the customer — the two
+// Live: "Larkspur Kitchen" on the deal, "Jordan Ellis" on the customer — the two
 // never met. A customer now leads with the business and names the person.
 const N = await import('../../supabase/functions/presence/lib/customer_names.ts');
 let pass = 0, fail = 0; const failed = [];
@@ -9,7 +9,7 @@ const eq = (n, a, b) => ok(`${n} (got ${JSON.stringify(a)})`, JSON.stringify(a) 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 
-eq('converted from a deal: the person is on the customer, the business on their site', N.customerNames({ clientName: 'Claud Beltran', siteBusinessName: 'Bacchus Kitchen', contactName: 'Claud Beltran', contactCompany: '' }), { name: 'Bacchus Kitchen', business_name: 'Bacchus Kitchen', person_name: 'Claud Beltran' });
+eq('converted from a deal: the person is on the customer, the business on their site', N.customerNames({ clientName: 'Jordan Ellis', siteBusinessName: 'Larkspur Kitchen', contactName: 'Jordan Ellis', contactCompany: '' }), { name: 'Larkspur Kitchen', business_name: 'Larkspur Kitchen', person_name: 'Jordan Ellis' });
 eq('no site yet: the contact\'s company is the business', N.customerNames({ clientName: 'Sam Rivera', contactName: 'Sam Rivera', contactCompany: 'Harbor Lane Bakery' }), { name: 'Harbor Lane Bakery', business_name: 'Harbor Lane Bakery', person_name: 'Sam Rivera' });
 eq('added as a business with no contact: the customer\'s own name, no person invented', N.customerNames({ clientName: 'Northside Dental' }), { name: 'Northside Dental', business_name: '', person_name: '' });
 eq('the person is never the same words as the business', N.customerNames({ clientName: 'Maple Street Studio', siteBusinessName: 'Maple Street Studio', contactName: '' , contactCompany: 'maple street studio' }), { name: 'Maple Street Studio', business_name: 'Maple Street Studio', person_name: '' });

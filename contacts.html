@@ -435,8 +435,8 @@ function headerHtml(count){
 }
 // The quiet "possible duplicate" note. The server annotates the roster read
 // (?dupes=1) with the SAME matcher the new-contact prompt already uses — phone
-// numbers compared as digits, so "6262346081" and "(626) 234-6081" are one
-// number, and near-identical names ("Claud" / "Claude") count. It says who and
+// numbers compared as digits, so "5550102468" and "(555) 010-2468" are one
+// number, and near-identical names ("Jordan" / "Jordon") count. It says who and
 // why on hover/focus; it never hides, reorders or merges anything.
 function dupFlag(c){
   const d=c&&c.possible_duplicate_of;
@@ -704,8 +704,12 @@ $('custForm').onsubmit=async(e)=>{
     const d=(r.body&&r.body.data)||{};
     const who=esc(business_name||name||email);
     let heading,line;
-    if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' already had an account — they’re connected to you now.';}
+    if(d.requested){
+      // final pass S1: an account that isn't yours yet is asked, never taken
+      heading='Request sent';
+      line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
+    }else if(mode==='connect'){
+      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
       else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
@@ -724,7 +728,7 @@ $('custForm').onsubmit=async(e)=>{
     // try/catch: a kit that won't apply must never repaint the set-up as a failure
     let kitLine='';
     if(kitId){
-      if(d.already_exists)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
+      if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
       else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
       else{
         let k={ok:false};try{k=await api('/agency/kits/'+encodeURIComponent(kitId)+'/apply','POST',{site_id:d.site_id});}catch(_){k={ok:false};}
@@ -916,7 +920,7 @@ $('editForm').onsubmit=async(e)=>{
 // Two steps, always. The first DELETE carries no ?confirm=1 and the server
 // treats it as a DRY RUN: it writes nothing and answers 409 with the inventory
 // of everything attached to this person. That inventory is what the confirm
-// shows — "Claud has 1 deal, 1 signed agreement, 1 paid invoice and 1 project"
+// shows — "Jordan has 1 deal, 1 signed agreement, 1 paid invoice and 1 project"
 // — so Eric decides with the facts, not a shrug. Only the second call, with
 // ?confirm=1, removes them, and it removes ONLY the contact row (a soft delete):
 // the deals, agreements, invoices and projects stay exactly where they are.

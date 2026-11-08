@@ -63,7 +63,8 @@ ok('safety: EVERY convert client-insert path is tracked for rollback (no orphan 
   const inbox = read('inbox.html');   // the Enquiries page folded in here (Oct 2026 audit change 5)
   const pipe = read('pipeline.html');
   const sp = read('set-password.html');
-  ok('Seam1: convert links an agency operator’s new customer into their portfolio', /resolveAgencyMember\(principal\.jwt\)/.test(sales) && /presence_agency_clients\?on_conflict=site_id/.test(sales));
+  // final pass S1 (Nov 8): the portfolio write moved to lib/connect_requests.ts and became insert-only — security_batch_a_test.mjs drives it
+ok('Seam1: convert links an agency operator’s new customer into their portfolio', /resolveAgencyMember\(principal\.jwt\)/.test(sales) && /claimPortfolioSite\(am\.agency_id, siteId/.test(sales) && /presence_agency_clients\?on_conflict=site_id/.test(read('supabase/functions/presence/lib/connect_requests.ts')));
   ok('Seam2: the invite lands in the client portal (?next=/client.html) + set-password honors it', /set-password\.html\?next=\/client\.html/.test(sales) && /params\.get\("next"\)/.test(sp));
   ok('Seam3: the Inbox enquiry pane promotes an inquiry into a deal (source_submission_id, no re-typing)', /function createDeal\(/.test(inbox) && /source_submission_id:id/.test(inbox) && /id="leadDeal"/.test(inbox));
   ok('refine: expected_close is date-validated (422, not a 502)', /DATE_RE\.test\(closeDate\)/.test(sales) && /DATE_RE = \//.test(sales));
@@ -226,7 +227,7 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
   ok(`${p}: the pricing box lives in CONNECT mode only (nothing is bought when the studio provisions)`, !/id="cu-signup"/.test(prov) && /id="cu-signup"/.test(conn) && /send them this to sign up/.test(conn));
   ok(`${p}: "Start from" kit select in provision mode (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(prov) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(prov));
   ok(`${p}: kits come from GET /agency/kits and apply to the NEW site via POST /agency/kits/:id/apply {site_id}`, /api\('\/agency\/kits'\)/.test(h) && /'\/agency\/kits\/'\+encodeURIComponent\(kitId\)\+'\/apply'/.test(h) && /\{site_id:d\.site_id\}/.test(h));
-  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=k\.ok\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\)kitLine=/.test(h));
+  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=k\.ok\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\|\|d\.requested\)kitLine=/.test(h));
   ok(`${p}: ${p === 'agency.html' ? 'the home always offers kits' : 'the kit field shows only for an agency (ddsContext.is_agency)'}`, p === 'agency.html' ? /async function cuIsAgency\(\)\{return true;\}/.test(h) : /return !!\(c&&c\.is_agency\)/.test(h));
 }
 {

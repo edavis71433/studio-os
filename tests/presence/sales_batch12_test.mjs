@@ -14,7 +14,7 @@ const ok = (n, c, note = '') => { if (c) { pass++; console.log('PASS ', n); } el
 
 // ── the feed format ──
 const NOW = '2026-11-08T12:00:00Z';
-ok('escaping: backslash, semicolon, comma and newlines', F.icsEscape('a\\b;c,d\ne') === 'a\\\\b\;c\\,d\\ne');
+ok('escaping: backslash, semicolon, comma and newlines', F.icsEscape('a\\b;c,d\ne') === 'a\\\\b\\;c\\,d\\ne');   // final pass F3: the old expectation had the same \\; typo as the code
 const long = 'SUMMARY:' + 'Résumé review with Harbor Lane Bakery '.repeat(4);
 const folded = F.foldLine(long);
 ok('folding: no line over 75 octets, and unfolding gives the line back', folded.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75) && folded.replace(/\r\n /g, '') === long);

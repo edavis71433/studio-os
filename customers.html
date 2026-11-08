@@ -343,14 +343,14 @@ function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{
     title:'Import customers from a CSV',
-    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has an account is connected to you now, and the rest connect when they sign up.',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest connect when they sign up.',
     noun:'customer',
     mapHeader:(h)=>{h=String(h).toLowerCase().trim();if(/e-?mail/.test(h))return'email';if(/company|business|organi[sz]ation/.test(h))return'business';if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';if(/^(full ?name|name|contact|customer)$/.test(h))return'name';return null;},
     ready:(keys)=>keys.includes('email')?'':'We couldn’t find an email column. Check the first row has a header like “Email”.',
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
-    send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.connected?'added':d.pending?'existed':d.owned_elsewhere?'skipped':'added';},
-    summary:(c)=>`${c.added} connected now · ${c.existed} saved to connect when they sign up${c.skipped?` · ${c.skipped} already with another studio`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.requested?'skipped':d.connected?'added':d.pending?'existed':'added';},
+    summary:(c)=>`${c.added} already yours · ${c.existed} saved to connect when they sign up${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
     done:()=>load(),
   });
 }
@@ -658,8 +658,12 @@ $('custForm').onsubmit=async(e)=>{
     const d=(r.body&&r.body.data)||{};
     const who=esc(business_name||name||email);
     let heading,line;
-    if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' already had an account — they’re connected to you now.';}
+    if(d.requested){
+      // final pass S1: an account that isn't yours yet is asked, never taken
+      heading='Request sent';
+      line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
+    }else if(mode==='connect'){
+      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
       else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
@@ -678,7 +682,7 @@ $('custForm').onsubmit=async(e)=>{
     // try/catch: a kit that won't apply must never repaint the set-up as a failure
     let kitLine='';
     if(kitId){
-      if(d.already_exists)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
+      if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
       else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
       else{
         let k={ok:false};try{k=await api('/agency/kits/'+encodeURIComponent(kitId)+'/apply','POST',{site_id:d.site_id});}catch(_){k={ok:false};}

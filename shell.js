@@ -1691,6 +1691,7 @@
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
           CTX = r.body.data; markRoleLimits(CTX); render();
+          try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
           markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
           try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17
@@ -1702,6 +1703,44 @@
       }).catch(minimalShell);
     });
   }
+  // ── A studio asked to work with you (final pass, Nov 8: S1) ──────────────
+  // /portal/context lists the requests waiting on this site's OWNER. Each shows
+  // once at the top of the page, with what saying yes means; nothing is linked
+  // until Accept. Accepting can change what the owner sees (their studio's
+  // projects and messages), so the page reloads after.
+  function paintStudioRequests() {
+    var list = (CTX && Array.isArray(CTX.studio_requests)) ? CTX.studio_requests : [];
+    var old = document.getElementById('dds-studio-req'); if (old) old.remove();
+    if (!list.length) return;
+    var host = document.querySelector('main') || document.getElementById('main') || document.body;
+    var wrap = document.createElement('div'); wrap.id = 'dds-studio-req';
+    list.forEach(function (rq) {
+      var box = document.createElement('section'); box.className = 'dds-req'; box.setAttribute('aria-label', 'A studio asked to work with you');
+      var p = document.createElement('p');
+      var b = document.createElement('b'); b.textContent = String(rq.studio || 'A studio');
+      p.appendChild(b); p.appendChild(document.createTextNode(' asked to work with you on Studio OS. If you accept, they can open and work on your website, and send you messages and invoices here.'));
+      var acts = document.createElement('div'); acts.className = 'acts';
+      var yes = document.createElement('button'); yes.type = 'button'; yes.className = 'yes'; yes.textContent = 'Accept';
+      var no = document.createElement('button'); no.type = 'button'; no.textContent = 'Decline';
+      function answer(verb) {
+        yes.disabled = true; no.disabled = true;
+        window.ddsApi('/portal/studio-requests/' + encodeURIComponent(rq.id) + '/' + verb, { method: 'POST', body: {} }).then(function (r) {
+          var msg = (r && r.body && r.body.message) || '';
+          if (!r || !r.ok) { yes.disabled = false; no.disabled = false; if (window.ddsToast) window.ddsToast(msg || 'That didn’t save. Please try again.', 'err'); return; }
+          box.remove();
+          if (verb === 'accept') {
+            if (window.ddsToast) window.ddsToast('You’re connected with ' + String(rq.studio || 'the studio') + '.');
+            setTimeout(function () { location.reload(); }, 900);
+          } else if (window.ddsToast) window.ddsToast('Declined. ' + String(rq.studio || 'The studio') + ' won’t be connected.');
+        });
+      }
+      yes.addEventListener('click', function () { answer('accept'); });
+      no.addEventListener('click', function () { answer('decline'); });
+      acts.appendChild(yes); acts.appendChild(no); box.appendChild(p); box.appendChild(acts); wrap.appendChild(box);
+    });
+    host.insertBefore(wrap, host.firstChild);
+  }
+
   // Register the service worker on app pages too — this is what makes the
   // workspace installable (manifest + SW) and enables push. sw.js already
   // excludes every app/token page from stale caching, so registration is safe.

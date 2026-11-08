@@ -505,14 +505,14 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   // reading them as site_id = <the drilled client's site> can only ever return
   // nothing: every client drill-in showed "Open pipeline $0 · 0 open deals · No
   // invoices yet · No wins yet", forever, for structural reasons. A guaranteed
-  // $0 is not an empty state, it is a false statement — Eric's Bacchus deal is
+  // $0 is not an empty state, it is a false statement — Eric's Larkspur deal is
   // won AND converted, and the board said he had none.
   //
   // The join key already exists and is indexed: presence_deals.converted_client_id
   // (0074, UNIQUE) and presence_invoices.customer_client_id (0086:37) both point
   // at the CLIENT. So when scoped we read by client instead of by site, and the
   // band becomes what Eric expected it to be — the business dashboard FOR
-  // Bacchus, showing the studio's actual sales relationship with Bacchus.
+  // Larkspur, showing the studio's actual sales relationship with Larkspur.
   //
   // Only when SCOPED. `x-dds-scope-site` reaching this handler means index.ts
   // already ran resolveScopedSite and it passed (agency membership + role +

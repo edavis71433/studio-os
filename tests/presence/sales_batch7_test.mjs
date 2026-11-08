@@ -80,7 +80,7 @@ eq('the total', od.total_cents, 170000);
 // ── the route and the pages ──
 const sales = read('supabase/functions/presence/routes/sales.ts');
 ok('GET /sales/reports sits with the other /sales routes (the same gate)', /if \(route === '\/sales\/reports' && method === 'GET'\) return handleSalesReports\(req, site, principal, cors\);/.test(read('supabase/functions/presence/index.ts')));
-ok('every read is the signed-in site\'s own', ((sales.match(/export async function handleSalesReports[\s\S]*?\n}\n/) || [''])[0].match(/site_id=eq\.\$\{site\.id\}/g) || []).length === 4);
+ok('every read is the signed-in site\'s own', ((sales.match(/export async function handleSalesReports[\s\S]*?\n}\n/) || [''])[0].match(/site_id=eq\.\$\{site\.id\}/g) || []).length === 5);   // final pass F5 added the close-date read
 ok('a failed read marks its report unavailable, never a false zero', /revenue: failed\.has\('revenue'\) \? \{ unavailable: true \}/.test(sales) && /pipeline: dealsOff \? \{ unavailable: true \}/.test(sales) && /overdue: failed\.has\('overdue'\) \|\| !rcv \? \{ unavailable: true \}/.test(sales));
 ok('overdue reads the same receivables as Who owes you', /loadReceivables\(site\)\.catch/.test(sales));
 const an = read('analytics.html');

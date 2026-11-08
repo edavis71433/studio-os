@@ -16,8 +16,19 @@ const EMAIL_FROM = Deno.env.get('EMAIL_FROM') || 'Davis Digital Studio <eric@dav
 
 const authHeaders = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
 
+// Final pass (Nov 8, S1): the old pattern let commas, brackets and quotes
+// through, and findClientByEmail puts the address inside a PostgREST either/or
+// filter, so "x@y.co,id.not.is.null" matched the first account on the platform.
+// A real address never needs those characters; the domain is plain labels.
 export function validEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+  if (typeof email !== 'string' || email.length > 254) return false;
+  return /^[^\s@,()"\\;:<>[\]]{1,64}@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:[a-z]{2,}|xn--[a-z0-9-]{2,})$/i.test(email);
+}
+
+/** A value made safe inside a PostgREST either/or (or=/and=) or in.() list:
+ *  double-quoted, with backslashes and quotes escaped, then URL-encoded. */
+export function pgrstQuoted(v: string): string {
+  return encodeURIComponent('"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"');
 }
 export function passwordProblem(pw: string): string | null {
   if (typeof pw !== 'string' || pw.length < 8) return 'Please choose a password with at least 8 characters.';
@@ -27,9 +38,14 @@ export function passwordProblem(pw: string): string | null {
 
 // Does an account already exist for this email? (their own client record)
 export async function findClientByEmail(email: string): Promise<{ id: string; name: string } | null> {
-  const e = encodeURIComponent(email.toLowerCase());
-  const r = await svc(`clients?or=(email.eq.${e},contact_email.eq.${e})&deleted_at=is.null&select=id,name&limit=1`);
-  return (r.ok && Array.isArray(r.json) && r.json.length) ? r.json[0] : null;
+  const want = String(email || '').trim().toLowerCase();
+  if (!validEmail(want)) return null;
+  const e = pgrstQuoted(want);
+  const r = await svc(`clients?or=(email.eq.${e},contact_email.eq.${e})&deleted_at=is.null&select=id,name,email,contact_email&limit=5`);
+  if (!r.ok || !Array.isArray(r.json)) return null;
+  // exact recheck in memory — a filter that ever over-matches can never hand back someone else
+  const hit = (r.json as any[]).find((c) => String(c.email || '').toLowerCase() === want || String(c.contact_email || '').toLowerCase() === want);
+  return hit ? { id: String(hit.id), name: String(hit.name || '') } : null;
 }
 
 // Create the auth user. email_confirm:true so sign-in works immediately

@@ -25,9 +25,15 @@ export function newFeedToken(): string {
   return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-/** RFC 5545 TEXT escaping. */
+/** RFC 5545 TEXT escaping: backslash, semicolon, comma, and every line break
+ *  (CRLF, LF or a bare CR) as \\n; other control characters are dropped.
+ *  Final pass (Nov 8, F3): the semicolon was written '\\;' — which in a JS
+ *  string is just ';' — so a title like "Review; phase 2" went out unescaped. */
 export function icsEscape(s: unknown): string {
-  return String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  return String(s ?? '')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /** Fold a content line at 75 octets (UTF-8), continuing with CRLF + one space. */
@@ -46,6 +52,9 @@ export function foldLine(line: string): string {
 
 const utc = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 const ymdNext = (ymd: string) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+/** A real calendar day (2026-02-30 and 2026-13-01 are not) — one bad date must
+ *  never throw and take the whole feed down. */
+const realDay = (ymd: string) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false; const t = Date.parse(ymd + 'T00:00:00Z'); return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === ymd; };
 
 /** The whole feed. Events without a usable date are left out. */
 export function buildIcs(calName: string, events: FeedEvent[], nowIso: string): string {
@@ -54,7 +63,7 @@ export function buildIcs(calName: string, events: FeedEvent[], nowIso: string): 
     `X-WR-CALNAME:${icsEscape(calName)}`, 'X-PUBLISHED-TTL:PT1H', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H'];
   for (const e of events) {
     let when: string[] = [];
-    if (e.allDay && /^\d{4}-\d{2}-\d{2}$/.test(e.allDay)) {
+    if (e.allDay && realDay(e.allDay)) {
       when = [`DTSTART;VALUE=DATE:${e.allDay.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${ymdNext(e.allDay).replace(/-/g, '')}`];
     } else if (e.start && isFinite(Date.parse(e.start))) {
       const s = Date.parse(e.start), mins = Math.max(5, Math.min(24 * 60, Number(e.minutes) || 30));

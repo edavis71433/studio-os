@@ -573,3 +573,14 @@ html[data-dds-lacks~="delete"] [data-needs="delete"],
 html[data-dds-lacks~="configure"] [data-needs="configure"],
 html[data-dds-lacks~="owner"] [data-needs="owner"]{display:none!important}
 html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}
+
+/* Final pass (Nov 8, S1): a studio asked to work with this website's owner. The
+   owner answers here — nothing is linked until they press Accept. */
+.dds-req{margin:0 0 var(--dds-s4,16px);padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--dds-p);border-radius:var(--dds-r-lg,10px);background:var(--dds-p-soft);color:var(--dds-ink);font-size:14px;line-height:1.5}
+.dds-req p{margin:0 0 10px}
+.dds-req .acts{display:flex;flex-wrap:wrap;gap:8px}
+.dds-req button{font:inherit;font-size:14px;font-weight:600;min-height:44px;padding:0 18px;border-radius:var(--dds-r,8px);cursor:pointer;border:1px solid var(--dds-line-strong,#d2d2db);background:var(--dds-card);color:var(--dds-ink)}
+.dds-req button.yes{background:var(--dds-p);border-color:var(--dds-p);color:#fff}
+.dds-req button:disabled{opacity:.6;cursor:default}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-req button.yes{color:#171320}}
+:root[data-theme="dark"] .dds-req button.yes{color:#171320}

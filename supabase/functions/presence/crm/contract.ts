@@ -121,7 +121,7 @@ export interface ClientProfileSummary {
 export function deriveClientHealth(p: Omit<ClientProfileSummary, 'health'>, nowIso: string): HealthLevel {
   // Second walk (Nov 8, item 51): a monitor-plan site is the client's own website
   // hosted elsewhere — Home and Analytics say so — so "never published here" is
-  // not "getting set up". Bacchus, live for months, read "nothing published yet".
+  // not "getting set up". Larkspur, live for months, read "nothing published yet".
   if (!p.live && !p.last_published_at && p.edition !== 'monitor') return 'new';
   if (p.connected_needing_attention > 0) return 'attention';
   if (p.pending_approvals > 0) return 'attention';

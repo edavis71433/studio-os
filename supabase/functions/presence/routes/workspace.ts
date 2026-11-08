@@ -117,6 +117,11 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // reads — their slot resolves to the empty shape ('none') instead. Every
   // best-effort slot swallows its own failure so one bad read never costs the
   // others (same net effect as the old per-block try/catch).
+  // Final pass (Nov 8, S1): a studio's request waiting on this site's OWNER (the
+  // shell shows it with Accept / Decline). Started now, read after the wave below.
+  const studioReqP: Promise<Array<{ id: string; studio: string }>> = role === 'business_owner' && !scopedName && !isOperator && !worksOnSite
+    ? import('./connect_requests.ts').then((m) => m.studioRequestsFor(site, principal)).catch(() => [])
+    : Promise.resolve([]);
   const none = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: null as any });
   const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ, cmQ] = await Promise.all([
@@ -273,6 +278,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     landing: landingFor(navCtx),
     scope: scopedName ? { site_id: site.id, name: scopedName } : null,   // SC-1: agency drill-in → the breadcrumb "Studio › {name}"
     attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals)
+    studio_requests: await studioReqP,   // final pass S1: studios asking this owner to connect
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);
 }
