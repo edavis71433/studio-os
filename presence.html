@@ -5420,10 +5420,7 @@ function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder
 }
 function eeHideKey(key) {                        // reuse the sections-visibility machinery
   if (!key) return;
-  const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
-  const order = (S.settings && S.settings.sections_order) || [];
-  hidden.add(key);
-  Promise.resolve(saveSections(order, [...hidden])).then(() => loadPreview());
+  Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => [...new Set([...sectionsHiddenNow(), key])])).then(() => loadPreview());
 }
 // Which editor a clicked section belongs to — G13: read the SERVER STAMPS.
 // A block section carries data-dds-src (its TRUE stored-list index, render
@@ -7824,9 +7821,9 @@ function renderLinkedChip(blk, idx, card) {
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
-  rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -9002,9 +8999,9 @@ function renderBlocksCard() {
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; BLOCKS_WORK.splice(idx, 1); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); sub.appendChild(head);
@@ -10204,27 +10201,52 @@ function dcCoreKeys(main) {
 // place in the saved order, so the move lands next to the neighbour that can be seen.
 let DC_FOCUS_CORE = null;   // the section just moved: the redraw brings it into view, and the left list's button keeps focus
 function dcMoveCore(key, dir, fromTree) {
-  const doc = dcFrameDoc(), shown = dcCoreKeys(doc && doc.getElementById("main"));
-  const i = shown.indexOf(key), j = i + dir;
-  if (i < 0 || j < 0 || j >= shown.length) return;
-  const order = homeOrderNow().filter((k) => k !== key);
-  const at = order.indexOf(shown[j]);
-  order.splice(dir < 0 ? at : at + 1, 0, key);
+  const doc = dcFrameDoc(), onShow = new Set(dcCoreKeys(doc && doc.getElementById("main")));
+  // Item 79: worked out when the move's turn comes, from the order the last move left (the
+  // canvas catches up after), so two quick presses make two moves; worked out at the press,
+  // the second repeated the first. Which sections are on show doesn't change with a move.
+  const moved = () => {
+    const shown = homeOrderNow().filter((k) => onShow.has(k));
+    const i = shown.indexOf(key), j = i + dir;
+    if (i < 0 || j < 0 || j >= shown.length) return null;
+    const order = homeOrderNow().filter((k) => k !== key);
+    const at = order.indexOf(shown[j]);
+    order.splice(dir < 0 ? at : at + 1, 0, key);
+    return order;
+  };
+  if (!moved()) return;
   DC_FOCUS_CORE = { key, dir, tree: !!fromTree };
-  saveSections(order, (S.settings && S.settings.sections_hidden) || []);
+  saveSections(moved, sectionsHiddenNow);
 }
+const sectionsHiddenNow = () => (S.settings && S.settings.sections_hidden) || [];
 function remountSectionsCard() {   // in place, so the card keeps its spot among the others
   const old = $("sectionsCard"); if (!old) return;
   const parent = old.parentNode, next = old.nextSibling;
   old.remove(); mountSectionsCard();
   const nu = $("sectionsCard"); if (nu && parent && nu.parentNode === parent) parent.insertBefore(nu, next);
 }
+// The order and the hidden list may be functions, read when the write's turn comes (item 79).
 async function saveSections(order, hidden) {
   try {
-    await settingsPut({ sections_order: order, sections_hidden: hidden });
+    const r = await settingsPut(() => {
+      const o = typeof order === "function" ? order() : order;
+      return o ? { sections_order: o, sections_hidden: typeof hidden === "function" ? hidden() : hidden } : null;
+    });
+    if (!r) { DC_FOCUS_CORE = null; return; }   // the move had nowhere left to go
     remountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { DC_FOCUS_CORE = null; toast(nice(err), true); }
+}
+// The Styles list's order, and one swap in it, as they stand when a write's turn comes (item 79).
+function cardOrderNow(heroPinned) {
+  const o = homeOrderNow();
+  return heroPinned ? ["hero", ...o.filter((k) => k !== "hero")] : o;
+}
+function swapInCard(key, dir, heroPinned) {
+  const o = cardOrderNow(heroPinned), i = o.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= o.length || (heroPinned && (key === "hero" || o[j] === "hero"))) return null;
+  [o[i], o[j]] = [o[j], o[i]];
+  return o;
 }
 function mountSectionsCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("sectionsCard")) return;
@@ -10239,15 +10261,15 @@ function mountSectionsCard() {
     const def = HOME_SECTION_DEFS.find(([k]) => k === key); if (!def) return;
     const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line,#eee)";
     const cb = el("input"); cb.type = "checkbox"; cb.checked = !hidden.has(key); cb.id = "sec-" + key;
-    cb.addEventListener("change", () => { const h = new Set(hidden); cb.checked ? h.delete(key) : h.add(key); saveSections(order, [...h]); });
+    cb.addEventListener("change", () => saveSections(() => cardOrderNow(heroPinned), () => { const h = new Set(sectionsHiddenNow()); cb.checked ? h.delete(key) : h.add(key); return [...h]; }));
     const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
     const still = heroPinned && key === "hero";
     const up = el("button", null, "↑"); up.type = "button"; up.disabled = still || idx <= (heroPinned ? 1 : 0); up.title = "Move up";
     const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = still || idx === order.length - 1; dn.title = "Move down";
     if (still) up.title = dn.title = "This template keeps the welcome section at the top";
     [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
-    up.addEventListener("click", () => { if (up.disabled) return; const o = [...order]; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; saveSections(o, [...hidden]); });
-    dn.addEventListener("click", () => { if (dn.disabled) return; const o = [...order]; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; saveSections(o, [...hidden]); });
+    up.addEventListener("click", () => { if (!up.disabled) saveSections(() => swapInCard(key, -1, heroPinned), sectionsHiddenNow); });
+    dn.addEventListener("click", () => { if (!dn.disabled) saveSections(() => swapInCard(key, 1, heroPinned), sectionsHiddenNow); });
     rowEl.append(cb, lb, up, dn);
     card.appendChild(rowEl);
   });
@@ -11491,6 +11513,19 @@ function dcShiftIndex(i, at, delta) {
 // already has once it exists (the stamp domain is the list AT LAST RELOAD, so
 // it must survive later length changes), else 0..n-1 for the PRE-splice length
 // `n` callers pass. dcInjectCanvas resets the map when a fresh render lands.
+// Item 79: a move or removal from a panel shifts the canvas's stamps the way the toolbar's
+// does (dcMove, dcDelete), so a hover, Edit, Hide or Delete on the canvas before the redraw
+// acts on the section it shows, not the neighbour now at that index.
+function panelSwap(idx, to) {
+  const o = BLOCKS_WORK;
+  [o[to], o[idx]] = [o[idx], o[to]];
+  if (DDS_SIDMAP) Object.keys(DDS_SIDMAP).forEach((sid) => { DDS_SIDMAP[sid] = dcPermuteIndex(DDS_SIDMAP[sid], idx, to); });
+  dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, idx, to));
+}
+function panelRemove(idx) {
+  dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, idx, -1));   // before the splice, like dcDelete
+  BLOCKS_WORK.splice(idx, 1);
+}
 function dcComposeSrcMap(n, fn) {
   const prev = DDS_SRCMAP, next = {};
   const keys = prev ? Object.keys(prev) : Array.from({ length: n }, (_, v) => v);

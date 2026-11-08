@@ -1219,6 +1219,32 @@ test.describe('Undo takes back a menu-category move', () => {
   });
 });
 
+test.describe('the section panel’s arrows keep the canvas pointing at the right section', () => {
+  // Item 79: the panel's own up, down and Remove changed the list without shifting the
+  // canvas's stamps, so until the redraw a canvas Edit opened the neighbour now at that index.
+  test('after the panel moves a section down, Edit on the canvas opens the section it shows', async ({ page }) => {
+    test.skip(isPhone(page), 'on a phone the section panel covers the canvas');
+    await mount(page, '/presence.html#design');
+    await page.route('**/functions/v1/presence/settings', async (route: Route) => {
+      if (route.request().method() === 'PUT') await new Promise((r) => setTimeout(r, 2500));   // the canvas keeps the old order meanwhile
+      return route.fallback();
+    });
+    const frame = page.frameLocator('#designPreview');
+    const editOn = async (id: string) => {
+      await frame.locator('#b' === id ? '#a' : '#b').hover();
+      await frame.locator(id).hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    };
+    await editOn('#a');
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+    await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
+    await page.locator('#blkSub-0 button', { hasText: '↓' }).click();
+    expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');
+    await editOn('#a');                                   // the canvas still draws the title first
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+  });
+});
+
 test.describe('move the welcome section among the others', () => {
   const page_ = (movable: boolean) => '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
     + '<section class="hero" data-dds-core="hero"' + (movable ? ' data-dds-movable' : '') + '><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'
@@ -1280,6 +1306,32 @@ test.describe('move the welcome section among the others', () => {
     await row.locator('button[aria-label="Move down"]').click();
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
+  });
+
+  // Item 79: each move is worked out when its save's turn comes, from the order the last one
+  // left; worked out at the press, the second press wrote the first move again.
+  // both presses land while the first save is still out
+  const slowSaves = (page: Page) => page.route('**/functions/v1/presence/settings', async (route: Route) => {
+    if (route.request().method() === 'PUT') await new Promise((r) => setTimeout(r, 500));
+    return route.fallback();
+  });
+  test('two quick presses on a built-in section’s arrow make two moves', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await slowSaves(page);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    const down = barButton(frame, 'Move this section down');
+    await down.click();
+    await down.click();
+    await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs'], ['about', 'offerings', 'hero', 'testimonials', 'faqs']]);
+  });
+  test('two quick presses on the Styles list’s arrow make two moves too', async ({ page }) => {
+    const { writes } = await canvas(page, true);
+    await slowSaves(page);
+    await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    const down = page.locator('#sectionsCard > div').filter({ hasText: 'About' }).locator('button').last();
+    await down.click();
+    await down.click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs'], ['hero', 'offerings', 'testimonials', 'about', 'faqs']]);
   });
 });
 
