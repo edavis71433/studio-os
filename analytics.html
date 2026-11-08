@@ -772,7 +772,7 @@ function renderPortfolio(d,roster){
     :`<div class="quiet" style="margin-top:0"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
   if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>{
     const n=ctx&&Number(ctx.attention_count)||0; const el=document.getElementById('allQuietStudio'); if(!el||!n)return;
-    el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/today.html">see Today</a>.`;
+    el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/agency.html" data-noscope="1">see Home</a>.`;
   }).catch(()=>{});
   if(ins.length)h+=`<div class="grid3" style="margin-top:0">${ins.map(insightCard).join('')}</div>`;
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);

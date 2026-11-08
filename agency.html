@@ -162,8 +162,22 @@
   .stat:last-child{border-right:0} .stat:hover .sv{color:var(--p)}
   .stat .sk{font-size:12px;color:var(--faint)} .stat .sv{font-size:22px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15} .stat .ss{font-size:12.5px;color:var(--soft)}
   .stat .sv.warn{color:var(--warn)} .stat .sv.good{color:var(--good)}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s3,12px)} @media (max-width:759px){.two{grid-template-columns:1fr}}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--dds-s3,12px)} @media (max-width:759px){.two{grid-template-columns:1fr}}
   .two .rcard{margin-bottom:0}
+  /* the Ask box (moved here from today.html, sales review item 23) */
+  .ask{margin-top:var(--dds-s7,32px);padding-top:var(--dds-s6,24px);border-top:1px solid var(--line)}
+  .ask h2{font-family:var(--sans);font-weight:600;font-size:17px;margin:0 0 var(--dds-s1,4px)}
+  .ask p{margin:0 0 var(--dds-s3,12px);color:var(--soft);font-size:14px}
+  .askbox{display:flex;gap:10px}
+  .askbox input{flex:1;min-width:0;font-family:inherit;font-size:15px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border-radius:var(--dds-r-lg,10px);border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .askbox input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .askbox button{font:inherit;font-size:14px;font-weight:600;border-radius:var(--dds-r-lg,10px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 16px;cursor:pointer}
+  .answer{margin-top:var(--dds-s4,16px);padding:var(--dds-s4,16px);background:var(--p-soft,#f1edf9);border-radius:var(--dds-r-lg,10px);font-size:14.5px;white-space:pre-wrap;color:var(--ink)}
+  .answer:empty{padding:0;margin:0;background:transparent}
+  .answer .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;white-space:normal}
+  .answer .srcs .lbl{font-size:12px;color:var(--soft);align-self:center}
+  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) 10px;line-height:18px}
+  .answer .lowc{margin-top:var(--dds-s2,8px);font-size:12.5px;color:var(--soft);white-space:normal}
   .rrows .late{color:var(--bad)} .rrows a .rn.due{color:var(--warn)}
   .rfoot{margin-top:var(--dds-s2,8px);font-size:12.5px} .rfoot a{color:var(--p);text-decoration:none;font-weight:500}
   .quiet{font-size:12.5px;color:var(--faint);margin:6px 0 0}
@@ -227,6 +241,12 @@
   <section id="needs" aria-label="Needs you" hidden></section>
   <section id="studio" aria-label="Your studio" hidden></section>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <section class="ask" id="askSec" aria-labelledby="askHead" hidden>
+    <h2 id="askHead">Have a question?</h2>
+    <p>Ask in your own words. It only speaks to what’s actually true of your studio.</p>
+    <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button type="button" id="askBtn">Ask</button></div>
+    <div class="answer" id="askAns" aria-live="polite"></div>
+  </section>
 </div>
 <!-- the one open ⋯ menu lives here, outside the table (a sticky cell is its own
      stacking context and would paint over a menu drawn inside the row) -->
@@ -764,6 +784,16 @@ function weekTodos(list){
   out.sort((a,b)=>(a.days==null?1:0)-(b.days==null?1:0)||(a.days||0)-(b.days||0)||String(a.deal).localeCompare(String(b.deal)));
   return out.slice(0,6);
 }
+// Recent wins (moved here from today.html, sales review item 23): won or
+// converted deals in the last 90 days, newest first — the same rule as the
+// server's recentWins (lib/analytics_dashboard.ts), drawn from the deals
+// already in hand, and each one opens its deal.
+function recentWins(list){
+  const start=Date.now()-90*86400000;
+  return(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&(d.stage==='won'||d.converted_client_id||d.converted_at))
+    .map(d=>({d,ms:Date.parse(String(d.converted_at||d.updated_at||''))})).filter(x=>Number.isFinite(x.ms)&&x.ms>=start)
+    .sort((a,b)=>b.ms-a.ms).slice(0,4).map(x=>x.d);
+}
 function keyDeals(list){return(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0).sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0)).slice(0,5);}
 function statTiles(s){
   const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
@@ -781,17 +811,18 @@ async function mountStudio(){
   const get=async(p)=>{try{const r=await api(p);return r.ok?r.body.data:null;}catch(_){return null;}};
   const [summary,deals]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100')]);
   if(gen!==SSEQ)return;
-  const tiles=statTiles(summary);const todos=weekTodos(deals);const top=keyDeals(deals);
-  if(!tiles.length&&!todos.length&&!top.length){host.hidden=true;host.innerHTML='';return;}
+  const tiles=statTiles(summary);const todos=weekTodos(deals);const top=keyDeals(deals);const wins=recentWins(deals);
+  if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
   let h='';
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
   if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(t=>`<a class="stat" role="listitem" id="${esc(t.id)}" href="${esc(t.href)}"><div><div class="sk">${esc(t.k)}</div><div class="sv ${esc(t.tone)}">${esc(t.v)}</div><div class="ss">${esc(t.s)}</div></div></a>`).join('')}</div></div>`;
-  if(todos.length||top.length){
+  if(todos.length||top.length||wins.length){
     h+='<div class="two">';
     if(todos.length){const late=todos.some(r=>r.days!=null&&r.days<0);
       h+=`<div class="rcard" id="this-week"><p class="rh">This week · ${todos.length}</p><div class="rrows">${todos.map(r=>`<a href="/crm.html?deal=${encodeURIComponent(r.id)}" data-noscope="1"><span${r.days!=null&&r.days<0?' class="late"':''}>${esc(r.title)}${r.deal?' <span style="color:var(--soft);font-weight:400">· '+esc(r.deal)+'</span>':''}</span><span class="rn${r.days!=null&&r.days<=0?' due':''}">${esc(dueLabel(r.at))}</span></a>`).join('')}</div>${late?'':'<p class="quiet">Nothing overdue.</p>'}<div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;}
     if(top.length)h+=`<div class="rcard" id="key-deals"><p class="rh">Key deals</p><div class="rrows">${top.map(d=>`<a href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1">${esc(d.title||'A deal')}<span class="rn">${esc(money(d.expected_value_cents))}</span></a>`).join('')}</div><div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;
+    if(wins.length)h+=`<div class="rcard" id="recent-wins"><p class="rh">Recent wins</p><div class="rrows">${wins.map(d=>`<a href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1">${esc(d.title||'A deal')}<span class="rn">${esc(money(d.expected_value_cents))}</span></a>`).join('')}</div></div>`;
     h+='</div>';
   }
   host.hidden=false;host.innerHTML=h;
@@ -928,6 +959,7 @@ async function boot(){
     await load();
     await needs;
     mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
+    mountAsk();      // and the Ask box (sales review item 23)
     mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
 }
@@ -947,6 +979,28 @@ async function mountHealthDoor(){
     const n=areas.filter(a=>a&&a.state==='attention').length;
     host.innerHTML='<a id="healthDoor" href="/admin-health.html">'+(n?'<span class="warnw">Platform: '+n+' area'+(n===1?'':'s')+' need'+(n===1?'s':'')+' a look</span>':'Platform: all clear')+' →</a>';
   }catch(_){/* the door is a nicety, never a blocker */}
+}
+
+// ── the Ask box (from today.html): the answer, then the sources it drew on ──
+function paintAnswer(box,d,fallback){
+  d=d||{};box.textContent=d.answer||d.text||fallback;
+  const labels=Array.isArray(d.source_labels)?d.source_labels.filter(Boolean).slice(0,4):[];
+  if(labels.length){const s=document.createElement('div');s.className='srcs';s.innerHTML='<span class="lbl">Drew on:</span>'+labels.map(l=>`<span class="src">${esc(l)}</span>`).join('');box.appendChild(s);}
+  if(d.low_confidence){const n=document.createElement('div');n.className='lowc';n.textContent='Part of this is judgment rather than measurement — treat it as a nudge.';box.appendChild(n);}
+}
+async function ask(){
+  const q=$('q'),box=$('askAns'),btn=$('askBtn');
+  const question=(q.value||'').trim();if(!question)return;
+  btn.disabled=true;btn.textContent='…';box.textContent='Thinking…';
+  try{const r=await apiSend('POST','/concierge/ask',{question});paintAnswer(box,r.ok?(r.body&&r.body.data):null,r.ok?'I don’t have anything measured on that yet — I’d rather say so than guess.':'I couldn’t answer just now — nothing’s wrong, please try again in a moment.');}
+  catch(_){box.textContent='I couldn’t answer just now — nothing’s wrong, please try again in a moment.';}
+  btn.disabled=false;btn.textContent='Ask';
+}
+function mountAsk(){
+  const sec=$('askSec');if(!sec||sec.dataset.on)return;
+  sec.dataset.on='1';sec.hidden=false;
+  $('askBtn').addEventListener('click',ask);
+  $('q').addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();ask();}});
 }
 
 // ── Needs you (Oct 2026 home rebuild): ONE list of the studio's own work from

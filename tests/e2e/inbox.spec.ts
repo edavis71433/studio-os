@@ -58,7 +58,7 @@ test.describe('Inbox — split-view console', () => {
     // real unread dots (SLDS unread-indicator idiom, aria-label "Unread")
     expect(await page.locator('.unread-dot').count()).toBeGreaterThanOrEqual(3);
     await expect(page.locator('#lmeta')).toContainText('conversations');
-    await expect(page.locator('#lmeta')).toContainText('need');
+    await expect(page.locator('#lmeta')).toContainText('waiting for a reply');   // its own count, in its own words (sales review item 11)
     // the old sections 5–6 fold in as dimmed system rows (Everything view)
     await expect(rows.locator('.sysrow').filter({ hasText: 'Milestone reached — Design' })).toBeVisible();
     await expect(rows.locator('.sysrow').filter({ hasText: 'A quote request is waiting for a reply' })).toBeVisible();

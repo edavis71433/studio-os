@@ -267,7 +267,7 @@ export function portfolioInsights(clients: PortfolioClientLite[], nowMs: number)
   if (withLeads.length) insights.push({ key: 'growing', title: 'New inquiries', sentence: `${withLeads.length} of your ${total} clients ${withLeads.length === 1 ? 'has' : 'have'} new inquiries waiting.`, number: withLeads.length, detail: withLeads.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'good' });
   if (needAttention.length) insights.push({ key: 'attention', title: 'Needs attention', sentence: `${needAttention.length} ${needAttention.length === 1 ? 'client needs' : 'clients need'} a look.`, number: needAttention.length, detail: needAttention.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'attention' });
   if (stale.length) insights.push({ key: 'quiet', title: 'Gone quiet', sentence: `${stale.length} ${stale.length === 1 ? 'client hasn’t' : 'clients haven’t'} published in over a month.`, number: stale.length, detail: stale.slice(0, 4).map((c) => c.name || 'a client').join(', '), tone: 'attention' });
-  const headline = total === 0 ? 'No clients yet.' : insights.length ? `Across ${total} ${total === 1 ? 'client' : 'clients'}, here’s what stands out.` : `All ${total} clients are quiet and current — nothing needs you.`;
+  const headline = total === 0 ? 'No clients yet.' : insights.length ? `Across ${total} ${total === 1 ? 'client' : 'clients'}, here’s what stands out.` : `All ${total} clients are quiet and current.`   // the studio's own count is Home's (sales review item 11);
   return { headline, insights };
 }
 
