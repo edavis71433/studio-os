@@ -43,6 +43,14 @@ async function mount(page: Page, url: string, api: Record<string, unknown> = {})
 const isPhone = (page: Page) => page.viewportSize()!.width <= 760;
 const SITE_HTML = '<!doctype html><html><head><meta charset="utf-8"></head><body><header><nav><a href="/">Home</a> <a href="/about/">About</a> <a href="/visit/">Visit</a> <a href="https://elsewhere.example/">Off site</a></nav></header><main id="main"><h1>Marlow’s Kitchen</h1></main><div id="presence-preview-badge" style="position:fixed;bottom:0;left:0;right:0">Preview of this site</div></body></html>';
 const CHANGES = (blockers: number) => ({ '/changes': { data: { count: 1, first_publish: false, changes: [{ section: 'business', sentence: 'x' }], blockers, warnings: 0, draft_hash: 'h' } } });
+// A site with every setup step done: details, address, hours, an offering (API's), logo,
+// welcome picture, its own address, published.
+const ALL_SET = {
+  '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1, custom_domain: 'marlows.example', last_published_at: '2026-10-30T15:00:00Z' },
+    identity: { business_name: 'Marlow’s Kitchen', description: 'Hello', phone: '555-0100' },
+    location: { address_line1: '1 Main St', city: 'Burbank', hours: [{ day: 'mon', closed: false, intervals: [{ open: '09:00', close: '17:00' }] }] } } },
+  '/settings': { data: { logo_media_id: 'm1', cover_media_id: 'm2' } },
+};
 
 test.describe('the Overview is the site', () => {
   test('the site fills the screen, under one bar with the page’s buttons', async ({ page }) => {
@@ -128,7 +136,7 @@ test.describe('one to-do line', () => {
   });
 
   test('nothing to finish, no line', async ({ page }) => {
-    await mount(page, '/presence.html', CHANGES(0));
+    await mount(page, '/presence.html', { ...CHANGES(0), ...ALL_SET });
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator('#ssTodo')).toBeHidden();
@@ -947,5 +955,98 @@ test.describe('move the welcome section among the others', () => {
     await row.locator('button[aria-label="Move down"]').click();
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
+  });
+});
+
+test.describe('the welcome list', () => {
+  const SHOWN = { '/commerce/first-run': { data: { dismissed: false } } };   // the owner hasn't hidden it
+  const status = (offline: string | null) => ({ draft: { unpublished_changes: 0 }, preview: { exists: false }, live: { published: true, last_published_at: '2026-10-30T15:00:00Z', offline_since: offline } });
+  const PUBLISHED = { '/site': { data: { site: { ...ALL_SET['/site'].data.site }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } } };
+
+  test('it counts what the site already has, goes straight to each step, and a step ticks itself once done', async ({ page }) => {
+    const writes = await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN });
+    const line = page.locator('#ssTodo');
+    await expect(line).toContainText('Set up your site · 2 of 8');   // the fixture's city and its one offering
+    await line.click();
+    const card = page.locator('#setupCard');
+    await expect(card.locator('h2')).toHaveText('Set up your site');
+    await expect(card.locator('.meta')).toHaveText('2 of 8 done');
+    await expect(card.locator('.hb-progress')).toHaveAttribute('aria-valuenow', '2');
+    await expect(card.locator('.hb-task.done')).toHaveCount(2);
+    await expect(card.locator('[data-step="address"]')).toHaveClass(/\bdone\b/);
+    await expect(card.locator('[data-step="offerings"]')).toContainText('Add your services');   // the business's own word
+    await expect(card.locator('.hb-task.just')).toHaveCount(0);   // done before you looked: nothing to tick
+    await card.locator('[data-step="details"]').click();
+    await expect(page.locator('#todoPanel')).toBeHidden();
+    await expect(page.locator('#view-business')).toBeVisible();
+    await expect(page.locator('#f-phone')).toBeFocused();   // the name is there, so the way to reach you is what's missing
+    await page.locator('#f-phone').fill('555-0100');
+    await expect.poll(() => writes.some((w) => w.path === '/identity' && w.body && w.body.phone === '555-0100')).toBe(true);
+    await expect(line).toContainText('3 of 8');
+    await page.evaluate(() => (window as any).go('today'));
+    await line.click();
+    await expect(card.locator('.meta')).toHaveText('3 of 8 done');
+    await expect(card.locator('[data-step="details"]')).toHaveClass(/\bdone\b/);
+    await expect(card.locator('[data-step="details"]')).toHaveClass(/\bjust\b/);   // done since you last looked: it ticks in front of you
+  });
+
+  test('a site never published is Private, with one Publish button', async ({ page }) => {
+    await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN });
+    await page.locator('#ssTodo').click();
+    await expect(page.locator('#todoPanel .dc-panel-t')).toHaveText('Your site');
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Private');
+    await expect(page.locator('#siteStatusCard')).toContainText('Only you can see it');
+    await expect(page.locator('#siteStatusBtn')).toHaveText('Publish');
+    await page.locator('#siteStatusBtn').click();
+    await expect(page.locator('#ritualWrap')).toHaveClass(/\bon\b/);
+  });
+
+  test('a live site is Public, shows its address, and can be taken offline', async ({ page }) => {
+    const writes = await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN, ...PUBLISHED });
+    await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: status(null) } }));
+    await page.locator('#ssTodo').click();
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Public');
+    await expect(page.locator('#siteStatusCard a')).toHaveText('marlows.example');
+    await expect(page.locator('#siteStatusCard a')).toHaveAttribute('href', 'https://marlows.example');
+    await expect(page.locator('#setupCard [data-step="publish"]')).toHaveClass(/\bdone\b/);
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#siteStatusBtn').click();
+    await expect.poll(() => writes.some((w) => w.method === 'POST' && w.path === '/site/offline')).toBe(true);
+  });
+
+  test('a site taken offline says so and brings itself back with one button', async ({ page }) => {
+    const writes = await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN, ...PUBLISHED });
+    let off: string | null = '2026-11-01T10:00:00Z';
+    await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: status(off) } }));
+    await page.locator('#ssTodo').click();
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Offline');
+    await expect(page.locator('#siteStatusCard a')).toHaveCount(0);
+    off = null;
+    await page.getByRole('button', { name: 'Bring back online' }).click();
+    await expect.poll(() => writes.some((w) => w.method === 'POST' && w.path === '/site/online')).toBe(true);
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Public');
+  });
+
+  test('the owner can hide it, and it stays hidden', async ({ page }) => {
+    const writes = await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN });
+    await page.locator('#ssTodo').click();
+    await page.getByRole('button', { name: 'Hide this list' }).click();
+    await expect(page.locator('#setupCard')).toBeHidden();
+    await expect(page.locator('#ssTodo')).toBeHidden();
+    await expect.poll(() => writes.some((w) => w.method === 'POST' && w.path === '/commerce/first-run/dismiss')).toBe(true);
+  });
+
+  test('hidden before, no list', async ({ page }) => {
+    await mount(page, '/presence.html', { ...CHANGES(0), '/commerce/first-run': { data: { dismissed: true } } });
+    await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#ssTodo')).toBeHidden();
+  });
+
+  test('the studio’s own site is a practice site: no list', async ({ page }) => {
+    await mount(page, '/presence.html', { ...CHANGES(0), ...SHOWN, '/portal/context': { data: { ...(API['/portal/context'] as any).data, is_agency: true } } });
+    await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#ssTodo')).toBeHidden();
   });
 });
