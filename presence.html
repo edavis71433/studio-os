@@ -2139,12 +2139,15 @@ const VIEW_HINTS = {
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
   search: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
 };
+const TOUCH_DESIGN_HINT = ["edit-tap", "Tap a section to select it, then tap its words to change them. Everything saves itself, and nothing goes live until you publish."];
 let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
 function contextHint(view) {
   // A tip explains the view it opened on, so leaving that view retires it. It was
   // staying up over the next tab, on top of whatever sat at the bottom of the page.
   document.querySelectorAll(".dds-hint.dds-live.show .x").forEach((x) => x.click());
-  const h = VIEW_HINTS[view];
+  // A finger can't double-click: on a touch screen the editor's tip says to tap (list item 31).
+  const fingers = (() => { try { return matchMedia("(hover: none), (pointer: coarse)").matches; } catch (_) { return false; } })();
+  const h = view === "design" && fingers ? TOUCH_DESIGN_HINT : VIEW_HINTS[view];
   if (!h || !window.ddsHint || HINT_SHOWN) return;
   if (view === "design" && S.site && S.site.edition === "monitor") return;   // nothing to pick on a watch plan
   setTimeout(() => {
@@ -12451,8 +12454,16 @@ function dcInjectCanvas(doc, main) {
     else y = Math.max(top + 6, sy + 2);
     bar.style.top = y + "px";
   };
-  const hideBar = () => { bar.classList.remove("on"); if (current) { current.classList.remove("dc-hot"); current = null; } };
+  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (current) { current.classList.remove("dc-hot"); current = null; } };
   const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 170); };
+  // List item 31: a finger has no hover. A tap selects a section and its toolbar
+  // stays until another tap selects something else or lands off every section; a
+  // second tap on the selected section's words edits them in place, as a
+  // double-click does with a mouse. The pretend mouse events a browser sends after
+  // a tap are ignored, so they can't hide the bar a moment after the tap showed it.
+  // The time of the last touch lives on the document, since every redraw of the
+  // canvas runs this again and older sections keep their first listeners.
+  const byTouch = () => Date.now() - (doc.__dcTouchAt || 0) < 900;
   bar.addEventListener("mouseenter", () => clearTimeout(hideT));
   bar.addEventListener("mouseleave", scheduleHide);
   const mkBtn = (label, aria, fn, opts) => {
@@ -12521,12 +12532,37 @@ function dcInjectCanvas(doc, main) {
   // review fix 8: the save outcome was announced into the doc this repaint just
   // replaced — re-announce it once into the fresh document's live region.
   if (IPE_LIVE_MSG) { ipeAnnounce(doc, IPE_LIVE_MSG); IPE_LIVE_MSG = null; }
+  if (!doc.body.hasAttribute("data-dc-touch")) {
+    doc.body.setAttribute("data-dc-touch", "1");
+    doc.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") doc.__dcTouchAt = Date.now(); }, true);
+    // a tap off every section puts the toolbar away
+    doc.addEventListener("click", (e) => {
+      if (!byTouch() || !doc.__dcSel) return;
+      if (e.target.closest && e.target.closest("main > section, main > nav.block-toc, #dds-dc-bar, #dds-ipe-bar, .dc-ins, .dc-colh, .dc-emptyzone")) return;
+      hideBar();
+    });
+  }
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
     if (!el2.hasAttribute("data-dc")) {
       el2.setAttribute("data-dc", "1");
-      el2.addEventListener("mouseenter", () => showBar(el2));
-      el2.addEventListener("mouseleave", scheduleHide);
+      el2.addEventListener("mouseenter", () => { if (!byTouch()) showBar(el2); });
+      el2.addEventListener("mouseleave", () => { if (!byTouch()) scheduleHide(); });
+      el2.addEventListener("click", (e) => {
+        if (!byTouch()) return;   // a mouse click keeps its meaning: hover shows the bar, a double-click edits
+        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
+        if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // typing in it already
+        if (IDE && IDE.el.contains(e.target)) return;
+        if (doc.__dcSel !== el2 || !bar.classList.contains("on")) {   // first tap: select it
+          e.preventDefault(); showBar(el2); if (bar.classList.contains("on")) doc.__dcSel = el2;
+          return;
+        }
+        if (DC_MODE !== "edit") return;   // Comments mode never edits
+        const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
+        const w = !f && e.target.closest ? e.target.closest("[data-pr]") : null;
+        if (f && el2.contains(f)) { e.preventDefault(); hideBar(); ipeStart(doc, f, el2); }
+        else if (w && el2.contains(w) && IDE_FIELDS[w.getAttribute("data-pr")]) { e.preventDefault(); hideBar(); ideStart(doc, w); }
+      });
       // G13 slice 2 · §2.1: double-click TEXT → edit it in place (Edit mode
       // only — the same chrome also serves Comments mode, which never edits).
       // Anything else — image, chrome, core, an unstamped section — routes to

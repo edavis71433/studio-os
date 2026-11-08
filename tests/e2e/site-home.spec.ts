@@ -240,6 +240,95 @@ test.describe('on a phone', () => {
   });
 });
 
+// List item 31: editing by touch. A finger has no hover: a tap selects a section and
+// its toolbar stays, a tap elsewhere moves or puts it away, and a second tap on the
+// selected section's words edits them in place.
+const TOUCH_PAGE = '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
+  + '<section class="hero" data-dds-core="hero"><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'
+  + '<section class="block" data-dds-core="about"><h2>About us</h2><p data-pr="identity.description">Hello</p></section>'
+  + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section>'
+  + '<section id="b" data-dds-sid="richtext" data-dds-key="block_richtext" data-dds-src="1" class="block"><h2 data-dds-field="title">Our story</h2></section>'
+  + '</main><footer id="ft" style="padding:40px">Footer</footer></body></html>';
+const touchCanvas = async (page: Page) => {
+  const writes = await mount(page, '/presence.html#design', { __html: TOUCH_PAGE });
+  const frame = page.frameLocator('#designPreview');
+  await frame.locator('section#a h2').waitFor();
+  await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+  await page.waitForLoadState('networkidle');
+  return { writes, frame };
+};
+const touchChecks = () => {
+  test('a tap selects a section, and its toolbar stays put', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await expect(bar).not.toHaveClass(/\bon\b/);
+    await frame.locator('section#a').tap();
+    await expect(bar).toHaveClass(/\bon\b/);
+    await expect(frame.locator('section#a')).toHaveClass(/dc-hot/);
+    await expect(bar.getByRole('button', { name: 'Duplicate this section' })).toBeVisible();
+    await page.waitForTimeout(600);   // the pretend mouse-leave after a tap must not put it away
+    await expect(bar).toHaveClass(/\bon\b/);
+    await expect(frame.locator('[contenteditable]')).toHaveCount(0);   // the first tap selects, it doesn't edit
+  });
+  test('a tap on another section moves the toolbar there, and a tap off every section puts it away', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').tap();
+    await frame.locator('section[data-dds-core="about"]').tap();
+    await expect(frame.locator('section[data-dds-core="about"]')).toHaveClass(/dc-hot/);
+    await expect(frame.locator('section#a')).not.toHaveClass(/dc-hot/);
+    await expect(bar.getByRole('button', { name: /Remove this section from the page/ })).toBeVisible();
+    await frame.locator('#ft').tap();
+    await expect(bar).not.toHaveClass(/\bon\b/);
+    await expect(frame.locator('.dc-hot')).toHaveCount(0);
+  });
+  test('a second tap on the selected section’s words edits them in place', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const h = frame.locator('section#a h2[data-dds-field="title"]');
+    await frame.locator('section#a').tap();
+    await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
+    await h.tap();
+    await expect(h).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);   // the toolbar steps aside while you type
+  });
+  test('the editor’s tip says to tap, not double-click', async ({ page }) => {
+    await touchCanvas(page);
+    await expect(page.locator('.dds-hint.dds-live')).toContainText('Tap a section to select it, then tap its words');
+  });
+  test('the toolbar’s buttons work by touch', async ({ page }) => {
+    const { writes, frame } = await touchCanvas(page);
+    await frame.locator('section#b').tap();
+    await frame.locator('#dds-dc-bar').getByRole('button', { name: 'Duplicate this section' }).tap();
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks)).map((w) => w.body.blocks.length).at(-1)).toBe(3);
+  });
+};
+test.describe('editing by touch: Safari on a phone and a tablet', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(!testInfo.project.use.hasTouch, 'touch devices only'); });
+  touchChecks();
+});
+test.describe('editing by touch: Chrome on an Android phone', () => {
+  const { defaultBrowserType: _d, ...PIXEL } = devices['Pixel 7'];
+  test.use(PIXEL);
+  test.beforeEach(({ browserName }) => { test.skip(browserName !== 'chromium', 'Chrome only'); });
+  touchChecks();
+});
+test.describe('editing with a mouse is unchanged', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(!!testInfo.project.use.hasTouch, 'a mouse'); });
+  test('hover shows the toolbar, leaving puts it away, and a click selects nothing', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').click();
+    await expect(bar).toHaveClass(/\bon\b/);   // the hover that came with the click
+    await expect(frame.locator('[contenteditable]')).toHaveCount(0);
+    await frame.locator('#ft').hover();
+    await expect(bar).not.toHaveClass(/\bon\b/);
+  });
+  test('the editor’s tip still says double-click', async ({ page }) => {
+    await touchCanvas(page);
+    await expect(page.locator('.dds-hint.dds-live')).toContainText('Double-click the words in a section');
+  });
+});
+
 test.describe('a watch-plan site', () => {
   const WATCH = { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Sample Bakery', description: 'Hello' }, location: {} } } };
   const open = async (page: Page) => {
