@@ -24,6 +24,8 @@ import { renderMarkdown } from './markdown.ts';
 import { sendEmail, validEmail } from '../commerce/account.ts';
 import { loadEmailBrand, type EmailBrand } from './email_brand.ts';
 import { isSuppressed } from '../routes/email_infra.ts';
+import { normalizeLists } from './saved_views.ts';
+import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 
@@ -48,6 +50,16 @@ export function isSegmentKey(k: unknown): k is SegmentKey {
 export function segmentLabel(k: string): string {
   return SEGMENTS.find((s) => s.key === k)?.label || 'your audience';
 }
+// Sales review items 31 + 39: an audience is a fixed segment OR a list of people
+// the studio picked (from Customers, Contacts or Pipeline) and kept to send to
+// again. A list lives in the site's own reserved store, so it is site-scoped by
+// construction, and every send still goes through the same suppression.
+export type AudienceKey = SegmentKey | `list:${string}`;
+const LIST_KEY_RE = /^list:[A-Za-z0-9-]{6,40}$/;
+export function isListKey(k: unknown): k is `list:${string}` { return typeof k === 'string' && LIST_KEY_RE.test(k); }
+export function isAudienceKey(k: unknown): k is AudienceKey { return isSegmentKey(k) || isListKey(k); }
+/** The site's picked lists (newest last), read from its own reserved store. */
+export async function loadPickedLists(siteId: string) { return normalizeLists(await readReservedJson(siteId, RESERVED_NAMES.broadcastLists)); }
 
 // ── Merge tokens (a FEW, safe): {{first_name}} + {{business_name}} ───────────
 // Merge happens on the RAW markdown/subject text; renderMarkdown then escapes all
@@ -150,7 +162,11 @@ export function scheduleDecision(scheduledAtInput: unknown, nowIso: string):
 const RECIPIENT_CAP = 5000;   // MVP bound: a single broadcast reaches at most this many
 
 /** Raw audience rows for a segment, SITE-SCOPED. Never crosses tenants. */
-export async function fetchAudienceRows(siteId: string, key: SegmentKey): Promise<Array<{ email?: string; name?: string }>> {
+export async function fetchAudienceRows(siteId: string, key: AudienceKey): Promise<Array<{ email?: string; name?: string }>> {
+  if (isListKey(key)) {
+    const l = (await loadPickedLists(siteId)).find((x) => `list:${x.id}` === key);
+    return l ? l.people.slice(0, RECIPIENT_CAP) : [];   // a removed list reaches no one
+  }
   if (key === 'contacts') {
     return rows(await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`));
   }
@@ -163,7 +179,7 @@ export async function fetchAudienceRows(siteId: string, key: SegmentKey): Promis
 }
 
 export interface SendableDeps {
-  fetchRows?: (key: SegmentKey) => Promise<Array<{ email?: string; name?: string }>>;
+  fetchRows?: (key: AudienceKey) => Promise<Array<{ email?: string; name?: string }>>;
   isSuppressed?: (email: string) => Promise<boolean>;
 }
 
@@ -171,8 +187,8 @@ export interface SendableDeps {
  *  opted-out. A broadcast must never mail a suppressed contact, so we filter here
  *  (up front, for the count the owner sees) AND again at the ONE send point. Deps
  *  are injectable so the whole thing is tested without a database. */
-export async function resolveSendable(siteId: string, key: SegmentKey, deps: SendableDeps = {}): Promise<{ recipients: Recipient[]; suppressed: number; audience: number }> {
-  const fetchRows = deps.fetchRows || ((k: SegmentKey) => fetchAudienceRows(siteId, k));
+export async function resolveSendable(siteId: string, key: AudienceKey, deps: SendableDeps = {}): Promise<{ recipients: Recipient[]; suppressed: number; audience: number }> {
+  const fetchRows = deps.fetchRows || ((k: AudienceKey) => fetchAudienceRows(siteId, k));
   const suppressedFn = deps.isSuppressed || isSuppressed;
   const recips = normalizeRecipients(await fetchRows(key));
   const kept: Recipient[] = [];
@@ -187,11 +203,11 @@ export async function resolveSendable(siteId: string, key: SegmentKey, deps: Sen
 /** Just the audience SIZE (distinct valid, pre-suppression) — the cheap number
  *  behind the segment chips. The honest post-suppression count is computed per
  *  broadcast at preview/send time via resolveSendable. */
-export async function audienceCount(siteId: string, key: SegmentKey): Promise<number> {
+export async function audienceCount(siteId: string, key: AudienceKey): Promise<number> {
   return normalizeRecipients(await fetchAudienceRows(siteId, key)).length;
 }
 
-export interface BroadcastRow { id: string; site_id: string; subject: string; body: string; audience: SegmentKey; status?: string }
+export interface BroadcastRow { id: string; site_id: string; subject: string; body: string; audience: AudienceKey; status?: string }
 
 export interface DispatchDeps extends SendableDeps {
   loadBrand?: (siteId: string) => Promise<EmailBrand>;
@@ -201,7 +217,7 @@ export interface DispatchDeps extends SendableDeps {
   claimFn?: (broadcastId: string, siteId: string, email: string) => Promise<'inserted' | 'duplicate' | 'error'>;
   markFailedFn?: (broadcastId: string, email: string) => Promise<void>;
   recordSkippedFn?: (broadcastId: string, siteId: string, email: string) => Promise<void>;
-  resolveFn?: (siteId: string, key: SegmentKey) => Promise<{ recipients: Recipient[]; suppressed: number; audience: number }>;
+  resolveFn?: (siteId: string, key: AudienceKey) => Promise<{ recipients: Recipient[]; suppressed: number; audience: number }>;
 }
 
 /** Insert a send-log row, ignoring duplicates. The unique(broadcast_id, lower(email))
@@ -237,7 +253,7 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
   const claim = deps.claimFn || defaultClaim;
   const markFailed = deps.markFailedFn || defaultMarkFailed;
   const recordSkipped = deps.recordSkippedFn || defaultRecordSkipped;
-  const resolve = deps.resolveFn || ((siteId: string, key: SegmentKey) => resolveSendable(siteId, key, deps));
+  const resolve = deps.resolveFn || ((siteId: string, key: AudienceKey) => resolveSendable(siteId, key, deps));
 
   const brand = await loadBrand(b.site_id);
   const businessName = brand?.name || 'us';

@@ -19,6 +19,8 @@ import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, 
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
+import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
+import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -59,6 +61,8 @@ const SERVICES_CATALOG_NAME = '__services_catalog__';
 // Site-scoped, deny-all, function-mediated — NO new migration for definitions.
 // (Per-contact VALUES live in presence_contacts.custom, migration 0097.)
 const CONTACT_FIELDS_NAME = '__crm_contact_fields__';
+// the reserved store's rows (lib/reserved_store.ts) never show as templates either
+const NOT_RESERVED_STORE = Object.values(RESERVED_NAMES).map((n) => `&name=neq.${encodeURIComponent(n)}`).join('');
 // A machine marker on a presence_contacts row (site-scoped) that says "this studio
 // wants THIS email as a customer — auto-connect them the moment they self-serve
 // sign up". The studio IS its presence site, and presence_contacts.site_id is
@@ -282,6 +286,24 @@ export async function handleSalesContactFields(req: Request, site: SiteRow, prin
       : rows(await svc('presence_sales_templates', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, kind: 'proposal', name: CONTACT_FIELDS_NAME, title: '', body, created_by: principal.email || principal.userId || 'system' }) }))[0];
     if (!wrote) return json({ error: 'write_failed', message: 'Your fields didn’t save — please try again.' }, 502, cors);
     return json({ data: defs }, 200, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ═══ SAVED LIST VIEWS (sales review item 31) ══════════════════════════════════
+// Named views on Customers, Contacts and Pipeline — the fixed view they start
+// from, the search, the columns shown and the sort — shared by the studio's team.
+// One reserved JSON row (lib/reserved_store.ts); every write is normalized
+// (lib/saved_views.ts). PUT replaces ONE list's views and returns them all.
+export async function handleSalesViews(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (req.method === 'GET') return json({ data: normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews)) }, 200, cors);
+  if (req.method === 'PUT') {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    if (!isViewList(b?.list)) return json({ error: 'validation', message: 'Which list are these views for?' }, 422, cors);
+    const all = normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews));
+    all[b.list as keyof typeof all] = normalizeViewList(b.views);
+    const ok = await writeReservedJson(site.id, RESERVED_NAMES.savedViews, all, principal.email || principal.userId || 'system');
+    return ok ? json({ data: all }, 200, cors) : json({ error: 'write_failed', message: 'Your view didn’t save — please try again.' }, 502, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
@@ -685,8 +707,11 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     }
     const closeDate = b.expected_close ? clean(b.expected_close, 10) : '';
     if (closeDate && !DATE_RE.test(closeDate)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors);
+    // sales review item 32: an imported deal may start at any OPEN stage (it was
+    // already there in the old tool). Won stays convert-only; Not a fit is not imported.
+    const startStage = (!srcSub && ['qualified', 'proposal', 'contract'].includes(String(b.stage))) ? String(b.stage) : 'lead';
     const ins = await svc('presence_deals', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: 'lead',
+      body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: startStage,
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
         expected_value_cents: Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0)), // R6: bounded like line items
         expected_close: closeDate || null, notes: clean(b.notes, 2000) || (enquiry ? clean(`Website enquiry: ${enquiry}`, 2000) : '') }) });
@@ -700,7 +725,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // presence_deal_events does not have — so PostgREST 400'd the insert and
     // dealEvent's best-effort catch swallowed it: the 'created' event was never
     // written at all. The link now lives where the schema can keep it.
-    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { source_submission_id: srcSub, ...(enquiry ? { enquiry: enquiry.slice(0, 500) } : {}) } });
+    await dealEvent(site.id, deal.id, 'created', principal, { to_stage: startStage, detail: { source_submission_id: srcSub, ...(enquiry ? { enquiry: enquiry.slice(0, 500) } : {}) } });
     return json({ data: deal }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -875,11 +900,11 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
     // list. __crm_contact_fields__'s body is contact field-definition JSON; one
     // mislabelled row and a client would be reading it as their contract.
     if (new URL(req.url).searchParams.get('with_body') === 'contract') {
-      const one = await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.contract&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&select=id,name,title,body,updated_at&order=updated_at.desc&limit=1`);
+      const one = await svc(`presence_sales_templates?site_id=eq.${site.id}&kind=eq.contract&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}${NOT_RESERVED_STORE}&select=id,name,title,body,updated_at&order=updated_at.desc&limit=1`);
       return one.ok ? json({ data: rows(one) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
     }
     // the reserved rows (services catalog + contact field defs) are NOT reusable templates — keep them out of the list
-    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
+    const r = await svc(`presence_sales_templates?site_id=eq.${site.id}&deleted_at=is.null&name=neq.${encodeURIComponent(SERVICES_CATALOG_NAME)}&name=neq.${encodeURIComponent(CONTACT_FIELDS_NAME)}${NOT_RESERVED_STORE}&select=id,kind,name,title,line_items,updated_at&order=updated_at.desc&limit=100`);
     return r.ok ? json({ data: rows(r) }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
   }
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }

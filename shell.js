@@ -173,6 +173,137 @@
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   };
 
+  // ── The list tools Customers, Contacts and Pipeline share (sales review items
+  //    31, 32 and 39, Nov 2026): saved views, a column picker, "send an update to
+  //    the people you picked" and the CSV import (the contacts importer, shared).
+  //    A page hands over its own request function with use(); without one, ddsApi.
+  window.ddsListKit = (function () {
+    var REQ = null, VIEWS_P = null, styled = false;
+    function req(path, method, body) { return REQ ? REQ(path, method, body) : window.ddsApi(path, { method: method, body: body }); }
+    function esc2(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function style() {
+      if (styled) return; styled = true;
+      var st = document.createElement('style');
+      st.textContent = '.dds-ask{border:none;border-radius:12px;padding:0;width:min(420px,calc(100% - 32px));background:var(--card,#fff);color:var(--ink,#1b1525);box-shadow:0 20px 60px rgba(0,0,0,.3)}'
+        + '.dds-ask::backdrop{background:rgba(27,21,37,.4)}.dds-ask form{padding:20px}.dds-ask h2{margin:0 0 10px;font-size:17px}'
+        + '.dds-ask label{display:block;font-size:13px;color:var(--soft,#5c5468);margin-bottom:6px}.dds-ask input{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--line,#e6e1ee);border-radius:8px;background:var(--card,#fff);color:inherit}'
+        + '.dds-ask .row{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.dds-ask button{font:inherit;font-size:14px;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:inherit}.dds-ask button[value=ok]{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}'
+        + '.dds-colmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:200px;background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:8px}'
+        + '.dds-colmenu label{display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:14px;border-radius:6px;cursor:pointer}.dds-colmenu label:hover{background:var(--p-soft,#efe9fa)}.dds-colmenu input{width:16px;height:16px}'
+        + '.dds-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--p,#5b3fa0);border-radius:10px;background:var(--p-soft,#efe9fa);font-size:13.5px}'
+        + '.dds-bulk b{margin-right:4px}.dds-bulk button,.dds-bulk select{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
+        + '.dds-bulk .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}.dds-bulk .clr{border-color:transparent;background:none;color:var(--p,#5b3fa0)}'
+        + 'td.pick,th.pick{width:34px;padding-right:0!important}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}';
+      document.head.appendChild(st);
+    }
+    // ── saved views: GET/PUT /sales/views (one read per page) ──
+    function views(list) {
+      if (!VIEWS_P) VIEWS_P = req('/sales/views').then(function (r) { return r && r.ok && r.body && r.body.data ? r.body.data : null; }).catch(function () { return null; });
+      return VIEWS_P.then(function (all) { return all ? (all[list] || []) : null; });
+    }
+    function saveViews(list, arr) {
+      return req('/sales/views', 'PUT', { list: list, views: arr }).then(function (r) {
+        if (!r || !r.ok || !r.body || !r.body.data) return null;
+        VIEWS_P = Promise.resolve(r.body.data); return r.body.data[list] || [];
+      }).catch(function () { return null; });
+    }
+    // ── a small named prompt (a <dialog>, never window.prompt) ──
+    function ask(o) {
+      style(); o = o || {};
+      return new Promise(function (resolve) {
+        var d = document.createElement('dialog'); d.className = 'dds-ask'; d.setAttribute('aria-labelledby', 'ddsAskH');
+        d.innerHTML = '<form method="dialog"><h2 id="ddsAskH"></h2><label for="ddsAskIn"></label><input id="ddsAskIn" maxlength="60" autocomplete="off"><div class="row"><button type="button" value="cancel">Cancel</button><button type="submit" value="ok"></button></div></form>';
+        d.querySelector('h2').textContent = o.title || 'Name it';
+        d.querySelector('label').textContent = o.label || 'Name';
+        d.querySelector('button[value=ok]').textContent = o.ok || 'Save';
+        var inp = d.querySelector('input'); inp.value = o.value || '';
+        var done = false;
+        function finish(v) { if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v); }
+        d.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value.trim(); if (!v) { inp.focus(); return; } finish(v); });
+        d.querySelector('button[value=cancel]').addEventListener('click', function () { finish(null); });
+        d.addEventListener('cancel', function (e) { e.preventDefault(); finish(null); });
+        document.body.appendChild(d);
+        if (d.showModal) d.showModal(); inp.focus(); inp.select();
+      });
+    }
+    // ── the column picker: a checkbox per column; the first column always shows ──
+    function columnsMenu(anchor, cols, hidden, onChange) {
+      style();
+      var host = anchor.parentNode, open = host.querySelector('.dds-colmenu');
+      if (open) { open.remove(); anchor.setAttribute('aria-expanded', 'false'); return; }
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      var m = document.createElement('div'); m.className = 'dds-colmenu'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', 'Columns to show');
+      m.innerHTML = cols.map(function (c, i) { return '<label><input type="checkbox" data-col="' + esc2(c[0]) + '"' + (hidden.has(c[0]) ? '' : ' checked') + (i === 0 ? ' disabled' : '') + '> ' + esc2(c[1]) + '</label>'; }).join('');
+      host.appendChild(m); anchor.setAttribute('aria-expanded', 'true');
+      var first = m.querySelector('input:not([disabled])'); if (first) first.focus();
+      m.addEventListener('change', function (e) {
+        var k = e.target && e.target.getAttribute('data-col'); if (!k) return;
+        var next = new Set(hidden); if (e.target.checked) next.delete(k); else next.add(k); hidden = next; onChange(next);
+      });
+      function close(back) { if (!m.isConnected) return; m.remove(); anchor.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', outside, true); if (back) anchor.focus(); }
+      function outside(e) { if (!m.contains(e.target) && e.target !== anchor) close(false); }
+      m.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); close(true); } });
+      setTimeout(function () { document.addEventListener('click', outside, true); }, 0);
+    }
+    // ── send an update to the people picked: keep them as a list, open the composer on it ──
+    function sendTo(people, name) {
+      return req('/broadcasts/lists', 'POST', { name: name || '', people: people }).then(function (r) {
+        if (r && r.ok && r.body && r.body.data && r.body.data.id) { location.href = '/broadcasts.html?list=' + encodeURIComponent(r.body.data.id); return true; }
+        if (window.ddsToast) window.ddsToast((r && r.body && r.body.message) || 'That list didn’t save — try again in a moment.', 'err');
+        return false;
+      });
+    }
+    // ── CSV: the contacts importer's parser, shared ──
+    function parseCsv(text) {
+      var rows = [], row = [], cell = '', inQ = false;
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i];
+        if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += ch; }
+        else if (ch === '"') inQ = true;
+        else if (ch === ',') { row.push(cell); cell = ''; }
+        else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; if (row.some(function (c) { return c.trim() !== ''; })) rows.push(row); row = []; }
+        else cell += ch;
+      }
+      if (cell !== '' || row.length) { row.push(cell); if (row.some(function (c) { return c.trim() !== ''; })) rows.push(row); }
+      return rows;
+    }
+    // host: an element to fill. o: {title, help, mapHeader(h)→key|null, ready(keys)→'' or a message, toItem(obj)→item|null,
+    // label(item)→string, noun, send(item)→Promise<'added'|'existed'|'skipped'|'failed'>, summary(counts)→string, done()}
+    function importPanel(host, o) {
+      host.innerHTML = '<div class="card" style="margin:10px 0;padding:14px 16px"><p style="font-weight:600;margin:0 0 4px"></p><p class="muted" style="margin-top:0"></p>'
+        + '<input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file"><div class="dds-csvprev"></div><p class="muted" style="margin:10px 0 0"><button type="button" class="linkbtn dds-csvx" style="font:inherit;color:var(--p,#5b3fa0);background:none;border:none;padding:0;cursor:pointer">Close</button></p></div>';
+      host.querySelector('p').textContent = o.title; host.querySelectorAll('p')[1].textContent = o.help;
+      var prev = host.querySelector('.dds-csvprev');
+      host.querySelector('.dds-csvx').addEventListener('click', function () { host.innerHTML = ''; });
+      host.querySelector('input[type=file]').addEventListener('change', function (e) {
+        var f = e.target.files && e.target.files[0]; if (!f) return;
+        f.text().then(function (text) {
+          var rows = parseCsv(text);
+          if (rows.length < 2) { prev.innerHTML = '<p class="muted">That file looks empty (or has only a header row).</p>'; return; }
+          var keys = rows[0].map(o.mapHeader);
+          var why = o.ready(keys); if (why) { prev.innerHTML = '<p class="muted"></p>'; prev.firstChild.textContent = why; return; }
+          var items = rows.slice(1).map(function (r) { var obj = {}; keys.forEach(function (k, i) { if (k) obj[k] = String(r[i] || '').trim(); }); return o.toItem(obj); }).filter(Boolean).slice(0, 500);
+          if (!items.length) { prev.innerHTML = '<p class="muted">None of the rows had what an import needs.</p>'; return; }
+          prev.innerHTML = '<p class="muted" style="margin:10px 0 6px"></p><button type="button" class="btn dds-csvgo"></button> <span class="muted dds-csvlive" role="status" aria-live="polite"></span>';
+          prev.querySelector('p').textContent = items.length + ' ' + o.noun + (items.length === 1 ? '' : 's') + ' found — first few: ' + items.slice(0, 3).map(o.label).join(', ') + (items.length > 3 ? '…' : '');
+          var go = prev.querySelector('.dds-csvgo'), live = prev.querySelector('.dds-csvlive');
+          go.textContent = 'Import ' + items.length;
+          go.addEventListener('click', function () {
+            go.disabled = true;
+            var counts = { added: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0;
+            (function next() {
+              if (i >= items.length) { host.innerHTML = ''; if (window.ddsToast) window.ddsToast(o.summary(counts), counts.failed ? 'err' : 'ok'); if (o.done) o.done(counts); return; }
+              var chunk = items.slice(i, i + 5); i += 5;
+              Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
+                .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });
+            })();
+          });
+        });
+      });
+    }
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style };
+  })();
+
   // ── DOM ──
   var root, sb, CTX = null, DESTS = [];
   function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }

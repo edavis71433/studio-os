@@ -106,6 +106,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
     `POST /sales/deals/${ID}/retainer/cancel`,
+    'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
   ]],
   ['configure', [
     '(POST|DELETE) /foundations/(domain|zone)',
@@ -169,6 +170,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
+    'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
+    'PUT /sales/views',         // sales review item 31: the team's saved list views
     'POST /broadcasts/draft-assist',
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,

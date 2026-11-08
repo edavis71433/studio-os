@@ -235,7 +235,7 @@ function render(){
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
       <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
-      <div class="segs" id="segs">${segsHtml()}</div>
+      <div class="segs" id="segs">${segsHtml()}</div>${SEL.startsWith('list:')&&SEG_OK?'<p class="muted" style="margin:6px 0 0;font-size:12.5px">A list you picked. <button class="ghost sm" id="dropList" data-needs="delete" type="button">Remove this list</button></p>':''}
     </div>
     <div class="card">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2>Your message</h2></div>
@@ -301,6 +301,14 @@ function bcCard(b){
 }
 function wire(){
   document.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{SEL=b.getAttribute('data-seg');syncDraftFromForm();render();}));
+  // sales review items 31 + 39: a picked list can be removed (the server refuses while a scheduled update uses it)
+  const dl=$('dropList');if(dl)dl.addEventListener('click',async()=>{
+    const s0=SEGMENTS.find(x=>x.key===SEL);if(!s0)return;
+    if(!(await askConfirm('Remove this list?','“'+(s0.label||'This list')+'” goes from your audiences. The people stay in your contacts and customers.','Remove list')))return;
+    const r=await api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE');
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through — try again in a moment.');return;}
+    syncDraftFromForm();SEL='contacts';toast('List removed.');load(true);
+  });
   const a=$('assist');if(a)a.addEventListener('click',assist);
   const p=$('preview');if(p)p.addEventListener('click',doPreview);
   // "Send update" takes the same road as Preview: the message is saved as a draft
@@ -548,7 +556,11 @@ async function load(soft){
   if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Sending updates lives in your studio workspace.</h2></div>`;return;}
   if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.');trouble();return;}
   if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
-  if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;}
+  if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;
+    // arriving from a list's "Send an update" (?list=<id>): that list is who it goes to
+    const pick=new URLSearchParams(location.search).get('list');
+    if(pick&&!DRAFT&&SEGMENTS.some(x=>x.key==='list:'+pick)){SEL='list:'+pick;try{const u=new URL(location.href);u.searchParams.delete('list');history.replaceState(null,'',u.toString());}catch(_){/* */}}
+  }
   else if(!soft)SEG_OK=false;   // soft keeps the last good lists on screen
   if(list.ok){
     BROADCASTS=(list.body.data&&list.body.data.broadcasts)||[];LIST_OK=true;LOADED_AT=Date.now();

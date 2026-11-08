@@ -5,8 +5,9 @@ import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
 // contacts.html get a list-view header (object icon + fixed-view dropdown +
 // "N items · Updated just now" meta + refresh), sortable table columns with
 // aria-sort, and a Table ⇄ Cards display toggle persisted in localStorage
-// (cards = the original look, kept). D3: fixed views only — no saved views,
-// no bulk actions, no inline edit.
+// (cards = the original look, kept). Sales review item 31 (Nov 2026) added
+// saved views, a column picker and picking rows (sales-batch6.spec.ts); the
+// first table cell is now the row's checkbox. Still no inline edit.
 
 const CUSTOMERS = { data: [
   { client_id: 'c-acme', name: 'Acme Bakery', email: 'a@acme.com', project_id: 'p1', project_name: 'Site', status: 'active', customer_site_id: 'site-acme', open_support: 2, project_count: 1 },
@@ -40,7 +41,7 @@ test.describe('Customers list view', () => {
     // table: th scope=col + default Name-ascending sort (aria-sort)
     await expect(page.locator('th[scope="col"]').first()).toBeVisible();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Name');
-    const names = page.locator('tbody tr td:first-child');
+    const names = page.locator('tbody tr td:nth-child(2)');
     await expect(names.first()).toContainText('Acme Bakery');
     // status renders as the existing pill; waiting count as the badge
     await expect(page.locator('tbody .pill.complete')).toContainText('complete');
@@ -54,13 +55,13 @@ test.describe('Customers list view', () => {
     // Name starts ascending — clicking it flips to descending
     await page.locator('[data-sort="name"]').click();
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Name');
-    await expect(page.locator('tbody tr td:first-child').first()).toContainText('Zeta Gym');
+    await expect(page.locator('tbody tr td:nth-child(2)').first()).toContainText('Zeta Gym');
     // meta mirrors the sort header
     await expect(page.locator('.lmeta')).toContainText('Sorted by Name — descending');
     // a different column starts ascending
     await page.locator('[data-sort="open_support"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Needs you');
-    await expect(page.locator('tbody tr td:first-child').last()).toContainText('Acme Bakery');
+    await expect(page.locator('tbody tr td:nth-child(2)').last()).toContainText('Acme Bakery');
   });
 
   test('the fixed-view dropdown filters client-side (Needs attention)', async ({ page }) => {
@@ -142,7 +143,7 @@ test.describe('Customers list view', () => {
     // "Their website" is a row action (only with a customer site); "Open record" rides every row
     await expect(page.locator('tbody [data-web]')).toHaveCount(2);
     await expect(page.locator('tbody [data-rec]')).toHaveCount(await page.locator('tbody tr').count());
-    await page.locator('tbody tr').first().locator('td').first().click();
+    await page.locator('tbody tr').first().locator('td').nth(1).click();   // the first cell is the row's checkbox (sales review item 31)
     await expect(page).toHaveURL(/crm\.html\?client=site-acme$/);
   });
 });
@@ -166,7 +167,7 @@ test.describe('Contacts list view', () => {
     // a row opens the unified record's Details tab (click the name cell — the
     // row's center can land on the mailto link at narrow widths, which the
     // row-open handler deliberately ignores)
-    await page.locator('tbody tr').first().locator('td').first().click();
+    await page.locator('tbody tr').first().locator('td').nth(1).click();   // the first cell is the row's checkbox (sales review item 31)
     await expect(page).toHaveURL(/crm\.html\?contact=ct-1&tab=details/);
   });
 

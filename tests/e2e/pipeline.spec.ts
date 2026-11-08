@@ -79,13 +79,13 @@ test.describe('Pipeline table view', () => {
       route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'plan-gated' }) }));
     await page.goto('/pipeline.html');
     await expect(page.locator('#table table')).toBeVisible();
-    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(1)).toHaveText('—');
-    await expect(page.locator(`#table tr[data-id="${DEAL2}"] td`).nth(1)).toHaveText('—');
+    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(2)).toHaveText('—');
+    await expect(page.locator(`#table tr[data-id="${DEAL2}"] td`).nth(2)).toHaveText('—');
     // the failed read was NOT cached: heal the route — the next render retries
     await page.unroute('**/functions/v1/presence/sales/contacts**');
     await page.locator('[data-tsort="title"]').click();
-    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(1)).toHaveText('Sam Rivera');
-    await expect(page.locator(`#table tr[data-id="${DEAL2}"] td`).nth(1)).toHaveText('Dana Lee');
+    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(2)).toHaveText('Sam Rivera');
+    await expect(page.locator(`#table tr[data-id="${DEAL2}"] td`).nth(2)).toHaveText('Dana Lee');
   });
 
   test('a table row opens the full-screen deal drawer', async ({ page }) => {
@@ -552,7 +552,7 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(API['/sales/contacts']) });
     });
     await page.goto('/pipeline.html');
-    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(1)).toHaveText('Sam Rivera');
+    await expect(page.locator(`#table tr[data-id="${DEAL}"] td`).nth(2)).toHaveText('Sam Rivera');
     expect(new URL(contactsUrl).searchParams.get('limit')).toBe('100');
   });
 });
