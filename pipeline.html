@@ -532,6 +532,10 @@ const DDS_STARTER_SERVICES=[
   {name:'Site audit — Digital Health Check',price:499},
   {name:'Site audit — Competitive Intelligence',price:899},
 ];
+// Sales review item 33: the reasons offered when a deal is marked not a fit, so
+// Analytics' "Won and not a fit" report can group them. A MIRROR of
+// LOST_REASONS in lib/sales_reports.ts (kept in sync by hand; a pure test pins it).
+const LOST_REASONS=['Price','Timing','Went with someone else','No reply','Not a fit for us'];
 // The Kanban board's open-stage columns (won/lost are OUTCOMES, not columns —
 // exactly like the summary's OPEN_STAGES).
 const BOARD_STAGES=['lead','qualified','proposal','contract'];
@@ -2143,6 +2147,8 @@ function miniForm(host, fields, onSubmit, opts){
     const lab=document.createElement('label'); lab.textContent=fl.label; lab.htmlFor=fid; f.appendChild(lab);
     const el=document.createElement(fl.type==='textarea'?'textarea':'input'); el.id=fid;
     if(fl.type&&fl.type!=='textarea') el.type=fl.type; if(fl.placeholder)el.placeholder=fl.placeholder; if(fl.step)el.step=fl.step;
+    // fl.list: suggestions to pick from (a <datalist>) — typing your own still works
+    if(fl.list){el.setAttribute('list',fl.list.id);if(!document.getElementById(fl.list.id)){const dl=document.createElement('datalist');dl.id=fl.list.id;dl.innerHTML=fl.list.options.map(o=>`<option value="${esc(o)}"></option>`).join('');document.body.appendChild(dl);}}
     if(fl.draft)el.setAttribute('data-dds-draft','1');
     f.appendChild(el); inputs[fl.name]=el;
   });
@@ -2549,7 +2555,7 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});PENDING_BACK='';toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
-    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — a note for your own records',placeholder:'e.g. Went with someone cheaper'}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
+    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as lost');openDeal(id);load();}catch(e){toast(nice(e),true);}});
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     // Saving Details saves the CONTACT too. An existing contact is patched in

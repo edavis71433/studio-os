@@ -19,6 +19,7 @@ import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, 
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
+import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
@@ -598,6 +599,45 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
   if (!Object.keys(patch).length) return json({ error: 'bad_request' }, 400, cors);
   const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
   return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
+}
+
+// ═══ FIXED REPORTS — Analytics' five printable tables (sales review item 33) ═══
+// Revenue by month against last year · open deals by stage with days in stage ·
+// won and not a fit (by source, by reason) · enquiries by page · overdue
+// invoices. Each read is best-effort: a failed one marks ITS report unavailable,
+// never a false zero. The shaping lives in lib/sales_reports.ts.
+export async function handleSalesReports(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const now = nowIso();
+  const failed = new Set<string>();
+  const read = async (key: string, path: string) => { try { const r = await svc(path); if (!r.ok) { failed.add(key); return []; } return rows(r); } catch { failed.add(key); return []; } };
+  const since24 = new Date(Date.now() - 2 * 366 * 86400_000).toISOString();
+  const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
+  const [paid, deals, subs, rcv] = await Promise.all([
+    read('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at&limit=5000`),
+    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,lost_reason&limit=2000`),
+    read('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at&limit=5000`),
+    loadReceivables(site).catch(() => { failed.add('overdue'); return null; }),
+  ]);
+  // when each open deal last moved INTO its current stage
+  const open = deals.filter((d: any) => REPORT_OPEN_STAGES.includes(String(d.stage)) && !d.converted_client_id);
+  const lastMoveInto: Record<string, string> = {};
+  for (let i = 0; i < open.length; i += 100) {
+    const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x));
+    if (!ids.length) continue;
+    const ev = await read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`);
+    const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
+    for (const e of ev) { const k = String(e.deal_id); if (!lastMoveInto[k] && String(e.to_stage) === stageOf.get(k)) lastMoveInto[k] = String(e.created_at); }
+  }
+  const becameDeal = new Set<string>(deals.map((d: any) => String(d.source_submission_id || '')).filter(Boolean));
+  const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
+  return json({ data: {
+    generated_at: now,
+    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
+    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now), partial: failed.has('stages') },
+    outcomes: dealsOff ? { unavailable: true } : wonAndLost(deals, now),
+    enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
+    overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),
+  } }, 200, cors);
 }
 
 // ═══ MY TASKS — Home's one list of the studio's own to-dos (sales review item 29) ═══

@@ -189,6 +189,32 @@
   .ins .act{display:inline-block;margin-top:var(--dds-s2,8px);font-size:13px}
   .ins-foot{color:var(--soft);font-size:12.5px;margin-top:10px}
   @media print{.seg,.print,.noprint,#dds-shell,#refreshBtn{display:none!important}.wrap{max-width:100%}.card,.tscroll,.stats{box-shadow:none;break-inside:avoid}}
+  /* sales review item 33: five fixed reports, one shown at a time, each printable on its own */
+  .rtabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+  .rtabs button{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:5px 12px;min-height:32px;cursor:pointer}
+  .rtabs button:hover{color:var(--ink)}
+  .rtabs button[aria-selected="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .rep{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:var(--dds-s4,16px);box-shadow:var(--shadow)}
+  .rep-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .rep-h h3{margin:0;font-size:15px;font-weight:600}
+  .rep-h p{margin:2px 0 0;font-size:12.5px;color:var(--faint)}
+  .rep-sum{font-size:14px;margin:0 0 12px}
+  .rep h4{font-size:13px;font-weight:600;margin:14px 0 4px}
+  .rscroll{overflow-x:auto}
+  .rtable{width:100%;border-collapse:collapse;font-size:13.5px}
+  .rtable th{font-size:12px;color:var(--faint);font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rtable th:first-child,.rtable td:first-child{text-align:left;padding-left:0}
+  .rtable td{border-bottom:1px solid var(--line-2);padding:8px;text-align:right;font-variant-numeric:tabular-nums;vertical-align:middle}
+  .rtable tfoot td{font-weight:700;border-bottom:none}
+  .rtable td.up{color:var(--good)} .rtable td.down{color:var(--bad)}
+  .rbar{display:inline-block;height:8px;border-radius:4px;background:var(--p);vertical-align:middle;margin-right:6px}
+  .rep-foot{font-size:12px;color:var(--faint);margin:10px 0 0}
+  @media print{
+    body[data-print="report"] *{visibility:hidden!important;transition:none!important}
+    body[data-print="report"] #repPrint,body[data-print="report"] #repPrint *{visibility:visible!important}
+    body[data-print="report"] #repPrint{position:absolute;left:0;top:0;width:100%;border:none;box-shadow:none;padding:0}
+    body[data-print="report"] #repPrint .noprint{display:none!important}
+  }
   /* tablet and phone: tiles pair up, then stack; cards go to one column */
   @media (max-width:1000px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(3){border-left:none}.stat:nth-child(n+3){border-top:1px solid var(--line)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
   /* the shell's sidebar takes a quarter of a tablet: two columns would leave a table no room for its names */
@@ -618,6 +644,72 @@ function headRow(title,subline,withPeriod){
       <div class="actions">${withPeriod?`<div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>`:''}<button type="button" class="btn" id="refreshBtn">Refresh</button></div>
     </header>`;
 }
+// ── Sales review item 33 (Nov 2026): five fixed reports from GET /sales/reports,
+// one at a time, each printable on its own. No report builder (decision 7). The
+// studio's own sales: hidden inside a client (?client=), where deals don't live. ──
+const REPORTS=[['revenue','Revenue by month'],['pipeline','Deals by stage'],['outcomes','Won and not a fit'],['enquiries','Enquiries by page'],['overdue','Overdue invoices']];
+let REP=null,REP_ON=(function(){try{const v=localStorage.getItem('dds-report');return REPORTS.some(r=>r[0]===v)?v:'revenue';}catch(_){return 'revenue';}})();
+const reportsShell=()=>scope()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
+async function loadReports(force){
+  if(!$('reportsBody'))return;
+  if(!REP||force){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}
+    const host=$('reportsBody');if(!host)return;
+    if(!r.ok){host.innerHTML='<p class="muted">Your reports couldn’t load just now — ↻ tries again. The numbers above are unaffected.</p>';return;}
+    REP=(r.body&&r.body.data)||{};}
+  paintReports();
+}
+const rDays=(n)=>n==null?'—':n+(n===1?' day':' days');
+function rTable(head,rows,foot){return `<div class="rscroll"><table class="rtable"><thead><tr>${head.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>${foot?`<tfoot><tr>${foot}</tr></tfoot>`:''}</table></div>`;}
+function reportBody(key,d){
+  if(!d||d.unavailable)return '<p class="muted">This report couldn’t load just now — ↻ tries again.</p>';
+  if(key==='revenue'){
+    const max=Math.max(1,...d.months.map(m=>Math.max(m.this_year,m.last_year)));
+    const rows=d.months.slice().reverse().map(m=>{const ch=m.this_year-m.last_year;return `<tr><td>${esc(m.label)}</td><td><span class="rbar" style="width:${Math.round(60*m.this_year/max)}px" aria-hidden="true"></span>${esc(money(m.this_year))}</td><td>${esc(money(m.last_year))}</td><td class="${ch>0?'up':ch<0?'down':''}">${ch===0?'—':(ch>0?'+':'−')+esc(money(Math.abs(ch)))}</td></tr>`;});
+    const tch=d.total_this_year-d.total_last_year;
+    return (d.total_this_year||d.total_last_year?'':'<p class="rep-sum">No paid invoices in the last two years yet.</p>')+rTable(['Month','This year','A year before','Change'],rows,`<td>Last 12 months</td><td>${esc(money(d.total_this_year))}</td><td>${esc(money(d.total_last_year))}</td><td class="${tch>0?'up':tch<0?'down':''}">${tch===0?'—':(tch>0?'+':'−')+esc(money(Math.abs(tch)))}</td>`);
+  }
+  if(key==='pipeline'){
+    const rows=d.rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.count}</td><td>${esc(money(r.value_cents))}</td><td>${esc(rDays(r.avg_days))}</td><td>${r.longest_title?esc(r.longest_title)+' · '+esc(rDays(r.longest_days)):'—'}</td></tr>`);
+    return rTable(['Stage','Deals','Value','Average time in stage','Longest there'],rows,`<td>Open deals</td><td>${d.count}</td><td>${esc(money(d.value_cents))}</td><td></td><td></td>`)
+      +(d.partial?'<p class="rep-foot">Some stage history couldn’t be read, so a few deals count from the day they were made.</p>':'');
+  }
+  if(key==='outcomes'){
+    const grp=(list,col)=>list.length?rTable([col,'Deals','Value'],list.map(g=>`<tr><td>${esc(g.label)}</td><td>${g.count}</td><td>${esc(money(g.value_cents))}</td></tr>`)):'<p class="muted">None in the last 12 months.</p>';
+    return `<p class="rep-sum"><b>${d.won.count} won</b> (${esc(money(d.won.value_cents))}) · <b>${d.lost.count} not a fit</b> (${esc(money(d.lost.value_cents))})${d.win_rate_pct==null?'':` · ${d.win_rate_pct}% won`}</p>`
+      +'<h4>Won, by where the deal came from</h4>'+grp(d.won_by_source,'Came from')
+      +'<h4>Not a fit, by the reason given</h4>'+grp(d.lost_by_reason,'Reason');
+  }
+  if(key==='enquiries'){
+    if(!d.rows.length)return '<p class="muted">No website enquiries in the last 12 months.</p>';
+    return rTable(['Page','Last 30 days','Last 12 months','Became deals'],d.rows.map(r=>`<tr><td>${esc(r.source)}</td><td>${r.last_30}</td><td>${r.last_365}</td><td>${r.became_deals}</td></tr>`),`<td>All pages</td><td>${d.last_30}</td><td>${d.last_365}</td><td>${d.became_deals}</td>`);
+  }
+  if(key==='overdue'){
+    if(!d.rows.length)return '<p class="muted">Nothing is overdue.</p>';
+    return rTable(['Invoice','Deal','Amount','Was due','Overdue by'],d.rows.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.deal||'—')}</td><td>${esc(money(r.amount_cents))}</td><td>${esc(r.due_date?shortDate(r.due_date+'T12:00:00Z'):'—')}</td><td>${esc(rDays(r.days_overdue))}</td></tr>`),`<td>Total</td><td></td><td>${esc(money(d.total_cents))}</td><td></td><td></td>`);
+  }
+  return '';
+}
+const REPORT_NOTE={revenue:'Paid invoices by the month they were paid, beside the same month a year before.',pipeline:'Open deals in each stage, and how long they have sat there.',outcomes:'Deals closed in the last 12 months. The reason is the one given when a deal was marked not a fit.',enquiries:'Website enquiries by the page they were sent from.',overdue:'Open invoices past their due date — the same list as Who owes you on the Pipeline.'};
+function paintReports(){
+  const host=$('reportsBody');if(!host||!REP)return;
+  const label=(REPORTS.find(r=>r[0]===REP_ON)||REPORTS[0])[1];
+  host.innerHTML=`<div class="rtabs noprint" role="tablist" aria-label="Reports">${REPORTS.map(([k,l])=>`<button type="button" role="tab" id="rt-${k}" aria-controls="repPrint" aria-selected="${k===REP_ON?'true':'false'}" tabindex="${k===REP_ON?'0':'-1'}" data-rep="${k}">${esc(l)}</button>`).join('')}</div>
+    <div class="rep" id="repPrint" role="tabpanel" aria-labelledby="rt-${REP_ON}"><div class="rep-h"><div><h3>${esc(label)}</h3><p>${esc(REPORT_NOTE[REP_ON]||'')}</p></div><button type="button" class="btn noprint" id="repPrintBtn">Print this report</button></div>
+    ${reportBody(REP_ON,REP[REP_ON])}<p class="rep-foot">As of ${esc(asOf(REP.generated_at))}</p></div>`;
+  const tabs=[...host.querySelectorAll('[data-rep]')];
+  const pick=(k,focus)=>{REP_ON=k;try{localStorage.setItem('dds-report',k);}catch(_){/* */}paintReports();if(focus){const b=$('rt-'+k);if(b)b.focus();}};
+  tabs.forEach((b,i)=>{
+    b.addEventListener('click',()=>pick(b.getAttribute('data-rep'),true));
+    b.addEventListener('keydown',(e)=>{const j=e.key==='ArrowRight'?i+1:e.key==='ArrowLeft'?i-1:-9;if(j===-9)return;e.preventDefault();pick(tabs[(j+tabs.length)%tabs.length].getAttribute('data-rep'),true);});
+  });
+  const pb=$('repPrintBtn');if(pb)pb.addEventListener('click',()=>{
+    document.body.setAttribute('data-print','report');
+    const off=()=>{document.body.removeAttribute('data-print');window.removeEventListener('afterprint',off);};
+    window.addEventListener('afterprint',off);
+    window.print();
+    setTimeout(off,1000);   // a browser that never fires afterprint still gets the page back
+  });
+}
 function renderDash(d){
   if(WEBSITE_VIEW){
     let w=headRow('Website analytics',`<span>Who visits, where they come from, and what they read. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span><span class="dot">·</span><a class="link" href="${esc(withScope('/analytics.html'))}">Sales and enquiries</a>`,true);
@@ -629,10 +721,12 @@ function renderDash(d){
   let h=headRow('Analytics',`<span>Your business at a glance. Numbers only where they’re real.</span><span class="dot">·</span><span>As of ${esc(asOf(d.generated_at))}</span>`,true);
   h+=salesBand(d);
   h+=websiteBand(d);
+  h+=reportsShell();
   h+=`<section id="insights" tabindex="-1" aria-labelledby="insightsH"><h2 class="band" id="insightsH">Insights</h2><div id="insightsBody"><p class="muted">Reading what we can see…</p></div></section>`;
   $('main').innerHTML=h;
   wireDash();
   loadInsights();
+  loadReports();
 }
 // ── Insights: the platform's own evidence-backed observations (GET /business-insights),
 //    read once per visit. A failed read says so in this section only; the board stands.
@@ -656,7 +750,7 @@ async function loadInsights(){
   if(location.hash==='#insights'){const s=$('insights');if(s){s.scrollIntoView({block:'start'});}}
 }
 function wireDash(){
-  $('refreshBtn').addEventListener('click',()=>loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
+  $('refreshBtn').addEventListener('click',()=>{REP=null;loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
   // PERIOD is committed only on a successful render (loadDash) — a failed
   // switch leaves the control and state exactly as they were. The segmented
   // control is plain buttons: no popup, so nothing to close and no focus to guard.
@@ -780,8 +874,10 @@ function renderPortfolio(d,roster){
   if(ins.length)h+=`<div class="grid3" style="margin-top:0">${ins.map(insightCard).join('')}</div>`;
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
   h+=`<div class="print noprint"><button type="button" class="btn" onclick="window.print()">Print this summary</button></div>`;
+  h+=reportsShell();
   $('main').innerHTML=h;
-  const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();}));
+  loadReports();
+  const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>{REP=null;loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
   // row click drills into the client's scoped Business dashboard; the name link
   // inside carries the keyboard/AT path, so plain rows stay non-focusable
   document.querySelectorAll('.tscroll tr[data-drill]').forEach(tr=>tr.addEventListener('click',(e)=>{
