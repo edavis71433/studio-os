@@ -3,11 +3,11 @@ import { installApp } from './helpers/app';
 
 // ── Editing and removing a contact ───────────────────────────────────────────
 // Eric: "i should be able to edit or delete these contacts." His roster carried
-// one person twice — "Claud Beltran / claud.beltran@gmail.com / (626) 234-6081"
-// and "Claude Beltran / no email / 6262346081" — and every row's only action was
+// one person twice — "Jordan Ellis / jordan.ellis@example.com / (555) 010-2468"
+// and "Jordon Ellis / no email / 5550102468" — and every row's only action was
 // "→ New deal". These pin the two new ones.
 //
-// The delete is the careful half. Claud is a CONVERTED CUSTOMER: a won deal, a
+// The delete is the careful half. Jordan is a CONVERTED CUSTOMER: a won deal, a
 // signed agreement, a paid deposit and a project hang off him. So:
 //   • an unconfirmed DELETE writes NOTHING — it is a dry run that returns the
 //     inventory, and the confirm NAMES it,
@@ -15,28 +15,28 @@ import { installApp } from './helpers/app';
 //   • a failure says what happened, and never looks like a success.
 
 const ROSTER = [
-  { id: 'ct-claud', name: 'Claud Beltran', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', company: 'Bacchus Kitchen + Wine Bar', updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-    possible_duplicate_of: { id: 'ct-claude', name: 'Claude Beltran', email: '', phone: '6262346081', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
-  { id: 'ct-claude', name: 'Claude Beltran', email: '', phone: '6262346081', company: '', updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-    possible_duplicate_of: { id: 'ct-claud', name: 'Claud Beltran', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
+  { id: 'ct-jordan', name: 'Jordan Ellis', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', company: 'Larkspur Kitchen + Wine Bar', updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    possible_duplicate_of: { id: 'ct-jordon', name: 'Jordon Ellis', email: '', phone: '5550102468', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
+  { id: 'ct-jordon', name: 'Jordon Ellis', email: '', phone: '5550102468', company: '', updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    possible_duplicate_of: { id: 'ct-jordan', name: 'Jordan Ellis', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
   { id: 'ct-eric', name: 'Eric Test', email: 'edavis7143@yahoo.com', phone: '', company: '', updated_at: new Date(Date.now() - 5 * 86400000).toISOString() },
-  { id: 'ct-hettie', name: 'Hettie Smith', email: 'hettie@example.com', phone: '(310) 555-0134', company: 'Smith & Co', updated_at: new Date(Date.now() - 9 * 86400000).toISOString() },
+  { id: 'ct-marigold', name: 'Marigold Smith', email: 'marigold@example.com', phone: '(310) 555-0134', company: 'Smith & Co', updated_at: new Date(Date.now() - 9 * 86400000).toISOString() },
   { id: 'ct-maurice', name: 'Maurice Tobin', email: 'maurice@example.com', phone: '', company: '', updated_at: new Date(Date.now() - 12 * 86400000).toISOString() },
 ];
 
 // The two shapes the DELETE dry run answers with (the server never writes on an
 // unconfirmed DELETE, so BOTH of these are 409s).
 const HAS_HISTORY = {
-  error: 'has_history', name: 'Claud Beltran', has_history: true, converted: true,
+  error: 'has_history', name: 'Jordan Ellis', has_history: true, converted: true,
   items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'],
   attachments: { deals: 1, won_deals: 1, projects: 1, signed_contracts: 1, paid_invoices: 1, open_invoices: 0, appointments: 0, reviews: 0 },
   unknown: [],
-  message: 'Claud Beltran has 1 deal, 1 signed agreement, 1 paid invoice and 1 project. They became a customer. Removing them takes them off your contact list only — the deal, the agreement, the invoices and the project all stay exactly where they are, and nothing is deleted with them.',
+  message: 'Jordan Ellis has 1 deal, 1 signed agreement, 1 paid invoice and 1 project. They became a customer. Removing them takes them off your contact list only — the deal, the agreement, the invoices and the project all stay exactly where they are, and nothing is deleted with them.',
 };
 const NO_HISTORY = {
-  error: 'confirm_required', name: 'Claude Beltran', has_history: false, converted: false,
+  error: 'confirm_required', name: 'Jordon Ellis', has_history: false, converted: false,
   items: [], attachments: {}, unknown: [],
-  message: 'Nothing else in your workspace is attached to Claude Beltran — no deals, invoices, projects or bookings.',
+  message: 'Nothing else in your workspace is attached to Jordon Ellis — no deals, invoices, projects or bookings.',
 };
 
 const pinTable = (page: Page) =>
@@ -93,7 +93,7 @@ test.describe('Contacts — editing a contact from the row', () => {
       onPatch: (body) => {
         patched = body as Record<string, unknown>;
         // the persisted roster now carries the edit — the reload after save must show it
-        const row = roster.find((c) => c.id === 'ct-hettie')!;
+        const row = roster.find((c) => c.id === 'ct-marigold')!;
         Object.assign(row, { name: patched.name, email: patched.email, phone: patched.phone, company: patched.company });
         return { status: 200, body: { data: row } };
       },
@@ -102,28 +102,28 @@ test.describe('Contacts — editing a contact from the row', () => {
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toHaveCount(5);
 
-    await page.locator('[data-edit="ct-hettie"]').click();
+    await page.locator('[data-edit="ct-marigold"]').click();
     await expect(page.locator('#editDlg')).toBeVisible();
     // seeded from the record, custom fields included (Manage fields defines them here)
-    await expect(page.locator('#e-name')).toHaveValue('Hettie Smith');
-    await expect(page.locator('#e-email')).toHaveValue('hettie@example.com');
+    await expect(page.locator('#e-name')).toHaveValue('Marigold Smith');
+    await expect(page.locator('#e-email')).toHaveValue('marigold@example.com');
     await expect(page.locator('#e-phone')).toHaveValue('(310) 555-0134');
     await expect(page.locator('#e-company')).toHaveValue('Smith & Co');
     await expect(page.locator('#e-custom [data-cf="referred_by"]')).toHaveValue('Word of mouth');
 
-    await page.locator('#e-name').fill('Hettie Smyth');
+    await page.locator('#e-name').fill('Marigold Smyth');
     await page.locator('#e-company').fill('Smyth & Co');
-    await page.locator('#e-custom [data-cf="referred_by"]').fill('Referral from Claud');
+    await page.locator('#e-custom [data-cf="referred_by"]').fill('Referral from Jordan');
     await page.locator('#e-save').click();
 
     await expect(page.locator('#editDlg')).toBeHidden();
     expect(patched).toEqual({
-      name: 'Hettie Smyth', email: 'hettie@example.com', phone: '(310) 555-0134', company: 'Smyth & Co',
-      custom: { referred_by: 'Referral from Claud' },
+      name: 'Marigold Smyth', email: 'marigold@example.com', phone: '(310) 555-0134', company: 'Smyth & Co',
+      custom: { referred_by: 'Referral from Jordan' },
     });
     // it PERSISTS: the roster reloads and reads back the saved name
-    await expect(page.locator('tbody')).toContainText('Hettie Smyth');
-    await expect(page.locator('tbody')).not.toContainText('Hettie Smith');
+    await expect(page.locator('tbody')).toContainText('Marigold Smyth');
+    await expect(page.locator('tbody')).not.toContainText('Marigold Smith');
     expect(writes.filter((w) => w.startsWith('PATCH'))).toHaveLength(1);
   });
 
@@ -134,9 +134,9 @@ test.describe('Contacts — editing a contact from the row', () => {
       onPatch: () => ({ status: 409, body: { error: 'email_taken', message: 'Another contact already uses that email.' } }),
     });
     await page.goto('/contacts.html');
-    await page.locator('[data-edit="ct-claude"]').click();
+    await page.locator('[data-edit="ct-jordon"]').click();
     await expect(page.locator('#editDlg')).toBeVisible();
-    await page.locator('#e-email').fill('claud.beltran@gmail.com');
+    await page.locator('#e-email').fill('jordan.ellis@example.com');
     await page.locator('#e-save').click();
     // the server's own words, not a generic "that didn't save"
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Another contact already uses that email.' }).first()).toBeVisible();
@@ -150,7 +150,7 @@ test.describe('Contacts — editing a contact from the row', () => {
     const writes: string[] = [];
     await mockContacts(page, { writes });
     await page.goto('/contacts.html');
-    await page.locator('[data-edit="ct-claude"]').click();
+    await page.locator('[data-edit="ct-jordon"]').click();
     await page.locator('#e-name').fill('');
     await page.locator('#e-email').fill('');
     await page.locator('#e-save').click();
@@ -167,27 +167,27 @@ test.describe('Contacts — removing a contact', () => {
     await mockContacts(page, {
       writes,
       onDelete: (_id, confirmed) => confirmed
-        ? { status: 200, body: { data: { ok: true, deleted: true, name: 'Claude Beltran', kept_items: [] } } }
+        ? { status: 200, body: { data: { ok: true, deleted: true, name: 'Jordon Ellis', kept_items: [] } } }
         : { status: 409, body: NO_HISTORY },
     });
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toHaveCount(5);
 
-    await page.locator('[data-del="ct-claude"]').click();
+    await page.locator('[data-del="ct-jordon"]').click();
     await expect(page.locator('#delDlg')).toBeVisible();
-    await expect(page.locator('#delBody')).toContainText('Remove Claude Beltran?');
+    await expect(page.locator('#delBody')).toContainText('Remove Jordon Ellis?');
     // the confirm still tells the truth about what is (not) attached
-    await expect(page.locator('#delBody')).toContainText('Nothing else in your workspace is attached to Claude Beltran');
+    await expect(page.locator('#delBody')).toContainText('Nothing else in your workspace is attached to Jordon Ellis');
     await expect(page.locator('#delBody .delfacts')).toHaveCount(0);
 
     await page.locator('#del-go').click();
     await expect(page.locator('#delDlg')).toBeHidden();
-    // gone from the roster — Eric ends up with ONE Claud
+    // gone from the roster — Eric ends up with ONE Jordan
     await expect(page.locator('tbody tr')).toHaveCount(4);
-    await expect(page.locator('tbody')).not.toContainText('Claude Beltran');
-    await expect(page.locator('tbody')).toContainText('Claud Beltran');
+    await expect(page.locator('tbody')).not.toContainText('Jordon Ellis');
+    await expect(page.locator('tbody')).toContainText('Jordan Ellis');
     // exactly two calls: the dry run, then the confirmed delete
-    expect(writes).toEqual(['DELETE /sales/contacts/ct-claude', 'DELETE /sales/contacts/ct-claude?confirm=1']);
+    expect(writes).toEqual(['DELETE /sales/contacts/ct-jordon', 'DELETE /sales/contacts/ct-jordon?confirm=1']);
   });
 
   test('a contact WITH history is warned about by name, and nothing cascades', async ({ page }) => {
@@ -199,11 +199,11 @@ test.describe('Contacts — removing a contact', () => {
     await mockContacts(page, {
       writes,
       onDelete: (_id, confirmed) => confirmed
-        ? { status: 200, body: { data: { ok: true, deleted: true, name: 'Claud Beltran', kept_items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'] } } }
+        ? { status: 200, body: { data: { ok: true, deleted: true, name: 'Jordan Ellis', kept_items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'] } } }
         : { status: 409, body: HAS_HISTORY },
     });
     await page.goto('/contacts.html');
-    await page.locator('[data-del="ct-claud"]').click();
+    await page.locator('[data-del="ct-jordan"]').click();
 
     await expect(page.locator('#delDlg')).toBeVisible();
     // it names WHAT is attached — not "Are you sure?"
@@ -217,15 +217,15 @@ test.describe('Contacts — removing a contact', () => {
     await expect(page.locator('#delBody')).toContainText('nothing is deleted with them');
     await expect(page.locator('#delBody')).toContainText('They became a customer');
     // nothing has been written yet — the dry run is a READ in disguise
-    expect(writes).toEqual(['DELETE /sales/contacts/ct-claud']);
+    expect(writes).toEqual(['DELETE /sales/contacts/ct-jordan']);
 
     await page.locator('#del-go').click();
     await expect(page.locator('#delDlg')).toBeHidden();
-    await expect(page.locator('tbody')).not.toContainText('Claud Beltran');
+    await expect(page.locator('tbody')).not.toContainText('Jordan Ellis');
     // the toast says what was KEPT
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'their 1 deal, 1 signed agreement, 1 paid invoice, 1 project stayed' }).first()).toBeVisible();
     // NOTHING CASCADED: the only writes in the whole flow were the two contact calls
-    expect(allWrites).toEqual(['DELETE /sales/contacts/ct-claud', 'DELETE /sales/contacts/ct-claud']);
+    expect(allWrites).toEqual(['DELETE /sales/contacts/ct-jordan', 'DELETE /sales/contacts/ct-jordan']);
   });
 
   test('backing out of the confirm writes nothing at all', async ({ page }) => {
@@ -234,12 +234,12 @@ test.describe('Contacts — removing a contact', () => {
     const writes: string[] = [];
     await mockContacts(page, { writes, onDelete: () => ({ status: 409, body: HAS_HISTORY }) });
     await page.goto('/contacts.html');
-    await page.locator('[data-del="ct-claud"]').click();
+    await page.locator('[data-del="ct-jordan"]').click();
     await expect(page.locator('#delDlg')).toBeVisible();
     await page.locator('#del-cancel').click();
     await expect(page.locator('#delDlg')).toBeHidden();
     await expect(page.locator('tbody tr')).toHaveCount(5);
-    expect(writes).toEqual(['DELETE /sales/contacts/ct-claud']);   // the dry run only
+    expect(writes).toEqual(['DELETE /sales/contacts/ct-jordan']);   // the dry run only
   });
 
   test('a failed delete says what happened and never reads as success', async ({ page }) => {
@@ -247,18 +247,18 @@ test.describe('Contacts — removing a contact', () => {
     await installApp(page);
     await mockContacts(page, {
       onDelete: (_id, confirmed) => confirmed
-        ? { status: 502, body: { error: 'write_failed', message: 'We couldn’t remove Claud Beltran — the change didn’t reach the database (502). Nothing was deleted; please try again.' } }
+        ? { status: 502, body: { error: 'write_failed', message: 'We couldn’t remove Jordan Ellis — the change didn’t reach the database (502). Nothing was deleted; please try again.' } }
         : { status: 409, body: HAS_HISTORY },
     });
     await page.goto('/contacts.html');
-    await page.locator('[data-del="ct-claud"]').click();
+    await page.locator('[data-del="ct-jordan"]').click();
     await page.locator('#del-go').click();
     // the dialog STAYS open, carrying the reason — a closed dialog would read as done
     await expect(page.locator('#delDlg')).toBeVisible();
-    await expect(page.locator('#delBody [role="alert"]')).toContainText('Claud Beltran was NOT removed');
+    await expect(page.locator('#delBody [role="alert"]')).toContainText('Jordan Ellis was NOT removed');
     await expect(page.locator('#delBody [role="alert"]')).toContainText('didn’t reach the database (502)');
     await expect(page.locator('#del-go')).toHaveText('Try again');
-    await expect(page.locator('tbody')).toContainText('Claud Beltran');
+    await expect(page.locator('tbody')).toContainText('Jordan Ellis');
   });
 
   test('a removed contact stays gone from the roster AND from search', async ({ page }) => {
@@ -271,17 +271,17 @@ test.describe('Contacts — removing a contact', () => {
         : { status: 409, body: NO_HISTORY },
     });
     await page.goto('/contacts.html');
-    await page.locator('[data-del="ct-claude"]').click();
+    await page.locator('[data-del="ct-jordon"]').click();
     await page.locator('#del-go').click();
     await expect(page.locator('tbody tr')).toHaveCount(4);
     // search finds the survivor and never the removed row
-    await page.locator('#q').pressSequentially('belt');
+    await page.locator('#q').pressSequentially('elli');
     await expect(page.locator('tbody tr')).toHaveCount(1);
-    await expect(page.locator('tbody tr').first()).toContainText('Claud Beltran');
+    await expect(page.locator('tbody tr').first()).toContainText('Jordan Ellis');
     // a full reload re-reads the server, which no longer lists them
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toHaveCount(4);
-    await expect(page.locator('#main')).not.toContainText('Claude Beltran');
+    await expect(page.locator('#main')).not.toContainText('Jordon Ellis');
   });
 });
 
@@ -294,10 +294,10 @@ test.describe('Contacts — the possible-duplicate hint', () => {
     await page.goto('/contacts.html');
     await asked;
     const flags = page.locator('.dupflag');
-    await expect(flags).toHaveCount(2);            // the two Clauds, nobody else
+    await expect(flags).toHaveCount(2);            // the two Jordans, nobody else
     await expect(flags.first()).toHaveText('possible duplicate');
-    await expect(page.locator('tr[data-open="ct-claud"] .dupflag')).toHaveAttribute('title', /Claude Beltran — same phone number and same name/);
-    await expect(page.locator('tr[data-open="ct-hettie"] .dupflag')).toHaveCount(0);
+    await expect(page.locator('tr[data-open="ct-jordan"] .dupflag')).toHaveAttribute('title', /Jordon Ellis — same phone number and same name/);
+    await expect(page.locator('tr[data-open="ct-marigold"] .dupflag')).toHaveCount(0);
   });
 });
 
@@ -322,7 +322,7 @@ test.describe('Contacts — reachable at 390px', () => {
     await expect(page.locator('.c[data-open]')).toHaveCount(5);      // cards, not the wide table
     await expect(page.locator('tbody tr')).toHaveCount(0);
 
-    const card = page.locator('.c[data-open="ct-claude"]');
+    const card = page.locator('.c[data-open="ct-jordon"]');
     const edit = card.locator('[data-edit]');
     const del = card.locator('[data-del]');
     await expect(edit).toBeVisible();

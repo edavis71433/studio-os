@@ -51,9 +51,9 @@ function installFetch(cfg = {}) {
     if (url.includes(`clients?id=eq.${OWNER_CLIENT}`)) return jr([{ id: OWNER_CLIENT, name: 'Davis Digital Studio', email: 'eric@davisdigitalstudio.com', contact_email: '' }]);
     if (url.includes('presence_deal_events')) return jr(null, 201);
     if (url.includes('presence_deals') && method === 'PATCH') return jr([{ id: DEAL }]);
-    if (url.includes('presence_deals')) return jr([{ id: DEAL, title: 'Bacchus website', stage: cfg.stage || 'contract', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', created_project_id: PROJECT }]);
+    if (url.includes('presence_deals')) return jr([{ id: DEAL, title: 'Larkspur website', stage: cfg.stage || 'contract', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', created_project_id: PROJECT }]);
     if (url.includes('presence_contracts')) return jr(cfg.signed === false ? [] : [{ id: 'k-1' }]);
-    if (url.includes('presence_contacts')) return jr([{ name: 'Claud Beltran' }]);
+    if (url.includes('presence_contacts')) return jr([{ name: 'Jordan Ellis' }]);
     if (url.includes('presence_tasks') && method === 'PATCH') return jr([{ id: 'task_1', title: 'Deposit paid', client_visible: false }]);
     if (url.includes('presence_tasks')) return jr([{ id: 'task_x' }]);
     if (url.includes('presence_project_events')) return jr(null, 201);

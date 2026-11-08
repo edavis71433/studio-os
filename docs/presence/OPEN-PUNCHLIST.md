@@ -665,7 +665,7 @@ further incidents, zero lost bytes.
 ## 🖼️ THE AFTERNOON BATCH — LIVE (deploys #34-35, 2026-08-07)
 
 Eric's second round from the roster screens: contacts uneditable (+ a live
-Claud/Claude duplicate), no task dropdown, pages half-width, analytics
+duplicate contact), no task dropdown, pages half-width, analytics
 platform-only, Hettie's previews broken.
 
 SHIPPED:
@@ -737,7 +737,7 @@ copyable from the old GOOGLE_CLIENT_ID/_SECRET) + Google Cloud checks.
 
 ## 💸 THE SILENT STUDIO — BUILT, NEEDS 0120 + DEPLOY (2026-08-07)
 
-Eric, from his phone: no email when Claud Beltran signed OR paid his deposit;
+Eric, from his phone: no email when a client signed OR paid their deposit;
 Bacchus project stuck at "0% · 0/0 tasks"; "connect search console just takes
 me in a circle"; business dashboard empty; then Projects + Pipeline + Contacts
 ALL empty; messages unfilterable outside a profile.

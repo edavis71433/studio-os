@@ -5,7 +5,7 @@
 // (presence_deals.contact_id, presence_appointments.contact_id,
 // presence_reviews.contact_id), every one of them `on delete set null`.
 //
-// So the confirm must NAME what is attached before anything happens — "Claud has
+// So the confirm must NAME what is attached before anything happens — "Jordan has
 // 1 deal, 1 signed agreement, 1 paid invoice and 1 project" beats "Are you
 // sure?" — and the delete itself must be a SOFT delete (`deleted_at`, the
 // established pattern since 0074) that touches exactly one row. Nothing
@@ -104,8 +104,8 @@ export function attachmentWarning(who: string, s: AttachmentSummary): string {
 }
 
 // ── roster duplicate hints ───────────────────────────────────────────────────
-// "6262346081" and "(626) 234-6081" are the same number; "Claud Beltran" and
-// "Claude Beltran" are the same person. The dedupe module already knows both
+// "5550102468" and "(555) 010-2468" are the same number; "Jordan Ellis" and
+// "Jordon Ellis" are the same person. The dedupe module already knows both
 // (phoneKey normalizes, nameSimilarity tolerates the typo) — it just only ever
 // ran on CREATE. Running it across the roster surfaces the pairs already sitting
 // there. A HINT only: it never merges, never hides, never reorders.

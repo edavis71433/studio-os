@@ -1,7 +1,7 @@
 // ── The two money moments + the delivery checklist ──────────────────────────
 //   deno run --allow-read --allow-env --allow-net tests/presence/money_moments_test.mjs
 //
-// Eric's client Claud Beltran signed a contract and paid a deposit, and Eric got
+// A client signed a contract and paid a deposit, and Eric got
 // NO EMAIL for either — because no such email existed. Both moments raised an
 // in-app notice and stopped there, which only ever helps someone already looking
 // at the app. This suite holds down the two sends, the send-ONCE gate on each,
@@ -89,8 +89,8 @@ function installFetch(cfg = {}) {
     if (url.includes('presence_identity')) return jr([{ business_name: 'Davis Digital Studio', email: cfg.identityEmail === undefined ? 'studio@davisdigitalstudio.com' : cfg.identityEmail }]);
     if (url.includes('presence_brand_kits') || url.includes('brand_kit')) return jr([]);
     if (url.includes(`clients?id=eq.${OWNER_CLIENT}`)) return jr([{ id: OWNER_CLIENT, name: 'Davis Digital Studio', email: cfg.ownerEmail === undefined ? 'eric@davisdigitalstudio.com' : cfg.ownerEmail, contact_email: '' }]);
-    if (url.includes('presence_deals')) return jr([{ id: DEAL, title: 'Bacchus website', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', created_project_id: PROJECT }]);
-    if (url.includes('presence_contacts')) return jr([{ name: 'Claud Beltran' }]);
+    if (url.includes('presence_deals')) return jr([{ id: DEAL, title: 'Larkspur website', contact_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', created_project_id: PROJECT }]);
+    if (url.includes('presence_contacts')) return jr([{ name: 'Jordan Ellis' }]);
     if (url.includes('presence_tasks') && method === 'PATCH') return jr(cfg.taskAlreadyDone ? [] : [{ id: 'task_1', title: 'Deposit paid', client_visible: false }]);
     if (url.includes('presence_tasks') && method === 'POST') return jr((body || []).map((_, i) => ({ id: `task_${i}` })), 201);
     if (url.includes('presence_tasks')) return jr(cfg.projectHasTasks ? [{ id: 'task_x' }] : []);
@@ -123,8 +123,8 @@ try {
     ok('paid: a paid deposit emails the operator', r.status === 200 && out.data?.emailed === true && sent.length === 1);
     ok('paid: it goes to the site’s resolved operator address', sent[0]?.to === 'studio@davisdigitalstudio.com');
     ok('paid: the subject SAYS deposit, the amount, and who paid — not "invoice"',
-      /^Deposit received — \$500\.00 from Claud Beltran$/.test(String(sent[0]?.subject || '')), String(sent[0]?.subject));
-    ok('paid: the body names the amount and the payer', /\$500\.00/.test(String(sent[0]?.html || '')) && /Claud Beltran/.test(String(sent[0]?.html || '')));
+      /^Deposit received — \$500\.00 from Jordan Ellis$/.test(String(sent[0]?.subject || '')), String(sent[0]?.subject));
+    ok('paid: the body names the amount and the payer', /\$500\.00/.test(String(sent[0]?.html || '')) && /Jordan Ellis/.test(String(sent[0]?.html || '')));
     // reply-to: operator mail must NEVER carry the site's inbound webhook address
     ok('paid: reply-to stays the human platform address (never the inbound webhook)', sent[0]?.reply_to === 'eric@davisdigitalstudio.com');
     const notice = calls.find((c) => c.url.includes('presence_plan_notices') && c.method === 'POST');
@@ -132,7 +132,7 @@ try {
       /on_conflict=client_id,kind,period/.test(String(notice?.url || '')), String(notice?.url));
     ok('paid: the notice keys on the invoice id, so a Stripe retry re-raises nothing', notice?.body?.period === `paid:${INVOICE}`);
     ok('paid: the notice headline names the deposit + amount + payer',
-      /^Deposit — Deposit \(\$500\.00\) from Claud Beltran$/.test(String(notice?.body?.headline || '')), String(notice?.body?.headline));
+      /^Deposit — Deposit \(\$500\.00\) from Jordan Ellis$/.test(String(notice?.body?.headline || '')), String(notice?.body?.headline));
     const tick = calls.find((c) => c.url.includes('presence_tasks') && c.method === 'PATCH');
     ok('paid: a paid DEPOSIT ticks checklist step 2', out.data?.ticked === true && /source=eq\.checklist%3Adeposit_paid/.test(String(tick?.url || '')), String(tick?.url));
     restore();

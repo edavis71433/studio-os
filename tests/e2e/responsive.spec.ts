@@ -7,8 +7,8 @@ import { installApp } from './helpers/app';
 // A roster with the kind of values that actually set a table's minimum width:
 // a long company name, a long email, a formatted phone.
 const CONTACTS = { data: [
-  { id: 'ct-1', name: 'Claud Beltran', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', company: 'Bacchus Kitchen + Wine Bar', updated_at: new Date(Date.now() - 3 * 86400000).toISOString() },
-  { id: 'ct-2', name: 'Hettie Smith', email: 'hettie@smithandcompany.example.com', phone: '(310) 555-0134', company: 'Smith & Co', updated_at: new Date(Date.now() - 9 * 86400000).toISOString() },
+  { id: 'ct-1', name: 'Jordan Ellis', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', company: 'Larkspur Kitchen + Wine Bar', updated_at: new Date(Date.now() - 3 * 86400000).toISOString() },
+  { id: 'ct-2', name: 'Marigold Smith', email: 'marigold@smithandcompany.example.com', phone: '(310) 555-0134', company: 'Smith & Co', updated_at: new Date(Date.now() - 9 * 86400000).toISOString() },
 ] };
 const CUSTOMERS = { data: [
   { client_id: 'c-acme', name: 'Acme Bakery', email: 'accounts@acmebakery.example.com', project_id: 'p1', project_name: 'Site refresh', status: 'active', customer_site_id: 'site-acme', open_support: 2, project_count: 1 },
