@@ -755,6 +755,86 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ description: 'Hello there' });
   });
 
+  // A slow server: each save of Business details takes most of a second to answer, and the
+  // log says when it was asked, when it answered and when the page asked for a drawing.
+  const slowDetails = async (page: Page) => {
+    const log: string[] = [];
+    await page.route('**/functions/v1/presence/identity', async (route: Route) => {
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 900)); log.push('save answered'); await route.fallback();
+    });
+    await page.route('**/functions/v1/presence/preview**', (route: Route) => { log.push('drawing'); return route.fallback(); });
+    return log;
+  };
+  const drawnWhileSaving = (log: string[]) => {
+    const from = log.lastIndexOf('save asked'), to = log.lastIndexOf('save answered');
+    return log.slice(from, to < from ? undefined : to).filter((x) => x === 'drawing').length;
+  };
+  const leaveWarns = (page: Page) => page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+
+  test('a redraw asked for while typing waits, so it neither cuts the words off nor paints the old ones back', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const log = await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh');
+    await page.evaluate(() => (window as any).refreshDesignPreview());   // as when a panel's save lands mid-word
+    await page.waitForTimeout(700);
+    await expect(tag).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.type(' pasta');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ tagline: 'Fresh pasta' });
+    await expect.poll(() => log.slice(log.lastIndexOf('save answered')).includes('drawing')).toBe(true);   // the held redraw comes after the save
+    expect(drawnWhileSaving(log)).toBe(0);
+  });
+
+  test('Preview right after Enter waits for the words, so it shows them', async ({ page }) => {
+    test.skip(isPhone(page), 'Edit mode’s Preview button is in the desktop bar');
+    const { writes, frame } = await canvas(page);
+    const log = await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    await page.keyboard.press('Enter');
+    await page.locator('#dcBtnPreview').click();
+    await expect(page.locator('#stage')).toHaveClass(/\bon\b/);
+    await expect.poll(() => log.slice(log.lastIndexOf('save answered')).includes('drawing')).toBe(true);
+    expect(drawnWhileSaving(log)).toBe(0);
+    expect(identityWrites(writes).at(-1)?.body).toEqual({ tagline: 'Fresh pasta' });
+  });
+
+  test('a second double-click before the save answers keeps the new words', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    await page.keyboard.press('Enter');
+    await tag.dblclick();   // the saved copy still says "no tagline"; the words on screen are real now
+    await page.keyboard.type('X');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => identityWrites(writes).length).toBe(2);
+    const last = identityWrites(writes).at(-1)!.body.tagline as string;
+    expect(last).not.toBe('X');
+    expect(last.startsWith('Fresh')).toBe(true);
+  });
+
+  test('closing the tab warns while typed words are still on their way', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    await slowDetails(page);
+    expect(await leaveWarns(page)).toBe(false);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    expect(await leaveWarns(page)).toBe(true);    // typed, not yet handed over
+    await page.keyboard.press('Enter');
+    expect(await leaveWarns(page)).toBe(true);    // on its way
+    await expect.poll(() => identityWrites(writes).length).toBe(1);
+    await expect.poll(() => leaveWarns(page)).toBe(false);
+    // the same for Business details typed in its own form, inside the form's pause
+    await page.evaluate(() => { const i = document.getElementById('f-service_area') as HTMLInputElement; i.value = 'Burbank'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(await leaveWarns(page)).toBe(true);
+  });
+
   test('the rest of a built-in section still says where its words live', async ({ page }) => {
     const { writes, frame } = await canvas(page);
     await frame.locator('section[data-dds-core="about"] h2').dblclick();
