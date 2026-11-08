@@ -311,13 +311,17 @@ ${o.body}
 // Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
 // Phase T-BLOCKS: enabled structured blocks (block_<type>) join the same order/
 // visibility machinery — they default after the core sections, reorderable/hideable.
-const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
+// The welcome section ('hero') takes part here too: it moves like the others, and
+// stays first until a saved order names it, so an order saved before it could
+// move never shifts it. The builder reads data-dds-movable to know it can move.
+const HOME_SECTIONS = ['hero', 'about', 'offerings', 'testimonials', 'faqs'];
 function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[] {
   const all = [...HOME_SECTIONS, ...blockKeys];
   const hidden = new Set(c.settings?.sections?.hidden || []);
   const chosen = (c.settings?.sections?.order || []).filter((k) => all.includes(k));
-  const rest = all.filter((k) => !chosen.includes(k));
-  return [...chosen, ...rest].filter((k) => !hidden.has(k));
+  const lead = chosen.includes('hero') ? [] : ['hero'];
+  const rest = all.filter((k) => !chosen.includes(k) && !lead.includes(k));
+  return [...lead, ...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
 function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof vocabFor>, blocks: RenderedBlock[] = []): string {
@@ -348,17 +352,21 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
     ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="(max-width:760px) 100vw, 45vw"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
     : '';
   const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
-  return `${heroOff ? '' : `
-<section class="hero wrap" data-dds-core="hero">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
-  ${heroImgOk ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}`}
-</section>`}
-${(loc0(c) || tel || maps) ? `<div class="strip"><div class="wrap">
+  // The address strip belongs under the welcome section and moves with it; with
+  // the welcome section removed it keeps its old place at the top.
+  const strip = (loc0(c) || tel || maps) ? `<div class="strip"><div class="wrap">
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
-</div></div>` : ''}
+</div></div>` : '';
+  return `${heroOff ? strip : ''}
 ${(() => {
   const parts: Record<string, string> = {
+    hero: `
+<section class="hero wrap" data-dds-core="hero" data-dds-movable>${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
+  ${heroImgOk ? `<div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div>` : ''}`}
+</section>
+${strip}`,
     about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}

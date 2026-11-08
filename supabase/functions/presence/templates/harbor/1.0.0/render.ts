@@ -316,13 +316,17 @@ ${o.body}
 
 // Home sections — owner-chosen order + visibility, structured; enabled structured
 // blocks (block_<type>) join the same order/visibility machinery.
-const HOME_SECTIONS = ['about', 'offerings', 'testimonials', 'faqs'];
+// The welcome section ('hero') takes part here too: it moves like the others, and
+// stays first until a saved order names it, so an order saved before it could
+// move never shifts it. The builder reads data-dds-movable to know it can move.
+const HOME_SECTIONS = ['hero', 'about', 'offerings', 'testimonials', 'faqs'];
 function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): string[] {
   const all = [...HOME_SECTIONS, ...blockKeys];
   const hidden = new Set(c.settings?.sections?.hidden || []);
   const chosen = (c.settings?.sections?.order || []).filter((k) => all.includes(k));
-  const rest = all.filter((k) => !chosen.includes(k));
-  return [...chosen, ...rest].filter((k) => !hidden.has(k));
+  const lead = chosen.includes('hero') ? [] : ['hero'];
+  const rest = all.filter((k) => !chosen.includes(k) && !lead.includes(k));
+  return [...lead, ...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
 // Harbor's signature: the hero's right column is a stat/checklist panel on a pale
@@ -378,18 +382,22 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
     : '';
   const right = useSplit ? splitImg : heroPanel(c, v);
   const heroOff = new Set(c.settings?.sections?.hidden || []).has('hero');   // hero is removable from the canvas
-  return `${heroOff ? '' : `
-<section class="hero" data-dds-core="hero"><div class="wrap hero-grid${right ? '' : ' solo'}"><div class="hero-copy">${heroText}</div>${right}</div>
-${heroImgOk && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div></div>` : ''}
-</section>`}
-${(loc0(c) || tel || maps || mail) ? `<div class="strip"><div class="wrap">
+  // The address strip belongs under the welcome section and moves with it; with
+  // the welcome section removed it keeps its old place at the top.
+  const strip = (loc0(c) || tel || maps || mail) ? `<div class="strip"><div class="wrap">
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${mail ? `<span>${mail}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
-</div></div>` : ''}
+</div></div>` : '';
+  return `${heroOff ? strip : ''}
 ${(() => {
   const parts: Record<string, string> = {
+    hero: `
+<section class="hero" data-dds-core="hero" data-dds-movable><div class="wrap hero-grid${right ? '' : ' solo'}"><div class="hero-copy">${heroText}</div>${right}</div>
+${heroImgOk && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div></div>` : ''}
+</section>
+${strip}`,
     about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
