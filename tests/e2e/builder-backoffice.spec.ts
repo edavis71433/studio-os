@@ -121,7 +121,7 @@ test.describe('Search tab', () => {
     await openSearch(page, VISIBILITY());
     await page.route('**/functions/v1/presence/visibility/check', async (route) => {
       calls++;
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 1500));   // long enough to read the status line under a busy test run
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { score: SCORE } }) });
     });
     await expect(page.locator('.sv-ring')).toHaveAttribute('aria-label', 'No score yet');
