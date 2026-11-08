@@ -156,14 +156,18 @@ function coerceAuthList(v: unknown): AuthResult[] {
 
 /** The authentication picture from a webhook `data` payload — computed ONLY from
  *  the provider's STRUCTURED verdict fields (data.dmarc/spf/dkim; each a bare
- *  string OR an object). SECURITY (SA1): the message's own `Authentication-Results`
+ *  string OR an object). Resend's received-email API reports the same verdict as
+ *  data.authentication.{spf,dkim,dmarc} — the RECEIVING server's own checks, not
+ *  anything the message says about itself — so that block is read too.
+ *  SECURITY (SA1): the message's own `Authentication-Results`
  *  header stanzas are attacker-controlled and are DELIBERATELY NOT parsed here —
  *  trusting them would let a spoofer stamp their own `dmarc=pass` and bypass the
  *  gate. If the provider supplies no structured verdict, this returns all-null and
  *  senderAuthVerdict fails closed ('none' → drop). Pure. */
 export function parseAuthResults(data: unknown): ParsedAuth {
   const d = (data && typeof data === 'object') ? data as any : {};
-  return { dmarc: coerceAuth(d.dmarc), spf: coerceAuth(d.spf), dkim: coerceAuthList(d.dkim) };
+  const a = (d.authentication && typeof d.authentication === 'object') ? d.authentication : {};
+  return { dmarc: coerceAuth(d.dmarc ?? a.dmarc), spf: coerceAuth(d.spf ?? a.spf), dkim: coerceAuthList(d.dkim ?? a.dkim) };
 }
 
 /** Relaxed/suffix domain alignment. NO Public Suffix List is available here, so
@@ -418,4 +422,46 @@ export function parseInbound(payload: unknown): Inbound | null {
   const message_id = clean(data.message_id ?? data.messageId ?? data['message-id'] ?? headerValue(data.headers, 'message-id'), 300);
   if (!subject && !text) return null;   // an empty message lands nothing
   return { message_id, from_email, from_name, to_email, to_emails, subject, text };
+}
+
+// ── Resend's envelope-only webhook → the full message ─────────────────────────
+// Resend's email.received webhook carries only the ENVELOPE — email_id, from,
+// to, cc, subject, message_id — never the body, the headers or the sender-auth
+// verdict. The route reads the rest from Resend's received-email API
+// (GET /emails/receiving/{id}); these helpers decide whether to, and merge.
+
+/** The id to fetch the full message by, or '' when the payload isn't Resend's
+ *  envelope (a provider that inlines the body, or the tests' inline shape).
+ *  A narrow charset — it goes into a URL path. Pure. */
+export function receivedEmailId(data: unknown): string {
+  const d = (data && typeof data === 'object') ? data as any : {};
+  const id = typeof d.email_id === 'string' ? d.email_id.trim() : '';
+  return /^[A-Za-z0-9-]{8,80}$/.test(id) ? id : '';
+}
+
+/** The sender and the site a webhook's own (signed) envelope names — enough to
+ *  drop mail that could never land BEFORE spending a Resend API call on it.
+ *  site_id is the first site-addressed recipient across to + cc. Pure. */
+export function envelopeOf(data: unknown): { from_email: string; site_id: string | null } {
+  const d = (data && typeof data === 'object') ? data as any : {};
+  const from_email = parseAddress(d.from ?? d.sender ?? d.from_email).email;
+  const site_id = collectAddresses(d.to).concat(collectAddresses(d.cc))
+    .map((a) => siteIdFromAddress(a.email)).find((x): x is string => !!x) || null;
+  return { from_email, site_id };
+}
+
+/** The webhook envelope merged with the API's full message: the API's fields win
+ *  (it is the stored message), the envelope fills any gap. Only the fields the
+ *  route reads are taken — the body, the headers, the addresses and the
+ *  `authentication` verdict block (see parseAuthResults). When the API sends that
+ *  block, no envelope-level dmarc/spf/dkim may shadow it. Pure. */
+export function mergeReceived(envelope: unknown, full: unknown): Record<string, unknown> {
+  const e = (envelope && typeof envelope === 'object') ? envelope as Record<string, unknown> : {};
+  const f = (full && typeof full === 'object') ? full as Record<string, unknown> : {};
+  const out: Record<string, unknown> = { ...e };
+  for (const k of ['from', 'to', 'cc', 'subject', 'text', 'html', 'headers', 'message_id', 'authentication']) {
+    if (f[k] != null && f[k] !== '') out[k] = f[k];
+  }
+  if (f.authentication && typeof f.authentication === 'object') { delete out.dmarc; delete out.spf; delete out.dkim; }
+  return out;
 }
