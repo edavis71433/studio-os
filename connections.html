@@ -55,6 +55,16 @@
   .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
   .btn.ghost{border-color:transparent;background:transparent;color:var(--soft)} .btn.ghost:hover{background:var(--line-2);color:var(--ink)}
   .btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+  /* sales review item 46: the Calendar card */
+  .calbox{padding:var(--dds-s3,12px) var(--dds-s4,16px)}
+  .calt{font-weight:600;font-size:14px}
+  .calp{margin:6px 0 0;font-size:13.5px;color:var(--soft);max-width:64ch}
+  .calp.quiet{font-size:12.5px;color:var(--faint)}
+  .calurl{display:flex;gap:8px;margin-top:8px;min-width:0}
+  .calurl input{flex:1;min-width:0;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px}
+  .calsteps{margin:10px 0 0;padding-left:20px;font-size:13.5px;color:var(--ink)}
+  .calsteps li{margin:2px 0}
+  .calacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .btn:disabled{opacity:.55;cursor:default}
   .actions{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
 
@@ -441,10 +451,57 @@ function render(surface){
   for(const g of keys){
     html += `<section class="sec"><div class="sec-h"><h2>${esc(g)}</h2></div><div class="list">${(groups[g]||[]).map(row).join('')}</div></section>`;
   }
+  html += `<section class="sec" id="calSec" hidden></section>`;   // sales review item 46
   html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();
   paintAskClient(entries);
+  paintCalendar();
+}
+
+// ── Sales review item 46: your bookings and dated tasks in Google Calendar ────
+// One way, no Google approval: a private link Google Calendar (or Apple, Outlook)
+// subscribes to "From URL" and reads a few times a day. Not while a client is in
+// view — this is the studio's own calendar. An older server without the route
+// shows no card. Making or turning off the link is a setting (configure).
+let CAL = null;
+async function calApi(method){ try { const r = await fetch(FN+'/calendar/link', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
+async function paintCalendar(){
+  const host = $('calSec'); if(!host || SCOPE) return;
+  if(!CAL){ const r = await calApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; CAL = d; }   // only an answer that is about the link
+  const c = CAL; let inner;
+  if(!c.can_manage){
+    inner = `<p class="calp">${c.on ? 'Your calendar link is on.' : 'No calendar link yet.'} The owner makes it and can turn it off.</p>`;
+  } else if(!c.url){
+    inner = `<p class="calp">Put your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook. You get a private link, and your calendar reads it a few times a day.</p>
+      <div class="calacts"><button type="button" class="btn" id="calMake" data-needs="configure">Make my calendar link</button></div>`;
+  } else {
+    inner = `<p class="calp">Your private calendar link:</p>
+      <div class="calurl"><input id="calUrl" type="text" readonly value="${esc(c.url)}" aria-label="Your private calendar link"><button type="button" class="btn" id="calCopy">Copy</button></div>
+      <ol class="calsteps"><li>Open Google Calendar on a computer.</li><li>Next to <b>Other calendars</b>, choose <b>+</b>, then <b>From URL</b>.</li><li>Paste the link and choose <b>Add calendar</b>.</li></ol>
+      <p class="calp quiet">Google reads the link a few times a day, so a new booking can take a few hours to show. Anyone with the link can see these events, so keep it to yourself.</p>
+      <div class="calacts"><button type="button" class="btn" id="calNew" data-needs="configure">Make a new link</button><button type="button" class="btn ghost" id="calOff" data-needs="configure">Turn it off</button></div>`;
+  }
+  host.innerHTML = `<div class="sec-h"><h2>Calendar</h2></div><div class="list"><div class="calbox"><div class="calt">Google Calendar</div>${inner}</div></div>`;
+  host.hidden = false;
+  const make = async (btn, method, okMsg) => {
+    btn.disabled = true;
+    const r = await calApi(method);
+    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    CAL = (r.body && r.body.data) || {}; toast(okMsg); paintCalendar();
+  };
+  const mk = $('calMake'); if(mk) mk.addEventListener('click', () => make(mk, 'POST', 'Your calendar link is ready.'));
+  const cp = $('calCopy'); if(cp) cp.addEventListener('click', async () => {
+    const u = $('calUrl'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press Copy on your keyboard.'); }
+  });
+  const nw = $('calNew'); if(nw) nw.addEventListener('click', async () => {
+    if(!(await askConfirm('Make a new link?', 'The old link stops working, so calendars using it go quiet until you add the new one.', 'Make a new link'))) return;
+    make(nw, 'POST', 'Your new calendar link is ready.');
+  });
+  const off = $('calOff'); if(off) off.addEventListener('click', async () => {
+    if(!(await askConfirm('Turn the calendar link off?', 'Calendars using it stop getting your bookings and tasks.', 'Turn it off'))) return;
+    make(off, 'DELETE', 'Your calendar link is off.');
+  });
 }
 
 // ── Studio audit change 9: "Ask the client to connect their Google" ──────────

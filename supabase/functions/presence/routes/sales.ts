@@ -667,21 +667,25 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
 // project tasks (unassigned or mine) on active/on-hold projects. Every read is
 // best-effort: a failed slot contributes nothing and `partial` says so, never a
 // false "nothing to do". The rule lives in lib/my_tasks.ts.
-export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+// Shared with the calendar link (item 46), which puts the dated ones in Google Calendar.
+export async function loadMyTasks(siteId: string, userId: string | null): Promise<{ all: ReturnType<typeof buildMyTasks>; partial: boolean }> {
   let partial = false;
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
   const [deals, dealTasks, projectTasks] = await Promise.all([
-    read(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    read(`presence_deal_tasks?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
-    read(`presence_tasks?site_id=eq.${site.id}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300`),
+    read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
+    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
+    read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300`),
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
   const [taskDeals, projects] = await Promise.all([
-    dealIds.length ? read(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage`) : Promise.resolve([]),
-    projIds.length ? read(`presence_projects?id=in.(${projIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status`) : Promise.resolve([]),
+    dealIds.length ? read(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,stage`) : Promise.resolve([]),
+    projIds.length ? read(`presence_projects?id=in.(${projIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,status`) : Promise.resolve([]),
   ]);
-  const all = buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId: principal.userId || null });
+  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId }), partial };
+}
+export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const { all, partial } = await loadMyTasks(site.id, principal.userId || null);
   return json({ data: { items: all.slice(0, MY_TASKS_MAX), total: all.length, partial } }, 200, cors);
 }
 

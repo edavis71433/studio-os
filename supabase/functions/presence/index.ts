@@ -311,6 +311,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const { handleInboundEmail } = await import('./routes/inbound_email.ts');
     return handleInboundEmail(req);
   }
+  // Sales review item 46: the private calendar link Google Calendar (or Apple,
+  // Outlook) reads on its own schedule — no session; the 160-bit token in the
+  // path is the key, and turning the link off or making a new one retires it.
+  const calFeed = route.match(/^\/calendar\/feed\/([0-9a-f]{40})\.ics$/);
+  if (calFeed && (method === 'GET' || method === 'HEAD')) {
+    const { handleCalendarFeed } = await import('./routes/calendar.ts');
+    const res = await handleCalendarFeed(calFeed[1]);
+    return method === 'HEAD' ? new Response(null, { status: res.status, headers: res.headers }) : res;
+  }
 
   if (principal.kind !== 'client' && principal.kind !== 'staff') {
     return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
@@ -690,6 +699,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/reports' && method === 'GET') return handleSalesReports(req, site, principal, cors);   // sales review item 33: Analytics' fixed reports
   if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
+  if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
+    const { handleCalendarLink } = await import('./routes/calendar.ts');
+    return handleCalendarLink(req, site, principal, cors);
+  }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   {
