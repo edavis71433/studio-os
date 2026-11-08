@@ -120,7 +120,7 @@ main{display:block}
 section.block{padding:calc(44px * var(--spacing-scale,1)) 0}
 section.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .menu-cat{margin-bottom:34px}
-.menu-cat h3{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:system-ui,sans-serif;font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.menu-cat h3{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:var(--font-body,system-ui,sans-serif);font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
 ul.items{list-style:none}
 .item{display:flex;gap:16px;justify-content:space-between;align-items:baseline;padding:10px 0}
 .item .nm{font-weight:600}

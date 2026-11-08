@@ -762,3 +762,75 @@ test.describe('type into the welcome section and About on the canvas', () => {
     expect(identityWrites(writes)).toHaveLength(0);
   });
 });
+
+test.describe('Styles show on the page at once, and save behind', () => {
+  // A slow server: a style save takes most of a second to answer. The log says when the
+  // page asked for a drawing of the canvas.
+  const styles = async (page: Page, api: Record<string, unknown> = {}, fail = false) => {
+    const writes = await mount(page, '/presence.html#design', api);
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#main > section').first().waitFor();
+    await page.waitForLoadState('networkidle');
+    const log: string[] = [];
+    await page.route('**/functions/v1/presence/dev/customization', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 900)); log.push('save answered');
+      if (fail) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Nothing was lost — that just didn’t go through. Try once more.' }) });
+      return route.fallback();
+    });
+    await page.route('**/functions/v1/presence/preview**', (route: Route) => { log.push('drawing'); return route.fallback(); });
+    await page.locator('#btnSettingsOpen').click();
+    await expect(page.locator('#designCard')).toBeVisible();
+    const pick = (name: string) => page.locator('#designCard').getByRole('button', { name, exact: true }).click();
+    const cssVar = (name: string) => frame.locator('html').evaluate((h, n) => getComputedStyle(h).getPropertyValue(n).trim(), name);
+    const saves = () => writes.filter((w) => w.path === '/dev/customization').map((w) => w.body.theme_tokens);
+    return { writes, log, pick, cssVar, saves };
+  };
+
+  test('a colour shows on the canvas before its save answers, saves once, and the page isn’t redrawn', async ({ page }) => {
+    const { log, pick, cssVar, saves } = await styles(page);
+    await pick('Evergreen');
+    await expect.poll(() => cssVar('--accent')).toBe('#23635a');
+    expect(log).not.toContain('save answered');                  // shown before the save came back
+    await expect.poll(saves).toEqual([{ accent: '#23635a', accent_dark: '#17453f', ink: '#1c2430', soft: '#5b6572' }]);
+    await page.waitForTimeout(800);                               // past the redraw's own pause
+    expect(log.filter((x) => x === 'drawing')).toHaveLength(0);
+    expect(await cssVar('--accent-dark')).toBe('#17453f');        // the dashed name the templates read, as the server writes it
+    await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen ✓' })).toBeVisible();
+  });
+
+  test('two quick picks keep both', async ({ page }) => {
+    const { pick, cssVar, saves } = await styles(page);
+    await pick('Evergreen');
+    await pick('Understated mono');
+    await expect.poll(() => cssVar('--font-display')).toContain('Courier New');
+    expect(await cssVar('--accent')).toBe('#23635a');
+    await expect.poll(() => saves().length).toBe(2);
+    expect(saves()[1]).toMatchObject({ accent: '#23635a', font_display: "'Courier New', ui-monospace, monospace" });
+  });
+
+  test('a save that fails puts the page back as it was', async ({ page }) => {
+    const { pick, cssVar } = await styles(page, {}, true);
+    await pick('Evergreen');
+    await expect.poll(() => cssVar('--accent')).toBe('#23635a');
+    await expect.poll(() => cssVar('--accent'), { timeout: 6000 }).toBe('#111111');   // the colour the site had
+    await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen', exact: true })).toBeVisible();
+  });
+
+  test('Original clears the choice, so the template’s own colour shows again', async ({ page }) => {
+    const { pick, cssVar, saves } = await styles(page);
+    await pick('Evergreen');
+    await expect.poll(saves).toHaveLength(1);
+    await page.locator('#designCard').getByRole('button', { name: 'Original', exact: true }).first().click();   // the Colors row's Original
+    await expect.poll(() => cssVar('--accent')).toBe('');
+    await expect.poll(() => saves().length).toBe(2);
+    expect(saves()[1]).toEqual({});
+  });
+
+  test('on Slate the colour choices are left out, and the panel says why', async ({ page }) => {
+    await styles(page, { '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'slate', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', description: 'Hello' }, location: { city: 'Burbank' } } } });
+    await expect(page.locator('#designCard')).toContainText('keeps its own dark colors');
+    await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen', exact: true })).toHaveCount(0);
+    await expect(page.locator('#designCard').getByRole('button', { name: 'Understated mono', exact: true })).toBeVisible();
+  });
+});

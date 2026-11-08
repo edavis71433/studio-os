@@ -73,8 +73,12 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 }
 
 // ═════════ CSS — Slate: bold dark charcoal, one electric teal accent, crisp grid lines ═════════
+// Slate is dark, and the builder's palettes and Background choice are written for light pages
+// (dark text, dark accents). So its own colours win: html:root outranks the style layer's :root
+// wherever that sits. Fonts, sizes, corners and spacing still follow the Styles panel.
 // G1 radius token: surfaces (btn, hero/split images, svc/card, svc img, inputs, post hero) take var(--radius,<current>); the tiny 6px nav/kicker chips and brandlogo stay hardcoded — structural to Slate's crisp-grid look.
 const CSS = `:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--line:#262a33;--wash:#14171d}
+html:root{--ink:#eef1f5;--soft:#9ba4b5;--paper:#101216;--accent:#2dd4bf;--accent-dark:#14b8a6}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
 picture{display:contents}
@@ -95,7 +99,7 @@ h1{font-size:clamp(2.5rem,6.4vw,4.2rem)}h2{font-size:clamp(1.5rem,3.4vw,2.1rem);
 .notice{background:#241d0d;color:#ecc862;border-bottom:1px solid var(--line);text-align:center;padding:10px 16px;font-size:.95rem}
 header.site{background:rgba(16,18,22,.8);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}
-.brand{font-weight:800;font-size:1.16rem;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
+.brand{font-family:var(--font-display,inherit);font-weight:800;font-size:1.16rem;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:32px;width:auto;vertical-align:middle;margin-right:10px;border-radius:6px}
 nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:var(--soft);font-weight:700;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;border:1px solid transparent;border-radius:6px;transition:color .12s,background .12s}
@@ -166,7 +170,7 @@ footer.site h2{font-size:1rem;text-transform:uppercase;letter-spacing:.12em}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){.btn,.svc,nav.primary a{transition:none}}
 @media (max-width:640px){.hero{padding:60px 0 40px}.block{padding:44px 0}}
-@media print{:root{color-scheme:light;--ink:#000;--soft:#444;--paper:#fff;--card:#fff;--accent:#0f766e;--accent-dark:#0f766e;--line:#999;--wash:#fff}body{background:#fff;color:#000}header.site{position:static;background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}.annbar,.notice{display:none}.btn{background:#fff;color:#000;border:1px solid #000}footer.site{background:#fff;color:#000}}
+@media print{:root,html:root{color-scheme:light;--ink:#000;--soft:#444;--paper:#fff;--card:#fff;--accent:#0f766e;--accent-dark:#0f766e;--line:#999;--wash:#fff}body{background:#fff;color:#000}header.site{position:static;background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}.annbar,.notice{display:none}.btn{background:#fff;color:#000;border:1px solid #000}footer.site{background:#fff;color:#000}}
 ${BLOCK_CSS}
 ${SEARCH_CSS}`;
 
