@@ -8,7 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
-import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient, notifyStudioOfClientAction } from '../lib/service_bridge.ts';
+import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient, notifyStudioOfClientAction, healSupportOwners } from '../lib/service_bridge.ts';
 import { csatRatingsForProject } from '../lib/csat.ts';
 import { clientMayTick } from '../lib/project_checklist.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
@@ -825,12 +825,25 @@ export async function handleStudioCustomers(_req: Request, jwt: string, site: Si
   const [clientsR, projectsR, supR] = await Promise.all([
     clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email`) : Promise.resolve({ json: [] }),
     projectIds.length ? svc(`presence_projects?id=in.(${projectIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status`) : Promise.resolve({ json: [] }),
-    svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,project_id&limit=500`),
+    svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,project_id,client_id,requester&limit=500`)
+      .then((r) => (r.ok ? r : svc(`presence_support_requests?site_id=eq.${site.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,project_id&limit=500`))),
   ]);
   const clientById: Record<string, any> = {}; for (const c of rows(clientsR)) clientById[String(c.id)] = c;
   const projectById: Record<string, any> = {}; for (const p of rows(projectsR)) projectById[String(p.id)] = p;
   const supportByProject: Record<string, number> = {};
-  for (const sreq of rows(supR)) { const pid = sreq.project_id ? String(sreq.project_id) : ''; if (pid) supportByProject[pid] = (supportByProject[pid] || 0) + 1; }
+  // Sales review B2: a project-less request counts against its customer by its
+  // stamp (healed from the requester's sign-in when missing). Before this only
+  // project requests counted, so a customer with two open July requests read
+  // "all clear".
+  const supRows = rows(supR);
+  const owners = await healSupportOwners(site.id, supRows);
+  const supportByClient: Record<string, number> = {};
+  for (const sreq of supRows) {
+    const pid = sreq.project_id ? String(sreq.project_id) : '';
+    if (pid) { supportByProject[pid] = (supportByProject[pid] || 0) + 1; continue; }
+    const cid = sreq.client_id ? String(sreq.client_id) : (owners.clientOf[String(sreq.id)] || '');
+    if (cid) supportByClient[cid] = (supportByClient[cid] || 0) + 1;
+  }
   // group by customer — the newest link is the primary project; sum open support
   // across ALL their projects so the roster shows one honest "needs you" count.
   const byCustomer = new Map<string, any>();
@@ -856,5 +869,6 @@ export async function handleStudioCustomers(_req: Request, jwt: string, site: Si
     row.project_count += 1;
     row.open_support += supportByProject[String(l.project_id)] || 0;
   }
+  for (const [cid, n] of Object.entries(supportByClient)) { const row = byCustomer.get(cid); if (row) row.open_support += n; }
   return json({ data: [...byCustomer.values()] }, 200, cors);
 }

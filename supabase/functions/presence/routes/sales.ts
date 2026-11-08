@@ -177,7 +177,7 @@ export async function handleSalesContactRestore(site: SiteRow, id: string, cors:
 // deal is won) is cleared, so the record never shows an overdue step for work
 // that is done. Pure rule in lib/sales_lifecycle.ts; best-effort here — a
 // pre-0089 database without the column simply keeps going.
-async function clearStaleNextStep(siteId: string, dealId: string, event: 'signed' | 'won'): Promise<void> {
+export async function clearStaleNextStep(siteId: string, dealId: string, event: 'signed' | 'won'): Promise<void> {
   try {
     const r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=next_step&limit=1`);
     const cur = rows(r)[0]?.next_step;
@@ -619,6 +619,12 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
         for (const d of deals) d.agreement_signed = signed.has(d.id);
       } catch { /* badge falls back to the plain stage label */ }
     }
+    // Sales review B4: a closed deal whose next step names work that is behind
+    // it ("Sign Contract" on a Won deal) read as overdue in red. The page hides
+    // a finished step and never paints a closed deal's step as due.
+    for (const d of deals as any[]) {
+      if ((d.stage === 'won' || d.stage === 'lost') && d.next_step) d.next_step_done = nextStepStaleAfter(d.next_step, 'won');
+    }
     return json({ data: deals, limit, offset }, 200, cors);
   }
   if (req.method === 'POST') {
@@ -713,7 +719,11 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
     const timeline = mergeDealTimeline(eventRows);
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: rows(proposals), contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows } }, 200, cors);
+    // Sales review B5: one total per proposal, after discount and tax — the
+    // record showed the stored pre-discount subtotal while the deal page added
+    // up the lines ($0 after a full discount) for the same draft.
+    const proposalRows = rows(proposals).map((p: any) => ({ ...p, total_cents: proposalTotals(p.line_items).total_cents }));
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -816,6 +826,9 @@ export async function handleSalesDealStage(req: Request, site: SiteRow, principa
   const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&stage=eq.${deal.stage}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That deal just changed — refresh and try again.' }, 409, cors); // optimistic: stage guard in WHERE
   await dealEvent(site.id, id, 'stage_change', principal, { from_stage: deal.stage, to_stage: to });
+  // Sales review B4: moving to Won by hand never retired "Sign contract" (only
+  // the signature and convert paths did), so a won deal kept a red overdue step.
+  if (to === 'won') { await clearStaleNextStep(site.id, id, 'won'); const fresh = await loadDeal(site.id, id); if (fresh) return json({ data: fresh }, 200, cors); }
   return json({ data: rows(up)[0] }, 200, cors);
 }
 
@@ -1473,6 +1486,9 @@ async function raiseDealReady(siteId: string, dealId: string, event: 'accepted' 
       ? 'The client signed. Convert them to a customer to provision their workspace whenever you’re ready.'
       : 'The client accepted your proposal. Prepare the agreement to sign when you’re ready.';
     const fresh = await raiseNotice({ siteId, clientId: site.client_id, kind: 'deal_signed', period: `${event}:${dealId}`, headline, body });
+    // "Proposal accepted — prepare the agreement" is done once the agreement is
+    // signed; leaving it up listed both steps side by side (sales review B3).
+    if (event === 'signed') await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`);
     // the document is decided — it is no longer waiting on anyone.
     // BELT-AND-BRACES ONLY: runDocumentReminders now raises `remind:<doc>` as a
     // silent ledger row (status 'dismissed'), so for anything raised after that

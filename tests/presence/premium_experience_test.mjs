@@ -22,6 +22,10 @@ const NOW = '2026-07-08T12:00:00Z';
   ok('coach: many issues → "A couple of things could help." capped at 3 suggestions', many.headline === 'A couple of things could help.' && many.suggestions.length === 3);
   const fresh = coachRead({ live: false, lastPublishedAt: null, pendingApprovals: 0, connectedNeedingAttention: 0, searchIssues: 0, leadsWaiting: 0, unpublishedChanges: false, domainExpiringDays: null }, NOW);
   ok('coach: brand-new → "getting set up", never alarmed', fresh.status === 'new' && /getting set up/.test(fresh.headline));
+  ok('coach: brand-new with nothing waiting says nothing needs you', /nothing needs you yet/.test(fresh.headline));
+  // sales review B7: the card read "10 people are waiting for a reply" under "nothing needs you yet"
+  const freshBusy = coachRead({ live: false, lastPublishedAt: null, pendingApprovals: 0, connectedNeedingAttention: 0, searchIssues: 0, leadsWaiting: 10, unpublishedChanges: false, domainExpiringDays: null }, NOW);
+  ok('coach: brand-new with people waiting never claims nothing needs you', freshBusy.status === 'new' && /getting set up/.test(freshBusy.headline) && !/nothing needs you/.test(freshBusy.headline) && /10 people are waiting/.test(freshBusy.suggestions[0].text));
   ok('coach: never emits a numeric score or grade', ![healthy, one, many, fresh].some((r) => /\b\d+\s*(\/|out of|%|points|score|grade)/i.test(JSON.stringify(r))));
 }
 

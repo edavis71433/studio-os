@@ -9,6 +9,7 @@ import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload } from './needs_you.ts';
+import { healSupportOwners } from '../lib/service_bridge.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
@@ -180,7 +181,10 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const todayStart = now.slice(0, 10) + 'T00:00:00Z';
     const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ] = await Promise.all([
       own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
-      own ? svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,created_at,updated_at&limit=200`).catch(swallow) : none,
+      // client_id + requester (sales review B2): name a project-less request; the
+      // narrow select is the fallback for a database without 0115's column
+      own ? svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,client_id,requester,created_at,updated_at&limit=200`)
+        .then((r) => (r.ok ? r : svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,created_at,updated_at&limit=200`))).catch(swallow) : none,
       own ? svc(`presence_service_links?agency_site_id=eq.${own.id}&status=eq.active&select=project_id,customer_client_id,customer_site_id&limit=500`).catch(swallow) : none,
       // next_step/next_step_at land with migration 0089 — a database without it answers "no stale steps", never an error
       own ? svc(`presence_deals?site_id=eq.${own.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&next_step=not.is.null&select=id,title,stage,next_step,next_step_at,contact_id,converted_client_id,converted_site_id&limit=500`).then((r) => (r.ok ? r : { ok: true, json: [] })).catch(swallow) : none,
@@ -189,12 +193,19 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
     ]);
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
+    // Sales review B2: a request with no stamp and no project names its customer
+    // through the requester's sign-in (stamped once), or at least their email.
+    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null }>(supQ);
+    if (own && supportRows.length) {
+      const owners = await healSupportOwners(own.id, supportRows);
+      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; }
+    }
     const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
     const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
     const deals = rowsOf<{ id: string; title: string; stage: string; next_step: string | null; next_step_at: string | null; contact_id: string | null; converted_client_id: string | null; converted_site_id: string | null }>(dealsQ);
     // names the portfolio does not know by site: bridged-only customers (by client id) and deal contacts — two batched reads
     const clientIds = [...new Set([
-      ...invoices.map((v) => v.client_id), ...serviceLinks.map((l) => l.customer_client_id), ...deals.map((d) => d.converted_client_id),
+      ...invoices.map((v) => v.client_id), ...serviceLinks.map((l) => l.customer_client_id), ...deals.map((d) => d.converted_client_id), ...supportRows.map((r) => r.client_id),
     ].filter((x): x is string => !!x && UUID_RE.test(x)))];
     const contactIds = [...new Set(deals.map((d) => d.contact_id).filter((x): x is string => !!x && UUID_RE.test(x)))];
     const [cnQ, ctQ] = await Promise.all([
@@ -206,7 +217,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const payload = needsYouPayload({
       nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
       invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
-      enquiries: input.enquiries, support: rowsOf(supQ), serviceLinks,
+      enquiries: input.enquiries, support: supportRows.map(({ requester: _r, ...row }) => row), serviceLinks,
       deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
       publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
     });

@@ -1030,7 +1030,7 @@ function renderBillingTab(host){
     if(p.status==='draft'&&!closed&&!both)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
     else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
     acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
-    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${p.subtotal_cents?esc(fmtC(p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
+    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${(p.total_cents!=null||p.subtotal_cents)?esc(fmtC(p.total_cents!=null?p.total_cents:p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
   }).join(''):`<p class="muted" style="font-size:13.5px">No proposals yet — draft one in the pipeline.</p>`;
   html+=`</div></section>`;
   // agreement
