@@ -240,7 +240,8 @@ const CARDS = [
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Three switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
   // an owner lands on the Domain & email desk; only an operator gets the platform-wide domains view (admin-health said "Operators only" to everyone else — Oct 2026 experience review)
-  { key: 'domains', href: '/presence.html#domain', hrefOperator: '/admin-health.html', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website', scoped: true },
+  // the operator's card says where it goes: the platform-wide view, not their own site's domain (sales review B12)
+  { key: 'domains', href: '/presence.html#domain', hrefOperator: '/admin-health.html', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', descOperator: 'Every site’s domain, email records and padlock, in the platform Health Center. Your own site’s domain is under Your website.', feature: 'website', scoped: true },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', feature: 'developer', cap: 'use_developer_mode',
     scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
@@ -254,7 +255,7 @@ function hasCap(c) { const list = CTX && CTX.capabilities; return !Array.isArray
 // Platform staff keep the operators-only domains view; everyone else gets the
 // domain desk of the site in scope.
 function cardHtml(c, status) {
-  if (c.hrefOperator && CTX && CTX.is_operator) c = { ...c, href: c.hrefOperator, scoped: false };
+  if (c.hrefOperator && CTX && CTX.is_operator) c = { ...c, href: c.hrefOperator, desc: c.descOperator || c.desc, scoped: false };
   const who = scopeName() || 'this client';
   const href = (SCOPE && c.scoped) ? withClient(c.href) : c.href;
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;

@@ -2303,8 +2303,16 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* ── whispers & autosave (identical PUTs) ── */
-const debounces = {};
-function debounce(key, fn, ms) { clearTimeout(debounces[key]); debounces[key] = setTimeout(fn, ms); }
+const debounces = {}, debounceFns = {};
+function debounce(key, fn, ms) { clearTimeout(debounces[key]); debounceFns[key] = fn; debounces[key] = setTimeout(() => { delete debounceFns[key]; fn(); }, ms); }
+// Run now whatever is waiting under keys that start with this, and wait for it to finish.
+function debounceFlush(prefix) {
+  return Promise.all(Object.keys(debounceFns).filter((k) => k.startsWith(prefix)).map((k) => {
+    clearTimeout(debounces[k]); const fn = debounceFns[k]; delete debounceFns[k];
+    return Promise.resolve().then(fn).catch(() => {});
+  }));
+}
+const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):/.test(k));
 // An inline editor (a menu item, a question, a testimonial, an update) saves each
 // field as you leave it. Done just closes it, once anything pending has landed.
 function editorAutosave(ed, read, patch, close) {
@@ -7758,6 +7766,8 @@ function pagesBarReveal() {
 // stays on this page. keepSession leaves an open session typing, for a write that isn't
 // a page change (a form's timer can fire while someone types on the canvas).
 async function dcSavePendingEdits(keepSession) {
+  if (IDE && !keepSession) ideEnd(true);
+  await Promise.all([IDE_SAVING, debounceFlush("identity:"), debounceFlush("location:")]);
   for (;;) {
     if (IPE && !keepSession) ipeCommit();
     const put = BLOCKS_PUT || (IPE_SAVE_T != null || IPE_SAVE_PENDING ? ipeSaveNow() : blocksDirty() ? blocksSaveNow() : null);
@@ -11159,12 +11169,11 @@ let DP_PAINT_OPEN = 0;   // the page opening (DC_PAGE_OPENS) the last document w
 // the newest would leave a stream of edits with slow reads never painting at all.
 let DP_READS = 0, DP_READ_PAINTED = 0;
 function dpHoldRepaint() {
-  if (IPE) { DP_REPAINT_HELD = true; return true; }
+  if (IPE || IDE || IDE_SAVING) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
 }
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
-  if (IDE) ideEnd(true);   // words being typed into the welcome section go to Business details before the redraw
   // Drawing a canvas nobody can see is a full page render per save. Opening Edit mode
   // repaints it (go), so it is never stale when it's on screen.
   if (!$("view-design").classList.contains("on")) return;
@@ -11801,7 +11810,8 @@ function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.conte
 // prompt; nothing is blocked outright.
 let IPE_SAVE_INFLIGHT = false;
 window.addEventListener('beforeunload', (e) => {
-  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()) { e.preventDefault(); e.returnValue = ''; }
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()
+    || (IDE && IDE.el.textContent !== IDE.orig) || IDE_SAVING || detailsPending()) { e.preventDefault(); e.returnValue = ''; }
 });
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
@@ -12103,14 +12113,17 @@ const IDE_FIELDS = {
   "identity.description": { input: "f-description", max: 600, label: "your description" },
 };
 let IDE = null;
+let IDE_SAVING = null;   // words just typed, on their way to the server; the canvas holds its redraw till they land
 function ideStart(doc, el) {
   const path = el.getAttribute("data-pr"), spec = IDE_FIELDS[path];
   if (!spec || DC_MODE !== "edit" || doc !== dcFrameDoc()) return false;
   if (IPE) ipeCommit();
   if (IDE) ideEnd(true);
   const field = path.split(".")[1];
-  // an empty field is on show as the preview's sample words, so the first keystroke replaces them
-  const sample = !String((S.identity || {})[field] || "").trim();
+  // an empty field is on show as the preview's sample words, so the first keystroke replaces them.
+  // The form holds the newest words: the saved copy lags while a save is on its way.
+  const inp = $(spec.input);
+  const sample = !String((inp ? inp.value : (S.identity || {})[field]) || "").trim();
   const prev = {};
   ["contenteditable", "role", "aria-label", "spellcheck"].forEach((a) => { prev[a] = el.getAttribute(a); });
   IDE = { doc, el, field, spec, orig: el.textContent, prev, sample };
@@ -12157,12 +12170,21 @@ function ideEnd(save) {
   Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) el.removeAttribute(a); else el.setAttribute(a, s.prev[a]); });
   el.classList.remove("ipe-on");
   const text = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, s.spec.max);
-  if (!save || text === String(s.orig).replace(/\s+/g, " ").trim()) { el.textContent = s.orig; return; }
-  if (!text && s.field === "business_name") { el.textContent = s.orig; toast("Your business needs a name, so it stays as it was.", true); return; }
-  if (!text && s.sample) { el.textContent = s.orig; return; }   // clearing a sample changes nothing
+  const keep = () => { el.textContent = s.orig; ideRelease(); };
+  if (!save || text === String(s.orig).replace(/\s+/g, " ").trim()) return keep();
+  if (!text && s.field === "business_name") { keep(); toast("Your business needs a name, so it stays as it was.", true); return; }
+  if (!text && s.sample) return keep();   // clearing a sample changes nothing
   el.textContent = text;
   const inp = $(s.spec.input);
-  if (inp) { inp.value = text; inp.dispatchEvent(new Event("input", { bubbles: true })); }
+  if (!inp) return ideRelease();
+  inp.value = text; inp.dispatchEvent(new Event("input", { bubbles: true }));
+  // Saved now, not after the form's pause, so Preview, a page change or closing the tab can't
+  // beat it. A redraw before it lands would paint the old words back.
+  const saving = IDE_SAVING = debounceFlush("identity:" + s.field).finally(() => { if (IDE_SAVING === saving) IDE_SAVING = null; ideRelease(); });
+}
+function ideRelease() {   // the redraw a session or its save held off
+  if (!DP_REPAINT_HELD || IPE || IDE || IDE_SAVING) return;
+  DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview();
 }
 // ── inject the editing chrome into the rendered preview document ─────────────
 function dcInjectCanvas(doc, main) {
@@ -12308,6 +12330,7 @@ function dcInjectCanvas(doc, main) {
   // already banked by refreshDesignPreview's pre-repaint commit; the stale
   // handle can't be restored, so drop it and let a deferred burst-save through.
   if (IPE) IPE = null;
+  if (IDE && IDE.doc !== doc) ideEnd(true);   // a redraw is held while one is open, so this is a safety net: the typed words still save
   if (IPE_SAVE_PENDING) { IPE_SAVE_PENDING = false; ipeSaveSoon(); }
   // review fix 8: the save outcome was announced into the doc this repaint just
   // replaced — re-announce it once into the fresh document's live region.

@@ -150,6 +150,9 @@ test.describe('Settings page', () => {
     await page.goto('/settings.html?client=' + CLIENT);
     await expect(page.locator('[data-card="domains"]')).toHaveAttribute('href', '/admin-health.html');
     await expect(page.locator('[data-card="domains"]')).toHaveAttribute('data-noscope', '1');
+    // sales review B12: the card says where it goes, not "put your site on your own domain"
+    await expect(page.locator('[data-card="domains"]')).toContainText('Health Center');
+    await expect(page.locator('[data-card="domains"]')).not.toContainText('Put your site on your own domain');
   });
 
   // ── scope honesty while drilled in (?client=) ───────────────────────────────

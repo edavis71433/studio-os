@@ -116,7 +116,7 @@ nav.primary a[aria-current="page"]{color:var(--accent);border-bottom-color:var(-
 .checklist li::before{content:"✓";position:absolute;left:2px;top:8px;color:var(--accent);font-weight:800}
 .hp-stats{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px}
 .hp-stats .num{display:block;font-size:1.55rem;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.2}
-.hp-stats .lb{display:block;font-size:.78rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+.hp-stats .hp-lb{display:block;font-size:.78rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
 .hp-contact{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-weight:600;font-variant-numeric:tabular-nums}
 .hp-contact a{color:var(--steel-dark)}
 .split-img{border-radius:var(--radius,10px);overflow:hidden;border:1px solid var(--line);border-bottom:2px solid var(--accent)}
@@ -338,9 +338,11 @@ function heroPanel(c: SnapshotContent, v: ReturnType<typeof vocabFor>): string {
   if (c.offerings.length) stats.push([String(c.offerings.length), v.offeringLabel]);
   if (cats.length > 1) stats.push([String(cats.length), 'Categories']);
   if (c.testimonials.length) stats.push([String(c.testimonials.length), 'Client reviews']);
+  // The label's class is hp-lb: plain `lb` is the gallery's full-screen photo viewer (site_blocks
+  // BLOCK_CSS), and `.hp-stats .lb` outranked its display:none, laying a dark sheet over the page.
   const rows = [
     items.length ? `<ul class="checklist">${items.map((o) => `<li>${esc(o.name)}</li>`).join('')}</ul>` : '',
-    stats.length ? `<div class="hp-stats">${stats.map(([n, l]) => `<div class="stat"><span class="num">${esc(n)}</span><span class="lb">${esc(l)}</span></div>`).join('')}</div>` : '',
+    stats.length ? `<div class="hp-stats">${stats.map(([n, l]) => `<div class="stat"><span class="num">${esc(n)}</span><span class="hp-lb">${esc(l)}</span></div>`).join('')}</div>` : '',
     (tel || mail) ? `<p class="hp-contact">${[tel, mail].filter(Boolean).join('<br>')}</p>` : '',
   ].filter(Boolean).join('');
   return rows ? `<aside class="hero-panel" aria-label="At a glance"><p class="hp-title">At a glance</p>${rows}</aside>` : '';

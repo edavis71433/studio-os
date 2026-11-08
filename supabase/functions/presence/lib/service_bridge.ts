@@ -146,6 +146,81 @@ export async function clientIdForRequester(agencySiteId: string, requester: { us
   } catch { return null; }
 }
 
+// ── Support requests that name nobody (sales review, Nov 2026, B2) ───────────
+// A request filed before 0115 (Aug 2026) has no client_id stamp, and its
+// requester is the customer's SIGN-IN ID. The read paths matched that id only
+// through contacts.auth_user_id, but a customer is usually tied to their
+// workspace by EMAIL (my_client_ids() matches clients.email) with no contact
+// carrying the id. So five July requests read "A customer" on Home, "Support
+// request" in the Inbox, and their customer showed "all clear".
+// healSupportOwners resolves such a row the way the sign-in itself resolves —
+// the sign-in's email, matched by clientIdForRequester, which also requires an
+// ACTIVE bridge to THIS studio — and saves the stamp, so every read that
+// prefers it (Inbox, record, project page) agrees from then on. Only rows with
+// neither a stamp nor a project are touched (a project names its customer
+// already); the stamp is written only where it is still null. A row that
+// resolves to no customer comes back with the requester's email, so a page can
+// at least say who wrote. Best-effort throughout: never throws.
+// read at call time, not import time, so a test (or a cold start) that sets the env late still works
+const sbUrlAuth = () => Deno.env.get('SUPABASE_URL') || '';
+const sbServiceAuth = () => Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SIGNIN_EMAIL_TTL_MS = 10 * 60_000;
+const signInEmails = new Map<string, { email: string; at: number }>();
+const SUPPORT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The email a sign-in id signs in with ('' when unknown). Cached per instance. */
+export async function signInEmail(uid: string): Promise<string> {
+  const base = sbUrlAuth(); const key = sbServiceAuth();
+  if (!SUPPORT_UUID_RE.test(uid || '') || !base || !key) return '';
+  const hit = signInEmails.get(uid);
+  if (hit && Date.now() - hit.at < SIGNIN_EMAIL_TTL_MS) return hit.email;
+  try {
+    const r = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(uid)}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    const j = r.ok ? await r.json().catch(() => null) : null;
+    const email = j && typeof j.email === 'string' ? j.email.trim() : '';
+    signInEmails.set(uid, { email, at: Date.now() });
+    return email;
+  } catch { return ''; }
+}
+
+/** The rows healSupportOwners may resolve: no stamp, no project, a requester. Pure. */
+export function unownedSupportRows<T extends { id?: unknown; client_id?: unknown; project_id?: unknown; requester?: unknown }>(rowsIn: T[]): T[] {
+  return (rowsIn || []).filter((r) => r && r.id && !r.client_id && !r.project_id && String(r.requester || '').trim() !== '');
+}
+
+export interface SupportOwners { clientOf: Record<string, string>; emailOf: Record<string, string> }
+export async function healSupportOwners(agencySiteId: string, rowsIn: Array<{ id?: unknown; client_id?: unknown; project_id?: unknown; requester?: unknown }>): Promise<SupportOwners> {
+  const out: SupportOwners = { clientOf: {}, emailOf: {} };
+  try {
+    const todo = unownedSupportRows(rowsIn);
+    if (!agencySiteId || !todo.length) return out;
+    const byRequester = new Map<string, string[]>();
+    for (const r of todo) { const k = String(r.requester).trim(); const ids = byRequester.get(k) || []; ids.push(String(r.id)); byRequester.set(k, ids); }
+    for (const [requester, ids] of byRequester) {
+      const isUid = SUPPORT_UUID_RE.test(requester);
+      const email = isUid ? await signInEmail(requester) : (requester.includes('@') ? requester : '');
+      const cid = await clientIdForRequester(agencySiteId, { userId: isUid ? requester : null, email });
+      for (const id of ids) {
+        if (cid) {
+          out.clientOf[id] = cid;
+          if (SUPPORT_UUID_RE.test(id)) await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${agencySiteId}&client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: cid }) }).catch(() => null);
+        } else if (email) out.emailOf[id] = email;
+      }
+    }
+  } catch { /* best-effort — a page still renders with what it had */ }
+  return out;
+}
+
+/** For reads that look requests up BY stamp (the record, the project page): heal
+ *  the studio's unstamped, project-less requests first, so they are found. */
+export async function healUnstampedSupport(agencySiteId: string): Promise<void> {
+  try {
+    if (!agencySiteId) return;
+    const r = await svc(`presence_support_requests?site_id=eq.${agencySiteId}&client_id=is.null&project_id=is.null&deleted_at=is.null&select=id,client_id,project_id,requester&limit=100`);
+    if (r.ok && Array.isArray(r.json) && r.json.length) await healSupportOwners(agencySiteId, r.json as any[]);
+  } catch { /* best-effort */ }
+}
+
 /** Email the bridged customer about project activity that needs them (a studio
  *  message, an approval request). Without this, the delivery loop stalls unless
  *  the client habitually opens the portal — an approval could sit unseen forever.
