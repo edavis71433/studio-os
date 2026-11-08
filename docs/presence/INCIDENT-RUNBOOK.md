@@ -35,7 +35,7 @@ Stripe Dashboard → Webhooks → the endpoint → recent deliveries. Non-200s: 
 https://status.supabase.com. Nothing to do but wait — published sites stay up; the app shows its own errors. When it returns, the next tick self-heals (retries, reconcile, rotation cursors).
 
 **A bad deploy (function broken after a change)**
-GitHub → Actions → `rollback.yml` → run with the last known-good ref (functions are stateless; rollback is a redeploy). Locally: `git log --oneline` to pick the ref.
+GitHub → Actions → `rollback.yml` → run with the last known-good ref (functions are stateless; rollback is a redeploy of all eight, then the same smoke tests as a deploy). Locally: `git log --oneline` to pick the ref.
 
 **Secret leaked / suspected compromise**
 Rotate in Supabase → Edge Functions → Secrets (and its consumer: pg_cron Vault entry for SCHEDULER_SECRET, Stripe dashboard for webhook secret, Resend for API key). Service-role key rotation: Supabase Dashboard → Settings → API. Then redeploy nothing — functions read env at invocation.

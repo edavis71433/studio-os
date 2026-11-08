@@ -590,7 +590,7 @@ test.describe('Context bar (slice 7)', () => {
 // installIosFocusSemantics() supplies the one WebKit behaviour that can — a tap
 // blurs the focused element and focuses nothing, so panel `focusout` handlers
 // see a null relatedTarget mid-tap. See tests/e2e/helpers/ios-focus.ts.
-test.describe('iOS tap semantics — tapping a menu item navigates', () => {
+test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@touch' }, () => {
   for (const opener of ['#dds-mbar-menu', '#dds-waffle']) {
     test(`mobile: the drawer opened by ${opener} navigates when an item is tapped`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== 'mobile', 'touch + the phone sheet');
@@ -1072,7 +1072,7 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
     await expect(customers).not.toHaveClass(/\bopen\b/);
   });
 
-  test('tablet: a row of the expanded list navigates when tapped', async ({ page }, testInfo) => {
+  test('tablet: a row of the expanded list navigates when tapped', { tag: '@touch' }, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'tablet', 'iPads show the sidebar and have touch');
     await installApp(page, { api: { '/portal/context': sideCtx() } });
     await installIosFocusSemantics(page);
