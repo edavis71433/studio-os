@@ -1,0 +1,39 @@
+// ── The pickers' pictures (list item 25) ────────────────────────────────────────
+//   deno run --allow-read --allow-env tests/presence/thumbnails_test.mjs
+// Every section type the builder offers has sample content that draws and a picture; every
+// template has a picture. The pictures are made by scripts/thumbnails (render.ts, then
+// shoot.mjs) and committed: re-run both when a section or template changes how it looks.
+import { SAMPLE_BLOCKS } from '../../scripts/thumbnails/samples.ts';
+import { sectionPages, drew, TEMPLATES } from '../../scripts/thumbnails/pages.ts';
+
+const results = [];
+const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
+const ROOT = new URL('../../', import.meta.url);
+const jpeg = (path) => { try { const b = Deno.readFileSync(new URL(path, ROOT)); return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff && b.length > 1500; } catch { return false; } };
+
+// the types the builder offers, read from its own list
+const html = Deno.readTextFileSync(new URL('presence.html', ROOT));
+const defs = html.slice(html.indexOf('const BLOCK_DEFS = ['), html.indexOf('\n];', html.indexOf('const BLOCK_DEFS = [')));
+const offered = [...defs.matchAll(/\{ type: "([a-z_]+)", name: "/g)].map((m) => m[1]);
+ok('the builder offers the section types it always has', offered.length >= 37, String(offered.length));
+
+const noSample = offered.filter((t) => !SAMPLE_BLOCKS[t]);
+ok('every offered section type has sample content for its picture', noSample.length === 0, noSample.join(', '));
+const noPic = offered.filter((t) => !jpeg(`thumbs/sections/${t}.jpg`));
+ok('every offered section type has its picture', noPic.length === 0, noPic.join(', '));
+const extra = Object.keys(SAMPLE_BLOCKS).filter((t) => !offered.includes(t));
+ok('no sample for a type the builder no longer offers', extra.length === 0, extra.join(', '));
+
+const noTemplatePic = TEMPLATES.filter((t) => !jpeg(`thumbs/templates/${t}.jpg`));
+ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.length === 0, noTemplatePic.join(', '));
+
+// every sample still draws through the real renderer
+{
+  const pages = sectionPages();
+  const missing = offered.filter((t) => !pages[t] || !drew(t, pages[t]));
+  ok('every sample draws a section', missing.length === 0, missing.join(', '));
+}
+
+const failed = results.filter((r) => !r.p);
+console.log(`\n════ PICKER PICTURES: ${results.length - failed.length}/${results.length} PASSED ════`);
+if (failed.length) { for (const f of failed) console.log(' FAIL: ' + f.n); Deno.exit(1); }

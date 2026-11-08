@@ -848,7 +848,8 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-card{border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;background:var(--sheet,#fff);display:flex;flex-direction:column}
 .tg-card.on{border-color:var(--plum,#5b3fa0);box-shadow:0 0 0 1px var(--plum,#5b3fa0)}
 .tg-shot{position:relative;height:300px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
-.tg-shot iframe{position:absolute;top:0;left:0;width:294%;height:294%;transform:scale(.34);transform-origin:0 0;border:none;pointer-events:none;display:block}
+.tg-shot .tg-pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.tg-shot:has(.tg-pic){height:auto;aspect-ratio:640/440}   /* the picture's own shape: nothing cut off the side */
 .tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
    nothing real to render), so the card always shows a designed page, never a name
@@ -971,6 +972,12 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tray-item .ti-txt{min-width:0}
 .tray-item .ti-name{display:block;font-weight:600;line-height:1.2}
 .tray-item .ti-alias{display:block;margin-top:2px;font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
+/* item 25: each section as a small picture of what it adds (thumbs/sections, scripts/thumbnails) */
+.tray-grp.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s2,8px)}
+.tray-grp.shots>.tray-grp-h{grid-column:1/-1}
+.tray-item.has-shot{flex-direction:column;align-items:stretch;gap:6px;padding:6px;margin:0;border-color:var(--hair,#eee)}
+.tray-item.has-shot .ti-ico{display:none}
+.tray-item .ti-shot{display:block;width:100%;height:auto;aspect-ratio:440/248;object-fit:cover;object-position:top;border-radius:6px;background:var(--wash,#f6f4fa);pointer-events:none}
 .tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:var(--dds-s2,8px) 2px}
 
@@ -1065,7 +1072,7 @@ body.pd-dragging *{cursor:grabbing !important}
 .blk-gap{position:relative;height:12px;margin:2px 0;display:flex;align-items:center;justify-content:center}
 .blk-gap .blk-plus{opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out);font:inherit;font-size:12px;line-height:1;width:22px;height:22px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .blk-gap:hover .blk-plus,.blk-gap:focus-within .blk-plus{opacity:1}
-.blk-insertmenu{position:absolute;z-index:200;width:300px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 18px 50px color-mix(in srgb,var(--scrim-ink) 28%,transparent);padding:var(--dds-s3,12px)}
+.blk-insertmenu{position:absolute;z-index:200;width:340px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 18px 50px color-mix(in srgb,var(--scrim-ink) 28%,transparent);padding:var(--dds-s3,12px)}
 
 /* #5 — big device toggle + a CANVAS that dominates the screen */
 .dp-title{font-size:12px;font-weight:600;margin-bottom:var(--dds-s2,8px)}
@@ -10443,7 +10450,6 @@ function drawTemplateGrid(fold, curSlug) {
   // A cold-start draft has nothing real to render; render the DEMO silhouette so
   // every card shows a designed page. Once there IS real content, we render it in
   // the actual /preview pipeline (the most faithful possible preview of the look).
-  const empty = draftLooksEmpty();
   LOOKS.templates.forEach((t) => {
     const sw = lookSwatch(t.slug);
     const active = t.slug === curSlug;
@@ -10451,22 +10457,17 @@ function drawTemplateGrid(fold, curSlug) {
     // BIG, realistic preview of THIS template's design (read-only)
     const shot = el("div", "tg-shot");
     if (active) { const badge = el("span", "tg-badge", "Your current template"); shot.appendChild(badge); }
-    // on-brand demo silhouette — always present as the realistic-looking base; it is
-    // replaced by the real render the moment the live /preview draws real content.
-    const demo = tgDemoNode(sw, t.name); shot.appendChild(demo);
-    if (!empty) {
-      const frame = el("iframe"); frame.setAttribute("title", t.name + " preview"); frame.setAttribute("aria-hidden", "true"); frame.setAttribute("tabindex", "-1"); frame.setAttribute("scrolling", "no");
-      frame.style.visibility = "hidden";   // show the on-brand demo underneath until the real render paints (no white flash)
-      frame.addEventListener("load", () => { if (frame.srcdoc) { frame.style.visibility = "visible"; demo.style.display = "none"; } });
-      apiHtml("/preview?version=draft&template=" + encodeURIComponent(t.slug) + "&page=%2F")
-        .then((html) => { frame.srcdoc = html; })
-        .catch(() => { /* keep the on-brand demo silhouette if the proof can't draw */ });
-      shot.appendChild(frame);
-    }
+    // Item 25: the template's picture with its sample site (thumbs/templates, scripts/thumbnails).
+    // Drawing every template live cost a full page render each time the gallery opened;
+    // Preview shows one with this site's own words. The drawn sample stands in if the
+    // picture can't load.
+    const pic = el("img", "tg-pic"); pic.src = "/thumbs/templates/" + t.slug + ".jpg"; pic.alt = ""; pic.loading = "lazy"; pic.width = 640; pic.height = 440;
+    pic.addEventListener("error", () => { pic.remove(); shot.appendChild(tgDemoNode(sw, t.name)); });
+    shot.appendChild(pic);
     card.appendChild(shot);
     const body = el("div", "tg-body");
     body.appendChild(el("div", "tg-name", t.name));
-    body.appendChild(el("div", "tg-tag", sw.tag + (empty ? " · sample layout" : "")));
+    body.appendChild(el("div", "tg-tag", sw.tag + " · shown with sample words"));
     const act = el("div", "tg-act");
     const start = el("button", "tg-start" + (active ? " current" : ""), active ? "✓ In use" : "Start with this");
     start.type = "button";
@@ -10648,7 +10649,7 @@ function renderBlockTray() {
       .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
       .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, TRAY_QUERY));
     if (!defs.length) return;
-    const wrap = el("div", "tray-grp");
+    const wrap = el("div", "tray-grp shots");
     const grpH = el("div", "tray-grp-h", grp.label);
     if (TRAY_GROUP_ICON[grp.label]) grpH.insertAdjacentHTML("afterbegin", uiIcon(TRAY_GROUP_ICON[grp.label], 14));
     wrap.appendChild(grpH);
@@ -10664,6 +10665,12 @@ function renderBlockTray() {
   });
   host.appendChild(more);
 }
+// The section's picture, or nothing when it can't load (the name still says what it is).
+function trayShot(b, type) {
+  const img = el("img", "ti-shot"); img.src = "/thumbs/sections/" + type + ".jpg"; img.alt = ""; img.loading = "lazy"; img.width = 440; img.height = 248;
+  img.addEventListener("error", () => { img.remove(); b.classList.remove("has-shot"); });
+  b.classList.add("has-shot"); b.insertBefore(img, b.firstChild);
+}
 function trayItem(d) {
   const b = el("button", "tray-item"); b.type = "button";
   b.title = "Add “" + d.name + "” — click to append, or drag onto the canvas to place it";
@@ -10672,6 +10679,7 @@ function trayItem(d) {
   txt.appendChild(el("span", "ti-name", d.name));
   if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
   b.appendChild(txt);
+  trayShot(b, d.type);
   // click = append (keyboard-accessible fallback); pointer-drag = drop into place
   b.addEventListener("click", () => { if (pdConsumeClick()) return; addBlockAt(d, BLOCKS_WORK.length); });
   b.addEventListener("pointerdown", (e) => pdStart(e, { kind: "new", type: d.type, label: d.name, icon: trayIcon(d.type) }, b));
@@ -11194,7 +11202,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
         .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
         .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, search.value));
       if (!defs.length) return;
-      const wrap = el("div", "tray-grp");
+      const wrap = el("div", "tray-grp shots");
       wrap.appendChild(el("div", "tray-grp-h", grp.label));
       defs.forEach((d) => {
         const b = el("button", "tray-item"); b.type = "button";
@@ -11202,6 +11210,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
         const txt = el("span", "ti-txt"); txt.appendChild(el("span", "ti-name", d.name));
         if (SECTION_ALIAS[d.type]) txt.appendChild(el("span", "ti-alias", SECTION_ALIAS[d.type]));
         b.appendChild(txt);
+        trayShot(b, d.type);
         b.addEventListener("click", () => { closeInsertMenu(); dcCaptureScroll(); addBlockAt(d, atIndex); if (MEDIA_FILL_TYPES.has(d.type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } });
         wrap.appendChild(b); shown++;
       });
@@ -11226,14 +11235,6 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
 
 // ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
 let designPreviewTimer = null;
-// A brand-new workspace has nothing to draw yet — the proof must say so honestly
-// instead of sitting as a blank white sheet (the empty state is also the doorway
-// to the two places that fill it: Business and what you offer).
-function draftLooksEmpty() {
-  const i = S.identity || {};
-  return !(i.business_name || i.tagline || i.description) &&
-    !(S.offerings || []).length && !(S.posts || []).length && !(S.faqs || []).length && !(S.testimonials || []).length;
-}
 function dpNote(title, body) {
   const box = $("designPreviewEmpty"); if (!box) return;
   const t = $("dpEmptyTitle"), b = $("dpEmptyBody");
