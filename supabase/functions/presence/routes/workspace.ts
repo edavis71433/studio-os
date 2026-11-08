@@ -50,7 +50,8 @@ async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
   // nudge, or "Proposal accepted" once the deal is signed — each cleared by its
   // own kind + exact period, so nothing else can be touched.
   if (stale.length && site.client_id) {
-    for (const n of stale) { if (!n.kind || !n.period) continue; try { await clearNotice(String(site.client_id), String(n.kind), String(n.period)); } catch { /* best-effort */ } }
+    // item 90: all at once; one after another, they held up the bell
+    await Promise.all(stale.filter((n) => n.kind && n.period).map((n) => clearNotice(String(site.client_id), String(n.kind), String(n.period)).catch(() => {})));
   }
   return keep;
 }

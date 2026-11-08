@@ -33,7 +33,7 @@ const C1 = 'c1000000-0000-4000-8000-000000000001';
 const ZONES = ['Pacific/Kiritimati', 'Pacific/Auckland', 'Asia/Tokyo', 'Asia/Kolkata', 'Asia/Dubai', 'Europe/Moscow', 'Europe/Berlin', 'Europe/London', 'Atlantic/Azores', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Pacific/Honolulu', 'Pacific/Pago_Pago'];
 const DAY_ZONE = ZONES.find((z) => daytimeIn(z, Date.now())), NIGHT_ZONE = ZONES.find((z) => !daytimeIn(z, Date.now()));
 function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
-  const w = { emails: [], ledger: [], asks: [], rate: {} };
+  const w = { emails: [], ledger: [], asks: [], rate: {}, reads: [] };
   const settings = [{ site_id: A, review_request_after_days: 3 }, { site_id: B, review_request_after_days: 5 }];
   const events = [
     { project_id: P(1), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // due
@@ -43,7 +43,7 @@ function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
     { project_id: P(5), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // reopened since
     { project_id: P(6), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // already asked
   ];
-  const projects = { [P(1)]: { id: P(1), name: 'New website', status: 'complete', client_id: C1 }, [P(5)]: { id: P(5), name: 'Logo', status: 'active', client_id: C1 }, [P(6)]: { id: P(6), name: 'Photos', status: 'complete', client_id: C1 } };
+  const projects = { [P(1)]: { id: P(1), name: 'New website', status: 'complete', client_id: C1, site_id: A }, [P(5)]: { id: P(5), name: 'Logo', status: 'active', client_id: C1, site_id: A }, [P(6)]: { id: P(6), name: 'Photos', status: 'complete', client_id: C1, site_id: A } };
   const ledger = new Set(asked.map(reviewAskPeriod).concat([reviewAskPeriod(P(6))]));
   const reply = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
   globalThis.fetch = (url, init = {}) => {
@@ -59,9 +59,12 @@ function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
       if (ledger.has(row.period)) return reply([]);
       ledger.add(row.period); return reply([{ id: 'n' + w.ledger.length, ...row }], 201);
     }
-    if (u.includes('/presence_projects?')) { const id = (u.match(/id=eq\.([0-9a-f-]{36})/) || [])[1]; return reply(projects[id] ? [projects[id]] : []); }
-    if (u.includes('/clients?')) return reply([{ email: 'pat@client.example', name: 'Pat' }]);
-    if (u.includes('/presence_sites?')) return reply([{ client_id: 'owner-1' }]);
+    // item 90: projects, clients and site owners come in one read each (id=in.(…)), as well as one by one
+    for (const t of ['presence_projects', 'clients', 'presence_sites']) if (u.includes(`/${t}?`)) w.reads.push(t);
+    const ids = () => ((u.match(/id=in\.\(([^)]*)\)/) || [])[1] || (u.match(/id=eq\.([0-9a-f-]{36})/) || [])[1] || '').split(',').filter(Boolean);
+    if (u.includes('/presence_projects?')) return reply(ids().map((id) => projects[id]).filter(Boolean));
+    if (u.includes('/clients?')) return reply(ids().map((id) => ({ id, email: 'pat@client.example', name: 'Pat' })));
+    if (u.includes('/presence_sites?')) return reply(ids().map((id) => ({ id, client_id: 'owner-1' })));
     if (u.includes('/presence_identity?')) return reply([{ business_name: 'Marlow Studio' }]);
     return reply([]);   // brand kit, suppression list and the rest: nothing on file
   };
@@ -74,6 +77,7 @@ function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
   ok('the email is the review request, to the project’s client', w.emails[0]?.to === 'pat@client.example' || (Array.isArray(w.emails[0]?.to) && w.emails[0].to[0] === 'pat@client.example'));
   ok('…with the hand-sent request’s words', String(w.emails[0]?.html || '').includes('Thanks for choosing Marlow Studio. If you have a moment, we’d love a quick review'));
   ok('the ledger row is written for that project only, silently', w.ledger.length === 1 && w.ledger[0].period === reviewAskPeriod(P(1)) && w.ledger[0].status === 'dismissed');
+  ok('item 90: the projects, clients and owners are one read each, not one per project', ['presence_projects', 'clients', 'presence_sites'].every((t) => w.reads.filter((x) => x === t).length === 1));
   ok('nothing for a project not yet due, long finished, on a later day for its site, reopened or already asked',
     !w.ledger.some((l) => [2, 3, 4, 5, 6].some((n) => l.period === reviewAskPeriod(P(n)))));
 }

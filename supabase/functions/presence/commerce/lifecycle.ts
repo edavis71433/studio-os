@@ -1352,16 +1352,23 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
   const periods = due.map(([id]) => `"${reviewAskPeriod(id)}"`).join(',');
   const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length}`);
   const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
+  // Item 90: the projects, their clients and the sites' owners in three reads, not three per project.
+  const open = due.filter(([id]) => !done.has(reviewAskPeriod(id)));
+  if (!open.length) return { asked: 0 };
+  const rowsOf = (r: { json: unknown }) => (Array.isArray(r.json) ? r.json : []) as Array<Record<string, any>>;
+  const projects = new Map(rowsOf(await svc(`presence_projects?id=in.(${open.map(([id]) => id).join(',')})&deleted_at=is.null&select=id,site_id,name,status,client_id`)).map((p) => [String(p.id), p]));
+  const clientIds = [...new Set([...projects.values()].map((p) => p.client_id).filter(Boolean))];
+  const clientsById = new Map(clientIds.length ? rowsOf(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,email,name`)).map((c) => [String(c.id), c]) : []);
+  const owners = new Map(rowsOf(await svc(`presence_sites?id=in.(${[...new Set(open.map(([, c]) => c.siteId))].join(',')})&select=id,client_id`)).map((x) => [String(x.id), x.client_id]));
   let asked = 0;
-  for (const [projectId, c] of due) {
+  for (const [projectId, c] of open) {
     if (asked >= limit) break;
-    if (done.has(reviewAskPeriod(projectId))) continue;
-    const p = (await svc(`presence_projects?id=eq.${projectId}&site_id=eq.${c.siteId}&deleted_at=is.null&select=id,name,status,client_id&limit=1`)).json?.[0];
-    if (!p || p.status !== 'complete' || !p.client_id) continue;   // reopened, removed, or nobody to ask
-    const cl = (await svc(`clients?id=eq.${p.client_id}&select=email,name&limit=1`)).json?.[0];
+    const p = projects.get(projectId);
+    if (!p || p.site_id !== c.siteId || p.status !== 'complete' || !p.client_id) continue;   // reopened, removed, or nobody to ask
+    const cl = clientsById.get(String(p.client_id));
     const email = String(cl?.email || '').trim();
     if (!email) continue;
-    const owner = (await svc(`presence_sites?id=eq.${c.siteId}&select=client_id&limit=1`)).json?.[0]?.client_id;
+    const owner = owners.get(c.siteId);
     if (!owner) continue;
     // the ledger row is the send-once gate, written before the email: a parallel tick can't double-send
     const fresh = await raiseNotice({ siteId: c.siteId, clientId: owner, kind: 'deal_followup', period: reviewAskPeriod(projectId), status: 'dismissed',
