@@ -7224,6 +7224,18 @@ const SUGGEST = { restaurant:["terracotta","classic_serif"], coffee_shop:["espre
   medical:["harbor","modern_sans"], dental:["harbor","modern_sans"], veterinary:["evergreen","friendly"],
   retail:["plum","modern_sans"], nonprofit:["evergreen","editorial"], church:["espresso","classic_serif"], professional:["slate","editorial"] };
 let DESIGN_TOKENS = {};
+let DESIGN_FONTS = [];   // the curated library (lib/fonts.ts), sent with /dev/customization
+// lib/fonts.ts fontFaceCss over libraryFontsIn: the same rules, so the canvas loads a picked
+// font straight away. Change both together.
+function dcFontFaces(tokens) {
+  const named = [];
+  ["font_display", "font_body"].forEach((k) => {
+    const first = String((tokens || {})[k] || "").split(",")[0].replace(/['"]/g, "").trim().toLowerCase();
+    const f = first && DESIGN_FONTS.find((x) => x.css.toLowerCase() === first);
+    if (f && !named.includes(f)) named.push(f);
+  });
+  return named.map((f) => f.weights.map((w) => `@font-face{font-family:'${f.css}';src:url(/fonts/library/${f.id}-${w}.woff2) format('woff2');font-weight:${w};font-style:normal;font-display:swap}`).join("")).join("");
+}
 // The canvas shows a style the moment it's picked: the same :root variables the server
 // writes into #presence-dev (render.ts devLayerFragments), set in place. Custom CSS in
 // that element stays, and a cleared choice falls back to the template's own default.
@@ -7235,10 +7247,10 @@ function dcPatchTokens(tokens) {
     return key.includes("_") ? [`--${key}:${val}`, `--${key.replace(/_/g, "-")}:${val}`] : [`--${key}:${val}`];
   }).join(";");
   let st = doc.getElementById("presence-dev");
-  const rest = st ? st.textContent.replace(/^:root\{[^}]*\}/, "") : "";
+  const rest = st ? st.textContent.replace(/^:root\{[^}]*\}/, "").replace(/^(?:@font-face\{[^}]*\})+/, "") : "";
   if (!vars && !rest) { if (st) st.remove(); return true; }
   if (!st) { st = doc.createElement("style"); st.id = "presence-dev"; doc.head.appendChild(st); }
-  st.textContent = (vars ? `:root{${vars}}` : "") + rest;
+  st.textContent = (vars ? `:root{${vars}}` : "") + dcFontFaces(tokens) + rest;
   return true;
 }
 // A pick shows at once and saves behind. The next pick builds on it before it has saved,
@@ -7397,13 +7409,46 @@ function renderBrandImageryReport(host, d) {
   }
   host.appendChild(box);
 }
+// The curated fonts, one list for headings and one for body text, each name shown in its
+// own face. Folded until opened: opening it loads each family's regular weight to draw the
+// names. A site only ever carries the families it picks.
+function mountFontLibrary(card, T) {
+  if (!DESIGN_FONTS.length) return;
+  const firstOf = (v) => String(v || "").split(",")[0].replace(/['"]/g, "").trim().toLowerCase();
+  if (!document.getElementById("fontLibraryFaces")) {
+    const st = document.createElement("style"); st.id = "fontLibraryFaces";
+    st.textContent = DESIGN_FONTS.map((f) => `@font-face{font-family:'${f.css}';src:url(/fonts/library/${f.id}-400.woff2) format('woff2');font-weight:400;font-display:swap}`).join("");
+    document.head.appendChild(st);
+  }
+  const box = el("details", "fontlib"); box.style.cssText = "margin-top:12px";
+  const sum = el("summary", null, "More fonts: " + DESIGN_FONTS.length + " to choose from"); sum.style.cssText = "font-size:12px;font-weight:600;cursor:pointer";
+  box.appendChild(sum);
+  if (FONT_LIB_OPEN) box.open = true;
+  box.addEventListener("toggle", () => { FONT_LIB_OPEN = box.open; });
+  [["font_display", "Headings", "Headings: "], ["font_body", "Body text", "Body text: "]].forEach(([tok, label, msg]) => {
+    box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin:10px 0 6px" }));
+    const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px";
+    grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label + " font");
+    DESIGN_FONTS.forEach((f) => {
+      const on = firstOf(T[tok]) === f.css.toLowerCase();
+      const b = el("button", null, f.family + (on ? " ✓" : "")); b.type = "button";
+      b.setAttribute("aria-pressed", String(on));
+      b.style.cssText = "font-family:'" + f.css + "'," + f.fallback + ";font-size:15px;text-align:left;padding:7px 10px;border-radius:10px;cursor:pointer;background:" + (on ? "var(--plum-tint,#faf7ff)" : "transparent") + ";border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line,#ddd)");
+      b.addEventListener("click", () => saveTokens({ [tok]: f.css + ", " + f.fallback }, msg + f.family));
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+  });
+  card.appendChild(box);
+}
+let FONT_LIB_OPEN = false;   // stays open across the card's remount after a pick
 // Templates that keep their own colours (see the template's CSS): the palettes and the
 // Background choice are written for light pages.
 const FIXED_COLOR_TEMPLATES = new Set(["slate"]);
 async function mountDesignCard(fresh = true) {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   if (fresh) {   // a remount right after this page's own save already holds the tokens
-    try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; }
+    try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; DESIGN_FONTS = (r.data && r.data.font_library) || []; }
     catch (_) { return; } // not an owner/developer on this site → no card
   }
  
@@ -7428,6 +7473,7 @@ async function mountDesignCard(fresh = true) {
   // type
   pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
     (t) => saveTokens(t.key ? { ...t.tokens } : { font_display: "", font_body: "" }, t.key ? t.name : "Original type"));
+  mountFontLibrary(card, T);
   // size / corners / background / density
   pillRow(card, "Text size", SIZE_OPTS, (o) => String(T.font_scale || "") === o[1], (o) => saveTokens({ font_scale: o[1] }, "Text size: " + o[0]));
   pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0]));

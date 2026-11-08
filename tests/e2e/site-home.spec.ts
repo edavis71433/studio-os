@@ -827,6 +827,28 @@ test.describe('Styles show on the page at once, and save behind', () => {
     expect(saves()[1]).toEqual({});
   });
 
+  test('More fonts: a family picked for headings loads on the canvas at once and saves as a style token', async ({ page }) => {
+    const LIB = [
+      { id: 'playfair-display', family: 'Playfair Display', css: 'Playfair Display', kind: 'serif', weights: [400, 700], fallback: 'Georgia, serif' },
+      { id: 'inter', family: 'Inter', css: 'Inter', kind: 'sans', weights: [400, 700], fallback: 'system-ui, sans-serif' },
+    ];
+    const { pick, saves } = await styles(page, { '/dev/customization': { data: { theme_tokens: { accent: '#111111' }, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, font_library: LIB } } });
+    await page.locator('#designCard summary', { hasText: 'More fonts' }).click();
+    const headings = page.locator('#designCard [aria-label="Headings font"]');
+    const pf = headings.getByRole('button', { name: 'Playfair Display' });
+    await expect(pf).toBeVisible();
+    expect(await pf.evaluate((b) => getComputedStyle(b).fontFamily)).toContain('Playfair Display');   // each name in its own face
+    await pf.click();
+    const frame = page.frameLocator('#designPreview');
+    await expect.poll(() => frame.locator('#presence-dev').evaluate((st) => st.textContent || '')).toContain("@font-face{font-family:'Playfair Display';src:url(/fonts/library/playfair-display-400.woff2)");
+    const loaded = await frame.locator('html').evaluate(async () => (await document.fonts.load("700 32px 'Playfair Display'")).length);
+    expect(loaded).toBeGreaterThan(0);                                   // the file is really there, and really a font
+    await expect.poll(saves).toEqual([{ accent: '#111111', font_display: 'Playfair Display, Georgia, serif' }]);
+    await expect(page.locator('#designCard [aria-label="Headings font"]').getByRole('button', { name: 'Playfair Display ✓' })).toBeVisible();   // still open after the card redraws
+    await expect(page.locator('#designCard [aria-label="Body text font"]').getByRole('button', { name: 'Inter', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    void pick;
+  });
+
   test('on Slate the colour choices are left out, and the panel says why', async ({ page }) => {
     await styles(page, { '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'slate', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', description: 'Hello' }, location: { city: 'Burbank' } } } });
     await expect(page.locator('#designCard')).toContainText('keeps its own dark colors');
