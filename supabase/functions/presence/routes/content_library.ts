@@ -4,7 +4,7 @@
 // it then publishes through the ONE settings/render/publish pipeline. Reuses the
 // block validator (site_blocks) — no duplicate block definitions or content model.
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { cleanLibraryName, validateLibraryBlock } from '../lib/content_library.ts';
 import { linkedUsageMap } from '../lib/linked_sections.ts';
@@ -35,8 +35,8 @@ export async function handleContentLibrarySave(req: Request, site: SiteRow, prin
   const block = validateLibraryBlock(body?.block);
   if (!name) return json({ error: 'bad_name', message: 'Give this saved section a name.' }, 422, cors);
   if (!block) return json({ error: 'bad_block', message: 'That isn’t a saveable content block yet — fill it in first.' }, 422, cors);
-  const cnt = await svc(`presence_content_library?site_id=eq.${site.id}&select=id`);
-  if (Array.isArray(cnt.json) && cnt.json.length >= MAX_ITEMS) return json({ error: 'library_full', message: `Your content library holds up to ${MAX_ITEMS} items — remove one first.` }, 422, cors);
+  const cnt = await svcCount(`presence_content_library?site_id=eq.${site.id}`);   // item 90: counted, not fetched
+  if (cnt !== null && cnt >= MAX_ITEMS) return json({ error: 'library_full', message: `Your content library holds up to ${MAX_ITEMS} items — remove one first.` }, 422, cors);
   const ins = await svc('presence_content_library', {
     method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, name, kind: 'block', payload: block, created_by: principal.userId }),

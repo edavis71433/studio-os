@@ -12,7 +12,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
 import { deployFileMap, netlifyConfigured } from '../lib/netlify.ts';
-import { mergeSecurityHeaders } from '../lib/security_headers.ts';
+import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
@@ -178,7 +178,10 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   at('images');
   // the library fonts the style names, copied into the site so it never loads one from elsewhere
   const { files: fonts, failed: fontsFailed } = await fetchLibraryFonts(libraryFontsIn(snapshotArg.snapshot?.dev_customization?.theme_tokens));
-  if (fontsFailed.length) return await fail('fonts', `font files couldn't be fetched: ${fontsFailed.join('; ')}`);
+  // Item 89: a font file that still can't be fetched doesn't stop the publish. Its page shows
+  // the font's fallback until the next publish copies it; a publish that failed here said
+  // "We hit a snag" over a site that would have looked fine.
+  if (fontsFailed.length) console.warn(`[publish] font files not copied, the fallback font shows: ${fontsFailed.join('; ')}`);
   Object.assign(fileMap, fonts);
   at('fonts');
 
@@ -188,7 +191,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // clickjacking (X-Frame-Options DENY + CSP frame-ancestors 'none'), MIME-sniff,
   // referrer, permissions, and a real CSP header. Merged into (never clobbering)
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
-  fileMap['_headers'] = mergeSecurityHeaders(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined);
+  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined));
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });

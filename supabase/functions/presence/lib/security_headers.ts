@@ -61,6 +61,25 @@ function parseHeaders(text: string): HeaderBlock[] {
  *    there: any pre-existing occurrence of a header we own (e.g. the template's
  *    nosniff) is dropped and replaced, so nothing is duplicated or weakened.
  *  - Deterministic: identical input → identical output bytes. */
+/** Item 88: a published site's stylesheet name carries its content's hash, and each image
+ *  file is named for the upload it came from, so neither changes under the same name: they
+ *  are cached for a year, as Restaurant Classic already asked. The library fonts keep a name
+ *  per family and weight, so a month. A template that sets its own rule for a path keeps it. */
+export const ASSET_CACHE_RULES: Array<[string, string]> = [
+  ['/assets/*', 'public, max-age=31536000, immutable'],
+  ['/img/*', 'public, max-age=31536000, immutable'],
+  ['/fonts/*', 'public, max-age=2592000'],
+];
+export function mergeAssetCaching(existing?: string): string {
+  const blocks = parseHeaders(existing ?? '');
+  for (const [path, value] of ASSET_CACHE_RULES) {
+    const b = blocks.find((x) => x.path === path);
+    if (!b) blocks.unshift({ path, headers: [['Cache-Control', value]] });
+    else if (!b.headers.some(([k]) => k.toLowerCase() === 'cache-control')) b.headers.push(['Cache-Control', value]);
+  }
+  return blocks.map((b) => `${b.path}\n${b.headers.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`).join('\n') + '\n';
+}
+
 export function mergeSecurityHeaders(existing?: string): string {
   const owned = new Set(SECURITY_RESPONSE_HEADERS.map(([k]) => k.toLowerCase()));
   const blocks = parseHeaders(existing ?? '');

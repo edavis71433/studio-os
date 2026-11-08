@@ -6,7 +6,7 @@
 Deno.env.set('RESEND_KEY', 'test-key');
 Deno.env.set('SUPABASE_URL', 'https://db.example');
 Deno.env.set('SERVICE_ROLE_KEY', 'test-service-key');   // signs the email's unsubscribe link
-const { reviewAskDue, automationSettings, AUTOMATION_DEFAULTS, runReviewRequests, reviewAskPeriod } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
+const { reviewAskDue, automationSettings, AUTOMATION_DEFAULTS, runReviewRequests, reviewAskPeriod, daytimeIn } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -28,8 +28,12 @@ ok('never without a date', !reviewAskDue('', NOW, 3) && !reviewAskDue('soon', NO
 const A = 'a0000000-0000-4000-8000-000000000001', B = 'b0000000-0000-4000-8000-000000000002';
 const P = (n) => `00000000-0000-4000-8000-00000000000${n}`;
 const C1 = 'c1000000-0000-4000-8000-000000000001';
-function world({ pre0137 = false, asked = [] } = {}) {
-  const w = { emails: [], ledger: [], asks: [], rate: {} };
+// item 91: the sweep asks only in the business's daytime, and reads the real clock, so the
+// stubbed locations carry a time zone where it is daytime (or night) right now
+const ZONES = ['Pacific/Kiritimati', 'Pacific/Auckland', 'Asia/Tokyo', 'Asia/Kolkata', 'Asia/Dubai', 'Europe/Moscow', 'Europe/Berlin', 'Europe/London', 'Atlantic/Azores', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Pacific/Honolulu', 'Pacific/Pago_Pago'];
+const DAY_ZONE = ZONES.find((z) => daytimeIn(z, Date.now())), NIGHT_ZONE = ZONES.find((z) => !daytimeIn(z, Date.now()));
+function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
+  const w = { emails: [], ledger: [], asks: [], rate: {}, reads: [] };
   const settings = [{ site_id: A, review_request_after_days: 3 }, { site_id: B, review_request_after_days: 5 }];
   const events = [
     { project_id: P(1), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // due
@@ -39,7 +43,7 @@ function world({ pre0137 = false, asked = [] } = {}) {
     { project_id: P(5), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // reopened since
     { project_id: P(6), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // already asked
   ];
-  const projects = { [P(1)]: { id: P(1), name: 'New website', status: 'complete', client_id: C1 }, [P(5)]: { id: P(5), name: 'Logo', status: 'active', client_id: C1 }, [P(6)]: { id: P(6), name: 'Photos', status: 'complete', client_id: C1 } };
+  const projects = { [P(1)]: { id: P(1), name: 'New website', status: 'complete', client_id: C1, site_id: A }, [P(5)]: { id: P(5), name: 'Logo', status: 'active', client_id: C1, site_id: A }, [P(6)]: { id: P(6), name: 'Photos', status: 'complete', client_id: C1, site_id: A } };
   const ledger = new Set(asked.map(reviewAskPeriod).concat([reviewAskPeriod(P(6))]));
   const reply = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
   globalThis.fetch = (url, init = {}) => {
@@ -48,15 +52,19 @@ function world({ pre0137 = false, asked = [] } = {}) {
     if (u.includes('/rpc/rate_hit')) { const b = JSON.parse(init.body); const k = `${b.p_bucket}|${b.p_window}`; w.rate[k] = (w.rate[k] || 0) + 1; return reply(w.rate[k] <= b.p_max); }
     if (u.includes('/presence_settings?review_requests=is.true')) return pre0137 ? reply({ message: 'column does not exist' }, 400) : reply(settings);
     if (u.includes('/presence_project_events?')) { w.asks.push(u); return reply(events); }
+    if (u.includes('/presence_locations?')) return reply([A, B].map((site_id) => ({ site_id, timezone: zone })));
     if (u.includes('/presence_plan_notices?') && m === 'GET') return reply([...ledger].filter((p) => u.includes(`"${p}"`)).map((period) => ({ period })));
     if (u.includes('/presence_plan_notices') && m === 'POST') {
       const row = JSON.parse(init.body); w.ledger.push(row);
       if (ledger.has(row.period)) return reply([]);
       ledger.add(row.period); return reply([{ id: 'n' + w.ledger.length, ...row }], 201);
     }
-    if (u.includes('/presence_projects?')) { const id = (u.match(/id=eq\.([0-9a-f-]{36})/) || [])[1]; return reply(projects[id] ? [projects[id]] : []); }
-    if (u.includes('/clients?')) return reply([{ email: 'pat@client.example', name: 'Pat' }]);
-    if (u.includes('/presence_sites?')) return reply([{ client_id: 'owner-1' }]);
+    // item 90: projects, clients and site owners come in one read each (id=in.(…)), as well as one by one
+    for (const t of ['presence_projects', 'clients', 'presence_sites']) if (u.includes(`/${t}?`)) w.reads.push(t);
+    const ids = () => ((u.match(/id=in\.\(([^)]*)\)/) || [])[1] || (u.match(/id=eq\.([0-9a-f-]{36})/) || [])[1] || '').split(',').filter(Boolean);
+    if (u.includes('/presence_projects?')) return reply(ids().map((id) => projects[id]).filter(Boolean));
+    if (u.includes('/clients?')) return reply(ids().map((id) => ({ id, email: 'pat@client.example', name: 'Pat' })));
+    if (u.includes('/presence_sites?')) return reply(ids().map((id) => ({ id, client_id: 'owner-1' })));
     if (u.includes('/presence_identity?')) return reply([{ business_name: 'Marlow Studio' }]);
     return reply([]);   // brand kit, suppression list and the rest: nothing on file
   };
@@ -69,6 +77,7 @@ function world({ pre0137 = false, asked = [] } = {}) {
   ok('the email is the review request, to the project’s client', w.emails[0]?.to === 'pat@client.example' || (Array.isArray(w.emails[0]?.to) && w.emails[0].to[0] === 'pat@client.example'));
   ok('…with the hand-sent request’s words', String(w.emails[0]?.html || '').includes('Thanks for choosing Marlow Studio. If you have a moment, we’d love a quick review'));
   ok('the ledger row is written for that project only, silently', w.ledger.length === 1 && w.ledger[0].period === reviewAskPeriod(P(1)) && w.ledger[0].status === 'dismissed');
+  ok('item 90: the projects, clients and owners are one read each, not one per project', ['presence_projects', 'clients', 'presence_sites'].every((t) => w.reads.filter((x) => x === t).length === 1));
   ok('nothing for a project not yet due, long finished, on a later day for its site, reopened or already asked',
     !w.ledger.some((l) => [2, 3, 4, 5, 6].some((n) => l.period === reviewAskPeriod(P(n)))));
 }
@@ -81,6 +90,17 @@ function world({ pre0137 = false, asked = [] } = {}) {
   const w = world({ pre0137: true });
   const r = await runReviewRequests(20);
   ok('before migration 0137 the sweep does nothing at all', r.asked === 0 && w.emails.length === 0 && w.asks.length === 0);
+}
+
+// ═══ 3b. item 91: only in the business's daytime ═══
+ok('daytime: 9:00 to 17:59 where the business is', daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T17:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T11:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-10T02:00:00Z')));
+ok('daytime: the same moment is day in one zone and night in another', daytimeIn('Europe/London', Date.parse('2026-11-09T10:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T10:00:00Z')));
+ok('daytime: an unknown or empty zone reads as the default one', daytimeIn('Not/AZone', Date.parse('2026-11-09T17:00:00Z')) && daytimeIn('', Date.parse('2026-11-09T17:00:00Z')) && !daytimeIn(null, Date.parse('2026-11-09T11:00:00Z')));
+ok('daytime: the test clock found a day zone and a night zone', !!DAY_ZONE && !!NIGHT_ZONE);
+{
+  const w = world({ zone: NIGHT_ZONE });
+  const r = await runReviewRequests(20);
+  ok('at night where the business is, nobody is asked and nothing is written', r.asked === 0 && w.emails.length === 0 && w.ledger.length === 0);
 }
 
 // ═══ 4. item 73: one person is asked at most once a month, by hand or automatically ═══

@@ -59,7 +59,9 @@ export async function resolveAgencyMember(jwt: string): Promise<AgencyMember | n
   const user: { id?: string; email?: string } | null = await authUser(jwt);
   if (!user?.id) return null;
   const email = (user.email || '').toLowerCase();
-  const m = await svc(`presence_agency_members?status=eq.active&or=(user_id.eq.${user.id},email.eq.${encodeURIComponent(email)})&select=id,agency_id,email,role&limit=1`);
+  // Item 87: user_id is read too. Without it the "first sight" write below ran on every
+  // request, an extra database write each time a studio worked inside a client.
+  const m = await svc(`presence_agency_members?status=eq.active&or=(user_id.eq.${user.id},email.eq.${encodeURIComponent(email)})&select=id,agency_id,email,role,user_id&limit=1`);
   const row = m.json?.[0];
   if (!row) return null;
   const a = await svc(`presence_agencies?id=eq.${row.agency_id}&status=eq.active&select=id,name,seat_limit,client_limit,plan,branding&limit=1`);

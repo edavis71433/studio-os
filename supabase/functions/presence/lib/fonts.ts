@@ -72,20 +72,30 @@ export function fontFaceCss(fonts: LibraryFont[]): string {
     `@font-face{font-family:'${f.css}';src:url(/${fontFilePath(f, w)}) format('woff2');font-weight:${w};font-style:normal;font-display:swap}`)).join('');
 }
 
+// Item 89: a font file once fetched stays for this function instance, and a fetch that
+// hiccups is tried twice more before the file counts as failed.
+const FONT_FILES = new Map<string, Uint8Array>();
+
 /** Publish: the files of these families, fetched from the app, keyed by their path on the site. */
-export async function fetchLibraryFonts(fonts: LibraryFont[]): Promise<{ files: Record<string, Uint8Array>; failed: string[] }> {
+export async function fetchLibraryFonts(fonts: LibraryFont[], opts: { tries?: number; pauseMs?: number } = {}): Promise<{ files: Record<string, Uint8Array>; failed: string[] }> {
   const APP_URL = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
+  const tries = opts.tries ?? 3, pause = opts.pauseMs ?? 300;
   const files: Record<string, Uint8Array> = {};
   const failed: string[] = [];
   await Promise.all(fonts.flatMap((f) => f.weights.map(async (w) => {
     const path = fontFilePath(f, w);
-    try {
-      const r = await fetch(`${APP_URL}/${path}`);
-      const bytes = r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
-      // a woff2 file starts "wOF2"; anything else (an HTML 404 page) isn't the font
-      if (bytes && bytes.length > 4 && String.fromCharCode(...bytes.slice(0, 4)) === 'wOF2') files[path] = bytes;
-      else failed.push(path);
-    } catch { failed.push(path); }
+    const kept = FONT_FILES.get(path);
+    if (kept) { files[path] = kept; return; }
+    for (let t = 0; t < tries; t++) {
+      if (t) await new Promise((r) => setTimeout(r, pause * t));
+      try {
+        const r = await fetch(`${APP_URL}/${path}`);
+        const bytes = r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+        // a woff2 file starts "wOF2"; anything else (an HTML 404 page) isn't the font
+        if (bytes && bytes.length > 4 && String.fromCharCode(...bytes.slice(0, 4)) === 'wOF2') { FONT_FILES.set(path, bytes); files[path] = bytes; return; }
+      } catch { /* tried again below */ }
+    }
+    failed.push(path);
   })));
   return { files, failed };
 }

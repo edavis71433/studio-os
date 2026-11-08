@@ -7,7 +7,7 @@
 // deterministic, non-clobbering result — mirroring routes/publish.ts exactly.
 //
 //   deno run --allow-read tests/presence/security_headers_test.mjs
-import { mergeSecurityHeaders, SECURITY_RESPONSE_HEADERS, PUBLISHED_CSP_RESPONSE } from '../../supabase/functions/presence/lib/security_headers.ts';
+import { mergeSecurityHeaders, mergeAssetCaching, SECURITY_RESPONSE_HEADERS, PUBLISHED_CSP_RESPONSE } from '../../supabase/functions/presence/lib/security_headers.ts';
 import { PUBLISHED_CSP, renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
 
 const results = [];
@@ -92,6 +92,20 @@ const merged = mergeSecurityHeaders(typeof templateHeaders === 'string' ? templa
   ok('no pre-existing _headers → still emits a /* block with all security headers',
     /^\/\*\n/.test(fromScratch) && SECURITY_RESPONSE_HEADERS.every(([k]) => fromScratch.includes(`  ${k}: `)));
   ok('CSP present when synthesized from scratch', /Content-Security-Policy:[^\n]*frame-ancestors 'none'/.test(fromScratch));
+}
+
+// ═══ item 88: every template's published files are cached, not only Restaurant Classic's ═══
+{
+  const blocks = (text) => Object.fromEntries(text.trim().split(/\n(?=\S)/).map((b) => { const [path, ...lines] = b.split('\n'); return [path.trim(), lines.map((l) => l.trim())]; }));
+  const fromNothing = blocks(mergeSecurityHeaders(mergeAssetCaching(undefined)));
+  ok('cache: a template with no rules gets the year-long rule for its stylesheet and images', fromNothing['/assets/*']?.includes('Cache-Control: public, max-age=31536000, immutable') && fromNothing['/img/*']?.includes('Cache-Control: public, max-age=31536000, immutable'));
+  ok('cache: the library fonts get a month', fromNothing['/fonts/*']?.includes('Cache-Control: public, max-age=2592000'));
+  ok('cache: the security headers still ride on every page', SECURITY_RESPONSE_HEADERS.every(([k]) => (fromNothing['/*'] || []).some((l) => l.startsWith(k + ':'))));
+  const own = blocks(mergeAssetCaching('/assets/*\n  Cache-Control: public, max-age=60\n/*\n  X-Content-Type-Options: nosniff\n'));
+  ok('cache: a template’s own rule for a path is kept, never doubled', (own['/assets/*'] || []).filter((l) => l.startsWith('Cache-Control')).length === 1 && own['/assets/*'].includes('Cache-Control: public, max-age=60'));
+  ok('cache: merging twice changes nothing', mergeAssetCaching(mergeAssetCaching(undefined)) === mergeAssetCaching(undefined));
+  const pub = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/publish.ts', import.meta.url));
+  ok('cache: publish applies it to every site', /mergeSecurityHeaders\(mergeAssetCaching\(/.test(pub));
 }
 
 const fails = results.filter((r) => !r.p);

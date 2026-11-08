@@ -1,6 +1,6 @@
 // POST /media/upload-url · DELETE /media/:id — the media surface (G1 §8).
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { createUpload, deleteMedia } from '../lib/media.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
@@ -14,8 +14,9 @@ export async function handleMediaUpload(req: Request, site: SiteRow, principal: 
   // per-site count cap from the manifest
   const t = getTemplate(site.template_slug, site.template_version);
   const cap = t?.manifest.entities.media?.max ?? 100;
-  const cnt = await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id`);
-  if (Array.isArray(cnt.json) && cnt.json.length >= cap) {
+  // Item 90: counted, not fetched (the upload's quota check reads the rows once more after)
+  const cnt = await svcCount(`presence_media?site_id=eq.${site.id}&deleted_at=is.null`);
+  if (cnt !== null && cnt >= cap) {
     return json({ error: 'media_cap', message: `This site supports up to ${cap} images — delete some you’re not using first.` }, 422, cors);
   }
 

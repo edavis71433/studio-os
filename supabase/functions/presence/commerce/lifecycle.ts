@@ -1316,6 +1316,16 @@ export function reviewAskDue(completedAtIso: unknown, nowMs: number, days: numbe
   const age = nowMs - t, day = 86400_000;
   return age >= days * day && age < (days + REVIEW_ASK_GRACE_DAYS) * day;
 }
+/** Item 91: is it daytime (9:00 to 17:59) in this time zone? An unknown or empty zone reads
+ *  as the default every location starts with. Pure. */
+export const ASK_HOURS = { from: 9, to: 18 };
+export function daytimeIn(timezone: string | null | undefined, nowMs: number): boolean {
+  const hourIn = (tz: string) => Number(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hourCycle: 'h23' }).format(new Date(nowMs)));
+  let h: number;
+  try { h = hourIn(String(timezone || '') || 'America/Los_Angeles'); } catch { h = hourIn('America/Los_Angeles'); }
+  return h >= ASK_HOURS.from && h < ASK_HOURS.to;
+}
+
 export async function runReviewRequests(limit = 20): Promise<{ asked: number }> {
   const on = await svc(`presence_settings?review_requests=is.true&select=site_id,review_request_after_days&limit=500`);
   if (!on.ok) return { asked: 0 };   // pre-0137: no switch to read
@@ -1330,21 +1340,35 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
   for (const e of ((ev.json as Array<{ project_id: string; site_id: string; detail?: { to?: string }; created_at: string }>) || [])) {
     if (e?.detail?.to === 'complete' && !completed.has(e.project_id)) completed.set(e.project_id, { siteId: e.site_id, at: e.created_at });
   }
-  const due = [...completed.entries()].filter(([, c]) => reviewAskDue(c.at, nowMs, sites.get(c.siteId) || AUTOMATION_DEFAULTS.review_request_after_days));
+  let due = [...completed.entries()].filter(([, c]) => reviewAskDue(c.at, nowMs, sites.get(c.siteId) || AUTOMATION_DEFAULTS.review_request_after_days));
+  if (!due.length) return { asked: 0 };
+  // Item 91: in the daytime where the business is. This runs every 15 minutes, so an ask that
+  // falls due at night goes out on the first run after nine in the morning, its time zone's.
+  const dueSites = [...new Set(due.map(([, c]) => c.siteId))];
+  const tz = await svc(`presence_locations?site_id=in.(${dueSites.join(',')})&select=site_id,timezone`);
+  const zoneOf = new Map(((tz.json as Array<{ site_id: string; timezone?: string }>) || []).map((r) => [r.site_id, String(r.timezone || '')]));
+  due = due.filter(([, c]) => daytimeIn(zoneOf.get(c.siteId), nowMs));
   if (!due.length) return { asked: 0 };
   const periods = due.map(([id]) => `"${reviewAskPeriod(id)}"`).join(',');
   const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length}`);
   const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
+  // Item 90: the projects, their clients and the sites' owners in three reads, not three per project.
+  const open = due.filter(([id]) => !done.has(reviewAskPeriod(id)));
+  if (!open.length) return { asked: 0 };
+  const rowsOf = (r: { json: unknown }) => (Array.isArray(r.json) ? r.json : []) as Array<Record<string, any>>;
+  const projects = new Map(rowsOf(await svc(`presence_projects?id=in.(${open.map(([id]) => id).join(',')})&deleted_at=is.null&select=id,site_id,name,status,client_id`)).map((p) => [String(p.id), p]));
+  const clientIds = [...new Set([...projects.values()].map((p) => p.client_id).filter(Boolean))];
+  const clientsById = new Map(clientIds.length ? rowsOf(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,email,name`)).map((c) => [String(c.id), c]) : []);
+  const owners = new Map(rowsOf(await svc(`presence_sites?id=in.(${[...new Set(open.map(([, c]) => c.siteId))].join(',')})&select=id,client_id`)).map((x) => [String(x.id), x.client_id]));
   let asked = 0;
-  for (const [projectId, c] of due) {
+  for (const [projectId, c] of open) {
     if (asked >= limit) break;
-    if (done.has(reviewAskPeriod(projectId))) continue;
-    const p = (await svc(`presence_projects?id=eq.${projectId}&site_id=eq.${c.siteId}&deleted_at=is.null&select=id,name,status,client_id&limit=1`)).json?.[0];
-    if (!p || p.status !== 'complete' || !p.client_id) continue;   // reopened, removed, or nobody to ask
-    const cl = (await svc(`clients?id=eq.${p.client_id}&select=email,name&limit=1`)).json?.[0];
+    const p = projects.get(projectId);
+    if (!p || p.site_id !== c.siteId || p.status !== 'complete' || !p.client_id) continue;   // reopened, removed, or nobody to ask
+    const cl = clientsById.get(String(p.client_id));
     const email = String(cl?.email || '').trim();
     if (!email) continue;
-    const owner = (await svc(`presence_sites?id=eq.${c.siteId}&select=client_id&limit=1`)).json?.[0]?.client_id;
+    const owner = owners.get(c.siteId);
     if (!owner) continue;
     // the ledger row is the send-once gate, written before the email: a parallel tick can't double-send
     const fresh = await raiseNotice({ siteId: c.siteId, clientId: owner, kind: 'deal_followup', period: reviewAskPeriod(projectId), status: 'dismissed',
