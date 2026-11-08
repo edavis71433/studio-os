@@ -568,7 +568,7 @@ test.describe('Pages: every page and the menu in one place', () => {
     const writes = await mount(page, '/presence.html#pages', withPages({ nav }));
     await expect.poll(() => names(page, 'pagesList')).toEqual(['Start', 'Our work', 'Say hello', 'Booking']);
     await expect(row(page, 'Say hello')).toHaveClass(/child/);
-    expect(await names(page, 'pagesUnlinked')).toEqual(expect.arrayContaining(['About', 'Questions', 'Landing']));
+    expect(await names(page, 'pagesUnlinked')).toEqual(expect.arrayContaining(['About', 'FAQ', 'Landing']));
     // a child row's arrow keys stay among its siblings
     await page.waitForLoadState('networkidle');
     await row(page, 'Say hello').locator('.pg-grab').focus();
@@ -652,6 +652,8 @@ test.describe('one preview screen', () => {
     await page.evaluate(() => document.getElementById('dcBtnPreview')!.click());
     await asked;
     await expect(page.locator('#stage')).toBeVisible();
+    // the shell is hidden in Edit mode, so nothing of the editor shows beside the preview
+    expect(await page.locator('#stage').evaluate((n) => { const b = n.getBoundingClientRect(); return [b.left, b.right, b.bottom]; })).toEqual([0, page.viewportSize()!.width, page.viewportSize()!.height]);
     await page.locator('#btnStageClose').click();
     await expect(page.locator('#stage')).toBeHidden();
     await expect(page.locator('html')).toHaveClass(/dc-edit/);

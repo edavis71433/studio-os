@@ -397,7 +397,7 @@ html.dc-edit:not(.plan-watch).dds-side body{padding-left:0}
 html.dc-edit:not(.plan-watch).dds-has-shell body,html.dc-edit:not(.plan-watch).dds-has-shell.dds-has-ctxbar body{padding-top:0}
 html.dc-edit:not(.plan-watch) body{overflow:hidden}
 html.dc-edit:not(.plan-watch) .content{padding:0;max-width:none}
-html.dc-edit:not(.plan-watch) .stage{top:0;left:0;bottom:0}
+html.dc-edit:not(.plan-watch) .stage{top:0 !important;left:0 !important;bottom:0 !important}  /* the shell is hidden in Edit mode, so the preview takes its room too */
 html.dc-edit:not(.plan-watch) #view-design.on{display:flex;flex-direction:column;height:100vh;height:100dvh;animation:none}
 html.dc-edit:not(.plan-watch){--dc-bar-h:52px}
 html.dc-edit:not(.plan-watch) .dc-bar{flex:none;flex-wrap:nowrap;box-sizing:border-box;height:var(--dc-bar-h);gap:var(--dds-s3,12px);margin:0;padding:0 var(--dds-s3,12px);background:var(--sheet);border-bottom:1px solid var(--hair);position:relative;z-index:60}
@@ -4312,7 +4312,7 @@ function hbStandardPages() {
     { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, testimonials", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
     { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: "What you offer", view: "offerings", icon: "menu", sections: ["offerings"] },
     { key: "about", path: "/about/", title: "About", sum: "Your story, in your words", view: "business", icon: "about", sections: ["business"] },
-    { key: "faq", path: "/faq/", title: "Questions", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
+    { key: "faq", path: "/faq/", title: "FAQ", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
     { key: "updates", path: "/updates/", title: "Updates", sum: "News and seasonal notes", view: "updates", icon: "updates", sections: ["updates"] },
     { key: "contact", path: "/contact/", title: "Contact", sum: "Hours, map, how to reach you", view: "business", icon: "contact", sections: ["business"] },
   ];
