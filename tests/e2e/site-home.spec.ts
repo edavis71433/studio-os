@@ -150,7 +150,11 @@ test.describe('where everything else went', () => {
     await expect(page.locator('#pagesList .hb-row').first()).toContainText('Home');
     await page.goto('/presence.html#health');
     await expect(page.locator('#view-search')).toBeVisible();
+    await page.waitForTimeout(700);   // and it stays there: it used to jump to the Overview after 0.2 s
+    await expect(page.locator('#view-search')).toBeVisible();
     await page.goto('/presence.html#activity');
+    await expect(page.locator('#view-history')).toBeVisible();
+    await page.waitForTimeout(700);
     await expect(page.locator('#view-history')).toBeVisible();
     await expect(page.locator('#view-history h1.doc')).toHaveText('Versions');
     // the versions come first; what happened to the site follows them
@@ -1301,7 +1305,8 @@ test.describe('Load the latest shows what was loaded', () => {
     ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: LOADED }) })
     : route.fallback());
   test('the announcement and the home page’s section order show the loaded values, in their places', async ({ page }) => {
-    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    // Edit mode, where the home page's section list lives (item 84 mounts it when Edit mode opens)
+    await mount(page, '/presence.html#design', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
     await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th');
     await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'About', 'What you offer', 'Testimonials', 'Questions']);
     const placeBefore = await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!));
@@ -1372,6 +1377,94 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     await page.waitForLoadState('networkidle');
     expect(await place()).toBe(before);
     expect(reads).toEqual([]);
+  });
+});
+
+test.describe('the website editor reads what it shows, when it shows it (item 84)', () => {
+  // Every GET to the server, by path, in the order asked.
+  const readsOf = (page: Page) => {
+    const reads: string[] = [];
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (r.method() === 'GET' && u.pathname.includes('/functions/v1/presence')) reads.push(u.pathname.replace(/^.*\/functions\/v1\/presence/, ''));
+    });
+    return reads;
+  };
+  // What each tab reads for itself, which the Overview shows none of.
+  const EXTRAS: Record<string, string[]> = {
+    '#pages': ['/content-tree'],
+    '#search': ['/website-health', '/foundations/domain', '/search/health'],
+    '#versions': ['/website-timeline'],
+    '#media': ['/knowledge/docs'],
+    '#business': ['/monitor/connection'],
+    '#design': ['/dev/customization', '/dev/brand-kit', '/site/templates', '/blocks/suggested'],
+  };
+  const go = (page: Page, hash: string) => page.evaluate((h) => { location.hash = h; }, hash);
+
+  test('the site’s picture, health and the changes count go out before the slow reads answer, and no tab’s extras are read', async ({ page }) => {
+    await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    // Load again with the site's own record slow: nothing the Overview shows waits for it.
+    let siteAnswered = false;
+    const asked: string[] = [];
+    await page.route('**/functions/v1/presence/site', async (route: Route) => { await new Promise((r) => setTimeout(r, 800)); siteAnswered = true; return route.fallback(); });
+    page.on('request', (r) => { if (!siteAnswered && r.url().includes('/functions/v1/presence')) asked.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
+    const reads = readsOf(page);
+    await page.reload();
+    await expect(page.frameLocator('#siteFrame').locator('h1').first()).toHaveText('Marlow’s Kitchen');
+    await page.waitForLoadState('networkidle');
+    expect(asked).toEqual(expect.arrayContaining(['/preview', '/health', '/changes']));
+    for (const p of Object.values(EXTRAS).flat()) expect(reads, p).not.toContain(p);
+    expect(reads.filter((p) => p === '/preview')).toHaveLength(1);
+    // The shell reads the account context; the page takes its copy instead of a second read.
+    expect(reads.filter((p) => p === '/portal/context')).toHaveLength(1);
+  });
+
+  test('each tab reads its own extras the first time it opens, and not again', async ({ page }) => {
+    const reads = readsOf(page);
+    await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    for (const [hash, own] of Object.entries(EXTRAS)) {
+      const before = reads.length;
+      await go(page, hash);
+      await expect.poll(() => own.filter((p) => !reads.slice(before).includes(p)), { message: hash }).toEqual([]);
+    }
+    // A second round of every tab. Not a wait for a quiet network: the tablet keeps a font
+    // request open in Edit mode, so the network never goes quiet there.
+    await page.waitForTimeout(500);
+    const before = reads.length;
+    for (const hash of Object.keys(EXTRAS)) { await go(page, hash); await page.waitForTimeout(150); }
+    await page.waitForTimeout(800);
+    for (const p of Object.values(EXTRAS).flat()) expect(reads.slice(before), p).not.toContain(p);
+  });
+
+  test('coming back to the Overview reads health again only after a save', async ({ page }) => {
+    const reads = readsOf(page);
+    const writes = await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    const healthReads = () => reads.filter((p) => p === '/health').length;
+    expect(healthReads()).toBe(1);
+    // A wait for a quiet network returns at once after the first load, so these give a read
+    // the time it would take to go out.
+    await go(page, '#pages');
+    await page.waitForTimeout(400);
+    await go(page, '#today');
+    await page.waitForTimeout(800);
+    expect(healthReads()).toBe(1);   // nothing saved since, so nothing new to read
+    await go(page, '#business');
+    await page.locator('#f-business_name').fill('Marlow’s Bistro');
+    await expect.poll(() => writes.filter((w) => w.path === '/identity').length).toBe(1);
+    await go(page, '#today');
+    await expect.poll(healthReads).toBe(2);
+  });
+
+  test('the template list and the style settings are each read once when Edit mode opens', async ({ page }) => {
+    const reads = readsOf(page);
+    await mount(page, '/presence.html#design');
+    await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+    await page.waitForLoadState('networkidle');
+    expect(reads.filter((p) => p === '/dev/customization')).toHaveLength(1);
+    expect(reads.filter((p) => p === '/site/templates')).toHaveLength(1);
   });
 });
 

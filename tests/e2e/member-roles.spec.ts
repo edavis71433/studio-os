@@ -412,8 +412,11 @@ test.describe('The builder', () => {
     });
 
     test(`${p.who}: forwards, reference documents, saved sections and a comment, and they keep Resolve`, async ({ page }) => {
-      await openBuilder(page, p, '#business');
+      // Item 84: each is read when its tab first opens, the forwards on Search and the
+      // reference documents on Files.
+      await openBuilder(page, p, '#search');
       await expectDisplay(page, p, 'button[title="Remove this forward"]', 'delete');
+      await page.evaluate(() => { location.hash = '#media'; });
       await expectDisplay(page, p, '#knowledgeList button.quietact', 'delete');
       await page.goto(withScope('/presence.html', p) + '#design');
       await page.waitForFunction(() => (window as unknown as { __ddsContext?: unknown }).__ddsContext);
