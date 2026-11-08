@@ -34,7 +34,7 @@ export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: u
 export const OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
 export const STAGE_LABEL: Record<string, string> = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
 /** lastMoveInto: deal id → when it last moved INTO its current stage (a stage_change event); else it has been there since it was made. */
-export function dealsByStage(deals: Array<{ id?: unknown; title?: unknown; stage?: unknown; expected_value_cents?: unknown; created_at?: unknown }>, lastMoveInto: Record<string, string>, nowIso: string) {
+export function dealsByStage(deals: Array<{ id?: unknown; title?: unknown; stage?: unknown; expected_value_cents?: unknown; created_at?: unknown }>, lastMoveInto: Record<string, string>, nowIso: string, labels: Record<string, string> = STAGE_LABEL) {
   const now = Date.parse(nowIso);
   const rows = OPEN_STAGES.map((stage) => {
     const ds = (deals || []).filter((d) => d && d.id && String(d.stage) === stage && !(d as any).converted_client_id);
@@ -44,7 +44,7 @@ export function dealsByStage(deals: Array<{ id?: unknown; title?: unknown; stage
     });
     const longest = days.slice().sort((a, b) => b.days - a.days)[0];
     return {
-      stage, label: STAGE_LABEL[stage], count: ds.length, value_cents: ds.reduce((a, d) => a + n(d.expected_value_cents), 0),
+      stage, label: labels[stage] || STAGE_LABEL[stage], count: ds.length, value_cents: ds.reduce((a, d) => a + n(d.expected_value_cents), 0),
       avg_days: days.length ? Math.round(days.reduce((a, x) => a + x.days, 0) / days.length) : null,
       longest_days: longest ? longest.days : null, longest_title: longest ? String(longest.d.title || 'A deal') : '',
     };

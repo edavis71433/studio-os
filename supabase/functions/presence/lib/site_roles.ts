@@ -109,6 +109,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
   ]],
   ['configure', [
+    'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
     '(POST|DELETE) /foundations/(domain|zone)',
     '(POST|PUT|DELETE) /foundations/zone/records',
     'PUT /foundations/dns',

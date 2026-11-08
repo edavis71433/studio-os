@@ -12,6 +12,7 @@
 //   POST /crm/notes                — add { audience, body }
 //   POST /crm/notes/:id/pin        — { pinned }
 //   DELETE /crm/notes/:id          — soft-delete
+import { loadStageLabels, renameMovedTo } from '../lib/stage_names.ts';
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -303,6 +304,7 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     // dedupe apart past 200 events), and the deal row isn't fetched twice.
     const deal: any = conv.deal;
     const dealEvents: any[] = conv.dealEvents;
+    const stageNames = dealEvents.length ? await loadStageLabels(AS).catch(() => null) : null;   // item 38: the studio's own stage names
     let tasks: any[] = []; let invoices: any[] = [];
     if (dealId) {
       try { tasks = arr(await svc(`presence_deal_tasks?site_id=eq.${AS}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`)); } catch { tasks = []; }
@@ -329,7 +331,7 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
 
     const items = mergeActivity([
       conv.items.map(mapConversationItem),
-      dealEvents.map((e) => mapDealEvent(e, dealId)),
+      dealEvents.map((e) => { const it = mapDealEvent(e, dealId); return it && stageNames ? { ...it, title: renameMovedTo(it.title, stageNames) } : it; }),   // item 38
       tasks.map((t) => mapDoneTask(t, dealId)),
       siteEvents,
     ]);
