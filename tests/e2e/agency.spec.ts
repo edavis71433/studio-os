@@ -400,7 +400,7 @@ test.describe('Agency portfolio', () => {
       { key: 'money:i2', kind: 'money', site_id: 'a2', client_id: 'c2', name: 'Bright Dental', what: 'invoice $800 is due Nov 3', when: 'Sent Oct 20 · no payment yet', verb: 'Resend', href: '/crm.html?deal=d2&tab=billing' },
       { key: 'enquiry:e1', kind: 'enquiry', site_id: 'a3', client_id: null, name: 'Cedar Garage', what: 'new enquiry from Maria', when: '2 days ago · quote form', verb: 'Reply', href: '/inbox.html?client=a3#enquiries?sel=lead:e1' },
       { key: 'support:s1', kind: 'support', site_id: 'a1', client_id: 'c1', name: 'Marlow’s Kitchen', what: 'support request: the gallery page', when: 'Opened yesterday', verb: 'Reply', href: '/inbox.html#support?sel=sup:s1' },
-      { key: 'deal:d9', kind: 'deal', site_id: null, client_id: 'c9', name: 'Claud Beltran', what: 'next step “Book the kickoff call” is 74 days late', when: 'On the deal Bacchus Kitchen · due Aug 8', verb: 'Open deal', href: '/crm.html?deal=d9' },
+      { key: 'deal:d9', kind: 'deal', site_id: null, client_id: 'c9', name: 'Jordan Ellis', what: 'next step “Book the kickoff call” is 74 days late', when: 'On the deal Larkspur Kitchen · due Aug 8', verb: 'Open deal', href: '/crm.html?deal=d9' },
       { key: 'broken:publish:a2', kind: 'broken', site_id: 'a2', client_id: null, name: 'Bright Dental', what: 'the last publish failed', when: 'Failed today', verb: 'Fix', href: '/presence.html?client=a2#publish' },
       { key: 'plan:p1', kind: 'plan', site_id: 'a3', client_id: null, name: 'Cedar Garage', what: 'approved “Protect your email” — not applied yet', when: 'Approved plan', verb: 'Apply', href: '/presence.html?client=a3#foundations' },
       { key: 'publish:a1', kind: 'publish', site_id: 'a1', client_id: null, name: 'Marlow’s Kitchen', what: 'changes are sitting unpublished', when: 'Last change today', verb: 'Review', href: '/presence.html?client=a1#publish' },
@@ -411,7 +411,7 @@ test.describe('Agency portfolio', () => {
     await expect(n.locator('.qhead')).toHaveText('Needs you · 8');
     await expect(n.locator('.need .row a.rowact')).toHaveText(['Resend', 'Resend', 'Reply', 'Reply', 'Open deal', 'Fix', 'Apply', 'Review']);
     await expect(n.locator('.need .row').first()).toContainText('Marlow’s Kitchen — invoice $1,600 is overdue by 3 days');
-    await expect(n.locator('.need .row').nth(4)).toContainText('Claud Beltran — next step “Book the kickoff call” is 74 days late');
+    await expect(n.locator('.need .row').nth(4)).toContainText('Jordan Ellis — next step “Book the kickoff call” is 74 days late');
     await expect(n.locator('#needsMore')).toHaveCount(0);
     // the roster's Status/Next read from the same list — first row per client
     await pinDisplay(page, 'table');
@@ -438,12 +438,12 @@ test.describe('Agency portfolio', () => {
 
   test('empty state: "Nothing needs you." plus one honest line; a partial read says so', async ({ page }) => {
     await pinDisplay(page, 'table');   // the roster pill is read from the table (phones default to Cards)
-    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { empty_line: 'Claud Beltran owes $1,600, due Nov 3.' }) } });
+    await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { empty_line: 'Jordan Ellis owes $1,600, due Nov 3.' }) } });
     await page.goto('/agency.html');
     const n = page.locator('#needs');
     await expect(n).toBeVisible();
     await expect(n.locator('#needsEmpty .nn')).toHaveText('Nothing needs you.');
-    await expect(n.locator('#needsEmpty')).toContainText('Claud Beltran owes $1,600, due Nov 3.');
+    await expect(n.locator('#needsEmpty')).toContainText('Jordan Ellis owes $1,600, due Nov 3.');
     await expect(n.locator('.pnote')).toHaveCount(0);
     await expect(page.locator('tbody tr', { hasText: 'Marlow’s Kitchen' }).locator('.pill')).toHaveText('Live');   // nothing needs the studio → the roster agrees
     await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou([], { partial: true }) } });

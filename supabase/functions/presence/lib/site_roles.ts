@@ -218,6 +218,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /dev/(customization|brand-kit)',
     'POST /dev/brand-kit/apply',
     'PUT /site/template',
+    // sales review final pass (S1): only the site's owner answers a studio's request; the route refuses anyone else and says why
+    `POST /portal/studio-requests/${ID}/(accept|decline)`,
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

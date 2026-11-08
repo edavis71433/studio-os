@@ -272,7 +272,7 @@
     <h3 id="convTitle">Make them a customer</h3>
     <p class="muted" id="convWho"></p>
     <label for="conv-biz">Business name</label>
-    <input id="conv-biz" type="text" maxlength="120" placeholder="e.g. Bacchus Kitchen + Wine Bar">
+    <input id="conv-biz" type="text" maxlength="120" placeholder="e.g. Larkspur Kitchen + Wine Bar">
     <label for="conv-email">Email <span class="muted">(their sign-in invitation goes here)</span></label>
     <input id="conv-email" type="email" maxlength="160">
     <label class="check"><input id="conv-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
@@ -332,7 +332,7 @@ const SI={cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
-// item 54: the badge reads `who` (the name alone) — "Eddie · 4 messages" gave "E·"
+// item 54: the badge reads `who` (the name alone) — "Marco · 4 messages" gave "E·"
 const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
 // SC-1: keep the agency drill-in scope on every internal link so a scoped operator
 // stays inside the client they opened.
@@ -465,7 +465,7 @@ function buildItems(feed,leads,notifs){
   const shared=(l)=>{const q=leadById.get(String(l.id));return (q&&q!==l)?Object.assign(q,l):l;};
   const enq=(Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit')).map(shared);
   // Phase 4 (triage): one row per PERSON. The same visitor submitting four forms
-  // showed as four rows ("Eddie ×4"); they group under the newest, with a count.
+  // showed as four rows ("Marco ×4"); they group under the newest, with a count.
   const byPerson=new Map();
   for(const l of enq){
     const key=String(l.email||'').trim().toLowerCase()||('id:'+l.id);
@@ -1362,6 +1362,11 @@ function openConvert(it){
       const r=await api('/sales/customers','POST',{email,name:l.name||'',business_name:biz,source_submission_id:id});
       if(!r.ok){go.disabled=false;go.textContent='Make customer';toast((r.body&&r.body.message)||'Couldn’t set them up just now.');return;}
       const d=r.body&&r.body.data||{};
+      if(d.requested){   // final pass S1: their account isn't yours yet — they're asked, nothing else happens
+        go.disabled=false; go.textContent='Make customer'; dlg.close();
+        toast('They already have a Studio OS account, so we asked them to accept you. They’ll see it the next time they sign in.');
+        return;
+      }
       let dealId=null;
       if($('conv-deal').checked){
         let contactId=null;

@@ -12,6 +12,7 @@ import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
+import { isCustomerOfStudio, claimPortfolioSite, requestConnection } from '../lib/connect_requests.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
@@ -65,6 +66,8 @@ const SERVICES_CATALOG_NAME = '__services_catalog__';
 const CONTACT_FIELDS_NAME = '__crm_contact_fields__';
 // the reserved store's rows (lib/reserved_store.ts) never show as templates either
 const NOT_RESERVED_STORE = Object.values(RESERVED_NAMES).map((n) => `&name=neq.${encodeURIComponent(n)}`).join('');
+/** Every Studio OS settings row is named __like_this__; no template may be. */
+export const isReservedName = (n: unknown) => /^__.*__$/.test(String(n ?? '').trim());
 // A machine marker on a presence_contacts row (site-scoped) that says "this studio
 // wants THIS email as a customer — auto-connect them the moment they self-serve
 // sign up". The studio IS its presence site, and presence_contacts.site_id is
@@ -223,8 +226,8 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
     const list = rows(r);
     // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
-    // the CREATE-time prompt uses (phoneKey → "6262346081" === "(626) 234-6081";
-    // nameSimilarity → "Claud" ≈ "Claude"), just run across the page instead of
+    // the CREATE-time prompt uses (phoneKey → "5550102468" === "(555) 010-2468";
+    // nameSimilarity → "Jordan" ≈ "Jordon"), just run across the page instead of
     // against one new arrival. Opt-in so no other caller pays for the scan.
     const hints = u.searchParams.get('dupes') === '1' ? duplicateHints(list) : null;
     if (hints) for (const c of list) { const h = hints[String(c.id)]; if (h) c.possible_duplicate_of = h; }
@@ -473,7 +476,7 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     //
     // ALWAYS TWO-STEP. A DELETE without ?confirm=1 writes NOTHING — it is a dry
     // run that answers 409 with the INVENTORY, so the browser can put the facts
-    // in front of Eric ("Claud has 1 deal, 1 signed agreement, 1 paid invoice
+    // in front of Eric ("Jordan has 1 deal, 1 signed agreement, 1 paid invoice
     // and 1 project") instead of a generic "Are you sure?". He decides; the
     // second DELETE carries ?confirm=1 and performs it. The dry run runs even
     // when nothing is attached, so no unconfirmed request can ever remove a
@@ -979,6 +982,11 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
   if (!kind) return json({ error: 'bad_kind', message: 'A template is a proposal or a contract.' }, 422, cors);
   const name = clean(b.name, 120);
   if (!name) return json({ error: 'validation', message: 'Give the template a name.' }, 422, cors);
+  // Final pass (Nov 8, S2): a name like __calendar_feed__ is one of Studio OS's own
+  // settings rows (lib/reserved_store.ts, the services catalog, contact fields). A
+  // template with that name became a second settings row — a seat without the
+  // "configure" right could plant a calendar link or rename stages that way.
+  if (isReservedName(name)) return json({ error: 'reserved_name', message: 'That name is kept for Studio OS’s own settings. Please choose another.' }, 422, cors);
   let title = clean(b.title, 200), body = '', line_items: unknown[] = [];
   if (UUID_RE.test(b.from_proposal_id || '')) {   // save an existing proposal as the template
     const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items&limit=1`))[0];
@@ -1002,6 +1010,10 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
 }
 export async function handleSalesTemplateDelete(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  // S2: a settings row is not a template — never removed through this door
+  const row = rows(await svc(`presence_sales_templates?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=name&limit=1`))[0];
+  if (!row) return json({ error: 'not_found' }, 404, cors);
+  if (isReservedName(row.name)) return json({ error: 'reserved_name', message: 'That isn’t a template.' }, 422, cors);
   const up = await svc(`presence_sales_templates?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
   return rows(up)[0] ? json({ data: { ok: true } }, 200, cors) : json({ error: 'not_found' }, 404, cors);
 }
@@ -2219,7 +2231,14 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   //    provisioning internal — the exact same helper the direct "Add a customer"
   //    path calls, so there is never a second provisioner. It rolls back only what
   //    IT created on failure; convert holds the deal claim around it.
-  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
+  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email, studioSiteId: site.id, studioClientId: site.client_id });
+  if (acct.error === 'needs_acceptance') {
+    // S1: the deal's email already has an account that isn't yours — ask first;
+    // once they accept, Convert again and it goes through as for any customer.
+    await unclaim();
+    if (!(await askToConnect(site, principal, email, businessName))) return requestUnavailable(cors);
+    return json({ error: 'needs_acceptance', message: 'They already have a Studio OS account, so we asked them to accept you. Convert again once they say yes.' }, 409, cors);   // under 160: the deal page shows it whole
+  }
   if (!acct.ok || !acct.clientId) {
     await unclaim();
     return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t set up the customer’s account — please try again.' }, acct.httpStatus || 502, cors);
@@ -2319,6 +2338,10 @@ interface CustomerAccountResult {
  *  Shared by convert and the direct add-customer route (no second provisioner). */
 async function provisionCustomerAccount(opts: {
   email: string; businessName: string; plan: PlanKey; actorEmail?: string | null;
+  // S1: the studio asking. An account that already exists is only reused when it
+  // is this studio's own (or the studio itself); otherwise → needs_acceptance,
+  // before anything of theirs is provisioned, re-planned or linked.
+  studioSiteId?: string; studioClientId?: string | null;
 }): Promise<CustomerAccountResult> {
   const { email, businessName, plan } = opts;
   // Track what WE created for clean rollback. `createdClient` is NEVER set for a
@@ -2330,6 +2353,9 @@ async function provisionCustomerAccount(opts: {
 
   if (email) {
     const existing = await findClientByEmail(email);
+    if (existing && opts.studioSiteId && existing.id !== opts.studioClientId && !(await isCustomerOfStudio(opts.studioSiteId, existing.id))) {
+      return { ok: false, error: 'needs_acceptance', message: 'They already have a Studio OS account.', httpStatus: 409, isNewLogin, alreadyExisted: true, createdClient, createdAuthId };
+    }
     if (existing) { clientId = existing.id; alreadyExisted = true; }  // reuse — never duplicate a customer
     else {
       const auth = await createAuthUser(email, crypto.randomUUID() + 'Aa1!');
@@ -2341,6 +2367,9 @@ async function provisionCustomerAccount(opts: {
       } else if (auth.error === 'account_exists') {                 // they already sign in; link a client by email if missing
         alreadyExisted = true;
         clientId = (await findClientByEmail(email))?.id || null;
+        if (clientId && opts.studioSiteId && clientId !== opts.studioClientId && !(await isCustomerOfStudio(opts.studioSiteId, clientId))) {
+          return { ok: false, error: 'needs_acceptance', message: 'They already have a Studio OS account.', httpStatus: 409, isNewLogin, alreadyExisted: true, createdClient, createdAuthId };
+        }
         if (!clientId) { const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, email, contact_email: email, status: 'active' }) }); clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true; }
       } else { return fail('auth_failed', 'We couldn’t set up the customer’s login — please try again.'); }
     }
@@ -2414,9 +2443,12 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
     if (!siteId || !principal.jwt) return false;
     const am = await resolveAgencyMember(principal.jwt);
     if (!am) return false;
-    const link = await svc('presence_agency_clients?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ site_id: siteId, agency_id: am.agency_id, status: 'active', owner_email: email || am.email }) });
-    return link.ok;
+    // Final pass (Nov 8, S1): insert-only. The old merge-duplicates upsert on the
+    // site_id key moved a site another studio managed into this one's portfolio.
+    // Callers reach here only for a site this studio created or a customer who is
+    // already this studio's (see customerConsent below).
+    const c = await claimPortfolioSite(am.agency_id, siteId, email || am.email);
+    return c === 'linked' || c === 'already';
   } catch { return false; } // portfolio link is best-effort
 }
 
@@ -2536,6 +2568,22 @@ async function ensureConnectContact(siteId: string, email: string, name: string,
   return rows(ins)[0] || null;
 }
 
+// ── An account that already exists is asked, not taken (final pass, Nov 8: S1) ──
+// When the email belongs to an account that isn't already this studio's customer,
+// nothing is provisioned, linked or bridged: the studio's request waits for the
+// owner to accept it in their own workspace (routes/connect_requests.ts).
+const NEEDS_ACCEPTANCE_LINE = 'They already have a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
+async function askToConnect(site: SiteRow, principal: Principal, email: string, name: string): Promise<boolean> {
+  const am = principal.jwt ? await resolveAgencyMember(principal.jwt).catch(() => null) : null;
+  const ok = await requestConnection({ studioSiteId: site.id, agencyId: am?.agency_id || null, email, name, requestedBy: principal.email || principal.userId || '' });
+  if (ok) {
+    await ensureConnectContact(site.id, email, name, false).catch(() => null);   // they're in your contacts meanwhile
+    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: email, action: 'connect_requested', summary: `Asked ${email} to connect with you`, principal, provenance: 'human' }).catch(() => {});
+  }
+  return ok;
+}
+const requestUnavailable = (cors: Record<string, string>) => json({ error: 'request_unavailable', message: 'We couldn’t send your request just now. Please try again in a little while.' }, 503, cors);
+
 // ═══ ADD A CUSTOMER (direct — no sales ceremony) ═════════════════════════════
 // The owner already has customers (people he's served for years). TWO paths, his
 // choice (owner's words: "there should be two options"):
@@ -2564,8 +2612,13 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
   if (mode === 'connect') {
     const existing = await findClientByEmail(email);
+    if (existing && existing.id !== site.client_id && !(await isCustomerOfStudio(site.id, existing.id))) {
+      // S1: someone else's account — ask, don't take
+      if (!(await askToConnect(site, principal, email, businessName))) return requestUnavailable(cors);
+      return json({ data: { mode: 'connect', requested: true, pending: true, connected: false, email, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
+    }
     if (existing) {
-      // They already have an account → connect (bridge) it to this studio now.
+      // Already this studio's customer → (re)connect: idempotent, nothing taken.
       const clientId = existing.id;
       const customerSite = rows(await svc(`presence_sites?client_id=eq.${clientId}&select=id&limit=1`))[0];
       const managed = await linkAgencyPortfolio(principal, customerSite?.id, email);
@@ -2590,7 +2643,11 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
   const existingWebsite = clean(b.website_url, 200);   // their OWN site, when we don't host it
 
-  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email });
+  const acct = await provisionCustomerAccount({ email, businessName, plan, actorEmail: principal.email, studioSiteId: site.id, studioClientId: site.client_id });
+  if (acct.error === 'needs_acceptance') {
+    if (!(await askToConnect(site, principal, email, businessName))) return requestUnavailable(cors);
+    return json({ data: { already_exists: true, requested: true, created: false, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
+  }
   if (!acct.ok || !acct.clientId) return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t set up the customer’s account — please try again.' }, acct.httpStatus || 502, cors);
   const clientId = acct.clientId;
 

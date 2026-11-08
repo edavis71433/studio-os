@@ -164,7 +164,7 @@ export function buildUpcoming(
   }
   const ns = str(inp.deal?.next_step).trim();
   const due0 = inp.deal?.next_step_at ? str(inp.deal.next_step_at) : null;
-  // Second walk (Nov 8, item 50): Bacchus was won and paid, and its "Sign
+  // Second walk (Nov 8, item 50): Larkspur was won and paid, and its "Sign
   // Contract · Aug 6" still sat here in red. On a closed deal (won or not a fit)
   // a next step with no date or a past date is history, not something due.
   const closed = inp.deal?.stage === 'won' || inp.deal?.stage === 'lost';

@@ -447,8 +447,8 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   if (!clientId) return json({ data: { ignored: true, reason: 'no_owner_client' } }, 200, cors);
 
   // A DEPOSIT IS NOT A SEPARATE FLOW — it is presence_invoices.purpose='deposit'
-  // (0086). It is, however, a different SENTENCE: "Deposit — $500 from Claud
-  // Beltran" is the thing Eric actually wants to read, and "Invoice paid" is not.
+  // (0086). It is, however, a different SENTENCE: "Deposit — $500 from Jordan
+  // Ellis" is the thing Eric actually wants to read, and "Invoice paid" is not.
   const isDeposit = inv.purpose === 'deposit';
   const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const what = String(inv.title || (isDeposit ? 'Deposit' : 'Invoice'));

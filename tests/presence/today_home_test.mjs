@@ -563,9 +563,9 @@ const SUMMARY={total:3,open:{count:2,value_cents:650000},won_month:{count:1,valu
 }
 // This week / Coming up — the next step on each open deal, split by date
 const DEALS=[
-  {id:'d1',title:'Claud',stage:'contract',next_step:'Send the kickoff details',next_step_at:H},
-  {id:'d2',title:'Bacchus',stage:'proposal',next_step:'Collect content',next_step_at:addDays(H,2)},
-  {id:'d3',title:'Hettie',stage:'qualified',next_step:'Chase the gallery photos',next_step_at:addDays(H,10)},
+  {id:'d1',title:'Jordan',stage:'contract',next_step:'Send the kickoff details',next_step_at:H},
+  {id:'d2',title:'Larkspur',stage:'proposal',next_step:'Collect content',next_step_at:addDays(H,2)},
+  {id:'d3',title:'Marigold',stage:'qualified',next_step:'Chase the gallery photos',next_step_at:addDays(H,10)},
   {id:'d4',title:'Late one',stage:'lead',next_step:'Call back',next_step_at:addDays(H,-3)},
   {id:'d5',title:'No date',stage:'lead',next_step:'Write the proposal',next_step_at:null},
   {id:'d6',title:'Won',stage:'won',next_step:'Open their project',next_step_at:H},
@@ -576,13 +576,13 @@ const DEALS=[
 {
   const w=weekTodos(DEALS,HOME_NOW);
   ok('weekTodos: open-stage deals only, due inside the week or undated/overdue — overdue first, then soonest, undated last',
-    w.map(r=>r.id).join()==='d4,d1,d2,d5' && w[0].days===-3 && w[3].days===null && w[1].title==='Send the kickoff details' && w[1].deal==='Claud');
+    w.map(r=>r.id).join()==='d4,d1,d2,d5' && w[0].days===-3 && w[3].days===null && w[1].title==='Send the kickoff details' && w[1].deal==='Jordan');
   ok('weekTodos: a step dated beyond the week, a closed deal, a blank step and junk input all stay out',
     !w.some(r=>r.id==='d3'||r.id==='d6'||r.id==='d7'||r.id==='d8'||r.id==='d9') && weekTodos(null,HOME_NOW).length===0 && weekTodos([null,{}],HOME_NOW).length===0);
   ok('weekTodos: capped at six',
     weekTodos(Array.from({length:9},(_,i)=>({id:'x'+i,stage:'lead',next_step:'s',next_step_at:H})),HOME_NOW).length===6);
   const APP=[
-    {slot_start_local:addDays(H,3)+'T10:00',status:'pending',type_name:'Menu review',customer_name:'Bacchus'},
+    {slot_start_local:addDays(H,3)+'T10:00',status:'pending',type_name:'Menu review',customer_name:'Larkspur'},
     {slot_start_local:H+'T14:30',status:'confirmed',type_name:'Today — the schedule has it'},
     {slot_start_local:addDays(H,1)+'T09:00',status:'canceled',type_name:'Gone'},
     {slot_start_local:addDays(H,40)+'T09:00',status:'confirmed',type_name:'Too far'},
@@ -590,9 +590,9 @@ const DEALS=[
   ];
   const c=comingUp(DEALS,APP,HOME_NOW);
   ok('comingUp: bookings after today (≤30 days, active) + next steps dated beyond the week, soonest first',
-    c.map(x=>x.title).join('|')==='Tomorrow|Menu review · Bacchus|Chase the gallery photos'
+    c.map(x=>x.title).join('|')==='Tomorrow|Menu review · Larkspur|Chase the gallery photos'
     && c[0].kind==='booking' && c[0].days===1 && c[1].sub==='10:00 am · to confirm' && c[1].href==='/presence.html#bookings'
-    && c[2].kind==='next_step' && c[2].days===10 && c[2].href==='/crm.html?deal=d3' && c[2].sub==='Hettie · next step on the deal');
+    && c[2].kind==='next_step' && c[2].days===10 && c[2].href==='/crm.html?deal=d3' && c[2].sub==='Marigold · next step on the deal');
   ok('comingUp: today\'s booking, a canceled one and one 40 days out stay out; junk yields empty',
     !c.some(x=>/Today|Gone|Too far/.test(x.title)) && comingUp(null,null,HOME_NOW).length===0 && comingUp([null],[null,{}],HOME_NOW).length===0);
   // a booking is judged in ITS site's calendar: a row dated "tomorrow" on
@@ -605,17 +605,17 @@ const DEALS=[
 // Customers — the roster rows, addressed like customers.html's "Open record"
 {
   const r=customerRows([
-    {client_id:'c1',name:'Bacchus Kitchen',status:'active',customer_site_id:'s1',open_support:0},
-    {client_id:'c2',name:'Hettie Orange Designs',status:'on_hold',customer_site_id:null,open_support:2},
+    {client_id:'c1',name:'Larkspur Kitchen',status:'active',customer_site_id:'s1',open_support:0},
+    {client_id:'c2',name:'Fennel Street Designs',status:'on_hold',customer_site_id:null,open_support:2},
     null,{name:'no id'},
   ]);
   ok('customerRows: by site when they have one, else by client id; status + open support in words',
     r.length===2 && r[0].href==='/crm.html?client=s1' && r[0].sub==='Active · All clear'
-    && r[1].href==='/crm.html?client_id=c2' && r[1].sub==='On hold · 2 requests' && r[1].name==='Hettie Orange Designs');
+    && r[1].href==='/crm.html?client_id=c2' && r[1].sub==='On hold · 2 requests' && r[1].name==='Fennel Street Designs');
   ok('customerRows: capped at five; junk yields empty',
     customerRows(Array.from({length:8},(_,i)=>({client_id:'c'+i,name:'n'}))).length===5 && customerRows(null).length===0 && customerRows('x').length===0);
   ok('initials: first letters of the first two words, "?" when blank',
-    initials('Bacchus Kitchen')==='BK' && initials('Hettie Orange Designs')==='HO' && initials('cher')==='C' && initials('')==='?');
+    initials('Larkspur Kitchen')==='LK' && initials('Fennel Street Designs')==='FS' && initials('cher')==='C' && initials('')==='?');
 }
 // structural pins — the wiring the mockup sections must keep
 for(const fn of ['daysBetween','ymdParts','dueLabel','todoAt','statTiles','weekTodos','comingUp','customerRows','initials']){

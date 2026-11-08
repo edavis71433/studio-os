@@ -742,7 +742,7 @@ test.describe('Projects — the New-project dialog on phones (SS6 pin)', () => {
 //
 // The ten steps already were the studio's spine, but only the deal→project
 // handoff could put them on a project. A project that missed that door — every
-// project made before the checklist, Bacchus among them — reads "0% · 0/0 tasks"
+// project made before the checklist, Larkspur among them — reads "0% · 0/0 tasks"
 // and has no way out except a SQL backfill. These tests drive the way out from
 // the page: pick known steps (several at once), or take the whole spine in one
 // press, and watch the COMPUTED percentage move.
@@ -803,7 +803,7 @@ function installChecklistProject(page: import('@playwright/test').Page, opts: { 
     if (path === '/messages' || path === '/surveys') return route.fulfill(jsonOf({ data: [] }));
     if (path === '/client-messages') return route.fulfill(jsonOf({ data: [], customer: null }));
     if (path === '') return route.fulfill(jsonOf({ data: {
-      project: { id: 'p7', name: 'Bacchus website', status: 'active', client_visible: true, client_id: null, target_date: null },
+      project: { id: 'p7', name: 'Larkspur website', status: 'active', client_visible: true, client_id: null, target_date: null },
       milestones: [], tasks: tasks(), deliverables: [], approvals: [],
       progress: progress(), checklist: checklist(), is_studio_view: true,
     } }));
@@ -813,11 +813,11 @@ function installChecklistProject(page: import('@playwright/test').Page, opts: { 
 }
 
 test.describe('Project record — the standard-step picker', () => {
-  test('Bacchus before the backfill: 0/0 with one press to the whole spine, and the evidence already ticked', async ({ page }) => {
+  test('Larkspur before the backfill: 0/0 with one press to the whole spine, and the evidence already ticked', async ({ page }) => {
     await installApp(page, { api: API });
     installChecklistProject(page, { signedAndPaid: true });   // registered AFTER installApp, so it wins
     await page.goto('/projects.html?project=p7');
-    await expect(page.locator('#dtitle')).toContainText('Bacchus');
+    await expect(page.locator('#dtitle')).toContainText('Larkspur');
     // the honest, useless number this whole feature exists to move
     await expect(page.locator('.hl-panel')).toContainText('0%');
     await expect(page.locator('#tsList')).toContainText('No tasks yet');
@@ -846,7 +846,7 @@ test.describe('Project record — the standard-step picker', () => {
     await installApp(page, { api: API });
     installChecklistProject(page, { held: ['deposit_paid'] });
     await page.goto('/projects.html?project=p7');
-    await expect(page.locator('#dtitle')).toContainText('Bacchus');
+    await expect(page.locator('#dtitle')).toContainText('Larkspur');
     // one step present → no "add all" nudge, but the picker is offered
     await expect(page.locator('.stepnudge')).toHaveCount(0);
     await page.locator('#addStep').click();

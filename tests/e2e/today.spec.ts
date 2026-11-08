@@ -614,25 +614,25 @@ const SUMMARY = { data: {
   win_rate: { pct: 100, won: 1, lost: 0 }, by_stage: [], ar: { outstanding_cents: 160000, count: 1, overdue_cents: 0, overdue_count: 0 },
 } };
 const RECEIVABLES = { data: { items: [
-  { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2099-01-10', overdue: false, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: 'https://pay.example/x' },
+  { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2099-01-10', overdue: false, deal_id: 'd1', deal: 'Jordan Ellis', stripe_url: 'https://pay.example/x' },
 ], total_cents: 160000, overdue_cents: 0 } };
 const FEED_WITH_ENQUIRIES = { data: {
   role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null,
   enquiries: [{ id: 'l1', name: 'Sam Rivera' }, { id: 'l2', name: 'Dana Lee' }],
 } };
 const NEXT_STEPS = () => ({ data: [
-  { id: 'd1', title: 'Claud Beltran — website build', stage: 'contract', expected_value_cents: 320000, next_step: 'Send Claud the kickoff details', next_step_at: ymdOffset(0) },
-  { id: 'd2', title: 'Bacchus Kitchen — menu refresh', stage: 'proposal', expected_value_cents: 450000, next_step: 'Collect content from Bacchus', next_step_at: ymdOffset(2) },
-  { id: 'd3', title: 'Hettie Orange Designs — gallery', stage: 'qualified', expected_value_cents: 200000, next_step: 'Chase the gallery photos', next_step_at: ymdOffset(10) },
+  { id: 'd1', title: 'Jordan Ellis — website build', stage: 'contract', expected_value_cents: 320000, next_step: 'Send Jordan the kickoff details', next_step_at: ymdOffset(0) },
+  { id: 'd2', title: 'Larkspur Kitchen — menu refresh', stage: 'proposal', expected_value_cents: 450000, next_step: 'Collect content from Larkspur', next_step_at: ymdOffset(2) },
+  { id: 'd3', title: 'Fennel Street Designs — gallery', stage: 'qualified', expected_value_cents: 200000, next_step: 'Chase the gallery photos', next_step_at: ymdOffset(10) },
   { id: 'd4', title: 'Won already', stage: 'won', expected_value_cents: 999900, next_step: 'Open their project', next_step_at: ymdOffset(0) },
 ] });
 const STUDIO_CUSTOMERS = { data: [
-  { client_id: 'c1', name: 'Bacchus Kitchen', email: 'hi@bacchus.example', project_id: 'p1', project_name: 'Menu refresh', status: 'active', customer_site_id: 's1', open_support: 0, project_count: 1 },
-  { client_id: 'c2', name: 'Hettie Orange Designs', email: 'hettie@example.com', project_id: 'p2', project_name: 'Gallery', status: 'on_hold', customer_site_id: null, open_support: 1, project_count: 1 },
+  { client_id: 'c1', name: 'Larkspur Kitchen', email: 'hi@larkspur.example', project_id: 'p1', project_name: 'Menu refresh', status: 'active', customer_site_id: 's1', open_support: 0, project_count: 1 },
+  { client_id: 'c2', name: 'Fennel Street Designs', email: 'marigold@example.com', project_id: 'p2', project_name: 'Gallery', status: 'on_hold', customer_site_id: null, open_support: 1, project_count: 1 },
 ] };
 const BOOKINGS_AHEAD = () => ({ data: { appointments: [
-  { id: 'b1', type_name: 'Kickoff call', slot_start_local: `${ymdOffset(0)}T14:30`, customer_name: 'Claud Beltran', status: 'confirmed' },   // today → the schedule, not Coming up
-  { id: 'b2', type_name: 'Menu page review', slot_start_local: `${ymdOffset(3)}T10:00`, customer_name: 'Bacchus Kitchen', status: 'pending' },
+  { id: 'b1', type_name: 'Kickoff call', slot_start_local: `${ymdOffset(0)}T14:30`, customer_name: 'Jordan Ellis', status: 'confirmed' },   // today → the schedule, not Coming up
+  { id: 'b2', type_name: 'Menu page review', slot_start_local: `${ymdOffset(3)}T10:00`, customer_name: 'Larkspur Kitchen', status: 'pending' },
   { id: 'b3', type_name: 'Gone', slot_start_local: `${ymdOffset(1)}T10:00`, status: 'canceled' },
 ], scope: 'upcoming', pending: 1 } });
 const FULL_HOME = () => ({
@@ -653,7 +653,7 @@ test.describe('Today — the studio home (mockup)', () => {
     const band = page.locator('#money-due');
     await expect(band).toBeVisible();
     await expect(band).toContainText('$1,600 is due now');
-    await expect(band).toContainText('Claud Beltran’s invoice “Deposit” hasn’t been paid yet.');
+    await expect(band).toContainText('Jordan Ellis’s invoice “Deposit” hasn’t been paid yet.');
     await expect(band.getByRole('link', { name: 'Resend invoice' })).toHaveAttribute('href', '/crm.html?deal=d1&tab=billing');
     await expect(band.getByRole('link', { name: 'Open record' })).toHaveAttribute('href', '/crm.html?deal=d1');
     // the band sits above the columns, under the greeting — not inside the feed
@@ -663,8 +663,8 @@ test.describe('Today — the studio home (mockup)', () => {
 
   test('the money band: several invoices total up and route to Who owes you', async ({ page }) => {
     await installApp(page, { api: { '/sales/receivables': { data: { items: [
-      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
-      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: null, overdue: false, deal_id: 'd2', deal: 'Bacchus Kitchen', stripe_url: null },
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Jordan Ellis', stripe_url: null },
+      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: null, overdue: false, deal_id: 'd2', deal: 'Larkspur Kitchen', stripe_url: null },
     ], total_cents: 250000, overdue_cents: 160000 } } } });
     await page.goto('/today.html');
     const band = page.locator('#money-due');
@@ -676,10 +676,10 @@ test.describe('Today — the studio home (mockup)', () => {
 
   test('the money band: a lone overdue invoice says so and names the date it was due', async ({ page }) => {
     await installApp(page, { api: { '/sales/receivables': { data: { items: [
-      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', overdue: true, deal_id: 'd1', deal: 'Jordan Ellis', stripe_url: null },
     ], total_cents: 160000, overdue_cents: 160000 } } } });
     await page.goto('/today.html');
-    await expect(page.locator('#money-due')).toContainText('$1,600 is overdue — Claud Beltran’s invoice “Deposit” was due Oct 1 and hasn’t been paid yet.');
+    await expect(page.locator('#money-due')).toContainText('$1,600 is overdue — Jordan Ellis’s invoice “Deposit” was due Oct 1 and hasn’t been paid yet.');
   });
 
   // Oct 2026 benchmark (item 2): the four money buckets under the band's line,
@@ -690,11 +690,11 @@ test.describe('Today — the studio home (mockup)', () => {
   // shows no Paid bucket rather than a fake $0.
   test('the money band: four buckets from one list — Paid (30 days) · Processing · Upcoming · Overdue — in four colours; processing money is on its way, not due', async ({ page }) => {
     await installApp(page, { api: { '/sales/receivables': { data: { items: [
-      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', status: 'open', state: 'overdue', overdue: true, deal_id: 'd1', deal: 'Claud Beltran', stripe_url: null },
-      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: '2099-01-10', status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Bacchus Kitchen', stripe_url: null },
-      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, status: 'open', state: 'processing', processing_since: '2026-10-19T00:00:00Z', overdue: false, deal_id: 'd3', deal: 'Hettie Orange', stripe_url: 'https://pay.example/3' },
+      { id: 'inv-1', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-01', status: 'open', state: 'overdue', overdue: true, deal_id: 'd1', deal: 'Jordan Ellis', stripe_url: null },
+      { id: 'inv-2', title: 'Balance', amount_cents: 90000, due_date: '2099-01-10', status: 'open', state: 'upcoming', overdue: false, deal_id: 'd2', deal: 'Larkspur Kitchen', stripe_url: null },
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, status: 'open', state: 'processing', processing_since: '2026-10-19T00:00:00Z', overdue: false, deal_id: 'd3', deal: 'Marigold Orange', stripe_url: 'https://pay.example/3' },
     ], paid: [
-      { id: 'inv-0', title: 'Kickoff', amount_cents: 120000, status: 'paid', state: 'paid', paid_at: '2026-10-15T00:00:00Z', deal_id: 'd1', deal: 'Claud Beltran' },
+      { id: 'inv-0', title: 'Kickoff', amount_cents: 120000, status: 'paid', state: 'paid', paid_at: '2026-10-15T00:00:00Z', deal_id: 'd1', deal: 'Jordan Ellis' },
     ], paid_window_days: 30, total_cents: 250000, overdue_cents: 160000, processing_cents: 40000 } } } });
     await page.goto('/today.html');
     const band = page.locator('#money-due');
@@ -710,7 +710,7 @@ test.describe('Today — the studio home (mockup)', () => {
 
   test('the money band: only processing money says "on its way" and chases nothing; an older payload without `paid` shows no Paid bucket (never a fake $0)', async ({ page }) => {
     await installApp(page, { api: { '/sales/receivables': { data: { items: [
-      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, overdue: false, processing_since: '2026-10-19T00:00:00Z', deal_id: 'd3', deal: 'Hettie Orange', stripe_url: null },
+      { id: 'inv-3', title: 'Photos', amount_cents: 40000, due_date: null, overdue: false, processing_since: '2026-10-19T00:00:00Z', deal_id: 'd3', deal: 'Marigold Orange', stripe_url: null },
     ], total_cents: 0, overdue_cents: 0 } } } });
     await page.goto('/today.html');
     const band = page.locator('#money-due');
@@ -810,15 +810,15 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(week.getByRole('heading', { name: 'This week' })).toBeVisible();
     const rows = week.locator('.trow');
     await expect(rows).toHaveCount(2);                                     // d3 is 10 days out → Coming up; d4 is won → never a to-do
-    await expect(rows.nth(0)).toContainText('Send Claud the kickoff details');
-    await expect(rows.nth(0).locator('.fmeta')).toHaveText('Claud Beltran — website build');
+    await expect(rows.nth(0)).toContainText('Send Jordan the kickoff details');
+    await expect(rows.nth(0).locator('.fmeta')).toHaveText('Jordan Ellis — website build');
     // Oct 2026 Today board: the one "Due today" chip sits only on the row due today; the right-hand column carries the time or the day word
     await expect(rows.nth(0).locator('.tdue')).toHaveText('Due today');
     await expect(rows.nth(1).locator('.tdue')).toHaveCount(0);
     await expect(rows.nth(1).locator('.tat')).toHaveText(/^(Tomorrow|[A-Z][a-z]{2})$/);   // d2 is two days out → a day word, tabular, at the right
     await expect(week.locator('.tdue')).toHaveCount(1);
     await expect(rows.nth(0).locator('a.frow')).toHaveAttribute('href', '/crm.html?deal=d1');
-    await expect(rows.nth(1)).toContainText('Collect content from Bacchus');
+    await expect(rows.nth(1)).toContainText('Collect content from Larkspur');
     await expect(week.getByText('Nothing overdue.')).toBeVisible();
     await expect(week.getByText('Open their project')).toHaveCount(0);
     await expect(rows.locator('button[data-todo-done]')).toHaveCount(2);
@@ -893,12 +893,12 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(up.getByRole('heading', { name: 'Coming up' })).toBeVisible();
     const rows = up.locator('.mrow');
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText('Menu page review · Bacchus Kitchen');
+    await expect(rows.nth(0)).toContainText('Menu page review · Larkspur Kitchen');
     await expect(rows.nth(0)).toContainText('10:00 am · to confirm');
     await expect(rows.nth(0)).toHaveAttribute('href', '/presence.html#bookings');
     await expect(rows.nth(0).locator('.md b')).toHaveText(String(Number(ymdOffset(3).slice(8, 10))));
     await expect(rows.nth(1)).toContainText('Chase the gallery photos');
-    await expect(rows.nth(1)).toContainText('Hettie Orange Designs — gallery · next step on the deal');
+    await expect(rows.nth(1)).toContainText('Fennel Street Designs — gallery · next step on the deal');
     await expect(rows.nth(1)).toHaveAttribute('href', '/crm.html?deal=d3');
     await expect(up.getByText('Kickoff call')).toHaveCount(0);
     await expect(up.getByText('Gone')).toHaveCount(0);
@@ -921,11 +921,11 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(card.getByRole('heading', { name: 'Customers' })).toBeVisible();
     const rows = card.locator('.crows a');
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText('Bacchus Kitchen');
+    await expect(rows.nth(0)).toContainText('Larkspur Kitchen');
     await expect(rows.nth(0)).toContainText('Active · All clear');
     await expect(rows.nth(0)).toHaveAttribute('href', '/crm.html?client=s1');       // a customer with a site → by site
-    await expect(rows.nth(0).locator('.cav')).toHaveText('BK');
-    await expect(rows.nth(1)).toContainText('Hettie Orange Designs');
+    await expect(rows.nth(0).locator('.cav')).toHaveText('LK');
+    await expect(rows.nth(1)).toContainText('Fennel Street Designs');
     await expect(rows.nth(1)).toContainText('On hold · 1 request');
     await expect(rows.nth(1)).toHaveAttribute('href', '/crm.html?client_id=c2');    // no site yet → by client id
     await expect(card.getByRole('link', { name: 'All customers →' })).toHaveAttribute('href', '/customers.html');

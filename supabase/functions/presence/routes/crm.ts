@@ -23,22 +23,26 @@ import { filterTimeline, relationshipSummary, isAudience, cleanNoteBody } from '
 import { mapConversationItem, mapSiteEvent, mapDealEvent, mapDoneTask, mergeActivity, buildUpcoming, type ActivityItem } from '../crm/activity.ts';
 import { svc } from '../lib/db.ts';
 import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts';
+import { resolveSite } from '../lib/site.ts';
+import { resolveMemberSite } from '../lib/workspace.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
  *  open them in context from the CRM (studio-side only; additive, best-effort).
  *  The deal lives on the agency site (converted_client_id = this client); the
  *  project comes through the Agency–Client Bridge. */
-async function crmContext(site: SiteRow): Promise<{ deal_id?: string; project_id?: string }> {
+async function crmContext(site: SiteRow, studioSiteId: string): Promise<{ deal_id?: string; project_id?: string }> {
   const ctx: { deal_id?: string; project_id?: string } = {};
-  if (!site.client_id) return ctx;
+  if (!site.client_id || !studioSiteId) return ctx;
   try {
+    // this studio's deal and project for the customer — never another studio's (S3)
     const [dealR, links] = await Promise.all([
-      svc(`presence_deals?converted_client_id=eq.${site.client_id}&deleted_at=is.null&select=id,updated_at&order=updated_at.desc&limit=1`),
+      svc(`presence_deals?converted_client_id=eq.${site.client_id}&site_id=eq.${studioSiteId}&deleted_at=is.null&select=id,updated_at&order=updated_at.desc&limit=1`),
       linksForCustomer(site.client_id),
     ]);
     const dealId = (Array.isArray(dealR.json) ? dealR.json[0]?.id : null) || null;
     if (dealId) ctx.deal_id = dealId;
-    if (links[0]?.project_id) ctx.project_id = links[0].project_id;
+    const mine = links.find((l) => String(l.agency_site_id) === studioSiteId);
+    if (mine?.project_id) ctx.project_id = mine.project_id;
   } catch { /* doorways are additive — never block the profile */ }
   return ctx;
 }
@@ -84,7 +88,7 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
     // Phase 2 (search across everything): customers and invoices join contacts,
     // deals and projects; a money word ("invoice", "owed", "unpaid") lists what's
     // open; and the first customers matched get ACTION rows ("Send invoice to
-    // Claud", "Message Claud") that land on the record with the form open.
+    // Jordan", "Message Jordan") that land on the record with the form open.
     const moneyWord = /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
     const cents = /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
     const [contacts, deals, projects, links, invoices] = await Promise.all([
@@ -135,11 +139,49 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
 export async function handleCrmMessages(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client conversation.' }, 403, cors);
   try {
-    const conv = await collectClientConversation(new URL(req.url), site);
+    const rs = await relationshipScope(jwt, site, principal);
+    const conv = await collectClientConversation(new URL(req.url), rs);
     return json({ data: { items: conv.items, project_id: conv.projectId || null, reply_to: conv.projectId ? `/projects/${conv.projectId}/messages` : null, reply_support_to: conv.replySupportTo } }, 200, cors);
   } catch (_e) {
     return json({ error: 'read_failed', message: 'We couldn’t load this conversation just now.' }, 502, cors);
   }
+}
+
+// ── Whose relationship is this? (final pass, Nov 8 2026: F1 + S3) ────────────
+// Two bugs had one cause. (1) "Scoped to a customer's own site" was decided by
+// site.client_id — and the studio's OWN site has one too, so opening the record
+// from a deal or a contact resolved the studio itself and the page said "You
+// don't have access to that client". (2) ?project= followed that project's link
+// to whichever studio owned it, so its messages, support thread and deal notes
+// were read (and its support rows stamped) on another studio's site. Now:
+//   scoped (index.ts authorised an x-dds-scope-site drill-in): the customer is
+//     that site; the relationship lives on the caller's OWN studio site — links
+//     from any other studio are never followed.
+//   not scoped: `site` IS the caller's studio site; a ?client_id or ?project
+//     only counts when it belongs to that site (deals and contacts are read with
+//     site_id = that site already).
+interface RelScope { scoped: boolean; studioSiteId: string; customerClientId: string; customerSiteId: string; links: Array<{ project_id: string; agency_site_id: string }> }
+async function callerOwnSiteId(jwt: string, principal: Principal): Promise<string> {
+  try { const s = await resolveSite(jwt); if (s?.id) return String(s.id); } catch { /* try the seat */ }
+  try { const m = await resolveMemberSite(principal as any); if (m?.site?.id) return String(m.site.id); } catch { /* none */ }
+  return '';
+}
+async function relationshipScope(jwt: string, site: SiteRow, principal: Principal): Promise<RelScope> {
+  const scoped = !!principal.scope && principal.scope.site_id === site.id;
+  if (!scoped) return { scoped: false, studioSiteId: site.id, customerClientId: '', customerSiteId: '', links: [] };
+  const customerClientId = site.client_id ? String(site.client_id) : '';
+  const own = await callerOwnSiteId(jwt, principal);
+  const links = customerClientId && own ? (await linksForCustomer(customerClientId)).filter((l) => String(l.agency_site_id) === own) : [];
+  return { scoped: true, studioSiteId: own, customerClientId, customerSiteId: String(site.id), links };
+}
+/** Unscoped: a customer id only counts when it is this studio's — an active
+ *  link from this site, or a deal on this site that became them. */
+async function customerOfThisStudio(studioSiteId: string, clientId: string): Promise<{ ok: boolean; customerSiteId: string }> {
+  if (!studioSiteId || !UUID_RE.test(clientId)) return { ok: false, customerSiteId: '' };
+  const lk = one(await svc(`presence_service_links?agency_site_id=eq.${studioSiteId}&customer_client_id=eq.${clientId}&status=eq.active&select=customer_site_id&order=created_at.desc&limit=1`));
+  if (lk) return { ok: true, customerSiteId: String(lk.customer_site_id || '') };
+  const d = one(await svc(`presence_deals?site_id=eq.${studioSiteId}&converted_client_id=eq.${clientId}&deleted_at=is.null&select=converted_site_id&limit=1`));
+  return d ? { ok: true, customerSiteId: String(d.converted_site_id || '') } : { ok: false, customerSiteId: '' };
 }
 
 /** The one conversation collector both /crm/messages and /crm/activity share:
@@ -150,28 +192,33 @@ export async function handleCrmMessages(req: Request, jwt: string, site: SiteRow
  *  — under the cap the output is byte-identical to the old asc reads. The deal
  *  row + deal-event window it fetched ride along in the return so /crm/activity
  *  reuses the SAME window instead of re-querying a different one. */
-async function collectClientConversation(u: URL, site: SiteRow): Promise<{
+async function collectClientConversation(u: URL, rs: RelScope): Promise<{
   items: any[]; projectId: string; clientId: string; dealId: string; agencySiteId: string; replySupportTo: string | null;
   deal: any | null; dealEvents: any[];
 }> {
   const qp = (k: string) => { const v = u.searchParams.get(k) || ''; return UUID_RE.test(v) ? v : ''; };
   let projectId = qp('project');
-  let clientId = qp('client_id');
+  let clientId = '';
   let dealId = qp('deal_id') || qp('deal');
-  let agencySiteId = site.id;
-  if (site.client_id) {
-    clientId = clientId || String(site.client_id);
-    const links = await linksForCustomer(String(site.client_id));
-    if (links[0]) { agencySiteId = links[0].agency_site_id; if (!projectId) projectId = links[0].project_id; }
+  const AS = rs.studioSiteId;   // the caller's own studio site — never another studio's (S3)
+  if (!AS) return { items: [], projectId: '', clientId: '', dealId: '', agencySiteId: '', replySupportTo: null, deal: null, dealEvents: [] };
+  if (rs.scoped) {
+    clientId = rs.customerClientId;
+    if (!projectId && rs.links[0]) projectId = String(rs.links[0].project_id || '');
+  } else {
+    const asked = qp('client_id');
+    if (asked && (await customerOfThisStudio(AS, asked)).ok) clientId = asked;
   }
-  // project → its customer (so a project-scoped record still resolves project-less tickets)
-  if (projectId && !clientId) { const lk = one(await svc(`presence_service_links?project_id=eq.${projectId}&status=eq.active&select=customer_client_id,agency_site_id&limit=1`)); if (lk) { clientId = String(lk.customer_client_id || ''); if (lk.agency_site_id) agencySiteId = String(lk.agency_site_id); } }
-  const AS = agencySiteId;
+  // project → its customer, only for this studio's projects (and, scoped, this customer's)
+  if (projectId) {
+    const lk = one(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${AS}&status=eq.active${rs.scoped && clientId ? `&customer_client_id=eq.${clientId}` : ''}&select=customer_client_id&limit=1`));
+    if (lk) { if (!clientId) clientId = String(lk.customer_client_id || ''); } else projectId = '';
+  }
 
   {
     // every project on this relationship — a multi-project client loses nothing
     const projectIds: string[] = projectId ? [projectId] : [];
-    if (clientId) { try { for (const lk of await linksForCustomer(clientId)) { const p = String(lk.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); } } catch { /* additive */ } }
+    if (clientId) { try { for (const lk of await linksForCustomer(clientId)) { if (String(lk.agency_site_id) !== AS) continue; const p = String(lk.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); } } catch { /* additive */ } }
     // A client_id-only call (the Inbox reading pane) still deserves a reply
     // target: adopt the first active bridge link's project as the top-level
     // projectId so reply_to resolves — the same link list the channel reads
@@ -294,7 +341,8 @@ async function collectClientConversation(u: URL, site: SiteRow): Promise<{
 export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client record.' }, 403, cors);
   try {
-    const conv = await collectClientConversation(new URL(req.url), site);
+    const rs = await relationshipScope(jwt, site, principal);
+    const conv = await collectClientConversation(new URL(req.url), rs);
     const AS = conv.agencySiteId;
     const dealId = conv.dealId;
     const now = new Date().toISOString();
@@ -323,7 +371,7 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     // when scoped to a real customer site (the same gate as the old Overview:
     // un-scoped this would read the operator's OWN site, the crm.html landmine).
     let siteEvents: (ActivityItem | null)[] = [];
-    if (site.client_id) {
+    if (rs.scoped) {   // F1: only inside a customer's own site — never the studio's own timeline
       try {
         const tl = await loadTimeline(site, { includeInternalNotes: true, limit: 60 });
         siteEvents = filterTimeline(tl, true).map(mapSiteEvent);
@@ -365,25 +413,28 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
   const qp = (k: string) => { const v = u.searchParams.get(k) || ''; return UUID_RE.test(v) ? v : ''; };
   let contactId = qp('contact_id') || qp('contact');
   let dealId = qp('deal_id') || qp('deal');
-  let clientId = qp('client_id');
+  let clientId = '';
   let projectId = qp('project_id') || qp('project');
   let customerSiteId = '';
 
-  // Determine the agency site the relationship data lives on.
-  let agencySiteId = site.id;
-  if (site.client_id) {                     // scoped to a customer's own site
-    clientId = clientId || String(site.client_id);
-    customerSiteId = String(site.id);
-    const links = await linksForCustomer(String(site.client_id));
-    if (links[0]) { agencySiteId = links[0].agency_site_id; if (!projectId) projectId = links[0].project_id; }
+  // Whose relationship this is (F1 + S3): scoped → that customer, on the caller's
+  // own studio site; unscoped → the studio site itself, and only its own ids.
+  const rs = await relationshipScope(jwt, site, principal);
+  const AS = rs.studioSiteId;
+  if (rs.scoped) {
+    clientId = rs.customerClientId; customerSiteId = rs.customerSiteId;
+    if (!projectId && rs.links[0]) projectId = String(rs.links[0].project_id || '');
+  } else {
+    const asked = qp('client_id');
+    if (asked) { const own = await customerOfThisStudio(AS, asked); if (own.ok) { clientId = asked; customerSiteId = own.customerSiteId; } }
   }
-  const AS = agencySiteId;
 
   try {
-    // project → bridge → client (+ agency site + deal)
-    if (projectId && !clientId) {
-      const lk = one(await svc(`presence_service_links?project_id=eq.${projectId}&status=eq.active&select=customer_client_id,customer_site_id,agency_site_id,deal_id&limit=1`));
-      if (lk) { clientId = String(lk.customer_client_id || ''); customerSiteId = customerSiteId || String(lk.customer_site_id || ''); if (lk.agency_site_id) agencySiteId = String(lk.agency_site_id); if (!dealId && lk.deal_id) dealId = String(lk.deal_id); }
+    // project → bridge → client (+ deal), only for this studio's projects (and, scoped, this customer's)
+    if (projectId) {
+      const lk = AS ? one(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${AS}&status=eq.active${rs.scoped && clientId ? `&customer_client_id=eq.${clientId}` : ''}&select=customer_client_id,customer_site_id,deal_id&limit=1`)) : null;
+      if (lk) { if (!clientId) clientId = String(lk.customer_client_id || ''); customerSiteId = customerSiteId || String(lk.customer_site_id || ''); if (!dealId && lk.deal_id) dealId = String(lk.deal_id); }
+      else projectId = '';
     }
     // client → newest deal (+ its converted site)
     if (clientId && !dealId) {
@@ -491,7 +542,9 @@ export async function handleCrmProfile(jwt: string, site: SiteRow, principal: Pr
   ]);
   const visible = filterTimeline(timeline, studio);
   const summary = relationshipSummary(profile, visible[0]?.at ?? null, now);
-  const context = studio ? await crmContext(site) : {};   // W3: Pipeline/Project doorways, studio-side only
+  // W3: Pipeline/Project doorways, studio-side only — and only inside a customer's site (F1)
+  const rs = studio ? await relationshipScope(jwt, site, principal) : null;
+  const context = rs && rs.scoped ? await crmContext(site, rs.studioSiteId) : {};
   return json({ data: { profile, summary, context, is_studio_view: studio, last_activity_at: visible[0]?.at ?? null } }, 200, cors);
 }
 
