@@ -36,7 +36,7 @@ async function mount(page: Page, url: string, api: Record<string, unknown> = {})
     const data = req.method() === 'POST' ? { id: 'new-' + writes.length, ...body } : (body || {});
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
   });
-  await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: (api as any).__html || HTML }));
   await page.goto(url);
   return writes;
 }
@@ -676,5 +676,89 @@ test.describe('one preview screen', () => {
     const ctx = (API['/portal/context'] as any).data;
     await mount(page, '/presence.html#design', { '/portal/context': { data: { ...ctx, is_agency: true } } });
     await expect.poll(() => page.locator('#dcModeSeg [data-dcmode="timewarp"]').evaluate((n) => getComputedStyle(n).display)).not.toBe('none');
+  });
+});
+
+test.describe('type into the welcome section and About on the canvas', () => {
+  const WELCOME = '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
+    + '<section class="hero" data-dds-core="hero"><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1><p class="tagline" data-pr="identity.tagline">A sample line: what you do, in a few words</p><a class="btn" href="/menu/">See the menu</a></section>'
+    + '<section class="block" data-dds-core="about"><h2>About us</h2><p data-pr="identity.description">Hello</p></section>'
+    + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section></main></body></html>';
+  const canvas = async (page: Page) => {
+    const writes = await mount(page, '/presence.html#design', { __html: WELCOME });
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('h1[data-pr]').waitFor();
+    await page.waitForLoadState('networkidle');
+    return { writes, frame };
+  };
+  const identityWrites = (writes: Write[]) => writes.filter((w) => w.path === '/identity');
+
+  test('double-click the business name, type, Enter: it saves to Business details, and Undo puts it back', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const h1 = frame.locator('h1[data-pr="identity.business_name"]');
+    await h1.dblclick();
+    await expect(h1).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Rosa’s Cafe');
+    await page.keyboard.press('Enter');
+    await expect(h1).not.toHaveAttribute('contenteditable', /.+/);
+    await expect(h1).toHaveText('Rosa’s Cafe');
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ business_name: 'Rosa’s Cafe' });
+    await expect(page.locator('#f-business_name')).toHaveValue('Rosa’s Cafe');
+    await page.locator('#btnUndo').click();
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ business_name: 'Marlow’s Kitchen' });
+  });
+
+  test('Escape puts the words back and saves nothing', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const p = frame.locator('p[data-pr="identity.description"]');
+    await p.dblclick();
+    await page.keyboard.type(' and more');
+    await page.keyboard.press('Escape');
+    await expect(p).toHaveText('Hello');
+    await page.waitForTimeout(900);
+    expect(identityWrites(writes)).toHaveLength(0);
+  });
+
+  test('a sample line is replaced by the first keystroke, and only real words are saved', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta, made daily');
+    await page.keyboard.press('Enter');
+    await expect(tag).toHaveText('Fresh pasta, made daily');
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ tagline: 'Fresh pasta, made daily' });
+  });
+
+  test('a business keeps its name: clearing it changes nothing', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const h1 = frame.locator('h1[data-pr="identity.business_name"]');
+    await h1.dblclick();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Enter');
+    await expect(h1).toHaveText('Marlow’s Kitchen');
+    await expect(page.getByText('Your business needs a name')).toBeVisible();
+    await page.waitForTimeout(900);
+    expect(identityWrites(writes)).toHaveLength(0);
+  });
+
+  test('the keyboard way: Tab to the words, Enter to type', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const p = frame.locator('p[data-pr="identity.description"]');
+    await p.focus();
+    await p.press('Enter');
+    await expect(p).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.press('End');
+    await page.keyboard.type(' there');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ description: 'Hello there' });
+  });
+
+  test('the rest of a built-in section still says where its words live', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    await frame.locator('section[data-dds-core="about"] h2').dblclick();
+    await expect(page.getByText('These words come from your')).toBeVisible();
+    expect(identityWrites(writes)).toHaveLength(0);
   });
 });
