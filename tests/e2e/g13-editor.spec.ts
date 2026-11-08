@@ -1696,6 +1696,26 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(v.refused).toEqual(['/settings']);
   });
 
+  test('a refused business detail offers Load the latest too, once, and after it the next save goes through', async ({ page }) => {
+    await mountPages(page);
+    const v = await draftVersion(page);
+    v.someoneElse();
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'Over their tagline');
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/identity']);
+    await typeDetail(page, '#f-tagline', 'Over their tagline again');   // refused again, the same way out still up
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/identity', '/identity']);
+    await expect(page.getByRole('button', { name: 'Load the latest' })).toHaveCount(1);
+    await expect(refusal(page)).toHaveCount(1);                       // no second copy of the sentence beside it
+    await page.getByRole('button', { name: 'Load the latest' }).click();
+    await expect(page.getByText('Loaded the latest version')).toBeVisible();
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(300);
+    await typeDetail(page, '#f-tagline', 'After loading');
+    await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/identity']);
+    expect(v.business).toEqual({ tagline: 'After loading' });
+  });
+
   test('another person\'s change refuses a business detail waiting behind a section save too', async ({ page }) => {
     const { frame, draft } = await mountPages(page);
     const v = await draftVersion(page);
