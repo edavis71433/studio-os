@@ -286,7 +286,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
       // Editable global nav — only present when the owner set one (absent = default nav).
       ...(customNav.length ? { nav: customNav } : {}),
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
-      // Item 61 (0138): only present when the owner turned counting off, so an on site's snapshot is unchanged.
+      // Item 61 (0139): only present when the owner turned counting off, so an on site's snapshot is unchanged.
       ...(settings.visit_counter === false ? { visit_counter: false } : {}),
       // Phase SD: per-page search visibility + overrides
       // cap must cover the worst case: 5 built-in pages + up to 20 builder pages

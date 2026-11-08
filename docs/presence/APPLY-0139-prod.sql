@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0138  (owner-apply, prod)
+--  APPLY PACK - migration 0139  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships the visit counter switch. ADDITIVE and IDEMPOTENT ("add column if
@@ -18,7 +18,7 @@
 --  Rollback (only if ever needed):
 --    alter table public.presence_settings drop column if exists visit_counter;
 --
---  Covers: supabase/migrations/0138_visit_counter_switch.sql
+--  Covers: supabase/migrations/0139_visit_counter_switch.sql
 -- ===========================================================================
 
 alter table public.presence_settings
