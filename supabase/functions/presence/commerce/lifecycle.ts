@@ -1316,6 +1316,16 @@ export function reviewAskDue(completedAtIso: unknown, nowMs: number, days: numbe
   const age = nowMs - t, day = 86400_000;
   return age >= days * day && age < (days + REVIEW_ASK_GRACE_DAYS) * day;
 }
+/** Item 91: is it daytime (9:00 to 17:59) in this time zone? An unknown or empty zone reads
+ *  as the default every location starts with. Pure. */
+export const ASK_HOURS = { from: 9, to: 18 };
+export function daytimeIn(timezone: string | null | undefined, nowMs: number): boolean {
+  const hourIn = (tz: string) => Number(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hourCycle: 'h23' }).format(new Date(nowMs)));
+  let h: number;
+  try { h = hourIn(String(timezone || '') || 'America/Los_Angeles'); } catch { h = hourIn('America/Los_Angeles'); }
+  return h >= ASK_HOURS.from && h < ASK_HOURS.to;
+}
+
 export async function runReviewRequests(limit = 20): Promise<{ asked: number }> {
   const on = await svc(`presence_settings?review_requests=is.true&select=site_id,review_request_after_days&limit=500`);
   if (!on.ok) return { asked: 0 };   // pre-0137: no switch to read
@@ -1330,7 +1340,14 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
   for (const e of ((ev.json as Array<{ project_id: string; site_id: string; detail?: { to?: string }; created_at: string }>) || [])) {
     if (e?.detail?.to === 'complete' && !completed.has(e.project_id)) completed.set(e.project_id, { siteId: e.site_id, at: e.created_at });
   }
-  const due = [...completed.entries()].filter(([, c]) => reviewAskDue(c.at, nowMs, sites.get(c.siteId) || AUTOMATION_DEFAULTS.review_request_after_days));
+  let due = [...completed.entries()].filter(([, c]) => reviewAskDue(c.at, nowMs, sites.get(c.siteId) || AUTOMATION_DEFAULTS.review_request_after_days));
+  if (!due.length) return { asked: 0 };
+  // Item 91: in the daytime where the business is. This runs every 15 minutes, so an ask that
+  // falls due at night goes out on the first run after nine in the morning, its time zone's.
+  const dueSites = [...new Set(due.map(([, c]) => c.siteId))];
+  const tz = await svc(`presence_locations?site_id=in.(${dueSites.join(',')})&select=site_id,timezone`);
+  const zoneOf = new Map(((tz.json as Array<{ site_id: string; timezone?: string }>) || []).map((r) => [r.site_id, String(r.timezone || '')]));
+  due = due.filter(([, c]) => daytimeIn(zoneOf.get(c.siteId), nowMs));
   if (!due.length) return { asked: 0 };
   const periods = due.map(([id]) => `"${reviewAskPeriod(id)}"`).join(',');
   const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length}`);

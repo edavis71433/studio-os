@@ -6,7 +6,7 @@
 Deno.env.set('RESEND_KEY', 'test-key');
 Deno.env.set('SUPABASE_URL', 'https://db.example');
 Deno.env.set('SERVICE_ROLE_KEY', 'test-service-key');   // signs the email's unsubscribe link
-const { reviewAskDue, automationSettings, AUTOMATION_DEFAULTS, runReviewRequests, reviewAskPeriod } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
+const { reviewAskDue, automationSettings, AUTOMATION_DEFAULTS, runReviewRequests, reviewAskPeriod, daytimeIn } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -28,7 +28,11 @@ ok('never without a date', !reviewAskDue('', NOW, 3) && !reviewAskDue('soon', NO
 const A = 'a0000000-0000-4000-8000-000000000001', B = 'b0000000-0000-4000-8000-000000000002';
 const P = (n) => `00000000-0000-4000-8000-00000000000${n}`;
 const C1 = 'c1000000-0000-4000-8000-000000000001';
-function world({ pre0137 = false, asked = [] } = {}) {
+// item 91: the sweep asks only in the business's daytime, and reads the real clock, so the
+// stubbed locations carry a time zone where it is daytime (or night) right now
+const ZONES = ['Pacific/Kiritimati', 'Pacific/Auckland', 'Asia/Tokyo', 'Asia/Kolkata', 'Asia/Dubai', 'Europe/Moscow', 'Europe/Berlin', 'Europe/London', 'Atlantic/Azores', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Pacific/Honolulu', 'Pacific/Pago_Pago'];
+const DAY_ZONE = ZONES.find((z) => daytimeIn(z, Date.now())), NIGHT_ZONE = ZONES.find((z) => !daytimeIn(z, Date.now()));
+function world({ pre0137 = false, asked = [], zone = DAY_ZONE } = {}) {
   const w = { emails: [], ledger: [], asks: [], rate: {} };
   const settings = [{ site_id: A, review_request_after_days: 3 }, { site_id: B, review_request_after_days: 5 }];
   const events = [
@@ -48,6 +52,7 @@ function world({ pre0137 = false, asked = [] } = {}) {
     if (u.includes('/rpc/rate_hit')) { const b = JSON.parse(init.body); const k = `${b.p_bucket}|${b.p_window}`; w.rate[k] = (w.rate[k] || 0) + 1; return reply(w.rate[k] <= b.p_max); }
     if (u.includes('/presence_settings?review_requests=is.true')) return pre0137 ? reply({ message: 'column does not exist' }, 400) : reply(settings);
     if (u.includes('/presence_project_events?')) { w.asks.push(u); return reply(events); }
+    if (u.includes('/presence_locations?')) return reply([A, B].map((site_id) => ({ site_id, timezone: zone })));
     if (u.includes('/presence_plan_notices?') && m === 'GET') return reply([...ledger].filter((p) => u.includes(`"${p}"`)).map((period) => ({ period })));
     if (u.includes('/presence_plan_notices') && m === 'POST') {
       const row = JSON.parse(init.body); w.ledger.push(row);
@@ -81,6 +86,17 @@ function world({ pre0137 = false, asked = [] } = {}) {
   const w = world({ pre0137: true });
   const r = await runReviewRequests(20);
   ok('before migration 0137 the sweep does nothing at all', r.asked === 0 && w.emails.length === 0 && w.asks.length === 0);
+}
+
+// ═══ 3b. item 91: only in the business's daytime ═══
+ok('daytime: 9:00 to 17:59 where the business is', daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T17:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T11:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-10T02:00:00Z')));
+ok('daytime: the same moment is day in one zone and night in another', daytimeIn('Europe/London', Date.parse('2026-11-09T10:00:00Z')) && !daytimeIn('America/Los_Angeles', Date.parse('2026-11-09T10:00:00Z')));
+ok('daytime: an unknown or empty zone reads as the default one', daytimeIn('Not/AZone', Date.parse('2026-11-09T17:00:00Z')) && daytimeIn('', Date.parse('2026-11-09T17:00:00Z')) && !daytimeIn(null, Date.parse('2026-11-09T11:00:00Z')));
+ok('daytime: the test clock found a day zone and a night zone', !!DAY_ZONE && !!NIGHT_ZONE);
+{
+  const w = world({ zone: NIGHT_ZONE });
+  const r = await runReviewRequests(20);
+  ok('at night where the business is, nobody is asked and nothing is written', r.asked === 0 && w.emails.length === 0 && w.ledger.length === 0);
 }
 
 // ═══ 4. item 73: one person is asked at most once a month, by hand or automatically ═══
