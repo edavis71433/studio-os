@@ -607,17 +607,13 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await expect.poll(() => moved).toBe('contract');
   });
 
-  // The deliberately forfeited half of the mobile focusout fix. The Move menu
-  // is the LAST focusable thing on the board, so a forward Tab leaves the
-  // document entirely and `relatedTarget` is null — indistinguishable from an
-  // iOS tap, which fires the identical event mid-gesture. The menu must NOT be
-  // removed on a null relatedTarget (that is what ate every tap on a real
-  // iPhone), so this one case leaves an open menu behind a switched tab:
-  // invisible, and the next real interaction closes it. Pinned so the trade-off
-  // is explicit rather than an accident.
-  test('leaving the document entirely leaves the menu open (the iOS-safety trade-off)', async ({ page }, testInfo) => {
-    // one width is enough: the premise (this menu is the last focusable thing
-    // on the page) is a desktop-layout fact, and Tab order is what's under test
+  // The mobile focusout fix forfeits one case: focus leaving the DOCUMENT gives a
+  // null relatedTarget, indistinguishable from an iOS tap, so the menu must not
+  // close on it. On the board that case used to come from a forward Tab off the
+  // last option (the menu was the last focusable thing). Since sales review item
+  // 30 the board ends with the Won column, so that Tab now lands on "See won
+  // deals" — a real element — and the menu closes the ordinary way.
+  test('Tab off the last option lands on the Won column and closes the menu', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'keyboard Tab order at one width');
     await pinBoard(page);
     await installApp(page, { api: API });
@@ -626,15 +622,11 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await move.click();
     const items = page.locator('#board .bc-menu button');
     await expect(items.first()).toBeFocused();
-    // prove the premise: forward-Tab off the last option focuses nothing
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
     await expect(items.nth(2)).toBeFocused();
     await page.keyboard.press('Tab');
-    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BODY');
-    await expect(page.locator('#board .bc-menu')).toHaveCount(1);
-    // …and any real interaction still closes it
-    await page.locator('h1').click();
+    await expect(page.locator('#seeWon')).toBeFocused();
     await expect(page.locator('#board .bc-menu')).toHaveCount(0);
   });
 

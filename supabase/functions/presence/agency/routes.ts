@@ -325,7 +325,8 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
 
   // ── team management ──
   if (route === '/agency/members' && method === 'GET') {
-    const r = await svc(`presence_agency_members?agency_id=eq.${member.agency_id}&select=id,email,role,status,created_at&order=created_at.asc&limit=200`);
+    // user_id (learned at each member's sign-in): the Inbox assigns a support request to a person by it (sales review item 34)
+    const r = await svc(`presence_agency_members?agency_id=eq.${member.agency_id}&select=id,email,role,status,user_id,created_at&order=created_at.asc&limit=200`);
     return json({ data: r.json ?? [] }, 200, cors);
   }
   if (route === '/agency/members' && method === 'POST') {
