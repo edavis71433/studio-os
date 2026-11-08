@@ -295,6 +295,39 @@ test.describe('a tab opens on its title', () => {
   });
 });
 
+test.describe('pictures in the pickers (item 25)', () => {
+  test('every section in the rail and in the canvas’s Add section menu shows its picture', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
+    await page.evaluate(() => (window as any).openTrayPanel('add'));
+    const items = page.locator('#designTray .tray-item.has-shot');
+    await expect(items.first()).toBeVisible();
+    const n = await items.count();
+    expect(n).toBeGreaterThan(30);
+    const loaded = await page.locator('#designTray .tray-item .ti-shot').evaluateAll(async (imgs: HTMLImageElement[]) => {
+      await Promise.all(imgs.map((i) => { i.loading = 'eager'; return i.decode().catch(() => null); }));
+      return imgs.filter((i) => i.naturalWidth === 440).length;
+    });
+    expect(loaded).toBe(n);                                                  // every picture is there and is a picture
+    await expect(page.locator('#designTray .tray-item').filter({ hasText: 'Photo gallery' }).locator('.ti-shot')).toHaveAttribute('src', '/thumbs/sections/gallery.jpg');
+    await page.evaluate(() => (window as any).openInsertMenu(0, null, { left: 200, top: 200, bottom: 220, right: 400 }));
+    await expect(page.locator('.blk-insertmenu .tray-item.has-shot').first()).toBeVisible();
+    expect(await page.locator('.blk-insertmenu .tray-item.has-shot').count()).toBe(n);
+  });
+
+  test('a picture that can’t load leaves the section’s name and icon, not a broken image', async ({ page }) => {
+    await page.route('**/thumbs/sections/gallery.jpg', (route) => route.fulfill({ status: 404, body: '' }));
+    await mount(page, '/presence.html#design');
+    await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
+    await page.evaluate(() => (window as any).openTrayPanel('add'));
+    const gallery = page.locator('#designTray .tray-item').filter({ hasText: 'Photo gallery' });
+    await gallery.scrollIntoViewIfNeeded();
+    await expect(gallery.locator('.ti-shot')).toHaveCount(0);
+    await expect(gallery).not.toHaveClass(/has-shot/);
+    await expect(gallery.locator('.ti-ico svg')).toBeVisible();
+  });
+});
+
 test.describe('Versions', () => {
   const pub = (i: number, more: Record<string, unknown> = {}) => ({ id: 'p' + i, kind: 'publish', status: 'live', summary: 'Version ' + i, label: '', at: new Date(Date.UTC(2026, 9, 30 - i, 15)).toISOString(), restorable: true, by_kind: 'client', ...more });
   const PUBS = [pub(0), pub(1, { by_kind: 'operator', label: 'Spring menu' }), pub(2, { status: 'failed', restorable: false }), ...Array.from({ length: 10 }, (_, i) => pub(i + 3))];
@@ -840,39 +873,6 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await frame.locator('section[data-dds-core="about"] h2').dblclick();
     await expect(page.getByText('These words come from your')).toBeVisible();
     expect(identityWrites(writes)).toHaveLength(0);
-  });
-});
-
-test.describe('pictures in the pickers (item 25)', () => {
-  test('every section in the rail and in the canvas’s Add section menu shows its picture', async ({ page }) => {
-    await mount(page, '/presence.html#design');
-    await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
-    await page.evaluate(() => (window as any).openTrayPanel('add'));
-    const items = page.locator('#designTray .tray-item.has-shot');
-    await expect(items.first()).toBeVisible();
-    const n = await items.count();
-    expect(n).toBeGreaterThan(30);
-    const loaded = await page.locator('#designTray .tray-item .ti-shot').evaluateAll(async (imgs: HTMLImageElement[]) => {
-      await Promise.all(imgs.map((i) => { i.loading = 'eager'; return i.decode().catch(() => null); }));
-      return imgs.filter((i) => i.naturalWidth === 440).length;
-    });
-    expect(loaded).toBe(n);                                                  // every picture is there and is a picture
-    await expect(page.locator('#designTray .tray-item').filter({ hasText: 'Photo gallery' }).locator('.ti-shot')).toHaveAttribute('src', '/thumbs/sections/gallery.jpg');
-    await page.evaluate(() => (window as any).openInsertMenu(0, null, { left: 200, top: 200, bottom: 220, right: 400 }));
-    await expect(page.locator('.blk-insertmenu .tray-item.has-shot').first()).toBeVisible();
-    expect(await page.locator('.blk-insertmenu .tray-item.has-shot').count()).toBe(n);
-  });
-
-  test('a picture that can’t load leaves the section’s name and icon, not a broken image', async ({ page }) => {
-    await page.route('**/thumbs/sections/gallery.jpg', (route) => route.fulfill({ status: 404, body: '' }));
-    await mount(page, '/presence.html#design');
-    await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
-    await page.evaluate(() => (window as any).openTrayPanel('add'));
-    const gallery = page.locator('#designTray .tray-item').filter({ hasText: 'Photo gallery' });
-    await gallery.scrollIntoViewIfNeeded();
-    await expect(gallery.locator('.ti-shot')).toHaveCount(0);
-    await expect(gallery).not.toHaveClass(/has-shot/);
-    await expect(gallery.locator('.ti-ico svg')).toBeVisible();
   });
 });
 
