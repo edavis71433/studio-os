@@ -11,6 +11,7 @@
 //   POST /connections/:key/refresh       — pull fresh data now (on-demand read)
 //   POST /connections/:key/disconnect    — revoke + destroy; account + data untouched
 import { json } from '../../_shared/http.ts';
+import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import { connectionActorKind } from '../lib/actor_kind.ts';   // audit change 2: a scoped agency member is the 'operator', not a 'customer'
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -136,6 +137,12 @@ export async function handleConnectionAsk(req: Request, site: SiteRow, principal
   const client = rowsOf(await svc(`clients?id=eq.${site.client_id}&select=email,name&limit=1`))[0];
   const email = client?.email ? String(client.email).trim() : '';
   if (!email || !validEmail(email)) return json({ error: 'no_email', message: 'This client has no email address on file — add one on their record first.' }, 422, cors);
+  // Item 73: one ask per client a day (the link lasts a week, and a new ask retires the last
+  // one), and a studio can't send them without limit.
+  if (!(await rateAllow(`connask:studio:${principal.userId || principal.email || 'unknown'}`, 30, 3600))) return tooMany(cors, 3600);
+  if (!(await rateAllow(`connask:${site.id}`, 1, 86400))) {
+    return json({ error: 'asked_recently', message: 'They were asked already today. The link in that email works for a week.' }, 429, cors);
+  }
 
   const askedAt = Date.now();
   for (const it of toAsk) {

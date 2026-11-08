@@ -240,10 +240,24 @@ export async function handleReviewRequest(req: Request, site: SiteRow, _principa
     if (c) { email = String(c.email || '').trim().toLowerCase(); name = name || String(c.name || '').trim().slice(0, 120); }
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'bad_email', message: 'Add a valid email to send the request to.' }, 400, cors);
+  // Item 73: one site can't fire requests without limit, and one person is asked at most
+  // once in a month (the automatic ask counts too); repeats are how a sending domain lands on a blocklist.
+  if (!(await rateAllow(`reviewask:site:${site.id}`, 20, 3600))) return tooMany(cors, 3600);
+  if (!(await rateAllow(await reviewAskBucket(site.id, email), 1, REVIEW_ASK_WINDOW))) {
+    return json({ error: 'asked_recently', message: 'They were asked for a review in the last month. Asking again so soon can send your emails to spam.' }, 429, cors);
+  }
 
   // sendEmail returns false when suppressed (opt-out/bounce) — report calmly either way.
   const sent = await sendReviewAsk(site.id, email, name);
   return json({ data: { ok: true, sent, email } }, 200, cors);
+}
+
+/** Item 73: one person is asked for a review at most once in this window. */
+export const REVIEW_ASK_WINDOW = 30 * 86400;
+/** The limiter's key for one address on one site; the address is hashed, never stored. */
+export async function reviewAskBucket(siteId: string, email: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.trim().toLowerCase()));
+  return `reviewask:${siteId}:${Array.from(new Uint8Array(digest).slice(0, 12)).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** The review request email: a hand-sent one (POST /reviews/request) and the automatic one
