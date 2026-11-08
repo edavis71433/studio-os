@@ -12131,6 +12131,10 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     s.el.removeEventListener('drop', ipeDrop);
     s.el.removeEventListener('dragover', ipeDragover);
     s.el.removeEventListener('beforeinput', ipeBeforeInput);
+    // Let go of the words, so an iPhone puts its keyboard away. Left focused, the
+    // keyboard stayed up over the page after Return with nothing to type into
+    // (real iPhone Safari, Nov 8 2026, list item 32).
+    if (s.doc.activeElement === s.el) s.el.blur();
     Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
@@ -12351,6 +12355,7 @@ function ideEnd(save) {
   IDE = null;
   const el = s.el;
   ["keydown", "blur", "paste", "drop"].forEach((t) => el.removeEventListener(t, t === "keydown" ? ideKeydown : t === "blur" ? ideBlur : idePaste));
+  try { if (el.ownerDocument.activeElement === el) el.blur(); } catch (_) {}   // the iPhone keyboard goes when the words are let go (as in ipeEnd)
   Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) el.removeAttribute(a); else el.setAttribute(a, s.prev[a]); });
   el.classList.remove("ipe-on");
   const text = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, s.spec.max);
@@ -12366,6 +12371,16 @@ function ideEnd(save) {
   // beat it. A redraw before it lands would paint the old words back.
   const saving = IDE_SAVING = debounceFlush("identity:" + s.field).finally(() => { if (IDE_SAVING === saving) IDE_SAVING = null; ideRelease(); });
 }
+// iPhone Safari scrolls the whole editor up to make room for its keyboard and
+// doesn't always scroll it back, which left the top bar (Exit, Preview, Publish)
+// off the top of the screen with a grey gap at the bottom (list item 32). The
+// editor is a fixed full-screen layout that never scrolls as a page, so once the
+// keyboard has gone it goes back to the top.
+if (window.visualViewport) window.visualViewport.addEventListener("resize", () => {
+  if (!document.documentElement.classList.contains("dc-edit") || IPE || IDE) return;
+  if (window.visualViewport.height < window.innerHeight * 0.85) return;   // the keyboard is still up
+  if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) { window.scrollTo(0, 0); document.body.scrollTop = 0; }
+});
 function ideRelease() {   // the redraw a session or its save held off
   if (!DP_REPAINT_HELD || IPE || IDE || IDE_SAVING) return;
   DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview();
