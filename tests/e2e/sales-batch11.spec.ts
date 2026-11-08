@@ -86,12 +86,12 @@ test.describe('item 53 — My tasks shows each project\'s next step', () => {
 test('item 54 — a one-word name gets its first letter in the Inbox badge', async ({ page }) => {
   const at = new Date().toISOString();
   await installApp(page, { api: { '/portal/feed': { data: { role: 'business_owner', moments: [], pending_approvals: [], client_messages: [], notices: [], enquiries: [
-    { id: 'aaaaaaaa-2222-4222-8222-000000000001', name: 'Eddie', email: 'eddie@example.com', message: 'Hello', status: 'new', form_kind: 'contact', created_at: at },
-    { id: 'aaaaaaaa-2222-4222-8222-000000000002', name: 'Eddie', email: 'eddie@example.com', message: 'Hello again', status: 'new', form_kind: 'contact', created_at: at },
+    { id: 'aaaaaaaa-2222-4222-8222-000000000001', name: 'Marco', email: 'marco@example.com', message: 'Hello', status: 'new', form_kind: 'contact', created_at: at },
+    { id: 'aaaaaaaa-2222-4222-8222-000000000002', name: 'Marco', email: 'marco@example.com', message: 'Hello again', status: 'new', form_kind: 'contact', created_at: at },
   ] } } } });
   await page.goto('/inbox.html');
-  const row = page.locator('#rows .row').filter({ hasText: 'Eddie · 2 messages' });
-  await expect(row.locator('.avatar')).toHaveText('E');
+  const row = page.locator('#rows .row').filter({ hasText: 'Marco · 2 messages' });
+  await expect(row.locator('.avatar')).toHaveText('M');
 });
 
 test('item 55 — a won deal on the Pipeline doesn\'t "close"', async ({ page }) => {

@@ -12,10 +12,10 @@ const ok = (n, c) => { if (c) { pass++; console.log('PASS ', n); } else { fail++
 const eq = (n, a, b) => ok(`${n} (got ${JSON.stringify(a)})`, JSON.stringify(a) === JSON.stringify(b));
 
 // ── item 49: names on the live account's shape ──
-eq('the site name only repeats the person: no business, and the person is not said twice', N.customerNames({ clientName: 'Claud Beltran', siteBusinessName: 'Claud Beltran', contactName: 'Claud Beltran' }), { name: 'Claud Beltran', business_name: '', person_name: '' });
-eq('…and once the contact names the business, it leads', N.customerNames({ clientName: 'Claud Beltran', siteBusinessName: 'claud beltran', contactName: 'Claud Beltran', contactCompany: 'Bacchus Kitchen + Wine Bar' }), { name: 'Bacchus Kitchen + Wine Bar', business_name: 'Bacchus Kitchen + Wine Bar', person_name: 'Claud Beltran' });
-eq('a real site name still wins (PR 151 case)', N.customerNames({ clientName: 'Claud Beltran', siteBusinessName: 'Bacchus Kitchen', contactName: 'Claud Beltran' }), { name: 'Bacchus Kitchen', business_name: 'Bacchus Kitchen', person_name: 'Claud Beltran' });
-eq('a customer added as a business keeps it (the site name matching the customer\'s own name proves nothing)', N.customerNames({ clientName: 'Hettie Orange Designs', siteBusinessName: 'Hettie Orange Designs', contactName: 'Hettie Orange' }), { name: 'Hettie Orange Designs', business_name: 'Hettie Orange Designs', person_name: 'Hettie Orange' });
+eq('the site name only repeats the person: no business, and the person is not said twice', N.customerNames({ clientName: 'Jordan Ellis', siteBusinessName: 'Jordan Ellis', contactName: 'Jordan Ellis' }), { name: 'Jordan Ellis', business_name: '', person_name: '' });
+eq('…and once the contact names the business, it leads', N.customerNames({ clientName: 'Jordan Ellis', siteBusinessName: 'jordan ellis', contactName: 'Jordan Ellis', contactCompany: 'Larkspur Kitchen + Wine Bar' }), { name: 'Larkspur Kitchen + Wine Bar', business_name: 'Larkspur Kitchen + Wine Bar', person_name: 'Jordan Ellis' });
+eq('a real site name still wins (PR 151 case)', N.customerNames({ clientName: 'Jordan Ellis', siteBusinessName: 'Larkspur Kitchen', contactName: 'Jordan Ellis' }), { name: 'Larkspur Kitchen', business_name: 'Larkspur Kitchen', person_name: 'Jordan Ellis' });
+eq('a customer added as a business keeps it (the site name matching the customer\'s own name proves nothing)', N.customerNames({ clientName: 'Fennel Street Designs', siteBusinessName: 'Fennel Street Designs', contactName: 'Marigold Orange' }), { name: 'Fennel Street Designs', business_name: 'Fennel Street Designs', person_name: 'Marigold Orange' });
 
 const AS = '11111111-1111-4111-8111-111111111111';
 const CL = '22222222-2222-4222-8222-222222222222', SITE = '33333333-3333-4333-8333-333333333333';
@@ -23,10 +23,10 @@ const DEALCT = '44444444-4444-4444-8444-444444444444', STAMPCT = '55555555-5555-
 const world = (over = {}) => {
   const paths = [];
   const rowsFor = {
-    presence_identity: [{ site_id: SITE, business_name: 'Claud Beltran' }],
+    presence_identity: [{ site_id: SITE, business_name: 'Jordan Ellis' }],
     presence_deals: [{ converted_client_id: CL, contact_id: DEALCT }],
     contacts_by_client: [],
-    contacts_by_id: [{ id: DEALCT, client_id: null, name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', phone: '(555) 010-0000' }],
+    contacts_by_id: [{ id: DEALCT, client_id: null, name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar', phone: '(555) 010-0000' }],
     ...over,
   };
   const read = async (p) => {
@@ -42,28 +42,28 @@ const world = (over = {}) => {
 };
 {
   const w = world();
-  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Claud Beltran', customerSiteId: SITE }], w.read);
-  eq('the contact is found through the won deal (it has no client stamp)', r[CL], { name: 'Bacchus Kitchen + Wine Bar', business_name: 'Bacchus Kitchen + Wine Bar', person_name: 'Claud Beltran', contact_id: DEALCT, phone: '(555) 010-0000' });
+  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE }], w.read);
+  eq('the contact is found through the won deal (it has no client stamp)', r[CL], { name: 'Larkspur Kitchen + Wine Bar', business_name: 'Larkspur Kitchen + Wine Bar', person_name: 'Jordan Ellis', contact_id: DEALCT, phone: '(555) 010-0000' });
   ok('every read is scoped to the studio\'s own site', w.paths.filter((p) => !p.startsWith('presence_identity')).every((p) => p.includes(`site_id=eq.${AS}`)));
 }
 {
-  const w = world({ contacts_by_client: [{ id: STAMPCT, client_id: CL, name: 'Claud B', company: '' }] });
-  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Claud Beltran', customerSiteId: SITE }], w.read);
-  ok('a contact that names the business beats one that doesn\'t', r[CL].contact_id === DEALCT && r[CL].business_name === 'Bacchus Kitchen + Wine Bar');
+  const w = world({ contacts_by_client: [{ id: STAMPCT, client_id: CL, name: 'Jordan B', company: '' }] });
+  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE }], w.read);
+  ok('a contact that names the business beats one that doesn\'t', r[CL].contact_id === DEALCT && r[CL].business_name === 'Larkspur Kitchen + Wine Bar');
 }
 {
-  const w = world({ contacts_by_id: [{ id: DEALCT, name: 'Claud Beltran', company: '' }] });
-  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Claud Beltran', customerSiteId: SITE }], w.read);
-  eq('live today (no company anywhere): the plain name, nothing doubled', [r[CL].name, r[CL].business_name, r[CL].person_name], ['Claud Beltran', '', '']);
+  const w = world({ contacts_by_id: [{ id: DEALCT, name: 'Jordan Ellis', company: '' }] });
+  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE }], w.read);
+  eq('live today (no company anywhere): the plain name, nothing doubled', [r[CL].name, r[CL].business_name, r[CL].person_name], ['Jordan Ellis', '', '']);
 }
 {
   const w = world({ fail: 'presence_' });
-  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Claud Beltran', customerSiteId: SITE }], w.read);
-  ok('failed reads leave the plain name', r[CL] && r[CL].name === 'Claud Beltran');
+  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE }], w.read);
+  ok('failed reads leave the plain name', r[CL] && r[CL].name === 'Jordan Ellis');
 }
 {
-  const w = world({ contacts_by_id: [{ id: STAMPCT, name: 'Dana Lee', company: 'Willow Day Spa' }, { id: DEALCT, name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar' }] });
-  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Claud Beltran', customerSiteId: SITE, contactId: STAMPCT }], w.read);
+  const w = world({ contacts_by_id: [{ id: STAMPCT, name: 'Dana Lee', company: 'Willow Day Spa' }, { id: DEALCT, name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar' }] });
+  const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE, contactId: STAMPCT }], w.read);
   ok('the record\'s own contact comes first', r[CL].contact_id === STAMPCT && r[CL].person_name === 'Dana Lee');
 }
 const cd = read('supabase/functions/presence/routes/client_delivery.ts'), crm = read('supabase/functions/presence/routes/crm.ts'), page = read('crm.html');
@@ -82,9 +82,9 @@ ok('an open deal\'s late step still reads overdue', ns({ id: 'd', stage: 'contra
 ok('the record\'s tile and its fallback list use the same rule', /const ns=\(d\.id\?liveNextStep\(d\):hl\.next_step\)\|\|'';/.test(page) && /if\(d&&liveNextStep\(d\)\)upcoming\.push/.test(page));
 
 // ── item 51: hosted elsewhere ──
-const prof = { business_name: 'Bacchus', edition: 'monitor', status: 'draft', live: false, last_published_at: null, members: 0, connected: 0, connected_needing_attention: 0, active_moments: 3, pending_approvals: 0 };
+const prof = { business_name: 'Larkspur', edition: 'monitor', status: 'draft', live: false, last_published_at: null, members: 0, connected: 0, connected_needing_attention: 0, active_moments: 3, pending_approvals: 0 };
 ok('a monitor-plan site is not "getting set up"', C.deriveClientHealth(prof, NOW) !== 'new');
-ok('…and its summary says hosted elsewhere', /^Bacchus’s website is hosted elsewhere\./.test(C.relationshipSummary({ ...prof, health: C.deriveClientHealth(prof, NOW) }, null, NOW)));
+ok('…and its summary says hosted elsewhere', /^Larkspur’s website is hosted elsewhere\./.test(C.relationshipSummary({ ...prof, health: C.deriveClientHealth(prof, NOW) }, null, NOW)));
 ok('a site we host, never published, is still getting set up', C.deriveClientHealth({ ...prof, edition: 'presence' }, NOW) === 'new');
 ok('the record says "Hosted elsewhere" in all three places', /const siteWord=\(p\)=>p\.live\?'Live':\(p\.edition==='monitor'\?'Hosted elsewhere'/.test(page) && (page.match(/siteWord\(p\)/g) || []).length >= 3);
 
@@ -94,7 +94,7 @@ ok('the won tip reads the project\'s progress', /function guideNow\(stage\)/.tes
 // ── item 53: My tasks ──
 const P1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const tasks = T.buildMyTasks({ deals: [], dealTasks: [], taskDeals: [], userId: null,
-  projects: [{ id: P1, name: 'Bacchus Kitchen + Wine Bar', status: 'active' }],
+  projects: [{ id: P1, name: 'Larkspur Kitchen + Wine Bar', status: 'active' }],
   projectTasks: [
     { id: 't3', project_id: P1, title: 'Site live', status: 'todo', sort_order: 3 },
     { id: 't1', project_id: P1, title: 'Domain connected', status: 'todo', sort_order: 1 },

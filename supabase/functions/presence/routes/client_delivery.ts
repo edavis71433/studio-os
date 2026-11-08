@@ -37,6 +37,12 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as 
 const readerKey = (p: Principal) => String(p.userId || p.email || 'anon');
 /** The customer this caller IS (their own site's client). */
 const customerOf = (site: SiteRow): string | null => (site.client_id ? String(site.client_id) : null);
+// Final pass (Nov 8, F6): which of a client's requests the list and the bell
+// look at is decided by real activity, not updated_at. Replies never move
+// updated_at, so once a client had more requests than one page (25), one the
+// studio had just answered could drop out of both. Up to this many are read,
+// newest-updated first, then sorted by what actually happened.
+const SUPPORT_POOL = 100;
 const noCustomer = (cors: Record<string, string>) => json({ data: [], message: 'No service delivery is linked to your account yet.' }, 200, cors);
 
 // This write is NOT an echo — presence_project_events rows stamped
@@ -490,7 +496,7 @@ export async function handleClientNotifications(req: Request, site: SiteRow, pri
   const limit = clampLimit(new URL(req.url).searchParams.get('limit'));
   const [evR, supR, seenR] = await Promise.all([
     ids.length ? svc(`presence_project_events?site_id=eq.${s}&project_id=in.(${ids.join(',')})&client_visible=is.true&select=kind,detail,project_id,created_at&order=created_at.desc&limit=${limit}`) : Promise.resolve({ json: [] }),
-    svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,resolved_at,requester,updated_at&order=updated_at.desc&limit=25`),
+    svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,resolved_at,requester,updated_at&order=updated_at.desc&limit=${SUPPORT_POOL}`),   // F6: not just the 25 newest-updated
     svc(`presence_activity_reads?site_id=eq.${s}&reader=eq.${encodeURIComponent('client:' + me)}&select=last_seen_at&limit=1`),
   ]);
   const lastSeen = rows(seenR)[0]?.last_seen_at || null;
@@ -587,9 +593,11 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   const s = links[0].agency_site_id;
   if (req.method === 'GET') {
     const u = new URL(req.url);
-    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester&order=updated_at.desc&limit=${clampLimit(u.searchParams.get('limit'))}&offset=${clampOffset(u.searchParams.get('offset'))}`);
+    const limit = clampLimit(u.searchParams.get('limit')), offset = clampOffset(u.searchParams.get('offset'));
+    const byActivity = offset + limit <= SUPPORT_POOL;   // past the pool, pages stay in updated_at order
+    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester&order=updated_at.desc&limit=${byActivity ? SUPPORT_POOL : limit}&offset=${byActivity ? 0 : offset}`);
     if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
-    const list = rows(r);
+    let list = rows(r);
     // Additive `last_activity_at` = max(updated_at, the newest reply's created_at):
     // replies only INSERT into presence_support_messages and never bump the
     // request's updated_at, so sorting on updated_at misses every reply after the
@@ -610,6 +618,10 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
           for (const row of list) { const n = newest[String(row.id)]; row.last_activity_at = supportActivityAt(row, n ? n.at : null) || String(row.updated_at || ''); const ll = lastLine(n); if (ll) row.last_message = ll; }
         }
       } catch { /* omit the field — callers fall back to updated_at */ }
+    }
+    if (byActivity) {
+      const at = (x: any) => String(x.last_activity_at || x.updated_at || '');
+      list = list.sort((a: any, b: any) => at(b).localeCompare(at(a)) || String(b.id).localeCompare(String(a.id))).slice(offset, offset + limit);
     }
     for (const row of list) delete row.requester;   // the client's own key — no use on the page
     return json({ data: list }, 200, cors);

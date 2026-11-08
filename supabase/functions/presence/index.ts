@@ -899,6 +899,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── A7: Workspace context, members, and client-visibility shares ──
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
+  // Final pass (Nov 8, S1): a studio asked to work with this website's owner; the owner answers
+  if (route === '/portal/studio-requests' || /^\/portal\/studio-requests\/[0-9a-f-]{36}\/(accept|decline)$/.test(route)) {
+    const { handleStudioRequests } = await import('./routes/connect_requests.ts');
+    return handleStudioRequests(req, route, site, principal, cors);
+  }
   if (route === '/portal/members' && method === 'GET') return handleMembersList(jwt, site, principal, cors);
   if (route === '/portal/members' && method === 'POST') return handleMemberAdd(req, jwt, site, principal, cors);
   {

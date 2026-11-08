@@ -139,7 +139,7 @@ test.describe('Inbox — split-view console', () => {
     await installApp(page, { api: { ...API,
       '/portal/feed': { data: { ...FEED.data,
         client_messages: [
-          { type: 'message', project: 'Site build', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', client_id: 'c-1', client: 'Hettie’s Flowers', created_at: '2026-07-15T00:00:00Z', needs_reply: true, count: 1, thread_key: 'client:c-1', unread: true, href: '/crm.html?project=aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa&tab=messages' },
+          { type: 'message', project: 'Site build', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', client_id: 'c-1', client: 'Marigold’s Flowers', created_at: '2026-07-15T00:00:00Z', needs_reply: true, count: 1, thread_key: 'client:c-1', unread: true, href: '/crm.html?project=aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa&tab=messages' },
         ],
       } },
     } });
@@ -148,7 +148,7 @@ test.describe('Inbox — split-view console', () => {
     await page.locator('#viewBtn').click();
     await page.locator('#viewMenu [data-view="messages"]').click();
     await expect(rows.getByRole('option')).toHaveCount(1);
-    await expect(rows.getByRole('option').first()).toContainText('Hettie’s Flowers');
+    await expect(rows.getByRole('option').first()).toContainText('Marigold’s Flowers');
     await expect(rows.getByRole('option').first().locator('.rchip')).toHaveText('Message');
     // and the Support & requests view shows NO trace of it
     await page.locator('#viewBtn').click();
@@ -161,7 +161,7 @@ test.describe('Inbox — split-view console', () => {
       '/portal/feed': { data: { ...FEED.data,
         client_messages: [
           // stamped (client_id resolved server-side → the feed carries the name)
-          { type: 'support', id: 's-7', subject: 'Please update our hours', status: 'open', project: '', client_id: 'c-9', client: 'Hettie’s Flowers', created_at: '2026-07-16T00:00:00Z', thread_key: 'support:s-7', unread: true, href: '/projects.html?support=s-7' },
+          { type: 'support', id: 's-7', subject: 'Please update our hours', status: 'open', project: '', client_id: 'c-9', client: 'Marigold’s Flowers', created_at: '2026-07-16T00:00:00Z', thread_key: 'support:s-7', unread: true, href: '/projects.html?support=s-7' },
           // legacy unstamped row — the old anonymous fallback stays
           { type: 'support', id: 's-8', subject: 'Anonymous ask', status: 'open', project: '', client_id: '', client: '', created_at: '2026-07-15T00:00:00Z', thread_key: 'support:s-8', unread: true, href: '/projects.html?support=s-8' },
         ],
@@ -170,7 +170,7 @@ test.describe('Inbox — split-view console', () => {
     await page.goto('/inbox.html');
     const rows = page.locator('#rows');
     const stamped = rows.getByRole('option').filter({ hasText: 'Please update our hours' });
-    await expect(stamped).toContainText('Hettie’s Flowers');
+    await expect(stamped).toContainText('Marigold’s Flowers');
     await expect(rows.getByRole('option').filter({ hasText: 'Anonymous ask' })).toContainText('Support request');
   });
 
@@ -807,7 +807,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
   test('a feed whose rows name no project offers no project lens (never a dropdown that cannot return anything)', async ({ page }) => {
     await installApp(page, { api: { ...LENS_API,
       '/portal/feed': { data: { ...LENS_FEED.data, client_messages: [
-        { type: 'support', id: 's-2', subject: 'A project-less ask', status: 'open', project: '', project_id: '', client_id: 'c-3', client: 'Hettie’s Flowers', created_at: '2026-07-15T00:00:00Z', thread_key: 'support:s-2', unread: true, href: '/projects.html?support=s-2' },
+        { type: 'support', id: 's-2', subject: 'A project-less ask', status: 'open', project: '', project_id: '', client_id: 'c-3', client: 'Marigold’s Flowers', created_at: '2026-07-15T00:00:00Z', thread_key: 'support:s-2', unread: true, href: '/projects.html?support=s-2' },
       ] } },
       '/notifications': { data: [], unread_count: 0 },
     } });

@@ -975,8 +975,12 @@ $('custForm').onsubmit=async(e)=>{
     const d=(r.body&&r.body.data)||{};
     const who=esc(business_name||name||email);
     let heading,line;
-    if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' already had an account — they’re connected to you now.';}
+    if(d.requested){
+      // final pass S1: an account that isn't yours yet is asked, never taken
+      heading='Request sent';
+      line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
+    }else if(mode==='connect'){
+      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
       else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
@@ -992,7 +996,7 @@ $('custForm').onsubmit=async(e)=>{
     // try/catch: a kit that won't apply must never repaint the set-up as a failure
     let kitLine='';
     if(kitId){
-      if(d.already_exists)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
+      if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
       else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
       else{
         let k={ok:false};try{k=await apiSend('POST','/agency/kits/'+encodeURIComponent(kitId)+'/apply',{site_id:d.site_id});}catch(_){k={ok:false};}

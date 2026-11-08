@@ -29,7 +29,7 @@ const A = 'a0000000-0000-4000-8000-000000000001', B = 'b0000000-0000-4000-8000-0
 const P = (n) => `00000000-0000-4000-8000-00000000000${n}`;
 const C1 = 'c1000000-0000-4000-8000-000000000001';
 function world({ pre0137 = false, asked = [] } = {}) {
-  const w = { emails: [], ledger: [], asks: [] };
+  const w = { emails: [], ledger: [], asks: [], rate: {} };
   const settings = [{ site_id: A, review_request_after_days: 3 }, { site_id: B, review_request_after_days: 5 }];
   const events = [
     { project_id: P(1), site_id: A, detail: { from: 'active', to: 'complete' }, created_at: ago(4) },    // due
@@ -45,6 +45,7 @@ function world({ pre0137 = false, asked = [] } = {}) {
   globalThis.fetch = (url, init = {}) => {
     const u = decodeURIComponent(String(url)), m = (init.method || 'GET').toUpperCase();
     if (u.startsWith('https://api.resend.com/')) { w.emails.push(JSON.parse(init.body)); return reply({ id: 'e' + w.emails.length }); }
+    if (u.includes('/rpc/rate_hit')) { const b = JSON.parse(init.body); const k = `${b.p_bucket}|${b.p_window}`; w.rate[k] = (w.rate[k] || 0) + 1; return reply(w.rate[k] <= b.p_max); }
     if (u.includes('/presence_settings?review_requests=is.true')) return pre0137 ? reply({ message: 'column does not exist' }, 400) : reply(settings);
     if (u.includes('/presence_project_events?')) { w.asks.push(u); return reply(events); }
     if (u.includes('/presence_plan_notices?') && m === 'GET') return reply([...ledger].filter((p) => u.includes(`"${p}"`)).map((period) => ({ period })));
@@ -80,6 +81,25 @@ function world({ pre0137 = false, asked = [] } = {}) {
   const w = world({ pre0137: true });
   const r = await runReviewRequests(20);
   ok('before migration 0137 the sweep does nothing at all', r.asked === 0 && w.emails.length === 0 && w.asks.length === 0);
+}
+
+// ═══ 4. item 73: one person is asked at most once a month, by hand or automatically ═══
+{
+  const { handleReviewRequest } = await import('../../supabase/functions/presence/routes/reviews.ts');
+  const w = world();
+  await runReviewRequests(20);
+  ok('the automatic ask counts as this month’s ask for that address', Object.keys(w.rate).some((k) => k.startsWith(`reviewask:${A}:`)));
+  const ask = (email) => handleReviewRequest(new Request('https://fn.example/reviews/request', { method: 'POST', body: JSON.stringify({ email, name: 'Pat' }) }), { id: A }, {}, {});
+  const again = await ask('Pat@Client.example');
+  const body = await again.json();
+  ok('a hand-sent ask to the same person that month is refused, in a sentence', again.status === 429 && body.error === 'asked_recently' && /in the last month/.test(body.message), `${again.status} ${JSON.stringify(body)}`);
+  const other = await ask('sam@other.example');
+  ok('someone else can still be asked', other.status === 200 && (await other.json()).data.ok === true);
+  const before = w.emails.length;
+  ok('the refused ask sent nothing', before === 2);
+  ok('the address is hashed in the limiter, never stored as written', !Object.keys(w.rate).some((k) => k.includes('@')));
+  const conn = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/connections.ts', import.meta.url));
+  ok('the connections ask: one per client a day, and a cap per studio, checked before anything is saved or sent', /rateAllow\(`connask:\$\{site\.id\}`, 1, 86400\)/.test(conn) && /rateAllow\(`connask:studio:/.test(conn) && conn.indexOf('connask:${site.id}') < conn.indexOf('await setConnection(site.id, it.key'));
 }
 
 const failed = results.filter((r) => !r.p);

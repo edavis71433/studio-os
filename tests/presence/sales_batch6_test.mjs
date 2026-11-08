@@ -43,7 +43,7 @@ ok('a list is read from the site\'s own store; a removed list reaches no one', /
 // ── the routes ──
 const bc = read('supabase/functions/presence/routes/broadcasts.ts');
 ok('a draft may only name one of this site\'s lists', /if \(isListKey\(body\?\.audience\) && !\(await audienceOk\(site\.id, body\.audience\)\)\) return json\(\{ error: 'validation'/.test(bc));
-ok('a list in use by a scheduled update can\'t be removed', /status=in\.\(scheduled,sending\)&select=id&limit=1`\);\s*if \(rows\(busy\)\[0\]\) return json\(\{ error: 'in_use'/.test(bc));
+ok('a list in use by a scheduled update can\'t be removed — and an unanswered check never deletes (F8)', /status=in\.\(scheduled,sending\)&select=id&limit=1`\);[\s\S]{0,260}?if \(!busy\.ok\) return json\(\{ error: 'unavailable'[^\n]*\n\s*if \(rows\(busy\)\[0\]\) return json\(\{ error: 'in_use'/.test(bc));
 ok('the picked lists follow the presets in the audience picker', /segments: \[\.\.\.SEGMENTS(\.filter\([^\n]*?\))?\.map\(/.test(bc)   /* item 56 (Nov 8) hides an empty Your customers */);
 const idx = read('supabase/functions/presence/index.ts');
 ok('the new routes are wired', /route === '\/sales\/views' && \(method === 'GET' \|\| method === 'PUT'\)/.test(idx) && /route === '\/broadcasts\/lists' && method === 'POST'/.test(idx) && /lm && method === 'DELETE'\) return handleBroadcastListDelete/.test(idx));

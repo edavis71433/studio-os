@@ -15,10 +15,10 @@ const NOW = '2026-10-21T15:00:00Z';
 const base = () => ({
   nowIso: NOW,
   links: [{ site_id: 's1', status: 'active' }, { site_id: 's2', status: 'active' }, { site_id: 's3', status: 'archived' }],
-  clientNames: { s1: 'Hettie Orange Designs', s2: 'Eric Test', s3: 'Old Client' },
-  namesByClient: { c9: 'Claud Beltran' },
+  clientNames: { s1: 'Fennel Street Designs', s2: 'Eric Test', s3: 'Old Client' },
+  namesByClient: { c9: 'Jordan Ellis' },
   sites: [
-    { id: 's1', edition: 'presence', status: 'live', last_published_at: '2026-10-01T00:00:00Z', custom_domain: 'hettie.example', domain_registrar: 'GoDaddy', domain_expires_at: null },
+    { id: 's1', edition: 'presence', status: 'live', last_published_at: '2026-10-01T00:00:00Z', custom_domain: 'marigold.example', domain_registrar: 'GoDaddy', domain_expires_at: null },
     { id: 's2', edition: 'presence', status: 'ready', last_published_at: null, custom_domain: null },
     { id: 's3', edition: 'presence', status: 'live', last_published_at: '2026-10-01T00:00:00Z', custom_domain: 'old.example', domain_expires_at: '2026-10-25' },
   ],
@@ -56,8 +56,8 @@ const base = () => ({
 {
   const i = { ...base(),
     invoices: [
-      { id: 'i-soon', title: 'Balance', amount_cents: 80000, due_date: '2026-10-24', status: 'open', state: 'upcoming', deal_id: 'd1', deal: 'Hettie site', client_id: 'c1', customer_site_id: 's1', created_at: '2026-10-14T00:00:00Z' },
-      { id: 'i-late3', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-18', status: 'open', state: 'overdue', deal_id: 'd9', deal: 'Bacchus rebuild', client_id: 'c9', customer_site_id: null, created_at: '2026-10-10T00:00:00Z' },
+      { id: 'i-soon', title: 'Balance', amount_cents: 80000, due_date: '2026-10-24', status: 'open', state: 'upcoming', deal_id: 'd1', deal: 'Marigold site', client_id: 'c1', customer_site_id: 's1', created_at: '2026-10-14T00:00:00Z' },
+      { id: 'i-late3', title: 'Deposit', amount_cents: 160000, due_date: '2026-10-18', status: 'open', state: 'overdue', deal_id: 'd9', deal: 'Larkspur rebuild', client_id: 'c9', customer_site_id: null, created_at: '2026-10-10T00:00:00Z' },
       { id: 'i-late1', title: 'Invoice', amount_cents: 30000, due_date: '2026-10-20', status: 'open', state: 'overdue', deal_id: 'd2', deal: 'Eric site', client_id: 'c2', customer_site_id: 's2' },
       { id: 'i-far', title: 'Invoice', amount_cents: 50000, due_date: '2026-11-30', status: 'open', state: 'upcoming', deal_id: 'd3', client_id: 'c2', customer_site_id: 's2' },   // beyond 7 days → not a row
       { id: 'i-proc', title: 'Balance (ACH)', amount_cents: 40000, due_date: '2026-10-01', status: 'open', state: 'processing', processing_since: '2026-10-20T00:00:00Z', deal_id: 'd1', client_id: 'c1', customer_site_id: 's1' },   // paid, settling → never owed
@@ -66,7 +66,7 @@ const base = () => ({
     enquiries: [{ id: 'e1', site_id: 's1', name: 'Maria', form_kind: 'quote', created_at: '2026-10-19T09:00:00Z' }],
     support: [{ id: 'sup1', subject: 'the gallery page', project_id: 'p1', created_at: '2026-10-19T00:00:00Z' }],
     serviceLinks: [{ project_id: 'p1', customer_client_id: 'c1', customer_site_id: 's1' }],
-    deals: [{ id: 'd9', title: 'Bacchus Kitchen — new site', stage: 'proposal', next_step: 'Book the kickoff call', next_step_at: '2026-08-08', converted_client_id: 'c9', converted_site_id: null, contact_name: 'Claud Beltran' }],
+    deals: [{ id: 'd9', title: 'Larkspur Kitchen — new site', stage: 'proposal', next_step: 'Book the kickoff call', next_step_at: '2026-08-08', converted_client_id: 'c9', converted_site_id: null, contact_name: 'Jordan Ellis' }],
     publishes: [{ site_id: 's2', status: 'failed', created_at: '2026-10-20T00:00:00Z', error_text: 'deploy: Netlify said no' }, { site_id: 's2', status: 'live', created_at: '2026-09-01T00:00:00Z' }],
     connections: [{ site_id: 's1', provider_key: 'google_search_console', status: 'expired' }],
     evidence: [{ site_id: 's1', type: 'trust.ssl_missing', severity: 'critical', human: 'The site has no HTTPS.' }, { site_id: 's1', type: 'seo.title_missing', severity: 'critical', human: '5 pages have no title.' }],
@@ -76,14 +76,14 @@ const base = () => ({
   const rows = buildNeedsYou(i);
   const kinds = rows.map((r) => r.kind);
   ok('overdue money sorts first, most overdue at the top, then due within 7 days', rows[0].key === 'money:i-late3' && rows[1].key === 'money:i-late1' && rows[2].key === 'money:i-soon');
-  ok('money rows read "Name — invoice $X is overdue by N days" / "is due Nov 3"', rows[0].name === 'Claud Beltran' && rows[0].what === 'invoice $1,600 is overdue by 3 days' && rows[1].what === 'invoice $300 is overdue by 1 day' && rows[2].what === 'invoice $800 is due Oct 24');
+  ok('money rows read "Name — invoice $X is overdue by N days" / "is due Nov 3"', rows[0].name === 'Jordan Ellis' && rows[0].what === 'invoice $1,600 is overdue by 3 days' && rows[1].what === 'invoice $300 is overdue by 1 day' && rows[2].what === 'invoice $800 is due Oct 24');
   ok('a money row says when it was sent and carries ONE verb: Resend → the deal’s billing tab', rows[0].when === 'Sent Oct 10 · no payment yet' && rows[0].verb === 'Resend' && rows[0].href === '/crm.html?deal=d9&tab=billing');
   ok('an invoice due beyond 7 days, a settling payment, and an archived client’s invoice are not rows', !rows.some((r) => /i-far|i-proc|i-arch/.test(r.key)));
   ok('the fixed order: money · enquiry · support · deal · broken · plan · publish', kinds.join(',') === 'money,money,money,enquiry,support,deal,broken,broken,broken,plan,publish', kinds.join(','));
   const by = (k) => rows.find((r) => r.key === k);
   ok('enquiry: "new enquiry from Maria", 2 days ago, Reply → the client’s Inbox row', by('enquiry:e1').what === 'new enquiry from Maria' && by('enquiry:e1').when === '2 days ago · quote form' && by('enquiry:e1').verb === 'Reply' && by('enquiry:e1').href === '/inbox.html?client=s1#enquiries?sel=lead:e1');
-  ok('support: named by the service link’s customer, Reply → the studio Inbox', by('support:sup1').name === 'Hettie Orange Designs' && by('support:sup1').what === 'support request: the gallery page' && by('support:sup1').verb === 'Reply' && by('support:sup1').href === '/inbox.html#support?sel=sup:sup1');
-  ok('deal: the late next step, since its date, Open deal', by('deal:d9').name === 'Claud Beltran' && by('deal:d9').what === 'next step “Book the kickoff call” is 74 days late' && /due Aug 8/.test(by('deal:d9').when) && by('deal:d9').verb === 'Open deal' && by('deal:d9').href === '/crm.html?deal=d9');
+  ok('support: named by the service link’s customer, Reply → the studio Inbox', by('support:sup1').name === 'Fennel Street Designs' && by('support:sup1').what === 'support request: the gallery page' && by('support:sup1').verb === 'Reply' && by('support:sup1').href === '/inbox.html#support?sel=sup:sup1');
+  ok('deal: the late next step, since its date, Open deal', by('deal:d9').name === 'Jordan Ellis' && by('deal:d9').what === 'next step “Book the kickoff call” is 74 days late' && /due Aug 8/.test(by('deal:d9').when) && by('deal:d9').verb === 'Open deal' && by('deal:d9').href === '/crm.html?deal=d9');
   ok('broken: publish failed · SSL missing · connection expired — Fix, scoped to the client', by('broken:publish:s2').what === 'the last publish failed' && by('broken:publish:s2').href === '/presence.html?client=s2#publish'
     && by('broken:ev:s1:trust.ssl_missing').href === '/presence.html?client=s1#domain' && by('broken:conn:s1:google_search_console').what === 'Google Search Console connection has expired' && by('broken:conn:s1:google_search_console').href === '/connections.html?client=s1'
     && rows.filter((r) => r.kind === 'broken').every((r) => r.verb === 'Fix'));
@@ -110,9 +110,9 @@ const base = () => ({
 // ═══ 5. empty state: one honest line ═══
 {
   const i = { ...base(), invoices: [{ id: 'i1', amount_cents: 160000, due_date: '2026-11-03', status: 'open', state: 'upcoming', deal_id: 'd9', client_id: 'c9', customer_site_id: null }] };
-  ok('nothing due within 7 days → no rows, but the line names who owes what and when', buildNeedsYou(i).length === 0 && emptyLine(i) === 'Claud Beltran owes $1,600, due Nov 3.');
+  ok('nothing due within 7 days → no rows, but the line names who owes what and when', buildNeedsYou(i).length === 0 && emptyLine(i) === 'Jordan Ellis owes $1,600, due Nov 3.');
   ok('nothing open at all → "Everything is paid and published."', emptyLine(base()) === 'Everything is paid and published.');
-  ok('an undated invoice → "owes $X."', emptyLine({ ...base(), invoices: [{ id: 'i2', amount_cents: 5000, due_date: null, status: 'open', client_id: 'c9' }] }) === 'Claud Beltran owes $50.');
+  ok('an undated invoice → "owes $X."', emptyLine({ ...base(), invoices: [{ id: 'i2', amount_cents: 5000, due_date: null, status: 'open', client_id: 'c9' }] }) === 'Jordan Ellis owes $50.');
 }
 
 // ═══ 6. money edge cases ═══
@@ -122,9 +122,9 @@ const base = () => ({
   const [r] = buildNeedsYou(i);
   ok('due today reads "is due today"; a reminder that went out today turns Resend into Open record', r.what === 'invoice $1,600 is due today' && r.verb === 'Open record' && r.href === '/crm.html?deal=d9' && r.when === 'Reminder went out today · no payment yet');
   const [r2] = buildNeedsYou({ ...base(), invoices: [{ id: 'i3', amount_cents: 20000, due_date: '2026-10-19', status: 'open', state: 'overdue', deal_id: null, client_id: null, customer_site_id: 's1' }] });
-  ok('no deal to resend from → Open record on the client’s billing tab', r2.verb === 'Open record' && r2.href === '/crm.html?client=s1&tab=billing' && r2.name === 'Hettie Orange Designs');
-  ok('a domain expiring within 30 days is broken; 31+ days is not (the Website page has the 45-day window)', buildNeedsYou({ ...base(), sites: [{ id: 's1', custom_domain: 'hettie.example', domain_expires_at: '2026-11-15' }] }).length === 1
-    && buildNeedsYou({ ...base(), sites: [{ id: 's1', custom_domain: 'hettie.example', domain_expires_at: '2026-11-25' }] }).length === 0);
+  ok('no deal to resend from → Open record on the client’s billing tab', r2.verb === 'Open record' && r2.href === '/crm.html?client=s1&tab=billing' && r2.name === 'Fennel Street Designs');
+  ok('a domain expiring within 30 days is broken; 31+ days is not (the Website page has the 45-day window)', buildNeedsYou({ ...base(), sites: [{ id: 's1', custom_domain: 'marigold.example', domain_expires_at: '2026-11-15' }] }).length === 1
+    && buildNeedsYou({ ...base(), sites: [{ id: 's1', custom_domain: 'marigold.example', domain_expires_at: '2026-11-25' }] }).length === 0);
   ok('a monitor site never gets a publish row', buildNeedsYou({ ...base(), sites: [{ id: 's1', edition: 'monitor', last_published_at: null }], lastChange: { s1: NOW } }).length === 0);
 }
 

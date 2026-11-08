@@ -1073,7 +1073,7 @@ test.describe('agreement form — the studio’s standard contract (ask 4)', () 
 // so the page can never ask for something the API would refuse.
 const DEAL4 = '44444444-4444-4444-8444-444444444444';
 const DRAFTS = { data: {
-  deal: { id: DEAL4, title: 'Bacchus', stage: 'proposal', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  deal: { id: DEAL4, title: 'Larkspur', stage: 'proposal', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
   contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', notes: '' },
   proposals: [
     { id: 'p-dup', title: 'Website build', status: 'draft', version: 1, line_items: [{ label: 'Build', qty: 1, unit_cents: 320000 }], first_viewed_at: null, expires_at: null },
@@ -1165,8 +1165,8 @@ test.describe('deal page — remove an unsent draft', () => {
 // signature), and the form asks which package before it seeds anything.
 const DEAL5 = '55555555-5555-4555-8555-555555555555';
 const GROWTH_DEAL = { data: {
-  deal: { id: DEAL5, title: 'Bacchus website', stage: 'contract', expected_value_cents: 640000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
-  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Bacchus Wine Bar', notes: '' },
+  deal: { id: DEAL5, title: 'Larkspur website', stage: 'contract', expected_value_cents: 640000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Larkspur Wine Bar', notes: '' },
   proposals: [], contracts: [], events: [], timeline: [], invoices: [], last_contacted_at: null,
 } };
 const PKG_API = { ...API, [`/sales/deals/${DEAL5}`]: GROWTH_DEAL, [`/sales/deals/${DEAL5}/tasks`]: { data: [] } };
@@ -1202,7 +1202,7 @@ test.describe('agreement — one per package', () => {
     expect(text).toContain('Growth package, one time project fee                    $6,400');
     expect(text).toContain('Deposit due at signing, 50 percent                      $3,200');
     expect(text).toContain('Balance due at launch, 50 percent                       $3,200');
-    expect(text).toContain('Bacchus Wine Bar');                                  // {{client_company}}
+    expect(text).toContain('Larkspur Wine Bar');                                  // {{client_company}}
     expect(text.split('\n')[0]).toBe('TEST STUDIO');                             // one legal seller, still
     // the fill-in blanks survive into the box so he can complete them
     expect(text).toContain('[LIST THE FIVE CORE PAGES]');
@@ -1694,7 +1694,7 @@ test.describe('invoice — the Void control', () => {
 const RINV1 = 'ccccccc1-1111-4111-8111-cccccccccccc';   // sent — has a payment link
 const RINV2 = 'ccccccc2-2222-4222-8222-cccccccccccc';   // minted, never sent
 const RCV_ITEM1 = { id: RINV1, title: 'Deposit', amount_cents: 40000, due_date: null, overdue: false, deal_id: DEAL, deal: 'Foreign Code', stripe_url: 'https://pay.example/fc' };
-const RCV_ITEM2 = { id: RINV2, title: 'Deposit', amount_cents: 160000, due_date: null, overdue: false, deal_id: DEAL2, deal: 'Bacchus Kitchen + Wine Bar', stripe_url: null };
+const RCV_ITEM2 = { id: RINV2, title: 'Deposit', amount_cents: 160000, due_date: null, overdue: false, deal_id: DEAL2, deal: 'Larkspur Kitchen + Wine Bar', stripe_url: null };
 const summaryWithAr = (outstanding: number, count: number) => ({ data: {
   total: 2, open: { count: 2, value_cents: 750000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 },
   by_stage: [{ label: 'Proposal sent', count: 2, value_cents: 750000 }],
@@ -1718,7 +1718,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await openList(page);
     await expect(page.locator('#detailInner')).toContainText('Outstanding: $2,000');
     const sent = page.locator('.rcv-row').filter({ hasText: 'Foreign Code' });
-    const unsent = page.locator('.rcv-row').filter({ hasText: 'Bacchus Kitchen + Wine Bar' });
+    const unsent = page.locator('.rcv-row').filter({ hasText: 'Larkspur Kitchen + Wine Bar' });
     // The already-emailed invoice: Resend + Copy link + Void + Open deal.
     await expect(sent.locator(`[data-send-inv="${RINV1}"]`)).toHaveText('Resend');
     await expect(sent.locator('[data-copy-pay]')).toHaveAttribute('data-copy-pay', 'https://pay.example/fc');
@@ -1770,7 +1770,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     // The row leaves and the header total moves — the survivor stays put.
     await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toHaveCount(0);
     await expect(page.locator('#detailInner')).toContainText('Outstanding: $1,600');
-    await expect(page.locator('.rcv-row').filter({ hasText: 'Bacchus Kitchen + Wine Bar' })).toBeVisible();
+    await expect(page.locator('.rcv-row').filter({ hasText: 'Larkspur Kitchen + Wine Bar' })).toBeVisible();
   });
 
   test('voiding the last invoice leaves an honest empty state', async ({ page }) => {
@@ -1960,9 +1960,9 @@ test.describe('money in four states — the drawer rows and the "Who owes you" l
 // (?dtab=), and the openers that live outside the strip switch tab first.
 const WON_DEAL = '88888888-8888-4888-8888-888888888888';
 const WON_DETAIL = { data: {
-  deal: { id: WON_DEAL, title: 'Bacchus rebuild', stage: 'won', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-bacchus', created_project_id: null, retainer: null },
-  contact: { id: 'ct-1', name: 'Claud Beltran', email: 'claud@example.com', phone: '', company: 'Bacchus', notes: '' },
-  proposals: [], contracts: [{ id: 'k-w', title: 'Service agreement', status: 'signed', signer_name: 'Claud Beltran', signed_at: '2026-08-08T10:00:00.000Z', version: 1, terms_snapshot: { term_end: '2027-08-08' }, body: 'Agreed.' }],
+  deal: { id: WON_DEAL, title: 'Larkspur rebuild', stage: 'won', expected_value_cents: 320000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'ct-1', converted_client_id: 'c-larkspur', created_project_id: null, retainer: null },
+  contact: { id: 'ct-1', name: 'Jordan Ellis', email: 'jordan@example.com', phone: '', company: 'Larkspur', notes: '' },
+  proposals: [], contracts: [{ id: 'k-w', title: 'Service agreement', status: 'signed', signer_name: 'Jordan Ellis', signed_at: '2026-08-08T10:00:00.000Z', version: 1, terms_snapshot: { term_end: '2027-08-08' }, body: 'Agreed.' }],
   events: [], timeline: [{ at: '2026-08-08T10:00:00.000Z', text: 'Agreement signed', icon: '✍️' }, { at: '2026-08-01T10:00:00.000Z', text: 'Proposal sent', icon: '📄' }],
   invoices: [
     { id: 'inv-paid', title: 'Deposit', amount_cents: 160000, purpose: 'deposit', status: 'paid', stripe_url: 'https://pay.example/d', due_date: null, paid_at: '2026-08-08T12:00:00.000Z' },
@@ -2094,6 +2094,22 @@ test.describe('deal page — "Manage their access" carries the customer', () => 
     await page.locator('#convert').click();
     await page.locator('#convYes').click();
     await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
+  });
+
+  // Final pass (Nov 8, S1): the deal's email already has someone else's account →
+  // the server asks them instead of taking it; the page says so and can try again
+  test('an email that is someone else\'s account: the request is explained, nothing converts', async ({ page }) => {
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'needs_acceptance', message: 'They already have a Studio OS account, so we asked them to accept you. Convert again once they say yes.' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    await expect(page.locator('.dds-toast')).toContainText('so we asked them to accept you');
+    await expect(page.locator('#convYes')).toBeEnabled();
+    await expect(accessLink(page)).toHaveCount(0);
   });
 });
 

@@ -10,6 +10,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { verifyConnection, fetchExternalSite } from '../monitor/external.ts';
+import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
 import { assessMigrationReadiness } from '../monitor/readiness.ts';
 import { buildImportInventory } from '../platform/importer.ts';
 import type { ReadinessReport } from '../monitor/readiness.ts';
@@ -61,10 +62,13 @@ export async function handleMonitorConnect(req: Request, site: SiteRow, principa
   } catch { return json({ error: 'bad_url', message: 'A full website address is needed — like https://yourbusiness.com.' }, 400, cors); }
   const method = METHODS.includes(String(body?.method)) ? String(body?.method) : 'meta';
   const clean = `${url.protocol}//${url.host}/`;
+  // Item 71: only a public website is ever fetched (a private or internal address is refused)
+  try { await assertPublicHttpUrl(clean); }
+  catch { return json({ error: 'bad_url', message: 'That address isn’t a public website. Use the one people type to reach it, like https://yourbusiness.com.' }, 400, cors); }
 
-  // read-only look at the site: platform detection is a courtesy, not a gate
+  // read-only look at the homepage: platform detection is a courtesy, not a gate
   let platform = 'custom';
-  try { const ext = await fetchExternalSite(clean); if (ext) platform = ext.platform; } catch { /* detection optional */ }
+  try { const ext = await fetchExternalSite(clean, { homeOnly: true }); if (ext) platform = ext.platform; } catch { /* detection optional */ }
 
   const token = 'dds-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
   const w = await svc(`presence_monitor_connections?on_conflict=site_id&select=${CONN_SELECT}`, {

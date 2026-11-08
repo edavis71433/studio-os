@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
 
 // Sales review item 22, second half (Nov 2026): a customer leads with the
-// business and names the person — the deal said "Bacchus Kitchen" while the
-// customer said "Claud Beltran", and the two never met. (Fictional names here.)
+// business and names the person — the deal said "Larkspur Kitchen" while the
+// customer said "Jordan Ellis", and the two never met. (Fictional names here.)
 const CLIENT = '44444444-4444-4444-8444-444444444444';
 
 test('Customers: the business leads, the person sits under it, and search finds either', async ({ page }) => {

@@ -1,6 +1,6 @@
 // ── A customer's two names (sales review item 22, second half, Nov 2026) ─────
-// A customer is a business AND a person. The live review found "Bacchus
-// Kitchen" on the deal and "Claud Beltran" on the customer — the two never met,
+// A customer is a business AND a person. The live review found "Larkspur
+// Kitchen" on the deal and "Jordan Ellis" on the customer — the two never met,
 // because a customer converted from a deal is stored under the contact's name.
 // No new column: the business name already lives on the customer's own site
 // (presence_identity.business_name) or on their contact (company), and the
@@ -22,7 +22,7 @@ export function customerNames(p: CustomerNameParts): { name: string; business_na
   // Second walk (Nov 8, item 49): converting a deal set up the customer's site
   // under the PERSON's name, so on the live account the site's "business name"
   // is just the contact's name again — a copy, not a business. (Matching the
-  // customer's own name proves nothing: "Hettie Orange Designs" is both.)
+  // customer's own name proves nothing: "Fennel Street Designs" is both.)
   let site = t(p.siteBusinessName);
   if (site && cname && cname.toLowerCase() === site.toLowerCase()) site = '';
   const business = site || company;

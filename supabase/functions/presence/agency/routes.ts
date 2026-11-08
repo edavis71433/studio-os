@@ -41,6 +41,7 @@ import { crossOrgRollup, approvalQueue, crossClientSummary } from './orchestrate
 import type { PendingPlan } from './orchestrate.ts';
 import { resolveIndustryKey } from '../industry/registry.ts';
 import { loadCustomerNames } from '../lib/customer_names.ts';
+import { isCustomerOfStudio, claimPortfolioSite } from '../lib/connect_requests.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
@@ -202,10 +203,26 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if ((existing.json ?? []).length >= member.client_limit) {
       return json({ error: 'client_limit', message: `The plan covers ${member.client_limit} clients — the limit can grow with the plan.` }, 400, cors);
     }
-    const w = await svc(`presence_agency_clients?on_conflict=site_id&select=site_id,status,tags,owner_email`, {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify({ site_id: b.site_id, agency_id: member.agency_id, tags: Array.isArray(b.tags) ? b.tags.slice(0, 10) : [], owner_email: member.email }),
-    });
+    // Final pass (Nov 8, S1): this added ANY site id to the portfolio, overwriting
+    // the agency that managed it — site ids show on published pages and in reply
+    // addresses, so any studio could take over any business's site. Now: a site
+    // already in this portfolio (restored if archived), or one whose owner is
+    // already this studio's customer (they were set up here or accepted a request).
+    // Insert-only either way: another agency's site is never taken.
+    const siteId = String(b.site_id);
+    const mine = (existing.json ?? []).some((r: any) => String(r.site_id) === siteId);   // every status — an archived one comes back
+    if (!mine) {
+      const target = (await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`)).json?.[0];
+      const jwt = req.headers.get('x-dds-user-jwt') || '';
+      const own = await ownSiteOf(jwt, principal);
+      const ok = !!(target?.client_id && own?.id && await isCustomerOfStudio(own.id, String(target.client_id)));
+      if (!ok) return json({ error: 'not_your_customer', message: 'You can add a site once its owner is your customer — set them up from Customers, or send them a request there.' }, 409, cors);
+    }
+    const tags = Array.isArray(b.tags) ? b.tags.slice(0, 10).map((t: unknown) => String(t).slice(0, 40)) : [];
+    const claim = await claimPortfolioSite(member.agency_id, siteId, member.email, { reactivate: true, tags });
+    if (claim === 'owned_elsewhere') return json({ error: 'owned_elsewhere', message: 'Another studio looks after that site.' }, 409, cors);
+    if (claim === 'failed') return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+    const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&select=site_id,status,tags,owner_email&limit=1`);
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     return json({ data: { ...w.json[0], onboarding: onboardingChecklist() } }, 200, cors);
   }

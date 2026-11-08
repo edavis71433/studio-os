@@ -792,14 +792,14 @@ test.describe('Client record — editing and removing the contact', () => {
   const SITE = 'cccccccc-3333-4333-8333-cccccccccccc';
   const CONTACT_RECORD = { data: {
     identity: { contact_id: CID, deal_id: null, client_id: null, customer_site_id: null, project_id: null },
-    header: { name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', status: 'customer' },
+    header: { name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', status: 'customer' },
     highlights: {},
     sections: { overview: false, details: true, deal: false, delivery: false },
     default_tab: 'details',
     canonical: { key: 'contact', value: CID },
   } };
   const DETAIL = { data: {
-    contact: { id: CID, name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com', phone: '(626) 234-6081', custom: { referred_by: 'Walk-in' } },
+    contact: { id: CID, name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', custom: { referred_by: 'Walk-in' } },
     custom_fields: [{ key: 'referred_by', label: 'Referred by', type: 'text' }],
     deals: [], timeline: [], last_contacted_at: null,
   } };
@@ -815,16 +815,16 @@ test.describe('Client record — editing and removing the contact', () => {
     await page.goto(`/crm.html?contact=${CID}&tab=details`);
     await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
     await page.getByRole('button', { name: 'Edit' }).click();
-    await expect(page.locator('#ec-name')).toHaveValue('Claud Beltran');
+    await expect(page.locator('#ec-name')).toHaveValue('Jordan Ellis');
     // the custom field the Details card already displayed is now editable here
     await expect(page.locator('#eccf-referred_by')).toHaveValue('Walk-in');
-    await page.locator('#ec-phone').fill('(626) 234-6081 ext 2');
-    await page.locator('#eccf-referred_by').fill('Referred by Hettie');
+    await page.locator('#ec-phone').fill('(555) 010-2468 ext 2');
+    await page.locator('#eccf-referred_by').fill('Referred by Marigold');
     await page.locator('#ec-save').click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
     expect(patched).toEqual({
-      name: 'Claud Beltran', company: 'Bacchus Kitchen + Wine Bar', email: 'claud.beltran@gmail.com',
-      phone: '(626) 234-6081 ext 2', custom: { referred_by: 'Referred by Hettie' },
+      name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar', email: 'jordan.ellis@example.com',
+      phone: '(555) 010-2468 ext 2', custom: { referred_by: 'Referred by Marigold' },
     });
   });
 
@@ -836,11 +836,11 @@ test.describe('Client record — editing and removing the contact', () => {
       if (route.request().method() !== 'DELETE') return route.fallback();
       const confirmed = new URL(route.request().url()).searchParams.get('confirm') === '1';
       return confirmed
-        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, deleted: true, name: 'Claud Beltran', kept_items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'] } }) })
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, deleted: true, name: 'Jordan Ellis', kept_items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'] } }) })
         : route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({
-            error: 'has_history', name: 'Claud Beltran', has_history: true, converted: true,
+            error: 'has_history', name: 'Jordan Ellis', has_history: true, converted: true,
             items: ['1 deal', '1 signed agreement', '1 paid invoice', '1 project'],
-            message: 'Claud Beltran has 1 deal, 1 signed agreement, 1 paid invoice and 1 project. They became a customer. Removing them takes them off your contact list only — the deal, the agreement, the invoices and the project all stay exactly where they are, and nothing is deleted with them.',
+            message: 'Jordan Ellis has 1 deal, 1 signed agreement, 1 paid invoice and 1 project. They became a customer. Removing them takes them off your contact list only — the deal, the agreement, the invoices and the project all stay exactly where they are, and nothing is deleted with them.',
           }) });
     });
     await page.goto(`/crm.html?contact=${CID}&tab=details`);

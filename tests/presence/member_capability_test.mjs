@@ -200,7 +200,7 @@ const DECIDED = {
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
     'POST /crm/notes/:id/pin', 'POST /dev/brand-kit/apply', 'POST /notifications/read', 'POST /portal/members',
     'POST /portal/members/:id/revoke', 'POST /portal/shares', 'POST /threads/read', 'PUT /dev/brand-kit',
-    'PUT /dev/customization', 'PUT /site/template',
+    'PUT /dev/customization', 'PUT /site/template', 'POST /portal/studio-requests/:id/accept', 'POST /portal/studio-requests/:id/decline',
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -423,6 +423,7 @@ const WRITE_HANDLERS = [
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
+  'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

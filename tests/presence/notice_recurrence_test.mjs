@@ -305,7 +305,7 @@ const restore = () => { globalThis.fetch = realFetch; };
   const { calls, held } = installFake();
   // quiet since mid-June (dealNudgeDue reads updated_at); the site has the Oct 2026
   // "nudge me" switch ON (benchmark item 6 — default off, so the fixture opts in)
-  const stale = { id: DEAL, site_id: SITE, title: 'Bacchus website', stage: 'proposal', updated_at: '2026-06-20T09:00:00Z', next_step_at: null };
+  const stale = { id: DEAL, site_id: SITE, title: 'Larkspur website', stage: 'proposal', updated_at: '2026-06-20T09:00:00Z', next_step_at: null };
   const orig = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;

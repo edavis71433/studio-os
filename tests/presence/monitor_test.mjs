@@ -244,6 +244,25 @@ if (SB && SR && ANON) {
   console.log('      (SB/SR_KEY/ANON not set — staging integration tier skipped)');
 }
 
+// ═══ item 71: a watched website is fetched only at a public address, on every hop ═══
+{
+  const { fetchPublicPage } = await import('../../supabase/functions/presence/monitor/external.ts');
+  const { assertPublicHttpUrl } = await import('../../supabase/functions/_shared/tools/url_guard.ts');
+  const noDns = (u) => assertPublicHttpUrl(u, null);   // no resolver here: literal addresses and names only
+  const seen = [];
+  const fake = (u) => { seen.push(u); return Promise.resolve(u.includes('jump') ? new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } }) : new Response('<html>ok</html>', { status: 200 })); };
+  const refused = async (u) => { try { await fetchPublicPage(u, {}, noDns, fake); return false; } catch { return true; } };
+  ok('guard: the cloud metadata address is refused', await refused('http://169.254.169.254/'));
+  ok('guard: loopback, private and local addresses are refused', await refused('http://127.0.0.1/') && await refused('http://10.0.0.5/') && await refused('http://192.168.1.1/') && await refused('http://printer.local/') && await refused('http://[::1]/'));
+  seen.length = 0;
+  ok('guard: a public site redirecting to a private address is refused at the hop', await refused('https://example.com/jump') && seen.length === 1);
+  ok('guard: a public site is fetched', (await (await fetchPublicPage('https://example.com/', {}, noDns, fake)).text()) === '<html>ok</html>');
+  const routes = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/monitor.ts', import.meta.url));
+  ok('connect: the address is checked before any fetch, and only the homepage is read', routes.indexOf('await assertPublicHttpUrl(clean)') > 0 && routes.indexOf('await assertPublicHttpUrl(clean)') < routes.indexOf('fetchExternalSite(clean, { homeOnly: true })'));
+  const ext = Deno.readTextFileSync(new URL('../../supabase/functions/presence/monitor/external.ts', import.meta.url));
+  ok('guard: no bare fetch of a watched website is left', !/await fetch\(/.test(ext) && /fetcher: Fetcher = \(u, init\) => fetchPublicPage\(u, init\)/.test(ext));
+}
+
 const fails = results.filter((r) => !r.p);
 console.log(`\n════ PRESENCE MONITOR: ${results.length - fails.length}/${results.length} PASSED ════`);
 if (fails.length) Deno.exit(1);
