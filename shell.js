@@ -193,7 +193,19 @@
         + '.dds-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--p,#5b3fa0);border-radius:10px;background:var(--p-soft,#efe9fa);font-size:13.5px}'
         + '.dds-bulk b{margin-right:4px}.dds-bulk button,.dds-bulk select{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
         + '.dds-bulk .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}.dds-bulk .clr{border-color:transparent;background:none;color:var(--p,#5b3fa0)}'
-        + 'td.pick,th.pick{width:34px;padding-right:0!important}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}';
+        + 'td.pick,th.pick{width:34px;padding-right:0!important;cursor:pointer}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}'
+        // final pass (Nov 8, batch C): white on the dark theme's light purple read 2.3:1 — dark text on the filled buttons
+        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-ask button[value=ok],:root:not([data-theme="light"]) .dds-bulk .go,:root:not([data-theme="light"]) .dds-confirm .go{color:#171320}}'
+        + ':root[data-theme="dark"] .dds-ask button[value=ok],:root[data-theme="dark"] .dds-bulk .go,:root[data-theme="dark"] .dds-confirm .go{color:#171320}'
+        // …a confirm that asks in place, where the button was
+        + '.dds-confirm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.dds-confirm .q{font-weight:600}'
+        + '.dds-confirm button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
+        + '.dds-confirm .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}'
+        // …and on a phone every control here is at least 44px, the pick cell included
+        + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}}'
+        // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
+        + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
+        + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}';
       document.head.appendChild(st);
     }
     // ── saved views: GET/PUT /sales/views (one read per page) ──
@@ -217,8 +229,13 @@
         d.querySelector('label').textContent = o.label || 'Name';
         d.querySelector('button[value=ok]').textContent = o.ok || 'Save';
         var inp = d.querySelector('input'); inp.value = o.value || '';
-        var done = false;
-        function finish(v) { if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v); }
+        // batch C: focus goes back where it came from (it was left on <body>). Safari never
+        // focuses a clicked button, so a page names its button (o.back) rather than trusting it
+        var done = false, back = pickBack(o.back, document.activeElement);
+        function finish(v) {
+          if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v);
+          if (back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
+        }
         d.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value.trim(); if (!v) { inp.focus(); return; } finish(v); });
         d.querySelector('button[value=cancel]').addEventListener('click', function () { finish(null); });
         d.addEventListener('cancel', function (e) { e.preventDefault(); finish(null); });
@@ -234,7 +251,7 @@
       if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
       var m = document.createElement('div'); m.className = 'dds-colmenu'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', 'Columns to show');
       m.innerHTML = cols.map(function (c, i) { return '<label><input type="checkbox" data-col="' + esc2(c[0]) + '"' + (hidden.has(c[0]) ? '' : ' checked') + (i === 0 ? ' disabled' : '') + '> ' + esc2(c[1]) + '</label>'; }).join('');
-      host.appendChild(m); anchor.setAttribute('aria-expanded', 'true');
+      host.appendChild(m); anchor.setAttribute('aria-expanded', 'true'); fit(m);
       var first = m.querySelector('input:not([disabled])'); if (first) first.focus();
       m.addEventListener('change', function (e) {
         var k = e.target && e.target.getAttribute('data-col'); if (!k) return;
@@ -274,7 +291,11 @@
         + '<input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file"><div class="dds-csvprev"></div><p class="muted" style="margin:10px 0 0"><button type="button" class="linkbtn dds-csvx" style="font:inherit;color:var(--p,#5b3fa0);background:none;border:none;padding:0;cursor:pointer">Close</button></p></div>';
       host.querySelector('p').textContent = o.title; host.querySelectorAll('p')[1].textContent = o.help;
       var prev = host.querySelector('.dds-csvprev');
-      host.querySelector('.dds-csvx').addEventListener('click', function () { host.innerHTML = ''; });
+      var opener = pickBack(o.back, document.activeElement);   // batch C: closing the panel gives focus back (it was left on <body>)
+      host.querySelector('.dds-csvx').addEventListener('click', function () {
+        host.innerHTML = '';
+        if (opener && opener.isConnected && opener.focus) try { opener.focus(); } catch (_) { /* */ }
+      });
       host.querySelector('input[type=file]').addEventListener('change', function (e) {
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (text) {
@@ -301,7 +322,68 @@
         });
       });
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style };
+    // ── batch C (final pass, Nov 8) ──
+    // where focus goes back to: the button a page names (shown on screen), else whatever had focus —
+    // never <body> (Safari leaves a clicked button unfocused)
+    function pickBack(named, active) {
+      var n = typeof named === 'string' ? document.querySelector(named) : named;
+      if (n && n.getClientRects && n.getClientRects().length) return n;
+      return (active && active !== document.body && active !== document.documentElement) ? active : null;
+    }
+    // keep a dropdown on screen: on a phone the Columns and Views menus ran off the right edge
+    function fit(m) {
+      try {
+        m.style.transform = ''; var r = m.getBoundingClientRect(), vw = document.documentElement.clientWidth, pad = 8, dx = 0;
+        if (r.right > vw - pad) dx = (vw - pad) - r.right;
+        if (r.left + dx < pad) dx = pad - r.left;
+        if (dx) m.style.transform = 'translateX(' + Math.round(dx) + 'px)';
+      } catch (_) { /* */ }
+    }
+    // a confirm that asks in place: the button steps aside for "the question · [Yes, …] [Cancel]".
+    // The newer pages ask this way (never a pop-up). Focus lands on Cancel, the safe answer.
+    function confirmIn(anchor, o) {
+      style(); o = o || {};
+      return new Promise(function (resolve) {
+        if (!anchor || !anchor.parentNode) { resolve(false); return; }
+        var id = 'ddsCq' + Math.random().toString(36).slice(2, 8);
+        var box = document.createElement('span'); box.className = 'dds-confirm'; box.setAttribute('role', 'group'); box.setAttribute('aria-labelledby', id);
+        box.innerHTML = '<span class="q"></span><button type="button" class="go"></button><button type="button" class="no">Cancel</button>';
+        box.querySelector('.q').id = id; box.querySelector('.q').textContent = o.text || 'Are you sure?';
+        box.querySelector('.go').textContent = o.yes || 'Yes';
+        box.querySelector('.go').setAttribute('aria-describedby', id); box.querySelector('.no').setAttribute('aria-describedby', id);
+        anchor.hidden = true; anchor.parentNode.insertBefore(box, anchor.nextSibling);
+        var done = false;
+        function finish(v) {
+          if (done) return; done = true;
+          if (box.isConnected) box.remove();
+          anchor.hidden = false; resolve(v);
+          if (!v && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+        }
+        box.querySelector('.go').addEventListener('click', function () { finish(true); });
+        box.querySelector('.no').addEventListener('click', function () { finish(false); });
+        box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); finish(false); } });
+        box.querySelector('.no').focus();
+      });
+    }
+    // one polite announcer for the whole page ("3 selected")
+    function announce(text) {
+      style();
+      var n = document.getElementById('dds-sr-status');
+      if (!n) { n = document.createElement('div'); n.id = 'dds-sr-status'; n.className = 'dds-sr'; n.setAttribute('role', 'status'); n.setAttribute('aria-live', 'polite'); document.body.appendChild(n); }
+      n.textContent = ''; setTimeout(function () { n.textContent = String(text || ''); }, 30);
+    }
+    // whole-cell picking: the cell around a row's checkbox toggles it (17px was hard to hit on
+    // a phone), and the new count is announced — the pages' own change handlers do the rest
+    document.addEventListener('click', function (e) {
+      var t = e.target; if (!t || !t.closest) return;
+      var cell = t.closest('td.pick,th.pick'); if (!cell || t.closest('input')) return;
+      var box = cell.querySelector('input[type=checkbox]'); if (box && !box.disabled) box.click();
+    });
+    document.addEventListener('change', function (e) {
+      var t = e.target; if (!t || !t.matches || !t.matches('td.pick input[type=checkbox],th.pick input[type=checkbox]')) return;
+      setTimeout(function () { var b = document.querySelector('.dds-bulk b'); announce(b ? b.textContent : 'None selected'); }, 60);
+    });
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce };
   })();
 
   // ── DOM ──

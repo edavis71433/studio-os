@@ -375,7 +375,7 @@ const agHref=(page,params)=>'/'+page+'?'+params+'&client=';
 const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client=':h;};
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
-const fmtC=(c)=>'$'+Math.round((Number(c)||0)/100).toLocaleString();
+const fmtC=(c)=>{const v=(Number(c)||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});}   // batch C: one money format;
 const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)+'T12:00:00Z');if(isNaN(t))return'';return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 // ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
 // mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
@@ -534,7 +534,7 @@ function renderShell(){
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
   // visual refresh: an initials avatar instead of an emoji object tile
-  const initials=String(nm).split(/\s+/).map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase()||'?';
+  const initials=String(nm).split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole
   $('main').innerHTML=`
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
