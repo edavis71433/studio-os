@@ -245,21 +245,24 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#btnPublish')).toHaveText('Publish');
   });
 
-  test('overview: the to-do line opens Setup progress from first-run', async ({ page }) => {
-    await installApp(page, { api: BOARD_API });
+  test('overview: the to-do line opens the welcome list, worked out from the site itself', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, '/settings': { data: { ...BOARD_API['/settings'].data, industry_key: 'restaurant' } } } });
     await page.goto('/presence.html');
+    await expect(page.locator('#ssTodo')).toContainText('Set up your site · 1 of 8');
     await page.locator('#ssTodo').click();
     const setup = page.locator('#setupCard');
     await expect(setup).toBeVisible();
-    await expect(setup.locator('.meta')).toHaveText('3 of 5 done');
-    await expect(setup.locator('.hb-progress')).toHaveAttribute('aria-valuenow', '3');
-    await expect(setup.locator('.hb-task.done')).toHaveCount(3);
-    await expect(setup.locator('button.hb-task')).toHaveCount(2);
-    await expect(setup.locator('button.hb-task').first().locator('span.t span')).toHaveText('Shows your hours on Google Maps');
+    await expect(setup.locator('.meta')).toHaveText('1 of 8 done');
+    await expect(setup.locator('.hb-progress')).toHaveAttribute('aria-valuenow', '1');
+    await expect(setup.locator('.hb-task.done')).toHaveCount(1);
+    await expect(setup.locator('.hb-task.done')).toContainText('Connect your web address');   // the site's own domain
+    await expect(setup.locator('button.hb-task')).toHaveCount(7);
+    await expect(setup.locator('[data-step="offerings"]')).toContainText('Add your menu');   // a restaurant's word for it
+    await expect(setup.locator('[data-step="hours"] span.t span')).toHaveText('Shown on your site, so nobody turns up to a locked door.');
   });
 
-  test('overview: a dismissed or complete setup has no to-do line; a first-run step routes to its editor', async ({ page }) => {
-    await installApp(page, { api: { ...BOARD_API, '/commerce/first-run': { data: { ...BOARD_API['/commerce/first-run'].data, complete: true } } } });
+  test('overview: a hidden setup has no to-do line; a step routes to its editor', async ({ page }) => {
+    await installApp(page, { api: { ...BOARD_API, '/commerce/first-run': { data: { ...BOARD_API['/commerce/first-run'].data, dismissed: true } } } });
     await page.goto('/presence.html');
     await expect(page.locator('#siteStage')).toBeVisible();
     await page.waitForTimeout(400);
@@ -267,8 +270,8 @@ test.describe('CMS workspace', () => {
     await installApp(page, { api: BOARD_API });
     await page.goto('/presence.html');
     await page.locator('#ssTodo').click();
-    await page.locator('#setupCard button.hb-task', { hasText: 'Add Google Business Profile' }).click();
-    await expect(page.locator('#view-search')).toBeVisible();   // Google connections live on Search
+    await page.locator('#setupCard [data-step="offerings"]').click();
+    await expect(page.locator('#view-offerings')).toBeVisible();
     await expect(page.locator('#todoPanel')).toBeHidden();
   });
 

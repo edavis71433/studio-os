@@ -51,12 +51,17 @@ test.describe('a client view shows the client', () => {
   const FIRST = { '/commerce/first-run': { data: { dismissed: false, complete: false, done: 0, total: 1, steps: [{ key: 'details', title: 'Add your business details', done: false }] } } };
 
   test('the studio’s own notices and checklist stay out of ?client=', async ({ page }) => {
+    const asked: string[] = [];
+    page.on('request', (r) => { if (r.url().includes('/commerce/first-run')) asked.push(r.url()); });
     await installApp(page, { api: { ...API, ...FIRST_RUN_HEALTH, ...NOTICE, ...FIRST } });
     await page.goto('/presence.html?client=c1');
     await expect(page.locator('#view-today')).toBeVisible();
     await page.waitForTimeout(400);
     await expect(page.getByText('ready to convert Someone Else')).toHaveCount(0);
-    await expect(page.locator('#setupCard')).toBeHidden();
+    // the list a client view shows is the client's own, worked out from their site
+    await expect(page.getByText('Add your business details')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Hide this list' })).toHaveCount(0);
+    expect(asked).toEqual([]);
   });
 
   test('a sales alert stays off the website page: it belongs to the bell, Home and Pipeline', async ({ page }) => {

@@ -143,6 +143,19 @@ html.site-home .content{padding:var(--dds-s3,12px);max-width:none}
 .todo-body{padding:var(--dds-s4,16px);display:flex;flex-direction:column;gap:var(--dds-s3,12px)}
 .todo-body .hb-card h2{font-size:14px;margin:0 0 6px}
 .todo-body .pillbtn{margin-top:var(--dds-s3,12px)}
+/* the site's status at the top of the welcome panel: a badge, the address, one button */
+.ts-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ts-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--hair-2);color:var(--ink-2)}
+.ts-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.ts-badge.public{background:var(--sage-soft);border-color:transparent;color:var(--sage)}
+.ts-badge.off{background:var(--amber-soft);border-color:transparent;color:var(--amber)}
+.ts-url{font-size:13px;color:var(--plum);text-decoration:none;overflow-wrap:anywhere}
+.ts-url:hover{text-decoration:underline}
+#siteStatusCard .note{margin-top:6px;color:var(--ink-3);font-size:12.5px}
+/* a step that just got done ticks itself */
+@keyframes hbTick{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.hb-task.just .cb{animation:hbTick .45s var(--ease,ease-out)}
+@media (prefers-reduced-motion:reduce){.hb-task.just .cb{animation:none}}
 @media(min-width:761px){html.site-home #todoPanel{top:0}}
 .navitem[hidden]{display:none !important}
 .ss-todo[hidden]{display:none}
@@ -1251,9 +1264,10 @@ body.pd-dragging *{cursor:grabbing !important}
             <span class="go">Show me</span>
           </button>
         </div>
-        <aside id="todoPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="What’s left" aria-hidden="true">
-          <div class="dc-panel-head"><span class="dc-panel-t">What’s left</span><button type="button" class="dc-actbtn" id="btnTodoClose">Done</button></div>
+        <aside id="todoPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="Your site" aria-hidden="true">
+          <div class="dc-panel-head"><span class="dc-panel-t">Your site</span><button type="button" class="dc-actbtn" id="btnTodoClose">Done</button></div>
           <div class="dc-panel-scroll todo-body">
+            <div class="hb-card" id="siteStatusCard" hidden></div>
             <div class="hb-card" id="todoBlockers" hidden></div>
             <div class="hb-card" id="setupCard" hidden></div>
           </div>
@@ -4949,10 +4963,11 @@ function renderStageStatus() {
   st.classList.toggle("live", !!live);
 }
 // One line for what's left before the site can go live. Nothing to finish, no line.
-let SETUP_LEFT = 0;
+let SETUP_LEFT = 0, SETUP_TOTAL = 0;
 function renderTodoLine() {
   const b = $("ssTodo"), t = $("ssTodoText"); if (!b || !t) return;
   if (S.site && S.site.edition === "monitor") { b.hidden = true; return; }
+  renderSetup();
   const blockers = Number((S.changes || {}).blockers || 0);
   const box = $("todoBlockers");
   if (box) {
@@ -4965,10 +4980,10 @@ function renderTodoLine() {
     }
   }
   if (blockers) t.textContent = `${blockers} thing${blockers === 1 ? "" : "s"} to finish before you can go live`;
-  else if (SETUP_LEFT) t.textContent = `${SETUP_LEFT} setup step${SETUP_LEFT === 1 ? "" : "s"} left`;
+  else if (SETUP_LEFT) t.textContent = `Set up your site · ${SETUP_TOTAL - SETUP_LEFT} of ${SETUP_TOTAL}`;
   b.hidden = !(blockers || SETUP_LEFT);
 }
-function openTodoPanel() { const p = $("todoPanel"); if (p) { p.classList.add("on"); p.setAttribute("aria-hidden", "false"); const c = $("btnTodoClose"); if (c) c.focus(); } }
+function openTodoPanel() { const p = $("todoPanel"); if (p) { p.classList.add("on"); renderTodoLine(); renderSiteStatus(); refreshSiteStatus(); p.setAttribute("aria-hidden", "false"); const c = $("btnTodoClose"); if (c) c.focus(); } }
 function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.contains("on")) { p.classList.remove("on"); p.setAttribute("aria-hidden", "true"); } }
 // Tabs open on their title. What a tab is for sits behind one small help button.
 (function initTabHelp() {
@@ -5692,6 +5707,8 @@ async function pollPublish(n, firstPublish) {
 function showReceipt(firstPublish) {
   const count = S.changes ? S.changes.count : 0;
   const now = new Date();
+  if (S.site) S.site.last_published_at = now.toISOString();   // the welcome list's last step and the status badge read this
+  S.previewStatus = null;
   const name = (S.identity && S.identity.business_name) || "Your business";
   const forClient = scopedClientName();
   $("ritTitle").textContent = ""; $("ritSub").textContent = ""; $("ritBlockers").innerHTML = "";
@@ -6578,6 +6595,7 @@ async function refreshAll() {
   // website + drafting surfaces, never the Business-OS "brains" it doesn't include.
   // null = no entitlement recorded → all features (studio_os default, unchanged).
   S.features = (ctxR && ctxR.data && ctxR.data.edition_features) || null;
+  S.ctx = (ctxR && ctxR.data) || null;
   S.isStudio = !!(ctxR && ctxR.data && ctxR.data.is_agency);   // the studio sees every version tool; a client sees the list
   document.documentElement.classList.toggle("is-studio", S.isStudio);
   applyEditionGating();
@@ -12859,52 +12877,151 @@ async function renderPlanNotice() {
   host.insertBefore(card, host.firstChild);
 }
 
-// ── L1: first-run welcome — a calm checklist, dismissible, nothing overwhelming ──
-async function renderFirstRun() {
+// ── The welcome list: "Set up your site", eight steps that tick themselves ──
+// Worked out here from what the builder already has (the business details, the
+// settings, the offerings), so it needs no read of its own, ticks the moment a save
+// lands (every save refreshes the to-do line), and shows for a client's site too.
+// Only hiding the list is the owner's own: the server keeps that, and refuses it
+// under a client view.
+let SETUP_DISMISSED = null;   // null until the owner's hide is read; a client view never reads it
+let SETUP_SEEN = null;        // the steps done when the owner last saw the list, so one done since ticks in front of them
+function setupScoped() { return !!new URLSearchParams(location.search).get("client"); }
+function setupSteps() {
+  const idn = S.identity || {}, loc = S.location || {}, set = S.settings || {}, site = S.site || {};
+  const live = S.previewStatus && S.previewStatus.live;
+  const has = (v) => !!String(v == null ? "" : v).trim();
+  const field = (id) => () => {
+    go("business");
+    const n = $(id); if (!n) return;
+    n.scrollIntoView({ block: "center" });
+    const f = n.matches("input,textarea,select") ? n : (n.querySelector("input:not([disabled])") || n.querySelector("input"));
+    if (f) f.focus({ preventScroll: true });
+  };
+  const words = (typeof vocabWords === "function" ? vocabWords() : VOCAB) || OFFER_WORDS.generic;
+  return [
+    { key: "details", title: "Add your business name and how to reach you", hint: "A phone number or an email, so customers can get in touch.",
+      done: has(idn.business_name) && (has(idn.phone) || has(idn.email)), go: field(has(idn.business_name) ? "f-phone" : "f-business_name") },
+    { key: "address", title: "Say where to find you", hint: "Your street address, or the area you serve.",
+      done: has(loc.address_line1) || has(loc.city) || has(idn.service_area), go: field("f-address_line1") },
+    { key: "hours", title: "Add your opening hours", hint: "Shown on your site, so nobody turns up to a locked door.",
+      done: Array.isArray(loc.hours) && loc.hours.some((d) => d && !d.closed && Array.isArray(d.intervals) && d.intervals.length > 0), go: field("hoursGrid") },
+    { key: "offerings", title: "Add your " + String(words.label || "services").toLowerCase(), hint: "What you offer, with prices if you like.",
+      done: (S.offerings || []).length > 0, go: () => go("offerings") },
+    { key: "logo", title: "Add your logo", hint: "In Files, upload it, then choose Set as logo.",
+      done: !!set.logo_media_id, go: () => go("media") },
+    { key: "picture", title: "Choose a welcome picture", hint: "The big photo at the top of your home page. In Files, choose Set as hero image.",
+      done: !!set.cover_media_id, go: () => go("media") },
+    { key: "domain", title: "Connect your web address", hint: "A name you own, like yourbusiness.com.",
+      done: has(site.custom_domain) || !!(typeof HB_DOMAIN !== "undefined" && HB_DOMAIN && HB_DOMAIN.custom_domain), go: () => openFoundationsDesk({ domain: true }) },
+    { key: "publish", title: "Publish your website", hint: "Check every change, then put it live.",
+      done: !!(site.last_published_at || (live && live.published)), go: () => openRitual() },
+  ];
+}
+// Draws the list into the panel and sets SETUP_LEFT for the to-do line. Hidden on a
+// monitored site (nothing here to build), on the studio's own practice site, and
+// once the owner hides it or every step is done.
+function renderSetup() {
   const wrap = $("setupCard");
-  if (!wrap) return;
-  // A studio's own site is a practice site: nobody is waiting on its setup steps.
-  const ctx0 = window.__ddsContext;
-  if (ctx0 && ctx0.is_agency && !(ctx0.scope && ctx0.scope.name) && !new URLSearchParams(location.search).get("client")) { wrap.hidden = true; SETUP_LEFT = 0; renderTodoLine(); return; }
-  let fr;
-  try { const r = await api("GET", "/commerce/first-run"); fr = r.data; }
-  catch (_) { return; }
-  if (!fr || fr.dismissed || fr.complete || !Array.isArray(fr.steps) || !fr.steps.length) { wrap.hidden = true; wrap.innerHTML = ""; SETUP_LEFT = 0; renderTodoLine(); return; }
-  SETUP_LEFT = Math.max(0, (fr.total || 0) - (fr.done || 0)); renderTodoLine();
-  wrap.innerHTML = ""; wrap.hidden = false;
+  const off = () => { SETUP_LEFT = 0; SETUP_TOTAL = 0; if (wrap) { wrap.hidden = true; wrap.textContent = ""; } };
+  if (!wrap || !S.site || S.site.edition === "monitor") return off();
+  const scoped = setupScoped();
+  const ctx0 = window.__ddsContext || S.ctx;
+  if (!scoped && ctx0 && ctx0.is_agency && !(ctx0.scope && ctx0.scope.name)) return off();   // a studio's own site is a practice site
+  if (!scoped && SETUP_DISMISSED !== false) return off();   // hidden by the owner, or not known yet
+  const steps = setupSteps();
+  const done = steps.filter((x) => x.done).length, total = steps.length;
+  const doneNow = new Set(steps.filter((x) => x.done).map((x) => x.key));
+  if (!SETUP_SEEN) SETUP_SEEN = doneNow;   // done before the page opened: nothing to tick
+  const seen = SETUP_SEEN;
+  const panel = $("todoPanel"); if (panel && panel.classList.contains("on")) SETUP_SEEN = doneNow;
+  SETUP_LEFT = total - done; SETUP_TOTAL = total;
+  if (!SETUP_LEFT) { wrap.hidden = true; wrap.textContent = ""; return; }
+  wrap.textContent = ""; wrap.hidden = false;
   const head = el("div", "hb-card-h");
-  head.appendChild(el("h2", null, "Setup"));
-  head.appendChild(el("span", "meta", `${fr.done} of ${fr.total} done`));
+  head.appendChild(el("h2", null, "Set up your site"));
+  head.appendChild(el("span", "meta", `${done} of ${total} done`));
   wrap.appendChild(head);
-  const bar = el("div", "hb-progress"); const fill = el("i"); fill.style.width = (fr.total ? Math.round(100 * fr.done / fr.total) : 0) + "%"; bar.appendChild(fill);
-  bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", String(fr.total)); bar.setAttribute("aria-valuenow", String(fr.done)); bar.setAttribute("aria-label", "Setup progress");
+  const bar = el("div", "hb-progress"); const fill = el("i"); fill.style.width = Math.round(100 * done / total) + "%"; bar.appendChild(fill);
+  bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", String(total)); bar.setAttribute("aria-valuenow", String(done)); bar.setAttribute("aria-label", "Setup progress");
   wrap.appendChild(bar);
   const tasks = el("div", "hb-tasks");
-  const viewFor = { details: "business", brand: "business", connect: "search", observe: "search" };
-  for (const s of (fr.steps || [])) {
-    const row = el(s.done ? "div" : "button", "hb-task" + (s.done ? " done" : ""));
-    if (!s.done) row.type = "button";
-    row.appendChild(el("span", "cb", s.done ? "✓" : ""));
-    const t = el("span", "t"); t.appendChild(el("b", null, s.title));
-    if (!s.done && s.hint) t.appendChild(el("span", null, s.hint));
+  for (const st of steps) {
+    const row = el(st.done ? "div" : "button", "hb-task" + (st.done ? " done" : "") + (st.done && !seen.has(st.key) ? " just" : ""));
+    row.dataset.step = st.key;
+    if (!st.done) row.type = "button";
+    row.appendChild(el("span", "cb", st.done ? "✓" : ""));
+    const t = el("span", "t"); t.appendChild(el("b", null, st.title));
+    if (!st.done) t.appendChild(el("span", null, st.hint));
     row.appendChild(t);
-    if (!s.done) {
-      row.addEventListener("click", () => {
-        if (s.key === "publish") { openRitual(); return; }
-        if (s.key === "domain") { openFoundationsDesk({ domain: true }); return; }   // was Business info — the step's job is the domain
-        const v = viewFor[s.key];
-        if (v && typeof go === "function") go(v);
-      });
-    }
+    if (!st.done) row.addEventListener("click", () => { closeTodoPanel(); st.go(); });
     tasks.appendChild(row);
   }
   wrap.appendChild(tasks);
-  const dismiss = el("button", "quietact", "Dismiss"); dismiss.type = "button"; dismiss.style.marginTop = "8px";
-  dismiss.addEventListener("click", async () => {
-    try { await api("POST", "/commerce/first-run/dismiss"); } catch (_) {}
-    wrap.hidden = true; wrap.innerHTML = "";
-  });
-  wrap.appendChild(dismiss);
+  if (!scoped) {
+    const hide = el("button", "quietact", "Hide this list"); hide.type = "button"; hide.style.marginTop = "8px";
+    hide.addEventListener("click", async () => {
+      SETUP_DISMISSED = true; renderTodoLine();
+      try { await api("POST", "/commerce/first-run/dismiss"); } catch (_) {}
+    });
+    wrap.appendChild(hide);
+  }
+}
+// The owner's own list: read whether they hid it. A client view never asks (the
+// server refuses the route under a scope) and shows the client's list as it stands.
+async function renderFirstRun() {
+  if (setupScoped()) return;
+  try { const r = await api("GET", "/commerce/first-run"); SETUP_DISMISSED = !!(r.data && r.data.dismissed); }
+  catch (_) { return; }   // unknown stays hidden: better no list than one the owner already hid
+  renderTodoLine();
+}
+// ── The site's status, at the top of the panel: Public, Private or Offline, the
+// address, and the one button that fits: Publish, Take offline, or Bring back online.
+function renderSiteStatus() {
+  const box = $("siteStatusCard"); if (!box) return;
+  if (!S.site || S.site.edition === "monitor") { box.hidden = true; return; }
+  const live = S.previewStatus && S.previewStatus.live;
+  const published = !!((live && live.published) || S.site.last_published_at);
+  const offline = !!(published && live && live.offline_since);
+  const url = siteLiveUrl();
+  box.textContent = ""; box.hidden = false;
+  const row = el("div", "ts-row");
+  const badge = el("span", "ts-badge " + (offline ? "off" : published ? "public" : "private"), offline ? "Offline" : published ? "Public" : "Private");
+  badge.id = "siteStatusBadge";
+  row.appendChild(badge);
+  if (published && !offline && url) {
+    const a = el("a", "ts-url", url.replace(/^https?:\/\//, "")); a.href = url; a.target = "_blank"; a.rel = "noopener";
+    row.appendChild(a);
+  }
+  box.appendChild(row);
+  box.appendChild(el("div", "note", offline
+    ? "Visitors see a short “temporarily offline” page. Nothing was deleted."
+    : published ? "Anyone can visit your site." : "Only you can see it. It goes public when you publish."));
+  let btn;
+  if (!published) {
+    btn = el("button", "pillbtn inked", "Publish");
+    btn.addEventListener("click", () => { closeTodoPanel(); openRitual(); });
+  } else if (offline) {
+    btn = el("button", "pillbtn inked", "Bring back online"); btn.dataset.needs = "configure";
+    btn.addEventListener("click", async () => { btn.disabled = true; await siteBringOnline(); refreshSiteStatus(true); });
+  } else {
+    btn = el("button", "pillbtn", "Take offline…"); btn.dataset.needs = "configure";
+    btn.addEventListener("click", async () => { await siteTakeOffline(); refreshSiteStatus(true); });
+  }
+  btn.type = "button"; btn.id = "siteStatusBtn";
+  box.appendChild(btn);
+}
+// Whether the live site is offline comes from the same read the Page menu uses;
+// a site never published has nothing to ask about.
+let SITE_STATUS_ASKING = false;
+function refreshSiteStatus(force) {
+  if (SITE_STATUS_ASKING || !S.site || S.site.edition === "monitor") return;
+  if (!force && S.previewStatus) return;
+  if (!force && !S.site.last_published_at) return;
+  SITE_STATUS_ASKING = true;
+  api("GET", "/preview/status")
+    .then((r) => { S.previewStatus = r.data || null; renderSiteStatus(); renderTodoLine(); })
+    .catch(() => {})
+    .finally(() => { SITE_STATUS_ASKING = false; });
 }
 
 (async function boot() {

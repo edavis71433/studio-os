@@ -78,7 +78,11 @@ test.describe('Commerce in a client drill-in', () => {
     }));
     await page.goto(`/presence.html?client=${CLIENT}`);
     await expect(page.locator('h1#siteTitle')).toHaveText('Joe’s Plumbing');
-    await expect(page.locator('#setupCard')).toBeHidden();
+    // the client's own setup list, from the client's site: the owner's hide is theirs alone
+    await expect(page.locator('#ssTodo')).toContainText('Set up your site · 0 of 8');
+    await page.locator('#ssTodo').click();
+    await expect(page.locator('#setupCard')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hide this list' })).toHaveCount(0);
     await expect(page.locator('#billingCard')).toHaveCount(0);
     await expect(page.locator('#deleteCard')).toHaveCount(0);
     expect(asked).toEqual([]);
