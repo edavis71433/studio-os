@@ -145,7 +145,9 @@ ok('the feed reads enough notices for the list (30, not 10)', /presence_plan_not
 const shell = read('shell.js');
 ok('the bell\'s Needs-you tab lists the same rows at studio level', /studioLevel \? api\('\/agency\/needs-you'\)/.test(shell) && /function studioBellRows\(d, ny\)/.test(shell));
 const today = read('today.html');
-ok('a studio account at studio level is sent to the one Home', /c0 && c0\.is_agency && !\(c0\.scope && c0\.scope\.site_id\) && !new URLSearchParams\(location\.search\)\.get\('client'\)\)\{ location\.replace\('\/agency\.html'\)/.test(today));
+// Item 86 (Nov 8 2026): the move Home happens when the context lands, not after Today's reads.
+ok('a studio account at studio level is sent to the one Home', /const studioHome = \(c\)=>!!\(c && c\.is_agency && !\(c\.scope && c\.scope\.site_id\) && !new URLSearchParams\(location\.search\)\.get\('client'\)\)/.test(today)
+  && /ctxRead\.then\(\(c\)=>\{[\s\S]{0,240}?if\(yes\) location\.replace\('\/agency\.html'\)/.test(today) && /if\(studioHome\(c0\)\) return;/.test(today));
 const inbox = read('inbox.html');
 ok('the Inbox counts conversations in its own words', /\$\{need\} waiting for a reply · Sorted by newest/.test(inbox) && !/need\$\{need===1\?'s':''\} you/.test(inbox));
 const comp = read('supabase/functions/presence/analytics/compose.ts');

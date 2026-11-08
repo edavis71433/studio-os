@@ -2640,10 +2640,12 @@ async function load(){
   // honor a deep link once, then drop it from the URL so any later re-load
   // (e.g. after approving something) lands on Home instead of re-opening it.
   if(dsup||deep||paidId||params.get('connect')){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
-  const ctx=await api('/portal/context');
+  // Item 86: the context, the projects and the feed go out together, then a client's
+  // notifications and Google ask together. Each used to wait for the one before: five round
+  // trips before Home could paint, on a phone connection too.
+  const [ctx,proj,feed]=await Promise.all([api('/portal/context'),api('/client/projects').catch(()=>null),api('/portal/feed')]);
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
-  const proj=await api('/client/projects').catch(()=>null);
   const projects=(proj&&proj.ok&&proj.body.data)||[];
   // A plain OWNER (full workspace, NOT a managed client, no delivery) — the full
   // workspace lives elsewhere. No client tabs.
@@ -2659,19 +2661,22 @@ async function load(){
   // the glance/needs-you queue treat it as a failed source. A reviewer's 403
   // here is the CONTRACT (no projects of their own), not a failure — calm.
   PORTAL.projectsFailed=PORTAL.persona==='client'&&!(proj&&proj.ok);
-  const feed=await api('/portal/feed'); PORTAL.feed=(feed.ok&&feed.body.data)||{};
+  PORTAL.feed=(feed.ok&&feed.body.data)||{};
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   // PS3: the boot notifications GET is persona-gated — a reviewer's /client/*
   // 403 is contract (reviewerAllowed); their bell boots calm with ZERO fetches.
-  const n=PORTAL.persona==='client'?await api('/client/notifications').catch(()=>null):null; const nb=(n&&n.body)||{};
+  const [n,a]=PORTAL.persona==='client'?await Promise.all([
+    api('/client/notifications').catch(()=>null),
+    api('/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'')).catch(()=>null),   // the studio's ask to connect Google, never a blocker
+  ]):[null,null];
+  const nb=(n&&n.body)||{};
   PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok);   // …nor a failed notifications read as zero messages — but a reviewer's 403 here is the CONTRACT (reviewerAllowed), not a failure: their bell stays calm
   PORTAL.notifs=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
   PORTAL.unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
   // the studio's ask to connect Google — a client persona only; never a blocker
   PORTAL.ask=null;
-  if(PORTAL.persona==='client'){const a=await api('/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'')).catch(()=>null);
-    if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
-    else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);}
+  if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
+  else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);
   PORTAL.ready=true;
   showNav();
   // deep links open the relevant drill-down; the nav stays visible around it.
