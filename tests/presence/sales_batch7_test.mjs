@@ -85,7 +85,7 @@ ok('a failed read marks its report unavailable, never a false zero', /revenue: f
 ok('overdue reads the same receivables as Who owes you', /loadReceivables\(site\)\.catch/.test(sales));
 const an = read('analytics.html');
 ok('both Analytics views carry the reports; never inside a client', /const reportsShell=\(\)=>scope\(\)\?'':/.test(an) && (an.match(/reportsShell\(\)/g) || []).length === 2);
-ok('printing a report prints only that report', /body\[data-print="report"\] \*\{visibility:hidden!important\}/.test(an) && /document\.body\.setAttribute\('data-print','report'\)/.test(an));
+ok('printing a report prints only that report', /body\[data-print="report"\] \*\{visibility:hidden!important;transition:none!important\}/.test(an) && /document\.body\.setAttribute\('data-print','report'\)/.test(an));
 const pipe = read('pipeline.html');
 const mirror = (pipe.match(/const LOST_REASONS=\[([^\]]+)\]/) || [])[1];
 eq('the deal page offers the same reasons the report groups by', mirror && JSON.parse('[' + mirror.replace(/'/g, '"') + ']'), R.LOST_REASONS);
