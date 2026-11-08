@@ -264,9 +264,10 @@ test.describe('Closing the account lives on Settings', () => {
   });
 });
 
-// ── Three switches, not a workflow builder (benchmark 2026-10, item 6) ────────
+// ── Four switches, not a workflow builder (benchmark 2026-10, item 6) ─────────
 // Acknowledge new enquiries · remind unpaid invoices −7/due/+N · nudge me on a
-// quiet deal — each default off, each showing the exact sentence it sends, each
+// quiet deal · ask for a review N days after a project is done (list item 29) —
+// each default off, each showing the exact sentence it sends, each
 // saving itself to /settings the moment it is flipped. Plus the per-stage
 // "stale after" (item 13). The studio's own; never shown while scoped.
 test.describe('Settings — automations', () => {
@@ -285,18 +286,33 @@ test.describe('Settings — automations', () => {
     return out;
   };
 
-  test('the card opens the section: three switches, all off by default, each with the sentence it will send', async ({ page }) => {
+  test('the card opens the section: four switches, all off by default, each with the sentence it will send', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/settings.html');
     await page.locator('[data-card="auto"]').click();
     await expect(page.locator('#automations')).toBeVisible();
-    await expect(page.locator('#automations [role="switch"]')).toHaveCount(3);
-    for (const id of ['sw-ack', 'sw-inv', 'sw-deal']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#automations [role="switch"]')).toHaveCount(4);
+    for (const id of ['sw-ack', 'sw-inv', 'sw-deal', 'sw-rev']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
     await expect(page.locator('#say-ack')).toHaveText('Thanks for getting in touch — we’ve got your message and will reply within one business day.');
     await expect(page.locator('#say-inv')).toContainText('Just a friendly nudge: the invoice for $1,250.00 is still open.');
     await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 3 days — a quick follow-up keeps it moving.');
     await expect(page.locator('#n-inv')).toHaveValue('2');
     await expect(page.locator('#n-deal')).toHaveValue('3');
+    await expect(page.locator('#say-rev')).toContainText('If you have a moment, we’d love a quick review — it really helps.');
+    await expect(page.locator('#n-rev')).toHaveValue('3');
+  });
+
+  test('the review switch: flipping it and changing its days each save just that field', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/settings': { data: { ...SAVED, review_requests: false, review_request_after_days: 3 } } } });
+    const sent = await puts(page, { ...SAVED, review_requests: false, review_request_after_days: 3 });
+    await page.goto('/settings.html#automations');
+    await expect(page.locator('#sw-rev')).toHaveAttribute('aria-checked', 'false');
+    await page.locator('#sw-rev').click();
+    await expect(page.locator('#sw-rev')).toHaveAttribute('aria-checked', 'true');
+    await page.locator('#n-rev').fill('5');
+    await expect(page.locator('#n-rev-echo')).toHaveText('5');
+    await page.locator('#n-rev').press('Tab');
+    await expect.poll(() => sent.map((p) => p.body)).toEqual([{ review_requests: true }, { review_request_after_days: 5 }]);
   });
 
   test('a saved row paints on; flipping a switch PUTs just that field and the sentence follows N', async ({ page }) => {

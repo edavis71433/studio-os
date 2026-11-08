@@ -106,7 +106,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('settings.html: the nudge preview is the lifecycle sentence', settings.includes(`<span id="say-deal">${dealNudgeCopy('qualified', 3)}</span>`));
   const invLine = invoiceReminderCopy('after', 'invoice', '$1,250.00', '').line.replace(/<\/?strong>/g, '').replace(/'/g, '’');
   ok('settings.html: the invoice preview is the lifecycle sentence', settings.includes(`<span id="say-inv">${invLine}</span>`), invLine);
-  ok('settings.html: three switches, default off, each writes /settings', (settings.match(/role="switch"/g) || []).length === 3 && /flip\('sw-ack', 'auto_ack_enquiries'\)/.test(settings) && /flip\('sw-inv', 'invoice_reminders'\)/.test(settings) && /flip\('sw-deal', 'deal_nudges'\)/.test(settings));
+  ok('settings.html: four switches, default off, each writes /settings', (settings.match(/role="switch"/g) || []).length === 4 && /flip\('sw-ack', 'auto_ack_enquiries'\)/.test(settings) && /flip\('sw-inv', 'invoice_reminders'\)/.test(settings) && /flip\('sw-deal', 'deal_nudges'\)/.test(settings) && /flip\('sw-rev', 'review_requests'\)/.test(settings));
   const content = read('supabase/functions/presence/routes/content.ts');
   ok('content.ts: /settings accepts the six 0134 fields, N bounded 1–90', /auto_ack_enquiries: \{ kind: 'bool' \}/.test(content) && /invoice_remind_after_days: \{ kind: 'int', min: 1, max: 90 \}/.test(content) && /stage_stale_days: \{ kind: 'stage_days' \}/.test(content));
   ok('content.ts: the settings read retries without the 0134 columns (deploy-order tolerant)', /pre-0134/.test(content));

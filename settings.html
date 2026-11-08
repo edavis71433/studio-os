@@ -156,7 +156,7 @@
        the same row the industry lives on — migration 0134, all off by default).
        Item 13's per-stage "stale after" lives here too. -->
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Three switches. Each saves as you flip it.</span></div>
+    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Four switches. Each saves as you flip it.</span></div>
     <div class="swrow">
       <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
       <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b>
@@ -174,6 +174,12 @@
       <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b>
         <div class="how">An open deal with no edit, no logged contact and nothing scheduled for that long rings your bell and emails you — once a week while it stays quiet.</div>
         <div class="say"><span class="lbl">What you’ll read</span><span id="say-deal">This deal has had no next step for 3 days — a quick follow-up keeps it moving.</span></div></div>
+    </div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-rev" aria-checked="false" aria-labelledby="sw-rev-l"></button>
+      <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b>
+        <div class="how">When you mark a project complete, its client gets one email <span id="n-rev-echo">3</span> days later with a link to your review page — the same email as a request you send by hand. Once per project. Every client is asked, whatever they said in the quick survey: asking only happy clients breaks Google’s rules on reviews.</div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-rev">Thanks for choosing us. If you have a moment, we’d love a quick review — it really helps.</span></div></div>
     </div>
     <div class="swrow" style="display:block">
       <b style="font-weight:600">Flag a deal as stalled after</b>
@@ -237,7 +243,7 @@ const CARDS = [
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
-  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Three switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
+  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
   // an owner lands on the Domain & email desk; only an operator gets the platform-wide domains view (admin-health said "Operators only" to everyone else — Oct 2026 experience review)
   // the operator's card says where it goes: the platform-wide view, not their own site's domain (sales review B12)
@@ -496,6 +502,7 @@ async function saveProfile() {
 // ── the three switches (+ the stale threshold): read from the same /settings row
 //    loadProfile fetched; every control writes itself the moment it changes. ──
 const STAGE_KEYS = ['lead', 'qualified', 'proposal', 'contract'];
+const reviewAskSentence = (biz) => `Thanks for choosing ${biz || 'us'}. If you have a moment, we’d love a quick review — it really helps.`;   // mirrors routes/reviews.ts sendReviewAsk
 const dealNudgeSentence = (n) => `This deal has had no next step for ${n === 1 ? 'a day' : n + ' days'} — a quick follow-up keeps it moving.`;   // mirrors commerce/lifecycle.ts dealNudgeCopy (qualified)
 function paintAutomations() {
   const st = SETTINGS || {};
@@ -505,6 +512,10 @@ function paintAutomations() {
   $('sw-ack').setAttribute('aria-checked', st.auto_ack_enquiries === true ? 'true' : 'false');
   $('sw-inv').setAttribute('aria-checked', st.invoice_reminders === true ? 'true' : 'false');
   $('sw-deal').setAttribute('aria-checked', st.deal_nudges === true ? 'true' : 'false');
+  $('sw-rev').setAttribute('aria-checked', st.review_requests === true ? 'true' : 'false');
+  const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
+  setVal('n-rev', String(nRev)); $('n-rev-echo').textContent = String(nRev);
+  $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
   const nInv = Number(st.invoice_remind_after_days) >= 1 ? Math.trunc(Number(st.invoice_remind_after_days)) : 2;
   const nDeal = Number(st.deal_nudge_days) >= 1 ? Math.trunc(Number(st.deal_nudge_days)) : 3;
   setVal('n-inv', String(nInv)); $('n-inv-echo').textContent = String(nInv);
@@ -523,9 +534,10 @@ async function saveAutomation(patch, undo) {
 }
 function wireAutomations() {
   const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };
-  flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges');
+  flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
   const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
-  days('n-inv', 'invoice_remind_after_days', 1, 90, 2); days('n-deal', 'deal_nudge_days', 1, 90, 3);
+  days('n-inv', 'invoice_remind_after_days', 1, 90, 2); days('n-deal', 'deal_nudge_days', 1, 90, 3); days('n-rev', 'review_request_after_days', 1, 90, 3);
+  $('n-rev').addEventListener('input', () => { $('n-rev-echo').textContent = $('n-rev').value || '3'; });
   $('n-inv').addEventListener('input', () => { $('n-inv-echo').textContent = $('n-inv').value || '2'; });
   $('n-deal').addEventListener('input', () => { const n = Math.trunc(Number($('n-deal').value)); $('say-deal').textContent = dealNudgeSentence(Number.isFinite(n) && n >= 1 ? n : 3); });
   for (const k of STAGE_KEYS) $('st-' + k).addEventListener('change', () => {

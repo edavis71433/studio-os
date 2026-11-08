@@ -143,6 +143,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   // per-stage stale threshold (item 13). Migration 0134; every switch default off.
   auto_ack_enquiries: { kind: 'bool' }, invoice_reminders: { kind: 'bool' }, invoice_remind_after_days: { kind: 'int', min: 1, max: 90 },
   deal_nudges: { kind: 'bool' }, deal_nudge_days: { kind: 'int', min: 1, max: 90 },
+  review_requests: { kind: 'bool' }, review_request_after_days: { kind: 'int', min: 1, max: 90 },   // list item 29 (0137)
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
@@ -302,7 +303,8 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
   const method = req.method.toUpperCase();
   if (method === 'GET') {
     let r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
-    if (!r.ok && r.status === 400 && cfg.select.includes(AUTOMATION_SETTINGS_COLS)) r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + AUTOMATION_SETTINGS_COLS, '')}&limit=1`);   // pre-0134
+    if (!r.ok && r.status === 400 && cfg.select.includes(REVIEW_SETTINGS_COLS)) r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + REVIEW_SETTINGS_COLS, '')}&limit=1`);   // pre-0137
+    if (!r.ok && r.status === 400 && cfg.select.includes(AUTOMATION_SETTINGS_COLS)) r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select.replace(',' + AUTOMATION_SETTINGS_COLS, '').replace(',' + REVIEW_SETTINGS_COLS, '')}&limit=1`);   // pre-0134
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${cfg.noun} just now.` }, 502, cors);
     return json({ data: r.json?.[0] ?? null }, 200, cors);
   }
@@ -325,9 +327,12 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
       const { id: _i, created_at: _c, updated_at: _u, ...baseFields } = base;
       body = { ...baseFields, site_id: site.id, ...v.cleanBody };
     }
-    const w = await db(`${cfg.table}?on_conflict=${cfg.conflict}&select=${cfg.select}`, {
+    const upsert = (select: string) => db(`${cfg.table}?on_conflict=${cfg.conflict}&select=${select}`, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body),
     });
+    let w = await upsert(cfg.select);
+    // pre-0137: the answer can't name the review columns. Any save that doesn't set them still lands.
+    if (!w.ok && w.status === 400 && cfg.select.includes(REVIEW_SETTINGS_COLS)) w = await upsert(cfg.select.replace(',' + REVIEW_SETTINGS_COLS, ''));
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
     await writeChangeEvent({ siteId: site.id, entityType: cfg.entityType, entityId: null, action: 'update', summary: cfg.summary, principal, provenance: 'human', fields: v.fields });
     return json({ data: w.json[0] }, 200, cors);
@@ -383,10 +388,13 @@ export async function handleVoice(req: Request, db: SiteDb, site: SiteRow, princ
 // database without them 400s the widened select; `singleton` retries the read
 // without them, so Settings never goes dark ahead of the apply pack.
 const AUTOMATION_SETTINGS_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days,stage_stale_days';
+// The 0137 columns (list item 29's switch). Their own step down, so a database with 0134
+// and not 0137 still reads and saves the other three switches, and every other setting.
+const REVIEW_SETTINGS_COLS = 'review_requests,review_request_after_days';
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

@@ -241,18 +241,25 @@ export async function handleReviewRequest(req: Request, site: SiteRow, _principa
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'bad_email', message: 'Add a valid email to send the request to.' }, 400, cors);
 
-  const ident = rows(await svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`))[0];
+  // sendEmail returns false when suppressed (opt-out/bounce) — report calmly either way.
+  const sent = await sendReviewAsk(site.id, email, name);
+  return json({ data: { ok: true, sent, email } }, 200, cors);
+}
+
+/** The review request email: a hand-sent one (POST /reviews/request) and the automatic one
+ *  after a project is done (commerce/lifecycle.runReviewRequests) are the same email.
+ *  False when the address is suppressed (opt-out or bounce). */
+export async function sendReviewAsk(siteId: string, email: string, name: string): Promise<boolean> {
+  const ident = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0];
   const biz = ident?.business_name || 'us';
-  const brand = await loadEmailBrand(site.id);
-  const link = reviewPageUrl(site.id);
-  const hi = name ? `Hi ${esc(name)},` : 'Hi there,';
-  const sent = await sendEmail(email, `How was your experience with ${biz}?`,
+  const brand = await loadEmailBrand(siteId);
+  const link = reviewPageUrl(siteId);
+  const hi = name ? `Hi ${esc(name.slice(0, 120))},` : 'Hi there,';
+  return await sendEmail(email, `How was your experience with ${biz}?`,
     `<p>${hi}</p>` +
     `<p>Thanks for choosing ${esc(biz)}. If you have a moment, we’d love a quick review — it really helps.</p>` +
     `<p class="cta"><a href="${esc(link)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">Leave a review →</a></p>` +
     `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`, brand);
-  // sendEmail returns false when suppressed (opt-out/bounce) — report calmly either way.
-  return json({ data: { ok: true, sent, email } }, 200, cors);
 }
 
 // ═════════ the public review page HTML (self-contained, zero external origins) ═════════

@@ -440,9 +440,12 @@ export interface AutomationSettings {
   invoice_remind_after_days: number;   // the +N leg after the due date (−7 and the due day are fixed)
   deal_nudges: boolean;
   deal_nudge_days: number;             // quiet for this many days → one nudge a week
+  review_requests: boolean;            // list item 29 (migration 0137): ask a project's client for a review
+  review_request_after_days: number;   // this many days after the project is marked complete
 }
-export const AUTOMATION_DEFAULTS: AutomationSettings = { auto_ack_enquiries: false, invoice_reminders: false, invoice_remind_after_days: 2, deal_nudges: false, deal_nudge_days: 3 };
-export const AUTOMATION_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days';
+export const AUTOMATION_DEFAULTS: AutomationSettings = { auto_ack_enquiries: false, invoice_reminders: false, invoice_remind_after_days: 2, deal_nudges: false, deal_nudge_days: 3, review_requests: false, review_request_after_days: 3 };
+export const AUTOMATION_COLS_0134 = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days';
+export const AUTOMATION_COLS = AUTOMATION_COLS_0134 + ',review_requests,review_request_after_days';
 /** Normalise a settings row (or nothing) into the five values. Pure. */
 export function automationSettings(row: Record<string, unknown> | null | undefined): AutomationSettings {
   const r = row && typeof row === 'object' ? row : {};
@@ -453,13 +456,17 @@ export function automationSettings(row: Record<string, unknown> | null | undefin
     invoice_remind_after_days: days(r.invoice_remind_after_days, AUTOMATION_DEFAULTS.invoice_remind_after_days),
     deal_nudges: r.deal_nudges === true,
     deal_nudge_days: days(r.deal_nudge_days, AUTOMATION_DEFAULTS.deal_nudge_days),
+    review_requests: r.review_requests === true,
+    review_request_after_days: days(r.review_request_after_days, AUTOMATION_DEFAULTS.review_request_after_days),
   };
 }
 export async function automationSettingsFor(siteId: string, cache?: Map<string, AutomationSettings>): Promise<AutomationSettings> {
   if (cache?.has(siteId)) return cache.get(siteId)!;
   let out = AUTOMATION_DEFAULTS;
   try {
-    const r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS}&limit=1`);
+    let r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS}&limit=1`);
+    // pre-0137: the review columns aren't there; the other three switches still hold
+    if (!r.ok) r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS_0134}&limit=1`);
     if (r.ok) out = automationSettings(Array.isArray(r.json) ? r.json[0] : null);   // a 400 (pre-0134) = all off
   } catch { /* defaults */ }
   cache?.set(siteId, out);
@@ -1289,4 +1296,63 @@ export async function runApexDriftWatch(limit = 10): Promise<{ checked: number; 
     }
   }
   return { checked, drifted, recovered };
+}
+
+// ── List item 29: ask for a review after a project is done ───────────────────────
+// Behind the per-site switch (migration 0137), off by default. A project marked
+// complete is asked about review_request_after_days days later, once: a few days
+// on, so it doesn't land with the satisfaction survey that goes out on completion.
+// Every client is asked, whatever they answered there (asking only the happy ones
+// breaks Google's rules on reviews). The day comes from the project's own status
+// events; a project reopened since isn't asked; one whose day passed more than two
+// weeks ago never is, so turning the switch on doesn't email every past client.
+export const REVIEW_ASK_GRACE_DAYS = 14;
+export const reviewAskPeriod = (projectId: string) => `reviewask:${projectId}`;
+/** Whether a project completed at `completedAtIso` is due its review ask now. Pure. */
+export function reviewAskDue(completedAtIso: unknown, nowMs: number, days: number): boolean {
+  const t = Date.parse(String(completedAtIso || ''));
+  if (!Number.isFinite(t)) return false;
+  const age = nowMs - t, day = 86400_000;
+  return age >= days * day && age < (days + REVIEW_ASK_GRACE_DAYS) * day;
+}
+export async function runReviewRequests(limit = 20): Promise<{ asked: number }> {
+  const on = await svc(`presence_settings?review_requests=is.true&select=site_id,review_request_after_days&limit=500`);
+  if (!on.ok) return { asked: 0 };   // pre-0137: no switch to read
+  const sites = new Map<string, number>(((on.json as Array<{ site_id: string; review_request_after_days?: number }>) || [])
+    .map((r) => [r.site_id, automationSettings({ review_request_after_days: r.review_request_after_days }).review_request_after_days]));
+  if (!sites.size) return { asked: 0 };
+  const nowMs = Date.now();
+  const since = new Date(nowMs - (90 + REVIEW_ASK_GRACE_DAYS) * 86400_000).toISOString();
+  const ev = await svc(`presence_project_events?site_id=in.(${[...sites.keys()].join(',')})&kind=eq.status_change&created_at=gte.${encodeURIComponent(since)}&select=project_id,site_id,detail,created_at&order=created_at.desc&limit=2000`);
+  // the latest move into "complete" per project (events come newest first)
+  const completed = new Map<string, { siteId: string; at: string }>();
+  for (const e of ((ev.json as Array<{ project_id: string; site_id: string; detail?: { to?: string }; created_at: string }>) || [])) {
+    if (e?.detail?.to === 'complete' && !completed.has(e.project_id)) completed.set(e.project_id, { siteId: e.site_id, at: e.created_at });
+  }
+  const due = [...completed.entries()].filter(([, c]) => reviewAskDue(c.at, nowMs, sites.get(c.siteId) || AUTOMATION_DEFAULTS.review_request_after_days));
+  if (!due.length) return { asked: 0 };
+  const periods = due.map(([id]) => `"${reviewAskPeriod(id)}"`).join(',');
+  const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length}`);
+  const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
+  let asked = 0;
+  for (const [projectId, c] of due) {
+    if (asked >= limit) break;
+    if (done.has(reviewAskPeriod(projectId))) continue;
+    const p = (await svc(`presence_projects?id=eq.${projectId}&site_id=eq.${c.siteId}&deleted_at=is.null&select=id,name,status,client_id&limit=1`)).json?.[0];
+    if (!p || p.status !== 'complete' || !p.client_id) continue;   // reopened, removed, or nobody to ask
+    const cl = (await svc(`clients?id=eq.${p.client_id}&select=email,name&limit=1`)).json?.[0];
+    const email = String(cl?.email || '').trim();
+    if (!email) continue;
+    const owner = (await svc(`presence_sites?id=eq.${c.siteId}&select=client_id&limit=1`)).json?.[0]?.client_id;
+    if (!owner) continue;
+    // the ledger row is the send-once gate, written before the email: a parallel tick can't double-send
+    const fresh = await raiseNotice({ siteId: c.siteId, clientId: owner, kind: 'deal_followup', period: reviewAskPeriod(projectId), status: 'dismissed',
+      headline: `Review requested — ${p.name || 'a finished project'}`, body: `We asked ${email} for a review, ${sites.get(c.siteId)} days after the project was marked complete.` });
+    if (!fresh) continue;
+    try {
+      const { sendReviewAsk } = await import('../routes/reviews.ts');
+      if (await sendReviewAsk(c.siteId, email, String(cl?.name || ''))) asked++;
+    } catch { /* the ledger row stands: one try per project, never a second email */ }
+  }
+  return { asked };
 }
