@@ -2,6 +2,7 @@
 // Templates are versioned folders statically imported here. Shipping a template
 // version = deploying the function (deliberately boring, per blueprint §2).
 // Old versions are never deleted while any site pins them.
+import { fontFaceCss, libraryFontsIn } from './fonts.ts';
 import type { RenderFn, Snapshot, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
 import { render as restaurantClassic_1_0_0 } from '../templates/restaurant-classic/1.0.0/render.ts';
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
@@ -126,8 +127,10 @@ export function devLayerFragments(dev: Snapshot['dev_customization']): { style: 
   // future write path that bypassed buildCustomization cannot become stored XSS
   // on the live site.
   const css = sanitizeDevCss(dev.custom_css || '');
+  // a library font the style names loads from the site's own copy (lib/fonts.ts)
+  const faces = fontFaceCss(libraryFontsIn(tokens));
   const style = (vars || css)
-    ? `<style id="presence-dev">${vars ? `:root{${vars}}` : ''}${css ? `\n${css}` : ''}</style>`
+    ? `<style id="presence-dev">${vars ? `:root{${vars}}` : ''}${faces}${css ? `\n${css}` : ''}</style>`
     : '';
   const safeHtml = dev.custom_html ? sanitizeDevHtml(dev.custom_html) : '';
   const block = safeHtml ? `<div class="presence-dev-block">${safeHtml}</div>` : '';
