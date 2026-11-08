@@ -137,6 +137,13 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   // ── redirects (rare; keep honest) ──
   if (!jeq(d.redirects, l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });
 
+  // ── the visit counter (item 61): the counting and the privacy page change together ──
+  if ((d.settings?.visit_counter !== false) !== (l.settings?.visit_counter !== false)) {
+    out.push({ section: 'site', sentence: d.settings?.visit_counter === false
+      ? 'Your site stops counting visits, and its privacy page says so.'
+      : 'Your site starts counting visits again, and its privacy page says so.' });
+  }
+
   // ── custom section blocks (home + pages) — without this, two versions that
   //    differ ONLY in blocks reported "identical" (G9 finding). Coarse but
   //    honest: count add/remove/change per page by stable id (type+index else).

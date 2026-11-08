@@ -24,6 +24,7 @@ import { svc } from '../lib/db.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, siteDownPeriod, siteDownPeriodPrefix, siteDownLegacyPeriod } from '../lib/notice.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { siteOrigin } from '../lib/site.ts';
 
 /** Consecutive failed probes required before we call a site confirmed-down.
  *  Two = one blip is forgiven; a real outage still alerts within ~2 ticks. */
@@ -37,9 +38,7 @@ const timed = (ms: number) => AbortSignal.timeout(ms);
 // hits the SAME origin we publish to.
 export interface HeartbeatSite { id: string; custom_domain?: string | null; netlify_site_id?: string | null }
 export function pickLiveUrl(site: HeartbeatSite): string | null {
-  if (site.custom_domain) return `https://${site.custom_domain}`;
-  if (site.netlify_site_id) return `https://${site.netlify_site_id}.netlify.app`;
-  return null;
+  return siteOrigin(site) || null;
 }
 
 // ── The probe (injectable I/O — mocked in tests) ─────────────────────────────

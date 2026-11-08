@@ -5,6 +5,7 @@
 // the convert handoff (create project + bridge, idempotent) and the /client/*
 // endpoints (resolve which projects a customer may see).
 import { svc } from './db.ts';
+import { siteOrigin } from './site.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
@@ -288,15 +289,14 @@ export async function emailCustomerSiteLive(customerSiteId: string): Promise<boo
     if (!customerSiteId) return false;
     const [linkR, siteR] = await Promise.all([
       svc(`presence_service_links?customer_site_id=eq.${customerSiteId}&status=eq.active&select=project_id,agency_site_id&order=created_at.desc&limit=1`),
-      svc(`presence_sites?id=eq.${customerSiteId}&select=custom_domain,netlify_site_id&limit=1`),
+      svc(`presence_sites?id=eq.${customerSiteId}&select=id,custom_domain,netlify_site_id&limit=1`),
     ]);
     const link = rows(linkR)[0];
     if (!link?.project_id || !link?.agency_site_id) return false;   // not a bridged delivery — nothing to celebrate on this channel
     const siteRow = rows(siteR)[0];
-    const host = siteRow?.custom_domain ? String(siteRow.custom_domain)
-      : (siteRow?.netlify_site_id ? `${siteRow.netlify_site_id}.netlify.app` : '');
-    if (!host) return false;
-    const liveUrl = `https://${host}`;
+    const liveUrl = siteOrigin(siteRow);
+    if (!liveUrl) return false;
+    const host = liveUrl.replace(/^https:\/\//, '');
     const body =
       `<p>It’s official — your website is live. Here it is:</p>` +
       `<p><a href="${escHtml(liveUrl)}" style="font-weight:600">${escHtml(host)}</a></p>` +

@@ -15,7 +15,8 @@ const eq = (name, a, b) => ok(name + ` (got ${JSON.stringify(a)})`, a === b);
 // ── 1. URL selection ─────────────────────────────────────────────────────────
 {
   eq('1 custom domain wins', pickLiveUrl({ id: 's', custom_domain: 'shop.com', netlify_site_id: 'nf1' }), 'https://shop.com');
-  eq('1 netlify default when no domain', pickLiveUrl({ id: 's', custom_domain: null, netlify_site_id: 'nf1' }), 'https://nf1.netlify.app');
+  // netlify_site_id is Netlify's internal id; the site answers at the name the provisioner gives it
+eq('1 netlify default when no domain', pickLiveUrl({ id: '11111111-1111-4111-8111-111111111111', custom_domain: null, netlify_site_id: 'a-netlify-uuid' }), 'https://presence-111111111111.netlify.app');
   eq('1 null when nothing to hit', pickLiveUrl({ id: 's', custom_domain: null, netlify_site_id: null }), null);
 }
 

@@ -19,6 +19,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { editionFor } from './catalog.ts';
 import type { PlanKey } from './catalog.ts';
 import type { EntitlementPatch } from './subscriptions.ts';
+import { hostedName } from '../lib/site.ts';
 
 const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition';
 
@@ -97,7 +98,7 @@ export async function provisionForSignup(opts: {
   let netlifyUrl: string | null = null;
   if (needsHosting) {
     if (!netlifyConfigured()) return { ok: false, error: 'hosting_unconfigured' };
-    const desiredName = `presence-${String(site.id).replace(/-/g, '').slice(0, 12)}`;
+    const desiredName = hostedName(site.id);
     let netlifyId = site.netlify_site_id as string | null;
     if (netlifyId) {
       const found = await getSite(netlifyId);

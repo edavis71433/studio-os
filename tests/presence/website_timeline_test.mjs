@@ -114,6 +114,18 @@ const group = (t, key) => t.groups.find((g) => g.key === key);
   eq('9 actor Automatic', e.actor, 'Automatic');
 }
 
+// 9b. item 67: each run of the notes rewrites them under the same key; the feed shows each note once
+{
+  const note = (id, key, at, status = 'superseded') => ({ id, moment_key: key, status, headline: key === 'k1' ? '4 small improvements are ready when you are.' : 'Reviews are up', created_at: at });
+  const t = build({ moments: [note('a', 'k1', '2026-07-08T09:00:00Z', 'active'), note('b', 'k1', '2026-07-07T09:00:00Z'), note('c', 'k2', '2026-07-06T09:00:00Z'), note('d', 'k1', '2026-07-05T09:00:00Z'), { ...note('e', 'k3', '2026-07-04T09:00:00Z'), status: 'suppressed', headline: 'held back' }] });
+  const titles = allEvents(t).filter((e) => e.actor === 'Automatic').map((e) => e.title);
+  eq('9b one line per note', titles.filter((x) => x === '4 small improvements are ready when you are.').length, 1);
+  eq('9b both notes shown', titles.length, 2);
+  eq('9b a held-back note never shows', titles.includes('held back'), false);
+  const many = build({ moments: Array.from({ length: 12 }, (_, i) => note(`n${i}`, `key${i}`, `2026-07-0${(i % 9) + 1}T09:00:00Z`)) });
+  eq('9b at most eight notes', allEvents(many).filter((e) => e.actor === 'Automatic').length, 8);
+}
+
 // 10. Launch published → Milestones "went live"; rolled_back → Publishing; draft skipped
 {
   const t = build({ launches: [

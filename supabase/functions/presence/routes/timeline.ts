@@ -29,7 +29,7 @@ export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, 
     svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,actor_kind,created_at,completed_at&order=created_at.desc&limit=25`),
     svc(`presence_change_events?site_id=eq.${site.id}&select=id,entity_type,action,summary,actor_kind,created_at&order=created_at.desc&limit=40`),
     svc(`presence_connection_events?site_id=eq.${site.id}&select=id,provider_key,action,actor_kind,created_at&order=created_at.desc&limit=15`),
-    svc(`presence_moments?site_id=eq.${site.id}&select=id,headline,summary,created_at,first_seen_at&order=created_at.desc&limit=8`),
+    svc(`presence_moments?site_id=eq.${site.id}&status=neq.suppressed&select=id,moment_key,status,headline,summary,created_at,first_seen_at&order=created_at.desc&limit=60`),   // folded to one per note by the builder
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,message,created_at&order=created_at.desc&limit=15`),
     svc(`presence_scheduled_publishes?site_id=eq.${site.id}&status=eq.pending&select=id,scheduled_for,summary,kind,created_at&order=scheduled_for.asc&limit=5`),
     svc(`presence_launches?site_id=eq.${site.id}&select=id,name,status,created_at,updated_at,approved_at&order=created_at.desc&limit=15`),

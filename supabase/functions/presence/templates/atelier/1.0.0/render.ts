@@ -17,7 +17,7 @@ import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
 import { seoHead } from '../../../lib/seo_emit.ts';
-import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
+import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -77,7 +77,7 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 // Contrast notes (AA): ink #1c1b18 on ivory #fbfaf7 ≈ 15.9:1; soft #5b564c ≈ 7.0:1;
 // bronze TEXT uses the darkened --accent-ink #7a5f3a ≈ 5.7:1 — the lighter #9a7b4f
 // bronze is reserved for 1px rules and decorative leaders only.
-const CSS = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--card:#ffffff;--accent:#9a7b4f;--accent-ink:#7a5f3a;--line:#e5e0d5;--wash:#f4f1e9}
+const CSS = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--card:#ffffff;--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5;--wash:#f4f1e9}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
 picture{display:contents}
@@ -183,9 +183,14 @@ footer.site h2::after{content:"";display:block;width:36px;border-top:1px solid v
 @media print{body{background:#fff;color:#000}.annbar,.skip{display:none}header.site{position:static}}
 @media (max-width:640px){.hero{padding:64px 0 44px}.block{padding:48px 0}.svc-grid{gap:0}}
 ${BLOCK_CSS}
-${SEARCH_CSS}`;
+${SEARCH_CSS}
+/* Item 67: the shared section and search styles colour some text with --accent, which here is
+   the light bronze (3.8:1 on ivory). They take --accent-dark instead (#7a5f3a, 5.7:1), which a
+   chosen palette or a section's own colour still sets. Other templates' accents already pass. */
+.search-hit .sh-kind,.post-tags li,.block-spotlight .sp-eyebrow,.block-linklist ul.linklist a,.block-progress .pgb-pct{color:var(--accent-dark)}
+.tagchip.on,ol.process li::before,.bk-done-ic{background:var(--accent-dark);border-color:var(--accent-dark)}`;
 
-const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding:96px 0 64px;text-align:center}`;
+const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding:96px 0 64px;text-align:center}`;
 
 // ═════════ partials ═════════
 
@@ -486,6 +491,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const siteTitle = i.seo_title || i.business_name;
   const siteDesc = i.seo_description || i.description;
   const ogImg = c.settings?.og_image?.variants?.w1600
+    || c.settings?.cover?.variants?.w1600   // item 67: the owner's chosen cover photo before any auto-pick
     || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
     || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
     || c.settings?.logo?.variants?.w1600;
@@ -542,6 +548,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   if (noidx.has('contact')) markNoindex('contact/index.html');
   page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
+  // item 62: where a message that didn't send lands — it says why and goes back to the form with the words kept
+  page('/not-sent/', { title: `Not sent — ${i.business_name}`, description: `Your message to ${i.business_name} didn’t send.`, ld: [], active: 'contact', body: `<section class="hero wrap">${notSentInner()}</section>` });
+  files['not-sent/index.html'] = (files['not-sent/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
   // The generated legal foundation — facts-true, the owner never writes legal HTML
   page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
@@ -570,7 +579,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   }
 
   // Static, privacy-safe on-site search — the site's own content index (zero
-  // external origins, zero trackers) + a calm results page whose first-party
+  // external origins, no outside trackers) + a calm results page whose first-party
   // inline script filters it client-side. Kept out of the sitemap + noindexed.
   files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });
   page('/search/', { title: `Search — ${i.business_name}`, description: `Search ${i.business_name}.`, ld: [], active: '', body: searchPageBody(esc, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel }) + searchClientScript() });
@@ -588,7 +597,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
   const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
-  files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
+  files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)
   {
     const feedItems = c.posts.filter((p) => !p.noindex).slice(0, 20).map((p) => {

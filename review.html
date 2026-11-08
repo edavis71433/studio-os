@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Leave a review</title>
+<style>
+  /* Minimal standalone shell: the fetched review page replaces this page entirely.
+     This styles only the loading and error states. */
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:520px;margin:80px auto;padding:0 20px;text-align:center}
+  h1{font-weight:500;font-size:clamp(22px,5vw,28px);margin-bottom:6px}
+  .muted{color:var(--soft);font-size:15px}
+</style>
+</head>
+<body>
+<main class="center" id="state"><p class="muted">Opening the review page…</p></main>
+<script>
+// The review page viewer. A review request email links here with ?site=<site id>. The
+// page itself is drawn by the presence function (GET /reviews/<site>), but Supabase's
+// default *.supabase.co address serves an HTML answer as plain text, so the email's old
+// link showed the page's code. This page, on our own address, asks the function and
+// writes what comes back into the document (our own server-rendered HTML). Its form
+// already sends the review to the function directly.
+(function(){
+  var q=new URLSearchParams(location.search);
+  var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
+  var site=q.get('site')||'';
+  var state=document.getElementById('state');
+  function fail(head,line){ state.innerHTML='<h1></h1><p class="muted"></p>'; state.querySelector('h1').textContent=head; state.querySelector('p').textContent=line; }
+  if(!/^[0-9a-f-]{36}$/i.test(site)){ fail('This review link isn’t complete','Open the link from the email again, or ask the business for a fresh one.'); return; }
+  fetch(FN+'/reviews/'+site+'?embed=1').then(function(r){
+    if(!r.ok){ fail('This review page isn’t available right now','Please try again in a moment.'); return; }
+    return r.text().then(function(html){ document.open(); document.write(html); document.close(); });
+  }).catch(function(){ fail('This review page couldn’t open','Check your connection, then reload the page.'); });
+})();
+</script>
+</body>
+</html>

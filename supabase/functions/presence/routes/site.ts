@@ -73,7 +73,14 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
 
   return json({
     data: {
-      site: { id: site.id, status: site.status, template: `${site.template_slug} ${site.template_version}`, edition: site.edition },
+      // Item 63: the page reads the address, the hosting, the publish date and the template
+      // name from `site`. Without them a published site read as "Not live yet" and Private,
+      // and never offered its live link.
+      site: {
+        id: site.id, status: site.status, template: `${site.template_slug} ${site.template_version}`, edition: site.edition,
+        template_slug: site.template_slug, template_version: site.template_version,
+        custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id, last_published_at: site.last_published_at,
+      },
       identity: (Array.isArray(ident.json) && ident.json[0]) || null,
       location: (Array.isArray(loc.json) && loc.json[0]) || null,
       voice: (Array.isArray(voice.json) && voice.json[0])

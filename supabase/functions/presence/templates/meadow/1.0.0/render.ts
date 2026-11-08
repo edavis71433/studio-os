@@ -14,7 +14,7 @@ import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
 import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
 import { seoHead } from '../../../lib/seo_emit.ts';
-import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
+import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -469,6 +469,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const siteTitle = i.seo_title || i.business_name;
   const siteDesc = i.seo_description || i.description;
   const ogImg = c.settings?.og_image?.variants?.w1600
+    || c.settings?.cover?.variants?.w1600   // item 67: the owner's chosen cover photo before any auto-pick
     || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
     || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
     || c.settings?.logo?.variants?.w1600;
@@ -525,6 +526,9 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   if (noidx.has('contact')) markNoindex('contact/index.html');
   page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
+  // item 62: where a message that didn't send lands — it says why and goes back to the form with the words kept
+  page('/not-sent/', { title: `Not sent — ${i.business_name}`, description: `Your message to ${i.business_name} didn’t send.`, ld: [], active: 'contact', body: `<section class="hero wrap">${notSentInner()}</section>` });
+  files['not-sent/index.html'] = (files['not-sent/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
   // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
   page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
@@ -553,7 +557,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   }
 
   // Phase SEARCH: static, privacy-safe on-site search — the site's own content
-  // index (zero external origins, zero trackers) + a calm results page whose
+  // index (zero external origins, no outside trackers) + a calm results page whose
   // first-party inline script filters it client-side. Kept out of the sitemap +
   // noindexed (a thin utility page).
   files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });
@@ -572,7 +576,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
   const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
-  files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
+  files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)
   {
     const feedItems = c.posts.filter((p) => !p.noindex).slice(0, 20).map((p) => {

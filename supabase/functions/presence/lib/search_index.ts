@@ -1,5 +1,5 @@
 // ── On-site search + post tags — the ONE static, privacy-safe search substrate ──
-// A published Studio OS site has zero external origins and zero trackers. So the
+// A published Studio OS site has zero external origins and no outside trackers. So the
 // site's own search is built the same way: at publish time we serialize a small
 // JSON index of the site's OWN content (pages, offerings, updates, FAQs), ship it
 // beside the site, and a tiny FIRST-PARTY inline script filters it in the browser.
@@ -62,6 +62,16 @@ export function buildSearchIndex(c: SnapshotContent, opts: SearchIndexOpts): Sea
   if ((c.posts || []).length) docs.push({ t: 'Updates', s: `News and updates from ${name}.`, u: '/updates/', k: 'page' });
   docs.push({ t: 'Contact & hours', s: `How to reach ${name} and when we're open.`, u: '/contact/', k: 'page' });
 
+  // The owner's own pages (item 67), found like the built-in ones. A page kept out of the
+  // menu or hidden from Google stays out of here too.
+  const hiddenPages = new Set((c.settings?.pages_noindex || []).map(String));
+  for (const p of c.settings?.pages || []) {
+    if (!p?.slug || p.hideNav || hiddenPages.has(`page:${p.slug}`)) continue;
+    const words = (p.blocks || []).map((b) => { const x = b as { body?: unknown; text?: unknown; subtitle?: unknown; title?: unknown }; return [x.body, x.text, x.subtitle, x.title].find((v) => typeof v === 'string' && v.trim()); }).find(Boolean);
+    const title = String(p.title || p.slug);
+    docs.push({ t: title, s: plainSnippet(String(words || '')) || `${title} at ${name}.`, u: `/${p.slug}/`, k: 'page' });
+  }
+
   // Offerings — one entry each (all live on the offerings page).
   for (const o of c.offerings || []) {
     const t = String(o.name || '').trim();
@@ -72,7 +82,7 @@ export function buildSearchIndex(c: SnapshotContent, opts: SearchIndexOpts): Sea
   // Updates — newest first; tags fold into the entry so a tag is searchable.
   for (const p of [...(c.posts || [])].sort((a, b) => String(b.published_at).localeCompare(String(a.published_at)))) {
     const t = String(p.title || '').trim();
-    if (!t || !p.slug) continue;
+    if (!t || !p.slug || p.noindex === true) continue;   // an update hidden from Google isn't offered here either
     const tags = normalizeTags((p as { tags?: unknown }).tags);
     docs.push({ t, s: plainSnippet(p.excerpt || p.body_md || ''), u: `/updates/${p.slug}/`, k: 'update', ...(tags.length ? { g: tags } : {}) });
   }

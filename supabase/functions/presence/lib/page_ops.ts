@@ -12,7 +12,7 @@ export const PAGE_SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /** Slugs a custom page may never take — the templates' built-in pages plus
  *  deploy-reserved paths. Single source for the server (the serializer imports
  *  this; presence.html mirrors it as DC_PAGE_RESERVED). */
-export const RESERVED_PAGE_SLUGS = new Set(['', 'index', 'home', '404', 'about', 'contact', 'faq', 'faqs', 'services', 'service', 'menu', 'products', 'classes', 'updates', 'blog', 'news', 'post', 'posts', 'thanks', 'thank-you', 'privacy', 'accessibility', 'search', 'sitemap', 'robots', 'assets', 'img']);
+export const RESERVED_PAGE_SLUGS = new Set(['', 'index', 'home', '404', 'about', 'contact', 'faq', 'faqs', 'services', 'service', 'menu', 'products', 'classes', 'updates', 'blog', 'news', 'post', 'posts', 'thanks', 'thank-you', 'not-sent', 'privacy', 'accessibility', 'search', 'sitemap', 'robots', 'assets', 'img']);
 
 const MAX_PAGES = 20;          // serializer caps custom pages at 20
 const SLUG_MAX = 40;
