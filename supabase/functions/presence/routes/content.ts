@@ -68,7 +68,13 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days'; json?: JsonShape };
+// Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
+// on every load, preview, publish, hash and sweep. The size is the saved text's length; the
+// shape checks only what every reader assumes (a list of objects, an object), never a
+// section's contents, so an empty section the owner is still filling in saves as before.
+type JsonShape = { bytes: number; shape: 'list' | 'object' | 'blocks' | 'pages'; items?: number };
+const KB = 1024;
 interface EntitySpec {
   table: string;
   entityType: string;           // provenance entity_type
@@ -127,14 +133,14 @@ export const SPECS: Record<string, EntitySpec> = {
 const LOCATION_FIELDS: Record<string, FieldRule> = {
   address_line1: { max: 160 }, address_line2: { max: 160 }, city: { max: 80 },
   region: { max: 40 }, postal_code: { max: 16 }, country: { max: 2 }, phone: { max: 32 },
-  timezone: { max: 60 }, hours: { kind: 'json' }, holiday_exceptions: { kind: 'json' },
+  timezone: { max: 60 }, hours: { kind: 'json', json: { bytes: 32 * KB, shape: 'list', items: 14 } }, holiday_exceptions: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 400 } },
   temporarily_closed: { kind: 'bool' }, temporarily_closed_note: { max: 200 },
 };
 const VOICE_FIELDS: Record<string, FieldRule> = {
   tone_notes: { max: 1000 }, preferred_vocabulary: { max: 1000 }, never_claim: { max: 1000 },
 };
 const SETTINGS_FIELDS: Record<string, FieldRule> = {
-  category_order: { kind: 'json' }, cover_media_id: { kind: 'uuid' },
+  category_order: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 200 } }, cover_media_id: { kind: 'uuid' },
   // Phase V no-code essentials: logo (FD-N2), share image (FD-N3), announcement bar (FD-N4)
   logo_media_id: { kind: 'uuid' }, og_media_id: { kind: 'uuid' },
   announcement_text: { max: 140 }, announcement_url: { max: 300 }, announcement_expires_at: { kind: 'date' },
@@ -148,17 +154,33 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
   hero_layout: { max: 20 }, nav_style: { max: 12 },
-  sections_hidden: { kind: 'json' }, sections_order: { kind: 'json' },
+  sections_hidden: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } }, sections_order: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } },
   footer_hours: { kind: 'bool' }, footer_social: { kind: 'bool' },
   // Phase SD: search visibility as human questions
-  pages_noindex: { kind: 'json' }, page_seo: { kind: 'json' },
+  pages_noindex: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } }, page_seo: { kind: 'json', json: { bytes: 256 * KB, shape: 'object' } },
   // Phase T-BLOCKS: structured content blocks (validated + capped at serialize time)
-  blocks: { kind: 'json' },
+  blocks: { kind: 'json', json: { bytes: 1024 * KB, shape: 'blocks', items: 64 } },
   // Multi-page: owner-created pages [{slug,title,blocks}] (validated at serialize time)
-  pages: { kind: 'json' },
+  pages: { kind: 'json', json: { bytes: 2048 * KB, shape: 'pages', items: 40 } },
   // Editable GLOBAL nav [{label,href,children?}] (validated at serialize time)
-  nav: { kind: 'json' },
+  nav: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 60 } },
 };
+
+/** Item 72: why a JSON value can't be saved, in a sentence, or null when it can. Pure. */
+export function jsonFieldProblem(v: unknown, limit: JsonShape): string | null {
+  if (v === null || v === undefined) return null;
+  let text = '';
+  try { text = JSON.stringify(v); } catch { return 'That couldn’t be read. Nothing was changed.'; }
+  if (text.length > limit.bytes) return 'That’s more than one save can hold. Try removing a few sections or pages, then save again.';
+  const isObj = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+  if (limit.shape === 'object') return isObj(v) ? null : 'That couldn’t be read. Nothing was changed.';
+  if (!Array.isArray(v)) return 'That couldn’t be read. Nothing was changed.';
+  if (limit.items && v.length > limit.items) return `That’s more than ${limit.items} at once. Remove a few, then save again.`;
+  if (limit.shape === 'blocks' && !v.every((b) => isObj(b) && typeof (b as { type?: unknown }).type === 'string')) return 'A section couldn’t be read. Nothing was changed.';
+  const pageOk = (p: unknown) => { if (!isObj(p)) return false; const b = (p as { blocks?: unknown }).blocks; return b === undefined || (Array.isArray(b) && b.length <= 64); };
+  if (limit.shape === 'pages' && !v.every(pageOk)) return 'A page couldn’t be read. Nothing was changed.';
+  return null;
+}
 
 /** { stage: days } for the OPEN stages only, each a whole number 1–365; null when
  *  the value is not that shape (an array, a string, an unknown stage, 0, 400, 'soon'). */
@@ -175,7 +197,7 @@ export function stageDaysMap(v: unknown): Record<string, number> | null {
 }
 
 function validateFields(payload: Record<string, unknown>, spec: Record<string, FieldRule>, requireRequired: boolean) {
-  const errors: Array<{ field: string; message: string }> = [];
+  const errors: Array<{ field: string; message: string; plain?: boolean }> = [];
   const cleanBody: Record<string, unknown> = {};
   const fields: string[] = [];
   for (const key of Object.keys(payload || {})) {
@@ -185,7 +207,11 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'bool') { cleanBody[key] = !!v; fields.push(key); continue; }
     if (rule.kind === 'int') { const n = Number(v); if (!Number.isFinite(n)) { errors.push({ field: key, message: `${key} must be a number.` }); continue; } const t = Math.trunc(n); if ((rule.min !== undefined && t < rule.min) || (rule.max !== undefined && t > rule.max)) { errors.push({ field: key, message: `${key} must be between ${rule.min ?? '…'} and ${rule.max ?? '…'}.` }); continue; } cleanBody[key] = t; fields.push(key); continue; }
     if (rule.kind === 'uuid') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } if (!UUID_RE.test(String(v))) { errors.push({ field: key, message: `${key} isn’t a valid reference.` }); continue; } cleanBody[key] = v; fields.push(key); continue; }
-    if (rule.kind === 'json') { cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue; }
+    if (rule.kind === 'json') {
+      const problem = rule.json ? jsonFieldProblem(v, rule.json) : null;
+      if (problem) { errors.push({ field: key, message: problem, plain: true }); continue; }
+      cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue;
+    }
     if (rule.kind === 'stage_days') {   // the per-stage "stale after N days" map (lib/sales_lifecycle.ts staleDaysFor): open stages only, whole days 1–365
       if (v === null || v === undefined) { cleanBody[key] = null; fields.push(key); continue; }
       const shaped = stageDaysMap(v);
@@ -241,7 +267,7 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     let payload: Record<string, unknown> = {};
     try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
     const v = validateFields(payload, spec.fields, true);
-    if (!v.ok) return json({ error: 'validation_failed', message: 'Some fields need a second look.', fields: v.errors }, 422, cors);
+    if (!v.ok) return json({ error: 'validation_failed', message: v.errors.find((e) => e.plain)?.message || 'Some fields need a second look.', fields: v.errors }, 422, cors);
     if ('media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if ('hero_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.hero_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if (entity === 'posts') {
@@ -263,7 +289,7 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     let payload: Record<string, unknown> = {};
     try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
     const v = validateFields(payload, spec.fields, false);
-    if (!v.ok) return json({ error: 'validation_failed', message: 'Some fields need a second look.', fields: v.errors }, 422, cors);
+    if (!v.ok) return json({ error: 'validation_failed', message: v.errors.find((e) => e.plain)?.message || 'Some fields need a second look.', fields: v.errors }, 422, cors);
     if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
     if ('media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if ('hero_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.hero_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
@@ -316,7 +342,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
     if (preParsed !== undefined) payload = preParsed;   // G7: handleSettings pre-reads the body (a Request body reads once)
     else { try { payload = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); } }
     const v = validateFields(payload, cfg.fields, false);
-    if (!v.ok) return json({ error: 'validation_failed', message: 'Some fields need a second look.', fields: v.errors }, 422, cors);
+    if (!v.ok) return json({ error: 'validation_failed', message: v.errors.find((e) => e.plain)?.message || 'Some fields need a second look.', fields: v.errors }, 422, cors);
     if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
     if ('cover_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.cover_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     // location upsert must include NOT NULL columns on first insert — merge over existing
