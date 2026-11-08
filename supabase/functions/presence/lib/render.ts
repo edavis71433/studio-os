@@ -3,7 +3,7 @@
 // version = deploying the function (deliberately boring, per blueprint §2).
 // Old versions are never deleted while any site pins them.
 import { fontFaceCss, libraryFontsIn } from './fonts.ts';
-import type { RenderFn, Snapshot, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
+import type { RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
 import { render as restaurantClassic_1_0_0 } from '../templates/restaurant-classic/1.0.0/render.ts';
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
 import { render as businessClassic_1_0_0 } from '../templates/business-classic/1.0.0/render.ts';
@@ -167,7 +167,9 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {
     throw new Error(`contract mismatch: template consumes v${t.manifest.content_contract_version}, snapshot is v${snapshot.content_contract_version}`);
   }
-  return injectCsp(injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), site.siteId));
+  // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
+  const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
+  return injectCsp(injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), counting ? site.siteId : undefined));
 }
 
 // ── Published-site Content-Security-Policy (defense-in-depth) ────────────────

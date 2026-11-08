@@ -67,6 +67,9 @@ export interface SnapshotContent {
     nav_style?: string;
     sections?: { hidden: string[]; order: string[] };
     footer?: { hours: boolean; social: boolean };
+    /** Item 61: false when the owner turned the visit counter off. Absent means on:
+     *  the counter is added at publish and the privacy page describes it. */
+    visit_counter?: boolean;
     /** Phase SD: page keys hidden from search (noindex + out of the sitemap). */
     pages_noindex?: string[];
     /** Phase SD: per-page search headline/description overrides, keyed by page.

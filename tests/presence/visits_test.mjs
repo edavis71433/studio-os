@@ -85,6 +85,33 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
   ok('inject: no site id → unchanged (safe for preview)', injectAnalytics(fm, undefined)['index.html'] === fm['index.html']);
 }
 
+// ── item 61: the owner's switch. Publish leaves the counter off every page when it's off,
+//    and the change list says so, because the privacy page changes with it. ──
+{
+  Deno.env.set('SUPABASE_URL', 'https://x.supabase.co');
+  const { renderSnapshot } = await import('../../supabase/functions/presence/lib/render.ts');
+  const { describeChanges } = await import('../../supabase/functions/presence/lib/diff.ts');
+  const fx = JSON.parse(await Deno.readTextFile(new URL('../../supabase/functions/presence/templates/business-classic/1.0.0/fixture.json', import.meta.url)));
+  fx.template_slug = 'business-classic'; fx.template_version = '1.0.0';
+  const SITE = { baseUrl: 'https://example.com', siteId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa' };
+  const on = renderSnapshot(fx, SITE);
+  const offSnap = structuredClone(fx); offSnap.content.settings = { ...(offSnap.content.settings || {}), visit_counter: false };
+  const off = renderSnapshot(offSnap, SITE);
+  ok('switch: on (absent) → the counter is on every page', on['index.html'].includes('id="presence-analytics"') && on['privacy/index.html'].includes('id="presence-analytics"'));
+  ok('switch: off → no page carries the counter', Object.entries(off).every(([k, v]) => !k.endsWith('.html') || !String(v).includes('presence-analytics')));
+  const offCh = describeChanges(offSnap.content, fx.content).changes.map((c) => c.sentence);
+  const onCh = describeChanges(fx.content, offSnap.content).changes.map((c) => c.sentence);
+  ok('switch: turning it off is a change to publish, in words', offCh.includes('Your site stops counting visits, and its privacy page says so.'));
+  ok('switch: turning it back on is too', onCh.includes('Your site starts counting visits again, and its privacy page says so.'));
+  ok('switch: no change when both are on', !describeChanges(fx.content, structuredClone(fx.content)).changes.some((c) => /counting visits/.test(c.sentence)));
+  const content = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/content.ts', import.meta.url));
+  ok('switch: /settings accepts visit_counter as a yes/no', /visit_counter: \{ kind: 'bool' \}/.test(content));
+  ok('switch: the settings read steps down without the 0138 column (deploy-order tolerant)', /VISIT_SETTINGS_COLS = 'visit_counter'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS\]/.test(content));
+  const mig = await Deno.readTextFile(new URL('../../supabase/migrations/0138_visit_counter_switch.sql', import.meta.url));
+  const pack = await Deno.readTextFile(new URL('../../docs/presence/APPLY-0138-prod.sql', import.meta.url));
+  ok('switch: migration 0138 and its apply pack add the column, on by default', /add column if not exists visit_counter boolean not null default true/.test(mig) && /add column if not exists visit_counter boolean not null default true/.test(pack));
+}
+
 // ── AN-2.10 no-AI guard: the collector + visits lib add no model calls ──
 {
   const collectSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/collect.ts', import.meta.url));

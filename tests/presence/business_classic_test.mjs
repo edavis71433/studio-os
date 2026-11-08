@@ -81,7 +81,10 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('privacy + accessibility pages generated', 'privacy/index.html' in f && 'accessibility/index.html' in f);
   const pv = f['privacy/index.html'];
   ok('privacy: facts-true (title + contact-form coverage + effective date)', pv.includes('Privacy policy') && pv.includes('contact form') && pv.includes('Effective '));
-  ok('privacy: honest no-cookies/no-tracking claim (the templates ARE cookieless)', pv.includes('no cookies') && pv.includes('no analytics or tracking'));
+  // item 61: every published page carries the first-party visit counter, so the page says so
+  ok('privacy: no cookies, and the visit counter described as it is', pv.includes('no cookies') && pv.includes('counts its own visits') && pv.includes('without any outside analytics') && pv.includes('Do Not Track') === false && pv.includes('asks websites not to track you') && !pv.includes('no analytics or tracking'));
+  const off = render('plumber', { visit_counter: false })['privacy/index.html'];
+  ok('privacy: with the counter switched off, the page says the site counts nothing', off.includes('does not count or track visits') && !off.includes('counts its own visits'));
   ok('accessibility: promises the template actually keeps', f['accessibility/index.html'].includes('keyboard') && f['accessibility/index.html'].includes('written description'));
   ok('every page footer links Privacy · Accessibility', f['index.html'].includes('href="/privacy/"') && f['about/index.html'].includes('href="/accessibility/"'));
   ok('sitemap includes the legal pages', f['sitemap.xml'].includes('/privacy/') && f['sitemap.xml'].includes('/accessibility/'));

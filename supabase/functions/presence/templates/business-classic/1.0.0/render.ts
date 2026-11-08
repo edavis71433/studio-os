@@ -538,7 +538,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   }
 
   // Phase SEARCH: static, privacy-safe on-site search — the site's own content
-  // index (zero external origins, zero trackers) + a calm results page whose
+  // index (zero external origins, no outside trackers) + a calm results page whose
   // first-party inline script filters it client-side. Kept out of the sitemap +
   // noindexed (a thin utility page).
   files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });

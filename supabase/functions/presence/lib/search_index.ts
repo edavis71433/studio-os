@@ -1,5 +1,5 @@
 // ── On-site search + post tags — the ONE static, privacy-safe search substrate ──
-// A published Studio OS site has zero external origins and zero trackers. So the
+// A published Studio OS site has zero external origins and no outside trackers. So the
 // site's own search is built the same way: at publish time we serialize a small
 // JSON index of the site's OWN content (pages, offerings, updates, FAQs), ship it
 // beside the site, and a tiny FIRST-PARTY inline script filters it in the browser.

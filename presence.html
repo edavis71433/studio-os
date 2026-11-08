@@ -1337,6 +1337,11 @@ body.pd-dragging *{cursor:grabbing !important}
           <div class="hoursgrid" id="hoursGrid"></div>
           <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
           <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
+          <div id="privacyWrap" data-needs="configure">
+          <h5 class="rune">Privacy <span class="whisper" id="save-privacy"></span></h5>
+          <label class="closedrow" style="margin-top:var(--dds-s3,12px)"><input type="checkbox" id="visitSwitch" aria-describedby="visitHint"> Count visits to your site</label>
+          <div class="hint" id="visitHint"></div>
+          </div>
           </div>
         </div>
 
@@ -2459,6 +2464,27 @@ $("closedSwitch").addEventListener("change", async () => {
   $("f-closednote").hidden = !now;
   try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
   catch (err) { toast(nice(err), true); }
+});
+// Item 61: the published site's visit counter, and the privacy page that describes it,
+// follow this one switch. Absent means on, as every site has counted until now.
+function renderVisitSwitch() {
+  $("privacyWrap").hidden = !!(S.site && S.site.edition === "monitor");   // a watched website isn't ours to count
+  const on = !(S.settings && S.settings.visit_counter === false);
+  $("visitSwitch").checked = on;
+  $("visitHint").textContent = on
+    ? "Counts which pages people open and when they tap your phone number, email or links, with no cookies and no outside company. Your privacy page says so. Changes go live when you publish."
+    : "Your site counts nothing, and its privacy page says so. Changes go live when you publish.";
+}
+$("visitSwitch").addEventListener("change", async () => {
+  const now = $("visitSwitch").checked;
+  whisper("save-privacy", "saving");
+  try {
+    await settingsPut({ visit_counter: now });
+    whisper("save-privacy", "saved"); renderVisitSwitch(); scheduleChangesRefresh();
+  } catch (err) {
+    whisper("save-privacy", ""); $("visitSwitch").checked = !now;
+    toast(nice(err), true);
+  }
 });
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
@@ -6574,6 +6600,7 @@ function fillSingles() {
   if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
   if ($("f-gsv")) $("f-gsv").value = (S.settings && S.settings.google_site_verification) || "";
   if ($("f-bsv")) $("f-bsv").value = (S.settings && S.settings.bing_site_verification) || "";
+  renderVisitSwitch();
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });

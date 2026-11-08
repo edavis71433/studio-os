@@ -1,11 +1,13 @@
 // ── Generated legal & trust pages (Phase Q / FD-M3) ──────────────────────────
 // Every published site gets a Privacy Policy and an Accessibility Statement,
 // GENERATED from structured business facts — the owner never writes legal HTML.
-// The honest foundation: Studio OS sites emit no cookies, no analytics, no
-// tracking, and no third-party embeds (verified — zero-JS templates; maps are
-// links), so no consent banner is required; the privacy policy covers the one
-// real data flow (the contact form) truthfully. Deterministic: the effective
-// date is the snapshot date (the only clock a renderer may read).
+// The honest foundation: Studio OS sites set no cookies and carry no third-party
+// embeds or outside analytics (maps are links), so no consent banner is required.
+// Two real data flows are described as they are: the contact form, and the site's
+// own first-party visit counter (lib/visits.ts trackerScript, routes/collect.ts),
+// which the owner can switch off (item 61); the page reads the same switch the
+// publish step does. Deterministic: the effective date is the snapshot date (the
+// only clock a renderer may read).
 //
 // Terms of Service are deliberately NOT auto-generated in V1: terms make
 // business-specific legal promises (refunds, liability, jurisdiction) that a
@@ -36,8 +38,12 @@ export function privacyBody(c: SnapshotContent, effectiveDate: string, hasForm: 
 ${hasForm
     ? `<p>If you send us a message through the contact form, we receive what you type — your name, an email address or phone number, and your message. We use it for one thing: getting back to you. We don’t sell it, share it for marketing, or add you to lists you didn’t ask for.</p>`
     : `<p>This website has no forms and collects nothing you type.</p>`}
-<h2>Cookies and tracking</h2>
-<p>This website sets <strong>no cookies</strong> and uses <strong>no analytics or tracking</strong>. There is nothing to consent to, which is why there is no cookie banner.</p>
+${c.settings?.visit_counter === false
+    ? `<h2>Cookies and visit counts</h2>
+<p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`
+    : `<h2>Cookies and visit counts</h2>
+<p>This website sets <strong>no cookies</strong> and stores nothing on your device, which is why there is no cookie banner.</p>
+<p>It counts its own visits, without any outside analytics or advertising company. When a page opens, it notes which page, the name of the website you came from, any campaign tag in the link, and your kind of device, browser and country. When you tap a phone number, an email address, a download or a link to another website, it notes which kind of link it was. It never keeps your IP address; it keeps a scrambled code made from it that changes every day, so a visit can be counted once without saying who you are. If your browser asks websites not to track you, nothing is counted. Only ${name} and the studio that runs this website see these counts, and they are never sold or shared for advertising.</p>`}
 <h2>Hosting</h2>
 <p>The site is served as static pages by our hosting provider, which may keep standard, short-lived server logs (such as IP addresses) for security and reliability.</p>
 <h2>Your choices</h2>
