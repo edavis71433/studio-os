@@ -14,6 +14,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsFor } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
+import { noteDraftBefore, withDraftVersion } from './lib/optimistic_lock.ts';
 import { resolvePrincipal } from '../_shared/auth.ts';
 import { resolveSite } from './lib/site.ts';
 import type { SiteRow } from './lib/site.ts';
@@ -99,7 +100,7 @@ serve(async (req) => {
   const cors = corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    return await route_(req, cors);
+    return await withDraftVersion(req, await route_(req, cors));   // a write that moves the draft names the version it left
   } catch (e) {
     // OBSERVABILITY: a request-path exception must land somewhere a human looks,
     // not just an ephemeral edge log. Best-effort ledger write; always returns a
@@ -468,6 +469,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Only a scoped, signed-in /commerce request is still here (L1 above): every gate
   // has passed and `site` is the client the scope authorised.
   if (route === '/commerce' || route.startsWith('/commerce/')) return handleScopedCommerce(req, db, site, route, method, cors);
+
+  // A write that moves the draft and names a version: hash the draft as it is now, before
+  // the write, so the answer can say which version the write left (lib/optimistic_lock.ts).
+  await noteDraftBefore(req, route, site);
 
   // 5. router — exact routes only
   if (route === '/site' && method === 'GET') return handleGetSite(db, site, cors);

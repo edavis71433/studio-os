@@ -1902,24 +1902,29 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 // The draft version is a hash of the whole draft, so any of these moves it, whether or
 // not the server checks that route against it. One at a time, in order: a write that goes
 // out while another is on its way names a version that one is about to move, and is
-// refused as someone else's change. Behind a write that lands, the next names no version
-// (see the end of apiSend); behind a refused one, the next names the same version and
-// hears the same. Everything else stays out of the line, so a slow ask (an AI draft) can't
-// hold up a save, and /publish still names the version that was reviewed.
-const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit\/apply|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+// refused as someone else's change. Behind a write that lands, the next names the version
+// that write's answer gave (see the end of apiSend); behind a refused one, the next names
+// the same version and hears the same. Everything else stays out of the line, so a slow
+// ask (an AI draft) can't hold up a save, and /publish still names the version that was
+// reviewed. The server keeps the same list (lib/optimistic_lock.ts).
+const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
-async function api(method, route, body) {
+let DRAFT_SEED = false;    // readChanges: the state was just loaded whole, so take the version with it
+let REVIEWED = null;       // the version Publish's review read, which /publish names
+// named: the version this write names, when it isn't the one the page holds (/publish
+// names the version that was reviewed).
+async function api(method, route, body, named) {
   const undoRec = undoPlan(method, route, body);   // reads the state BEFORE this write
   if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
-  const send = () => apiSend(method, route, body, undoRec);
+  const send = () => apiSend(method, route, body, undoRec, named);
   if (method === "GET" || !DRAFT_WRITE.test(route)) return send();
   DRAFT_WRITES_OUT++;
   const turn = DRAFT_LINE.then(send).finally(() => { DRAFT_WRITES_OUT--; });
   DRAFT_LINE = turn.catch(() => {});
   return turn;
 }
-async function apiSend(method, route, body, undoRec) {
+async function apiSend(method, route, body, undoRec, named) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
   if (!jwt) { showGate("Please sign in", "Your room uses your usual sign-in. Sign in and come straight back.", true); throw new Error("no-session"); }
@@ -1927,10 +1932,11 @@ async function apiSend(method, route, body, undoRec) {
   // edit is refused, never silently overwriting a newer one. One place → every
   // save is protected consistently, no duplicated logic.
   const mut = method !== "GET";
+  const version = named !== undefined ? named : S.draftHash;
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
-      ...(mut && S.draftHash ? { "If-Match": S.draftHash } : {}) },
+      ...(mut && version ? { "If-Match": version } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   }).finally(() => { if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
@@ -1953,12 +1959,19 @@ async function apiSend(method, route, body, undoRec) {
     }
     const e = new Error((j && j.message) || "Nothing was lost — that just didn’t go through. Try once more."); e.status = r.status; e.body = j; throw e;
   }
-  // after a successful write our held hash is stale (the draft moved); mark it
-  // unknown until the next /changes refresh restores it (prevents self-conflicts
-  // during a rapid burst of the SAME user's edits). The stashed 409 provenance
-  // is stale too — OUR write is now the newest edit, so the "Last edit" line
-  // must not keep attributing the draft to someone else.
-  if (mut) { S.draftHash = null; S.lastChange = null; }
+  // A write that moves the draft leaves it at a new version, and its answer says which:
+  // the next write names that one. Waiting for a /changes read instead let in anyone
+  // else's change from that second, which nothing here had loaded. An answer that doesn't
+  // say (a route the server doesn't check, or a server from before it said) leaves the
+  // version unknown until readChanges finds it. A write that doesn't move the draft leaves
+  // the version alone. The stashed 409 provenance is stale too: OUR write is now the
+  // newest edit, so the "Last edit" line must not keep attributing the draft to someone else.
+  if (mut) {
+    const left = r.headers.get("X-Draft-Version");
+    if (left) { S.draftHash = left; DRAFT_SEED = false; }
+    else if (DRAFT_WRITE.test(route)) S.draftHash = null;
+    S.lastChange = null;
+  }
   if (undoRec) undoCommit(undoRec, j);
   // G13: every /settings read/save carries the server-computed section_meta
   // sidecar ({sid,key,src_index} per stored block, home + pages) — the ONE
@@ -5081,14 +5094,18 @@ function renderPublishButton() {
     barPub.classList.toggle("inked", $("btnPublish").classList.contains("inked"));
   }
 }
-// A read names the version the draft had when it got there. One of our writes answered
-// since it left has moved the draft on, and one still out is about to, so that version
-// would refuse our next write as someone else's change: leave it, and read again.
+// A read names the version the draft had when it got there, someone else's changes and
+// all. The page holds the version its own state is built on: the one it loaded with,
+// then whatever each of its writes left. So a read's version is only taken when the page
+// holds none, or along with a full load (refreshAll sets DRAFT_SEED). One of our writes
+// answered since the read left has moved the draft on, and one still out is about to, so
+// that version would refuse our next write as someone else's change: leave it, and read
+// again.
 async function readChanges() {
   const answered = WRITES_ANSWERED;
   const c = await api("GET", "/changes");
-  if (c.data && c.data.draft_hash) {
-    if (answered === WRITES_ANSWERED && !DRAFT_WRITES_OUT) S.draftHash = c.data.draft_hash;
+  if (c.data && c.data.draft_hash && (DRAFT_SEED || !S.draftHash)) {
+    if (answered === WRITES_ANSWERED && !DRAFT_WRITES_OUT) { S.draftHash = c.data.draft_hash; DRAFT_SEED = false; }
     else scheduleChangesRefresh();
   }
   return c;
@@ -5521,9 +5538,12 @@ async function loadRitual(toSchedule) {
   try {
     // A save can land while this is out. Read again: what's reviewed should include it, and
     // the version from before it would refuse the next save as someone else's change.
+    // Publish names the version reviewed here (If-Match), and only Publish does: it can hold
+    // someone else's change the page hasn't loaded, so the page's next save doesn't take it.
     let c, answered;
     do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);
-    S.changes = c; if (c && c.draft_hash) S.draftHash = c.draft_hash;   // M9: publish exactly what you reviewed (If-Match)
+    S.changes = c; REVIEWED = (c && c.draft_hash) || null;
+    if (REVIEWED && !S.draftHash && !DRAFT_WRITES_OUT) S.draftHash = REVIEWED;   // as readChanges, when the page holds none
     renderPublishButton();
     const body = $("ritBody"); body.innerHTML = "";
     const forClient = scopedClientName();
@@ -5597,7 +5617,7 @@ async function runPublish(btn, firstPublish) {
   $("ritBody").innerHTML = pipeHtml(1);
   $("ritSub").textContent = "All at once, never halfway — your site is never partially updated.";
   try {
-    const r = await api("POST", "/publish");
+    const r = await api("POST", "/publish", undefined, REVIEWED || S.draftHash);
     if (r.data.status === "live") return showReceipt(firstPublish);
     pollPublish(0, firstPublish);
   } catch (err) {
@@ -6508,6 +6528,7 @@ async function refreshAll() {
   // non-critical content reads — one flaky endpoint must never blank the whole
   // editor. Only /site is truly required. `tagged` prefixes an error with which
   // call failed so a real failure is diagnosable, not a generic "couldn't load".
+  DRAFT_SEED = true;   // everything is read again below, so the next read's version is the page's
   const soft = (p) => p.catch((e) => (e && (e.status === 403 || e.status >= 500) ? { data: [] } : Promise.reject(e)));
   const tagged = (name, p) => p.catch((e) => { if (e && typeof e.message === "string") e.message = "[" + name + "] " + e.message; throw e; });
   const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
