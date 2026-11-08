@@ -205,6 +205,25 @@ html.dds-embed #detailWrap{padding-top:0}
   .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
   .col-body.drop-over{background:var(--p-soft)}
   .bempty{font-size:12px;text-align:center;padding:10px var(--dds-s1,4px);opacity:.7}
+  /* Sales review item 30: the board ends with a collapsed Won column and a
+     Not-a-fit drop zone, narrower than the four open stages */
+  .board.with-out{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(170px,1fr)) repeat(2,minmax(120px,.55fr))}
+  .board.with-out .col{min-width:0}
+  .col.col-won{background:var(--good-soft,#e6f2ea)}
+  .won-v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;margin:2px 0 8px}
+  .col-out .linkbtn{font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer;text-align:left}
+  .lost-drop{min-height:72px;border:1px dashed var(--line-strong,var(--line));justify-content:center}
+  /* Sales review item 36: the first-deal walkthrough on an empty pipeline */
+  .firstdeal{max-width:640px;margin:8px auto;padding:var(--dds-s5,20px) var(--dds-s5,20px) var(--dds-s4,16px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px)}
+  .firstdeal h3{margin:0 0 4px;font-size:17px}
+  .firstdeal>p{margin:0 0 12px;color:var(--soft);font-size:14px}
+  .firstdeal ol{margin:0;padding:0;list-style:none;counter-reset:fd}
+  .firstdeal li{counter-increment:fd;position:relative;padding:10px 0 10px 40px;border-top:1px solid var(--line);font-size:14px;line-height:1.45}
+  .firstdeal li:first-child{border-top:0}
+  .firstdeal li::before{content:counter(fd);position:absolute;left:0;top:9px;width:26px;height:26px;border-radius:999px;background:var(--p-soft);color:var(--p);font-weight:700;font-size:13px;display:grid;place-items:center}
+  .firstdeal li b{display:block}
+  .firstdeal li span{color:var(--soft)}
+  .firstdeal .fd-act{margin-top:8px}
   .bcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px;cursor:pointer;position:relative}
   .bcard:hover{border-color:var(--p)}
   .bcard.dragging{opacity:.5}
@@ -1422,6 +1441,7 @@ async function renderSummary(gen){
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
   const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
+  if(s.won_month){WON_MONTH=wm;const wc=$('wonCol');if(wc){wc.innerHTML=wonColInner();const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});}}   // item 30: the Won column says the tile's number
   // visual refresh: four icon tiles (Open · Won this month · Win rate ·
   // Outstanding) in place of the one-line strip; the per-stage cells follow.
   const ICO={open:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
@@ -1673,8 +1693,20 @@ function renderRosterEmpty(host){
   if(window.ddsStudioLevel&&window.ddsStudioLevel(host,{noun:'Deals',lower:'deals and invoices'}))return;
   if(FILTER==='won'){host.innerHTML='<div class="dds-empty"><div class="ico">🏆</div><h3>No won deals yet</h3><p>Deals you win show up here with their values.</p></div>';return;}
   if(FILTER){host.innerHTML='<div class="dds-empty"><h3>Nothing in “'+esc(stageLabel(FILTER))+'” right now.</h3><p>Deals in this stage will show up here.</p></div>';return;}
-  if(window.ddsEmpty) window.ddsEmpty(host,{icon:'🧭',title:'No deals yet',body:'New enquiries and manual deals show up here. Add your first one to start the pipeline.',actionLabel:'New deal',onAction:openNewDeal});
-  else host.innerHTML='<p class="mut">No deals yet.</p>';
+  renderFirstDeal(host);
+}
+// Sales review item 36: an empty pipeline walks the four steps to a first
+// customer (Salesforce's guided workflow), with step one's button right there.
+function renderFirstDeal(host){
+  host.innerHTML=`<div class="firstdeal" id="firstDeal"><h3>Your first deal, in four steps</h3>
+    <p>Every customer starts here. The deal page guides each step as you go.</p>
+    <ol>
+      <li><b>Add the deal.</b><span>Who it’s with and what it’s worth. An enquiry in your Inbox can start one too.</span><div class="fd-act"><button type="button" class="btn" id="fdNew">Add your first deal</button></div></li>
+      <li><b>Send a proposal.</b><span>Pick from your services, set the price and send it from the deal.</span></li>
+      <li><b>Get the agreement signed.</b><span>They sign online, and the deal moves to Won.</span></li>
+      <li><b>Make them a customer.</b><span>Converting opens their portal and starts their project.</span></li>
+    </ol></div>`;
+  const fd=host.querySelector('#fdNew');if(fd)fd.addEventListener('click',openNewDeal);
 }
 // ONE re-render for whatever display is active — the search, refresh, and sort
 // paths all come through here so the meta line never drifts from the list.
@@ -1799,6 +1831,25 @@ function boardCard(d,today){
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
   return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}<div class="bc-actions">${moveBtn}</div></article>`;
 }
+// Sales review item 30: the board keeps its outcomes in view. Won is collapsed to
+// this month's count and value (the summary's own number once it has loaded, the
+// same rule over the deals in hand until then) with a way to the won deals; Not
+// a fit is a drop zone (a drop there is the tap menu's "Mark as not a fit").
+let WON_MONTH=null;
+function wonThisMonthLocal(){
+  const mk=new Date().toISOString().slice(0,7);
+  const ws=DEALS.filter(d=>(d.converted_client_id||d.stage==='won')&&String(d.converted_at||d.updated_at||'').slice(0,7)===mk);
+  return{count:ws.length,value_cents:ws.reduce((a,d)=>a+(Number(d.expected_value_cents)||0),0)};
+}
+function wonColInner(){
+  const wm=WON_MONTH||wonThisMonthLocal();
+  return `<header class="col-h"><span class="col-t">Won</span><span class="col-n" id="wonN">${Number(wm.count)||0}</span></header><div class="col-tip mut">This month</div><div class="won-v" id="wonV">${wm.count?esc(money(wm.value_cents)||'$0'):'Nothing yet'}</div><button type="button" class="linkbtn" id="seeWon">See won deals →</button>`;
+}
+function outcomeColsHtml(){
+  const lost=DEALS.filter(d=>d.stage==='lost').length;
+  return `<section class="col col-out col-won" id="wonCol" aria-label="Won column">${wonColInner()}</section>`
+    +`<section class="col col-out col-lost" id="lostCol" aria-label="Not a fit column"><header class="col-h"><span class="col-t">Not a fit</span>${lost?`<span class="col-n">${lost}</span>`:''}</header><div class="col-tip mut">Drop a deal here to close it</div><div class="col-body lost-drop" data-drop="lost"><div class="bempty mut">Drop here</div></div></section>`;
+}
 function renderBoard(){
   const host=$('board');
   const today=new Date().toISOString().slice(0,10);
@@ -1806,6 +1857,8 @@ function renderBoard(){
   // boardVisible() = visibleDeals() (the .lhead search narrows the board too)
   // minus outcomes — the SAME set renderMeta counts, by construction.
   const open=boardVisible();
+  // a pipeline with no deals at all gets the walkthrough, not four empty columns (item 30/36)
+  if(!DEALS.length){if(window.ddsStudioLevel&&window.ddsStudioLevel(host,{noun:'Deals',lower:'deals and invoices'}))return;renderFirstDeal(host);return;}
   const cols=BOARD_STAGES.map(stg=>{
     const ds=open.filter(d=>d.stage===stg);
     const sum=ds.reduce((a,d)=>a+(d.expected_value_cents||0),0);   // per-column total value (pipeline health at a glance)
@@ -1813,10 +1866,11 @@ function renderBoard(){
     return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span>${sum?`<span class="col-val">${money(sum)}</span>`:''}</header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div></section>`;
   }).join('');
   const terminal=DEALS.length-open.length;
-  host.innerHTML=`<div class="board-scroll"><div class="board">${cols}</div></div>`
+  host.innerHTML=`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
     +(open.length?'':'<div class="mut" style="margin-top:12px">No open deals yet. Add one to start the pipeline.</div>')
     +(terminal>0?`<div class="mut board-foot">${terminal} won or closed deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
   wireBoard();
+  const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});
 }
 function wireBoard(){
   const host=$('board');

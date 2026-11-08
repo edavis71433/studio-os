@@ -18,6 +18,7 @@ import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
+import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -575,6 +576,29 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
   if (!Object.keys(patch).length) return json({ error: 'bad_request' }, 400, cors);
   const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
   return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
+}
+
+// ═══ MY TASKS — Home's one list of the studio's own to-dos (sales review item 29) ═══
+// Next steps on open deals · open deal to-dos (not on a lost deal) · studio-side
+// project tasks (unassigned or mine) on active/on-hold projects. Every read is
+// best-effort: a failed slot contributes nothing and `partial` says so, never a
+// false "nothing to do". The rule lives in lib/my_tasks.ts.
+export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  let partial = false;
+  const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
+  const [deals, dealTasks, projectTasks] = await Promise.all([
+    read(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
+    read(`presence_deal_tasks?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
+    read(`presence_tasks?site_id=eq.${site.id}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required&limit=300`),
+  ]);
+  const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
+  const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
+  const [taskDeals, projects] = await Promise.all([
+    dealIds.length ? read(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage`) : Promise.resolve([]),
+    projIds.length ? read(`presence_projects?id=in.(${projIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status`) : Promise.resolve([]),
+  ]);
+  const all = buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId: principal.userId || null });
+  return json({ data: { items: all.slice(0, MY_TASKS_MAX), total: all.length, partial } }, 200, cors);
 }
 
 // ═══ DEALS ═══

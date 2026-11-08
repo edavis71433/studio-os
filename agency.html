@@ -179,6 +179,17 @@
   .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) 10px;line-height:18px}
   .answer .lowc{margin-top:var(--dds-s2,8px);font-size:12.5px;color:var(--soft);white-space:normal}
   .rrows .late{color:var(--bad)} .rrows a .rn.due{color:var(--warn)}
+  /* My tasks (sales review item 29): a row is the link plus its own Done */
+  .trow{display:flex;align-items:center;gap:var(--dds-s2,8px);padding:6px 0;border-top:1px solid var(--line)}
+  .trow:first-child{border-top:0}
+  .trow a{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
+  .trow a:hover{color:var(--p)}
+  .trow a:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:var(--dds-r,8px)}
+  .trow .late{color:var(--bad)} .trow .rn{flex:0 0 auto;font-size:12px;color:var(--soft);font-weight:400;white-space:nowrap} .trow .rn.due{color:var(--warn)}
+  .trow .tctx{color:var(--soft);font-weight:400}
+  .tdone{flex:0 0 auto;font:inherit;font-size:12px;font-weight:600;color:var(--p);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;min-height:32px;cursor:pointer}
+  .tdone:hover{border-color:var(--p)} .tdone:disabled{opacity:.6;cursor:default}
+  .tblk{flex:0 0 auto;font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:3px 10px}
   .rfoot{margin-top:var(--dds-s2,8px);font-size:12.5px} .rfoot a{color:var(--p);text-decoration:none;font-weight:500}
   .quiet{font-size:12.5px;color:var(--faint);margin:6px 0 0}
   /* ── the top row: agency name · role · + Add a customer · platform health (staff) ── */
@@ -807,21 +818,69 @@ function statTiles(s){
   if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',tone:'',href:'/pipeline.html'});}
   return t;
 }
+// ── My tasks (sales review item 29, Nov 2026): every open deal next step and
+//    to-do and the studio's own project tasks, from GET /sales/my-tasks (the rule
+//    is lib/my_tasks.ts), each with its due date and a Done that uses the route
+//    that owns it. An older server without the route keeps This week. ──
+let MYTASKS=null,MYT_ALL=false;
+const MYT_SHOW=6;
+function myTaskDoneReq(t){
+  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),{next_step:'',next_step_at:''}];
+  if(t.kind==='deal_task')return['PATCH','/sales/deal-tasks/'+encodeURIComponent(t.id),{status:'done'}];
+  return['PATCH','/projects/'+encodeURIComponent(t.parent_id)+'/tasks/'+encodeURIComponent(t.id),{status:'done'}];
+}
+function myTaskRow(t){
+  const d=t.due?daysBetween(localYmd(),t.due):null;
+  const key=t.kind+':'+t.id;
+  return `<div class="trow" data-task="${esc(key)}"><a href="${esc(t.href)}" data-noscope="1"><span${d!=null&&d<0?' class="late"':''}>${esc(t.title)} <span class="tctx">· ${esc(t.context)}</span></span><span class="rn${d!=null&&d<=0?' due':''}">${esc(t.due?dueLabel(t.due):'No date')}</span></a>${
+    t.blocked?'<span class="tblk" title="Unblock it on the project first">Blocked</span>':`<button type="button" class="tdone" data-done="${esc(key)}" aria-label="${esc('Done: '+t.title)}">Done</button>`}</div>`;
+}
+function myTasksHtml(){
+  const items=MYTASKS.items,total=MYTASKS.total;
+  const shown=MYT_ALL?items:items.slice(0,MYT_SHOW);
+  const hiddenHere=items.length-shown.length,beyond=Math.max(0,total-items.length);
+  let h=`<div class="rcard" id="my-tasks"><p class="rh">My tasks · ${total}</p>`;
+  h+=shown.length?`<div class="trows">${shown.map(myTaskRow).join('')}</div>`:'<p class="quiet">Nothing left on your list.</p>';
+  if(hiddenHere>0)h+=`<p class="quiet"><button type="button" class="linkbtn" id="myTasksMore">Show all ${items.length}</button></p>`;
+  else if(beyond>0)h+=`<p class="quiet">${beyond} more on your deals and projects.</p>`;
+  if(MYTASKS.partial)h+='<p class="quiet">Some of this couldn’t be checked just now — ↻ tries again.</p>';
+  return h+'<div class="rfoot"><a href="/pipeline.html" data-noscope="1">Pipeline →</a> · <a href="/projects.html" data-noscope="1">Projects →</a></div></div>';
+}
+function paintMyTasks(){
+  const el=$('my-tasks');if(!el||!MYTASKS)return;
+  el.outerHTML=myTasksHtml();wireMyTasks();
+}
+function wireMyTasks(){
+  const card=$('my-tasks');if(!card)return;
+  const more=$('myTasksMore');if(more)more.addEventListener('click',()=>{MYT_ALL=true;paintMyTasks();const f=document.querySelector('#my-tasks .trow:nth-child('+(MYT_SHOW+1)+') a');if(f)f.focus();});
+  card.querySelectorAll('[data-done]').forEach(b=>b.addEventListener('click',async()=>{
+    const key=b.getAttribute('data-done');const t=MYTASKS.items.find(x=>x.kind+':'+x.id===key);if(!t)return;
+    b.disabled=true;
+    const [m,path,body]=myTaskDoneReq(t);
+    let r;try{r=await apiSend(m,path,body);}catch(_){r={ok:false,body:{}};}
+    if(!r.ok){b.disabled=false;toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.',true);return;}
+    MYTASKS.items=MYTASKS.items.filter(x=>x!==t);MYTASKS.total=Math.max(0,MYTASKS.total-1);
+    toast('Done: '+t.title);paintMyTasks();
+  }));
+}
 let SSEQ=0;
 async function mountStudio(){
   const host=$('studio');if(!host)return;
   const gen=++SSEQ;
   const get=async(p)=>{try{const r=await api(p);return r.ok?r.body.data:null;}catch(_){return null;}};
-  const [summary,deals]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100')]);
+  const [summary,deals,mine]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
   if(gen!==SSEQ)return;
-  const tiles=statTiles(summary);const todos=weekTodos(deals);const top=keyDeals(deals);const wins=recentWins(deals);
-  if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
+  MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
+  const tiles=statTiles(summary);const todos=MYTASKS?[]:weekTodos(deals);const top=keyDeals(deals);const wins=recentWins(deals);
+  const tasks=!!(MYTASKS&&(MYTASKS.items.length||MYTASKS.partial));
+  if(!tiles.length&&!tasks&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
   let h='';
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
   if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(t=>`<a class="stat" role="listitem" id="${esc(t.id)}" href="${esc(t.href)}"><div><div class="sk">${esc(t.k)}</div><div class="sv ${esc(t.tone)}">${esc(t.v)}</div><div class="ss">${esc(t.s)}</div></div></a>`).join('')}</div></div>`;
-  if(todos.length||top.length||wins.length){
+  if(tasks||todos.length||top.length||wins.length){
     h+='<div class="two">';
+    if(tasks)h+=myTasksHtml();
     if(todos.length){const late=todos.some(r=>r.days!=null&&r.days<0);
       h+=`<div class="rcard" id="this-week"><p class="rh">This week · ${todos.length}</p><div class="rrows">${todos.map(r=>`<a href="/crm.html?deal=${encodeURIComponent(r.id)}" data-noscope="1"><span${r.days!=null&&r.days<0?' class="late"':''}>${esc(r.title)}${r.deal?' <span style="color:var(--soft);font-weight:400">· '+esc(r.deal)+'</span>':''}</span><span class="rn${r.days!=null&&r.days<=0?' due':''}">${esc(dueLabel(r.at))}</span></a>`).join('')}</div>${late?'':'<p class="quiet">Nothing overdue.</p>'}<div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;}
     if(top.length)h+=`<div class="rcard" id="key-deals"><p class="rh">Key deals</p><div class="rrows">${top.map(d=>`<a href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1">${esc(d.title||'A deal')}<span class="rn">${esc(money(d.expected_value_cents))}</span></a>`).join('')}</div><div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;
@@ -829,6 +888,7 @@ async function mountStudio(){
     h+='</div>';
   }
   host.hidden=false;host.innerHTML=h;
+  wireMyTasks();
 }
 
 // ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by

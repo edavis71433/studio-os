@@ -112,6 +112,14 @@
   .rwhen{margin-left:auto;flex:0 0 auto;font-size:11.5px;color:var(--faint)}
   .rprev{display:flex;align-items:center;gap:var(--dds-s2,8px);min-width:0}
   .rprev .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--soft)}
+  /* sales review item 34: a support request's priority (only High and Urgent show
+     on the row) and who has it */
+  .prio{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--warn-soft);color:var(--warn);white-space:nowrap}
+  .prio.urgent{background:var(--bad-soft,#f6e3e1);color:var(--bad,#a3423a)}
+  .asg{flex:0 0 auto;font-size:12px;color:var(--soft);white-space:nowrap}
+  .triage{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+  .triage label{display:inline-flex;align-items:center;gap:6px}
+  .triage select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:4px 8px;min-height:32px}
   .rchip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--p-soft);color:var(--p);white-space:nowrap}
   .rchip.support{background:var(--warn-soft);color:var(--warn)}
   .rchip.lead{background:var(--good-soft);color:var(--good)}
@@ -435,6 +443,7 @@ function buildItems(feed,leads,notifs){
     items.push({kind:'support',id:'sup:'+c.id,support_id:String(c.id||''),thread_key:c.thread_key||('support:'+c.id),
       name:c.client||'Support request',when:String(c.created_at||''),preview:c.subject||'A support request',
       chip:'Support'+(c.status?' · '+capFirst(String(c.status).replace(/_/g,' ')):''),chipCls:'support',status:String(c.status||'open'),
+      priority:String(c.priority||'normal'),assigned_to:c.assigned_to?String(c.assigned_to):'',
       unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),
       project_id:pid,projects:pid?[{id:pid,name:String(c.project||'')}]:[],href:String(c.href||'')});
   }
@@ -804,7 +813,7 @@ function renderList(){
       <span class="avatar" aria-hidden="true">${it.kind==='approval'?'✓':initialsOf(it.name)}</span>
       <span class="rmain">
         <span class="rtop"><span class="rname">${esc(it.name)}</span>${it.when?`<span class="rwhen">${esc(when(it.when))}</span>`:''}</span>
-        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(rowChip(it))}</span><span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
+        <span class="rprev"><span class="rchip ${it.chipCls}">${esc(rowChip(it))}</span>${supBadges(it)}<span class="txt">${esc(it.preview)}</span>${it.count>1?`<span class="cmbadge">${it.count}</span>`:''}</span>
       </span></li>`;
   }
   rows.innerHTML=h;
@@ -1042,6 +1051,44 @@ function renderTL(host,items){
 
 // ── A support row → the thread + an honest status control + reply composer ───
 const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',closed:'Closed'};
+// ── Sales review item 34: priority and who has a request ─────────────────────
+// Priority (low · normal · high · urgent) and assigned_to have been columns since
+// 0078; PATCH /support/:id already takes both. The row shows High and Urgent, and
+// who has it; the pane sets both. People come from the studio's team
+// (/agency/members, by the sign-in id each member's row learns): the assignee
+// picker shows only when a second person has signed in (decision 6).
+const PRIO_LABEL={low:'Low',normal:'Normal',high:'High',urgent:'Urgent'};
+let TEAM=null,TEAM_P=null;
+function loadTeam(){
+  if(TEAM)return Promise.resolve(TEAM);
+  if(TEAM_P)return TEAM_P;
+  TEAM_P=Promise.all([api('/agency/me'),api('/agency/members')]).then(([me,mem])=>{
+    const list=(mem.ok&&Array.isArray(mem.body.data))?mem.body.data:[];
+    const myId=(me.ok&&me.body.data&&me.body.data.member_id)||'';
+    const myRow=list.find(m=>m.id===myId);
+    const meUid=myRow&&myRow.user_id?String(myRow.user_id):'';
+    const people=list.filter(m=>m&&m.status!=='revoked'&&m.user_id).map(m=>({uid:String(m.user_id),label:String(m.user_id)===meUid?'You':(String(m.email||'').split('@')[0]||'A teammate')}));
+    TEAM={me:meUid,people};return TEAM;
+  }).catch(()=>{TEAM={me:'',people:[]};return TEAM;});
+  return TEAM_P;
+}
+function whoHas(uid){if(!uid)return'';const p=TEAM&&TEAM.people.find(x=>x.uid===uid);return p?p.label:(TEAM?'A teammate':'');}
+function supBadges(it){
+  if(it.kind!=='support')return'';
+  const p=String(it.priority||'normal');
+  const who=whoHas(it.assigned_to);
+  return (p==='high'||p==='urgent'?`<span class="prio ${p}">${PRIO_LABEL[p]}</span>`:'')+(who?`<span class="asg">${who==='You'?'Yours':esc(who)}</span>`:'');
+}
+async function setSupportField(it,field,value,ctl){
+  const prev=field==='priority'?it.priority:it.assigned_to;
+  ctl.disabled=true;
+  const r=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{[field]:value||null});
+  ctl.disabled=false;
+  if(!r.ok){ctl.value=prev||'';toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.');return;}
+  if(field==='priority'){it.priority=value;toast('Priority: '+(PRIO_LABEL[value]||value)+'.');}
+  else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours.':'Assigned to '+whoHas(value)+'.'):'Nobody has it now.');}
+  renderList();
+}
 // Oct 2026 review: ONE path for every status change — the select, the header's
 // Resolve / Close, and "Reply and resolve". PATCH /support/:id (the existing
 // triage route; the server re-checks the ladder). Resolved or closed ENDS the
@@ -1100,12 +1147,26 @@ async function paneSupport(host,it){
   const openNowSrv=cur==='open'||cur==='in_progress';
   if(!openNowSrv){const sr0=$('supResolve'),sc0=$('supClose'),st0=$('supTask');if(sr0)sr0.remove();if(sc0)sc0.remove();if(st0)st0.remove();}
   $('paneStatusWrap').innerHTML='';
-  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div></div>`;
+  // item 34: the server's priority and assignee win over the feed's
+  it.priority=String(req.priority||it.priority||'normal');it.assigned_to=req.assigned_to?String(req.assigned_to):'';
+  const prioSel=`<label>Priority <select id="supPrio">${['low','normal','high','urgent'].map(v=>`<option value="${v}"${v===it.priority?' selected':''}>${PRIO_LABEL[v]}</option>`).join('')}</select></label>`;
+  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div><div class="triage" id="supTriage">${prioSel}<span id="supAsgWrap"></span></div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
     h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
   }
   pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
+  const ps=$('supPrio');if(ps)ps.addEventListener('change',()=>setSupportField(it,'priority',ps.value,ps));
+  loadTeam().then((team)=>{
+    if(seq!==PANE_SEQ)return;
+    const w=$('supAsgWrap');if(!w)return;
+    if(team.people.length>1){
+      const known=!it.assigned_to||team.people.some(p=>p.uid===it.assigned_to);
+      w.innerHTML=`<label>Assigned to <select id="supAsg"><option value="">Nobody</option>${team.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===it.assigned_to?' selected':''}>${esc(p.label)}</option>`).join('')}${known?'':`<option value="${esc(it.assigned_to)}" selected>A teammate</option>`}</select></label>`;
+      const as=$('supAsg');if(as)as.addEventListener('change',()=>setSupportField(it,'assigned_to',as.value,as));
+    }else if(it.assigned_to){w.textContent='Assigned to '+(whoHas(it.assigned_to)==='You'?'you':whoHas(it.assigned_to));}
+    if(ITEMS.some(x=>x.kind==='support'&&x.assigned_to))renderList();   // the row's "who has it" can name people now
+  });
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
@@ -1383,6 +1444,7 @@ async function loadData(){
   NOTIFS=(notifs.ok&&Array.isArray(notifs.body.data))?notifs.body.data:[];
   ITEMS=buildItems(FEED,LEADS,NOTIFS);
   SYSROWS=buildSystem(FEED,NOTIFS);
+  if(!TEAM&&ITEMS.some(x=>x.kind==='support'&&x.assigned_to))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // item 34: name who has each request
   // the meta line's honesty: TOTAL counts what the Everything view actually
   // RENDERS (conversation items + system rows) — never raw feed rows, which
   // group and fold differently (one row per client; moments stay counted).
