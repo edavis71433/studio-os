@@ -204,7 +204,7 @@ test.describe('the builder’s icons', () => {
     await installApp(page, { api: API });
     await page.goto('/presence.html#design');
     await page.locator('#btnTrayOpen').click();
-    await expect(page.locator('.tray-item .ti-ico svg').first()).toBeVisible();
+    await expect(page.locator('.tray-item .ti-ico svg').first()).toBeAttached();   // drawn, and shown when a section's picture can't load (item 25)
     const text = await page.locator('#designTray').innerText();
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     await expect(page.locator('#btnComments')).toHaveText('Comments');

@@ -403,7 +403,7 @@ test.describe('what a real site showed', () => {
     const fold = page.locator('#designGallery .tg-fold');
     await expect(fold).toContainText('Business Classic');
     await expect(page.locator('#designGallery .tg-card').first()).toBeHidden();
-    expect(previews).toHaveLength(0);                                // each card draws a live preview, so none load until asked
+    expect(previews).toHaveLength(0);
 
     // the row sits inside the panel's margins, not against its edge. One read, after the
     // panel has finished sliding in, so both boxes describe the same moment.
@@ -420,14 +420,16 @@ test.describe('what a real site showed', () => {
     await expect(card).toBeVisible();
     await expect(page.locator('#designGallery .tg-card')).toHaveCount(3);
     expect((await margins('#designGallery .tg-card[data-look="editorial"]')).right).toBeGreaterThanOrEqual(12);   // no card runs off the side
-    await expect.poll(() => previews.length).toBe(3);
+    // each card is the template's picture, not a live drawing of it (item 25)
+    await expect.poll(() => card.locator('.tg-pic').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBe(640);
+    expect(previews).toHaveLength(0);
     await expect(card.locator('.tg-start')).toHaveText('Start with this');
     await expect(page.locator('#designGallery .tg-second')).toHaveCount(0);           // it pointed at the panel you're already in
 
     await fold.locator('summary').click();
     await fold.locator('summary').click();
     await expect(card).toBeVisible();
-    expect(previews).toHaveLength(3);                                // reopening doesn't draw them all again
+    expect(previews).toHaveLength(0);
   });
 
   test('the purple preview ribbon stays out of Edit mode and shows in Preview', async ({ page }) => {
