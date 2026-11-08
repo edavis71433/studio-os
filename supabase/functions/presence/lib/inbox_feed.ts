@@ -323,8 +323,42 @@ export function invoiceReminderIds(rows: Array<{ kind?: unknown; period?: unknow
   }
   return [...out];
 }
+// ── Nov 2026 (sales review B3): one row per subject, not one per week ────────
+// Five nudges re-raise on a time bucket so a thing that is STILL waiting speaks
+// up again: `support:<id>:w<N>`, `deal:<id>:w<N>`, `lead:<id>:w<N>`,
+// `conn:<key>:w<N>` and `site:<id>:<YYYY-MM-DD>` (the shape before the bucket
+// was the bare `<prefix>:<id>`). Raising week N+1 never retired week N, so a request
+// open for three weeks listed "Waiting on you — <subject>" three times on Today,
+// the Inbox and the bell. Only the newest bucket per subject renders; the older
+// ones are stale, so the caller clears them and the count self-heals.
+// Also: "Proposal accepted — X" is the step BEFORE "Agreement signed — X"; once
+// the same deal is signed, the accepted row is done.
+const BUCKETED_PREFIXES = new Set(['support', 'deal', 'lead', 'conn', 'site']);
+// a week bucket (w<N>, d0 for a bad clock) or a UTC day (2026-11-08 ranks as 20261108)
+const BUCKET_RE = /^(?:[wd](\d+)|(\d{4})-(\d{2})-(\d{2}))$/;
+/** The subject a bucketed notice is about, and how new its bucket is (a bare
+ *  legacy period ranks oldest). null for any period that is not bucketed. */
+export function noticeBucket(kind: string, period: string): { subject: string; rank: number } | null {
+  const parts = String(period || '').split(':');
+  if (!BUCKETED_PREFIXES.has(parts[0]) || !parts[1]) return null;
+  if (parts[0] === 'deal' && kind !== 'deal_followup') return null;
+  const subject = `${kind}|${parts[0]}:${parts[1]}`;
+  if (parts.length === 2) return { subject, rank: -1 };
+  const m = parts.length === 3 ? BUCKET_RE.exec(parts[2]) : null;
+  if (!m) return null;
+  return { subject, rank: m[1] !== undefined ? Number(m[1]) : Number(m[2] + m[3] + m[4]) };
+}
 export function renderableNotices<T extends { kind?: unknown; period?: unknown }>(rows: T[], openInvoiceIds: ReadonlySet<string> | null): { keep: T[]; stale: T[] } {
   const keep: T[] = []; const stale: T[] = [];
+  // pass 1: the newest bucket per subject, and which deals have a signed row
+  const newest = new Map<string, number>();
+  const signedDeals = new Set<string>();
+  for (const n of rows || []) {
+    const kind = String(n?.kind ?? ''); const p = String(n?.period ?? '');
+    const b = noticeBucket(kind, p);
+    if (b && b.rank > (newest.get(b.subject) ?? -2)) newest.set(b.subject, b.rank);
+    if (kind === 'deal_signed' && p.startsWith('signed:')) signedDeals.add(p.slice('signed:'.length));
+  }
   for (const n of rows || []) {
     const kind = String(n?.kind ?? '');
     if (CLIENT_ACTIVITY_NOTICE_KINDS.has(kind)) continue;          // its counted half renders elsewhere
@@ -334,6 +368,9 @@ export function renderableNotices<T extends { kind?: unknown; period?: unknown }
       // only an id we could have looked up is judged; a malformed period is kept
       if (UUID_RE.test(id) && !openInvoiceIds.has(id)) { stale.push(n); continue; }    // paid or voided → no longer owed
     }
+    const b = noticeBucket(kind, p);
+    if (b && b.rank < (newest.get(b.subject) ?? b.rank)) { stale.push(n); continue; }  // a newer bucket says the same thing
+    if (kind === 'deal_signed' && p.startsWith('accepted:') && signedDeals.has(p.slice('accepted:'.length))) { stale.push(n); continue; }
     keep.push(n);
   }
   return { keep, stale };

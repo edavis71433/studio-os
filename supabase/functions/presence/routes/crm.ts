@@ -20,7 +20,7 @@ import { loadProfile, loadTimeline, listNotes, addNote, setNotePinned, deleteNot
 import { filterTimeline, relationshipSummary, isAudience, cleanNoteBody } from '../crm/contract.ts';
 import { mapConversationItem, mapSiteEvent, mapDealEvent, mapDoneTask, mergeActivity, buildUpcoming, type ActivityItem } from '../crm/activity.ts';
 import { svc } from '../lib/db.ts';
-import { linksForCustomer } from '../lib/service_bridge.ts';
+import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
  *  open them in context from the CRM (studio-side only; additive, best-effort).
@@ -200,6 +200,10 @@ async function collectClientConversation(u: URL, site: SiteRow): Promise<{
       }
     }
     const ident = clientId ? await customerRequesterKeys(AS, clientId) : { keys: [], emails: [] };
+    // Sales review B2: stamp the studio's old unstamped requests first, so the
+    // stamped read below finds one this customer filed under a sign-in id that
+    // no contact carries.
+    if (clientId) await healUnstampedSupport(AS);
     const sup: any[] = [];
     const seen = new Set<string>();
     const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };

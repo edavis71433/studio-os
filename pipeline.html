@@ -1683,14 +1683,21 @@ function renderCurrent(){
   if(!visibleDeals().length){host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;}
   if(VIEW==='table')renderTable();else renderList();
 }
+// A deal is closed once it is won or not a fit; a closed deal's next step that
+// the server says is finished (next_step_done) is not shown at all.
+const isClosed=(d)=>d.stage==='won'||d.stage==='lost';
+const shownStep=(d)=>(d.next_step&&!(isClosed(d)&&d.next_step_done))?d.next_step:'';
 function renderList(){
   const host=$('list');
   // Deals with a DUE next step float to the top (overdue first) — the pipeline
   // answers "what do I do today", not just "what exists".
   const today=new Date().toISOString().slice(0,10);
-  const list=[...visibleDeals()].sort((a,b)=>{const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
+  // A won or lost deal sinks below the open ones, and its next step is never
+  // "Due" (sales review B4: a Won deal read "Due: Sign Contract" in red).
+  const list=[...visibleDeals()].sort((a,b)=>{const ac=isClosed(a)?1:0,bc=isClosed(b)?1:0;if(ac!==bc)return ac-bc;const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
   host.innerHTML=list.map(d=>{
-    const ns=d.next_step?`<div class="m">${(d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(d.next_step)}</span>`:`Next: ${esc(d.next_step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
+    const step=shownStep(d);
+    const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
     return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
@@ -1701,7 +1708,7 @@ const TCOLS=[
   ['contact','Contact',(d)=>String((CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'').toLowerCase()],
   ['stage','Stage',(d)=>STAGES.indexOf(d.stage)],
   ['value','Value',(d)=>Number(d.expected_value_cents||0)],
-  ['next','Next step (due)',(d)=>d.next_step_at||'9999-99-99'],   // no due date sorts last
+  ['next','Next step (due)',(d)=>(isClosed(d)?'~':'')+(shownStep(d)&&d.next_step_at||'9999-99-99')],   // no due date sorts last; closed deals after open ones
   ['last','Last contacted',(d)=>String(d.last_contacted_at||'')],
 ];
 let TSORT={key:'next',dir:1};
@@ -1723,10 +1730,11 @@ function renderTable(){
   }).join('');
   const trs=list.map(d=>{
     const cn=CONTACT_NAME?((d.contact_id&&CONTACT_NAME[d.contact_id])||'—'):'…';
-    const overdue=d.next_step&&d.next_step_at&&d.next_step_at<=today;
-    const ns=d.next_step
-      ?(overdue?`<span class="over">Due: ${esc(d.next_step)} · ${esc(d.next_step_at)}</span>`
-               :`${esc(d.next_step)}${d.next_step_at?` <span class="mut">· ${esc(d.next_step_at)}</span>`:''}`)
+    const step=shownStep(d);
+    const overdue=step&&!isClosed(d)&&d.next_step_at&&d.next_step_at<=today;
+    const ns=step
+      ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(d.next_step_at)}</span>`
+               :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(d.next_step_at)}</span>`:''}`)
       :'—';
     return `<tr data-id="${d.id}" tabindex="0" aria-label="Open ${esc(d.title||'Untitled deal')}">
       <td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>
@@ -2156,7 +2164,7 @@ async function openDeal(id){
     const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
     const dtabBtn=(k,label,n)=>`<button type="button" role="tab" data-dtab="${k}" id="dtab-${k}" aria-controls="dpanel-${k}" aria-selected="false" tabindex="-1">${label}${n?`<span class="n">${esc(n)}</span>`:''}</button>`;
     const dpanel=(k)=>`<div class="dtab" id="dpanel-${k}" role="tabpanel" aria-labelledby="dtab-${k}" data-dtab-panel="${k}" hidden>`;
-    const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}">${esc(k[1])}</button>`).join('');
+    const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}" aria-pressed="${i===0?'true':'false'}">${k[1]}</button>`).join('');   // k[1] is our own icon + word (ACTKINDS), never input — escaping it printed the icon's code as text
     $('detailInner').innerHTML=`
       <div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button><a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="margin-left:auto;text-decoration:none" title="The customer record — deal, billing, project, files and messages in one place">Open customer record →</a></div>
       <div class="dhead">
@@ -2396,7 +2404,7 @@ async function openDeal(id){
     // optionally date it, "Log it". A logged activity feeds the merged timeline +
     // "last contacted", so the drawer + card refresh after saving.
     let qlKind='call';
-    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;qlKinds.querySelectorAll('.kb').forEach(x=>x.classList.toggle('on',x===btn));const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
+    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
     const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:($('qlDate')&&$('qlDate').value)||undefined});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,

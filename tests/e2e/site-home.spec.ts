@@ -755,6 +755,86 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ description: 'Hello there' });
   });
 
+  // A slow server: each save of Business details takes most of a second to answer, and the
+  // log says when it was asked, when it answered and when the page asked for a drawing.
+  const slowDetails = async (page: Page) => {
+    const log: string[] = [];
+    await page.route('**/functions/v1/presence/identity', async (route: Route) => {
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 900)); log.push('save answered'); await route.fallback();
+    });
+    await page.route('**/functions/v1/presence/preview**', (route: Route) => { log.push('drawing'); return route.fallback(); });
+    return log;
+  };
+  const drawnWhileSaving = (log: string[]) => {
+    const from = log.lastIndexOf('save asked'), to = log.lastIndexOf('save answered');
+    return log.slice(from, to < from ? undefined : to).filter((x) => x === 'drawing').length;
+  };
+  const leaveWarns = (page: Page) => page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+
+  test('a redraw asked for while typing waits, so it neither cuts the words off nor paints the old ones back', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    const log = await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh');
+    await page.evaluate(() => (window as any).refreshDesignPreview());   // as when a panel's save lands mid-word
+    await page.waitForTimeout(700);
+    await expect(tag).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.type(' pasta');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ tagline: 'Fresh pasta' });
+    await expect.poll(() => log.slice(log.lastIndexOf('save answered')).includes('drawing')).toBe(true);   // the held redraw comes after the save
+    expect(drawnWhileSaving(log)).toBe(0);
+  });
+
+  test('Preview right after Enter waits for the words, so it shows them', async ({ page }) => {
+    test.skip(isPhone(page), 'Edit mode’s Preview button is in the desktop bar');
+    const { writes, frame } = await canvas(page);
+    const log = await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    await page.keyboard.press('Enter');
+    await page.locator('#dcBtnPreview').click();
+    await expect(page.locator('#stage')).toHaveClass(/\bon\b/);
+    await expect.poll(() => log.slice(log.lastIndexOf('save answered')).includes('drawing')).toBe(true);
+    expect(drawnWhileSaving(log)).toBe(0);
+    expect(identityWrites(writes).at(-1)?.body).toEqual({ tagline: 'Fresh pasta' });
+  });
+
+  test('a second double-click before the save answers keeps the new words', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    await slowDetails(page);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    await page.keyboard.press('Enter');
+    await tag.dblclick();   // the saved copy still says "no tagline"; the words on screen are real now
+    await page.keyboard.type('X');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => identityWrites(writes).length).toBe(2);
+    const last = identityWrites(writes).at(-1)!.body.tagline as string;
+    expect(last).not.toBe('X');
+    expect(last.startsWith('Fresh')).toBe(true);
+  });
+
+  test('closing the tab warns while typed words are still on their way', async ({ page }) => {
+    const { writes, frame } = await canvas(page);
+    await slowDetails(page);
+    expect(await leaveWarns(page)).toBe(false);
+    const tag = frame.locator('p[data-pr="identity.tagline"]');
+    await tag.dblclick();
+    await page.keyboard.type('Fresh pasta');
+    expect(await leaveWarns(page)).toBe(true);    // typed, not yet handed over
+    await page.keyboard.press('Enter');
+    expect(await leaveWarns(page)).toBe(true);    // on its way
+    await expect.poll(() => identityWrites(writes).length).toBe(1);
+    await expect.poll(() => leaveWarns(page)).toBe(false);
+    // the same for Business details typed in its own form, inside the form's pause
+    await page.evaluate(() => { const i = document.getElementById('f-service_area') as HTMLInputElement; i.value = 'Burbank'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(await leaveWarns(page)).toBe(true);
+  });
+
   test('the rest of a built-in section still says where its words live', async ({ page }) => {
     const { writes, frame } = await canvas(page);
     await frame.locator('section[data-dds-core="about"] h2').dblclick();
@@ -803,5 +883,69 @@ test.describe('Undo takes back a menu-category move', () => {
     await page.locator('body').click({ position: { x: 1, y: 1 } });
     await page.keyboard.press('ControlOrMeta+z');
     await expect.poll(orders).toEqual([['Mains', 'Starters'], []]);   // the usual order, as before any move
+  });
+});
+
+test.describe('move the welcome section among the others', () => {
+  const page_ = (movable: boolean) => '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
+    + '<section class="hero" data-dds-core="hero"' + (movable ? ' data-dds-movable' : '') + '><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'
+    + '<section class="block" data-dds-core="about"><h2>About us</h2><p data-pr="identity.description">Hello</p></section>'
+    + '<section class="block alt" data-dds-core="offerings"><h2>Menu</h2></section>'
+    + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section></main></body></html>';
+  const canvas = async (page: Page, movable: boolean) => {
+    const writes = await mount(page, '/presence.html#design', { __html: page_(movable) });
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('h1[data-pr]').waitFor();
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+    await page.waitForLoadState('networkidle');
+    return { writes, frame };
+  };
+  const orders = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.body && 'sections_order' in w.body).map((w) => w.body.sections_order);
+  const barButton = (frame: ReturnType<Page['frameLocator']>, label: string) => frame.locator(`#dds-dc-bar button[aria-label="${label}"]`);
+
+  test('the welcome section’s own toolbar moves it below About: one write, in the order the site reads', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);   // already at the top
+    await barButton(frame, 'Move this section down').click();
+    await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs']]);
+    await page.locator('#btnUndo').click();
+    await expect.poll(() => orders(writes).at(-1)).toEqual([]);   // back to the usual order on a site that had none saved
+  });
+
+  test('a built-in section moves past its visible neighbour, and the last one can’t go further down', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await frame.locator('section[data-dds-core="about"]').hover();
+    await barButton(frame, 'Move this section down').click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
+    await frame.locator('section[data-dds-core="offerings"]').hover();
+    await expect(barButton(frame, 'Move this section down')).toHaveClass(/dc-off/);   // added sections follow the built-in ones
+  });
+
+  test('on a template that keeps the welcome section on top, it has no arrows and nothing goes above it', async ({ page }) => {
+    const { writes, frame } = await canvas(page, false);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
+    await expect(barButton(frame, 'Move this section down')).toHaveCount(0);
+    await frame.locator('section[data-dds-core="about"]').hover();
+    await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);
+    // the Styles list says the same
+    const row = (name: string) => page.locator('#sectionsCard > div').filter({ hasText: name });
+    await expect(row('Welcome').locator('button')).toHaveCount(2);
+    await expect(row('Welcome').locator('button').first()).toBeDisabled();
+    await expect(row('Welcome').locator('button').last()).toBeDisabled();
+    await expect(row('About').locator('button').first()).toBeDisabled();
+    await expect(row('About').locator('button').last()).toBeEnabled();
+    expect(orders(writes)).toHaveLength(0);
+  });
+
+  test('the left list moves built-in sections too, and keeps the button in focus after the redraw', async ({ page }) => {
+    const { writes } = await canvas(page, true);
+    await page.evaluate(() => (window as any).openTrayPanel('contents'));   // the list's panel starts closed
+    const row = page.locator('#designTreeList .dc-tree-row[data-core="about"]');
+    await row.hover();
+    await row.locator('button[aria-label="Move down"]').click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
+    await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
   });
 });

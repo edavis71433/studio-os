@@ -36,7 +36,9 @@ export function coachRead(s: HealthSignals, _nowIso: string): HealthCoachRead {
 
   // status + headline — a word and a sentence, never a number
   if (!s.live && !s.lastPublishedAt) {
-    return { status: 'new', headline: 'You’re getting set up — nothing needs you yet.', suggestions: suggestions.slice(0, 3) };
+    // "nothing needs you yet" only when that is true — the card read "10 people
+    // are waiting for a reply" right under it (sales review, Nov 2026, B7)
+    return { status: 'new', headline: suggestions.length ? 'You’re getting set up.' : 'You’re getting set up — nothing needs you yet.', suggestions: suggestions.slice(0, 3) };
   }
   if (!s.live) {
     return { status: 'quiet', headline: 'Your site isn’t live right now.', suggestions: [{ text: 'Publish when you’re ready to be found again.', href: '/presence.html#publish' }, ...suggestions].slice(0, 3) };

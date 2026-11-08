@@ -54,7 +54,9 @@ export interface NeedsInput {
   /** presence_form_submissions status=new spam=false, on the clients' sites */
   enquiries?: Array<{ id: string; site_id: string; name?: string | null; email?: string | null; form_kind?: string | null; created_at?: string | null }>;
   /** open / in-progress support requests on the studio's own site */
-  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; created_at?: string | null; updated_at?: string | null }>;
+  // client_id: the write-time stamp (or one healed from the requester's sign-in);
+  // requester_email: who wrote, when no customer could be named
+  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; client_id?: string | null; requester_email?: string | null; created_at?: string | null; updated_at?: string | null }>;
   /** the studio's active service links: project → customer */
   serviceLinks?: Array<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>;
   /** the studio's own deals (open stages) with their next step */
@@ -161,16 +163,22 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       verb: 'Reply', href: `/inbox.html${sc(e.site_id)}#enquiries?sel=lead:${encodeURIComponent(e.id)}` });
   }
 
-  // ── c. open support requests (oldest first), mapped to the customer by project ──
+  // ── c. open support requests (oldest first), mapped to the customer by their
+  //    stamp first, then by project; one that names nobody shows who wrote ──
   {
     const custByProject = new Map<string, { client_id: string | null; site_id: string | null }>();
-    for (const l of i.serviceLinks || []) if (l.project_id) custByProject.set(String(l.project_id), { client_id: l.customer_client_id || null, site_id: l.customer_site_id || null });
+    const siteByClient = new Map<string, string>();
+    for (const l of i.serviceLinks || []) {
+      if (l.project_id) custByProject.set(String(l.project_id), { client_id: l.customer_client_id || null, site_id: l.customer_site_id || null });
+      if (l.customer_client_id && l.customer_site_id && !siteByClient.has(String(l.customer_client_id))) siteByClient.set(String(l.customer_client_id), String(l.customer_site_id));
+    }
     const rows = [...(i.support || [])].sort((a, b) => String(a.created_at || a.updated_at || '').localeCompare(String(b.created_at || b.updated_at || '')));
     for (const s of rows) {
-      const cust = custByProject.get(String(s.project_id || '')) || { client_id: null, site_id: null };
+      const stamped = s.client_id ? { client_id: String(s.client_id), site_id: siteByClient.get(String(s.client_id)) || null } : null;
+      const cust = stamped || custByProject.get(String(s.project_id || '')) || { client_id: null, site_id: null };
       if (cust.site_id && archivedSites.has(cust.site_id)) continue;
       const subject = String(s.subject || '').trim();
-      push({ key: `support:${s.id}`, kind: 'support', site_id: cust.site_id, client_id: cust.client_id, name: nameOf(cust.site_id, cust.client_id),
+      push({ key: `support:${s.id}`, kind: 'support', site_id: cust.site_id, client_id: cust.client_id, name: nameOf(cust.site_id, cust.client_id, String(s.requester_email || '').trim() || 'A customer'),
         what: subject ? `support request: ${subject}` : 'has an open support request',
         when: `Opened ${ago(s.created_at || s.updated_at, today) || 'recently'}`,
         verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}` });
