@@ -5,7 +5,7 @@
 // are written; the concierge that carries them is M9.4.
 import { svc } from '../lib/db.ts';
 import { momentize, DISMISSAL_TTL_DAYS } from './rules.ts';
-import type { RecRow, MomentContext } from './rules.ts';
+import type { RecRow, MomentContext, EvidenceFact } from './rules.ts';
 import type { SiteRow } from '../lib/site.ts';
 
 export interface MomentsSummary {
@@ -20,6 +20,30 @@ export interface MomentsSummary {
   error?: string;
 }
 
+// List item 30: each recommendation's evidence rows (its affected_resources, the
+// M9.0 ids), so a note can say "3 changes have waited 16 days" from the facts.
+// A list at the 50-row cap may be short, so that note keeps its fixed words; a
+// failed read costs only the numbers, never the notes.
+const EVIDENCE_CAP = 50;
+export async function withEvidence(rows: Array<RecRow & { affected_resources?: unknown }>): Promise<RecRow[]> {
+  const idsOf = (r: { affected_resources?: unknown }) =>
+    (Array.isArray(r.affected_resources) ? r.affected_resources : []).filter((x): x is string => typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x));
+  const wanted = [...new Set(rows.filter((r) => r.audience === 'customer' && r.status === 'active' && idsOf(r).length < EVIDENCE_CAP).flatMap(idsOf))];
+  const byId = new Map<string, EvidenceFact>();
+  for (let i = 0; i < wanted.length; i += 40) {
+    try {
+      const q = await svc(`presence_evidence?id=in.(${wanted.slice(i, i + 40).join(',')})&select=id,type,resource,facts`);
+      for (const e of (q.ok ? q.json ?? [] : [])) byId.set(e.id, { type: e.type, resource: e.resource || '', facts: e.facts || {} });
+    } catch { /* the notes keep their fixed words */ }
+  }
+  return rows.map(({ affected_resources: _a, ...r }) => {
+    const ids = idsOf({ affected_resources: _a });
+    if (!ids.length || ids.length >= EVIDENCE_CAP) return r;
+    const evidence = ids.map((id) => byId.get(id)).filter((e): e is EvidenceFact => !!e);
+    return evidence.length === ids.length ? { ...r, evidence } : r;   // part of it missing: no half-counted number
+  });
+}
+
 export async function runMoments(site: SiteRow): Promise<MomentsSummary> {
   const t0 = Date.now();
   try {
@@ -28,8 +52,8 @@ export async function runMoments(site: SiteRow): Promise<MomentsSummary> {
     const rb = latest.json?.[0]?.batch_id ?? null;
     if (!rb) return { ok: false, batch_id: null, recommendation_batch_id: null, active: 0, suppressed: 0, deferred: [], untranslated_rules: [], ms: Date.now() - t0, error: 'no_recommendation_batch' };
 
-    const rQ = await svc(`presence_recommendations?batch_id=eq.${rb}&select=recommendation_hash,rule,priority,audience,status,value_dimensions,timing,expires_at&limit=200`);
-    const recs: RecRow[] = rQ.json ?? [];
+    const rQ = await svc(`presence_recommendations?batch_id=eq.${rb}&select=recommendation_hash,rule,priority,audience,status,value_dimensions,timing,expires_at,affected_resources&limit=200`);
+    const recs: RecRow[] = await withEvidence(rQ.json ?? []);
 
     // 2. memory: prior first_seen per key + the freshest dismissal per key (within TTL window)
     const prevQ = await svc(`presence_moments?site_id=eq.${site.id}&select=moment_key,moment_hash,importance,first_seen_at,status,dismissed_at,created_at&order=created_at.desc&limit=300`);
