@@ -62,7 +62,8 @@ ok('searchReadiness: broken links flagged', /point somewhere broken/.test(search
   ok('portfolio: surfaces who has gone quiet (>30d)', insights.find((i) => i.key === 'quiet')?.number === 1);
   ok('portfolio: headline frames the whole portfolio', /Across 3 clients/.test(headline));
   const calm = portfolioInsights([{ name: 'X', leads_waiting: 0, attention: 0, last_published_at: daysAgo(2) }], NOW);
-  ok('portfolio: all-quiet → reassuring headline, no invented work', calm.insights.length === 0 && /nothing needs you/.test(calm.headline));
+  // sales review item 11: the clients' lens says they are quiet, never that nothing needs the studio (Home's list is the one count)
+  ok('portfolio: all-quiet → reassuring headline, no invented work', calm.insights.length === 0 && /quiet and current/.test(calm.headline) && !/nothing needs you/.test(calm.headline));
 }
 
 // ── AN-9: Analytics adds NO AI. The route + compose must not import any model. ──
