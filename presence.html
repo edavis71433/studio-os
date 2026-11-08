@@ -9345,7 +9345,13 @@ function renderBlocksCard() {
     card.appendChild(sub);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
-    if (idx === focusIdx) setTimeout(() => { try { sub.scrollIntoView({ behavior: "smooth", block: "center" }); ti.focus(); } catch (_) {} }, 40);
+    // Item 77: someone already typing in this section's fields keeps the caret; on a busy
+    // phone the timer can fire late, and the next words went into the heading.
+    if (idx === focusIdx) setTimeout(() => { try {
+      sub.scrollIntoView({ behavior: "smooth", block: "center" });
+      const ae = document.activeElement;
+      if (!(ae && ae !== ti && sub.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) ti.focus();
+    } catch (_) {} }, 40);
   });
   if (solo === null) card.appendChild(blkGap(BLOCKS_WORK.length));   // #3/#4 — trailing "+" insert point / drop-line target
   if ($("designTray")) renderBlockTray();   // #3 — keep the tray's "already added" states in sync
@@ -9603,6 +9609,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   if (def.mediaKind === "gallery") {
     // Wave-2 G18: only the gallery block carries per-image captions + the zoom
     // lightbox — partners shares this picker but stores neither key.
@@ -9617,7 +9624,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--clay,#a3423a);color:var(--fill-ink,#fff);cursor:pointer;font-size:13px;line-height:1";
       // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
       // caption with it (the server re-validates the same alignment).
-      x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
+      x.addEventListener("click", () => { commitTitle(); cur().image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
       chip.appendChild(x); cell.appendChild(chip);
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
@@ -9668,15 +9675,15 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
         cell.appendChild(el("span", "hint", j ? "After" : "Before"));
         if (pair[key]) cell.appendChild(mediaThumb(pair[key]));
         const pb = el("button", null, pair[key] ? "Change" : "Choose"); pb.type = "button"; pb.style.cssText = miniBtn;
-        pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.items[k][key] = id; renderBlocksCard(); } }); });
+        pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().items[k][key] = id; renderBlocksCard(); } }); });
         cell.appendChild(pb); pics.appendChild(cell);
       });
       row.appendChild(pics);
       const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = pair.caption || ""; cap.style.cssText = inputCss + ";margin-top:8px";
-      cap.addEventListener("change", () => { blk.items[k].caption = cap.value.trim(); });
+      cap.addEventListener("change", () => { cur().items[k].caption = cap.value.trim(); });
       row.appendChild(cap);
       const rm = el("button", null, "Remove pair"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm); sub.appendChild(row);
     });
     const add = el("button", null, "+ Add a pair"); add.type = "button"; add.style.cssText = miniBtn;
@@ -9689,23 +9696,24 @@ function renderTeamBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const members = Array.isArray(blk.members) ? blk.members : [];
   members.forEach((m, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap";
     const photo = el("div"); photo.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px";
     if (m.media_id) photo.appendChild(mediaThumb(m.media_id));
     const pb = el("button", null, m.media_id ? "Change photo" : "Add photo"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.members[k].media_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().members[k].media_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb);
     const fields = el("div"); fields.style.cssText = "flex:1;min-width:180px";
     const nm = el("input"); nm.type = "text"; nm.placeholder = "Name"; nm.value = m.name || ""; nm.style.cssText = inputCss;
     const role = el("input"); role.type = "text"; role.placeholder = "Role (optional)"; role.value = m.role || ""; role.style.cssText = inputCss;
     const bio = el("input"); bio.type = "text"; bio.placeholder = "Short bio (optional)"; bio.value = m.bio || ""; bio.style.cssText = inputCss;
-    const commit = () => { blk.members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: blk.members[k].media_id }; };
+    const commit = () => { cur().members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: cur().members[k]?.media_id }; };
     [nm, role, bio].forEach((inp) => inp.addEventListener("change", commit));
     fields.append(nm, role, bio, aiField(bio, { field: "", write: false }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.members.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().members.splice(k, 1); renderBlocksCard(); });
     row.append(photo, fields, rm); sub.appendChild(row);
   });
   const add = el("button", null, "+ Add person"); add.type = "button"; add.style.cssText = miniBtn;
@@ -9717,6 +9725,7 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const items = Array.isArray(blk.items) ? blk.items : [];
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9724,11 +9733,11 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
     const bd = el("textarea"); bd.value = it.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "The details inside…";
     bd.rows = Math.max(3, (it.body || "").split("\n").length + 1);
     bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
-    const commit = () => { blk.items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
+    const commit = () => { cur().items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
     sm.addEventListener("change", commit); bd.addEventListener("change", commit);
     row.append(sm, aiField(sm, { field: "question", write: false }), bd, aiField(bd, { field: "answer" }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (items.length < 10) {
@@ -9742,6 +9751,7 @@ function renderTabsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const tabs = Array.isArray(blk.tabs) ? blk.tabs : [];
   tabs.forEach((t, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9750,17 +9760,17 @@ function renderTabsBlockBody(blk, idx, sub, ti) {
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
     if (t.image_id) photo.appendChild(mediaThumb(t.image_id));
     const pb = el("button", null, t.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.tabs[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().tabs[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb);
     const bd = el("textarea"); bd.value = t.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "What’s inside this tab…";
     bd.rows = Math.max(3, (t.body || "").split("\n").length + 1);
     bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
-    const commit = () => { blk.tabs[k] = { label: lb.value.trim(), body: bd.value.trim(), image_id: blk.tabs[k].image_id || undefined }; };
+    const commit = () => { cur().tabs[k] = { label: lb.value.trim(), body: bd.value.trim(), image_id: cur().tabs[k]?.image_id || undefined }; };
     [lb, bd].forEach((inp) => inp.addEventListener("change", commit));
     row.append(lb, photo, bd, aiField(bd, {}));
     if (tabs.length > 1) {
       const rm = el("button", null, "Remove tab"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.tabs.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().tabs.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9777,18 +9787,19 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const slides = Array.isArray(blk.slides) ? blk.slides : (blk.slides = []);
   slides.forEach((sl, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start";
     if (sl.image_id) row.appendChild(mediaThumb(sl.image_id));
     const col = el("div"); col.style.cssText = "flex:1;min-width:0";
     const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = sl.caption || ""; cap.style.cssText = inputCss;
-    cap.addEventListener("change", () => { blk.slides[k].caption = cap.value.trim() || undefined; });
+    cap.addEventListener("change", () => { cur().slides[k].caption = cap.value.trim() || undefined; });
     const acts = el("div"); acts.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
     const ch = el("button", null, sl.image_id ? "Change image" : "Choose image"); ch.type = "button"; ch.style.cssText = miniBtn;
-    ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.slides[k].image_id = id; renderBlocksCard(); } }); });
+    ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().slides[k].image_id = id; renderBlocksCard(); } }); });
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.slides.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().slides.splice(k, 1); renderBlocksCard(); });
     acts.append(ch, rm);
     col.append(cap, acts); row.appendChild(col); sub.appendChild(row);
   });
@@ -9803,6 +9814,7 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
 function renderProgressBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const items = Array.isArray(blk.items) ? blk.items : (blk.items = []);
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
@@ -9811,12 +9823,12 @@ function renderProgressBlockBody(blk, idx, sub, ti) {
     const pct = el("input"); pct.type = "number"; pct.min = "0"; pct.max = "100"; pct.value = String(typeof it.percent === "number" ? it.percent : 60);
     pct.style.cssText = "width:74px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
     pctWrap.append(pct, el("span", "hint", "%"));
-    const commit = () => { blk.items[k] = { label: lb.value.trim(), percent: Math.max(0, Math.min(100, parseInt(pct.value, 10) || 0)) }; };
+    const commit = () => { cur().items[k] = { label: lb.value.trim(), percent: Math.max(0, Math.min(100, parseInt(pct.value, 10) || 0)) }; };
     lb.addEventListener("change", commit); pct.addEventListener("change", commit);
     row.append(lb, pctWrap);
     if (items.length > 1) {
       const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9833,6 +9845,7 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const buttons = Array.isArray(blk.buttons) ? blk.buttons : [];
   buttons.forEach((bt, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9841,11 +9854,11 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     const stWrap = el("label", "hint", "Style "); const st = el("select");
     [["primary", "Filled"], ["outline", "Outline"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((bt.style || "primary") === v) o.selected = true; st.appendChild(o); });
     st.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; stWrap.appendChild(st);
-    const commit = () => { blk.buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
+    const commit = () => { cur().buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
     [lb, ur, st].forEach((inp) => inp.addEventListener("change", commit));
     row.append(lb, aiField(lb, { field: "button label" }), ur, stWrap);
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.buttons.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().buttons.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (buttons.length < 3) {
@@ -9859,6 +9872,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const cols = Array.isArray(blk.columns) ? blk.columns : [];
   cols.forEach((c, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9866,7 +9880,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
     if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
     const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.columns[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().columns[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb); row.appendChild(photo);
     const bd = el("textarea"); bd.value = c.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "This column’s text…";
     bd.rows = Math.max(3, (c.body || "").split("\n").length + 1);
@@ -9882,7 +9896,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const WIDTHS = [[0, "Auto (equal)"], [3, "¼ — narrow"], [4, "⅓"], [6, "½ — half"], [8, "⅔"], [9, "¾ — wide"], [12, "Full row"]];
     WIDTHS.forEach(([v, lab]) => { const o = el("option", null, lab); o.value = String(v); if ((c.span || 0) === v) o.selected = true; wsel.appendChild(o); });
     wrap.appendChild(wsel);
-    const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; const sp = parseInt(wsel.value, 10) || 0; if (sp) o.span = sp; blk.columns[k] = o; };
+    const commit = () => { const o = { body: bd.value.trim(), image_id: cur().columns[k]?.image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; const sp = parseInt(wsel.value, 10) || 0; if (sp) o.span = sp; cur().columns[k] = o; };
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
     wsel.addEventListener("change", () => { commit(); renderBlocksCard(); });
     row.append(bd, aiField(bd, {}), bl, bu, wrap);
@@ -9893,13 +9907,13 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const cLab = el("label", "hint", "Or drop a component here: "); cLab.style.fontWeight = "600";
     const cSel = el("select"); cSel.style.cssText = "padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-left:6px";
     [["", "— none (use the text above) —"], ["video", "Video"], ["features", "Feature list"], ["stats", "Stats / numbers"], ["pricing", "Pricing"], ["table", "Table"], ["title", "Heading"], ["richtext", "Rich text"], ["link_list", "Link list"], ["accordion", "Accordion"]].forEach(([v, lab]) => { const o = el("option", null, lab); o.value = v; if (((c.block && c.block.type) || "") === v) o.selected = true; cSel.appendChild(o); });
-    cSel.addEventListener("change", () => { commit(); const t = cSel.value; if (!t) { delete blk.columns[k].block; } else { const d = BLOCK_DEFS.find((x) => x.type === t); blk.columns[k].block = d ? emptyBlock(d) : { type: t }; } renderBlocksCard(); });
+    cSel.addEventListener("change", () => { commit(); const t = cSel.value; if (!t) { delete cur().columns[k].block; } else { const d = BLOCK_DEFS.find((x) => x.type === t); cur().columns[k].block = d ? emptyBlock(d) : { type: t }; } renderBlocksCard(); });
     cLab.appendChild(cSel); compRow.appendChild(cLab);
-    if (c.block && c.block.type) { const host = el("div"); host.style.cssText = "margin-top:8px"; renderCellBlockEditor(c.block, (nb) => { blk.columns[k].block = nb; }, host); compRow.appendChild(host); }
+    if (c.block && c.block.type) { const host = el("div"); host.style.cssText = "margin-top:8px"; renderCellBlockEditor(c.block, (nb) => { cur().columns[k].block = nb; }, host); compRow.appendChild(host); }
     row.appendChild(compRow);
     if (cols.length > 1) {
       const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9973,24 +9987,25 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const cards = Array.isArray(blk.cards) ? blk.cards : [];
   cards.forEach((c, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
     if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
     const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.cards[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().cards[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb); row.appendChild(photo);
     const hd = el("input"), tx = el("input"), lk = el("input");
     hd.placeholder = "Card title"; hd.value = c.heading || "";
     tx.placeholder = "A line of text (optional)"; tx.value = c.text || "";
     lk.placeholder = "Link (optional)"; lk.value = c.link || "";
     [hd, tx, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-    const commit = () => { blk.cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: blk.cards[k].image_id || undefined, link: lk.value.trim() || undefined }; };
+    const commit = () => { cur().cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: cur().cards[k]?.image_id || undefined, link: lk.value.trim() || undefined }; };
     [hd, tx, lk].forEach((inp) => inp.addEventListener("change", commit));
     row.append(hd, tx, aiField(tx, { field: "caption" }), lk);
     const rm = el("button", null, "Remove card"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.cards.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().cards.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (cards.length < 8) {

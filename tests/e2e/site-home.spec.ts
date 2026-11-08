@@ -1468,6 +1468,92 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
   });
 });
 
+test.describe('words typed in a section’s panel while its save lands are kept (item 77)', () => {
+  // A list section's panel: one item field is finished (its save leaves 0.7 s later), the
+  // next field is focused before that save comes back, and typed in after. The save's answer
+  // used to replace the page's list with fresh copies while the panel, left alone because
+  // someone was typing, kept writing into the old ones: nothing saved, the words were gone.
+  const putsOf = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.method === 'PUT' && w.body && Array.isArray(w.body.blocks));
+  type Editor = { name: string; block: Record<string, unknown>; first: [string, number, string]; next: [string, number, string]; saved: (b: any) => unknown };
+  const EDITORS: Editor[] = [
+    { name: 'Team', block: { type: 'team', title: 'Our team', members: [{ name: 'Ana', role: 'Chef' }, { name: 'Ben' }] },
+      first: ['Name', 0, 'Rosa'], next: ['Role (optional)', 0, 'Head chef'], saved: (b) => b.members[0] },
+    { name: 'Accordion', block: { type: 'accordion', title: 'Questions', items: [{ summary: 'Parking?', body: 'Out back.' }, { summary: 'Dogs?', body: 'On the patio.' }] },
+      first: ['Label (what people click to expand)', 0, 'Is there parking?'], next: ['The details inside…', 0, 'Free, behind the building.'], saved: (b) => b.items[0] },
+    { name: 'Tabs', block: { type: 'tabs', title: 'Services', tabs: [{ label: 'Lunch', body: 'Noon to three.' }, { label: 'Dinner', body: 'Five to ten.' }] },
+      first: ['Tab label (what people click)', 0, 'Brunch'], next: ['What’s inside this tab…', 0, 'Weekends, nine to two.'], saved: (b) => b.tabs[0] },
+    { name: 'Carousel', block: { type: 'carousel', title: 'Slides', slides: [{ image_id: 'm1', caption: 'One' }, { image_id: 'm2', caption: 'Two' }] },
+      first: ['Caption (optional)', 0, 'The front room'], next: ['Caption (optional)', 1, 'The patio'], saved: (b) => b.slides.map((x: any) => x.caption) },
+    { name: 'Progress bars', block: { type: 'progress', title: 'How it’s going', items: [{ label: 'Design', percent: 50 }, { label: 'Build', percent: 20 }] },
+      first: ['Label (e.g. Design, Capacity)', 0, 'Planning'], next: ['Label (e.g. Design, Capacity)', 1, 'Building'], saved: (b) => b.items.map((x: any) => x.label) },
+    { name: 'Buttons', block: { type: 'buttons', title: 'Get in touch', buttons: [{ label: 'Call', url: 'tel:5550100', style: 'primary' }] },
+      first: ['Button label (e.g. Get a quote)', 0, 'Book a table'], next: ['Where it goes (link)', 0, 'https://example.com/book'], saved: (b) => b.buttons[0] },
+    { name: 'Columns', block: { type: 'columns', title: 'Why us', columns: [{ body: 'Fresh.' }, { body: 'Local.' }] },
+      first: ['This column’s text…', 0, 'Fresh every morning.'], next: ['This column’s text…', 1, 'From farms nearby.'], saved: (b) => b.columns.map((x: any) => x.body) },
+    { name: 'Feature cards', block: { type: 'cards', title: 'What we do', cards: [{ heading: 'Catering' }, { heading: 'Events' }] },
+      first: ['Card title', 0, 'Private dining'], next: ['A line of text (optional)', 0, 'Up to twenty guests.'], saved: (b) => b.cards[0] },
+    { name: 'Photo gallery', block: { type: 'gallery', title: 'Photos', image_ids: ['m1', 'm2'] },
+      first: ['Caption (optional)', 0, 'The bar'], next: ['Caption (optional)', 1, 'The kitchen'], saved: (b) => b.captions },
+    { name: 'Before & after', block: { type: 'before_after', title: 'Our work', items: [{ before_id: 'm1', after_id: 'm2' }, { before_id: 'm3', after_id: 'm4' }] },
+      first: ['Caption (optional)', 0, 'The old counter'], next: ['Caption (optional)', 1, 'The new floor'], saved: (b) => b.items.map((x: any) => x.caption) },
+  ];
+  const EXPECT: Record<string, unknown> = {
+    'Team': { name: 'Rosa', role: 'Head chef' },
+    'Accordion': { summary: 'Is there parking?', body: 'Free, behind the building.' },
+    'Tabs': { label: 'Brunch', body: 'Weekends, nine to two.' },
+    'Carousel': ['The front room', 'The patio'],
+    'Progress bars': ['Planning', 'Building'],
+    'Buttons': { label: 'Book a table', url: 'https://example.com/book' },
+    'Columns': ['Fresh every morning.', 'From farms nearby.'],
+    'Feature cards': { heading: 'Private dining', text: 'Up to twenty guests.' },
+    'Photo gallery': ['The bar', 'The kitchen'],
+    'Before & after': ['The old counter', 'The new floor'],
+  };
+  for (const e of EDITORS) {
+    test(`${e.name}: the next field’s words save after the first field’s save comes back`, async ({ page }) => {
+      const type = String(e.block.type);
+      const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main"><section id="a" data-dds-sid="${type}" data-dds-key="block_${type}" data-dds-src="0" class="block"><h2 data-dds-field="title">${e.block.title}</h2></section></main></body></html>`;
+      const writes = await mount(page, '/presence.html#design', { __html: html, '/settings': { data: { blocks: [e.block], section_meta: { blocks: [{ sid: type, key: `block_${type}`, src_index: 0 }], pages: {} } } } });
+      await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+      await page.waitForLoadState('networkidle');
+      await page.evaluate(() => (window as any).eeEditBlock(0));
+      // the panel opens with the caret in the section's heading
+      await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.value)).toBe(e.block.title);
+      const card = page.locator('#blocksCard');
+      const first = card.getByPlaceholder(e.first[0], { exact: true }).nth(e.first[1]);
+      const next = card.getByPlaceholder(e.next[0], { exact: true }).nth(e.next[1]);
+      await first.fill(e.first[2]);
+      await next.focus();   // the first field is finished: its save leaves 0.7 s later
+      await expect.poll(() => putsOf(writes).length).toBe(1);
+      await page.waitForTimeout(300);   // and its answer lands while the next field has the caret
+      await expect(next).toBeFocused();
+      await next.fill(e.next[2]);
+      await next.blur();
+      await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(2);
+      expect(e.saved(putsOf(writes)[1].body.blocks[0])).toMatchObject(EXPECT[e.name] as object);
+      await expect(page.locator('#dcWhisper')).not.toHaveText(/Unsaved|Not saved/);
+    });
+  }
+  // The gallery's captions already wrote to the section as it stands; its remove button didn't.
+  test('Photo gallery: a photo removed after a save comes back is removed', async ({ page }) => {
+    const block = { type: 'gallery', title: 'Photos', image_ids: ['m1', 'm2'] };
+    const html = '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main"><section id="a" data-dds-sid="gallery" data-dds-key="block_gallery" data-dds-src="0" class="block"><h2 data-dds-field="title">Photos</h2></section></main></body></html>';
+    const writes = await mount(page, '/presence.html#design', { __html: html, '/settings': { data: { blocks: [block], section_meta: { blocks: [{ sid: 'gallery', key: 'block_gallery', src_index: 0 }], pages: {} } } } });
+    await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.value)).toBe('Photos');
+    const caption = page.locator('#blocksCard').getByPlaceholder('Caption (optional)', { exact: true });
+    await caption.nth(0).fill('The bar');
+    await caption.nth(1).focus();
+    await expect.poll(() => putsOf(writes).length).toBe(1);
+    await page.waitForTimeout(300);
+    await page.locator('#blocksCard button[title="Remove"]').nth(1).click();
+    await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(2);
+    expect(putsOf(writes)[1].body.blocks[0]).toMatchObject({ image_ids: ['m1'], captions: ['The bar'] });
+  });
+});
+
 test.describe('the Add section menu can always be closed', () => {
   // Item 82: on a phone there is no Escape and no hover, and a tap on the canvas never
   // reached the page's own listener, so the menu stayed open over the canvas.
