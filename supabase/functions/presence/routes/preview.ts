@@ -17,6 +17,7 @@ import { snapshotContentUsable } from '../lib/render_types.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { injectPreviewBadge } from '../lib/preview_env.ts';
+import { withSampleWords } from '../lib/sample_words.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 
@@ -69,6 +70,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
 
   let snapshot: Snapshot, mediaManifest: any[];
   let blockers = 0, warnings = 0;
+  let ownName: string | null = null;   // the draft's real name, for the badge, before any sample words
 
   const loaded = await loadSnapshotFor(site, version, publishId, launchId);
   if (loaded && 'error' in loaded) return json({ error: loaded.error, message: loaded.message }, loaded.status, cors);
@@ -80,6 +82,9 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
     // preview is allowed while INVALID — clients need to see drafts — but blockers ride along in headers
     const v = validateSnapshot(snapshot, t.manifest);
     blockers = v.blockers.length; warnings = v.warnings.length;
+    // a new site reads like a site while it's being built; only this draft path fills them (lib/sample_words.ts)
+    ownName = (snapshot.content as any)?.identity?.business_name || '';
+    snapshot = withSampleWords(snapshot);
   }
 
   // Phase CP-1 (FD-T8): try-another-look — render THIS snapshot with a different
@@ -138,7 +143,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
   // renderSnapshot → it can never reach a published deploy. (Explicit live/publish
   // comparison views stay clean so the operator sees the true published look.)
   if (version === 'draft' || version === 'preview') {
-    const bizName = (snapshot.content as any)?.identity?.business_name || '';
+    const bizName = ownName ?? ((snapshot.content as any)?.identity?.business_name || '');
     html = injectPreviewBadge(html!, bizName);
   }
 

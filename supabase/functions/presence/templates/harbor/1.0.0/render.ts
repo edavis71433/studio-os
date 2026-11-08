@@ -380,15 +380,15 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
 <section class="hero" data-dds-core="hero"><div class="wrap hero-grid${right ? '' : ' solo'}"><div class="hero-copy">${heroText}</div>${right}</div>
 ${heroImgOk && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, '(max-width: 1000px) 100vw, 960px', false)}</div></div>` : ''}
 </section>`}
-<div class="strip"><div class="wrap">
+${(loc0(c) || tel || maps || mail) ? `<div class="strip"><div class="wrap">
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${mail ? `<span>${mail}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
-</div></div>
+</div></div>` : ''}
 ${(() => {
   const parts: Record<string, string> = {
-    about: `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>`,
+    about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>${esc(v.offeringLabel)}</h2><div class="svc-grid">${featured.map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
 </div><p style="margin-top:22px"><a class="btn ghost" href="${attr(v.offeringPath)}">All ${esc(v.offeringLabel.toLowerCase())}</a></p></div></section>` : '',

@@ -349,15 +349,15 @@ function homeBody(c: SnapshotContent, site: SiteConfig, blocks: RenderedBlock[] 
 <section class="hero wrap" data-dds-core="hero">${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
   ${hero ? `<div class="hero-img">${img(hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}`}
 </section>`}
-<div class="strip"><div class="wrap">
+${(loc0(c) || tel || maps) ? `<div class="strip"><div class="wrap">
   <span id="open-now" class="open-now" aria-live="polite"></span>
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
-</div></div>
+</div></div>` : ''}
 ${(() => {
   const parts: Record<string, string> = {
-    about: `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>`,
+    about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr("identity.description")}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap"><h2>From the menu</h2><ul class="items">${featured.map((o) => `
   <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
 </ul><p style="margin-top:18px"><a class="btn ghost" href="/menu/">Full menu</a></p></div></section>` : '',
