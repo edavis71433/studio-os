@@ -239,6 +239,8 @@
   /* slice 10: the at-a-glance strip (Lightning Home highlights, portal skin) */
   .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px}
   .glance[hidden]{display:none}
+  @media (max-width:719px){.glance .gt:last-child:nth-child(odd){grid-column:1/-1}}   /* the walk found an empty grey cell beside three tiles */
+  @media (min-width:720px) and (max-width:920px){.tab .ti{display:none}.tab{padding-left:10px;padding-right:10px}}   /* all six tabs fit, no clipped "Hel" */
   .glance .gt{background:var(--card);padding:12px 14px;min-width:0}
   /* PS3 (D1a): the needs-you tile is a REAL button pointing at the list it counts */
   .glance button.gt{display:block;width:100%;border:0;border-radius:0;text-align:left;font:inherit;font-weight:400;cursor:pointer}
@@ -490,6 +492,8 @@ function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).l
 // clientMayTick in supabase/functions/presence/lib/project_checklist.ts; the
 // server refuses a checklist tick regardless of what this draws.
 function clientMayTick(t){return String((t&&t.source)||'').indexOf('checklist:')!==0;}
+// a to-do's status in words (the walk found the raw "todo" on the card)
+const TASK_WORD={todo:'To do',in_progress:'In progress',blocked:'Waiting on something',done:'Done'};
 // PS2: the ONE portal money formatter — the glance tile, the Needs-you invoice
 // row, the Invoices rows and the tab's unpaid-total line all render the same
 // cents the same way ($1,200, $1,234.50 — never a bare $1200 drifting from the
@@ -703,6 +707,7 @@ function setWide(on){try{document.body.classList.toggle('wide',!!on);document.bo
 function showTab(tab){
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
+  try{document.title=({home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'}[tab]||'Home')+' — Your studio';}catch(_){}   // the walk found "Your updates" on every tab
   if(tab==='messages')return renderMessages();
   if(tab==='files')return renderFiles();
   if(tab==='invoices')return renderInvoices();
@@ -888,7 +893,9 @@ async function buildNeedsYou(){
   const [snaps,billing]=await Promise.all([ensureSnaps(),ensureBilling()]);
   for(const s of snaps){
     const el=document.getElementById('glance-'+s.id);
-    if(el){const bits=[];const waiting=snapWaiting(s);if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0)bits.push(`<strong style="color:var(--warn)">${waiting} thing${waiting===1?'':'s'} need${waiting===1?'s':''} your OK</strong>`);el.innerHTML=bits.join(' · ');}
+    if(el){const bits=[];const waiting=snapWaiting(s);if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0){const na=((s.approvals)||[]).length,nt=waiting-na;   // approvals need your OK; to-dos are to-dos (the walk read "3 things need your OK" for three to-dos)
+      if(na>0)bits.push(`<strong style="color:var(--warn)">${na} need${na===1?'s':''} your OK</strong>`);
+      if(nt>0)bits.push(`<strong style="color:var(--warn)">${nt} to-do${nt===1?'':'s'} for you</strong>`);}el.innerHTML=bits.join(' · ');}
     const mp=document.getElementById('mp-'+s.id);
     if(mp)mp.innerHTML=miniPathHtml(s.milestones);
   }
@@ -934,7 +941,7 @@ async function buildNeedsYou(){
       return row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
         `<button class="${top}" data-qapr="${esc(a.id)}" data-qah="${esc(a.content_hash||'')}" data-qproj="${esc(s.id)}" aria-label="Approve — ${esc(a.title||'A change is ready')}">Approve</button><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="See it first — ${esc(a.title||'A change is ready')}">See it first</button>`);}
     if(it.kind==='todos'){const s=it.s;
-      return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} thing${s.todos.length===1?'':'s'} for you`,esc(s.name),
+      return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} to-do${s.todos.length===1?'':'s'} for you`,esc(s.name),
         `<button class="${top}" data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
     if(it.kind==='survey'){const s=it.s,sv=it.sv;
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
@@ -1084,7 +1091,7 @@ function convRows(projects,support,latest){
     // recency prefers last_activity_at (new function builds — replies only INSERT
     // and never bump updated_at) with the updated_at fallback for old builds.
     rows.push({id:'sup:'+rq.id,kind:'support',sid:rq.id,pid:rq.project_id||'',title:rq.subject||'Support request',
-      when:rq.last_activity_at||rq.updated_at||'',preview:rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio',
+      when:rq.last_activity_at||rq.updated_at||'',preview:rq.last_message&&rq.last_message.text?((rq.last_message.from==='you'?'You: ':'')+rq.last_message.text):(rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio'),
       chip:'Support · '+status.replace(/_/g,' '),chipCls:'support',status,unreadKey:'support-'+rq.id});
   }
   rows.sort(convCompare);
@@ -1734,7 +1741,8 @@ function invoiceRowHtml(i,todayYmd){
   // A processing row never offers Pay, whatever the server shipped: the client
   // already paid, and a second charge on a settling payment is a double-pay.
   const pay=st!=='processing'&&i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
-  const act=st==='paid'?`<span class="finote">Paid — thank you.</span>`
+  const paidOn=i.paid_at?invDueLabel(String(i.paid_at).slice(0,10)):'';
+  const act=st==='paid'?`<span class="finote">Paid${paidOn?' '+esc(paidOn):''} — thank you.</span>`
     :dead?''
     :st==='processing'?paidConfirmNote(i)
     :pay?`<a class="fbtn pay" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
@@ -1957,7 +1965,9 @@ async function openBooking(){
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   if(!(siteRes&&siteRes.ok)){failCard();return;}
   const site=(siteRes.body&&siteRes.body.data&&siteRes.body.data.site_id)||'';
-  if(!site){$('main').innerHTML=back+emptyCard('Online booking isn’t set up yet — use “Message your studio” and they’ll find a time with you.');backReq();return;}
+  // portal walk (Nov 8): both "no times" ends hand over the next step — ask for a call, prefilled
+  const askCall=(msg)=>{$('main').innerHTML=back+emptyCard(msg)+`<div class="row" style="justify-content:center;margin-top:-4px"><button class="approve" id="bk-ask">Ask for a call</button></div>`;backReq();const a=$('bk-ask');if(a)a.addEventListener('click',()=>openSupport(null,'requests',{subject:'A call',body:'I’d like to book a call. Times that work for me: '}));};
+  if(!site){askCall('Online booking isn’t set up yet — ask for a call and your studio will find a time with you.');return;}
   let typesRes=null;try{typesRes=await api('/book/'+site+'/types');}catch(_){}
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
   if(!(typesRes&&typesRes.ok)){failCard();return;}
@@ -1965,7 +1975,7 @@ async function openBooking(){
   let types=[],intro='';
   if(d.enabled){types=d.types||[];intro=d.intro||'';BOOK={site,type:null,slot:'',maxDays:d.max_days_ahead||30};}
   // an OK read with the engine off / no services is genuine absence — calm copy
-  if(!types.length){$('main').innerHTML=back+emptyCard('Your studio hasn’t opened any times for booking yet — message them and they’ll find a slot with you.');backReq();return;}
+  if(!types.length){askCall('Your studio hasn’t opened any times for booking yet — ask for a call and they’ll find a slot with you.');return;}
   let html=back+`<header><h1>Book a call</h1>${intro?`<p class="sub">${esc(intro)}</p>`:''}</header><section><h2>Choose a service</h2>`;
   for(const t of types)html+=`<div class="card"><h3>${esc(t.name)}</h3><p class="muted">${t.duration_min?esc(String(t.duration_min))+' min':''}${t.price_text?' · '+esc(t.price_text):''}</p>${t.description?`<p>${esc(t.description)}</p>`:''}<div class="row"><button data-bt="${esc(t.id)}">Choose</button></div></div>`;
   html+=`</section>`;
@@ -2334,7 +2344,7 @@ async function openProject(id,focusSection){
   // your tasks
   // A to-do the studio settles gets NO Mark done button — and says so, so the
   // card reads as "we're watching for it", never as a broken/inert control.
-  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';const mine=clientMayTick(t);html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(t.status.replace('_',' '))}</p>${done?'':(mine?`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`:`<p class="muted tdnote">Your studio marks this one off once it arrives.</p>`)}</div>`;}html+=`</section>`;}
+  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';const mine=clientMayTick(t);html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(TASK_WORD[t.status]||String(t.status||'').replace(/_/g,' '))}</p>${done?'':(mine?`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`:`<p class="muted tdnote">Your studio marks this one off once it arrives.</p>`)}</div>`;}html+=`</section>`;}
   // files — the Files tab's exact list anatomy (fileRowHtml .frow rows with
   // You-shared chips and honest meta — never the raw server note as body copy),
   // then the slice-12 share card preselected to THIS project (preflight,
@@ -2594,19 +2604,21 @@ async function openSurvey(sid,pid,ctrl){
 // the Requests tab passes 'requests' so its "Something else?" round-trips home
 // to the tab (and the fresh request), not to the Home feed. Other callers keep
 // the old default (project → the project; otherwise the client home).
-async function openSupport(pid,ret){
+async function openSupport(pid,ret,prefill){
   VIEW_SEQ++;   // this drill-in owns #main now — a late guarded render must not clobber (and wipe) the half-typed message
   setWide(false);
   // fields carry the card/ink tokens + font:inherit its sibling composer already had
   const fbox='style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
   let html=`<p><a class="link" href="#" id="back">${pid?'← Back to project':'← Back'}</a></p><header><h1>${pid?'Open a support request':'Message your studio'}</h1></header><section><div class="card"><label for="sup-subj" style="display:block;font-weight:600;margin-bottom:6px">Subject</label><input id="sup-subj" ${fbox}><label for="sup-body" style="display:block;font-weight:600;margin:12px 0 6px">What do you need?</label><textarea id="sup-body" rows="3" ${fbox}></textarea><div class="row"><button class="approve" id="sup-send">Send</button></div></div></section>`;
   $('main').innerHTML=html;
-  {const f=$('sup-subj');if(f)f.focus();}   // entry focus on the first field (shareCompose's pattern)
+  if(prefill){const fs=$('sup-subj'),fb=$('sup-body');if(fs&&prefill.subject)fs.value=prefill.subject;if(fb&&prefill.body)fb.value=prefill.body;}
+  {const f=prefill&&prefill.body?$('sup-body'):$('sup-subj');if(f){f.focus();if(prefill&&prefill.body&&f.setSelectionRange)f.setSelectionRange(f.value.length,f.value.length);}}   // entry focus on the first field (shareCompose's pattern); a prefilled ask lands at its end
   // No project yet? Back and success return to the client home (load), not a
   // missing project — so a managed client with zero projects never hits a dead end.
   const backTo=()=>{if(pid)return openProject(pid);if(ret==='requests')return showTab('requests');load();};
   $('back').addEventListener('click',(e)=>{e.preventDefault();backTo();});
-  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
+  // a form with its own subject is a new request — never folded into an older conversation (portal walk, Nov 8)
+  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid,new_request:true});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
 }
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
