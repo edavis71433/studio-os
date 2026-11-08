@@ -127,6 +127,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
   /* activity quick-log + merged timeline */
   .qlog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s3,12px);background:var(--bg);margin-bottom:var(--dds-s3,12px)}
+  #list .card .m.conv,#table .conv{color:var(--p);font-weight:500}
   .qlog .kinds{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
   .qlog .kb{font:inherit;font-size:13px;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer}
   .qlog .kb.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:500}
@@ -574,6 +575,8 @@ let GUIDE_OPEN=true,PENDING_BACK='';
 // "Convert them") switch to the right tab before they act.
 const DTAB_KEYS=['overview','billing','activity'];
 let DTAB='overview';
+let WANT_CONVERT=false;    // sales review item 22: ?deal=X#convert opens Billing at "Convert to customer" (Home's Convert, the signed notice, a won row)
+let WANT_CONVERT_NEXT=false;   // a won-but-not-a-customer row was opened: land on Convert
 let WANT_SCHEDULE=false;   // crm.html's "Payment schedule" link (…?deal=X#schedule): open the builder once the deal renders
 // ONE filled button per view (studio audit 2026-10, change 7): a control above
 // the tabs names the tabs it is primary for; on any other tab it goes quiet.
@@ -1686,6 +1689,8 @@ function renderCurrent(){
 // A deal is closed once it is won or not a fit; a closed deal's next step that
 // the server says is finished (next_step_done) is not shown at all.
 const isClosed=(d)=>d.stage==='won'||d.stage==='lost';
+// item 22: won (or signed and won) but never made a customer — the row says so and opens at Convert
+const needsConvert=(d)=>d.stage==='won'&&!d.converted_client_id;
 const shownStep=(d)=>(d.next_step&&!(isClosed(d)&&d.next_step_done))?d.next_step:'';
 function renderList(){
   const host=$('list');
@@ -1699,9 +1704,10 @@ function renderList(){
     const step=shownStep(d);
     const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(d.next_step_at):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
-    return `<div class="card" data-id="${d.id}" tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    const cv=needsConvert(d)?`<div class="m conv">Not a customer yet — open to make them one</div>`:'';
+    return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
-  host.querySelectorAll('.card').forEach(c=>{const open=()=>openDeal(c.dataset.id);c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  host.querySelectorAll('.card').forEach(c=>{const open=()=>{if(c.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(c.dataset.id);};c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
 const TCOLS=[
   ['title','Deal',(d)=>String(d.title||'').toLowerCase()],
@@ -1736,10 +1742,10 @@ function renderTable(){
       ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(d.next_step_at)}</span>`
                :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(d.next_step_at)}</span>`:''}`)
       :'—';
-    return `<tr data-id="${d.id}" tabindex="0" aria-label="Open ${esc(d.title||'Untitled deal')}">
+    return `<tr data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" aria-label="Open ${esc(d.title||'Untitled deal')}${needsConvert(d)?' — not a customer yet':''}">
       <td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>
       <td>${esc(cn)}</td>
-      <td>${stageBadge(d.stage,d.agreement_signed)}</td>
+      <td>${stageBadge(d.stage,d.agreement_signed)}${needsConvert(d)?' <span class="mut conv">· not a customer yet</span>':''}</td>
       <td class="num">${money(d.expected_value_cents)||'—'}</td>
       <td>${ns}</td>
       <td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>
@@ -1757,8 +1763,9 @@ function renderTable(){
     const note=$('tsortNote'); if(note)note.textContent='Sorted by '+sc[1]+', '+(TSORT.dir>0?'ascending':'descending');
   });
   host.querySelectorAll('tr[data-id]').forEach(tr=>{
-    tr.onclick=()=>openDeal(tr.getAttribute('data-id'));
-    tr.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDeal(tr.getAttribute('data-id'));}};
+    const open=()=>{if(tr.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(tr.getAttribute('data-id'));};
+    tr.onclick=open;
+    tr.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
   });
 }
 
@@ -2012,7 +2019,7 @@ async function openDeal(id){
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
   // the tab: a ?dtab= deep link on a fresh open; an in-view refresh keeps the current one
   // (?tab= is an alias — the record links crm.html-style; #schedule opens Billing and the schedule builder, studio audit change 12)
-  if(CURRENT_DEAL!==id){const q=new URLSearchParams(location.search);const u=q.get('dtab')||q.get('tab');WANT_SCHEDULE=location.hash==='#schedule';DTAB=DTAB_KEYS.includes(u)?u:(WANT_SCHEDULE?'billing':'overview');}
+  if(CURRENT_DEAL!==id){const q=new URLSearchParams(location.search);const u=q.get('dtab')||q.get('tab');WANT_SCHEDULE=location.hash==='#schedule';WANT_CONVERT=location.hash==='#convert'||WANT_CONVERT_NEXT;WANT_CONVERT_NEXT=false;DTAB=DTAB_KEYS.includes(u)?u:((WANT_SCHEDULE||WANT_CONVERT)?'billing':'overview');}
   CURRENT_DEAL=id;
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():'')+(DTAB!=='overview'?'&dtab='+DTAB:''));
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
@@ -2723,6 +2730,7 @@ async function openDeal(id){
     };
     // the record's "Payment schedule" link lands on #schedule (studio audit change 12): open the builder straight away, once
     if(WANT_SCHEDULE){WANT_SCHEDULE=false;if(setupPlanBtn)setupPlanBtn.click();}   // the replaceState above already dropped the hash
+    if(WANT_CONVERT){WANT_CONVERT=false;const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});}
     const conv=$('convert'); if(conv) conv.onclick=()=>{
       // two-step confirm (no confirm() dialog). Service language, not SaaS: the
       // labels say WHAT KIND OF WORK this is; the values stay the same edition

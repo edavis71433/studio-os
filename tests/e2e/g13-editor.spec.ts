@@ -1645,8 +1645,10 @@ test.describe('G13 in-place canvas text editor', () => {
     let release = () => {};
     v.slowRead = new Promise<void>((r) => { release = r; });
     const reads = v.reads;
+    const landedAtRead: number[] = [];
+    await page.route('**/functions/v1/presence/changes**', (route: Route) => { landedAtRead.push(v.landed.length); return route.fallback(); });
     await page.locator('#f-tagline').fill('My tagline');
-    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // the review reads the draft while that field's timer runs
+    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // opened while that field's timer runs
     await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
     await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/identity']);
     await page.locator('#f-phone').fill('555 0100');               // its timer runs out after the review's answer is in
@@ -1654,7 +1656,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => v.business.phone, { timeout: 6000 }).toBe('555 0100');
     expect(v.refused).toEqual([]);
     await expect(refusal(page)).toHaveCount(0);
-    expect(v.reads).toBeGreaterThanOrEqual(reads + 2);             // what's reviewed includes the save that landed
+    expect(landedAtRead[0]).toBe(1);                               // what's reviewed includes that save: Publish sends it and waits before it reads
   });
 
   test('a read dropped for being late is read again, so another person\'s change is still caught', async ({ page }) => {
@@ -1694,6 +1696,26 @@ test.describe('G13 in-place canvas text editor', () => {
     await duplicate(page);                                         // having loaded it, the next edit goes through
     await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/settings']);
     expect(v.refused).toEqual(['/settings']);
+  });
+
+  test('a refused business detail offers Load the latest too, once, and after it the next save goes through', async ({ page }) => {
+    await mountPages(page);
+    const v = await draftVersion(page);
+    v.someoneElse();
+    await openBusiness(page);
+    await typeDetail(page, '#f-tagline', 'Over their tagline');
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/identity']);
+    await typeDetail(page, '#f-tagline', 'Over their tagline again');   // refused again, the same way out still up
+    await expect.poll(() => v.refused, { timeout: 6000 }).toEqual(['/identity', '/identity']);
+    await expect(page.getByRole('button', { name: 'Load the latest' })).toHaveCount(1);
+    await expect(refusal(page)).toHaveCount(1);                       // no second copy of the sentence beside it
+    await page.getByRole('button', { name: 'Load the latest' }).click();
+    await expect(page.getByText('Loaded the latest version')).toBeVisible();
+    await expect.poll(() => v.reads, { timeout: 6000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(300);
+    await typeDetail(page, '#f-tagline', 'After loading');
+    await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/identity']);
+    expect(v.business).toEqual({ tagline: 'After loading' });
   });
 
   test('another person\'s change refuses a business detail waiting behind a section save too', async ({ page }) => {

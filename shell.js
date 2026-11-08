@@ -695,6 +695,14 @@
       return ka - kb || a.i - b.i;
     });
   }
+  // Studio level: the needs-you rows (one per thing, money first) + the feed's news.
+  function studioBellRows(d, ny) {
+    var needs = (ny.rows || []).concat(ny.rest || []).map(function (n) {
+      return { id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false };
+    });
+    var news = shapeBellRows({ notices: (d.notices || []).filter(function (n) { return n.tier === 'update'; }) }, false);
+    return needs.concat(news);
+  }
   function bellRowHtml(r, seen) {
     return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (r.sub ? '<div class="sub">' + esc(r.sub) + '</div>' : '') + '</a>';
   }
@@ -759,15 +767,20 @@
     }
     notif.classList.add('open');
     setExpanded('dds-bell', true);
-    api('/portal/feed').then(function (r) {
+    // Sales review item 11: at STUDIO level the badge is the studio's one
+    // needs-you list, so the Needs-you tab lists exactly those rows (the same
+    // read Home heads its list with); Updates keeps the news from the feed.
+    var studioLevel = !!(CTX && CTX.is_agency && !(CTX.scope && CTX.scope.site_id));
+    Promise.all([api('/portal/feed'), studioLevel ? api('/agency/needs-you') : Promise.resolve(null)]).then(function (res) {
+      var r = res[0], ny = res[1];
       var body = notif.querySelector('.body');
       // A FAILED read is not an empty one — never claim "caught up" on an error.
-      if (!r.ok) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
+      if (!r.ok || (ny && !ny.ok)) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
       var d = r.body.data || {};
       // A reviewer's whole world is client.html — every bell row lands THERE
       // (the owner pages these rows normally target are 403 walls for them).
       var revr = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
-      bellRows = shapeBellRows(d, revr);
+      bellRows = ny ? studioBellRows(d, (ny.body && ny.body.data) || {}) : shapeBellRows(d, revr);
       paintBellRows();
       // W4: the bell is the quick glance; the Inbox is the complete "everything that
       // needs you" (also client messages, surveys, new leads). Send them to the one
@@ -1181,7 +1194,14 @@
   // "Got it", remember the dismissal, and never show it again. No tour, no steps.
   function hintsSeen() { try { return JSON.parse(localStorage.getItem('dds-hints') || '{}'); } catch (_) { return {}; } }
   function markHint(k) { try { var s = hintsSeen(); s[k] = 1; localStorage.setItem('dds-hints', JSON.stringify(s)); } catch (_) { /* */ } }
+  // Sales review item 27 (Nov 2026), the builder's rule (contextHint) for every
+  // page: ONE tip per visit, and a tip that was shown is retired when the page is
+  // left, Got it or not. "Notes here stay private…" came back on every visit to a
+  // record, and the bell tip on every Home, because only Got it retired them.
+  var hintThisVisit = '';
+  window.addEventListener('pagehide', function () { if (hintThisVisit) markHint(hintThisVisit); });
   function attachDismiss(node, key) {
+    hintThisVisit = key;
     var x = document.createElement('button');
     // no aria-label: the visible text IS the accessible name (WCAG 2.5.3 —
     // an aria-label here would make "Got it" unmatchable by voice control).
@@ -1197,6 +1217,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.dds-hint[data-hint]:not(.dds-live)'), function (node) {
       var key = node.getAttribute('data-hint');
       if (!key || seen[key]) { node.remove(); return; }
+      if (hintThisVisit) return;   // one tip per visit; the next waits for the next visit
       if (document.querySelector('.dds-hint.show')) return;   // only one hint visible at once
       node.classList.add('dds-live'); node.hidden = false; attachDismiss(node, key);
     });
@@ -1206,6 +1227,7 @@
     var seen = hintsSeen();
     if (!key || seen[key]) return false;
     if (tour) return false;   // Phase 4: the tour is already teaching — one thing at a time
+    if (hintThisVisit) return false;   // one tip per visit
     if (document.querySelector('.dds-hint.show')) return false;   // never stack
     var bar = el('<div class="dds-hint dds-live" role="note"><span class="t"></span></div>');
     bar.querySelector('.t').innerHTML = html;

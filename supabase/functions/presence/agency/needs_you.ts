@@ -24,7 +24,7 @@
 //
 // Pure: no DB, no network, no clock (nowIso is an input). routes.ts gathers the
 // rows (fixed query count) and calls needsYouPayload().
-export type NeedsKind = 'money' | 'enquiry' | 'support' | 'deal' | 'broken' | 'plan' | 'publish';
+export type NeedsKind = 'money' | 'enquiry' | 'support' | 'message' | 'deal' | 'broken' | 'plan' | 'publish' | 'account' | 'notice';
 
 export interface NeedsRow {
   key: string;                 // stable: '<kind>:<row id>'
@@ -68,6 +68,19 @@ export interface NeedsInput {
   evidence?: Array<{ site_id: string; type: string; severity: string; human: string }>;
   plans?: Array<{ id?: string; site_id: string; title: string; status: string }>;
   lastChange?: Record<string, string>;
+  /** Sales review item 11 (Nov 2026): the studio site's OWN Inbox rows
+   *  (routes/workspace.ts buildPortalFeed — the very rows the Inbox lists), so
+   *  Home, the bell and the Inbox name one set of things. Each becomes one row
+   *  here, except the nudges ABOUT a thing already listed (see SKIP below). */
+  own?: {
+    site_id?: string | null;
+    enquiries?: Array<{ id: string; name?: string | null; email?: string | null; form_kind?: string | null; status?: string | null; tier?: string | null; created_at?: string | null }>;
+    messages?: Array<{ type?: string | null; tier?: string | null; client_id?: string | null; client?: string | null; project?: string | null; count?: number | null; created_at?: string | null; href?: string | null; thread_key?: string | null }>;
+    notices?: Array<{ id?: string | null; kind?: string | null; period?: string | null; headline?: string | null; body?: string | null; href?: string | null; tier?: string | null }>;
+    /** the deals those notices name (id → the deal now), so a notice about a deal
+     *  since converted, lost or deleted is not a row (dealNoticeIds / staleDealNotices) */
+    deals?: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }>;
+  };
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
 }
@@ -163,6 +176,30 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       verb: 'Reply', href: `/inbox.html${sc(e.site_id)}#enquiries?sel=lead:${encodeURIComponent(e.id)}` });
   }
 
+  // ── b2. the studio's OWN new enquiries — one row per person, as the Inbox
+  //      groups them (three messages from one sender are one conversation) ──
+  {
+    type Enq = NonNullable<NonNullable<NeedsInput['own']>['enquiries']>[number];
+    const groups = new Map<string, Enq[]>();
+    for (const e of (i.own?.enquiries || [])) {
+      if (String(e.status || 'new') !== 'new' || (e.tier && e.tier !== 'needs_you')) continue;
+      const k = String(e.email || '').trim().toLowerCase() || String(e.name || '').trim().toLowerCase() || String(e.id);
+      const g = groups.get(k) || []; g.push(e); groups.set(k, g);
+    }
+    const ordered = [...groups.values()].map((g) => g.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))))
+      .sort((a, b) => String(a[a.length - 1].created_at || '').localeCompare(String(b[b.length - 1].created_at || '')));   // the longest wait first
+    for (const g of ordered) {
+      const newest = g[0];
+      const who = String(newest.name || newest.email || '').trim() || 'Someone';
+      const kind = String(newest.form_kind || '').trim();
+      const noun = kind === 'quote' ? 'quote request' : kind === 'booking' ? 'booking request' : 'enquiry';
+      push({ key: `enquiry:own:${newest.id}`, kind: 'enquiry', site_id: null, client_id: null, name: who,
+        what: g.length > 1 ? `${g.length} new ${noun === 'enquiry' ? 'enquiries' : noun + 's'} through your website` : `new ${noun} through your website`,
+        when: ago(g[g.length - 1].created_at, today).replace(/^\w/, (c) => c.toUpperCase()),
+        verb: 'Reply', href: `/inbox.html#enquiries?sel=lead:${encodeURIComponent(String(newest.id))}` });
+    }
+  }
+
   // ── c. open support requests (oldest first), mapped to the customer by their
   //    stamp first, then by project; one that names nobody shows who wrote ──
   {
@@ -185,6 +222,17 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     }
   }
 
+  // ── c2. client conversations waiting for the studio's reply (the Inbox's own rows) ──
+  for (const m of (i.own?.messages || [])) {
+    if (String(m.type || '') !== 'message' || m.tier !== 'needs_you') continue;
+    const n = Number(m.count || 0);
+    push({ key: `message:${m.thread_key || m.client_id || m.project || ''}`, kind: 'message', site_id: null, client_id: m.client_id || null,
+      name: String(m.client || '').trim() || nameOf(null, m.client_id || null, String(m.project || '').trim() || 'A customer'),
+      what: n > 1 ? `${n} messages are waiting for your reply` : 'is waiting for your reply',
+      when: ago(m.created_at, today).replace(/^\w/, (c) => c.toUpperCase()),
+      verb: 'Reply', href: String(m.href || '/inbox.html') });
+  }
+
   // ── d. deals whose next step is past its date (most late first) ──
   {
     const OPEN = new Set(['lead', 'qualified', 'proposal', 'contract']);
@@ -202,6 +250,25 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         what: `next step “${String(d.next_step).trim()}” is ${plural(days as number, 'day')} late`,
         when: `On the deal${d.title ? ' ' + d.title : ''} · due ${shortDate(d.next_step_at)}`,
         verb: 'Open deal', href: `/crm.html?deal=${encodeURIComponent(d.id)}` });
+    }
+  }
+
+  // ── d2. a deal that is waiting on the studio's next move: signed (make them a
+  //      customer), accepted (send the agreement), or gone quiet ──
+  for (const n of ownNotices(i)) {
+    const kind = String(n.kind || ''); const p = String(n.period || ''); const head = String(n.headline || '').trim();
+    let m: RegExpExecArray | null;
+    if (kind === 'deal_signed' && (m = /^(signed|accepted):(.+)$/.exec(p))) {
+      const signed = m[1] === 'signed'; const dealId = m[2];
+      const title = head.replace(/^Agreement signed — ready to convert\s*/, '').replace(/^Proposal accepted —\s*/, '').trim() || 'A deal';
+      push({ key: `deal:${m[1]}:${dealId}`, kind: 'deal', site_id: null, client_id: null, name: title,
+        what: signed ? 'signed the agreement — make them a customer' : 'accepted your proposal — send the agreement',
+        when: signed ? 'Agreement signed' : 'Proposal accepted', verb: signed ? 'Convert' : 'Open deal',
+        href: `/pipeline.html?deal=${encodeURIComponent(dealId)}${signed ? '#convert' : ''}` });   // item 22: Convert lands on the Convert step
+    } else if (kind === 'deal_followup' && (m = /^deal:([^:]+)(?::.*)?$/.exec(p))) {
+      if (seen.has(`deal:${m[1]}`)) continue;                     // its late next step is already a row
+      push({ key: `deal:quiet:${m[1]}`, kind: 'deal', site_id: null, client_id: null, name: head.replace(/^Follow up on\s*/, '').trim() || 'A deal',
+        what: 'has had no next step for a while', when: 'Gone quiet', verb: 'Open deal', href: `/pipeline.html?deal=${encodeURIComponent(m[1])}` });
     }
   }
 
@@ -263,7 +330,79 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       what: 'changes are sitting unpublished', when: `Last change ${ago(lc, today) || shortDate(lc)}`, verb: 'Review', href: `/presence.html${sc(s.id)}#publish` });
   }
 
+  // ── h. the studio's own account, then anything else that asks for the studio ──
+  for (const n of ownNotices(i)) {
+    const kind = String(n.kind || ''); const p = String(n.period || '');
+    if (kind === 'deal_signed' || (kind === 'deal_followup' && p.startsWith('deal:'))) continue;   // rows in d2
+    const head = String(n.headline || '').trim() || 'Something needs a look';
+    const body = String(n.body || '').trim();
+    const firstSentence = (body.match(/^[^.!?]*[.!?]?/) || [''])[0].trim().replace(/[.!?]$/, '').slice(0, 90);
+    const account = ACCOUNT_KINDS.has(kind);
+    push({ key: `${account ? 'account' : 'notice'}:${n.id || kind + ':' + p}`, kind: account ? 'account' : 'notice', site_id: null, client_id: null,
+      name: account ? 'Your Studio OS account' : head,
+      what: account ? head.replace(/^\w/, (c) => c.toLowerCase()) : (firstSentence ? firstSentence.replace(/^\w/, (c) => c.toLowerCase()) : 'needs a look'),
+      when: '', verb: 'Open', href: String(n.href || '/inbox.html') });
+  }
+
   return out;
+}
+
+// ── which of the studio's own notices are rows of their own ──────────────────
+// Website kinds are about the studio's OWN site and stay on the Website page
+// (sales review decision 2). The nudge kinds are reminders ABOUT a thing that
+// is already a row — the request (support_aging), the enquiry (lead_followup,
+// website_enquiry), the invoice (an invremind deal_followup) — and counting
+// them as well is how the bell reached 25 for eleven things.
+export const NEEDS_WEBSITE_KINDS: ReadonlySet<string> = new Set([
+  'search_setup', 'domain_expiry', 'publish_failed', 'connection_expired', 'site_down', 'email_auth', 'apex_drift', 'new_review', 'missing_required', 'client_feedback',
+]);
+export const NEEDS_NUDGE_KINDS: ReadonlySet<string> = new Set(['support_aging', 'lead_followup', 'website_enquiry', 'client_updates']);
+const ACCOUNT_KINDS: ReadonlySet<string> = new Set(['capacity', 'trial_ending', 'trial_ended', 'payment_trouble', 'account_lapsed', 'renewal_reminder', 'winddown_reminder', 'deletion_requested']);
+// ── deal notices that outlived their deal (found live on Nov 8 2026) ─────────
+// Reading 30 notices instead of 10 surfaced two old rows: "make them a
+// customer" for a deal converted months ago, and "no next step" for a deal no
+// longer in the pipeline. A deal notice is only a row while its deal still
+// waits on that step; the caller clears the rest (computeStudioNeeds).
+const DEAL_NOTICE_RE = /^(signed|accepted|deal):([0-9a-f-]{36})(?::.*)?$/i;
+/** The deal ids the studio's deal notices name. Pure. */
+export function dealNoticeIds(notices: Array<{ kind?: string | null; period?: string | null }>): string[] {
+  const out = new Set<string>();
+  for (const n of notices || []) {
+    const kind = String(n?.kind || ''); const m = DEAL_NOTICE_RE.exec(String(n?.period || ''));
+    if (!m) continue;
+    if ((kind === 'deal_signed' && m[1] !== 'deal') || (kind === 'deal_followup' && m[1] === 'deal')) out.add(m[2].toLowerCase());
+  }
+  return [...out];
+}
+/** Deal notices whose deal no longer waits on that step. Pure. `deals` holds
+ *  every deal that could be read; null = the read failed (keep everything). */
+export function staleDealNotices<T extends { kind?: string | null; period?: string | null }>(notices: T[], deals: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }> | null): T[] {
+  if (!deals) return [];
+  const out: T[] = [];
+  for (const n of notices || []) {
+    const kind = String(n?.kind || ''); const m = DEAL_NOTICE_RE.exec(String(n?.period || ''));
+    if (!m) continue;
+    const isSigned = kind === 'deal_signed' && m[1] !== 'deal';
+    const isQuiet = kind === 'deal_followup' && m[1] === 'deal';
+    if (!isSigned && !isQuiet) continue;
+    const d = deals[m[2].toLowerCase()];
+    const gone = !d || !!d.deleted_at || d.stage === 'lost';
+    if (gone || (isSigned && !!d?.converted_client_id) || (isQuiet && d?.stage === 'won')) out.push(n);
+  }
+  return out;
+}
+function ownNotices(i: NeedsInput) {
+  const deals = i.own?.deals;
+  const stale = new Set(deals ? staleDealNotices(i.own?.notices || [], deals) : []);
+  return (i.own?.notices || []).filter((n) => {
+    if (stale.has(n)) return false;
+    const kind = String(n.kind || ''); const p = String(n.period || '');
+    if (n.tier && n.tier !== 'needs_you') return false;                       // news (a payment landed) is not an ask
+    if (NEEDS_WEBSITE_KINDS.has(kind) || NEEDS_NUDGE_KINDS.has(kind)) return false;
+    if (kind === 'deal_followup' && p.startsWith('invremind:')) return false;  // the money row says it
+    if (kind === 'deal_followup' && p.startsWith('remind:')) return false;     // "Reminder sent — Proposal": a report of what the platform did, not an ask
+    return true;
+  });
 }
 
 /** The first `cap` rows, how many more there are, and the next slice (so the

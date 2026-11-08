@@ -44,7 +44,7 @@ test.describe('Customers list view', () => {
     await expect(names.first()).toContainText('Acme Bakery');
     // status renders as the existing pill; waiting count as the badge
     await expect(page.locator('tbody .pill.complete')).toContainText('complete');
-    await expect(page.locator('tbody .badge.wait')).toContainText('2 waiting');
+    await expect(page.locator('tbody .badge.wait')).toContainText('2 requests');
   });
 
   test('clicking a column header sorts asc/desc with aria-sort', async ({ page }) => {
@@ -59,7 +59,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('.lmeta')).toContainText('Sorted by Name — descending');
     // a different column starts ascending
     await page.locator('[data-sort="open_support"]').click();
-    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Waiting');
+    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Needs you');
     await expect(page.locator('tbody tr td:first-child').last()).toContainText('Acme Bakery');
   });
 

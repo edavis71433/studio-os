@@ -410,7 +410,7 @@ test.describe('SS4 — broadcasts console', () => {
     // visual refresh: breadcrumb · the list picker shows label, description and
     // count per row · the composer carries Preview, Send update and the toolbar
     const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
-    await expect(crumbs.getByRole('link', { name: 'Customers' })).toHaveAttribute('href', '/customers.html');   // Broadcasts live under Customers in the menu
+    await expect(crumbs.getByRole('link', { name: 'Inbox' })).toHaveAttribute('href', '/inbox.html');   // sales review item 25: it opens from the Inbox, so the crumb says Inbox (it said Customers while the menu lit Inbox)
     await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Send an update');
     const contacts = page.locator('[data-seg="contacts"]');
     await expect(contacts).toContainText('All contacts');

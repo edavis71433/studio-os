@@ -34,8 +34,8 @@ const notice = read('supabase/functions/presence/lib/notice.ts');
   const k = leadFollowupNoticeKey('abc-123');
   ok('gap 2: leadIdOfNoticePeriod inverts leadFollowupNoticeKey', leadIdOfNoticePeriod(k.period) === 'abc-123');
   ok('gap 2: a weekly bucket, a blank, null and a stranger period give null', [leadIdOfNoticePeriod('2026-W42'), leadIdOfNoticePeriod(''), leadIdOfNoticePeriod(null), leadIdOfNoticePeriod(undefined), leadIdOfNoticePeriod('lead:'), leadIdOfNoticePeriod('lead:a b')].every((v) => v === null));
-  ok('gap 2: noticeHrefFor builds /inbox.html#enquiries?sel=lead:<id> for lead_followup and stays kind-only otherwise',
-    /export const noticeHrefFor = /.test(workspace) && /const id = n\.kind === 'lead_followup' \? leadIdOfNoticePeriod\(n\.period\) : null;/.test(workspace) && /return id \? `\$\{base\}\?sel=lead:\$\{id\}` : base;/.test(workspace) && /lead_followup: '\/inbox\.html#enquiries'/.test(workspace));
+  ok('gap 2: noticeHrefFor builds /inbox.html#enquiries?sel=lead:<id> for lead_followup (deal_signed deep-links its deal since sales review item 22)',
+    /export const noticeHrefFor = /.test(workspace) && /const id = n\.kind === 'lead_followup' \? leadIdOfNoticePeriod\(n\.period\) : null;/.test(workspace) && /if \(id\) return `\$\{base\}\?sel=lead:\$\{id\}`;/.test(workspace) && /lead_followup: '\/inbox\.html#enquiries'/.test(workspace));
   ok('gap 2: the feed, the attention read and the push all mint the href through noticeHrefFor', /href: noticeHrefFor\(n\), dismissible: noticeDismissible/.test(workspace) && /href: noticeHrefFor\(n\) \}\)\)/.test(attention) && /noticeHrefFor\(n\);/.test(notice));
   ok('gap 2: the attention read selects `period` so the href has the lead id', /select=kind,period,headline,body/.test(attention));
   ok('gap 2: inbox.html reads #view?sel=… once at boot and opens that row after the first paint', /const HASH_LINK=\(\(\)=>\{const raw=String\(location\.hash\|\|''\)\.slice\(1\);const i=raw\.indexOf\('\?'\)/.test(inbox) && /function openLinkedRow\(\)/.test(inbox) && /renderConsole\(\);renderList\(\);renderPane\(\);\n  openLinkedRow\(\);/.test(inbox));

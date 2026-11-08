@@ -58,10 +58,12 @@ test.describe('Inbox — split-view console', () => {
     // real unread dots (SLDS unread-indicator idiom, aria-label "Unread")
     expect(await page.locator('.unread-dot').count()).toBeGreaterThanOrEqual(3);
     await expect(page.locator('#lmeta')).toContainText('conversations');
-    await expect(page.locator('#lmeta')).toContainText('need');
-    // the old sections 5–6 fold in as dimmed system rows (Everything view)
-    await expect(rows.locator('.sysrow').filter({ hasText: 'Milestone reached — Design' })).toBeVisible();
-    await expect(rows.locator('.sysrow').filter({ hasText: 'A quote request is waiting for a reply' })).toBeVisible();
+    await expect(page.locator('#lmeta')).toContainText('waiting for a reply');   // its own count, in its own words (sales review item 11)
+    // sales review item 18: the Inbox lists what people said or asked — the studio's
+    // own worklog ("Milestone reached") stays on the project, and the reminder about
+    // Sam's enquiry is not a second row next to Sam's own row
+    await expect(rows.locator('.sysrow').filter({ hasText: 'Milestone reached — Design' })).toHaveCount(0);
+    await expect(rows.locator('.sysrow').filter({ hasText: 'A quote request is waiting for a reply' })).toHaveCount(0);
     // opening the Inbox still marks section-level activity seen (bell clears)
   });
 
@@ -627,7 +629,8 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await page.goto('/inbox.html');
     const rows = page.locator('#rows');
     // everything is here first: 2 client rows + 1 support + 1 enquiry + 1 approval
-    await expect(rows.getByRole('option')).toHaveCount(6);   // + 1 system activity row
+    // (the project's worklog row stays on the project — sales review item 18)
+    await expect(rows.getByRole('option')).toHaveCount(5);
     // ONE action: the lens sits in the list-pane header, no navigation
     const lens = page.locator('#fClient');
     await expect(lens).toBeVisible();
@@ -652,9 +655,9 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
     await lens.selectOption(P2);
     expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
-    // and the project's own worklog row stays with it under the lens
+    // the project's own worklog stays on the project now (sales review item 18) — no system row under the lens
     await lens.selectOption(P1);
-    await expect(page.locator('#rows .sysrow')).toHaveCount(1);
+    await expect(page.locator('#rows .sysrow')).toHaveCount(0);
     // Beacon's project brings its conversation AND its support thread
     await lens.selectOption(P3);
     expect(await rowTexts(page)).toEqual(['Beacon Bakery', 'Beacon Bakery']);
@@ -731,7 +734,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#q')).toHaveValue('');
     expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
     expect(new URL(page.url()).searchParams.has('project')).toBe(false);
-    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+    await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
   test('the reading pane blames the LENS, not the view, when a lens emptied the list', async ({ page }, testInfo) => {
@@ -746,7 +749,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(pane).toContainText('project “Rebrand”');
     await expect(pane).not.toContainText('check Everything');   // the old, wrong blame
     await pane.getByRole('button', { name: 'Clear these filters' }).click();
-    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+    await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
   test('a stale linked lens says "Not in this inbox" instead of quietly showing everything', async ({ page }) => {
@@ -757,7 +760,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#rows')).toContainText('client “Not in this inbox”');
     await expect(page.locator('#fClient')).toHaveValue('c-gone');
     await page.locator('#rows').getByRole('button', { name: 'Clear this filter' }).click();
-    await expect(page.locator('#rows [role=option]')).toHaveCount(6);
+    await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
   test('a lens can only ever REMOVE rows — it never reveals anything the Inbox was not already showing', async ({ page }) => {
@@ -978,7 +981,8 @@ test.describe('Inbox — views by hash', () => {
     const rows = page.locator('#rows');
     await expect(rows).toContainText('Protect your email');
     await expect(rows).toContainText('Sam Rivera');
-    await expect(rows).toContainText('A quote request is waiting for a reply');
+    // the reminder about Sam's enquiry is not a second row beside Sam's own (sales review item 18)
+    await expect(rows).not.toContainText('A quote request is waiting for a reply');
     await expect(rows).not.toContainText('Logo tweak');
     await expect(rows).not.toContainText('Milestone reached');
   });
