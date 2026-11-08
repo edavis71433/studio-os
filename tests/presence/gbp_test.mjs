@@ -18,6 +18,7 @@ const {
 } = await import(`${P}/lib/gbp.ts`);
 const { discoverGbpLocations, normalize, readGbp, readProvider, READ_STRATEGIES } = await import(`${P}/connected/adapters.ts`);
 const { syncGscForSite } = await import(`${P}/ops/gsc_sync.ts`);
+const { gscMonthWindow } = await import(`${P}/lib/gsc.ts`);
 const { handleConnectionProperties, handleConnectionPropertySelect, ASKABLE_PROVIDERS } = await import(`${P}/routes/connections.ts`);
 const { authorizeUrl, REDIRECT_URI, APP_URL } = await import(`${P}/connected/auth.ts`);
 const { seal } = await import(`${P}/connected/crypto.ts`);
@@ -119,7 +120,15 @@ ok('auth: Google returns to the APP host; the marketing domain\'s redirect drops
 ok('ask: the studio can ask a client to connect their listing too', ASKABLE_PROVIDERS.includes('google_business_profile'));
 
 // ═══ 3. the reads, against the fake ═══
+// A pick answers first and reads after, through EdgeRuntime.waitUntil. Holding that
+// read here lets a block wait for it. Left running, it carried on in the next
+// block's fake, auto-picked that block's listing and failed "nothing recorded"
+// there, whenever its token decrypt finished late (CI, Nov 6 2026).
+const afterResponse = [];
+globalThis.EdgeRuntime = { waitUntil: (p) => afterResponse.push(p) };
+const settle = () => Promise.all(afterResponse.splice(0));
 function fakeWorld(over = {}) {
+  if (afterResponse.length) throw new Error('a read from the last block is still running: await settle() before the next fakeWorld');
   const world = {
     calls: [], config: {}, connected: null, statuses: [], signals: [], terms: [], accountsStatus: 200, accountsBody: ACCOUNTS,
     locations: [location('1', 'Marlow Kitchen', 'https://marlowskitchen.example/')], reviewsStatus: 200, perfStatus: 200, detailStatus: 200,
@@ -269,6 +278,8 @@ const post = (b) => new Request('http://x/', { method: 'POST', body: JSON.string
   const w = fakeWorld({ locations: [location('1', 'A', ''), location('2', 'B', '')], tokenRow: await tokenRow() });
   const { status, j } = await body(await handleConnectionPropertySelect(post({ property_id: 'locations/2' }), site, 'google_business_profile', principal, {}));
   ok('pick: records the location AND the account the reviews path needs', status === 200 && w.config.location_id === 'locations/2' && w.config.account === 'accounts/456' && w.config.auto_selected === false && /Reading B/.test(j.data.message));
+  await settle();
+  ok('pick: then reads the listing it picked', w.connected?.data?.listing_name === 'B');
 }
 {
   const w = fakeWorld({ locations: [location('1', 'A', '')], tokenRow: await tokenRow() });
@@ -288,10 +299,11 @@ const post = (b) => new Request('http://x/', { method: 'POST', body: JSON.string
 
 // ═══ 6. Search Console: connecting produces numbers ═══
 const gscSite = { id: SITE, client_id: CLIENT, custom_domain: 'marlowskitchen.example', netlify_site_id: null, edition: 'presence' };
-const gscAnswers = (reply) => (prop, q) => {
+// `latest` is the month the read is about: 40 clicks there, 10 in every earlier one.
+const gscAnswers = (reply, latest = gscMonthWindow(NOW).period) => (prop, q) => {
   if (prop !== 'sc-domain:marlowskitchen.example') return reply(403, {});
   if (q.dimensions?.length) return reply(200, { rows: [{ keys: [q.dimensions[0] === 'query' ? 'wine bar pasadena' : 'https://marlowskitchen.example/menu/'], clicks: 9, impressions: 100, position: 3.2 }] });
-  return reply(200, { rows: [{ clicks: q.startDate.startsWith('2026-10') ? 40 : 10, impressions: 400, ctr: 0.1, position: 5 }] });
+  return reply(200, { rows: [{ clicks: q.startDate.startsWith(latest) ? 40 : 10, impressions: 400, ctr: 0.1, position: 5 }] });
 };
 {
   const w = fakeWorld({ tokenRow: await tokenRow() });
@@ -328,7 +340,9 @@ const gscAnswers = (reply) => (prop, q) => {
 }
 {
   const w = fakeWorld({ tokenRow: await tokenRow(), site: { id: SITE, client_id: CLIENT, custom_domain: 'marlowskitchen.example', netlify_site_id: null, edition: 'presence' } });
-  w.gsc = (p, q, reply) => gscAnswers(reply)(p, q);
+  // readProvider takes no clock, so this read is about last month by the wall clock.
+  // Pinned to October 2026, this failed every run from Dec 1 2026.
+  w.gsc = (p, q, reply) => gscAnswers(reply, gscMonthWindow(new Date()).period)(p, q);
   const data = await readProvider(SITE, 'google_search_console', 'how you show up in Google Search');
   ok('gsc: connecting (the same read) caches real numbers, not a site list', data?.search_clicks === 40 && data?.search_impressions === 400 && w.connected?.data?.search_clicks === 40);
 }
