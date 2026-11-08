@@ -205,6 +205,14 @@ html.dds-embed #detailWrap{padding-top:0}
   .col-body.drop-ok{outline:1px dashed var(--p);outline-offset:-2px}
   .col-body.drop-over{background:var(--p-soft)}
   .bempty{font-size:12px;text-align:center;padding:10px var(--dds-s1,4px);opacity:.7}
+  /* sales review item 31: the Views menu and the Columns picker beside the toolbar's buttons */
+  .pvwrap,.colsdd{position:relative}
+  .pvmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:240px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow,0 12px 32px rgba(0,0,0,.14));padding:6px}
+  .pvmenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);padding:8px 10px;border-radius:var(--dds-r,8px);cursor:pointer}
+  .pvmenu button:hover,.pvmenu button:focus-visible{background:var(--p-soft)}
+  .pvmenu button[aria-checked="true"]{color:var(--p);font-weight:700}
+  .pvmenu .pvsep{border-top:1px solid var(--line);margin:4px 0}
+  .pvmenu .pvnone{font-size:13px;color:var(--soft);padding:8px 10px}
   /* Sales review item 30: the board ends with a collapsed Won column and a
      Not-a-fit drop zone, narrower than the four open stages */
   .board.with-out{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(170px,1fr)) repeat(2,minmax(120px,.55fr))}
@@ -339,7 +347,8 @@ html.dds-embed #detailWrap{padding-top:0}
   <!-- "Manage services" also lives here: it used to be reachable ONLY from
        inside an open deal's Proposals section, so the catalog that unhides the
        proposal line-item dropdown was effectively undiscoverable. -->
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><span class="pvwrap"><button class="btn ghost" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span><span class="colsdd" id="colsWrap" hidden><button class="btn ghost" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <div id="csvZone"></div>
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
   <!-- NOT aria-live: renderTable() swaps the whole innerHTML per sort click, and a
@@ -1567,6 +1576,8 @@ function setView(v){
   });
   $('list').hidden=v!=='list'; $('board').hidden=v!=='board'; $('table').hidden=v!=='table';
   $('filters').style.display=v==='board'?'none':'';
+  const cw=$('colsWrap');if(cw)cw.hidden=v!=='table';   // item 31: columns are a Table choice
+  if(v!=='table')PICKED.clear();
   load();
 }
 $('viewList').onclick=()=>{if(VIEW!=='list')setView('list');};
@@ -1741,6 +1752,134 @@ function renderList(){
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>{if(c.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(c.dataset.id);};c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
+// ── Sales review items 31 + 32 (Nov 2026): saved views (stage filter, search,
+// table columns and sort; GET/PUT /sales/views, shared by the team), picking
+// deals in the Table to act on together, and a CSV import of deals. The shared
+// pieces live in shell.js (window.ddsListKit). ──
+let SAVED=[],CURVIEW='',PICKED=new Set();
+const COLS_KEY='dds-cols:pipeline';
+let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
+const KIT=()=>window.ddsListKit||null;
+const kitReq=(p,m,b)=>api(p,m,b).then(body=>({ok:true,status:200,body}),e=>({ok:false,status:(e&&e.status)||0,body:(e&&e.body)||{}}));
+const shownT=()=>TCOLS.filter(c=>c[0]==='title'||!HIDDEN.has(c[0]));
+function paintViewsMenu(){
+  const m=$('pvMenu');if(!m)return;
+  const cur=SAVED.find(x=>x.id===CURVIEW);
+  m.innerHTML=(SAVED.length?SAVED.map(v=>`<button type="button" role="menuitemradio" aria-checked="${v.id===CURVIEW?'true':'false'}" data-pv="${esc(v.id)}">${esc(v.name)}</button>`).join(''):'<div class="pvnone">No saved views yet.</div>')
+    +'<div class="pvsep" role="separator"></div><button type="button" role="menuitem" id="pvSave">Save this view…</button>'
+    +(cur?`<button type="button" role="menuitem" id="pvDrop">Remove “${esc(cur.name)}”</button>`:'');
+  const b=$('pvBtn');if(b)b.textContent=(cur?cur.name:'Views')+' ▾';
+}
+function closeViews(back){const m=$('pvMenu'),b=$('pvBtn');if(!m||m.hidden)return;m.hidden=true;if(b){b.setAttribute('aria-expanded','false');if(back)b.focus();}}
+function applySaved(v){
+  FILTER=(v.base&&STAGES.includes(v.base))?v.base:'';Q=v.q||'';const si=$('dealSearch');if(si)si.value=Q;
+  TSORT=(v.sort&&TCOLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'next',dir:1};
+  HIDDEN=(v.cols&&v.cols.length)?new Set(TCOLS.map(c=>c[0]).filter(k=>k!=='title'&&!v.cols.includes(k))):new Set();
+  CURVIEW=v.id;PICKED.clear();paintViewsMenu();history.replaceState(null,'',listUrl());renderFilters();load();
+}
+async function saveView(){
+  const k=KIT();if(!k)return;
+  const cur=SAVED.find(x=>x.id===CURVIEW);
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  if(!name)return;
+  const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:FILTER||'',q:Q,cols:shownT().map(c=>c[0]),sort:TSORT};
+  const out=await k.saveViews('pipeline',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
+  if(!out){toast('That view didn’t save — try again in a moment.',true);return;}
+  SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
+  paintViewsMenu();toast('View saved — it’s under Views.');
+}
+async function dropView(){
+  const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  const out=await k.saveViews('pipeline',SAVED.filter(x=>x.id!==cur.id));
+  if(!out){toast('That didn’t save — try again in a moment.',true);return;}
+  SAVED=out;CURVIEW='';paintViewsMenu();toast('View removed.');
+}
+function wireViews(){
+  const b=$('pvBtn'),m=$('pvMenu');if(!b||!m)return;
+  paintViewsMenu();
+  b.addEventListener('click',(e)=>{e.stopPropagation();if(!m.hidden){closeViews(false);return;}paintViewsMenu();m.hidden=false;b.setAttribute('aria-expanded','true');const f=m.querySelector('button');if(f)f.focus();});
+  m.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const t=e.target.closest('button');if(!t)return;
+    if(t.dataset.pv){const v=SAVED.find(x=>x.id===t.dataset.pv);closeViews(true);if(v)applySaved(v);}
+    else if(t.id==='pvSave'){closeViews(true);saveView();}
+    else if(t.id==='pvDrop'){closeViews(true);dropView();}
+  });
+  m.addEventListener('keydown',(e)=>{
+    const opts=[...m.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();closeViews(true);}
+    else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
+  });
+  document.addEventListener('click',(e)=>{if(!e.target.closest('.pvwrap'))closeViews(false);});
+  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{e.stopPropagation();const k=KIT();if(!k)return;k.columnsMenu(cb,TCOLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderTable();});});
+  const im=$('importDeals');if(im)im.addEventListener('click',importDeals);
+}
+function bulkHtml(){
+  if(!PICKED.size)return'';
+  return `<div class="dds-bulk" role="region" aria-label="Selected deals"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><button type="button" id="bulkLost">Mark as not a fit</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+}
+async function bulkSend(){
+  const k=KIT();if(!k)return;
+  let r;try{r=await api('/sales/contacts?limit=100&include_deleted=1');}catch(_){r=null;}
+  const byId={};for(const c of ((r&&r.data)||[]))byId[c.id]=c;
+  const people=DEALS.filter(d=>PICKED.has(String(d.id))&&d.contact_id&&byId[d.contact_id]&&byId[d.contact_id].email).map(d=>({email:byId[d.contact_id].email,name:byId[d.contact_id].name||''}));
+  if(!people.length){toast('None of the deals you picked has a contact with an email address.',true);return;}
+  const b=$('bulkSend');if(b)b.disabled=true;
+  if(!(await k.sendTo(people)))if(b)b.disabled=false;
+}
+async function bulkLost(){
+  const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
+  let ok=0,skip=0,fail=0;
+  for(const d of picked){
+    if(!boardCanMove(d.stage,'lost')){skip++;continue;}   // won, already closed, or a customer
+    try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to:'lost'});ok++;}catch(_){fail++;}
+  }
+  toast(`${ok} marked not a fit${skip?` · ${skip} already closed`:''}${fail?` · ${fail} couldn’t change`:''}.`,!!fail);
+  PICKED.clear();load();
+}
+// item 32: deals from a CSV — the contacts importer's flow (shell.js). Each row
+// makes (or reuses, by email) its contact, then the deal at its open stage.
+const STAGE_WORDS=[[/won|closed ?won/,'won'],[/lost|not a fit|closed ?lost|dead/,'lost'],[/contract|agreement|negotiat|sign/,'contract'],[/proposal|quote|estimate/,'proposal'],[/qualif/,'qualified'],[/lead|new|open|prospect/,'lead']];
+function importDeals(){
+  const k=KIT(),z=$('csvZone');if(!k||!z)return;
+  k.importPanel(z,{
+    title:'Import deals from a CSV',
+    help:'One row per deal: a deal name (or the company), and if you have them the value, stage, contact name and email, and close date. Won and lost deals are skipped; a contact already in your list (by email) is reused. Nobody is emailed.',
+    noun:'deal',
+    mapHeader:(h)=>{h=String(h).toLowerCase().trim();
+      if(/e-?mail/.test(h))return'email';if(/stage|status/.test(h))return'stage';if(/close|due/.test(h))return'close';
+      if(/value|amount|price|budget|revenue|\$/.test(h))return'value';if(/company|business|organi[sz]ation|account/.test(h))return'company';
+      if(/^(deal|deal name|opportunity|opportunity name|title|project)$/.test(h))return'title';
+      if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';if(/^(name|full ?name|contact|contact name)$/.test(h))return'name';return null;},
+    ready:(keys)=>(keys.includes('title')||keys.includes('company')||keys.includes('name'))?'':'We couldn’t find a deal name. Check the first row has a header like “Deal”, “Company” or “Name”.',
+    toItem:(o)=>{
+      const who=o.name||[o.first,o.last].filter(Boolean).join(' ');
+      const title=o.title||o.company||who;if(!title)return null;
+      const sw=String(o.stage||'').toLowerCase();let stage='lead';for(const [re,k2] of STAGE_WORDS){if(re.test(sw)){stage=k2;break;}}
+      const v=Math.round(parseFloat(String(o.value||'').replace(/[^0-9.]/g,''))*100);
+      const d=/^\d{4}-\d{2}-\d{2}$/.test(o.close||'')?o.close:(Number.isFinite(Date.parse(o.close||''))?new Date(Date.parse(o.close)).toISOString().slice(0,10):'');
+      return{title,stage,value_cents:Number.isFinite(v)?v:0,email:String(o.email||'').toLowerCase(),name:who,company:o.company||'',close:d};
+    },
+    label:(it)=>it.title,
+    send:async(it)=>{
+      if(it.stage==='won'||it.stage==='lost')return'skipped';
+      let contact_id;
+      if(it.email||it.name){try{const c=await api('/sales/contacts','POST',{name:it.name||undefined,email:it.email||undefined,company:it.company||undefined});contact_id=c&&c.data&&c.data.id;}catch(_){/* the deal still comes in, without a contact */}}
+      await api('/sales/deals','POST',{title:it.title,stage:it.stage,expected_value_cents:it.value_cents,contact_id,expected_close:it.close||undefined,source:'import'});
+      return'added';
+    },
+    summary:(c)=>`${c.added} deal${c.added===1?'':'s'} added${c.skipped?` · ${c.skipped} won or lost skipped`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    done:()=>load(),
+  });
+}
+let VIEWS_ASKED=false;
+function loadSavedViews(){
+  if(VIEWS_ASKED||scope())return;
+  const go=()=>{const k=KIT();if(!k)return;VIEWS_ASKED=true;k.use(kitReq);k.views('pipeline').then(v=>{if(Array.isArray(v)){SAVED=v;paintViewsMenu();}});};
+  if(KIT())go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+}
 const TCOLS=[
   ['title','Deal',(d)=>String(d.title||'').toLowerCase()],
   ['contact','Contact',(d)=>String((CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'').toLowerCase()],
@@ -1762,7 +1901,9 @@ function renderTable(){
   const today=new Date().toISOString().slice(0,10);
   const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];
   const list=[...visibleDeals()].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});
-  const ths=TCOLS.map(([k,label])=>{
+  if(KIT())KIT().style();
+  const allOn=list.length>0&&list.every(d=>PICKED.has(String(d.id)));
+  const ths=`<th scope="col" class="pick"><input type="checkbox" id="pickAll" aria-label="Select all ${list.length} shown"${allOn?' checked':''}></th>`+shownT().map(([k,label])=>{
     const on=TSORT.key===k;
     return `<th scope="col"${on?` aria-sort="${TSORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-tsort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${TSORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('');
@@ -1774,17 +1915,23 @@ function renderTable(){
       ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(d.next_step_at)}</span>`
                :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(d.next_step_at)}</span>`:''}`)
       :'—';
+    const CELL={title:()=>`<td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>`,contact:()=>`<td>${esc(cn)}</td>`,
+      stage:()=>`<td>${stageBadge(d.stage,d.agreement_signed)}${needsConvert(d)?' <span class="mut conv">· not a customer yet</span>':''}</td>`,
+      value:()=>`<td class="num">${money(d.expected_value_cents)||'—'}</td>`,next:()=>`<td>${ns}</td>`,last:()=>`<td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>`};
     return `<tr data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" aria-label="Open ${esc(d.title||'Untitled deal')}${needsConvert(d)?' — not a customer yet':''}">
-      <td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>
-      <td>${esc(cn)}</td>
-      <td>${stageBadge(d.stage,d.agreement_signed)}${needsConvert(d)?' <span class="mut conv">· not a customer yet</span>':''}</td>
-      <td class="num">${money(d.expected_value_cents)||'—'}</td>
-      <td>${ns}</td>
-      <td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>
+      <td class="pick"><input type="checkbox" data-pick="${esc(d.id)}" aria-label="Select ${esc(d.title||'Untitled deal')}"${PICKED.has(String(d.id))?' checked':''}></td>
+      ${shownT().map(([k])=>CELL[k]()).join('')}
     </tr>`;
   }).join('');
   // the count/sort meta lives in the .lhead's .lmeta now — ONE meta line per page
-  host.innerHTML=`<div class="tscroll"><table aria-label="Deals"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  host.innerHTML=bulkHtml()+`<div class="tscroll"><table aria-label="Deals"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  // item 31: pick deals, then act on them together
+  const refocus=(sel)=>{const n=host.querySelector(sel);if(n)n.focus();};
+  host.querySelectorAll('[data-pick]').forEach(cb=>cb.addEventListener('change',()=>{const id=cb.getAttribute('data-pick');if(cb.checked)PICKED.add(id);else PICKED.delete(id);renderTable();refocus('[data-pick="'+id+'"]');}));
+  const pa=host.querySelector('#pickAll');if(pa)pa.addEventListener('change',()=>{const ids=list.map(d=>String(d.id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderTable();refocus('#pickAll');});
+  const bs=host.querySelector('#bulkSend');if(bs)bs.addEventListener('click',bulkSend);
+  const bl=host.querySelector('#bulkLost');if(bl)bl.addEventListener('click',bulkLost);
+  const bc=host.querySelector('#bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderTable();refocus('#pickAll');});
   host.querySelectorAll('[data-tsort]').forEach(b=>b.onclick=()=>{
     const k=b.getAttribute('data-tsort');
     if(TSORT.key===k)TSORT.dir=-TSORT.dir; else TSORT={key:k,dir:k==='last'?-1:1};   // last-contacted reads newest-first on first click
@@ -1796,8 +1943,8 @@ function renderTable(){
   });
   host.querySelectorAll('tr[data-id]').forEach(tr=>{
     const open=()=>{if(tr.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(tr.getAttribute('data-id'));};
-    tr.onclick=open;
-    tr.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
+    tr.onclick=(e)=>{if(e.target.closest('input,td.pick'))return;open();};
+    tr.onkeydown=(e)=>{if(e.target.closest('input'))return;if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
   });
 }
 
@@ -2829,6 +2976,9 @@ async function boot(){
     // filter still applies the moment List/Table renders).
     if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;if(urlStage==='won'||urlStage==='lost')VIEW='list';}
     renderFilters();
+    // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
+    if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});}
+    else{wireViews();loadSavedViews();}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
     // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"

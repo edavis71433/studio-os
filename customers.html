@@ -53,6 +53,10 @@
   .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
 
   .bar{display:flex;gap:var(--dds-s2,8px);margin-bottom:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
+  /* sales review item 31: saved views in the view menu; the text buttons beside it */
+  #viewMenu .vsep{font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
+  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p)}
+  .colsdd{position:relative}
   .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
 
@@ -264,6 +268,80 @@ const COLS=[
   ['status','Status',(c)=>String(c.status||'active')],
 ];
 let SORT={key:'name',dir:1};
+// ── Sales review items 31 + 32 (Nov 2026): saved views (GET/PUT /sales/views,
+// shared by the team), the columns shown, picking rows to act on together, and
+// a CSV import. The shared pieces live in shell.js (window.ddsListKit). ──
+let SAVED=[],CURVIEW='',PICKED=new Set();
+const COLS_KEY='dds-cols:customers';
+let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
+const KIT=()=>window.ddsListKit||null;
+const viewLabel=()=>{const v=SAVED.find(x=>x.id===CURVIEW);return v?v.name:VIEW_LABEL[VIEWNAME];};
+const shownCols=()=>COLS.filter(c=>c[0]==='name'||!HIDDEN.has(c[0]));
+function applySaved(v){
+  VIEWNAME=VIEW_LABEL[v.base]?v.base:'all';Q=v.q||'';
+  SORT=(v.sort&&COLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'name',dir:1};
+  HIDDEN=(v.cols&&v.cols.length)?new Set(COLS.map(c=>c[0]).filter(k=>k!=='name'&&!v.cols.includes(k))):new Set();
+  CURVIEW=v.id;PICKED.clear();render();
+}
+async function saveView(){
+  const k=KIT();if(!k)return;
+  const cur=SAVED.find(x=>x.id===CURVIEW);
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  if(!name)return;
+  const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
+  const out=await k.saveViews('customers',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
+  if(!out){toast('That view didn’t save — try again in a moment.');return;}
+  SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
+  render();toast('View saved — it’s in the view menu.');
+}
+async function dropView(){
+  const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  const out=await k.saveViews('customers',SAVED.filter(x=>x.id!==cur.id));
+  if(!out){toast('That didn’t save — try again in a moment.');return;}
+  SAVED=out;CURVIEW='';render();toast('View removed.');
+}
+function bulkHtml(){
+  if(!PICKED.size||DISPLAY!=='table')return'';
+  return `<div class="dds-bulk" role="region" aria-label="Selected customers"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><select id="bulkMark" aria-label="Mark the selected customers as"><option value="">Mark as…</option><option value="active">Active</option><option value="on_hold">On hold</option></select><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+}
+async function bulkSend(){
+  const k=KIT();if(!k)return;
+  const people=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
+  if(!people.length){toast('None of the customers you picked has an email address.');return;}
+  const b=$('bulkSend');if(b)b.disabled=true;
+  if(!(await k.sendTo(people)))if(b)b.disabled=false;
+}
+// "Mark as" sets each picked customer's main project to Active or On hold.
+// Complete is left to the project page on purpose: completing a project emails
+// the client a one-question survey.
+async function bulkMark(to){
+  const picked=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id)));
+  let ok=0,fail=0,none=0;
+  for(const c of picked){
+    if(!c.project_id){none++;continue;}
+    const r=await api('/projects/'+encodeURIComponent(c.project_id)+'/status','POST',{to});
+    if(r.ok)ok++;else fail++;
+  }
+  const word=to==='on_hold'?'on hold':'active';
+  toast(`${ok} marked ${word}${fail?` · ${fail} couldn’t change from where they are`:''}${none?` · ${none} with no project`:''}.`);
+  PICKED.clear();await load();
+}
+function importCustomers(){
+  const k=KIT(),z=$('csvZone');if(!k||!z)return;
+  k.importPanel(z,{
+    title:'Import customers from a CSV',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has an account is connected to you now, and the rest connect when they sign up.',
+    noun:'customer',
+    mapHeader:(h)=>{h=String(h).toLowerCase().trim();if(/e-?mail/.test(h))return'email';if(/company|business|organi[sz]ation/.test(h))return'business';if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';if(/^(full ?name|name|contact|customer)$/.test(h))return'name';return null;},
+    ready:(keys)=>keys.includes('email')?'':'We couldn’t find an email column. Check the first row has a header like “Email”.',
+    toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
+    label:(it)=>it.business_name||it.name||it.email,
+    send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.connected?'added':d.pending?'existed':d.owned_elsewhere?'skipped':'added';},
+    summary:(c)=>`${c.added} connected now · ${c.existed} saved to connect when they sign up${c.skipped?` · ${c.skipped} already with another studio`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    done:()=>load(),
+  });
+}
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 function openCustomer(c){
@@ -297,13 +375,14 @@ function headerHtml(count){
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🏢</span>
       <div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(VIEW_LABEL[VIEWNAME])}">${esc(VIEW_LABEL[VIEWNAME])} <span class="car" aria-hidden="true">▾</span></button>
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}">${esc(viewLabel())} <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
       </div>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
+      ${TAB==='customers'?`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}`:''}
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
@@ -311,19 +390,20 @@ function headerHtml(count){
 }
 
 function tableHtml(list){
-  const ths=COLS.map(([k,label])=>{
+  if(KIT())KIT().style();
+  const allOn=list.length>0&&list.every(c=>PICKED.has(String(c.client_id)));
+  const ths=`<th scope="col" class="pick"><input type="checkbox" id="pickAll" aria-label="Select all ${list.length} shown"${allOn?' checked':''}></th>`+shownCols().map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
+    const CELL={name:()=>`<td><span class="n">${esc(c.name||'Customer')}</span></td>`,email:()=>`<td class="c-email">${esc(c.email||'—')}</td>`,project_count:()=>`<td class="num">${Number(c.project_count||0)}</td>`,
+      open_support:()=>`<td><span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></td>`,status:()=>`<td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>`};
     return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Open ${esc(c.name||'Customer')}">
-      <td><span class="n">${esc(c.name||'Customer')}</span></td>
-      <td class="c-email">${esc(c.email||'—')}</td>
-      <td class="num">${Number(c.project_count||0)}</td>
-      <td><span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></td>
-      <td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>
+      <td class="pick"><input type="checkbox" data-pick="${esc(c.client_id)}" aria-label="Select ${esc(c.name||'Customer')}"${PICKED.has(String(c.client_id))?' checked':''}></td>
+      ${shownCols().map(([k])=>CELL[k]()).join('')}
       <td class="acts"><button class="rowact" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="rowact ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</td>
     </tr>`;
   }).join('');
@@ -350,7 +430,7 @@ function listHtml(list){
   if(!list.length){
     return `<div class="center"><h2>${CUSTOMERS.length?'No customers match that.':'You haven’t added a customer yet.'}</h2><p class="muted">${CUSTOMERS.length?(Q?'Try a different name or email.':'Nothing in this view — try “All customers”.'):'When you convert an enquiry or add a customer, they’ll appear here — with everything you deliver for them in one place.'}</p>${CUSTOMERS.length?'':`<p style="margin-top:18px"><a class="link" href="${esc(scoped('/pipeline.html'))}">Go to your sales pipeline →</a></p>`}</div>`;
   }
-  return DISPLAY==='table'?tableHtml(list):cardsHtml(list);
+  return DISPLAY==='table'?bulkHtml()+tableHtml(list):cardsHtml(list);
 }
 // ── Phase 2 (one customer model): the People sub-tab ─────────────────────────
 // Customers and the people behind them are ONE list with two tabs. People reads
@@ -398,9 +478,11 @@ function render(){
     return;
   }
   let h=headerHtml(list.length)+tabsHtml();
-  h+=`<div class="bar"><input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button></div>`;
+  h+=`<div class="bar"><input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" type="button">Import CSV</button></div><div id="csvZone"></div>`;
   h+=`<div id="listZone">${listHtml(list)}</div>`;
+  const zPrev=document.getElementById('csvZone');const zKeep=zPrev&&zPrev.childNodes.length;
   $('main').innerHTML=h;
+  if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
   wire();wireList();wireTabs();
 }
 // C5: keystrokes re-render ONLY the list zone (+ the meta count) — the search
@@ -421,7 +503,8 @@ function wire(){
   // Outside clicks close via the ONE document-level delegated closer above.
   const vb=$('viewBtn'),vm=$('viewMenu');
   if(vb&&vm){
-    vm.innerHTML=VIEWS.map(v=>`<button type="button" role="option" data-view="${v[0]}" aria-selected="${VIEWNAME===v[0]?'true':'false'}">${v[1]}${VIEWNAME===v[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
+    vm.innerHTML=VIEWS.map(v=>{const on=!CURVIEW&&VIEWNAME===v[0];return `<button type="button" role="option" data-view="${v[0]}" aria-selected="${on?'true':'false'}">${v[1]}${on?' <span aria-hidden="true">✓</span>':''}</button>`;}).join('')
+      +(SAVED.length?'<div class="vsep" role="presentation">Saved views</div>'+SAVED.map(v=>{const on=CURVIEW===v.id;return `<button type="button" role="option" data-saved="${esc(v.id)}" aria-selected="${on?'true':'false'}">${esc(v.name)}${on?' <span aria-hidden="true">✓</span>':''}</button>`;}).join(''):'');
     const close=()=>{vm.hidden=true;vb.setAttribute('aria-expanded','false');};
     vb.addEventListener('click',()=>{const open=vm.hidden;vm.hidden=!open;vb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=vm.querySelector('button');if(f)f.focus();}});
     vm.addEventListener('keydown',(e)=>{
@@ -430,8 +513,13 @@ function wire(){
       else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
       else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
     });
-    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');render();const nb=$('viewBtn');if(nb)nb.focus();}));
+    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');CURVIEW='';PICKED.clear();render();const nb=$('viewBtn');if(nb)nb.focus();}));
+    vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);const nb=$('viewBtn');if(nb)nb.focus();}));
   }
+  const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
+  const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
+  const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
+  const ic=$('importCsv');if(ic)ic.addEventListener('click',importCustomers);
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.
   // These re-renders also restore focus to their control (the sort handlers' pattern).
@@ -453,12 +541,19 @@ function wireList(){
   // like pipeline's rows — preventDefault keeps Space from scrolling the page)
   document.querySelectorAll('button[data-open]').forEach(b=>b.addEventListener('click',()=>openCustomer(byId[b.getAttribute('data-open')])));
   document.querySelectorAll('tr[data-open]').forEach(tr=>{
-    const open=(e)=>{if(e.target.closest('button'))return;openCustomer(byId[tr.getAttribute('data-open')]);};
+    const open=(e)=>{if(e.target.closest('button,input,td.pick'))return;openCustomer(byId[tr.getAttribute('data-open')]);};
     tr.addEventListener('click',open);
-    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openCustomer(byId[tr.getAttribute('data-open')]);}});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,input')){e.preventDefault();openCustomer(byId[tr.getAttribute('data-open')]);}});
   });
   document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();manageSite(byId[b.getAttribute('data-web')]);}));
   document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openCustomer(byId[b.getAttribute('data-rec')]);}));
+  // item 31: pick rows, then act on them together
+  const refocus=(sel)=>{const n=document.querySelector(sel);if(n)n.focus();};
+  document.querySelectorAll('[data-pick]').forEach(cb=>cb.addEventListener('change',()=>{const id=cb.getAttribute('data-pick');if(cb.checked)PICKED.add(id);else PICKED.delete(id);renderListZone();refocus('[data-pick="'+id+'"]');}));
+  const pa=$('pickAll');if(pa)pa.addEventListener('change',()=>{const ids=sortedRows().map(c=>String(c.client_id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderListZone();refocus('#pickAll');});
+  const bs=$('bulkSend');if(bs)bs.addEventListener('click',bulkSend);
+  const bm=$('bulkMark');if(bm)bm.addEventListener('change',()=>{if(bm.value)bulkMark(bm.value);});
+  const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
 
 // ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in
@@ -602,7 +697,15 @@ async function load(){
   if(!r.ok){trouble();return;}
   CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
   LOADED_AT=Date.now();
+  { const live=new Set(CUSTOMERS.map(c=>String(c.client_id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
   render();
+  loadSavedViews();
+}
+let VIEWS_ASKED=false;
+function loadSavedViews(){
+  if(VIEWS_ASKED)return;
+  const go=()=>{const k=KIT();if(!k)return;VIEWS_ASKED=true;k.use(api);k.views('customers').then(v=>{if(Array.isArray(v)&&v.length){SAVED=v;if(TAB==='customers')render();}});};
+  if(KIT())go();else document.addEventListener('DOMContentLoaded',go,{once:true});
 }
 
 (async function(){

@@ -29,7 +29,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
-import { handleSalesSummary, handleSalesMyTasks, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesMyTasks, handleSalesViews, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
@@ -57,7 +57,7 @@ import { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, h
 import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
-import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
+import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
 import { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } from './routes/reviews.ts';
@@ -645,6 +645,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/broadcasts' && method === 'GET') return handleBroadcastsList(site, cors);
   if (route === '/broadcasts' && method === 'POST') return handleBroadcastCreate(req, site, principal, cors);
   if (route === '/broadcasts/segments' && method === 'GET') return handleBroadcastSegments(site, cors);
+  if (route === '/broadcasts/lists' && method === 'POST') return handleBroadcastListCreate(req, site, principal, cors);   // items 31 + 39: picked people
+  { const lm = route.match(/^\/broadcasts\/lists\/([A-Za-z0-9-]{6,40})$/); if (lm && method === 'DELETE') return handleBroadcastListDelete(site, principal, lm[1], cors); }
   if (route === '/broadcasts/draft-assist' && method === 'POST') return handleBroadcastDraftAssist(req, site, cors);
   {
     let m = route.match(/^\/broadcasts\/([0-9a-f-]{36})$/);
@@ -684,6 +686,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // the site's deals — computed server-side because the list below is paged.
   if (route === '/sales/summary' && method === 'GET') return handleSalesSummary(req, site, principal, cors);
   if (route === '/sales/my-tasks' && method === 'GET') return handleSalesMyTasks(req, site, principal, cors);   // sales review item 29: Home's My tasks
+  if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   {

@@ -35,6 +35,10 @@
   .lrow1{display:flex;align-items:center;gap:6px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .viewdd{position:relative;min-width:0;flex:1}
+  /* sales review item 31: saved views in the view menu; the text buttons beside it */
+  #viewMenu .vsep{font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
+  .lbtn.txt{font-size:13px;font-weight:600;color:var(--p)}
+  .colsdd{position:relative}
   #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
   #viewBtn .car{font-size:10px;color:var(--faint)}
@@ -342,6 +346,57 @@ const COLS=[
   ['updated_at','Updated',(c)=>String(c.updated_at||'')],
 ];
 let SORT={key:'name',dir:1};
+// ── Sales review item 31 (Nov 2026): saved views (GET/PUT /sales/views, shared
+// by the team), the columns shown, and picking people to send an update to.
+// The shared pieces live in shell.js (window.ddsListKit). Contacts have no
+// status, so the one action here is Send an update. ──
+let SAVED=[],CURVIEW='',PICKED=new Set();
+const COLS_KEY='dds-cols:contacts';
+let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
+const KIT=()=>window.ddsListKit||null;
+const viewLabel=()=>{const v=SAVED.find(x=>x.id===CURVIEW);return v?v.name:VIEW_LABEL[VIEWNAME];};
+const shownCols=()=>COLS.filter(c=>c[0]==='name'||!HIDDEN.has(c[0]));
+function applySaved(v){
+  VIEWNAME=VIEW_LABEL[v.base]?v.base:'all';Q=v.q||'';
+  SORT=(v.sort&&COLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'name',dir:1};
+  HIDDEN=(v.cols&&v.cols.length)?new Set(COLS.map(c=>c[0]).filter(k=>k!=='name'&&!v.cols.includes(k))):new Set();
+  CURVIEW=v.id;PICKED.clear();render();
+}
+async function saveView(){
+  const k=KIT();if(!k)return;
+  const cur=SAVED.find(x=>x.id===CURVIEW);
+  const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view'});
+  if(!name)return;
+  const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
+  const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
+  if(!out){toast('That view didn’t save — try again in a moment.');return;}
+  SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
+  render();toast('View saved — it’s in the view menu.');
+}
+async function dropView(){
+  const k=KIT();const cur=SAVED.find(x=>x.id===CURVIEW);if(!k||!cur)return;
+  const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==cur.id));
+  if(!out){toast('That didn’t save — try again in a moment.');return;}
+  SAVED=out;CURVIEW='';render();toast('View removed.');
+}
+function bulkHtml(){
+  if(!PICKED.size||DISPLAY!=='table')return'';
+  return `<div class="dds-bulk" role="region" aria-label="Selected contacts"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+}
+async function bulkSend(){
+  const k=KIT();if(!k)return;
+  const people=ALL.filter(c=>PICKED.has(String(c.id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
+  if(!people.length){toast('None of the people you picked has an email address.');return;}
+  const b=$('bulkSend');if(b)b.disabled=true;
+  if(!(await k.sendTo(people)))if(b)b.disabled=false;
+}
+let VIEWS_ASKED=false;
+function loadSavedViews(){
+  if(VIEWS_ASKED||scope())return;
+  const go=()=>{const k=KIT();if(!k)return;VIEWS_ASKED=true;k.use(api);k.views('contacts').then(v=>{if(Array.isArray(v)&&v.length){SAVED=v;render();}});};
+  if(KIT())go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+}
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
@@ -364,13 +419,14 @@ function headerHtml(count){
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">👤</span>
       <div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Contacts view: ${esc(VIEW_LABEL[VIEWNAME])}">${esc(VIEW_LABEL[VIEWNAME])} <span class="car" aria-hidden="true">▾</span></button>
+        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Contacts view: ${esc(viewLabel())}">${esc(viewLabel())} <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Contact views" hidden></div>
       </div>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
+      ${scope()?'':`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}`}
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
@@ -388,19 +444,23 @@ function dupFlag(c){
   return `<span class="dupflag" title="Looks like ${esc(d.name)}${esc(why)}">possible duplicate</span>`;
 }
 function tableHtml(list){
-  const ths=COLS.map(([k,label])=>{
+  if(KIT())KIT().style();
+  const allOn=list.length>0&&list.every(c=>PICKED.has(String(c.id)));
+  const ths=`<th scope="col" class="pick"><input type="checkbox" id="pickAll" aria-label="Select all ${list.length} shown"${allOn?' checked':''}></th>`+shownCols().map(([k,label])=>{
     const on=SORT.key===k;
     return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const who=esc(c.name||c.email||c.phone||'Contact');
     const tel=c.phone?c.phone.replace(/[^0-9+]/g,''):'';
+    const CELL={name:()=>`<td><span class="nm">${who}</span>${dupFlag(c)}</td>`,
+      company:()=>`<td>${c.client_id?`<a href="/crm.html?client_id=${esc(c.client_id)}" data-noscope="1" title="This person belongs to a customer — open their record">${esc(c.company||'Customer')} ↗</a>`:esc(c.company||'—')}</td>`,
+      email:()=>`<td class="c-email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>`,
+      phone:()=>`<td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>`,
+      updated_at:()=>`<td>${esc(relWhen(c.updated_at)||'—')}</td>`};
     return `<tr data-open="${esc(c.id)}" tabindex="0" aria-label="Open ${who}">
-      <td><span class="nm">${who}</span>${dupFlag(c)}</td>
-      <td>${c.client_id?`<a href="/crm.html?client_id=${esc(c.client_id)}" data-noscope="1" title="This person belongs to a customer — open their record">${esc(c.company||'Customer')} ↗</a>`:esc(c.company||'—')}</td>
-      <td class="c-email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td>
-      <td>${c.phone?`<a href="tel:${esc(tel)}">${esc(c.phone)}</a>`:'—'}</td>
-      <td>${esc(relWhen(c.updated_at)||'—')}</td>
+      <td class="pick"><input type="checkbox" data-pick="${esc(c.id)}" aria-label="Select ${who}"${PICKED.has(String(c.id))?' checked':''}></td>
+      ${shownCols().map(([k])=>CELL[k]()).join('')}
       <td class="acts"><div class="rowacts">
         <button class="rowact" data-edit="${esc(c.id)}" title="Edit this contact" aria-label="Edit ${who}">Edit</button>
         <button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
@@ -435,7 +495,7 @@ function listHtml(rows){
   if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
   if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
   if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;
-  return DISPLAY==='table'?tableHtml(rows):cardsHtml(rows);
+  return DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows);
 }
 function render(){
   const rows=sortedRows();
@@ -467,7 +527,8 @@ function wire(){
   // Outside clicks close via the ONE document-level delegated closer above.
   const vb=$('viewBtn'),vm=$('viewMenu');
   if(vb&&vm){
-    vm.innerHTML=VIEWS.map(v=>`<button type="button" role="option" data-view="${v[0]}" aria-selected="${VIEWNAME===v[0]?'true':'false'}">${v[1]}${VIEWNAME===v[0]?' <span aria-hidden="true">✓</span>':''}</button>`).join('');
+    vm.innerHTML=VIEWS.map(v=>{const on=!CURVIEW&&VIEWNAME===v[0];return `<button type="button" role="option" data-view="${v[0]}" aria-selected="${on?'true':'false'}">${v[1]}${on?' <span aria-hidden="true">✓</span>':''}</button>`;}).join('')
+      +(SAVED.length?'<div class="vsep" role="presentation">Saved views</div>'+SAVED.map(v=>{const on=CURVIEW===v.id;return `<button type="button" role="option" data-saved="${esc(v.id)}" aria-selected="${on?'true':'false'}">${esc(v.name)}${on?' <span aria-hidden="true">✓</span>':''}</button>`;}).join(''):'');
     const close=()=>{vm.hidden=true;vb.setAttribute('aria-expanded','false');};
     vb.addEventListener('click',()=>{const open=vm.hidden;vm.hidden=!open;vb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=vm.querySelector('button');if(f)f.focus();}});
     vm.addEventListener('keydown',(e)=>{
@@ -476,8 +537,12 @@ function wire(){
       else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
       else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
     });
-    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');render();const nv=$('viewBtn');if(nv)nv.focus();}));
+    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');CURVIEW='';PICKED.clear();render();const nv=$('viewBtn');if(nv)nv.focus();}));
+    vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);const nv=$('viewBtn');if(nv)nv.focus();}));
   }
+  const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
+  const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
+  const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.
   // These re-renders also restore focus to their control (the sort handlers' pattern).
@@ -510,9 +575,15 @@ function wireList(){
     card.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.acts')){e.preventDefault();openDetail(card.getAttribute('data-open'));}});
   });
   document.querySelectorAll('tr[data-open]').forEach(tr=>{
-    tr.addEventListener('click',(e)=>{if(e.target.closest('a,button'))return;openDetail(tr.getAttribute('data-open'));});
-    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button')){e.preventDefault();openDetail(tr.getAttribute('data-open'));}});
+    tr.addEventListener('click',(e)=>{if(e.target.closest('a,button,input,td.pick'))return;openDetail(tr.getAttribute('data-open'));});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button,input')){e.preventDefault();openDetail(tr.getAttribute('data-open'));}});
   });
+  // item 31: pick people, then send them an update together
+  const refocus=(sel)=>{const n=document.querySelector(sel);if(n)n.focus();};
+  document.querySelectorAll('[data-pick]').forEach(cb=>cb.addEventListener('change',()=>{const id=cb.getAttribute('data-pick');if(cb.checked)PICKED.add(id);else PICKED.delete(id);renderListZone();refocus('[data-pick="'+id+'"]');}));
+  const pa=$('pickAll');if(pa)pa.addEventListener('change',()=>{const ids=sortedRows().map(c=>String(c.id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderListZone();refocus('#pickAll');});
+  const bs=$('bulkSend');if(bs)bs.addEventListener('click',bulkSend);
+  const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
 function openNew(){$('c-name').value='';$('c-email').value='';$('c-phone').value='';$('c-company').value='';$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
 $('c-cancel').onclick=()=>$('newDlg').close();
@@ -920,7 +991,9 @@ async function load(){
   if(seq!==REQ_SEQ)return;
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}
-  ALL=(r.body&&r.body.data)||[];LOADED_AT=Date.now();render();
+  ALL=(r.body&&r.body.data)||[];LOADED_AT=Date.now();
+  { const live=new Set(ALL.map(c=>String(c.id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
+  render();loadSavedViews();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

@@ -14,6 +14,8 @@
 //   PATCH /broadcasts/:id             — edit a draft
 //   POST  /broadcasts/:id/send        — send now, or {scheduled_at} to schedule
 //   POST  /broadcasts/:id/cancel      — cancel a scheduled broadcast
+//   POST  /broadcasts/lists           — keep a list of picked people {name, people} (items 31 + 39)
+//   DELETE /broadcasts/lists/:id      — remove a picked list (refused while a scheduled send uses it)
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { loadEmailBrand, brandEmailShell } from '../lib/email_brand.ts';
@@ -22,7 +24,10 @@ import {
   SEGMENTS, isSegmentKey, segmentLabel, validSubject, cleanSubject, cleanBody,
   scheduleDecision, resolveSendable, audienceCount, dispatchBroadcast,
   buildEmailHtml, renderSubject, type SegmentKey, type BroadcastRow,
+  isAudienceKey, isListKey, loadPickedLists, type AudienceKey,
 } from '../lib/broadcast.ts';
+import { normalizeLists, normalizePeople, newId, MAX_LISTS } from '../lib/saved_views.ts';
+import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -59,13 +64,55 @@ export async function handleBroadcastSegments(site: SiteRow, cors: Record<string
   // honest post-suppression count is shown on the specific broadcast's preview).
   const counts: Record<string, number> = {};
   for (const s of SEGMENTS) counts[s.key] = await audienceCount(site.id, s.key).catch(() => 0);
-  return json({ data: { segments: SEGMENTS.map((s) => ({ ...s, count: counts[s.key] ?? 0 })) } }, 200, cors);
+  // the studio's picked lists follow the presets, newest first (items 31 + 39)
+  const lists = (await loadPickedLists(site.id).catch(() => [])).slice().reverse().map((l) => ({
+    key: `list:${l.id}`, label: l.name, description: `A list you picked · ${l.people.length} ${l.people.length === 1 ? 'person' : 'people'}`, count: l.people.length, list: true,
+  }));
+  return json({ data: { segments: [...SEGMENTS.map((s) => ({ ...s, count: counts[s.key] ?? 0 })), ...lists] } }, 200, cors);
+}
+
+/** A list key must name one of THIS site's lists; a segment key is always fine. */
+async function audienceOk(siteId: string, key: unknown): Promise<boolean> {
+  if (isSegmentKey(key)) return true;
+  if (!isListKey(key)) return false;
+  return (await loadPickedLists(siteId).catch(() => [])).some((l) => `list:${l.id}` === key);
+}
+async function audienceLabelFor(siteId: string, key: string): Promise<string> {
+  if (!isListKey(key)) return segmentLabel(key);
+  const l = (await loadPickedLists(siteId).catch(() => [])).find((x) => `list:${x.id}` === key);
+  return l ? l.name : 'A list that was removed';
+}
+
+export async function handleBroadcastListCreate(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  let body: any = {};
+  try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const people = normalizePeople(body?.people);
+  if (!people.length) return json({ error: 'validation', message: 'None of the people you picked has an email address.' }, 422, cors);
+  const day = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const name = String(body?.name || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80) || `Picked on ${day} · ${people.length} ${people.length === 1 ? 'person' : 'people'}`;
+  const list = { id: newId(), name, people, created_at: nowIso() };
+  const lists = [...await loadPickedLists(site.id), list].slice(-MAX_LISTS);
+  const ok = await writeReservedJson(site.id, RESERVED_NAMES.broadcastLists, normalizeLists(lists), principal.email || principal.userId || 'owner');
+  if (!ok) return json({ error: 'write_failed', message: 'That list didn’t save — please try again.' }, 502, cors);
+  return json({ data: { id: list.id, key: `list:${list.id}`, name, count: people.length } }, 201, cors);
+}
+
+export async function handleBroadcastListDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  const key = `list:${id}`;
+  if (!isListKey(key)) return json({ error: 'not_found' }, 404, cors);
+  const busy = await svc(`presence_broadcasts?site_id=eq.${site.id}&audience=eq.${encodeURIComponent(key)}&status=in.(scheduled,sending)&select=id&limit=1`);
+  if (rows(busy)[0]) return json({ error: 'in_use', message: 'A scheduled update is going to this list. Cancel it first.' }, 409, cors);
+  const lists = await loadPickedLists(site.id);
+  if (!lists.some((l) => l.id === id)) return json({ error: 'not_found' }, 404, cors);
+  const ok = await writeReservedJson(site.id, RESERVED_NAMES.broadcastLists, lists.filter((l) => l.id !== id), principal.email || principal.userId || 'owner');
+  return ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
 }
 
 export async function handleBroadcastCreate(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   let body: any = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right — nothing was saved.' }, 400, cors); }
-  const audience = isSegmentKey(body?.audience) ? body.audience : 'contacts';
+  if (isListKey(body?.audience) && !(await audienceOk(site.id, body.audience))) return json({ error: 'validation', message: 'That list isn’t here any more — pick who it goes to again.' }, 422, cors);
+  const audience = isAudienceKey(body?.audience) ? body.audience : 'contacts';
   const subject = cleanSubject(body?.subject);
   const bodyMd = cleanBody(body?.body);
   const ins = await svc('presence_broadcasts', {
@@ -83,13 +130,13 @@ export async function handleBroadcastGet(site: SiteRow, id: string, cors: Record
   // The HONEST recipient count (suppression-filtered) + a full branded preview the
   // owner sees before they approve. Rendered with a representative first name.
   const brand = await loadEmailBrand(site.id);
-  const sendable = await resolveSendable(site.id, b.audience as SegmentKey).catch(() => ({ recipients: [], suppressed: 0, audience: 0 }));
+  const sendable = await resolveSendable(site.id, b.audience as AudienceKey).catch(() => ({ recipients: [], suppressed: 0, audience: 0 }));
   const tokens = { firstName: 'there', businessName: brand.name };
   const preview_html = brandEmailShell(buildEmailHtml(b.body, tokens), brand);
   const preview_subject = renderSubject(b.subject, tokens);
   return json({ data: {
     broadcast: b,
-    audience_label: segmentLabel(b.audience),
+    audience_label: await audienceLabelFor(site.id, String(b.audience || '')),
     recipient_count: sendable.recipients.length,
     suppressed_count: sendable.suppressed,
     preview_subject, preview_html,
@@ -106,7 +153,7 @@ export async function handleBroadcastUpdate(req: Request, site: SiteRow, id: str
   const patch: Record<string, unknown> = { updated_at: nowIso() };
   if (body.subject !== undefined) patch.subject = cleanSubject(body.subject);
   if (body.body !== undefined) patch.body = cleanBody(body.body);
-  if (body.audience !== undefined) patch.audience = isSegmentKey(body.audience) ? body.audience : b.audience;
+  if (body.audience !== undefined) patch.audience = (await audienceOk(site.id, body.audience)) ? body.audience : b.audience;
   const up = await svc(`presence_broadcasts?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft`, {
     method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch),
   });
@@ -147,12 +194,12 @@ export async function handleBroadcastSend(req: Request, site: SiteRow, principal
       body: JSON.stringify({ status: 'scheduled', scheduled_at: decision.scheduledAt, updated_at: nowIso() }),
     });
     if (!up.ok || !rows(up)[0]) return json({ error: 'schedule_failed', message: 'Couldn’t schedule that.' }, 502, cors);
-    const sendable = await resolveSendable(site.id, b.audience as SegmentKey).catch(() => ({ recipients: [] as unknown[], suppressed: 0, audience: 0 }));
+    const sendable = await resolveSendable(site.id, b.audience as AudienceKey).catch(() => ({ recipients: [] as unknown[], suppressed: 0, audience: 0 }));
     return json({ data: { status: 'scheduled', scheduled_at: decision.scheduledAt, recipient_count: sendable.recipients.length, skipped_count: sendable.suppressed } }, 200, cors);
   }
 
   // ── SEND NOW. Resolve the honest (suppression-filtered) audience first.
-  const sendable = await resolveSendable(site.id, b.audience as SegmentKey).catch(() => null);
+  const sendable = await resolveSendable(site.id, b.audience as AudienceKey).catch(() => null);
   if (!sendable) return unavailable(cors);
   if (sendable.recipients.length === 0) {
     return json({ error: 'no_recipients', message: 'No reachable contacts in this list right now — everyone is either unsubscribed or has no email on file.' }, 400, cors);
