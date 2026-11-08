@@ -21,6 +21,7 @@ import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
+import { oauthConfigured } from '../connected/auth.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -71,18 +72,19 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
     { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
   ],
-  // These are the names connected/auth.ts ACTUALLY reads. The three it used to
-  // list — GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_SECRET — are
-  // read by NO connected-platform code: credentials come from
-  // CONNECTED_<PROVIDER_KEY>_CLIENT_ID/_SECRET (auth.ts creds()), and the OAuth
-  // state is SEALED with CONNECTION_ENC_KEY (auth.ts signState), not HMAC'd. So
-  // the old list was wrong in both directions: setting them lit up
-  // capabilities.connected_platform while every connect call still 503'd, and
-  // setting the real ones left it reading false.
+  // These are the names connected/auth.ts ACTUALLY reads (credsSource): a
+  // provider's own CONNECTED_<PROVIDER_KEY>_CLIENT_ID/_SECRET pair, else, for a
+  // Google product, the studio's Google app GOOGLE_CLIENT_ID/_SECRET (since Nov 8
+  // 2026; before that GOOGLE_* lit nothing here). The OAuth state is SEALED with
+  // CONNECTION_ENC_KEY (auth.ts signState); STATE_SIGNING_SECRET is read by
+  // nothing. connected_platform below asks auth.ts itself, so the two can't
+  // disagree again.
   connected: [
     { name: 'CONNECTION_ENC_KEY', required: false, enables: 'encrypting connected tokens at rest AND sealing the OAuth state (FAIL-CLOSED: without it, token storage is refused, not faked)' },
-    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID', required: false, enables: 'connecting Google Search Console (the one live provider) — paired with _CLIENT_SECRET' },
-    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET', required: false, enables: 'the Search Console token exchange + silent refresh. The provider app must also register ${SITE_URL}/connections-callback.html as its redirect URI (SITE_URL is listed under `site`)' },
+    { name: 'GOOGLE_CLIENT_ID', required: false, enables: 'the studio’s Google app (the back office reads with it too). Serves every Google connection that has no CONNECTED_GOOGLE_* pair of its own — paired with GOOGLE_CLIENT_SECRET. The app must list https://app.davisdigitalstudio.com/connections-callback.html (APP_URL) as a redirect and carry each product’s permissions' },
+    { name: 'GOOGLE_CLIENT_SECRET', required: false, enables: 'the studio’s Google app’s secret, for the token exchange + silent refresh of those Google connections' },
+    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID', required: false, enables: 'optional: a Google app of its own for Search Console, used instead of the studio’s Google app — paired with _CLIENT_SECRET' },
+    { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET', required: false, enables: 'optional: that app’s secret. Whichever app is used must list https://app.davisdigitalstudio.com/connections-callback.html (APP_URL) as a redirect' },
   ],
   site: [
     { name: 'SITE_URL', required: false, enables: 'absolute links in emails (defaults to the production host)' },
@@ -119,7 +121,7 @@ export function validateSecrets() {
     // PAIR under the name connected/auth.ts reads. Derived from the registry, so
     // flipping a second provider live needs no edit here.
     connected_platform: has('CONNECTION_ENC_KEY') && CONNECTED_PROVIDERS.some((p) =>
-      p.status !== 'planned' && has(`CONNECTED_${p.key.toUpperCase()}_CLIENT_ID`) && has(`CONNECTED_${p.key.toUpperCase()}_CLIENT_SECRET`)),
+      p.status !== 'planned' && oauthConfigured(p.key)),
   };
   return {
     ok: missingRequired.length === 0,           // backward-compatible

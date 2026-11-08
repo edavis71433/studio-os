@@ -2,8 +2,9 @@
 // OAuth and API-key connections, config-driven. NO provider-specific flow: the
 // provider registry + this endpoint map is all that differs. App credentials are
 // edge-function env secrets (CONNECTED_<KEY>_CLIENT_ID / _SECRET), registered by
-// the owner per provider; until they exist a connection is honestly "not
-// available on this environment yet" — never a fake success.
+// the owner per provider, or for Google the studio's Google app (credsSource);
+// until they exist a connection is honestly "not available on this environment
+// yet" — never a fake success.
 import type { TokenBundle } from './store.ts';
 import { providerByKey } from './providers.ts';
 import { seal, open, encryptionConfigured } from './crypto.ts';
@@ -41,11 +42,24 @@ const OAUTH: Record<string, OAuthEndpoints> = {
 };
 
 const ENVKEY = (k: string) => k.toUpperCase();
+const isGoogle = (providerKey: string) => !!OAUTH[providerKey] && OAUTH[providerKey].authorize.startsWith('https://accounts.google.com/');
+/** Where a provider's app credentials come from: its own CONNECTED_<KEY> pair,
+ *  else, for a Google product, the studio's Google app (GOOGLE_CLIENT_ID and
+ *  _SECRET, first set up for the older back office). Eric's call on Nov 8 2026:
+ *  one Google app serves both, so switching a Google connection on means adding
+ *  the callback address and the product's permissions to that app, not making a
+ *  second one. Always a whole pair from one place, never half of each. */
+export function credsSource(providerKey: string): 'own' | 'studio_google' | 'none' {
+  const own = (n: string) => Deno.env.get(`CONNECTED_${ENVKEY(providerKey)}_CLIENT_${n}`) || '';
+  if (own('ID') && own('SECRET')) return 'own';
+  if (isGoogle(providerKey) && Deno.env.get('GOOGLE_CLIENT_ID') && Deno.env.get('GOOGLE_CLIENT_SECRET')) return 'studio_google';
+  return 'none';
+}
 function creds(providerKey: string): { id: string; secret: string } {
-  return {
-    id: Deno.env.get(`CONNECTED_${ENVKEY(providerKey)}_CLIENT_ID`) || '',
-    secret: Deno.env.get(`CONNECTED_${ENVKEY(providerKey)}_CLIENT_SECRET`) || '',
-  };
+  const from = credsSource(providerKey);
+  if (from === 'own') return { id: Deno.env.get(`CONNECTED_${ENVKEY(providerKey)}_CLIENT_ID`) || '', secret: Deno.env.get(`CONNECTED_${ENVKEY(providerKey)}_CLIENT_SECRET`) || '' };
+  if (from === 'studio_google') return { id: Deno.env.get('GOOGLE_CLIENT_ID') || '', secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '' };
+  return { id: '', secret: '' };
 }
 
 export function isOAuth(providerKey: string): boolean { return !!OAUTH[providerKey]; }

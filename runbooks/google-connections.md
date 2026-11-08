@@ -4,6 +4,25 @@ Search Console and Google Business Profile are built, but they can't run until G
 
 Allow about 30 minutes of clicking, plus waiting on Google: **listing access takes days or weeks**, and a public app needs Google's verification.
 
+## The short way: reuse the studio's Google app (chosen Nov 8 2026)
+
+The older back office already has a Google app. Its keys are on the server as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Since Nov 8 2026, every Google connection without keys of its own uses that app. So there is no new app to make and nothing to paste into Supabase. Do these steps in Google Cloud **before** the deploy that ships this. Once it's deployed, the Connect buttons switch on, and Google refuses them until step 2 is done.
+
+1. Turn on 2-step verification for the Google account that owns the Cloud project. Google Cloud now blocks its console without it.
+2. In <https://console.cloud.google.com>, pick the back office's project. Open **Google Auth Platform**, then **Clients**. Open the web client whose redirect list already holds the back office's address (`https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api`). Under **Authorized redirect URIs**, add this exact address and save:
+
+   ```
+   https://app.davisdigitalstudio.com/connections-callback.html
+   ```
+
+3. Under **Data Access**, make sure both scopes from step 2 below are listed (`webmasters.readonly` and `business.manage`). Under **Audience**, check the app says **In production**, not "Testing".
+4. Under **APIs & Services**, make sure the **Google Search Console API** is on. The back office reads with it, so it probably is.
+5. For listings, do step 4 below (Google's approval form), then switch on the four Business Profile APIs in step 5 once it's approved.
+6. Skip step 6 below. The server already has the keys.
+7. Deploy, then try it on your own site (step 7 below).
+
+The long way, a separate Google app with its own `CONNECTED_GOOGLE_*` keys, still works and takes priority for any product whose pair is set.
+
 ## 1. Create the Google app
 
 1. Go to <https://console.cloud.google.com> and create a project, for example `Studio OS connections`.
