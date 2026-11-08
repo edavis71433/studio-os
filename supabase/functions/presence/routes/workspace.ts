@@ -27,6 +27,7 @@ import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
+import { healSupportOwners } from '../lib/service_bridge.ts';
 
 // ── Phase 3 (one source for numbers): the notice rows the bell COUNTS and Today
 // RENDERS are the same rows. Drops the client_* throttle notices (their counted
@@ -44,8 +45,11 @@ async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
     } catch { open = null; }
   }
   const { keep, stale } = renderableNotices(rows, open);
+  // stale = a paid invoice's reminder, an older week's copy of a still-open
+  // nudge, or "Proposal accepted" once the deal is signed — each cleared by its
+  // own kind + exact period, so nothing else can be touched.
   if (stale.length && site.client_id) {
-    for (const n of stale) { try { await clearNotice(String(site.client_id), 'deal_followup', String(n.period)); } catch { /* best-effort */ } }
+    for (const n of stale) { if (!n.kind || !n.period) continue; try { await clearNotice(String(site.client_id), String(n.kind), String(n.period)); } catch { /* best-effort */ } }
   }
   return keep;
 }
@@ -128,7 +132,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
       ? import('../middleware/entitlement.ts').then((m) => m.entitlementFor(principal, site.client_id)).catch(() => null)
       : Promise.resolve(null),
     // Phase FLOW: active notices (owner surfaces only; bounded — the badge caps out anyway)
-    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind&limit=100`).catch(swallow) : none,
+    // period rides along so the badge counts what Today renders (one row per subject — renderableNotices)
+    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,period&limit=100`).catch(swallow) : none,
     // proposed plans/writes are pure counts — HEAD + count=exact, flat cost at any size
     showApprovals ? svcCount(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed`) : Promise.resolve(0),
     showApprovals ? svcCount(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed`) : Promise.resolve(0),
@@ -538,6 +543,12 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       for (const pid of pids) { const cid = projById[pid]?.client_id; if (cid) clientIds.add(cid); }
       // F3: rows stamped at write time name their client directly — make sure the
       // name lookup below covers them even when no bridge/project ties them in.
+      // Sales review B2 (Nov 2026): a request filed before the stamp existed, by a
+      // customer tied to their workspace by email, matched nobody and read
+      // "Support request". Resolve and stamp it once (lib/service_bridge.ts);
+      // one that still names no customer shows the sender's email instead.
+      const owners = await healSupportOwners(site.id, sup);
+      for (const r of sup) { const cid = owners.clientOf[String(r.id)]; if (cid && !r.client_id) r.client_id = cid; }
       for (const r of sup) { if (r.client_id) clientIds.add(String(r.client_id)); }
       const clientById: Record<string, string> = {};       // client id → display name
       const requesterToClient: Record<string, string> = {}; // reader key → client id
@@ -578,7 +589,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
       // NAME. Stamping the id makes the lens whole. Purely additive: the page
       // falls back to matching a support row by project name when this is absent
       // (an older function build), so neither deploy order drops a row.
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client, created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client || owners.emailOf[String(r.id)] || '', created_at: r.updated_at, thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = cv.needsReply; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClientAt, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       client_messages = client_messages.slice(0, 20).map((r) => ({ ...r, tier: (r.type === 'support' ? (r.status === 'open' || r.status === 'in_progress') : !!r.needs_reply) ? 'needs_you' : 'update', priority: false }));

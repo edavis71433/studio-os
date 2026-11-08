@@ -107,6 +107,18 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('sections reorder (faqs before about)', reordered.indexOf('Good to know') < reordered.indexOf('About us'));
   const noSet = render('plumber')['index.html'];
   ok('no settings → all four sections in default order', noSet.indexOf('About us') < noSet.indexOf('What customers say'));
+  // The welcome section moves like the others, and its address strip moves with it.
+  const at = (h, needle) => h.indexOf(needle);
+  ok('the welcome section is stamped movable for the builder', noSet.includes('data-dds-core="hero" data-dds-movable'));
+  ok('no settings → the welcome section comes first', at(noSet, 'data-dds-core="hero"') < at(noSet, 'About us'));
+  const heroDown = render('plumber', { sections: { hidden: [], order: ['about', 'hero', 'offerings', 'testimonials', 'faqs'] } })['index.html'];
+  ok('a saved order can put the welcome section below About', at(heroDown, 'About us') < at(heroDown, 'data-dds-core="hero"'));
+  const stripAt = at(heroDown, 'class="strip"');
+  ok('the address strip follows the welcome section wherever it goes', stripAt > at(heroDown, 'data-dds-core="hero"') && stripAt < at(heroDown, 'data-dds-core="offerings"'));
+  ok('an order saved before the welcome section could move leaves it first', at(reordered, 'data-dds-core="hero"') < at(reordered, 'Good to know'));
+  const heroOff = render('plumber', { sections: { hidden: ['hero'], order: ['about', 'hero'] } })['index.html'];
+  ok('with the welcome section removed, the strip keeps its place at the top', !heroOff.includes('data-dds-core="hero"') && at(heroOff, 'class="strip"') < at(heroOff, 'About us'));
+  ok('the welcome section appears once', (heroDown.match(/data-dds-core="hero"/g) || []).length === 1 && (heroDown.match(/class="strip"/g) || []).length === 1);
   // DS-6 split hero consumes DS-5 focal — the first cropping presentation
   const base = JSON.parse(JSON.stringify(fixture));
   const heroOffering = base.content.offerings.find((o) => o.media);

@@ -8,7 +8,7 @@ import { svc } from '../lib/db.ts';
 import { isStudioSide, loadProject, projectEvent } from './projects.ts';
 import { clampLimit, clampOffset } from '../lib/service_delivery.ts';
 import { isAudience, notifHref, notifLabel, isRead } from '../lib/notifications.ts';
-import { emailBridgedCustomer } from '../lib/service_bridge.ts';
+import { emailBridgedCustomer, healUnstampedSupport } from '../lib/service_bridge.ts';
 import { cleanThreadKey, markThreadRead } from '../lib/thread_reads.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -106,6 +106,7 @@ export async function handleProjectClientMessages(req: Request, jwt: string, sit
   // (pre-0115 the filter 400s → the stamped list is simply empty); the
   // key-matched read below remains the fallback for legacy unstamped rows.
   const sel = 'id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at';
+  await healUnstampedSupport(site.id);   // sales review B2: old unstamped requests get their stamp first
   let stamped: any[] = [];
   try { stamped = rows(await svc(`presence_support_requests?site_id=eq.${site.id}&project_id=is.null&client_id=eq.${custId}&deleted_at=is.null&select=${sel}&order=updated_at.desc&limit=100`)); } catch { stamped = []; }
   if (!keys.length && !stamped.length) return json({ data: [], customer, is_studio_view: true }, 200, cors);
