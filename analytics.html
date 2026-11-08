@@ -695,7 +695,7 @@ function paintReports(){
   const label=(REPORTS.find(r=>r[0]===REP_ON)||REPORTS[0])[1];
   host.innerHTML=`<div class="rtabs noprint" role="tablist" aria-label="Reports">${REPORTS.map(([k,l])=>`<button type="button" role="tab" id="rt-${k}" aria-controls="repPrint" aria-selected="${k===REP_ON?'true':'false'}" tabindex="${k===REP_ON?'0':'-1'}" data-rep="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="rep" id="repPrint" role="tabpanel" aria-labelledby="rt-${REP_ON}"><div class="rep-h"><div><h3>${esc(label)}</h3><p>${esc(REPORT_NOTE[REP_ON]||'')}</p></div><button type="button" class="btn noprint" id="repPrintBtn">Print this report</button></div>
-    ${reportBody(REP_ON,REP[REP_ON])}<p class="rep-foot">As of ${esc(asOf(REP.generated_at))}</p></div>`;
+    ${reportBody(REP_ON,REP[REP_ON])}<p class="rep-foot">Figures as of ${esc(asOf(REP.generated_at))}</p></div>`;
   const tabs=[...host.querySelectorAll('[data-rep]')];
   const pick=(k,focus)=>{REP_ON=k;try{localStorage.setItem('dds-report',k);}catch(_){/* */}paintReports();if(focus){const b=$('rt-'+k);if(b)b.focus();}};
   tabs.forEach((b,i)=>{
