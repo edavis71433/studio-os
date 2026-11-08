@@ -150,7 +150,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['edit', [
     'POST /redirects',
     'POST /visibility/check',
-    'POST /preview/(publish|share-link)',
+    'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,

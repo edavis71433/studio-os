@@ -10,7 +10,8 @@ import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
-import { validateBlocksWithMap, resolveBlockMediaTracked, type BlockResolveExtras } from './site_blocks.ts';
+import { validateBlocksWithMap, resolveBlockMediaTracked, renderSiteBlocks, type BlockResolveExtras } from './site_blocks.ts';
+import { esc, attr, safeHref } from './markdown.ts';
 import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
@@ -51,6 +52,27 @@ export interface MediaManifestEntry {
   media_id: string;
   storage_path: string;
   variants: Array<{ name: string; width: number; format: VariantFormat; output_path: string }>;
+}
+
+function manifestEntry(m: MediaRow, manifest: TemplateManifest): MediaManifestEntry {
+  // DL-FILES: a NON-image file (a PDF Download) is deployed as its ORIGINAL, byte
+  // for byte — NEVER image-transformed (that would fail the deploy). Images keep
+  // the exact same variant manifest as before, so their output is byte-identical.
+  if (!isImageMime(String(m.mime ?? ''))) {
+    return {
+      media_id: m.id, storage_path: m.storage_path,
+      variants: [{ name: 'original', width: 0, format: 'original' as VariantFormat, output_path: originalPath(m.storage_path, String(m.mime ?? '')) }],
+    };
+  }
+  return {
+    media_id: m.id, storage_path: m.storage_path,
+    // Emit BOTH formats at every width: WebP (universal) + AVIF (smaller, modern).
+    // The render offers both via <picture>; fetchVariants generates both files.
+    variants: Object.entries(manifest.image_variants).flatMap(([name, v]) => ([
+      { name, width: v.width, format: 'webp' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'webp') },
+      { name: `${name}_avif`, width: v.width, format: 'avif' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'avif') },
+    ])),
+  };
 }
 
 function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | null {
@@ -291,27 +313,7 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     redirects: redirects.map((r: any) => ({ from_path: r.from_path, to_path: r.to_path })),
   };
 
-  const mediaManifest: MediaManifestEntry[] = [...usedMedia].sort().map((id) => {
-    const m = mediaById.get(id)!;
-    // DL-FILES: a NON-image file (a PDF Download) is deployed as its ORIGINAL, byte
-    // for byte — NEVER image-transformed (that would fail the deploy). Images keep
-    // the exact same variant manifest as before, so their output is byte-identical.
-    if (!isImageMime(String(m.mime ?? ''))) {
-      return {
-        media_id: m.id, storage_path: m.storage_path,
-        variants: [{ name: 'original', width: 0, format: 'original' as VariantFormat, output_path: originalPath(m.storage_path, String(m.mime ?? '')) }],
-      };
-    }
-    return {
-      media_id: m.id, storage_path: m.storage_path,
-      // Emit BOTH formats at every width: WebP (universal) + AVIF (smaller, modern).
-      // The render offers both via <picture>; fetchVariants generates both files.
-      variants: Object.entries(manifest.image_variants).flatMap(([name, v]) => ([
-        { name, width: v.width, format: 'webp' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'webp') },
-        { name: `${name}_avif`, width: v.width, format: 'avif' as VariantFormat, output_path: variantPath(m.storage_path, v.width, 'avif') },
-      ])),
-    };
-  });
+  const mediaManifest: MediaManifestEntry[] = [...usedMedia].sort().map((id) => manifestEntry(mediaById.get(id)!, manifest));
 
   // Phase B1: the Developer-Mode layer rides in the snapshot as a sibling of
   // content. Re-sanitize here so the snapshot always carries inert values even
@@ -328,4 +330,36 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
     ...(devCustomization ? { dev_customization: devCustomization } : {}),
   };
   return { snapshot, mediaManifest };
+}
+
+// ── Item 26: one section of an unsaved list, for the canvas while the save is on its way ──
+// The same composition the draft runs (composeBlocks: linked sections, validation, photos,
+// reviews) over the page's list as the builder holds it, then only the section renderer, not
+// the whole site. The list is needed whole: a section's id and render key depend on its
+// neighbours. Reads only what the list needs.
+const UUID_G = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+export async function draftSectionHtml(siteId: string, manifest: TemplateManifest, rawBlocks: unknown[], index: number, now: string): Promise<{ html: string; mediaManifest: MediaManifestEntry[] }> {
+  const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
+  const text = JSON.stringify(rawBlocks);
+  const ids = [...new Set((text.match(UUID_G) || []).map((x) => x.toLowerCase()))].slice(0, 200);
+  const refIds = linkedRefIds(rawBlocks);
+  const [media, libRows, reviewsArr] = await Promise.all([
+    ids.length ? q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&id=in.(${ids.join(',')})&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`) : Promise.resolve([]),
+    refIds.length ? q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : Promise.resolve([]),
+    text.includes('"reviews_wall"') ? q(`presence_reviews?site_id=eq.${siteId}&status=eq.approved&order=approved_at.desc,created_at.desc&select=reviewer_name,rating,body,owner_reply,status,approved_at,created_at&limit=500`) : Promise.resolve([]),
+  ]);
+  const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
+  const used = new Set<string>();
+  const ref = (id: string | null | undefined): MediaRef | null => { const m = id ? mediaById.get(id) : undefined; if (m) used.add(m.id); return toRef(m, manifest); };
+  const lib = new Map<string, unknown>((libRows as Array<{ id: string; payload: unknown }>).map((r) => [r.id, r.payload]));
+  const approved = reviewsArr as any[];
+  const extras = approved.length ? { reviewsWall: { items: shapeReviewsForDisplay(approved, 24), aggregate: aggregateApproved(approved) } } : undefined;
+  const composed = composeBlocks(rawBlocks, (id) => lib.get(id) ?? null, ref, extras);
+  const rendered = renderSiteBlocks(composed.blocks, { esc, attr, safeHref, now, src: composed.src });
+  const hit = rendered.find((r) => r.html.includes(` data-dds-src="${index}"`));
+  const html = hit ? hit.html : '';
+  // only the photos this section shows: each one's preview address costs a signing call
+  const shown = [...used].sort().map((id) => manifestEntry(mediaById.get(id)!, manifest))
+    .filter((e) => e.variants.some((v) => html.includes(v.output_path)));
+  return { html, mediaManifest: shown };
 }

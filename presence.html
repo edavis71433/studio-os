@@ -8438,7 +8438,44 @@ function blocksDirty() {
 }
 function blocksSaveSoon(ms) {
   clearTimeout(BLOCKS_SAVE_T);
-  BLOCKS_SAVE_T = setTimeout(blocksSaveNow, ms === undefined ? 700 : ms);
+  // a field being typed into (LIVE_TYPING) saves when it's left, not halfway through a word;
+  // a page change or Preview still saves it at once (dcSavePendingEdits calls blocksSaveNow)
+  BLOCKS_SAVE_T = setTimeout(() => { if (LIVE_TYPING && document.activeElement === LIVE_TYPING) blocksSaveSoon(ms); else blocksSaveNow(); }, ms === undefined ? 700 : ms);
+}
+// Item 26: a section edited in its panel redraws on the canvas while its save waits. The
+// server draws just that section from the page's list as it stands (POST /preview/section)
+// and it takes the old one's place; the save's own redraw follows as before. Only for an
+// edit to one or two sections: an add, a delete or a move leaves the stamps on the other
+// sections stale, so it waits for the full redraw.
+let LIVE_T = null, LIVE_SEQ = 0, LIVE_PROBE = false, LIVE_TYPING = null;
+let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list save clears it
+function dcLiveFromPanel() { LIVE_WANTED = true; dcLiveSoon(); }
+const LIVE_TYPE_OK = new Set(["title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
+  "features", "stats", "process", "pricing", "certifications", "events", "social", "link_list", "service_areas"]);
+function dcLiveSoon() { clearTimeout(LIVE_T); LIVE_T = setTimeout(dcLiveNow, 200); }   // only the section panel asks (dcLiveFromPanel)
+async function dcLiveNow() {
+  LIVE_T = null;
+  const doc = dcFrameDoc(), main = doc && doc.getElementById("main");
+  if (!main || IPE || IDE || DDS_SRCMAP || DC_MODE !== "edit" || !BLOCKS_WORK || DC_HIST_LAST == null) return;
+  let saved; try { saved = JSON.parse(DC_HIST_LAST); } catch (_) { return; }
+  if (!Array.isArray(saved) || saved.length !== BLOCKS_WORK.length) return;
+  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === JSON.stringify(saved[i]) ? -1 : i)).filter((i) => i >= 0);
+  if (!changed.length || changed.length > 2) return;
+  const seq = ++LIVE_SEQ, opened = DC_PAGE_OPENS, list = JSON.parse(JSON.stringify(BLOCKS_WORK));
+  let swapped = false;
+  for (const i of changed) {
+    let html;
+    try { html = (await api("POST", "/preview/section", { blocks: list, index: i })).data.html; } catch (_) { return; }   // the save's redraw still comes
+    if (typeof html !== "string") return;   // not a drawing of the section (a function from before the route): leave it to the redraw
+    if (seq !== LIVE_SEQ || opened !== DC_PAGE_OPENS || dcFrameDoc() !== doc || DDS_SRCMAP) return;   // a newer edit, a page change or a redraw took over
+    const old = Array.prototype.find.call(main.children, (n) => { const c = eeClassify(n); return c.kind === "block" && c.bi === i; });
+    if (!old) continue;
+    const tpl = doc.createElement("template"); tpl.innerHTML = html;
+    const nu = tpl.content.firstElementChild;
+    if (nu) old.replaceWith(nu); else old.hidden = true;   // an emptied section draws nothing, as on the site
+    swapped = true;
+  }
+  if (swapped) try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
@@ -8492,7 +8529,7 @@ async function putBlocks() {
     // those edits are newer than what just came back: keep them, and save them next.
     if (DC_PAGE !== sentPage) { /* the list on screen belongs to another page now */ }
     else if (histSnap() !== sentSnap) { DC_HIST_LAST = sentSnap; updateUndoButtons(); blocksSaveSoon(); }
-    else { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); }   // the new persisted state becomes the history baseline
+    else { BLOCKS_WORK = currentBlocks(); dcHistoryCommit(); LIVE_WANTED = false; }   // the new persisted state becomes the history baseline
     // G13 §3: never rebuild the panel under a focused input — its uncommitted
     // text (panel inputs commit on change = blur) would be destroyed mid-typing.
     // The input's own blur/change re-renders; every other save re-renders here.
@@ -8534,7 +8571,21 @@ function mountBlocksCard() {
   if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
   const card = el("div", "field"); card.id = "blocksCard"; card.style.marginTop = "18px";
   host.appendChild(card);
-  card.addEventListener("change", () => blocksSaveSoon());   // field handlers run first; this sees their result
+  card.addEventListener("change", () => { if (!LIVE_PROBE) { LIVE_TYPING = null; blocksSaveSoon(); dcLiveFromPanel(); } });   // field handlers run first; this sees their result
+  // Item 26, part two: typing shows on the canvas as you type. Each keystroke runs the
+  // field's own commit (a change event this card's save listener lets pass), then the
+  // section redraws; the save still waits for the field to be left. Only for sections whose
+  // editor rebuilds the whole section on each commit (LIVE_TYPE_OK): the others edit the
+  // object they were drawn from, which a commit mid-typing could leave behind.
+  card.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName) || (t.tagName === "INPUT" && !/^(text|search|url|email|tel|number)$/.test(t.type))) return;
+    const b = BLOCK_SOLO != null && BLOCKS_WORK ? BLOCKS_WORK[BLOCK_SOLO] : null;
+    if (!b || !LIVE_TYPE_OK.has(b.type)) return;
+    LIVE_PROBE = true; LIVE_TYPING = t;
+    try { t.dispatchEvent(new Event("change", { bubbles: true })); } finally { LIVE_PROBE = false; }
+    dcLiveFromPanel();
+  });
   renderBlocksCard();
   // FD-T4: industry-recommended blocks (server preset — no client duplication)
   if (BLOCK_SUGGEST === null) api("GET", "/blocks/suggested").then((r) => { BLOCK_SUGGEST = r.data || false; renderBlocksCard(); }).catch(() => { BLOCK_SUGGEST = false; });
@@ -8692,6 +8743,7 @@ function blockStyleRow(idx, blk, sub) {
     if (Object.keys(s).length) b.style = s; else delete b.style;
     BLOCKS_WORK[idx] = b;
     renderBlocksCard();
+    dcLiveFromPanel();   // item 26: a style pick shows on the canvas before its save
   };
   // Enumerated picks — pillRows; the FIRST option is the default, stored as ABSENT
   // (the BLOCK_STYLE_FIELDS convention, matching parseStyle exactly).
@@ -12750,6 +12802,9 @@ function dcTreeSelect(el2, row) {
     const main = doc.getElementById("main"); if (!main) return;
     if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
     try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
+    // Item 26: a redraw is drawn from the saved draft; a section edited since and not yet
+    // saved is put back the way it's being edited, so old words never come back on screen.
+    if (LIVE_WANTED && blocksDirty()) dcLiveSoon();
     // A just-added / dropped / duplicated / pasted section: scroll the canvas to it
     // and flash it, so the change is NEVER invisible (blocks render below the core
     // sections, so a silent add looked like nothing happened). Falls back to the
