@@ -2361,7 +2361,8 @@ function debounceFlush(prefix) {
     return Promise.resolve().then(fn).catch(() => {});
   }));
 }
-const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):/.test(k));
+// Item 78: the hours and the closed note wait 0.6s before saving too, so they count.
+const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):|^(hours|closednote)$/.test(k));
 // An inline editor (a menu item, a question, a testimonial, an update) saves each
 // field as you leave it. Done just closes it, once anything pending has landed.
 function editorAutosave(ed, read, patch, close) {
@@ -5623,6 +5624,10 @@ async function loadRitual(toSchedule) {
     // What was just typed, and any save still waiting in line, goes in first: otherwise the
     // review leaves it out, and Publish names a version that save is about to move.
     await dcSavePendingEdits();
+    // Item 78: so are an hours change and the closed note still in their 0.6s wait, and any
+    // settings write in line; without them the review left the hours out, or Publish named
+    // a version they were about to move and was refused as someone else's change.
+    await Promise.all([debounceFlush("hours"), debounceFlush("closednote"), SETTINGS_WRITES]);
     await DRAFT_LINE;
     let c, answered;
     do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);

@@ -385,6 +385,31 @@ test.describe('Business details holds only the business', () => {
     await expect(sw).not.toBeChecked();
     await expect(page.locator('#visitHint')).toContainText('Your site counts nothing');
   });
+  // Item 78: an hours change waits 0.6s before it saves; Publish in that window used to read
+  // the changes first, so the review left the hours out.
+  test('Publish right after changing the hours saves them before it reads the changes', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    const order: string[] = [];
+    page.on('request', (r) => {
+      const p = new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (p === '/location' && r.method() === 'PUT') order.push('hours');
+      if (p === '/changes') order.push('changes');
+    });
+    const first = page.locator('#hoursGrid input[type=checkbox]').first();
+    await expect(first).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    order.length = 0;                                   // only what happens from the click on
+    await first.click();
+    await page.evaluate(() => (window as any).openRitual());
+    await expect.poll(() => order.includes('changes')).toBe(true);
+    expect(order[0]).toBe('hours');
+  });
+  test('closing the tab during an hours change is warned about', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await page.locator('#hoursGrid input[type=checkbox]').first().click();
+    const warned = await page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+    expect(warned).toBe(true);
+  });
   test('a watched website has no visit counter switch', async ({ page }) => {
     await mount(page, '/presence.html#business', { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } } });
     await expect(page.locator('#view-business h1.doc')).toHaveText('Business details');
