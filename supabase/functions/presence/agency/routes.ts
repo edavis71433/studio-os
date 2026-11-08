@@ -8,7 +8,8 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
-import { needsYouPayload } from './needs_you.ts';
+import { needsYouPayload, dealNoticeIds, staleDealNotices } from './needs_you.ts';
+import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners } from '../lib/service_bridge.ts';
 import { buildPortalFeed } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
@@ -610,13 +611,28 @@ export async function computeStudioNeeds(member: AgencyMember, principal: Princi
     const namesByClient = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(cnQ).map((c) => [c.id, String(c.name || c.email || '')]).filter(([, n]) => n));
     const contactName = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(ctQ).map((c) => [c.id, String(c.name || c.email || '')]));
     const ownFeed = await ownFeedP;
+    // the deals the studio's deal notices name — a notice about a deal since
+    // converted, lost or deleted is not a row, and it is cleared here
+    let ownDeals: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }> | undefined;
+    if (own && ownFeed) {
+      const ids = dealNoticeIds(ownFeed.notices || []);
+      if (ids.length) {
+        const dr = await svc(`presence_deals?site_id=eq.${own.id}&id=in.(${ids.join(',')})&select=id,stage,converted_client_id,deleted_at`).catch(() => null);
+        if (dr && dr.ok && Array.isArray(dr.json)) {
+          ownDeals = Object.fromEntries((dr.json as Array<{ id: string; stage: string; converted_client_id: string | null; deleted_at: string | null }>).map((d) => [String(d.id).toLowerCase(), d]));
+          if (own.client_id) for (const n of staleDealNotices(ownFeed.notices || [], ownDeals)) {
+            await clearNotice(String(own.client_id), String(n.kind), String(n.period)).catch(() => {});
+          }
+        }
+      }
+    }
     const payload = needsYouPayload({
       nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
       invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
       enquiries: input.enquiries, support: supportRows.map(({ requester: _r, ...row }) => row), serviceLinks,
       deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
       publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
-      own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [] } : undefined,
+      own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [], deals: ownDeals } : undefined,
     });
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);

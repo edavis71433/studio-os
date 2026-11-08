@@ -18,7 +18,7 @@ const STUDIO_CTX = { data: {
 const ROWS = [
   { key: 'enquiry:own:e1', kind: 'enquiry', site_id: null, client_id: null, name: 'Harbor Lane Bakery', what: '3 new enquiries through your website', when: '2 days ago', verb: 'Reply', href: '/inbox.html#enquiries?sel=lead:e1' },
   { key: 'support:s1', kind: 'support', site_id: 's1', client_id: 'c1', name: 'Maple Street Studio', what: 'support request: can you update our hours', when: 'Opened Jul 22', verb: 'Reply', href: '/inbox.html#support?sel=sup:s1' },
-  { key: 'deal:signed:d1', kind: 'deal', site_id: null, client_id: null, name: 'Willow Day Spa', what: 'signed the agreement — make them a customer', when: 'Agreement signed', verb: 'Convert', href: '/pipeline.html?deal=d1' },
+  { key: 'deal:signed:d1', kind: 'deal', site_id: null, client_id: null, name: 'Willow Day Spa', what: 'signed the agreement — make them a customer', when: 'Agreement signed', verb: 'Convert', href: '/pipeline.html?deal=d1#convert' },
 ];
 const NEEDS = { data: { rows: ROWS, more: 0, rest: [], total: 3, empty_line: '', partial: false, own_site: true, next_by_site: {}, next_by_client: {} } };
 const FEED = { data: {
@@ -57,7 +57,7 @@ test.describe('item 11 — one number, one list, at studio level', () => {
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('Harbor Lane Bakery — 3 new enquiries through your website');
     await expect(rows.nth(2)).toContainText('Willow Day Spa — signed the agreement — make them a customer');
-    await expect(rows.nth(2)).toHaveAttribute('href', '/pipeline.html?deal=d1');
+    await expect(rows.nth(2)).toHaveAttribute('href', '/pipeline.html?deal=d1#convert');
     await expect(pop).not.toContainText('Waiting on you');          // the nudge about a listed request is not a second row
     await pop.getByRole('tab', { name: 'Updates' }).click();
     await expect(pop.locator('.body')).toContainText('Paid — Invoice ($500.00)');

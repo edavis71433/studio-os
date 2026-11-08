@@ -110,7 +110,7 @@ test.describe('Agency portfolio', () => {
     await expect(dental.locator('.rowact')).toHaveText(['Open record', '⋯']);
   });
 
-  test('status words: Not live yet for an unpublished site, Live for a monitored one; search issues alone are NOT "Needs you"', async ({ page }) => {
+  test('status words: Not live yet for an unpublished site, Hosted elsewhere for a monitored one; search issues alone are NOT "Needs you"', async ({ page }) => {
     // Eric's complaint: every roster row said "5 search issues" for sites that
     // weren't even live, and read as needing him. Search issues stay on the
     // client's Website page; the home's status is about the studio's work.
@@ -123,7 +123,8 @@ test.describe('Agency portfolio', () => {
     await expect(q.locator('.pill')).toHaveText('Not live yet');
     await expect(q.locator('td.next')).toHaveText('Nothing — all quiet');
     await expect(q).not.toContainText('search issue');
-    await expect(page.locator('tbody tr', { hasText: 'Watched Bakery' }).locator('.pill')).toHaveText('Live');
+    // sales review item 15: a watched site lives elsewhere — never "Live" here (Analytics agrees)
+    await expect(page.locator('tbody tr', { hasText: 'Watched Bakery' }).locator('.pill')).toHaveText('Hosted elsewhere');
     await page.locator('[data-view="needs"]').click();
     await expect(page.locator('tbody tr')).toHaveCount(1);   // Marlow alone — the one with a Needs-you row
     await expect(page.locator('tbody')).not.toContainText('Quiet Quarry');
