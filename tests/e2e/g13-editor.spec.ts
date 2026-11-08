@@ -1645,8 +1645,10 @@ test.describe('G13 in-place canvas text editor', () => {
     let release = () => {};
     v.slowRead = new Promise<void>((r) => { release = r; });
     const reads = v.reads;
+    const landedAtRead: number[] = [];
+    await page.route('**/functions/v1/presence/changes**', (route: Route) => { landedAtRead.push(v.landed.length); return route.fallback(); });
     await page.locator('#f-tagline').fill('My tagline');
-    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // the review reads the draft while that field's timer runs
+    await page.evaluate(() => (window as unknown as { openRitual: () => void }).openRitual());   // opened while that field's timer runs
     await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
     await expect.poll(() => v.landed, { timeout: 6000 }).toEqual(['/identity']);
     await page.locator('#f-phone').fill('555 0100');               // its timer runs out after the review's answer is in
@@ -1654,7 +1656,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect.poll(() => v.business.phone, { timeout: 6000 }).toBe('555 0100');
     expect(v.refused).toEqual([]);
     await expect(refusal(page)).toHaveCount(0);
-    expect(v.reads).toBeGreaterThanOrEqual(reads + 2);             // what's reviewed includes the save that landed
+    expect(landedAtRead[0]).toBe(1);                               // what's reviewed includes that save: Publish sends it and waits before it reads
   });
 
   test('a read dropped for being late is read again, so another person\'s change is still caught', async ({ page }) => {
