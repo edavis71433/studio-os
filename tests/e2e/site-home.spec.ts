@@ -762,3 +762,31 @@ test.describe('type into the welcome section and About on the canvas', () => {
     expect(identityWrites(writes)).toHaveLength(0);
   });
 });
+
+test.describe('Publish waits for what was just typed', () => {
+  test('a section edit still saving when Publish is pressed lands before the review reads', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2[data-dds-field="title"]').waitFor();
+    await page.waitForLoadState('networkidle');
+    const log: string[] = [];
+    await page.route('**/functions/v1/presence/settings**', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      log.push('save asked'); await new Promise((r) => setTimeout(r, 900)); log.push('save answered'); await route.fallback();
+    });
+    await page.route('**/functions/v1/presence/changes**', (route: Route) => { log.push('review read'); return route.fallback(); });
+    const h2 = frame.locator('#a h2[data-dds-field="title"]');
+    await h2.dblclick();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Fresh heading');
+    await page.keyboard.press('Enter');
+    log.push('publish opened');
+    await page.evaluate(() => { (window as any).openRitual(); });   // at once, inside the save's pause
+    await expect(page.locator('#ritTitle')).not.toHaveText('One moment.');
+    await expect.poll(() => log.includes('save answered')).toBe(true);
+    const firstRead = log.indexOf('review read', log.indexOf('publish opened'));
+    expect(firstRead).toBeGreaterThan(log.indexOf('save answered'));
+    const saved = writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks));
+    expect(saved.at(-1)!.body.blocks[0].title).toBe('Fresh heading');
+  });
+});

@@ -5560,6 +5560,10 @@ async function loadRitual(toSchedule) {
     // the version from before it would refuse the next save as someone else's change.
     // Publish names the version reviewed here (If-Match), and only Publish does: it can hold
     // someone else's change the page hasn't loaded, so the page's next save doesn't take it.
+    // What was just typed, and any save still waiting in line, goes in first: otherwise the
+    // review leaves it out, and Publish names a version that save is about to move.
+    await dcSavePendingEdits();
+    await DRAFT_LINE;
     let c, answered;
     do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);
     S.changes = c; REVIEWED = (c && c.draft_hash) || null;
