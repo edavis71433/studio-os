@@ -4,7 +4,7 @@
 // buttons and sentences all over the app say "Mark as not a fit", "the Won
 // column", and the lifecycle depends on both. Kept as one reserved JSON row
 // (lib/reserved_store.ts); every page and report reads the same names.
-import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
+import { readReservedJsonOrThrow, RESERVED_NAMES } from './reserved_store.ts';
 
 export const DEFAULT_STAGE_LABEL: Record<string, string> = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
 export const RENAMEABLE = ['lead', 'qualified', 'proposal', 'contract'];
@@ -46,7 +46,19 @@ export function renameMovedTo(text: unknown, labels: Record<string, string>): st
   const key = Object.keys(DEFAULT_STAGE_LABEL).find((k) => DEFAULT_STAGE_LABEL[k] === m[1]);
   return key && labels[key] ? 'Moved to ' + labels[key] : t;
 }
-/** The studio's stage names (defaults when it renamed nothing, or the read fails). */
-export async function loadStageLabels(siteId: string): Promise<Record<string, string>> {
-  return stageLabels(await readReservedJson(siteId, RESERVED_NAMES.stageNames) as Record<string, string> | null);
+/** The studio's stage names (defaults when it renamed nothing, or the read fails).
+ *  Final pass (Nov 8, batch B): kept per site for STAGE_NAMES_TTL_MS — Pipeline,
+ *  the deal page, the record, the reports and Analytics each read them on every
+ *  open. A rename forgets them on this server at once (forgetStageLabels); a
+ *  failed read is never kept. */
+export const STAGE_NAMES_TTL_MS = 60_000;
+const keptLabels = new Map<string, { at: number; p: Promise<Record<string, string>> }>();
+export function loadStageLabels(siteId: string): Promise<Record<string, string>> {
+  const hit = keptLabels.get(siteId);
+  if (hit && Date.now() - hit.at < STAGE_NAMES_TTL_MS) return hit.p.catch(() => stageLabels(null));
+  const p = readReservedJsonOrThrow(siteId, RESERVED_NAMES.stageNames).then((v) => stageLabels(v as Record<string, string> | null));
+  keptLabels.set(siteId, { at: Date.now(), p });
+  p.catch(() => { if (keptLabels.get(siteId)?.p === p) keptLabels.delete(siteId); });
+  return p.catch(() => stageLabels(null));
 }
+export function forgetStageLabels(siteId: string): void { keptLabels.delete(siteId); }

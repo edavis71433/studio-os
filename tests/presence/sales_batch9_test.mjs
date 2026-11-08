@@ -27,7 +27,7 @@ eq('"Moved to" lines follow a rename; other lines are left alone', [S.renameMove
 // ── 38: the wiring ──
 const sales = read('supabase/functions/presence/routes/sales.ts');
 ok('GET/PUT /sales/stages is wired, and PUT is a configure write for team seats', /route === '\/sales\/stages' && \(method === 'GET' \|\| method === 'PUT'\)/.test(read('supabase/functions/presence/index.ts')) && /'PUT \/sales\/stages',/.test(read('supabase/functions/presence/lib/site_roles.ts')));
-ok('the Pipeline summary, the deal timeline and the reports use the studio\'s names', /if \(names\) sum\.by_stage = sum\.by_stage\.map/.test(sales) && /text: renameMovedTo\(it\.text, stageNames\)/.test(sales) && /dealsByStage\(deals, lastMoveInto, now, await loadStageLabels\(site\.id\)/.test(sales));
+ok('the Pipeline summary, the deal timeline and the reports use the studio\'s names', /if \(names\) sum\.by_stage = sum\.by_stage\.map/.test(sales) && /text: renameMovedTo\(it\.text, stageNames\)/.test(sales) && /dealsByStage\(deals, lastMoveInto, now, await labelsP\)/.test(sales) && /const labelsP = loadStageLabels\(site\.id\)/.test(sales));
 ok('so do the Analytics dashboard and the record\'s activity', /names \? sum\.by_stage\.map/.test(read('supabase/functions/presence/routes/analytics.ts')) && /renameMovedTo\(it\.title, stageNames\)/.test(read('supabase/functions/presence/routes/crm.ts')));
 ok('Pipeline and the record read the names (the record at studio level)', /api\('\/sales\/stages'\)\.then/.test(read('pipeline.html')) && /apiAg\('\/sales\/stages'\)\.then/.test(read('crm.html')));
 const st = read('settings.html');

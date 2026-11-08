@@ -756,13 +756,41 @@
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner(badgeCount());
   }
+  // Final pass (Nov 8, batch B): at STUDIO level /portal/context no longer
+  // builds the needs-you list on every page boot. It hands back the kept total
+  // (null when none is kept yet) and attention_stale; the shell then reads just
+  // the total (/agency/needs-you?only=total) behind the page. Home reads the
+  // whole list anyway and hands the bell its number (ddsBellSet), so the shell
+  // skips its own read there. Every new number also goes out as 'dds:attention'
+  // for a page that shows it (Analytics' "things need you" line).
+  function studioTotals() { return !!(CTX && CTX.is_agency && !(CTX.scope && CTX.scope.site_id) && typeof CTX.attention_stale === 'boolean'); }
+  function setAttention(n) {
+    if (!CTX || typeof n !== 'number' || !isFinite(n) || n < 0) return;   // anything short of a good number keeps the last good badge
+    var changed = n !== CTX.attention_count;
+    CTX.attention_count = n; CTX.attention_stale = false;
+    try { window.__ddsContext = CTX; } catch (_) { /* */ }
+    if (changed) paintBell();
+    try { document.dispatchEvent(new CustomEvent('dds:attention', { detail: n })); } catch (_) { /* */ }
+  }
+  var pageSetBell = false, pendingBell = null;
+  window.ddsBellSet = function (n) {
+    pageSetBell = true; markAttentionFresh();
+    if (!CTX) { pendingBell = n; return; }                        // the page beat the shell's own boot read — applied when it lands
+    setAttention(Number(n));
+  };
+  function readStudioTotal(fresh) {
+    return api('/agency/needs-you?only=total' + (fresh ? '&fresh=1' : '')).then(function (r) {
+      if (r && r.ok && r.body && r.body.data) setAttention(r.body.data.total);
+    })['catch'](function () { /* keep the last good badge */ });
+  }
   // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
   // resolving a support request) can ask for the badge now, past the throttle.
-  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(); };
-  function refreshAttention() {
+  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(true); };
+  function refreshAttention(changed) {
     if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
     if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;
     markAttentionFresh();                                         // claim the window BEFORE the request
+    if (studioTotals()) { try { readStudioTotal(!!changed); } catch (_) { /* */ } return; }   // batch B: just the studio's total
     try {
       api('/portal/context').then(function (r) {
         if (!r || !r.ok || !r.body || !r.body.data) return;        // a failed read is not "nothing needs you"
@@ -902,8 +930,17 @@
     // needs-you list, so the Needs-you tab lists exactly those rows (the same
     // read Home heads its list with); Updates keeps the news from the feed.
     var studioLevel = !!(CTX && CTX.is_agency && !(CTX.scope && CTX.scope.site_id));
-    Promise.all([api('/portal/feed'), studioLevel ? api('/agency/needs-you') : Promise.resolve(null)]).then(function (res) {
+    // Final pass (Nov 8, batch B): at studio level ONE call. /agency/needs-you
+    // builds the studio's feed anyway and sends its update rows along
+    // (update_notices); an older server without them gets the feed as before.
+    var nyP = studioLevel ? api('/agency/needs-you') : Promise.resolve(null);
+    var feedP = studioLevel ? nyP.then(function (x) {
+      var dd = x && x.ok && x.body && x.body.data;
+      return (dd && Array.isArray(dd.update_notices)) ? { ok: true, status: 200, body: { data: { notices: dd.update_notices } } } : api('/portal/feed');
+    }) : api('/portal/feed');
+    Promise.all([feedP, nyP]).then(function (res) {
       var r = res[0], ny = res[1];
+      if (ny && ny.ok && ny.body && ny.body.data) setAttention(Number(ny.body.data.total));   // the list in the bell and its badge agree
       var body = notif.querySelector('.body');
       // A FAILED read is not an empty one — never claim "caught up" on an error.
       if (!r.ok || (ny && !ny.ok)) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
@@ -1693,6 +1730,10 @@
           CTX = r.body.data; markRoleLimits(CTX); render();
           try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
           markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
+          // batch B: a studio total Home already handed over wins; a stale or
+          // missing one is refreshed behind the page unless Home hands one over first
+          if (pendingBell !== null) { setAttention(Number(pendingBell)); pendingBell = null; }
+          else if (studioTotals() && CTX.attention_stale) setTimeout(function () { if (!pageSetBell) readStudioTotal(false); }, 1200);
           try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17
           // queries incl. 3× auth). The shell already fetched it — publish it so

@@ -78,7 +78,10 @@ eq('a sign-in that is no customer comes back with its email', out.emailOf[R3], '
 ok('…and is not stamped', !out.clientOf[R3]);
 ok('stamped and project rows are untouched', !(R4 in out.clientOf) && !(R5 in out.clientOf));
 const patches = calls.filter((c) => c.method === 'PATCH');
-eq('one stamp per resolved row', patches.map((c) => c.u.match(/id=eq\.([0-9a-f-]+)/)[1]).sort(), [R1, R2, R6].sort());
+// final pass (Nov 8, batch B): a requester's rows are stamped in ONE write (id=in.(…))
+const stampedIds = patches.flatMap((c) => { const m = c.u.match(/[?&]id=(?:eq\.([0-9a-f-]+)|in\.\(([^)]*)\))/); return m ? (m[1] ? [m[1]] : m[2].split(',')) : []; });
+eq('every resolved row is stamped, once', stampedIds.sort(), [R1, R2, R6].sort());
+eq('…one write per requester (R1 and R2 share a sign-in)', patches.length, 2);
 ok('a stamp is written only where it is still null, on this studio\'s site', patches.every((c) => c.u.includes(`site_id=eq.${AGENCY}`) && c.u.includes('client_id=is.null') && JSON.parse(c.body).client_id === CLIENT_H));
 const authCalls = calls.filter((c) => c.u.includes('/auth/v1/admin/users/'));
 eq('one sign-in lookup per distinct sign-in id', authCalls.length, 2);
@@ -142,7 +145,8 @@ ok('Home: never hands the raw sign-in id to the page', /support: supportRows\.ma
 const cd = read('supabase/functions/presence/routes/client_delivery.ts');
 ok('Customers: project-less requests count against their customer', /healSupportOwners\(site\.id, supRows\)/.test(cd) && /row\.open_support \+= n/.test(cd));
 const crm = read('supabase/functions/presence/routes/crm.ts');
-ok('Record: heals before the stamped read', /if \(clientId\) await healUnstampedSupport\(AS\);/.test(crm));
+// batch B: the heal runs in round 2, the stamped read in round 3 (after it lands)
+ok('Record: heals before the stamped read', (() => { const h = crm.indexOf('clientId ? healUnstampedSupport(AS)'); const r3 = crm.indexOf('// round 3'); const st = crm.indexOf('project_id=is.null&client_id=eq.${clientId}'); return h > 0 && r3 > h && st > r3; })());
 const pc = read('supabase/functions/presence/routes/project_comms.ts');
 ok('Project page: heals before the stamped read', /await healUnstampedSupport\(site\.id\);/.test(pc));
 

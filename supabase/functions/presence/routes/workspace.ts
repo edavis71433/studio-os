@@ -210,7 +210,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // OUT of the count. Those notices are the operator email's throttle key and
   // still render in the bell rail; counting them too double-counted every client
   // action, and nothing ever cleared them, so the badge only ever rose.
-  let attention_count = 0;
+  let attention_count: number | null = 0;
+  let attention_stale = false;
   try {
     attention_count = studioBellCount({
       notices: await verifiedNotices(site, ((nQ.json as any[]) || [])),
@@ -229,12 +230,18 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   } catch { /* the badge is best-effort — never block the shell on it */ }
   // Sales review item 11 (Nov 2026): at STUDIO level the badge is the studio's
   // ONE needs-you list total — the same number Home heads its list with and the
-  // bell's Needs-you tab lists. Kept for a minute per agency
-  // (agency/routes.ts). On any failure the count above stands.
+  // bell's Needs-you tab lists (agency/routes.ts). On any failure the count
+  // above stands.
+  // Final pass (Nov 8, batch B): a page boot never computes that list (55–60
+  // reads, 0.3–0.5 s, on every page). It shows the kept total; when that is
+  // stale or missing it says so, and the shell refreshes the badge behind the
+  // page. Missing = null ("not known yet"), never the site's own count.
   if (agencyMember && !scopedName && seesFull) {
     try {
-      const { studioNeedsTotal } = await import('../agency/routes.ts');
-      attention_count = await studioNeedsTotal(agencyMember as any, principal, jwt);
+      const { keptStudioNeedsTotal } = await import('../agency/routes.ts');
+      const kept = keptStudioNeedsTotal(String((agencyMember as any).agency_id || ''));
+      attention_count = kept ? kept.total : null;
+      attention_stale = !kept || !kept.fresh;
     } catch { /* keep the site count */ }
   }
 
@@ -250,7 +257,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
           ids.length ? svc(`presence_project_events?site_id=eq.${s}&project_id=in.(${ids.join(',')})&client_visible=is.true&select=created_at&order=created_at.desc&limit=50`) : Promise.resolve({ json: [] as any[] }),
         ]);
         const lastSeen = (seen.json as any[])?.[0]?.last_seen_at || null;
-        attention_count += ((ev.json as any[]) || []).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
+        attention_count = (attention_count || 0) + ((ev.json as any[]) || []).filter((e) => !lastSeen || String(e.created_at) > String(lastSeen)).length;
       }
     }
   } catch { /* best-effort */ }
@@ -278,7 +285,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
     landing: landingFor(navCtx),
     scope: scopedName ? { site_id: site.id, name: scopedName } : null,   // SC-1: agency drill-in → the breadcrumb "Studio › {name}"
-    attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals)
+    attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals); null = not known yet (studio level, batch B)
+    attention_stale,                     // batch B: the shell refreshes a stale or missing studio total behind the page
     studio_requests: await studioReqP,   // final pass S1: studios asking this owner to connect
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);

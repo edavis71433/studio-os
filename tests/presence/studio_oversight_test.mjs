@@ -13,7 +13,7 @@ const a = read('supabase/functions/presence/routes/analytics.ts');
 const w = read('supabase/functions/presence/analytics/compose.ts');
 
 ok('oversight: gated to agency members with read access (bridge/role scope)', /resolveAgencyMember\(jwt\)/.test(a) && /can\(member\.role, 'read'\)/.test(a));
-ok('oversight: bounded to the agency-authorized site scope (agencySiteIds)', /const siteIds = await agencySiteIds\(member\.agency_id\)/.test(a));
+ok('oversight: bounded to the agency-authorized site scope (agencySiteIds)', /const \[siteIds, input\] = await Promise\.all\(\[agencySiteIds\(member\.agency_id\)/.test(a));
 ok('oversight: per-client website status (draft/live, last publish, unpublished)', /draft_live: c\.last_published_at \? 'live' : 'draft'/.test(w) && /unpublished_changes: !!c\.unpublished_changes/.test(w));
 ok('oversight: surfaces publish failures (bounded query over scoped sites)', /presence_publishes\?site_id=in\.\(\$\{siteIds\.join\(','\)\}\)&status=eq\.failed/.test(a) && /publish_failed: pubFailed/.test(w));
 ok('oversight: coarse SaaS blocker only (plan status, NEVER payment details)', /plan_status: plan/.test(w) && /never payment details/.test(w) && !/payment_method|stripe_customer|card_number/.test((a.split('handleAnalyticsPortfolio')[1] || '') + w));

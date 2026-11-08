@@ -1028,11 +1028,15 @@ async function boot(){
     renderTop();
     openFromHash();   // ⌘K → /agency.html#add (or #kits)
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
+    // final pass (Nov 8, batch B): the studio strip and the staff doorway read
+    // alongside the roster and Needs you too — they use neither, and Home's last
+    // answer waited on Needs you for them (live: 1.45 s before they even started)
+    const studio=mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
+    mountHealthDoor();   // staff-only doorway to the platform Health Center
     await load();
     await needs;
-    mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
+    await studio;
     mountAsk();      // and the Ask box (sales review item 23)
-    mountHealthDoor();   // staff-only doorway to the platform Health Center
   }catch(_){trouble();}
 }
 boot();
@@ -1120,6 +1124,8 @@ async function mountNeeds(){
   const d=r.body.data;
   NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{}};
   NEEDS_EXPANDED=false;
+  // final pass (Nov 8, batch B): the bell's badge is this list's total — hand it over, so the shell doesn't build the list again
+  try{if(window.ddsBellSet)window.ddsBellSet(NEEDS.total);}catch(_){}
   applyNext();paintNeeds();
   if(LOADED_ONCE)render();   // the roster's Status/Next read from this payload
 }
