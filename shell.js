@@ -1703,8 +1703,8 @@
     });
   }
   // Register the service worker on app pages too — this is what makes the
-  // workspace installable (manifest + SW) and enables push. sw.js already
-  // excludes every app/token page from stale caching, so registration is safe.
+  // workspace installable (manifest + SW) and enables push. sw.js caches only
+  // the marketing pages it lists, so every app page comes from the network.
   if ('serviceWorker' in navigator) {
     try { navigator.serviceWorker.register('/sw.js').then(function () { refreshPushState(); }).catch(function () {}); } catch (_) { /* */ }
   }

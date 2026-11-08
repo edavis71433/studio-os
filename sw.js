@@ -1,17 +1,28 @@
-const CACHE_NAME = 'dds-v16'; // bumped: the tool paths that moved off this site left NETWORK_FIRST, so no old cached copy may answer them
+const CACHE_NAME = 'dds-v17'; // bumped: the worker now caches only the marketing pages listed below, so every old copy of an app page rotates out
 const PRECACHE = [
   '/about',
   '/services',
   '/work',
   '/contact',
-  '/manifest.json',
   '/404.html'
 ];
 
-// Pages that must always load fresh (have live API calls or dynamic content)
-const NETWORK_FIRST = ['/report-card', '/site-review', '/ai-visibility', '/'];
+// The marketing pages, and nothing else (list item 64). The worker used to cache every
+// page that wasn't on a hand-written list of app pages, so Settings, Customers and Send an
+// update were served stale for one load after each deploy, and so would every new app page
+// have been. Now a page is handled only if it is listed here: fresh from the network, the
+// cached copy only when there is no connection. An unlisted page, every app page
+// included, goes straight to the network. Paths _redirects sends off this site stay off.
+const NETWORK_FIRST = ['/', '/about', '/services', '/work', '/contact', '/how-we-work', '/industries', '/web-design',
+  '/seo-strategy', '/monthly-retainer', '/privacy', '/terms', '/accessibility', '/ai-disclaimer', '/report-card',
+  '/burbank-web-design', '/glendale-web-design', '/pasadena-web-design', '/health-wellness-web-design',
+  '/home-services-web-design', '/restaurant-web-design', '/retail-web-design', '/salon-web-design'];
 // The Free Tools report page carries private data and versioned scripts: never from this cache.
 const NEVER_CACHE = /^\/(report\/|site-review|ai-visibility)/;
+// Pictures, icons and fonts keep their meaning across a deploy: served from the cache and
+// refreshed behind it. Scripts and styles are not cached: a page and its script must come
+// from the same deploy.
+const STATIC_FILE = /\.(png|jpe?g|webp|avif|gif|svg|ico|woff2?)$/i;
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -36,75 +47,37 @@ self.addEventListener('activate', function(e) {
   );
 });
 
+function keep(request, response) {
+  if (response.ok) {
+    var clone = response.clone();
+    caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+  }
+  return response;
+}
+
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
-
-  // NEVER intercept the logged-in surfaces or the research instrument.
-  // The admin tool and portal are living apps; serving them stale is a
-  // correctness bug, not a performance win. Let the browser hit the network.
-  if (url.pathname.startsWith('/portal') || url.pathname.includes('supabase')) return;
-  if (url.pathname.startsWith('/dds-studio-manage')) return;
-  if (url.pathname === '/dp-mode.js') return;
-  if (url.pathname === '/config.js') return; // per-deployment config must NEVER be cache-served
-  if (url.pathname.startsWith('/set-password')) return;
-  // The signed-in Presence app surfaces are living apps too — never serve them
-  // stale (they load live data via the API; a cached shell after a deploy is a
-  // correctness bug). Let the browser hit the network.
-  if (url.pathname.startsWith('/presence') || url.pathname.startsWith('/today') ||
-      url.pathname.startsWith('/connections') || url.pathname.startsWith('/visual-studio') ||
-      url.pathname.startsWith('/client') || url.pathname.startsWith('/agency') || url.pathname.startsWith('/sharing') ||
-      url.pathname.startsWith('/developer') || url.pathname.startsWith('/crm') ||
-      url.pathname.startsWith('/shell') || url.pathname.startsWith('/approve') ||
-      url.pathname.startsWith('/leads') || url.pathname.startsWith('/schedule') ||
-      url.pathname.startsWith('/get-started') ||
-      url.pathname.startsWith('/studio') ||            // the owner front door — never stale
-      url.pathname.startsWith('/sign') ||              // contract/proposal signing + signup — stale = correctness bug
-      url.pathname.startsWith('/project-survey') || url.pathname.startsWith('/welcome') ||
-      url.pathname.startsWith('/provision') || url.pathname.startsWith('/pipeline') ||
-      url.pathname.startsWith('/contacts') || url.pathname.startsWith('/projects') ||
-      url.pathname.startsWith('/inbox') || url.pathname.startsWith('/files') ||
-      url.pathname.startsWith('/analytics') || url.pathname.startsWith('/attention') ||
-      url.pathname.startsWith('/approval-center') || url.pathname.startsWith('/business-insights') ||
-      url.pathname.startsWith('/content-tree') || url.pathname.startsWith('/snapshot-history') ||
-      url.pathname.startsWith('/timeline') || url.pathname.startsWith('/upcoming') ||
-      url.pathname.startsWith('/website-health') || url.pathname.startsWith('/help') ||
-      url.pathname.startsWith('/admin-health') || url.pathname.startsWith('/admin-growth') ||
-      url.pathname === '/pricing' || url.pathname === '/pricing.html' ||   // exact — this page only; /pricing-estimator 301s off this site
-      url.pathname.startsWith('/payment-')) return; // every signed-in/app/money surface — always fresh
-
-  // Network-first for dynamic/tool pages — always fetch fresh, fall back to cache
   if (NEVER_CACHE.test(url.pathname)) return;   // plain network, no cache lookups or puts
-  var isNetworkFirst = NETWORK_FIRST.some(function(p) { return url.pathname === p || url.pathname === p + '.html'; });
-  if (isNetworkFirst) {
+
+  var page = url.pathname.replace(/\.html$/, '').replace(/(.)\/$/, '$1');
+  if (NETWORK_FIRST.indexOf(page) >= 0) {
     e.respondWith(
-      fetch(e.request).then(function(response) {
-        if (response.ok) {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) { cache.put(e.request, clone); });
-        }
-        return response;
-      }).catch(function() {
-        return caches.match(e.request);
-      })
+      fetch(e.request).then(function(response) { return keep(e.request, response); })
+        .catch(function() { return caches.match(e.request); })
     );
     return;
   }
-
-  // Cache-first for everything else (static marketing assets/pages)
-  e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      var networkFetch = fetch(e.request).then(function(response) {
-        if (response.ok) {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) { cache.put(e.request, clone); });
-        }
-        return response;
-      });
-      return cached || networkFetch;
-    })
-  );
+  if (STATIC_FILE.test(url.pathname)) {
+    e.respondWith(
+      caches.match(e.request).then(function(cached) {
+        var fresh = fetch(e.request).then(function(response) { return keep(e.request, response); });
+        return cached || fresh;
+      })
+    );
+  }
+  // anything else, every app page and script included: the network, untouched
 });
 
 // ── Web Push (Studio OS notifications) ───────────────────────────────────────
