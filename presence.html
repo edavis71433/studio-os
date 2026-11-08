@@ -1955,6 +1955,7 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
+const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
 let DRAFT_SEED = false;    // readChanges: the state was just loaded whole, so take the version with it
 let REVIEWED = null;       // the version Publish's review read, which /publish names
 // named: the version this write names, when it isn't the one the page holds (/publish
@@ -1976,7 +1977,10 @@ async function apiSend(method, route, body, undoRec, named) {
   // M9 optimistic locking: echo the draft version (M3 hash) on writes so a stale
   // edit is refused, never silently overwriting a newer one. One place → every
   // save is protected consistently, no duplicated logic.
-  const mut = method !== "GET";
+  // Item 82: a live section draw is a read that goes by POST; counted as a write, it made an
+  // overlapping changes read (the publish review's too) throw itself away and repeat, and
+  // cleared the "last edit by someone else" line.
+  const mut = method !== "GET" && !READS_BY_POST.test(route);
   const version = named !== undefined ? named : S.draftHash;
   const r = await fetch(FN + route, {
     method,
@@ -11356,13 +11360,23 @@ function pdEnd(e) { pdFinish(true); }
 function pdCancel(e) { pdFinish(false); }
 // The "+" popover: the SAME grouped, searchable add-list as the tray, but every
 // pick inserts at THIS gap index (not append). One list builder, two entry points.
-let INSERT_MENU = null;
-function closeInsertMenu() { if (INSERT_MENU) { INSERT_MENU.remove(); INSERT_MENU = null; document.removeEventListener("keydown", insertMenuKey, true); } }
+let INSERT_MENU = null, INSERT_MENU_OFF = [];   // what closing the menu takes back
+function closeInsertMenu() {
+  if (INSERT_MENU) { INSERT_MENU.remove(); INSERT_MENU = null; document.removeEventListener("keydown", insertMenuKey, true); }
+  INSERT_MENU_OFF.splice(0).forEach((fn) => { try { fn(); } catch (_) {} });
+}
 function insertMenuKey(e) { if (e.key === "Escape") { e.stopPropagation(); closeInsertMenu(); } }
 function openInsertMenu(atIndex, anchor, rectOverride) {
   closeInsertMenu();
   const menu = el("div", "blk-insertmenu"); INSERT_MENU = menu;
-  menu.appendChild(el("div", "tray-h", "Add a section here"));
+  // Item 82: a phone has no Escape and no hover, and a tap on the canvas never reaches this
+  // page's listeners, so the menu has its own close button and a tap on the canvas closes it.
+  const head = el("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+  head.appendChild(el("div", "tray-h", "Add a section here"));
+  const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.title = "Close";
+  x.style.cssText = "font:inherit;font-size:20px;line-height:1;min-width:44px;min-height:44px;margin:-8px -8px 0 0;border:0;background:transparent;color:var(--ink-2,#666);cursor:pointer;border-radius:10px";
+  x.addEventListener("click", closeInsertMenu);
+  head.appendChild(x); menu.appendChild(head);
   // If a section was copied/cut, offer to paste it right here (before the palette).
   const clip = dcClipGet();
   if (clip) {
@@ -11412,8 +11426,15 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + "px";
   document.addEventListener("keydown", insertMenuKey, true);
   setTimeout(() => { try { search.focus(); } catch (_) {} }, 20);
-  const off = (e) => { if (INSERT_MENU && !INSERT_MENU.contains(e.target) && e.target !== anchor) { closeInsertMenu(); document.removeEventListener("mousedown", off, true); } };
-  setTimeout(() => document.addEventListener("mousedown", off, true), 0);
+  const off = (e) => { if (INSERT_MENU && !INSERT_MENU.contains(e.target) && e.target !== anchor) closeInsertMenu(); };
+  const fdoc = dcFrameDoc();
+  const offCanvas = () => { if (INSERT_MENU) closeInsertMenu(); };
+  setTimeout(() => {
+    if (INSERT_MENU !== menu) return;   // already closed
+    document.addEventListener("mousedown", off, true);
+    if (fdoc) fdoc.addEventListener("pointerdown", offCanvas, true);
+    INSERT_MENU_OFF.push(() => document.removeEventListener("mousedown", off, true), () => { if (fdoc) fdoc.removeEventListener("pointerdown", offCanvas, true); });
+  }, 0);
 }
 
 // ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
@@ -12531,7 +12552,11 @@ function dcInjectCanvas(doc, main) {
   }
   let bar = doc.getElementById("dds-dc-bar");
   if (!bar) { bar = doc.createElement("div"); bar.id = "dds-dc-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
-  let current = null, hideT = null;
+  // Item 82: what the bar points at and its hide timer live on the document. A live redraw
+  // runs this again on the same document while older sections keep their first listeners;
+  // with a copy per run, leaving a redrawn section for an older one hid the bar under the
+  // pointer. The bar's own two listeners go on once.
+  const ds = doc.__dcBarState || (doc.__dcBarState = { current: null, hideT: null });
   // The toolbar sits on the section's top edge, OUTSIDE its text. Placed inside
   // the padding it wrapped to two rows on a narrow canvas (an iPad's 250px
   // frame) and covered the heading — nothing under it could be double-clicked
@@ -12549,8 +12574,8 @@ function dcInjectCanvas(doc, main) {
     else y = Math.max(top + 6, sy + 2);
     bar.style.top = y + "px";
   };
-  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (current) { current.classList.remove("dc-hot"); current = null; } };
-  const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 170); };
+  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
+  const scheduleHide = () => { clearTimeout(ds.hideT); ds.hideT = setTimeout(hideBar, 170); };
   // List item 31: a finger has no hover. A tap selects a section and its toolbar
   // stays until another tap selects something else or lands off every section; a
   // second tap on the selected section's words edits them in place, as a
@@ -12559,8 +12584,11 @@ function dcInjectCanvas(doc, main) {
   // The time of the last touch lives on the document, since every redraw of the
   // canvas runs this again and older sections keep their first listeners.
   const byTouch = () => Date.now() - (doc.__dcTouchAt || 0) < 900;
-  bar.addEventListener("mouseenter", () => clearTimeout(hideT));
-  bar.addEventListener("mouseleave", scheduleHide);
+  if (!bar.__dcWired) {
+    bar.__dcWired = true;
+    bar.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
+    bar.addEventListener("mouseleave", scheduleHide);
+  }
   const mkBtn = (label, aria, fn, opts) => {
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + ((opts && opts.cls) ? " " + opts.cls : "");
     b.textContent = label; b.setAttribute("aria-label", aria); b.title = aria;
@@ -12569,9 +12597,9 @@ function dcInjectCanvas(doc, main) {
   };
   const showBar = (el2) => {
     if (IPE) return;   // G13 slice 2: the hover toolbar sleeps while a text session is active
-    clearTimeout(hideT);
-    if (current && current !== el2) current.classList.remove("dc-hot");
-    current = el2; el2.classList.add("dc-hot");
+    clearTimeout(ds.hideT);
+    if (ds.current && ds.current !== el2) ds.current.classList.remove("dc-hot");
+    ds.current = el2; el2.classList.add("dc-hot");
     const c = eeClassify(el2); bar.textContent = "";
     if (c.kind === "block") {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};

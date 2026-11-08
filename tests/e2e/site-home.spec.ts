@@ -854,6 +854,18 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     await expect.poll(() => log.slice(log.indexOf('save answered')).includes('page drawn')).toBe(true);   // the save's own redraw still follows
   });
 
+  // Item 82: the draw is a read sent by POST; counted as a write, it made an overlapping
+  // changes read throw itself away and repeat, and cleared the "last edit by" line.
+  test('a live draw isn’t counted as a save', async ({ page }) => {
+    const { frame } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const before = await page.evaluate('WRITES_ANSWERED');
+    await page.evaluate("S.lastChange = { actor_kind: 'operator', created_at: new Date().toISOString() }");
+    await page.locator('#blocksCard input').first().fill('A fresh heading');   // still in the field: no save yet
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('A fresh heading');
+    expect(await page.evaluate('WRITES_ANSWERED')).toBe(before);
+    expect(await page.evaluate('S.lastChange && S.lastChange.actor_kind')).toBe('operator');
+  });
   test('typing shows on the canvas as you type, and the save still waits for the field to be left', async ({ page }) => {
     const { frame, writes } = await setup(page);
     await page.evaluate(() => (window as any).eeEditBlock(0));
@@ -1281,6 +1293,27 @@ test.describe('Load the latest shows what was loaded', () => {
     await page.evaluate(() => (window as any).loadLatest());
     await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th and 5th');
     await expect(page.locator('#ann-text')).toBeFocused();
+  });
+});
+
+test.describe('the Add section menu can always be closed', () => {
+  // Item 82: on a phone there is no Escape and no hover, and a tap on the canvas never
+  // reached the page's own listener, so the menu stayed open over the canvas.
+  test('it has a close button, and a tap on the canvas closes it', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const open = () => page.evaluate(() => (window as any).openInsertMenu(0, null, { left: 20, top: 200, bottom: 220, right: 300 }));
+    const menu = page.locator('.blk-insertmenu');
+    await open();
+    await expect(menu).toBeVisible();
+    await menu.getByRole('button', { name: 'Close' }).click();
+    await expect(menu).toHaveCount(0);
+    await open();
+    await expect(menu).toBeVisible();
+    await page.waitForTimeout(50);                                     // its outside-tap listeners go on after the opening tap
+    await frame.locator('#b h2').dispatchEvent('pointerdown');
+    await expect(menu).toHaveCount(0);
   });
 });
 
