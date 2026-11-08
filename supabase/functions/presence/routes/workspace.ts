@@ -220,6 +220,16 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
       lastSeenAt: (seenQ.json as any[])?.[0]?.last_seen_at || null,
     });
   } catch { /* the badge is best-effort — never block the shell on it */ }
+  // Sales review item 11 (Nov 2026): at STUDIO level the badge is the studio's
+  // ONE needs-you list total — the same number Home heads its list with and the
+  // bell's Needs-you tab lists. Kept for a minute per agency
+  // (agency/routes.ts). On any failure the count above stands.
+  if (agencyMember && !scopedName && seesFull) {
+    try {
+      const { studioNeedsTotal } = await import('../agency/routes.ts');
+      attention_count = await studioNeedsTotal(agencyMember as any, principal, jwt);
+    } catch { /* keep the site count */ }
+  }
 
   // The bridged CUSTOMER's own badge (their unread client-visible delivery
   // activity) needs reads that DEPEND on their bridge links, so it stays here.
@@ -323,6 +333,24 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
  *  Business Moments, the site's publish status, and the plans awaiting their OK.
  *  Computed server-side with the visibility model, so it can never over-expose. */
 export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  return json({ data: await buildPortalFeed(jwt, site, principal) }, 200, cors);
+}
+
+// Sales review decision 2 (Nov 2026): at STUDIO level (an agency member on their
+// own site, not drilled into a client) the Inbox and the bell are the sales
+// side. Notices, moments and approvals about the studio's OWN website stay on
+// the Website page — they read as sales work on Home and in the Inbox.
+export const STUDIO_WEBSITE_NOTICE_KINDS: ReadonlySet<string> = new Set([
+  'search_setup', 'domain_expiry', 'publish_failed', 'connection_expired', 'site_down', 'email_auth', 'apex_drift', 'new_review', 'missing_required', 'client_feedback',
+]);
+/** Pure: the feed as the studio sees it at studio level. */
+export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pending_approvals: any[] }>(d: T): T {
+  return { ...d, notices: (d.notices || []).filter((n) => !STUDIO_WEBSITE_NOTICE_KINDS.has(String(n?.kind ?? ''))), moments: [], pending_approvals: [] };
+}
+
+/** The feed's rows — the Inbox, the bell panel and the studio's Needs-you list
+ *  all read this one builder. */
+export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Principal): Promise<any> {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
@@ -347,7 +375,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
     // `period` joins the select (a widening, no migration) because the KIND alone
     // can't tell an unpaid-invoice reminder from an ordinary deal follow-up —
     // both are `deal_followup`, and only one of them may ever be dismissed.
-    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,period,headline,body,created_at&order=created_at.desc&limit=10`) : Promise.resolve({ ok: true, json: [] as any[] }),
+    seesFull ? svc(`presence_plan_notices?site_id=eq.${site.id}&status=eq.active&select=id,kind,period,headline,body,created_at&order=created_at.desc&limit=30`) : Promise.resolve({ ok: true, json: [] as any[] }),
     svc(`presence_media?site_id=eq.${site.id}&asset_status=eq.pending&deleted_at=is.null&select=id,storage_path,alt_text,metadata&limit=10`), // DAM-2: files awaiting approval
     // FIX 1: brand-new website enquiries (owner surfaces only) — one synthetic feed
     // row so the bell + Inbox surface them like every other needs-you item.
@@ -620,7 +648,13 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
         : undefined;
     } catch { enquiries = undefined; /* best-effort — the feed still works without the rows */ }
   }
-  return json({ data: { role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries } }, 200, cors);
+  const data = { role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries };
+  // studio level = an agency member on their own site, not drilled in
+  if (seesFull && !principal.scope) {
+    const member = await resolveAgencyMember(jwt).catch(() => null);
+    if (member) return studioLevelFeed(data);
+  }
+  return data;
 }
 
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {

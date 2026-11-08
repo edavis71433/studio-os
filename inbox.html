@@ -759,7 +759,9 @@ function renderList(){
     $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
     paintEnqCounts();
   }else{
-    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} need${need===1?'s':''} you · Sorted by newest`;
+    // "N waiting for a reply", not "need you": Home's Needs-you list is the one
+    // count of everything that needs the studio; this counts conversations (item 11)
+    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply · Sorted by newest`;
   }
   // partial-failure honesty: one of the two reads failed (loadData renders the
   // surviving half) — say so instead of presenting a quietly complete inbox

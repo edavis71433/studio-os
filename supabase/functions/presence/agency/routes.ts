@@ -10,6 +10,7 @@ import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload } from './needs_you.ts';
 import { healSupportOwners } from '../lib/service_bridge.ts';
+import { buildPortalFeed } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
@@ -173,57 +174,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   if (route === '/agency/needs-you' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
     const jwt = req.headers.get('x-dds-user-jwt') || '';
-    const [input, own] = await Promise.all([gather(member.agency_id, now), ownSiteOf(jwt, principal)]);
-    const ids = input.links.filter((l) => l.status === 'active').map((l) => l.site_id);
-    const IN = `site_id=in.(${ids.join(',')})`;
-    const none = Promise.resolve({ ok: true, json: [] as unknown[] });
-    const swallow = () => ({ ok: false, json: null as unknown });
-    const todayStart = now.slice(0, 10) + 'T00:00:00Z';
-    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ] = await Promise.all([
-      own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
-      // client_id + requester (sales review B2): name a project-less request; the
-      // narrow select is the fallback for a database without 0115's column
-      own ? svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,client_id,requester,created_at,updated_at&limit=200`)
-        .then((r) => (r.ok ? r : svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,created_at,updated_at&limit=200`))).catch(swallow) : none,
-      own ? svc(`presence_service_links?agency_site_id=eq.${own.id}&status=eq.active&select=project_id,customer_client_id,customer_site_id&limit=500`).catch(swallow) : none,
-      // next_step/next_step_at land with migration 0089 — a database without it answers "no stale steps", never an error
-      own ? svc(`presence_deals?site_id=eq.${own.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&next_step=not.is.null&select=id,title,stage,next_step,next_step_at,contact_id,converted_client_id,converted_site_id&limit=500`).then((r) => (r.ok ? r : { ok: true, json: [] })).catch(swallow) : none,
-      ids.length ? svc(`presence_publishes?${IN}&select=site_id,status,created_at,error_text&order=created_at.desc&limit=1000`).catch(swallow) : none,
-      ids.length ? svc(`presence_connections?${IN}&status=in.(expired,error,revoked)&select=site_id,provider_key,status&limit=500`).catch(swallow) : none,
-      own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
-    ]);
-    const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
-    // Sales review B2: a request with no stamp and no project names its customer
-    // through the requester's sign-in (stamped once), or at least their email.
-    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null }>(supQ);
-    if (own && supportRows.length) {
-      const owners = await healSupportOwners(own.id, supportRows);
-      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; }
-    }
-    const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
-    const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
-    const deals = rowsOf<{ id: string; title: string; stage: string; next_step: string | null; next_step_at: string | null; contact_id: string | null; converted_client_id: string | null; converted_site_id: string | null }>(dealsQ);
-    // names the portfolio does not know by site: bridged-only customers (by client id) and deal contacts — two batched reads
-    const clientIds = [...new Set([
-      ...invoices.map((v) => v.client_id), ...serviceLinks.map((l) => l.customer_client_id), ...deals.map((d) => d.converted_client_id), ...supportRows.map((r) => r.client_id),
-    ].filter((x): x is string => !!x && UUID_RE.test(x)))];
-    const contactIds = [...new Set(deals.map((d) => d.contact_id).filter((x): x is string => !!x && UUID_RE.test(x)))];
-    const [cnQ, ctQ] = await Promise.all([
-      clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
-      contactIds.length ? svc(`presence_contacts?id=in.(${contactIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
-    ]);
-    const namesByClient = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(cnQ).map((c) => [c.id, String(c.name || c.email || '')]).filter(([, n]) => n));
-    const contactName = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(ctQ).map((c) => [c.id, String(c.name || c.email || '')]));
-    const payload = needsYouPayload({
-      nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
-      invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
-      enquiries: input.enquiries, support: supportRows.map(({ requester: _r, ...row }) => row), serviceLinks,
-      deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
-      publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
-    });
-    // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
-    const partial = !own || !recv || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
-    return json({ data: { ...payload, partial, own_site: !!own } }, 200, cors);
+    return json({ data: await computeStudioNeeds(member, principal, jwt, now) }, 200, cors);
   }
 
   // ── client management ──
@@ -606,6 +557,80 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
  *  live. The same two-step index.ts uses: RLS (resolveSite) first, then an
  *  active membership for a seat that owns no site. Null when there is none;
  *  the caller degrades honestly (partial). */
+// ── The studio's ONE "needs you" list (sales review item 11, Nov 2026) ───────
+// Home's list, the bell badge at studio level and the bell's Needs-you tab are
+// this one computation; the Inbox's rows feed it. The bell asks on every page,
+// so the total is kept for NEEDS_TOTAL_TTL_MS per agency (a fresh Home read
+// always recomputes and refreshes it).
+export const NEEDS_TOTAL_TTL_MS = 60_000;
+const needsTotals = new Map<string, { at: number; total: number }>();
+export async function computeStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string) {
+    const [input, own] = await Promise.all([gather(member.agency_id, now), ownSiteOf(jwt, principal)]);
+    // item 11: the studio site's own Inbox rows (the SAME builder the Inbox and the
+    // bell read), so the list, the bell and the Inbox name one set of things
+    const ownFeedP: Promise<any> = own ? buildPortalFeed(jwt, own, principal).catch(() => null) : Promise.resolve(null);
+    const ids = input.links.filter((l) => l.status === 'active').map((l) => l.site_id);
+    const IN = `site_id=in.(${ids.join(',')})`;
+    const none = Promise.resolve({ ok: true, json: [] as unknown[] });
+    const swallow = () => ({ ok: false, json: null as unknown });
+    const todayStart = now.slice(0, 10) + 'T00:00:00Z';
+    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ] = await Promise.all([
+      own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
+      // client_id + requester (sales review B2): name a project-less request; the
+      // narrow select is the fallback for a database without 0115's column
+      own ? svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,client_id,requester,created_at,updated_at&limit=200`)
+        .then((r) => (r.ok ? r : svc(`presence_support_requests?site_id=eq.${own.id}&status=in.(open,in_progress)&deleted_at=is.null&select=id,subject,project_id,created_at,updated_at&limit=200`))).catch(swallow) : none,
+      own ? svc(`presence_service_links?agency_site_id=eq.${own.id}&status=eq.active&select=project_id,customer_client_id,customer_site_id&limit=500`).catch(swallow) : none,
+      // next_step/next_step_at land with migration 0089 — a database without it answers "no stale steps", never an error
+      own ? svc(`presence_deals?site_id=eq.${own.id}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&next_step=not.is.null&select=id,title,stage,next_step,next_step_at,contact_id,converted_client_id,converted_site_id&limit=500`).then((r) => (r.ok ? r : { ok: true, json: [] })).catch(swallow) : none,
+      ids.length ? svc(`presence_publishes?${IN}&select=site_id,status,created_at,error_text&order=created_at.desc&limit=1000`).catch(swallow) : none,
+      ids.length ? svc(`presence_connections?${IN}&status=in.(expired,error,revoked)&select=site_id,provider_key,status&limit=500`).catch(swallow) : none,
+      own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
+    ]);
+    const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
+    // Sales review B2: a request with no stamp and no project names its customer
+    // through the requester's sign-in (stamped once), or at least their email.
+    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null }>(supQ);
+    if (own && supportRows.length) {
+      const owners = await healSupportOwners(own.id, supportRows);
+      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; }
+    }
+    const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
+    const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
+    const deals = rowsOf<{ id: string; title: string; stage: string; next_step: string | null; next_step_at: string | null; contact_id: string | null; converted_client_id: string | null; converted_site_id: string | null }>(dealsQ);
+    // names the portfolio does not know by site: bridged-only customers (by client id) and deal contacts — two batched reads
+    const clientIds = [...new Set([
+      ...invoices.map((v) => v.client_id), ...serviceLinks.map((l) => l.customer_client_id), ...deals.map((d) => d.converted_client_id), ...supportRows.map((r) => r.client_id),
+    ].filter((x): x is string => !!x && UUID_RE.test(x)))];
+    const contactIds = [...new Set(deals.map((d) => d.contact_id).filter((x): x is string => !!x && UUID_RE.test(x)))];
+    const [cnQ, ctQ] = await Promise.all([
+      clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
+      contactIds.length ? svc(`presence_contacts?id=in.(${contactIds.join(',')})&select=id,name,email&limit=1000`).catch(swallow) : none,
+    ]);
+    const namesByClient = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(cnQ).map((c) => [c.id, String(c.name || c.email || '')]).filter(([, n]) => n));
+    const contactName = Object.fromEntries(rowsOf<{ id: string; name: string | null; email: string | null }>(ctQ).map((c) => [c.id, String(c.name || c.email || '')]));
+    const ownFeed = await ownFeedP;
+    const payload = needsYouPayload({
+      nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
+      invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
+      enquiries: input.enquiries, support: supportRows.map(({ requester: _r, ...row }) => row), serviceLinks,
+      deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
+      publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
+      own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [] } : undefined,
+    });
+    // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
+    const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
+    needsTotals.set(member.agency_id, { at: Date.now(), total: Number(payload.total) || 0 });
+    return { ...payload, partial, own_site: !!own };
+}
+/** The studio's needs-you total for the bell: the kept one while fresh, else a fresh computation. */
+export async function studioNeedsTotal(member: AgencyMember, principal: Principal, jwt: string): Promise<number> {
+  const hit = needsTotals.get(member.agency_id);
+  if (hit && Date.now() - hit.at < NEEDS_TOTAL_TTL_MS) return hit.total;
+  const d = await computeStudioNeeds(member, principal, jwt, new Date().toISOString());
+  return Number(d.total) || 0;
+}
+
 async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | null> {
   if (!jwt) return null;
   try {

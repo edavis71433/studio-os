@@ -45,7 +45,7 @@ ok('FIXD: a clear "← Back to projects" affordance', /← Back to projects/.tes
 ok('FIXD: all detail sections still present (milestones/tasks/files/approvals/surveys/support/messages)', ['Milestones', 'Tasks', 'Files', 'Approvals', 'Surveys', 'Support', 'Messages'].every((s) => projects.includes('>' + s + ' ') || projects.includes('>' + s + '<') || projects.includes(s)));
 
 // ═══ FIX 5 — client messages first-class in the Inbox + never dropped ═══
-ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /return json\(\{ data: \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries \}/.test(ws)); // slice 2 extended the feed additively (enquiries rows)
+ok('FIX5: the feed builds a client_messages section (studio side only)', /let client_messages/.test(ws) && /const data = \{ role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries \}/.test(ws)); // slice 2 extended the feed additively (enquiries rows)
 ok('FIX5: OPEN support requests (incl. project-less) feed the section', /presence_support_requests\?site_id=eq\.\$\{site\.id\}&status=in\.\(open,in_progress\)/.test(ws));
 // The from=client rule moved into the pure shaper/counter (lib/inbox_feed.ts) —
 // same authoritative signal, now behaviourally tested (operator_notify_fixes_test.mjs).

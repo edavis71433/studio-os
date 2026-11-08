@@ -922,6 +922,11 @@ function trouble(){
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)),   // the Customers card — the studio's own roster, never for a drilled-in operator (D7: the scope header would blank it)
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/commerce/example-data').catch(()=>null)),   // benchmark 12: are the trial's example rows still here? (never for a drilled-in operator; hidden on a failed/404 read)
     ]);
+    // Sales review item 23 (Nov 2026): a studio has ONE Home — Your clients
+    // (agency.html). This page stays the plain owner's Today and a client's
+    // Overview (?client=); a studio account at studio level is sent home.
+    const c0 = ctx && ctx.data;
+    if(c0 && c0.is_agency && !(c0.scope && c0.scope.site_id) && !new URLSearchParams(location.search).get('client')){ location.replace('/agency.html'); return; }
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
     render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data, summary && summary.data, rcv && rcv.data, customers && customers.data, example && example.data);
