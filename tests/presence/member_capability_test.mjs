@@ -45,6 +45,7 @@ const { handleDevCustomizationPut, handleBrandKitPut } = await import(`${P}/rout
 const { handleLaunchDecide } = await import(`${P}/routes/launches.ts`);
 const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
+const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -139,7 +140,7 @@ const DECIDED = {
     'POST /foundations/dns/rollback', 'POST /foundations/domain', 'POST /foundations/prepare',
     'POST /foundations/zone', 'POST /foundations/zone/records', 'POST /preview/settings', 'POST /site/offline',
     'POST /site/online', 'PUT /bookings/settings', 'PUT /foundations/dns', 'PUT /foundations/zone/records',
-    'PUT /sales/contacts/fields', 'PUT /sales/stages',
+    'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -295,6 +296,8 @@ const CHANGED = [
   { name: 'PUT /bookings/settings', body: { enabled: true }, run: (r, p) => handleBookingSettingsPut(r, A, p, cors) },
   { name: 'PUT /sales/contacts/fields', body: { fields: [{ label: 'A' }] }, run: (r, p) => handleSalesContactFields(r, A, p, cors) },
   { name: 'PUT /sales/stages', body: { names: { lead: 'Enquiry' } }, run: (r, p) => handleSalesStages(r, A, p, cors) },
+  { name: 'POST /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },     // sales review item 46
+  { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
 ];
@@ -419,6 +422,7 @@ const WRITE_HANDLERS = [
   'handleSalesProposalCreate', 'handleSalesProposalDelete', 'handleSalesProposalRevise', 'handleSalesProposalSend',
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
+  'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

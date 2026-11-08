@@ -40,6 +40,7 @@ import type { OrgOp } from '../enterprise/contract.ts';
 import { crossOrgRollup, approvalQueue, crossClientSummary } from './orchestrate.ts';
 import type { PendingPlan } from './orchestrate.ts';
 import { resolveIndustryKey } from '../industry/registry.ts';
+import { loadCustomerNames } from '../lib/customer_names.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
@@ -97,13 +98,27 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   const clientIds = [...new Set(sites.map((s) => s.client_id))];
   const namesQ = clientIds.length ? await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : { json: [] };
   const nameByClient = Object.fromEntries(((namesQ.json ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
+  // Sales review item 49 (the rest, Nov 8): Home's Needs you, its roster and
+  // Analytics lead with the business too — the same reader Customers and the
+  // record use, on the studio site each customer is linked to. Best-effort: a
+  // failed read leaves the stored names.
+  const bizBySite: Record<string, string> = {};
+  try {
+    const sl = ((await svc(`presence_service_links?customer_site_id=in.(${ids.join(',')})&status=eq.active&select=agency_site_id,customer_site_id,customer_client_id&limit=1000`)).json ?? []) as Array<{ agency_site_id: string; customer_site_id: string; customer_client_id: string }>;
+    const byStudio = new Map<string, typeof sl>();
+    for (const l of sl) if (l.agency_site_id && l.customer_site_id && l.customer_client_id) byStudio.set(String(l.agency_site_id), [...(byStudio.get(String(l.agency_site_id)) || []), l]);
+    for (const [studioSite, ls] of byStudio) {
+      const named = await loadCustomerNames(studioSite, ls.map((l) => ({ clientId: String(l.customer_client_id), clientName: nameByClient[String(l.customer_client_id)], customerSiteId: String(l.customer_site_id) })), (path) => svc(path).then((r) => (Array.isArray(r.json) ? r.json as any[] : [])));
+      for (const l of ls) { const n = named[String(l.customer_client_id)]; if (n && n.name && !bizBySite[String(l.customer_site_id)]) bizBySite[String(l.customer_site_id)] = n.name; }
+    }
+  } catch { /* the stored names stand */ }
   // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
   const entQ = clientIds.length ? await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : { json: [] };
   const statusByClient = Object.fromEntries(((entQ.json ?? []) as Array<{ client_id: string; status: string }>).map((e) => [e.client_id, e.status]));
   const billingBySite = Object.fromEntries(sites.map((s) => [s.id, statusByClient[s.client_id] || 'active']));
   return {
     sites, links,
-    clientNames: Object.fromEntries(sites.map((s) => [s.id, nameByClient[s.client_id] || ''])),
+    clientNames: Object.fromEntries(sites.map((s) => [s.id, bizBySite[s.id] || nameByClient[s.client_id] || ''])),
     moments: ((momQ.json ?? []) as Array<{ site_id: string; moment_key: string; moment_type: string; headline: string }>)
       .map((m) => ({ site_id: m.site_id, moment_key: m.moment_key, type: m.moment_type, headline: m.headline })),
     evidence: ((evQ.json ?? []) as Array<{ run_id: string; type: string; severity: string; human: string }>)
