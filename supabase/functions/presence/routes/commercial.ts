@@ -22,6 +22,7 @@ import {
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
+import { notSentReason } from '../lib/legal_pages.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -118,6 +119,16 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   const siteRow = site.json[0];
   const siteOrigin = siteRow.custom_domain ? `https://${siteRow.custom_domain}` : (siteRow.netlify_site_id ? `https://${siteRow.netlify_site_id}.netlify.app` : '');
   const redirectTo = (path: string) => new Response(null, { status: 303, headers: { ...cors, Location: /^https?:\/\//i.test(path) ? path : `${siteOrigin}${path}` } });
+  // Item 62: a message that didn't send lands on the site's own "didn't send" page, which says
+  // why and goes back to the form, where the browser still holds what was typed. A site
+  // published before that page existed has none, so it gets its contact page as before.
+  const notSent = async (error: string) => {
+    try {
+      const r = await fetch(`${siteOrigin}/not-sent/`, { method: 'HEAD', signal: AbortSignal.timeout(1500) });
+      if (r.ok) return redirectTo(`/not-sent/#ns-${notSentReason(error)}`);
+    } catch { /* falls back below */ }
+    return redirectTo('/contact/');
+  };
 
   // ── FB: a CUSTOM form (built in the Forms area) posts a `form_id`. Load its
   //    definition from the site's stored blocks (same JSON storage as content
@@ -142,7 +153,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     const spam = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
     const fv = validateFormValues(def, rawMap as any);
     if (!fv.ok) {
-      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      if (isFormPost && siteOrigin) return await notSent(fv.error);
       return json({ error: fv.error, field: fv.field, message: fv.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : (fv.error === 'empty' ? 'Please fill in the form.' : fv.error) }, 400, cors);
     }
     const ipHash2 = await hashIp(req);
@@ -152,7 +163,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
     });
     if (!ins2.ok) {
-      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      if (isFormPost && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
     if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
@@ -162,7 +173,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 
   const v = validateSubmission(b);
   if (!v.ok) {
-    if (isFormPost && siteOrigin) return redirectTo('/contact/');   // calm retry; browser `required` makes this rare
+    if (isFormPost && siteOrigin) return await notSent(v.error);   // browser `required` makes this rare
     return json({ error: v.error, message: v.error === 'bad_email' ? 'That email doesn’t look right.' : v.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : 'Add a short message.' }, 400, cors);
   }
   const ipHash = await hashIp(req);
@@ -172,7 +183,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     body: JSON.stringify({ site_id: siteId, form_kind: v.sub.form_kind, name: v.sub.name, email: v.sub.email, phone: v.sub.phone, message: v.sub.message, fields: v.sub.fields, source_page: v.sub.source_page, spam: v.spam, ip_hash: ipHash }),
   });
   if (!ins.ok) {
-    if (isFormPost && siteOrigin) return redirectTo('/contact/');
+    if (isFormPost && siteOrigin) return await notSent('try_again');
     return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   }
   if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking

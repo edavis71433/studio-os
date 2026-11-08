@@ -8,7 +8,7 @@ import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '
 import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
 import { seoHead } from '../../../lib/seo_emit.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
-import { privacyBody, accessibilityBody, legalFooterLinks } from '../../../lib/legal_pages.ts';
+import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest } from '../../../lib/render_types.ts';
 
@@ -546,6 +546,9 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
     body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>`,
   });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
+  // item 62: where a message that didn't send lands — it says why and goes back to the form with the words kept
+  page('/not-sent/', { title: `Not sent — ${i.business_name}`, description: `Your message to ${i.business_name} didn’t send.`, ld: [], active: 'contact', body: `<section class="hero wrap">${notSentInner()}</section>` });
+  files['not-sent/index.html'] = (files['not-sent/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
 
   // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
   page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });

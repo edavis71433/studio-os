@@ -67,6 +67,31 @@ export function accessibilityBody(c: SnapshotContent): string {
 </section>`;
 }
 
+/** Item 62: where a browser visitor lands when their message didn't send. The reason
+ *  rides in the address's #fragment and CSS :target shows its line, so the page stays
+ *  script-free; with no reason, or a browser without :has(), the general line shows.
+ *  It points the visitor at the browser's Back button, which returns to the form with
+ *  what they typed still in it; a link to a fresh contact page would lose it. No click
+ *  handler either: published pages carry none (render_test's hostile check). */
+export const NOT_SENT_REASONS = ['need_contact', 'empty', 'bad_email', 'try_again'] as const;
+/** The page's line for a failed submission's error code; anything else gets the general line. */
+export function notSentReason(error: string): string {
+  return (NOT_SENT_REASONS as readonly string[]).includes(error) ? error : 'check';
+}
+export function notSentInner(): string {
+  return `<h1>Your message didn’t send.</h1>
+<style>.ns-why{display:none}.ns-why:target{display:block}.ns-lines:has(.ns-why:target) .ns-general{display:none}</style>
+<div class="ns-lines">
+<p class="tagline ns-general">Check that you left an email or a phone number and a short message, then send it again.</p>
+<p class="tagline ns-why" id="ns-need_contact">Leave an email or a phone number so we can reply, then send it again.</p>
+<p class="tagline ns-why" id="ns-empty">Add a short message, then send it again.</p>
+<p class="tagline ns-why" id="ns-bad_email">That email address doesn’t look right. Check it, then send it again.</p>
+<p class="tagline ns-why" id="ns-try_again">Something went wrong on our side. Please send it again in a minute.</p>
+</div>
+<p>Use your browser’s Back button to return to the form: what you wrote is still there.</p>
+<div class="cta-row"><a class="btn" href="/contact/">Contact page</a></div>`;
+}
+
 /** The footer links every template renders (Privacy · Accessibility). */
 export function legalFooterLinks(): string {
   return `<a href="/privacy/">Privacy</a> · <a href="/accessibility/">Accessibility</a>`;

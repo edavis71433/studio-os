@@ -6,7 +6,8 @@
 // thanks), announcement/logo, sitemap/robots, determinism.
 //
 //   deno run --allow-read --allow-env tests/presence/business_classic_test.mjs
-import { getTemplate, renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
+import { getTemplate, renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
+import { NOT_SENT_REASONS, notSentReason } from '../../supabase/functions/presence/lib/legal_pages.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -90,6 +91,22 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('sitemap includes the legal pages', f['sitemap.xml'].includes('/privacy/') && f['sitemap.xml'].includes('/accessibility/'));
   const noForm = renderSnapshot(snapFor('plumber'), { baseUrl: 'https://example.com' });
   ok('no form endpoint → privacy honestly says nothing is collected', noForm['privacy/index.html'].includes('no forms and collects nothing'));
+}
+
+// ═══ 5b+. item 62: a message that didn't send says why, and goes back with the words kept ═══
+{
+  const f = render('plumber');
+  const ns = f['not-sent/index.html'];
+  ok('not-sent: the page exists, noindex, out of the sitemap, disallowed for robots', !!ns && ns.includes('name="robots" content="noindex"') && !f['sitemap.xml'].includes('/not-sent/') && f['robots.txt'].includes('Disallow: /not-sent/'));
+  ok('not-sent: says it didn’t send, with a line per reason and a general one', ns.includes('Your message didn’t send.') && NOT_SENT_REASONS.every((r) => ns.includes(`id="ns-${r}"`)) && ns.includes('ns-general'));
+  ok('not-sent: it sends the visitor Back, where the browser keeps the words, and offers the contact page', ns.includes('Back button to return to the form: what you wrote is still there.') && ns.includes('href="/contact/"'));
+  ok('not-sent: no script and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")/.test(ns) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
+  ok('reasons: a known code keeps its line, anything else gets the general one', notSentReason('bad_email') === 'bad_email' && notSentReason('need_contact') === 'need_contact' && notSentReason('weird') === 'check');
+  const route = await Deno.readTextFile(new URL('supabase/functions/presence/routes/commercial.ts', ROOT));
+  ok('route: every failed browser submission goes to the page; the contact page is only the old-site fallback and the gone-form case', (route.match(/await notSent\(/g) || []).length === 4 && (route.match(/redirectTo\('\/contact\/'\)/g) || []).length === 2);
+  const slugs = listTemplates().map((t) => t.slug);
+  const each = slugs.map((slug) => { const sn = snapFor('plumber'); sn.template_slug = slug; const g = renderSnapshot(sn, SITE); const h = String(g['not-sent/index.html'] || ''); return [slug, h.includes('Your message didn’t send.') && h.includes('content="noindex"') && (h.match(/<h1[\s>]/g) || []).length === 1 && h.includes('aria-current="page"')]; });
+  ok('not-sent: all eight templates draw it, noindex, one heading, Contact marked in the menu', slugs.length === 8 && each.every(([, good]) => good), each.filter(([, g]) => !g).map(([s]) => s).join(','));
 }
 
 // ═══ 5c. Phase Z: search-engine verification — a field, not a technical task ═══
