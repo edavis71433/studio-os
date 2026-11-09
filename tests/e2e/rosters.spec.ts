@@ -414,7 +414,7 @@ test.describe('Contacts — Manage fields (A1)', () => {
 // beyond the visible viewport and taps could never reach it. The customers C4
 // tests above pin that page; this pins contacts' own copy of the dialog with
 // the roster table behind it, so the regression can't sneak back per-page.
-test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', () => {
+test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { tag: '@layout' }, () => {
   test('provision submits over the pinned roster table: POST /sales/customers lands and the done panel renders', async ({ page }) => {
     await pinTable('dds-display:contacts')(page);
     await installApp(page, { api: {
