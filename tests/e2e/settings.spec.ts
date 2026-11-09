@@ -41,9 +41,12 @@ test.describe('Settings page', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
     // Oct 2026 nav cut: Settings is a plain item at the foot of the sidebar (the gear went with the cut)
     await expect(page.locator('.dds-nav a[data-href="/settings.html"]')).toHaveAttribute('href', '/settings.html');
-    // the nine areas (Automations joined in Oct 2026 — benchmark item 6), each a link to where the thing lives
+    // the eleven areas (Automations joined in Oct 2026 — benchmark item 6; Deal stages and Calendar joined in
+    // the Nov 2026 bold redesign), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
-    await expect(cards).toHaveCount(9);
+    await expect(cards).toHaveCount(11);
+    await expect(page.locator('[data-card="stages"]')).toHaveAttribute('href', '#stages');
+    await expect(page.locator('[data-card="calendar"]')).toHaveAttribute('href', '/connections.html#calSec');
     await expect(page.locator('[data-card="auto"]')).toHaveAttribute('href', '#automations');
     await expect(page.locator('[data-card="team"]')).toHaveAttribute('href', '/sharing.html');
     await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', '/connections.html');

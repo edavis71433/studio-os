@@ -476,7 +476,7 @@ function render(surface){
 // subscribes to "From URL" and reads a few times a day. Not while a client is in
 // view — this is the studio's own calendar. An older server without the route
 // shows no card. Making or turning off the link is a setting (configure).
-let CAL = null;
+let CAL = null, CAL_SHOWN = false;   // CAL_SHOWN: the #calSec deep link (Settings' Calendar row) scrolls here once
 async function calApi(method){ try { const r = await fetch(FN+'/calendar/link', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
 async function paintCalendar(){
   const host = $('calSec'); if(!host || SCOPE) return;
@@ -496,6 +496,7 @@ async function paintCalendar(){
   }
   host.innerHTML = `<div class="sec-h"><h2>Calendar</h2></div><div class="list"><div class="calbox"><div class="calt">Your calendar</div>${inner}</div></div>`;
   host.hidden = false;
+  if(location.hash === '#calSec' && !CAL_SHOWN){ CAL_SHOWN = true; host.scrollIntoView({ block:'start' }); }
   const make = async (btn, method, okMsg) => {
     btn.disabled = true;
     const r = await calApi(method);

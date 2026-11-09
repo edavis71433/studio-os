@@ -30,6 +30,37 @@
   .subline .dot{color:var(--faint)}
   .setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dds-s4,16px);margin-top:var(--dds-s5,20px)}
   @media (max-width:700px){.setgrid{grid-template-columns:minmax(0,1fr)}}
+  /* ══ Bold redesign — Settings (Nov 2026): on a computer a list on the left that
+     follows you down the page and marks where you are, the sections beside it;
+     on a phone a simple list — each row its name, a one-line status, and › ══ */
+  .wrap{max-width:var(--dds-w-app,1180px)}
+  .setlay{display:grid;grid-template-columns:minmax(230px,270px) minmax(0,1fr);gap:24px;align-items:start;margin-top:var(--dds-s4,16px)}
+  .setnav{position:sticky;top:16px;min-width:0}
+  .setnav .setgrid{display:flex;flex-direction:column;gap:2px;margin:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);padding:6px;box-shadow:var(--dds-shadow,none)}
+  .setnav .setcard{border:0;border-radius:var(--dds-r,10px);padding:8px 10px;gap:10px;align-items:center;background:transparent;box-shadow:none;min-width:0}
+  .setnav a.setcard:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+  .setnav .setcard .ico{width:28px;height:28px}
+  .setnav .setcard .ico svg{width:15px;height:15px}
+  .setnav .setcard .t b{font-size:13.5px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .setnav .setcard .t .dsc{display:none}
+  .setnav .setcard .t .st,.setnav .setcard .t .st.warn,.setnav .setcard .t .st.plain{display:block;margin:1px 0 0;padding:0;border-radius:0;background:none;font-size:11.5px;font-weight:500;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .setnav .setcard .t .st.warn{color:var(--warn)}
+  .setnav .setcard .go{flex:0 0 auto;margin-left:auto;color:var(--faint);font-size:13px}
+  .setnav .setcard[aria-current="location"]{background:var(--p-soft)}
+  .setnav .setcard[aria-current="location"] .t b{color:var(--p)}
+  .setmain{min-width:0}
+  .swrow>.how{font-size:12.5px;color:var(--faint);margin-top:2px}   /* the stage blocks' explainers read like the switches' */
+  .setmain>.card:first-child{margin-top:0}
+  .setmain>.card{scroll-margin-top:16px}
+  @media (max-width:980px){
+    .setlay{grid-template-columns:minmax(0,1fr);gap:8px}
+    .setnav{position:static}
+    .setnav .setcard{padding:12px 10px;min-height:52px}
+    .setnav .setcard::after{content:"›";margin-left:auto;padding-left:8px;color:var(--faint);font-size:20px;line-height:1}
+    .setnav .setcard .go{display:none}
+    .setnav .setcard[aria-current="location"]{background:transparent}
+    .setnav .setcard[aria-current="location"] .t b{color:inherit}
+  }
   .setcard{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:var(--dds-s4,16px) var(--dds-s5,20px);display:flex;gap:var(--dds-s4,16px);align-items:flex-start;color:inherit;text-decoration:none;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   a.setcard:hover{border-color:var(--dds-line-strong,#d2d2db);background:var(--card)}
   a.setcard:focus-visible{outline:2px solid var(--p);outline-offset:2px}
@@ -108,7 +139,9 @@
   <div class="toprow">
     <div><h1 id="pagehead" tabindex="-1">Settings</h1><div class="subline" id="subline"><span>Loading…</span></div></div>
   </div>
-  <div class="setgrid" id="cards" aria-label="Settings areas"></div>
+  <div class="setlay">
+  <nav class="setnav" aria-label="Settings areas"><div class="setgrid" id="cards"></div></nav>
+  <div class="setmain">
   <section class="card" id="studio" aria-labelledby="profileHead" hidden>
     <div class="card-h"><h2 id="profileHead">Studio profile</h2><button class="btn sm primary" type="button" id="profileSave">Save</button></div>
     <form class="form2" id="profileForm">
@@ -134,62 +167,11 @@
        a role, change a role, remove) existed with no page — the only way to add a
        seat was an operator route. Agency members at studio level only; a client's
        settings never show the studio's team. -->
-  <section class="card" id="team" aria-labelledby="teamHead" hidden>
-    <div class="card-h"><h2 id="teamHead" tabindex="-1">Team</h2><span class="hint" id="seats"></span></div>
-    <div class="people" id="people" aria-live="polite"></div>
-    <form class="invite" id="inviteForm" hidden>
-      <div><label for="inv-email">Invite by email</label><input id="inv-email" type="email" maxlength="160" placeholder="name@yourstudio.com" autocomplete="off"></div>
-      <div><label for="inv-role">Role</label><select id="inv-role"></select></div>
-      <div style="flex:0 0 auto"><button class="btn sm primary" type="submit" id="inviteBtn">Invite</button></div>
-    </form>
-    <p class="rolehelp" id="roleHelp"></p>
-  </section>
-  <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
-    <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
-    <div class="plan" id="plan" aria-live="polite"></div>
-    <!-- sales review item 69: walk out with everything — one zip of spreadsheets (GET /sales/export) -->
-    <div class="dlrow" id="dlRow">
-      <div><b>Download my data</b><div class="hint">One zip of spreadsheets: customers, contacts, deals, proposals, agreements, invoices and payments, enquiries, support requests and tasks.</div></div>
-      <button class="btn sm" type="button" id="dlData">Download my data</button>
-    </div>
-    <details class="closeacct" id="deleteCard">
-      <summary>Close your account</summary>
-      <p>This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first, from <a href="/presence.html#export">Domain &amp; email</a>. That stays open until deletion.</p>
-      <button class="btn sm danger" type="button" id="deleteAsk">Request deletion</button>
-      <button class="btn sm" type="button" id="deleteCancel" hidden>Cancel deletion request</button>
-    </details>
-  </section>
-  <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
-       is a system job the studio can see and tune; each shows the exact
-       sentence it sends; each saves the moment it is flipped (PUT /settings,
-       the same row the industry lives on — migration 0134, all off by default).
-       Item 13's per-stage "stale after" lives here too. -->
-  <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Four switches. Each saves as you flip it.</span></div>
-    <div class="swrow">
-      <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
-      <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b>
-        <div class="how">Someone who writes in through your website gets one short reply right away, on your brand. You still answer them yourself.</div>
-        <div class="say"><span class="lbl">What they’ll read</span><span id="say-ack">Thanks for getting in touch — we’ve got your message and will reply within one business day.</span></div></div>
-    </div>
-    <div class="swrow">
-      <button type="button" class="sw" role="switch" id="sw-inv" aria-checked="false" aria-labelledby="sw-inv-l"></button>
-      <div class="t"><b id="sw-inv-l">Remind unpaid invoices <input type="number" id="n-inv" min="1" max="90" value="2" aria-label="Days after the due date"> days after they’re due, at most once a day</b>
-        <div class="how">A week before the due date, on the due date, and once more <span id="n-inv-echo">2</span> days after — three reminders at most, with the same secure payment link, to the deal’s contact. An invoice with no due date counts as due a week after it was sent.</div>
-        <div class="say"><span class="lbl">What they’ll read</span><span id="say-inv">Just a friendly nudge: the invoice for $1,250.00 is still open. The same secure link works whenever you’re ready — nothing expires.</span></div></div>
-    </div>
-    <div class="swrow">
-      <button type="button" class="sw" role="switch" id="sw-deal" aria-checked="false" aria-labelledby="sw-deal-l"></button>
-      <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b>
-        <div class="how">An open deal with no edit, no logged contact and nothing scheduled for that long rings your bell and emails you — once a week while it stays quiet.</div>
-        <div class="say"><span class="lbl">What you’ll read</span><span id="say-deal">This deal has had no next step for 3 days — a quick follow-up keeps it moving.</span></div></div>
-    </div>
-    <div class="swrow">
-      <button type="button" class="sw" role="switch" id="sw-rev" aria-checked="false" aria-labelledby="sw-rev-l"></button>
-      <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b>
-        <div class="how">When you mark a project complete, its client gets one email <span id="n-rev-echo">3</span> days later with a link to your review page — the same email as a request you send by hand. Once per project. Every client is asked, whatever they said in the quick survey: asking only happy clients breaks Google’s rules on reviews.</div>
-        <div class="say"><span class="lbl">What they’ll read</span><span id="say-rev">Thanks for choosing us. If you have a moment, we’d love a quick review — it really helps.</span></div></div>
-    </div>
+  <!-- Bold redesign (Nov 2026): the deal stages have their own section — the
+       studio's names for the four open stages, the chance each one closes, and
+       when a deal counts as stalled (they lived under Automations) -->
+  <section class="card" id="stages" aria-labelledby="stagesHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="stagesHead" tabindex="-1">Deal stages</h2><span class="hint">Names · chances · when a deal stalls</span></div>
     <div class="swrow" style="display:block">
       <b style="font-weight:600">Flag a deal as stalled after</b>
       <div class="how">The pipeline board marks a deal “Stalled” when nothing has moved for this many days. Per stage; 14 unless you say otherwise.</div>
@@ -225,6 +207,65 @@
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
     </div>
   </section>
+  <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
+       is a system job the studio can see and tune; each shows the exact
+       sentence it sends; each saves the moment it is flipped (PUT /settings,
+       the same row the industry lives on — migration 0134, all off by default).
+       Item 13's per-stage "stale after" lives here too. -->
+  <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Four switches. Each saves as you flip it.</span></div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
+      <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b>
+        <div class="how">Someone who writes in through your website gets one short reply right away, on your brand. You still answer them yourself.</div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-ack">Thanks for getting in touch — we’ve got your message and will reply within one business day.</span></div></div>
+    </div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-inv" aria-checked="false" aria-labelledby="sw-inv-l"></button>
+      <div class="t"><b id="sw-inv-l">Remind unpaid invoices <input type="number" id="n-inv" min="1" max="90" value="2" aria-label="Days after the due date"> days after they’re due, at most once a day</b>
+        <div class="how">A week before the due date, on the due date, and once more <span id="n-inv-echo">2</span> days after — three reminders at most, with the same secure payment link, to the deal’s contact. An invoice with no due date counts as due a week after it was sent.</div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-inv">Just a friendly nudge: the invoice for $1,250.00 is still open. The same secure link works whenever you’re ready — nothing expires.</span></div></div>
+    </div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-deal" aria-checked="false" aria-labelledby="sw-deal-l"></button>
+      <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b>
+        <div class="how">An open deal with no edit, no logged contact and nothing scheduled for that long rings your bell and emails you — once a week while it stays quiet.</div>
+        <div class="say"><span class="lbl">What you’ll read</span><span id="say-deal">This deal has had no next step for 3 days — a quick follow-up keeps it moving.</span></div></div>
+    </div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-rev" aria-checked="false" aria-labelledby="sw-rev-l"></button>
+      <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b>
+        <div class="how">When you mark a project complete, its client gets one email <span id="n-rev-echo">3</span> days later with a link to your review page — the same email as a request you send by hand. Once per project. Every client is asked, whatever they said in the quick survey: asking only happy clients breaks Google’s rules on reviews.</div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-rev">Thanks for choosing us. If you have a moment, we’d love a quick review — it really helps.</span></div></div>
+    </div>
+  </section>
+  <section class="card" id="team" aria-labelledby="teamHead" hidden>
+    <div class="card-h"><h2 id="teamHead" tabindex="-1">Team</h2><span class="hint" id="seats"></span></div>
+    <div class="people" id="people" aria-live="polite"></div>
+    <form class="invite" id="inviteForm" hidden>
+      <div><label for="inv-email">Invite by email</label><input id="inv-email" type="email" maxlength="160" placeholder="name@yourstudio.com" autocomplete="off"></div>
+      <div><label for="inv-role">Role</label><select id="inv-role"></select></div>
+      <div style="flex:0 0 auto"><button class="btn sm primary" type="submit" id="inviteBtn">Invite</button></div>
+    </form>
+    <p class="rolehelp" id="roleHelp"></p>
+  </section>
+  <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
+    <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
+    <div class="plan" id="plan" aria-live="polite"></div>
+    <!-- sales review item 69: walk out with everything — one zip of spreadsheets (GET /sales/export) -->
+    <div class="dlrow" id="dlRow">
+      <div><b>Download my data</b><div class="hint">One zip of spreadsheets: customers, contacts, deals, proposals, agreements, invoices and payments, enquiries, support requests and tasks.</div></div>
+      <button class="btn sm" type="button" id="dlData">Download my data</button>
+    </div>
+    <details class="closeacct" id="deleteCard">
+      <summary>Close your account</summary>
+      <p>This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first, from <a href="/presence.html#export">Domain &amp; email</a>. That stays open until deletion.</p>
+      <button class="btn sm danger" type="button" id="deleteAsk">Request deletion</button>
+      <button class="btn sm" type="button" id="deleteCancel" hidden>Cancel deletion request</button>
+    </details>
+  </section>
+  </div>
+  </div>
 </div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -278,25 +319,31 @@ const IC = {
   auto: '<path d="M13 3L4 14h7l-1 7 9-11h-7z"/>',
   domains: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   dev: '<path d="M8 9l-4 3 4 3"/><path d="M16 9l4 3-4 3"/><path d="M14 5l-4 14"/>',
+  stages: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+  calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 const CARDS = [
   { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
+  // the studio's own switches — never a client's (the invoices and deals are the studio's book)
+  // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
+  { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', studioOnly: true },
+  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
-  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
-    agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
   { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, how to change it, and closing your account.', ownerOnly: true, needs: 'owner' },
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
+  // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
+  { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', feature: 'connected', studioOnly: true },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
-  // the studio's own switches — never a client's (the invoices and deals are the studio's book)
-  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
-  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
   // everyone — the operator too — lands on their own site's Domain & email desk. Final pass (Nov 8, F10):
   // the operator's card used to go to the platform Health Center instead (sales review B12 was exactly
   // that case); the platform-wide view is now a card of its own, for staff only.
   { key: 'domains', href: '/presence.html#domain', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website', scoped: true },
   { key: 'domains_all', icon: 'domains', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
+  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
+    agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
+  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', feature: 'developer', cap: 'use_developer_mode',
     scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
@@ -318,7 +365,8 @@ function cardHtml(c, status) {
   const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
   return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}${c.needs ? ` data-needs="${esc(c.needs)}"` : ''}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.icon || c.key]}</svg></span>` +
-    `<span class="t"><b>${esc(title)}</b><span>${esc(desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span></a>`;
+    `<span class="t"><b>${esc(title)}</b><span class="dsc">${esc(desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span>` +
+    (/^#/.test(href) ? '' : '<span class="go" aria-hidden="true">→</span>') + '</a>';
 }
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
 function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); }
@@ -333,6 +381,24 @@ function renderCards() {
   if (ac) ac.addEventListener('click', (e) => { e.preventDefault(); reveal('automations', 'autoHead'); });
   const tc = $('cards').querySelector('[data-card="agency_team"]');
   if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
+  const gc = $('cards').querySelector('[data-card="stages"]');
+  if (gc) gc.addEventListener('click', (e) => { e.preventDefault(); reveal('stages', 'stagesHead'); });
+  markCurrent(CURRENT);
+}
+// Bold redesign: on a computer the list follows you down the page and marks the
+// section you're reading (an in-page card is aria-current="location")
+let CURRENT = '';
+function markCurrent(id) {
+  CURRENT = id || '';
+  $('cards').querySelectorAll('.setcard').forEach((a) => { if (CURRENT && a.getAttribute('href') === '#' + CURRENT) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
+}
+function spySections() {
+  if (!('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver((entries) => {
+    const on = entries.filter((e) => e.isIntersecting).sort((x, y) => x.boundingClientRect.top - y.boundingClientRect.top)[0];
+    if (on) markCurrent(on.target.id);
+  }, { rootMargin: '-15% 0px -70% 0px' });
+  for (const id of ['studio', 'stages', 'automations', 'team', 'billing']) { const sec = $(id); if (sec) io.observe(sec); }
 }
 
 // ── the team, inline: GET /agency/members, POST to invite, PATCH to change a role
@@ -571,6 +637,7 @@ function paintAutomations() {
   const stale = (st.stage_stale_days && typeof st.stage_stale_days === 'object') ? st.stage_stale_days : {};
   for (const k of STAGE_KEYS) { const n = Math.trunc(Number(stale[k])); setVal('st-' + k, (Number.isFinite(n) && n >= 1) ? String(n) : ''); }
   $('automations').hidden = false;
+  $('stages').hidden = false;
   loadStageNames();
 }
 async function saveAutomation(patch, undo) {
@@ -593,7 +660,9 @@ function paintStageNames(d) {
 async function loadStageNames() {
   if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
   const r = await api('/sales/stages').catch(() => null);
-  if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data); }
+  if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data);
+    const d = (r.body && r.body.data) || {}, named = Object.values(d.custom || {}).filter((v) => String(v || '').trim()).length;
+    setStatus('stages', { text: `4 stages${named ? ` · ${named} renamed` : ''}${d.chances ? ' · chances set' : ''}`, cls: 'plain' }); }
   else { for (const id of ['stageNames', 'stageChances']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
 }
 // ── sales review item 69: the chance each open stage closes (PUT /sales/stages { chances }) ──
@@ -689,6 +758,12 @@ function signedOut() {
       if (on || attn) setStatus('connections', { text: `${on} connected${named}${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
       else setStatus('connections', { text: 'Nothing connected yet', cls: '' });
     }).catch(() => {});
+    // bold redesign: the Calendar row says whether the private calendar link is on (GET /calendar/link —
+    // an older server, or an answer that isn't about the link, leaves the row without a status)
+    if (!SCOPE && hasFeature('connected')) api('/calendar/link').then((r) => {
+      const d = (r && r.ok && r.body && r.body.data) || null; if (!d || typeof d.can_manage !== 'boolean') return;
+      setStatus('calendar', { text: d.on ? 'Your calendar link is on' : 'No calendar link yet', cls: d.on ? '' : 'plain' });
+    }).catch(() => {});
     // sales review item 69: the Domain & email card says which address your emails go out from, and whether
     // the mail provider has it verified (GET /email/sending). Studio level only: a client's card is their desk.
     if (!SCOPE && hasFeature('website')) api('/email/sending').then((r) => {
@@ -705,6 +780,8 @@ function signedOut() {
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing') { const sec = $('billing'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
     if (location.hash === '#automations' && !SCOPE) { const sec = $('automations'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
+    if (location.hash === '#stages' && !SCOPE) { const sec = $('stages'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
+    spySections();
   } catch (_) {
     $('main').innerHTML = '<div class="center"><h2>We couldn’t load your settings just now.</h2><p>Nothing’s wrong with your account — refresh to try again.</p></div>';
   }
