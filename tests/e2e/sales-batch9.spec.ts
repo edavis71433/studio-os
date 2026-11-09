@@ -21,8 +21,13 @@ test.describe('item 38 — the Pipeline uses the studio\'s stage names', () => {
       '/sales/summary': { data: { total: 1, open: { count: 1, value_cents: 50000 }, won_month: { count: 0, value_cents: 0 }, win_rate: {}, by_stage: [], ar: {} } },
     } });
     await page.goto('/pipeline.html');
-    await expect(page.getByRole('region', { name: 'Quote sent column' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Enquiry column' })).toBeVisible();
+    if ((page.viewportSize()?.width || 0) <= 760) {   // a phone shows one stage at a time (bold redesign): the tabs carry the names
+      await expect(page.locator('[data-stab="proposal"]')).toContainText('Quote sent');
+      await expect(page.locator('[data-stab="lead"]')).toContainText('Enquiry');
+    } else {
+      await expect(page.getByRole('region', { name: 'Quote sent column' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Enquiry column' })).toBeVisible();
+    }
     await page.locator('#viewList').click();
     await expect(page.locator('#filters .chip[data-stage="lead"]')).toHaveText('Enquiry');
     await expect(page.locator('#filters .chip[data-stage="won"]')).toHaveText('Won');

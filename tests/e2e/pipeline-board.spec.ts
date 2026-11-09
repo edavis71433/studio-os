@@ -84,6 +84,7 @@ test.describe('Pipeline — the board first (bold redesign)', () => {
   test('+ Add a deal in a column: a name and a value, Enter adds it to that stage; Esc puts the button back', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    if ((page.viewportSize()?.width || 0) <= 760) await page.locator('[data-stab="qualified"]').click();   // a phone shows one stage at a time
     const add = col(page, 'qualified').locator('[data-addbtn]');
     await add.click();
     const form = col(page, 'qualified').locator('form.qadd');
@@ -118,5 +119,118 @@ test.describe('Pipeline — the board first (bold redesign)', () => {
     await expect(form.locator('.qa-err')).toHaveText('That value doesn’t look like an amount.');
     await expect(form.getByLabel('Value (optional)')).toBeFocused();
     expect(posted).toBe(0);
+  });
+});
+
+// Pipeline B: a card opens the deal beside the board (a sheet on a phone)
+const D4 = '44444444-4444-4444-8444-4444444444d4';   // agreement out: its next step is Won, on the deal itself
+const B_DEALS = [...DEALS, { id: D4, title: 'Kestrel Yoga — classes', stage: 'contract', contact_id: 'c2', expected_value_cents: 140000, source: 'manual', created_at: ago(9), updated_at: ago(1) }];
+// a board whose deals move when the stage route says so
+async function liveDeals(page: Page) {
+  const deals = JSON.parse(JSON.stringify(B_DEALS));
+  const moved: Array<{ id: string; to: string }> = [];
+  await page.route(/\/functions\/v1\/presence\/sales\/deals(\?.*)?$/, (route) => route.request().method() === 'GET'
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: deals }) }) : route.fallback());
+  await page.route(/\/functions\/v1\/presence\/sales\/deals\/[^/]+\/stage$/, (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').slice(-2)[0], to = (route.request().postDataJSON() || {}).to;
+    moved.push({ id, to }); const d = deals.find((x: { id: string }) => x.id === id); if (d) d.stage = to;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id, stage: to } }) });
+  });
+  return moved;
+}
+const ACTIVITY = { data: { items: [
+  { id: 'a1', kind: 'deal_activity', type: 'call', title: 'You called Dana', at: ago(2) },
+  { id: 'a2', kind: 'deal_event', type: 'system', title: 'Moved to Qualified', at: ago(3) },
+  { id: 'a3', kind: 'deal_event', type: 'system', title: 'Deal added', at: ago(4) },
+  { id: 'a4', kind: 'deal_event', type: 'system', title: 'Older', at: ago(9) },
+], upcoming: [] } };
+const pv = (page: Page) => page.locator('#dprev');
+
+test.describe('Pipeline — the deal beside the board (bold redesign)', () => {
+  test('a card opens the deal: value, chance, close date, where it is, and the next stage as one button', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/crm/activity': ACTIVITY } });
+    const moved = await liveDeals(page);
+    await page.goto('/pipeline.html');
+    if ((page.viewportSize()?.width || 0) <= 760) await page.locator('[data-stab="qualified"]').click();   // a phone shows one stage at a time
+    await page.locator(`#board .bcard[data-id="${D2}"]`).click();
+    await expect(pv(page).getByRole('heading', { level: 2 })).toHaveText('Harbor Lane — logo');
+    await expect(pv(page).locator('.dp-tiles')).toContainText('Value$900');
+    await expect(pv(page).locator('.dp-tiles')).toContainText('Chance25%');
+    await expect(pv(page).locator('.dp-stage')).toHaveText('Qualified · step 2 of 5');
+    await expect(pv(page).locator('.dp-latest li')).toHaveCount(3);
+    await expect(page.locator(`#board .bcard[data-id="${D2}"]`)).toHaveClass(/dp-on/);
+    await pv(page).getByRole('button', { name: 'Move to Proposal sent →' }).click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Moved to Proposal sent');
+    expect(moved).toEqual([{ id: D2, to: 'proposal' }]);
+    await expect(pv(page).locator('.dp-stage')).toHaveText('Proposal sent · step 3 of 5');   // the same preview, one stage on
+    await expect(pv(page).getByRole('button', { name: 'Move to Agreement out →' })).toBeFocused();
+  });
+
+  test('Agreement out: the next step is Won, which happens on the deal (where it becomes a customer)', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/crm/activity': ACTIVITY } });
+    await liveDeals(page);
+    await page.goto('/pipeline.html');
+    if ((page.viewportSize()?.width || 0) <= 760) await page.locator('[data-stab="contract"]').click();
+    await page.locator(`#board .bcard[data-id="${D4}"]`).click();
+    await pv(page).getByRole('button', { name: /Mark it won/ }).click();
+    await expect(pv(page)).toBeHidden();
+    await expect(page.locator('#detailWrap')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`deal=${D4}`));
+  });
+
+  test('quick actions: Log a call and Invoice ask + Create for this deal; Proposal and Open full deal go to the deal', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/crm/activity': ACTIVITY } });
+    await liveDeals(page);
+    await page.goto('/pipeline.html');
+    await page.evaluate(() => {
+      const w = window as unknown as { ddsOpenCreate: (...a: unknown[]) => boolean; __asked: unknown[] };
+      w.__asked = []; w.ddsOpenCreate = function (...a: unknown[]) { w.__asked.push([a[0], a[3]]); return true; };
+    });
+    await page.locator(`#board .bcard[data-id="${D1}"]`).click();
+    await pv(page).getByRole('button', { name: 'Log a call' }).click();
+    await pv(page).getByRole('button', { name: 'Invoice' }).click();
+    expect(await page.evaluate(() => (window as unknown as { __asked: unknown[] }).__asked)).toEqual([['call', { deal_id: D1 }], ['invoice', { deal_id: D1 }]]);
+    await pv(page).getByRole('button', { name: /Open full deal/ }).click();
+    await expect(pv(page)).toBeHidden();
+    await expect(page.locator('#detailWrap')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`deal=${D1}`));
+  });
+
+  test('Proposal goes straight to the deal’s proposal', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/crm/activity': ACTIVITY } });
+    await liveDeals(page);
+    await page.goto('/pipeline.html');
+    await page.locator(`#board .bcard[data-id="${D1}"]`).click();
+    const nav = page.waitForRequest((r) => r.isNavigationRequest() && r.url().includes('compose=proposal'));
+    await pv(page).getByRole('button', { name: 'Proposal' }).click();
+    expect((await nav).url()).toContain(`deal=${D1}&dtab=billing&compose=proposal`);
+    await expect(page).toHaveURL(new RegExp(`deal=${D1}&dtab=billing`));   // the page takes the compose flag and tidies the address
+  });
+
+  test('Escape closes it and goes back to the card', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/crm/activity': ACTIVITY } });
+    await liveDeals(page);
+    await page.goto('/pipeline.html');
+    await page.locator(`#board .bcard[data-id="${D1}"]`).focus();
+    await page.keyboard.press('Enter');
+    await expect(pv(page).getByRole('heading', { level: 2 })).toHaveText('Blue Finch — site');
+    await page.keyboard.press('Escape');
+    await expect(pv(page)).toBeHidden();
+    await expect(page.locator(`#board .bcard[data-id="${D1}"]`)).toBeFocused();
+  });
+
+  test('a phone shows one stage at a time, picked from tabs with their counts', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'phone width');
+    await installApp(page, { api: API });
+    await page.goto('/pipeline.html');
+    const tabs = page.locator('[data-stab]');
+    await expect(tabs).toHaveText(['New lead 1', 'Qualified 1', 'Proposal sent 1', 'Agreement out 0', 'Won 0']);   // Won is a tab on a phone (this month's count)
+    await expect(page.locator('#board .col[data-col]:visible')).toHaveCount(1);
+    await expect(page.locator(`#board .bcard[data-id="${D1}"]`)).toBeVisible();
+    await page.locator('[data-stab="proposal"]').click();
+    await expect(page.locator('[data-stab="proposal"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator(`#board .bcard[data-id="${D3}"]`)).toBeVisible();
+    await expect(page.locator(`#board .bcard[data-id="${D1}"]`)).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });

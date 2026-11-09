@@ -306,6 +306,15 @@ test.describe('SS5 stale-race guards + boot retry', () => {
 // the tablist-shaped rows downgraded to what they are (role=group + pressed).
 const pinBoard = (page: import('@playwright/test').Page) =>
   page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'board'); } catch { /* denied */ } });
+// a phone shows one board stage at a time (bold redesign): bring a stage up first
+const showOnPhone = async (page: import('@playwright/test').Page, stage: string) => {
+  if ((page.viewportSize()?.width || 0) <= 760) await page.locator(`[data-stab="${stage}"]`).click();
+};
+const showCardOnPhone = async (page: import('@playwright/test').Page, id: string) => {
+  if ((page.viewportSize()?.width || 0) > 760) return;
+  const stage = await page.locator(`#board .bcard[data-id="${id}"]`).getAttribute('data-stage');
+  if (stage) await page.locator(`[data-stab="${stage}"]`).click();
+};
 // the board is the default since the bold redesign (Nov 2026): tests of the List pin it
 const pinList = (page: import('@playwright/test').Page) =>
   page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'list'); } catch { /* denied */ } });
@@ -315,6 +324,7 @@ test.describe('SS5 board popup contract + group semantics', () => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.click();
     const menu = page.locator('#board .bc-menu');
@@ -345,6 +355,7 @@ test.describe('SS5 board popup contract + group semantics', () => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     const mb = await move.boundingBox();
     expect(mb && mb.height).toBeGreaterThanOrEqual(44);
@@ -582,6 +593,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.click();
     const items = page.locator('#board .bc-menu button');
@@ -616,6 +628,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.tap();
     const menu = page.locator('#board .bc-menu');

@@ -125,6 +125,7 @@ test.describe('item 30 — the Board keeps Won and Not a fit in view', () => {
     await pinBoard(page);
     await installApp(page, { api: PIPE(DEALS) });
     await page.goto('/pipeline.html');
+    if ((page.viewportSize()?.width || 0) <= 760) await page.locator('[data-stab="won"]').click();   // a phone shows one stage at a time (bold redesign); Won is a tab there
     const won = page.locator('#wonCol');
     await expect(won.locator('#wonN')).toHaveText('1');
     await expect(won.locator('#wonV')).toHaveText('$2,400');
