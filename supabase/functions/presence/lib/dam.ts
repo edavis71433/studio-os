@@ -550,16 +550,11 @@ export function partitionOwned(requested: string[], owned: Iterable<string>): { 
   return { present, missing };
 }
 
-// ── DAM-3/4: collections + tags rollups ───────────────────────────────────────
+// ── DAM-3: the collections rollup ─────────────────────────────────────────────
 export function collectionsOf(assets: Asset[]): Array<{ name: string; count: number }> {
   const m = new Map<string, number>();
   for (const a of assets) { const c = (a.collection || '').trim(); if (c) m.set(c, (m.get(c) || 0) + 1); }
   return [...m.entries()].map(([name, count]) => ({ name, count })).sort((x, y) => y.count - x.count || x.name.localeCompare(y.name));
-}
-export function tagsOf(assets: Asset[]): Array<{ tag: string; count: number }> {
-  const m = new Map<string, number>();
-  for (const a of assets) for (const t of (a.tags || [])) { const k = String(t).trim().toLowerCase(); if (k) m.set(k, (m.get(k) || 0) + 1); }
-  return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((x, y) => y.count - x.count || x.tag.localeCompare(y.tag));
 }
 
 // ── DAM-1/2/6: the library query + on-demand keyword search (no index; ranked) ─

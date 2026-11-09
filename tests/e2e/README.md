@@ -11,11 +11,13 @@ No real network, no data mutation. Fixtures default to a `studio_os` owner with 
 
 ## Run it
 ```bash
-npm install
+npm ci                      # the versions package-lock.json pins (Playwright is pinned on purpose)
 npx playwright install --with-deps chromium webkit
 npm run test:e2e            # all projects: desktop / tablet / mobile
 npm run test:e2e:report     # open the HTML report
 ```
+In CI (`.github/workflows/e2e.yml`) the three devices run side by side inside Playwright's own image, and the `scope` job skips the suite only when every changed file is on its skip list; the `browser` check reports either way.
+
 Visual baselines (opt-in):
 ```bash
 VISUAL=1 npm run test:e2e:update-snapshots   # generate
@@ -24,22 +26,21 @@ VISUAL=1 npm run test:e2e                     # enforce
 ```
 
 ## Coverage
-| Area | Spec | Verifies |
-|---|---|---|
-| Shell | `shell.spec.ts` | brand/nav render, ⌘K palette open+filter+target, bell unified feed (notices→approvals), attention badge, profile sign-out, signed-out degrade |
-| Today | `today.spec.ts` | needs-you cards (notices+approvals), **attention == bell badge**, moment dismiss, website vs CRM empty state (PP-5), upgrade orientation once + never-again (PP-6) |
-| CMS | `cms.spec.ts` | edition gating hides Business-OS links for CMS (SKU), "Files" terminology (Architecture v1.0), `#design`/`#business` deep-links (OS) |
-| CRM | `crm.spec.ts` | leads inbox render + prefilled reply + filter + mark-read toast; relationship timeline |
-| Client portal | `portal.spec.ts` | mirrored "needs you" heading + approvals, approve→toast, caught-up state, owner-redirect |
-| Member roles | `member-roles.spec.ts` | owner, studio scoped in, platform staff, staff seat, developer seat: each delete/configure control shows exactly when the role can use it; real capability table |
-| Agency | `agency.spec.ts` | portfolio status row (attention badge, leads, domain+registrar, billing), non-agency turned away |
-| A11y | `a11y.spec.ts` | axe WCAG2A/AA (no serious/critical) on Today/Leads/Portal, accessible names, keyboard palette |
-| Responsive | `responsive.spec.ts` | no horizontal overflow + content present at desktop/tablet/mobile |
-| Visual | `visual.spec.ts` | per-viewport screenshot vs baseline (opt-in) |
+64 specs as of November 2026. Each spec's opening comment says what it pins; by area:
+
+| Area | Specs |
+|---|---|
+| Shell, Today, Home, help | `shell`, `today`, `one-needs-list`, `home-words`, `help`, `onboarding`, `settings` |
+| Website builder | `site-home`, `g13-editor`, `builder-phase0`, `builder-phase1`, `builder-backoffice`, `cms`, `schedule`, `developer-mode`, `files`, `files-basics`, `visual-studio` |
+| Customers, deals and money | `contacts`, `crm`, `customer-names`, `rosters`, `pipeline`, `inbox`, `inbound-rough-edges`, `broadcasts`, `calendar-link`, `estimates-recurring`, `sign`, `doc`, `sales-batch3` to `sales-batch11`, `sales-extras-1` to `-3`, `sales-review-fixes` |
+| Projects and the client portal | `projects`, `portal`, `sharing` |
+| Studios, scope and roles | `agency`, `studio-sites`, `scope`, `scoped-empty`, `member-roles`, `admin-health` |
+| Analytics and connections | `analytics`, `connections` |
+| Public pages | `marketing`, `marketing-tools`, `public-pages`, `retired-pages` |
+| Cross-cutting passes | `a11y`, `responsive`, `visual` (opt-in), `polish-batch-c`, `security-batch-a`, `speed-batch-b`, `tests-batch-d`, `wave2-bets` |
 
 ## Honest coverage gaps (not written, with reasons)
-These appeared in the phase brief but are **not browser-testable here** or **not built in the product** — writing tests for them would be fiction:
-- **Uploads, Contracts, Invoices, Messages** — not built. The client portal is review + approve only (`client.html`); there is no upload/contract/invoice/messaging UI to drive.
+These are **not browser-testable here** — writing tests for them would be fiction:
 - **Magic-link invitation, first login, email delivery** — GoTrue link generation + email are backend/email flows; the browser can't hermetically verify a link that arrives out-of-band. (The invite path is covered by backend tests.)
 - **Real publishing / template switching / restore side-effects, weekly digest, renewal + domain-watch emails, Stripe checkout** — these are backend/cron/external; covered by the deno unit/integration suites (`commercial`, `lifecycle`, `render`, `agency`, …). The browser suite verifies the *affordances* (e.g. the Publish control exists and opens), not the server outcome.
 - **AI drafting output** — nondeterministic; a browser test can verify the desk opens, not the generated text.

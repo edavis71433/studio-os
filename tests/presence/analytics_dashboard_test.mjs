@@ -145,11 +145,11 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
   const route = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/analytics.ts', import.meta.url));
   ok('index.ts registers GET /analytics/dashboard', /route === '\/analytics\/dashboard' && method === 'GET'.*handleAnalyticsDashboard/.test(idx));
   ok('index.ts imports handleAnalyticsDashboard from routes/analytics.ts', /handleAnalyticsDashboard[^]*from '\.\/routes\/analytics\.ts'/.test(idx));
-  for (const old of ['/analytics', '/analytics/website', '/analytics/customers', '/analytics/search', '/analytics/portfolio']) {
+  for (const old of ['/analytics', '/analytics/portfolio']) {
     ok(`index.ts still serves the pre-slice-8 route ${old}`, idx.includes(`route === '${old}'`));
   }
   ok('routes/analytics.ts still exports the old handlers (deploy-order tolerance)',
-    ['handleAnalyticsHome', 'handleAnalyticsWebsite', 'handleAnalyticsCustomers', 'handleAnalyticsSearch', 'handleAnalyticsPortfolio'].every((h) => route.includes(`export async function ${h}`)));
+    ['handleAnalyticsHome', 'handleAnalyticsPortfolio'].every((h) => route.includes(`export async function ${h}`)));
   ok('routes/analytics.ts exports handleAnalyticsDashboard', route.includes('export async function handleAnalyticsDashboard'));
   ok('dashboard reuses the pure lib (no forked math in the route)', /from '\.\.\/lib\/analytics_dashboard\.ts'/.test(route) && /summarizePipeline/.test(route));
 }

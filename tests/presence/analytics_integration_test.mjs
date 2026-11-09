@@ -8,7 +8,7 @@ const SR = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_RO
 if (!SB_URL || !SR) { console.log('SKIP analytics_integration (creds not set)'); Deno.exit(0); }
 
 const { svc } = await import('../../supabase/functions/presence/lib/db.ts');
-const { handleAnalyticsHome, handleAnalyticsCustomers } = await import('../../supabase/functions/presence/routes/analytics.ts');
+const { handleAnalyticsHome } = await import('../../supabase/functions/presence/routes/analytics.ts');
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
 const arr = (r) => (Array.isArray(r.json) ? r.json : []);
@@ -42,11 +42,6 @@ try {
   // only honest "not measured" left is Search/GSC. Never a fabricated number anywhere.
   ok('home: honest "not measured" (search/GSC), never a fabricated number', (d.not_measured || []).some((c) => c.key === 'search') && (d.not_measured || []).every((c) => c.number === null));
   ok('home: publishing insight present (real signal)', (d.insights || []).some((i) => i.key === 'publishing'));
-
-  const cRes = await handleAnalyticsCustomers(new Request('http://x/analytics/customers?period=week'), site, cors);
-  const cd = (await cRes.json()).data;
-  ok('customers: by-kind reflects real submissions (≥2 quote)', cd.by_kind.quote >= 2);
-  ok('customers: honest note — no invented repeat/conversion figures', /aren’t tracked yet/.test(cd.note));
 } finally {
   for (const id of made) await svc(`presence_form_submissions?id=eq.${id}`, { method: 'DELETE' });
 }

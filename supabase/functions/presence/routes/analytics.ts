@@ -5,8 +5,6 @@
 // until a provider is connected — AN-4). Reuses Health Coach, Customer Journey,
 // Business Moments, leads, publishing, and the agency portfolio rollup.
 //   GET /analytics            — the home (inquiries · website · journey · health · watching · not-measured)
-//   GET /analytics/customers  — inquiries detail (AN-3)
-//   GET /analytics/search     — getting-found readiness, honest about GSC (AN-4)
 //   GET /analytics/portfolio  — agency scope: who's growing / needs attention (AN-7)
 import { loadStageLabels } from '../lib/stage_names.ts';
 import { json } from '../../_shared/http.ts';
@@ -17,12 +15,12 @@ import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { sharedGather } from '../agency/routes.ts';
 import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
-  inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights, websiteRows,
+  inquiriesInsight, publishingInsight, notMeasured, portfolioInsights, websiteRows,
   trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
   searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
-import { searchInsights, searchNotice, searchHealth, searchMilestones, searchDetailInsights, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
+import { searchInsights, searchNotice, searchHealth, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors, sourceShares,
@@ -221,72 +219,6 @@ export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Rec
     not_measured: gscConnected ? [] : notMeasured(true, false),   // traffic is first-party; search real when connected
     // Named plainly so the page never has to guess whose website this is.
     hosting: hostingSurface({ hosted: homeHosted, externalDomain: homeExternalDomain }),
-  } }, 200, cors);
-}
-
-export async function handleAnalyticsCustomers(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const period = periodOf(req);
-  const nowMs = Date.now();
-  const subsR = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,form_kind,status,name,message&order=created_at.desc&limit=500`);
-  const subs = arr(subsR);
-  const createdAts = subs.map((s) => s.created_at).filter(Boolean);
-  const wMs = nowMs - (period === 'week' ? 7 : 30) * 86_400_000;
-  const cur = subs.filter((s) => Date.parse(s.created_at) > wMs);
-  const byKind = { contact: 0, quote: 0, booking: 0 };
-  for (const s of cur) if (s.form_kind in byKind) (byKind as any)[s.form_kind]++;
-  const unread = subs.filter((s) => s.status === 'new').length;
-  const inquiries = inquiriesInsight(createdAts, byKind, unread, nowMs, period);
-  const recent = subs.slice(0, 8).map((s) => ({ when: s.created_at, kind: s.form_kind, who: s.name || 'Someone', unread: s.status === 'new' }));
-  // Honest note: without a contact identity/orders table there is no truthful
-  // "repeat customer" or "conversion" figure — we do not invent one.
-  return json({ data: { period, inquiries, by_kind: byKind, total_all_time: subs.length, unread, recent, note: 'Studio OS counts inquiries — everyone who reached out. Repeat-customer and revenue figures aren’t tracked yet.' } }, 200, cors);
-}
-
-// ── AN-2: the Website view — real first-party traffic (honest empty state) ────
-export async function handleAnalyticsWebsite(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const period = periodOf(req);
-  const nowMs = Date.now();
-  const visits = await loadVisits(site.id, period, nowMs);
-  const agg = aggregateVisits(visits, nowMs, periodDays(period));
-  return json({ data: {
-    period,
-    insights: trafficInsights(agg, period),
-    visitors: agg.visitors, pageviews: agg.pageviews,
-    top_pages: agg.topPages, top_sources: agg.topSources, devices: agg.devices, countries: agg.countries,
-    events: agg.events,
-    has_data: agg.hasData,
-  } }, 200, cors);
-}
-
-export async function handleAnalyticsSearch(_req: Request, site: SiteRow, cors: Record<string, string>) {
-  const [identR, settingsR, conn] = await Promise.all([
-    svc(`presence_identity?site_id=eq.${site.id}&select=seo_title,seo_description,settings&limit=1`),
-    svc(`presence_settings?site_id=eq.${site.id}&select=google_site_verification,bing_site_verification&limit=1`),
-    connectionState(site.id),
-  ]);
-  const ident = arr(identR)[0] || {};
-  const settings = arr(settingsR)[0] || {};
-  const readiness = searchReadinessInsight({
-    verified: !!(String(settings.google_site_verification || '').trim() || String(settings.bing_site_verification || '').trim()),
-    titleSet: !!String(ident.seo_title || '').trim(),
-    descriptionSet: !!String(ident.seo_description || '').trim(),
-    sitemap: true, // emitted by construction for every published site
-    brokenLinks: 0,
-  });
-  // AN-3: real Search Performance from the shared `signals` table when present.
-  const gsc = await readGsc(site.client_id);
-  const connected = conn.gsc || gsc.hasData;
-  // AN-3.1: query/page detail now flows from presence_search_terms (via the GSC sync)
-  const detail = gsc.hasData ? await readSearchTerms(site.client_id, gsc.period) : { queries: [], pages: [] };
-  const detailCards = searchDetailInsights(detail.queries, detail.pages);
-  return json({ data: {
-    readiness,
-    performance: searchInsights(gsc),               // real impressions/clicks when connected; [] otherwise
-    detail: detailCards,                            // top searches + best page, in plain English
-    milestones: gsc.hasData ? searchMilestones(gsc.totalImpressions, gsc.totalClicks, gsc.firstImpressionAt, gsc.firstSearchClickAt) : [],
-    detail_available: detailCards.length > 0,
-    not_measured: connected ? [] : notMeasured(true, false),
-    connected: { search_console: connected },
   } }, 200, cors);
 }
 

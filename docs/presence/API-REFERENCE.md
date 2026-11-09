@@ -17,7 +17,7 @@ The complete route surface of the `presence` edge function as of V1. Supersedes 
 ## Customer routes (auth + entitlement; act on the caller's own site)
 
 **Content / CMS**
-- `GET|PUT /identity` · `GET|PUT /location` · `GET|PUT /voice` · `GET|PUT /settings` — the structured-content singletons.
+- `GET|PUT /identity` · `GET|PUT /location` · `GET|PUT /settings` — the structured-content singletons. (The voice now lives on the Brand Profile, `GET|PUT /brand/profile`; the old `/voice` route was removed in Nov 2026.)
 - `GET|POST|PUT|DELETE /<collection>` — collection entities (offerings, faqs, posts, testimonials…) via the `SPECS`-driven matcher.
 - `GET /site` — site + identity + location + voice + counts + publish state.
 - `GET /changes` — the change ledger (provenance).
@@ -59,8 +59,8 @@ The complete route surface of the `presence` edge function as of V1. Supersedes 
 
 **Knowledge, Monitor, Foundations, Launch, Export**
 - `POST /knowledge/import` · `GET /knowledge/docs` · `DELETE /knowledge/docs/:id`.
-- `GET|DELETE /monitor/connection` · `POST /monitor/connect|verify|import-inventory` · `GET /monitor/readiness`.
-- `GET /foundations` · `GET /foundations/plans` · `POST /foundations/prepare` · `POST /foundations/plans/:id/decide` · `/foundations/dns` · `/foundations/dns/rollback` · `/foundations/email` — infrastructure plans (Approved-Plan spine).
+- `GET|DELETE /monitor/connection` · `POST /monitor/connect|verify`. (Migration readiness is the operator's: `GET /admin/sites/:id/migration-readiness`.)
+- `GET /foundations` · `GET /foundations/plans` · `POST /foundations/prepare` · `POST /foundations/plans/:id/decide` · `GET|POST|DELETE /foundations/domain` — infrastructure plans (Approved-Plan spine) and the custom domain.
 - `GET /launch` — the Launch Assistant checklist.
 - `GET /export` — the ownership/export right (download everything).
 - `GET /health` · `GET /notes`.
@@ -73,7 +73,7 @@ The complete route surface of the `presence` edge function as of V1. Supersedes 
 ## Operator / advanced-tier routes (gated `staff || system`, before the client-site gate; operators own no site)
 
 - **Admin/Ops:** `/admin/*` (operator inventory, ops), `/system/*` (scheduler cron endpoints — require `SCHEDULER_SECRET` in body).
-- **Marketplace:** `GET /marketplace` (list) · `GET /marketplace/audit` · `POST /marketplace/:key/prepare` · `POST /marketplace/operations/:id/{decide|execute|rollback}`. (`GET /marketplace/features` is the *customer* view, handled with a site.)
+- **Marketplace:** `GET /marketplace` (list) · `POST /marketplace/:key/prepare` · `POST /marketplace/operations/:id/{decide|execute|rollback}`. (`GET /marketplace/features` is the *customer* view, handled with a site.)
 - **Enterprise:** `POST /enterprise/operations/:id/{decide|execute|rollback}` · `GET /enterprise/:org/locations/:loc/config` · org/region/location management. See [ENTERPRISE](ENTERPRISE.md).
 - **Agency:** `/agency/*` — organizations, portfolio, rollups, approvals, rollouts. Portfolio-scoped (403 `forbidden` outside your portfolio). See [AGENCY-PLATFORM](AGENCY-PLATFORM.md).
 

@@ -28,7 +28,7 @@ const { resolveMemberSite, resolveSiteRole, resolveSiteRoleCached } = await impo
 const { SITE_ROLES, siteCan, contentWriteNeeds, SETTINGS_CONTENT_FIELDS } = await import('../../supabase/functions/presence/lib/site_roles.ts');
 const { draftHashForSite } = await import('../../supabase/functions/presence/lib/draft_hash.ts');
 const { handleGetIdentity, handlePutIdentity } = await import('../../supabase/functions/presence/routes/identity.ts');
-const { handleCollection, handleLocation, handleVoice, handleSettings, handlePageDuplicate } = await import('../../supabase/functions/presence/routes/content.ts');
+const { handleCollection, handleLocation, handleSettings, handlePageDuplicate } = await import('../../supabase/functions/presence/routes/content.ts');
 const { handleGetSite } = await import('../../supabase/functions/presence/routes/site.ts');
 const { handleBrandProfileGet, handleBrandProfilePut, handleBrandReportList, handleBrandReportGet } = await import('../../supabase/functions/presence/routes/brand.ts');
 const { handleKnowledgeList } = await import('../../supabase/functions/presence/routes/knowledge.ts');
@@ -37,7 +37,6 @@ const { handleWriterList, handleWriterGet } = await import('../../supabase/funct
 const { handleReviewList, handleReviewGet } = await import('../../supabase/functions/presence/routes/review.ts');
 const { handleMomentsList } = await import('../../supabase/functions/presence/routes/moments.ts');
 const { handleCoachList } = await import('../../supabase/functions/presence/routes/coach.ts');
-const { handleDnsGet } = await import('../../supabase/functions/presence/routes/services.ts');
 const { reviewerAllowed, memberWriteGate } = await import('../../supabase/functions/presence/routes/workspace.ts');
 
 const ROOT = new URL('../../', import.meta.url);
@@ -86,8 +85,6 @@ function seedFor(site, id, tag) {
     presence_growth_opportunities: { id, site_id: site, status: 'open', opportunity: `${tag} opportunity`, area: 'website', created_at: '2026-01-01T00:00:00Z' },
     presence_knowledge_docs: { id, site_id: site, filename: `${tag}.txt`, extracted: { items: [1] }, created_at: '2026-01-01T00:00:00Z', deleted_at: null },
     presence_infra_plans: { id, site_id: site, kind: 'dns', title: `${tag} plan`, status: 'proposed', created_at: '2026-01-01T00:00:00Z' },
-    presence_dns_zones: { site_id: site, records: [{ type: 'TXT', name: '@', value: `${tag} record`, ttl: 300 }], updated_at: '2026-01-01T00:00:00Z' },
-    presence_dns_zone_history: { id, site_id: site, note: `${tag} note`, saved_at: '2026-01-01T00:00:00Z' },
     presence_offerings: { id, site_id: site, name: `${tag} plate`, category: 'Mains', description: '', price_text: '', media_id: null, is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
     presence_testimonials: { id, site_id: site, quote: `${tag} quote`, author: 'Sam', source: '', quote_date: null, is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
     presence_faqs: { id, site_id: site, question: `${tag} question`, answer: 'Yes', is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
@@ -230,8 +227,8 @@ const pinned = (c, site) => c.query.includes(`site_id=eq.${site}`) || c.body?.si
   ok('fields: nothing on the content side is stale', [...SETTINGS_CONTENT_FIELDS].every((f) => FIELDS_IN_SOURCE.includes(f)));
 
   const needs = (route, method, fields) => contentWriteNeeds(route, method, fields);
-  ok('needs: the singletons are edit', ['/identity', '/location', '/voice', '/brand/profile'].every((r) => needs(r, 'PUT') === 'edit'));
-  ok('needs: their reads are not writes', ['/identity', '/location', '/voice', '/brand/profile', '/settings', '/offerings'].every((r) => needs(r, 'GET') === null));
+  ok('needs: the singletons are edit', ['/identity', '/location', '/brand/profile'].every((r) => needs(r, 'PUT') === 'edit'));
+  ok('needs: their reads are not writes', ['/identity', '/location', '/brand/profile', '/settings', '/offerings'].every((r) => needs(r, 'GET') === null));
   ok('needs: duplicating a page is edit', needs('/pages/duplicate', 'POST') === 'edit');
   ok('needs: settings with only content is edit', needs('/settings', 'PUT', ['blocks', 'announcement_text']) === 'edit');
   ok('needs: settings with no fields is edit, and the handler refuses it as empty', needs('/settings', 'PUT', []) === 'edit');
@@ -331,7 +328,6 @@ const READS = [
   { route: 'GET /identity', tables: ['presence_identity'], run: (db) => handleGetIdentity(db, A, cors), has: (b) => b.data?.business_name === 'Alpha Cafe' },
   { route: 'GET /location', tables: ['presence_locations'], run: (db, p) => handleLocation(req('GET', '/location'), db, A, p, cors), has: (b) => b.data?.city === 'Alpha-town' },
   { route: 'GET /settings', tables: ['presence_settings'], run: (db, p) => handleSettings(req('GET', '/settings'), db, A, p, cors), has: (b) => b.data?.announcement_text === 'Alpha news' },
-  { route: 'GET /voice', tables: ['presence_brand_profile'], run: (db, p) => handleVoice(req('GET', '/voice'), db, A, p, cors), has: (b) => b.data?.tone_notes === 'Alpha voice' },
   { route: 'GET /offerings', tables: ['presence_offerings'], run: (db, p) => handleCollection(req('GET', '/offerings'), db, A, p, 'offerings', null, cors), has: (b) => b.data?.[0]?.name === 'Alpha plate' && b.data.length === 1 },
   { route: 'GET /testimonials', tables: ['presence_testimonials'], run: (db, p) => handleCollection(req('GET', '/testimonials'), db, A, p, 'testimonials', null, cors), has: (b) => b.data?.[0]?.quote === 'Alpha quote' && b.data.length === 1 },
   { route: 'GET /faqs', tables: ['presence_faqs'], run: (db, p) => handleCollection(req('GET', '/faqs'), db, A, p, 'faqs', null, cors), has: (b) => b.data?.[0]?.question === 'Alpha question' && b.data.length === 1 },
@@ -347,7 +343,6 @@ const READS = [
   { route: 'GET /review/reports/:id', tables: ['presence_ai_reviews'], run: (db) => handleReviewGet(db, A, ROW_A, cors), has: (b) => b.data?.scope === 'Alpha review' },
   { route: 'GET /moments', tables: ['presence_moments'], run: (db) => handleMomentsList(db, A, cors), has: (b) => b.data?.[0]?.headline === 'Alpha moment' && b.data.length === 1 },
   { route: 'GET /coach/opportunities', tables: ['presence_growth_opportunities'], run: (db) => handleCoachList(db, A, cors), has: (b) => b.data?.[0]?.opportunity === 'Alpha opportunity' && b.data.length === 1 },
-  { route: 'GET /foundations/dns', tables: ['presence_dns_zones', 'presence_dns_zone_history'], run: (db) => handleDnsGet(db, A, cors), has: (b) => b.data?.desired?.[0]?.value === 'Alpha record' },
 ];
 const blank = ({ status, body }) => status === 404 || body.data === null || (Array.isArray(body.data) && body.data.length === 0) || body.data?.identity === null || (Array.isArray(body.data?.desired) && body.data.desired.length === 0);
 
@@ -388,7 +383,6 @@ const WRITES = [
   { name: 'PUT /settings (verification code)', method: 'PUT', route: '/settings', body: { google_site_verification: 'abc' }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').google_site_verification === 'abc' },
   { name: 'PUT /settings (automation switch)', method: 'PUT', route: '/settings', body: { deal_nudges: true }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').deal_nudges === true },
   { name: 'PUT /settings (content and a code together)', method: 'PUT', route: '/settings', body: { announcement_text: 'Now open', google_site_verification: 'abc' }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').google_site_verification === 'abc' && row('presence_settings').announcement_text === 'Now open' },
-  { name: 'PUT /voice', method: 'PUT', route: '/voice', body: { tone_notes: 'Warm' }, needs: 'edit', table: 'presence_brand_profile', status: 200, rlsStatus: 502, run: (r, db, p) => handleVoice(r, db, A, p, cors), saved: () => row('presence_brand_profile').voice_characteristics === 'Warm' },
   { name: 'PUT /brand/profile', method: 'PUT', route: '/brand/profile', body: { mission: 'New mission' }, needs: 'edit', table: 'presence_brand_profile', status: 200, rlsStatus: 502, run: (r, db, p) => handleBrandProfilePut(r, db, A, p, cors), saved: () => row('presence_brand_profile').mission === 'New mission' },
   { name: 'POST /pages/duplicate', method: 'POST', route: '/pages/duplicate', body: { slug: '' }, needs: 'edit', table: 'presence_settings', status: 201, rlsStatus: 502, run: (r, db, p) => handlePageDuplicate(r, db, A, p, cors), saved: () => row('presence_settings').pages.length === 1 },
 ];
@@ -574,7 +568,7 @@ for (const w of WRITES) {
   // it fails closed in siteDb. So a new one fails here until someone decides what it needs.
   const onPath = idx.split('\n').filter((l) => /\((req, )?db,/.test(l) && /route === '/.test(l) && /'(PUT|POST|PATCH|DELETE)'/.test(l));
   const writes = onPath.map((l) => [l.match(/route === '([^']+)'/)[1], l.match(/'(PUT|POST|PATCH|DELETE)'/)[1]]);
-  ok('index: the write routes handed the data path were found', JSON.stringify(writes.map(([r]) => r).sort()) === JSON.stringify(['/brand/profile', '/identity', '/location', '/pages/duplicate', '/settings', '/voice']), writes.map(([r]) => r).join(','));
+  ok('index: the write routes handed the data path were found', JSON.stringify(writes.map(([r]) => r).sort()) === JSON.stringify(['/brand/profile', '/identity', '/location', '/pages/duplicate', '/settings']), writes.map(([r]) => r).join(','));
   ok('index: every one is classified', writes.every(([r, m]) => contentWriteNeeds(r, m) !== null));
   ok('index: and the collections, the one route handed it by pattern, are the same four', idx.includes('route.match(/^\\/(offerings|testimonials|faqs|posts)(?:\\/([0-9a-f-]{36}))?$/)') && read('supabase/functions/presence/lib/site_roles.ts').includes('(?:offerings|testimonials|faqs|posts)'));
   ok('this suite drives each of them', [...writes.map(([r]) => r), ...Object.keys(TABLE).map((e) => `/${e}`)].every((r) => WRITES.some((w) => w.route === r || w.route.startsWith(`${r}/`))));

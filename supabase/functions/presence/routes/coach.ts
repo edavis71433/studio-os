@@ -11,8 +11,6 @@ import { svc, type SiteDb } from '../lib/db.ts';
 import { runGrowthCoach, decideOpportunity } from '../coach/engine.ts';
 import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
-import { memorySentence } from '../lib/business_memory.ts';
-import { loadBusinessMemory } from '../concierge/grounding.ts';
 import { anthropicModel } from '../writer/model.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { loadPlan } from '../commerce/enforce.ts';
@@ -97,12 +95,6 @@ export async function handleCoachJourney(site: SiteRow, cors: Record<string, str
     renewsAt: e.current_period_end || null,
   }, nowIso);
   return json({ data: journey }, 200, cors);
-}
-
-// ── PT-9: AI Business Memory — what the AI knows, assembled from existing data ─
-export async function handleCoachMemory(site: SiteRow, cors: Record<string, string>) {
-  const memory = await loadBusinessMemory(site);
-  return json({ data: { memory, sentence: memorySentence(memory) } }, 200, cors);
 }
 
 export async function handleCoachDecide(req: Request, site: SiteRow, oppId: string, cors: Record<string, string>) {

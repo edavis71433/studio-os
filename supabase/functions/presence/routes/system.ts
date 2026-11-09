@@ -3,8 +3,9 @@
 // the router (before principal resolution) because cron has no session. This is
 // how the platform keeps observing, retries failures, and reports its own health
 // while no operator is present.
-//   POST /system/run     {secret, task?: 'cycle'|'retry'|'coach', limit?}
-//   GET  /system/health  ?secret=…   (or x-system-secret header)
+//   POST /system/run     {secret, task?, limit?} — task defaults to 'cycle' (the
+//                        15-minute tick); the single tasks are listed in the handler
+//   GET  /system/health  the secret in the x-system-secret header (never ?secret=)
 import { json } from '../../_shared/http.ts';
 import { svc, svcAll, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns, runWindowExpiries } from '../ops/scheduler.ts';

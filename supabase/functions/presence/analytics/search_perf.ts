@@ -66,29 +66,6 @@ export function searchInsights(g: GscMetrics): Insight[] {
   return out;
 }
 
-// ── AN-3.1: query/page detail (from presence_search_terms) in plain English ──
-export interface SearchTerm { key: string; clicks: number; impressions: number; position: number | null; }
-const prettyPage = (p: string) => { try { const u = new URL(p); const seg = u.pathname.replace(/^\/|\/$/g, '').split('/')[0]; return seg ? `Your ${seg.replace(/-/g, ' ')} page` : 'Your home page'; } catch { const seg = String(p).replace(/^\/|\/$/g, '').split('/')[0]; return seg ? `Your ${seg.replace(/-/g, ' ')} page` : 'Your home page'; } };
-
-/** Top searches + top pages, as sentences (never a raw keyword table). Empty when
- *  there's no detail data yet (honest). AN-3.1. */
-export function searchDetailInsights(queries: SearchTerm[], pages: SearchTerm[]): Insight[] {
-  const out: Insight[] = [];
-  if (queries.length) {
-    const t = queries[0];
-    const more = queries.slice(1, 3).map((q) => `“${q.key}”`).join(', ');
-    out.push({ key: 'top_query', title: 'What people search to find you', number: t.clicks,
-      sentence: `Your top search is “${t.key}” — ${n(t.clicks)} ${t.clicks === 1 ? 'click' : 'clicks'} from ${n(t.impressions)} ${t.impressions === 1 ? 'appearance' : 'appearances'} on Google.`,
-      detail: more ? `People also found you with ${more}.` : '', tone: 'good' });
-  }
-  if (pages.length) {
-    const t = pages[0];
-    out.push({ key: 'top_page', title: 'Your best page in search', number: t.clicks,
-      sentence: `${prettyPage(t.key)} brings the most people in from Google.`, href: '/presence.html', tone: 'neutral' });
-  }
-  return out;
-}
-
 /** A single Search moment — only on a MEANINGFUL change, never noise (AN-3 §Today). */
 export function searchNotice(g: GscMetrics): { headline: string; summary: string; tone: 'good' | 'attention' } | null {
   if (!g.hasData || g.priorImpressions === null || g.priorImpressions < 20) return null;
@@ -102,15 +79,6 @@ export function searchHealth(g: GscMetrics): { impressionsFalling: boolean; noVi
   const falling = g.hasData && g.priorImpressions !== null && g.priorImpressions >= 20 && g.impressions <= g.priorImpressions * 0.5;
   const none = g.hasData && g.impressions === 0;
   return { impressionsFalling: falling, noVisibility: none };
-}
-
-/** Genuine search milestones from real GSC totals. No fake milestones. Pure. */
-export function searchMilestones(totalImpressions: number, totalClicks: number, firstImpressionAt: string | null, firstClickAt: string | null): Array<{ key: string; label: string; achieved: boolean; note: string }> {
-  return [
-    { key: 'first_impression', label: 'First seen on Google', achieved: !!firstImpressionAt, note: firstImpressionAt ? 'Your business showed up in Google search for the first time. 🎉' : 'Once Google indexes you, your first appearance shows here.' },
-    { key: 'first_search_click', label: 'First Google click', achieved: !!firstClickAt, note: firstClickAt ? 'Someone found you on Google and clicked through. 🎉' : 'Your first click from Google search will show here.' },
-    { key: 'impressions_1k', label: '1,000 times seen on Google', achieved: totalImpressions >= 1000, note: totalImpressions >= 1000 ? 'Over 1,000 people have seen you on Google. 🎉' : `${n(totalImpressions)} of your first 1,000 Google appearances so far.` },
-  ];
 }
 
 /** Agency: classify a client's search state for the portfolio (AN-3 §Agency). Pure. */

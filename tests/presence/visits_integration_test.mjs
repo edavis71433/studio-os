@@ -1,7 +1,7 @@
 // ── Phase AN-2: LIVE integration — the real deployed collector + composition ──
 // Beacons the DEPLOYED /px endpoint over HTTP exactly as a browser sendBeacon
-// would (no apikey), verifies privacy behavior (bot dropped, DNT respected, UA
-// parsed server-side, no raw IP), then confirms the Website view composes it.
+// would (no apikey) and verifies privacy behavior (bot dropped, DNT respected, UA
+// parsed server-side, no raw IP).
 // Isolated by a unique path; skips when creds absent.
 //   SUPABASE_URL=<staging> SERVICE_ROLE_KEY=<sr> deno run --allow-env --allow-net --allow-read tests/presence/visits_integration_test.mjs
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -9,7 +9,6 @@ const SR = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_RO
 if (!SB_URL || !SR) { console.log('SKIP visits_integration (creds not set)'); Deno.exit(0); }
 
 const { svc } = await import('../../supabase/functions/presence/lib/db.ts');
-const { handleAnalyticsWebsite } = await import('../../supabase/functions/presence/routes/analytics.ts');
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
 const arr = (r) => (Array.isArray(r.json) ? r.json : []);
@@ -41,11 +40,6 @@ try {
   ok('collector: BOT beacon was DROPPED (not stored)', rows.filter((x) => x.kind === 'pageview').length === 1);
   ok('collector: DNT beacon was DROPPED (not stored)', rows.filter((x) => x.kind === 'pageview').length === 1);
 
-  // composition sees the real visit
-  const site = arr(await svc(`presence_sites?id=eq.${SITE}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`))[0];
-  const web = (await (await handleAnalyticsWebsite(new Request('http://x/analytics/website?period=week'), site, {})).json()).data;
-  ok('composition: Website view now reports real visitors (≥1)', web.has_data && web.visitors >= 1);
-  ok('composition: the visited path appears in top pages', (web.top_pages || []).some((p) => p.path === TAG));
 } finally {
   await svc(`presence_visits?site_id=eq.${SITE}&path=eq.${encodeURIComponent(TAG)}`, { method: 'DELETE' });
 }

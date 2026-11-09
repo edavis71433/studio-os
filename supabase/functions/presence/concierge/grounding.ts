@@ -26,7 +26,7 @@ export interface Grounding {
 }
 
 /** PT-9: assemble the AI Business Memory from data the platform already holds —
- *  ONE place, reused by grounding (concierge) and the /coach/memory endpoint.
+ *  ONE place, read by the concierge's grounding below.
  *  Never a second memory store; pure assembly over existing rows. */
 export async function loadBusinessMemory(site: SiteRow): Promise<BusinessMemory> {
   const [identQ, offQ] = await Promise.all([

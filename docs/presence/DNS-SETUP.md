@@ -1,5 +1,15 @@
 # DNS one-stop shop — Eric's one-time setup (slice D1 runbook)
 
+> **Nov 2026: the `/foundations/zone*` routes are gone.** No page ever called them,
+> so they were removed (builder list item 104): creating a zone, reading its
+> status, editing records and detaching have no route now, and the steps below
+> that call them can't be followed. What remains is the Route 53 client
+> (`lib/route53.ts`, `platform/managed_dns.ts`): with the secrets set, an
+> approved DNS plan writes its records into a hosted zone that already exists for
+> the domain. To bring the zone lifecycle back, restore
+> `supabase/functions/presence/routes/zone.ts` and its router lines from git
+> history (`git log -- supabase/functions/presence/routes/zone.ts`).
+
 D1 shipped the Route 53 backend adapter + zone lifecycle **dormant and
 fail-closed**: until the secrets below exist, every `/foundations/zone*`
 route answers an honest 503 ("DNS management isn't switched on yet") and the

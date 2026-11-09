@@ -1,7 +1,6 @@
-// ── Phase AN-3.1: Google Search Console — pure parsing + detail composition ───
+// ── Phase AN-3.1: Google Search Console — pure parsing ──────────────────────
 //   deno run --allow-read --allow-env tests/presence/gsc_test.mjs
 import { gscBackMonths, noPropertySentence, propertyCandidates, gscQueryBody, gscMonthWindow, parseTotals, parseTermRows, signalRowsFor } from '../../supabase/functions/presence/lib/gsc.ts';
-import { searchDetailInsights } from '../../supabase/functions/presence/analytics/search_perf.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -33,17 +32,6 @@ ok('parseTermRows: rows with keys[] → normalized terms', (() => { const r = pa
   ok('signalRowsFor: impressions + clicks + ctr(pct) + position rows', rows.length === 4 && rows.find((r) => r.metric === 'search_impressions').value === 1284 && rows.find((r) => r.metric === 'search_ctr').value === 2.9 && rows.find((r) => r.metric === 'avg_position').value === 12.3);
   ok('signalRowsFor: all tagged source=gsc, scope=client, given period', rows.every((r) => r.source === 'gsc' && r.scope === 'client' && r.period === '2026-06' && r.client_id === 'c1'));
   ok('signalRowsFor: omits ctr/position when absent', signalRowsFor('c1', '2026-06', { impressions: 5, clicks: 0, ctr: null, position: null }).length === 2);
-}
-
-// ── plain-English detail (AN-3.1 §Analytics — sentences, no keyword table, no jargon) ──
-{
-  const qs = [{ key: 'joes plumbing', clicks: 12, impressions: 200, position: 3 }, { key: 'emergency plumber', clicks: 5, impressions: 80, position: 6 }];
-  const ps = [{ key: 'https://x.com/services/', clicks: 9, impressions: 150, position: 4 }];
-  const cards = searchDetailInsights(qs, ps);
-  ok('detail: top query as a sentence', cards.some((c) => /Your top search is “joes plumbing” — 12 clicks from 200 appearances on Google\./.test(c.sentence)));
-  ok('detail: top page in plain English (no raw URL)', cards.some((c) => c.key === 'top_page' && /Your services page brings the most people/.test(c.sentence)));
-  ok('detail: NO SEO jargon (no CTR/impressions/query/SERP)', !/\bCTR\b|\bimpressions?\b|\bquery\b|\bSERP\b/i.test(cards.map((c) => c.sentence + ' ' + (c.detail || '')).join(' ')));
-  ok('detail: empty when no data (honest)', searchDetailInsights([], []).length === 0);
 }
 
 // ── AN-3.1 no-AI guard (sync + lib are deterministic) ──

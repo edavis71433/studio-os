@@ -26,7 +26,7 @@ const { resolveScopedSite } = await import('../../supabase/functions/presence/li
 const { resolveSiteRole } = await import('../../supabase/functions/presence/lib/workspace.ts');
 const { draftHashForSite } = await import('../../supabase/functions/presence/lib/draft_hash.ts');
 const { handleGetIdentity, handlePutIdentity } = await import('../../supabase/functions/presence/routes/identity.ts');
-const { handleCollection, handleLocation, handleVoice, handleSettings, handlePageDuplicate } = await import('../../supabase/functions/presence/routes/content.ts');
+const { handleCollection, handleLocation, handleSettings, handlePageDuplicate } = await import('../../supabase/functions/presence/routes/content.ts');
 const { handleGetSite } = await import('../../supabase/functions/presence/routes/site.ts');
 const { handleBrandProfileGet, handleBrandProfilePut, handleBrandReportList, handleBrandReportGet } = await import('../../supabase/functions/presence/routes/brand.ts');
 const { handleKnowledgeList } = await import('../../supabase/functions/presence/routes/knowledge.ts');
@@ -35,7 +35,6 @@ const { handleWriterList, handleWriterGet } = await import('../../supabase/funct
 const { handleReviewList, handleReviewGet } = await import('../../supabase/functions/presence/routes/review.ts');
 const { handleMomentsList } = await import('../../supabase/functions/presence/routes/moments.ts');
 const { handleCoachList } = await import('../../supabase/functions/presence/routes/coach.ts');
-const { handleDnsGet } = await import('../../supabase/functions/presence/routes/services.ts');
 const { reviewerAllowed } = await import('../../supabase/functions/presence/routes/workspace.ts');
 
 const ROOT = new URL('../../', import.meta.url);
@@ -87,8 +86,6 @@ function seedFor(site, id, tag) {
     presence_growth_opportunities: { id, site_id: site, status: 'open', opportunity: `${tag} opportunity`, area: 'website', created_at: '2026-01-01T00:00:00Z' },
     presence_knowledge_docs: { id, site_id: site, filename: `${tag}.txt`, extracted: { items: [1] }, created_at: '2026-01-01T00:00:00Z', deleted_at: null },
     presence_infra_plans: { id, site_id: site, kind: 'dns', title: `${tag} plan`, status: 'proposed', created_at: '2026-01-01T00:00:00Z' },
-    presence_dns_zones: { site_id: site, records: [{ type: 'TXT', name: '@', value: `${tag} record`, ttl: 300 }], updated_at: '2026-01-01T00:00:00Z' },
-    presence_dns_zone_history: { id, site_id: site, note: `${tag} note`, saved_at: '2026-01-01T00:00:00Z' },
     presence_offerings: { id, site_id: site, name: `${tag} plate`, category: 'Mains', description: '', price_text: '', media_id: null, is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
     presence_testimonials: { id, site_id: site, quote: `${tag} quote`, author: 'Sam', source: '', quote_date: null, is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
     presence_faqs: { id, site_id: site, question: `${tag} question`, answer: 'Yes', is_visible: true, sort_order: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
@@ -245,7 +242,6 @@ const READS = [
   { route: 'GET /identity', tables: ['presence_identity'], run: (db) => handleGetIdentity(db, A, cors), has: (b) => b.data?.business_name === 'Alpha Cafe' },
   { route: 'GET /location', tables: ['presence_locations'], run: (db, p) => handleLocation(req('GET', '/location'), db, A, p, cors), has: (b) => b.data?.city === 'Alpha-town' },
   { route: 'GET /settings', tables: ['presence_settings'], run: (db, p) => handleSettings(req('GET', '/settings'), db, A, p, cors), has: (b) => b.data?.announcement_text === 'Alpha news' },
-  { route: 'GET /voice', tables: ['presence_brand_profile'], run: (db, p) => handleVoice(req('GET', '/voice'), db, A, p, cors), has: (b) => b.data?.tone_notes === 'Alpha voice' },
   { route: 'GET /offerings', tables: ['presence_offerings'], run: (db, p) => handleCollection(req('GET', '/offerings'), db, A, p, 'offerings', null, cors), has: (b) => b.data?.[0]?.name === 'Alpha plate' && b.data.length === 1 },
   { route: 'GET /testimonials', tables: ['presence_testimonials'], run: (db, p) => handleCollection(req('GET', '/testimonials'), db, A, p, 'testimonials', null, cors), has: (b) => b.data?.[0]?.quote === 'Alpha quote' && b.data.length === 1 },
   { route: 'GET /faqs', tables: ['presence_faqs'], run: (db, p) => handleCollection(req('GET', '/faqs'), db, A, p, 'faqs', null, cors), has: (b) => b.data?.[0]?.question === 'Alpha question' && b.data.length === 1 },
@@ -261,7 +257,6 @@ const READS = [
   { route: 'GET /review/reports/:id', tables: ['presence_ai_reviews'], run: (db) => handleReviewGet(db, A, ROW_A, cors), has: (b) => b.data?.scope === 'Alpha review' },
   { route: 'GET /moments', tables: ['presence_moments'], run: (db) => handleMomentsList(db, A, cors), has: (b) => b.data?.[0]?.headline === 'Alpha moment' && b.data.length === 1 },
   { route: 'GET /coach/opportunities', tables: ['presence_growth_opportunities'], run: (db) => handleCoachList(db, A, cors), has: (b) => b.data?.[0]?.opportunity === 'Alpha opportunity' && b.data.length === 1 },
-  { route: 'GET /foundations/dns', tables: ['presence_dns_zones', 'presence_dns_zone_history'], run: (db) => handleDnsGet(db, A, cors), has: (b) => b.data?.desired?.[0]?.value === 'Alpha record' },
 ];
 const blank = ({ status, body }) => status === 404 || body.data === null || (Array.isArray(body.data) && body.data.length === 0) || body.data?.identity === null || (Array.isArray(body.data?.desired) && body.data.desired.length === 0);
 
@@ -294,7 +289,6 @@ const WRITES = [
   { route: 'PUT /identity', table: 'presence_identity', status: 200, rlsStatus: 403, run: (db, p) => handlePutIdentity(req('PUT', '/identity', { business_name: 'Renamed' }), db, A, p, cors), saved: () => row('presence_identity').business_name === 'Renamed' },
   { route: 'PUT /location', table: 'presence_locations', status: 200, rlsStatus: 502, run: (db, p) => handleLocation(req('PUT', '/location', { city: 'Newtown' }), db, A, p, cors), saved: () => row('presence_locations').city === 'Newtown' && rowsOf('presence_locations', SITE_A).length === 1 },
   { route: 'PUT /settings', table: 'presence_settings', status: 200, rlsStatus: 502, run: (db, p) => handleSettings(req('PUT', '/settings', { announcement_text: 'Now open' }), db, A, p, cors), saved: () => row('presence_settings').announcement_text === 'Now open' },
-  { route: 'PUT /voice', table: 'presence_brand_profile', status: 200, rlsStatus: 502, run: (db, p) => handleVoice(req('PUT', '/voice', { tone_notes: 'Warm' }), db, A, p, cors), saved: () => row('presence_brand_profile').voice_characteristics === 'Warm' },
   { route: 'PUT /brand/profile', table: 'presence_brand_profile', status: 200, rlsStatus: 502, run: (db, p) => handleBrandProfilePut(req('PUT', '/brand/profile', { mission: 'New mission' }), db, A, p, cors), saved: () => row('presence_brand_profile').mission === 'New mission' },
   { route: 'POST /pages/duplicate', table: 'presence_settings', status: 201, rlsStatus: 502, run: (db, p) => handlePageDuplicate(req('POST', '/pages/duplicate', { slug: '' }), db, A, p, cors), saved: () => row('presence_settings').pages.length === 1 },
 ];
@@ -532,7 +526,7 @@ for (const w of WRITES) {
   ok('index: …and before the first route', at(BUILD) < at("if (route === '/site' && method === 'GET')"));
 
   const handed = [...idx.matchAll(/\b(handle\w+)\((?:req, )?db,/g)].map((m) => m[1]).sort();
-  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDnsGet', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleVoice', 'handleWriterGet', 'handleWriterList'].sort();
+  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleWriterGet', 'handleWriterList'].sort();
   ok('index: the handlers on this path are exactly the audited list', JSON.stringify(handed) === JSON.stringify(EXPECTED), handed.join(','));
 
   const reviewerRoutes = idx.split('\n').filter((l) => /'\/portal\/(context|feed)'|\/decide\$\/|\/status\$\/|\/foundations\/plans\/\[|\/launches\/\[/.test(l) || /handle(PortalContext|PortalFeed|FoundationsDecide|WriteDecide|AssetStatus|LaunchDecide)\(/.test(l));

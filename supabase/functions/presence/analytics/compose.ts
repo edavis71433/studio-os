@@ -173,19 +173,6 @@ export function hostingSurface(x: { hosted: boolean; externalDomain?: string | n
   };
 }
 
-/** SEO readiness — REAL booleans from search-health (no fake impressions). AN-4. */
-export function searchReadinessInsight(x: { verified: boolean; titleSet: boolean; descriptionSet: boolean; sitemap: boolean; brokenLinks: number }): Insight {
-  const gaps: string[] = [];
-  if (!x.titleSet) gaps.push('a search title');
-  if (!x.descriptionSet) gaps.push('a search description');
-  if (!x.verified) gaps.push('Google verification');
-  let sentence: string, tone: Insight['tone'];
-  if (!gaps.length && x.brokenLinks === 0) { sentence = 'Your site is set up to be found: titles, descriptions, and sitemap are all in place.'; tone = 'good'; }
-  else if (gaps.length) { sentence = `A few things would help search find you — you’re missing ${gaps.join(', ')}.`; tone = 'attention'; }
-  else { sentence = `${plural(x.brokenLinks, 'link', 'links')} on your site point somewhere broken — worth a quick fix.`; tone = 'attention'; }
-  return { key: 'search_readiness', title: 'Getting found', sentence, detail: x.sitemap ? 'Your sitemap is published for search engines.' : '', href: '/presence.html#business', tone };
-}
-
 // ── AN-2: first-party traffic, in plain English (real data now) ───────────────
 // Structural param (no import) so compose.ts stays dependency-free (AN-9 guard).
 export interface TrafficAgg {

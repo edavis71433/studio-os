@@ -12,7 +12,9 @@ Customers always own their domain, content, media, and data. M14 makes each guar
 
 ## DNS management — a document, drift, and repair
 
-The manual DNS editor edits a **desired-state document** (`presence_dns_zones`), never the world: every record validated (A/AAAA/CNAME/MX/TXT/SRV/CAA/NS + SPF/DKIM/DMARC specializations, duplicates caught, problems named by index), every save versioned (`presence_dns_zone_history`), rollback one call. Observed reality comes from read-only zone snapshots (M12); **drift** = desired records reality doesn't honor — normalized so trailing dots and case never cry wolf, and records the platform doesn't manage are *never* treated as drift or touched. **One-click repair** turns drift into a plan carrying the exact records (adds only, nothing deleted) under the unchanged approval law. When a write-capable DNS adapter ships, repair steps flip from guided to automatic — same plan shape.
+*Nov 2026:* the editor's routes (`GET|PUT /foundations/dns`, `POST /foundations/dns/rollback`) were removed — no page ever called them. The desired zone is still the document below, written through when an approved plan applies records, and drift and repair still read it.
+
+The manual DNS editor edited a **desired-state document** (`presence_dns_zones`), never the world: every record validated (A/AAAA/CNAME/MX/TXT/SRV/CAA/NS + SPF/DKIM/DMARC specializations, duplicates caught, problems named by index), every save versioned (`presence_dns_zone_history`), rollback one call. Observed reality comes from read-only zone snapshots (M12); **drift** = desired records reality doesn't honor — normalized so trailing dots and case never cry wolf, and records the platform doesn't manage are *never* treated as drift or touched. **One-click repair** turns drift into a plan carrying the exact records (adds only, nothing deleted) under the unchanged approval law. When a write-capable DNS adapter ships, repair steps flip from guided to automatic — same plan shape.
 
 ## Hosting & SSL
 
@@ -20,11 +22,11 @@ Already automatic through the M12 hosting adapter (deploy history = restore poin
 
 ## Business email — guided, never hosted
 
-Provider presets as data (`google_workspace`, `microsoft365`, `zoho`, `other` — a new provider is an entry): `email_setup` plans prepare validated MX + SPF + DMARC and name the DKIM record honestly — *the key comes from the provider's panel; the platform never invents signing keys*. MX risk is stated when mail could move. `GET /foundations/email` reports deliverability posture in plain words (MX / SPF / DMARC / DKIM, each explained). The plan says it itself: the platform is not an email service.
+Provider presets as data (`google_workspace`, `microsoft365`, `zoho`, `other` — a new provider is an entry): `email_setup` plans prepare validated MX + SPF + DMARC and name the DKIM record honestly — *the key comes from the provider's panel; the platform never invents signing keys*. MX risk is stated when mail could move. (`GET /foundations/email`, the deliverability posture in plain words, was removed in Nov 2026: no page called it.) The plan says it itself: the platform is not an email service.
 
 ## Website migration — reviewed before anything moves
 
-`GET /monitor/import-inventory` reads the verified external site (WordPress/Wix/Squarespace/Shopify/Webflow/Framer/static/custom — the M11 adapter registry) and produces the reviewable inventory: per page, title/description/headings/real body text (nav and footer noise excluded)/word count, plus the deduped absolute-URL media list. Combined with M11 readiness and the M12 migration plan (URL preservation via redirects, launch checks, post-launch QA, DNS-back rollback), that is the migration report and its rollback guidance. **Nothing changes until customer approval** — proven live: the inventory run leaves content byte-identical.
+*Removed in Nov 2026:* `GET /monitor/import-inventory` (and `platform/importer.ts` behind it) read the verified external site and listed its pages and media for review. No page ever called it, so it went; the M11 readiness assessment and the M12 migration plan remain.
 
 ## The Launch Assistant
 

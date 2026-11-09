@@ -7,10 +7,7 @@
 // + the publish/snapshot pipeline; nothing here is duplicated.
 //   GET   /assets                 — the library (?collection=&tag=&status=&brand=&q=&limit=)
 //   GET   /assets/collections     — collections + counts
-//   GET   /assets/tags            — tags + counts
 //   GET   /assets/health          — plain findings (missing alt, unused, oversized, dupes)
-//   GET   /assets/duplicates      — duplicate groups
-//   GET   /assets/usage           — per-asset in_use map
 //   GET   /assets/match           — is this file already here? (?hash=&bytes=&width=&height=)
 //   POST  /assets/folders/move    — { from, to } rename a folder, or ('' ) take its files out
 //   GET   /assets/:id             — one file: metadata + complete where-used + versions
@@ -36,7 +33,7 @@ import { imageEditModel, editSizeFor } from '../visual/model.ts';
 import type { VisualPlan } from '../visual/contract.ts';
 import { saveVisualPlan, attachVariations, getVisualPlan, withPreviews } from '../visual/store.ts';
 import {
-  searchAssets, collectionsOf, tagsOf, assetHealth, detectDuplicates, usageMap,
+  searchAssets, collectionsOf, assetHealth, usageMap,
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
   fileKind, isFavorite, isClientUpload, replaceNeedsApproval, fileState, clientsByMedia,
   normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef, type MediaClient,
@@ -321,19 +318,9 @@ export async function handleAssetsCollections(site: SiteRow, cors: Record<string
   const rows = (await loadAssets(site.id)).filter((a) => a.asset_status !== 'archived' && a.client_private !== true);
   return json({ data: collectionsOf(rows) }, 200, cors);
 }
-export async function handleAssetsTags(site: SiteRow, cors: Record<string, string>) {
-  return json({ data: tagsOf(await loadAssets(site.id)) }, 200, cors);
-}
 export async function handleAssetsHealth(site: SiteRow, cors: Record<string, string>) {
   const [assets, refInfo] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
   return json({ data: { findings: assetHealth(assets, siteRefs(refInfo.map)) } }, 200, cors);
-}
-export async function handleAssetsDuplicates(site: SiteRow, cors: Record<string, string>) {
-  return json({ data: { groups: detectDuplicates(await loadAssets(site.id)) } }, 200, cors);
-}
-export async function handleAssetsUsage(site: SiteRow, cors: Record<string, string>) {
-  const [assets, refInfo] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
-  return json({ data: { usage: usageMap(assets, siteRefs(refInfo.map)) } }, 200, cors);
 }
 
 // ── item 115: is this file already here? ─────────────────────────────────────

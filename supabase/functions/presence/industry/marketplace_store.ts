@@ -44,10 +44,6 @@ export async function saveOperation(plan: MarketplacePlan, scope: string = GLOBA
   });
   return ins.ok && Array.isArray(ins.json) ? ins.json[0] : null;
 }
-export async function listOperations(limit = 50): Promise<any[]> {
-  const r = await svc(`${OP_TABLE}?select=${OP_SELECT}&order=created_at.desc&limit=${limit}`);
-  return r.ok && Array.isArray(r.json) ? r.json : [];
-}
 export async function getOperation(id: string): Promise<any | null> {
   const r = await svc(`${OP_TABLE}?id=eq.${encodeURIComponent(id)}&select=${OP_SELECT}&limit=1`);
   return r.ok && Array.isArray(r.json) ? (r.json[0] || null) : null;
