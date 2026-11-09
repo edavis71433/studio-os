@@ -27,7 +27,7 @@ const token = () => (Deno.env.get('REPLICATE_API_TOKEN') || '').trim();
 export type CutoutState =
   | { state: 'done'; output: string }
   | { state: 'waiting'; id: string }
-  | { state: 'failed'; why: string };
+  | { state: 'failed'; why: string; status?: number };   // status: Replicate's HTTP answer, when it gave one
 
 /** Only Replicate's own delivery host is ever fetched as a result, so an answer
  *  can't point the server at anything else. Pure. */
@@ -60,9 +60,18 @@ export async function startCutout(imageUrl: string, fetchImpl: typeof fetch = fe
       signal: AbortSignal.timeout((WAIT_SECONDS + 15) * 1000),
     });
     const j = await r.json().catch(() => null);
-    if (!r.ok) return { state: 'failed', why: `HTTP ${r.status} ${String((j as Record<string, unknown> | null)?.detail || '').slice(0, 200)}` };
+    if (!r.ok) return { state: 'failed', status: r.status, why: `HTTP ${r.status} ${String((j as Record<string, unknown> | null)?.detail || '').slice(0, 200)}` };
     return readPrediction(j);
   } catch (e) { return { state: 'failed', why: String(e).slice(0, 200) }; }
+}
+
+/** What a failed cut-out says. Pure. "Try again" only where trying again can help: on Nov 9
+ *  2026 a refused key (401) and an account with no credit (402) both said "Try again in a
+ *  moment", and each took a round of guessing. The log keeps Replicate's own words. */
+export function cutoutFailWords(status?: number): string {
+  if (status === 401 || status === 403) return 'The cut-out service didn’t accept our key, so nothing changed. Trying again won’t help until the key is fixed.';
+  if (status === 402) return 'The cut-out service is out of credit, so nothing changed. Once credit is added, wait a few minutes and try again.';
+  return 'The cut-out didn’t come through, so nothing changed. Try again in a moment.';
 }
 
 /** Ask after a cut-out that was still starting. */
@@ -71,7 +80,7 @@ export async function checkCutout(id: string, fetchImpl: typeof fetch = fetch): 
   try {
     const r = await fetchImpl(`${API}/predictions/${id}`, { headers: { Authorization: `Bearer ${token()}` }, signal: AbortSignal.timeout(20000) });
     const j = await r.json().catch(() => null);
-    if (!r.ok) return { state: 'failed', why: `HTTP ${r.status}` };
+    if (!r.ok) return { state: 'failed', status: r.status, why: `HTTP ${r.status}` };
     return readPrediction(j);
   } catch (e) { return { state: 'failed', why: String(e).slice(0, 200) }; }
 }

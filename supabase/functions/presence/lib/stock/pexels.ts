@@ -5,7 +5,7 @@
 // on PEXELS_API_KEY (like GSC): absent → available() is false and the routes
 // answer honestly (503 not_available). Network calls are thin wrappers around the
 // PURE parse helpers below, which the test suite covers without any network.
-import type { StockProvider, StockImage, StockDownload } from './contract.ts';
+import { StockProviderError, type StockProvider, type StockImage, type StockDownload } from './contract.ts';
 
 const API = 'https://api.pexels.com/v1';
 const key = () => Deno.env.get('PEXELS_API_KEY') || '';
@@ -52,7 +52,7 @@ export const pexels: StockProvider = {
     if (!key()) return [];
     const q = encodeURIComponent(query.trim() || 'business');
     const r = await fetch(`${API}/search?query=${q}&per_page=24&page=${Math.max(1, page || 1)}`, { headers: { Authorization: key() } });
-    if (!r.ok) return [];
+    if (!r.ok) { await r.body?.cancel(); throw new StockProviderError(r.status); }
     return parseSearch(await r.json());
   },
   async download(id: string): Promise<StockDownload | null> {
