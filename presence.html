@@ -2161,7 +2161,13 @@ let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
 function contextHint(view) {
   // A tip explains the view it opened on, so leaving that view retires it. It was
   // staying up over the next tab, on top of whatever sat at the bottom of the page.
-  document.querySelectorAll(".dds-hint.dds-live.show .x").forEach((x) => x.click());
+  // A tip gets its "show" one frame after it's added; leaving inside that frame missed
+  // it, and it came up over the next view (main's tablet run, Nov 8). One not yet
+  // shown just goes, unseen, so it can teach another visit.
+  document.querySelectorAll(".dds-hint.dds-live").forEach((h) => {
+    if (!h.classList.contains("show")) { h.remove(); return; }
+    const x = h.querySelector(".x"); if (x) x.click();
+  });
   // A finger can't double-click: on a touch screen the editor's tip says to tap (list item 31).
   const fingers = (() => { try { return matchMedia("(hover: none), (pointer: coarse)").matches; } catch (_) { return false; } })();
   const h = view === "design" && fingers ? TOUCH_DESIGN_HINT : VIEW_HINTS[view];
@@ -5026,6 +5032,7 @@ async function loadToday(first) {
 // guarded, nothing is editable here. Edit site opens the same page to build on.
 let SS_LOADED = false, SS_STALE = true, SS_SEQ = 0, SS_PATH = "/";
 let SS_PENDING = false;   // item 84: a draw on its way; asked again meanwhile, it isn't drawn twice
+const SS_FRAME = $("siteFrame") ? frameWriter($("siteFrame")) : null;   // item 100: a quick second draw can't be lost
 function loadSiteStage(force) {
   const frame = $("siteFrame"); if (!frame || !$("view-today").classList.contains("on")) return;
   if (SS_LOADED && !SS_STALE && !force) return;
@@ -5035,7 +5042,7 @@ function loadSiteStage(force) {
   apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).finally(() => { if (seq === SS_SEQ) SS_PENDING = false; }).then((html) => {
     if (seq !== SS_SEQ) return;
     SS_LOADED = true; SS_STALE = false;
-    frame.srcdoc = html;
+    SS_FRAME.write(html);
     const note = $("ssNote"); if (note) { note.hidden = true; note.textContent = ""; }
     document.documentElement.classList.remove("ss-noplan");
   }).catch((err) => {
@@ -5384,26 +5391,30 @@ window.addEventListener("message", (e) => {
 // Item 85: Hide or a move from the canvas also drew the page into the Preview screen,
 // hidden behind Edit mode: two full renders for one Hide. Opening Preview draws it anyway.
 function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")) loadPreview(); }
-// Item 100: two writes to the frame a few milliseconds apart could leave it on the first. A
+// Item 100: two writes to a frame a few milliseconds apart could leave it on the first. A
 // draft that came back quickly stayed on "Loading your draft…" for good, the page itself sitting
 // unused in srcdoc: the loading line finished loading after the page was written, and the
-// browser dropped the page. So every write is numbered, and a frame that finishes loading an
-// older one is given the newest again (twice in a row at most, so nothing can loop). An answer
-// to an older ask (another page or version picked meanwhile, or Preview closed) is dropped, as
-// the Overview's are.
-let PV_SEQ = 0, PV_WRITES = 0, PV_DOC = "", PV_REDOS = 0;
-function pvWrite(doc) {
-  PV_DOC = doc ? doc + `<!--dds-proof ${++PV_WRITES}-->` : ""; PV_REDOS = 0;
-  $("previewFrame").srcdoc = PV_DOC;
+// browser dropped the page. The Overview's frame did the same between two quick draws. So a
+// frame's writes go through frameWriter: each is numbered, and a frame that finishes loading an
+// older one is given the newest again (twice in a row at most, so nothing can loop).
+function frameWriter(frame) {
+  const w = { count: 0, doc: "", redos: 0 };
+  w.write = (doc) => { w.doc = doc ? doc + `<!--dds-proof ${++w.count}-->` : ""; w.redos = 0; frame.srcdoc = w.doc; };
+  frame.addEventListener("load", () => {
+    const d = frame.contentDocument;
+    if (!w.doc || !d) return;
+    const walk = d.createTreeWalker(d, NodeFilter.SHOW_COMMENT); let n, shown = 0;
+    while ((n = walk.nextNode())) { const m = /^dds-proof (\d+)$/.exec(n.data); if (m) shown = +m[1]; }
+    if (shown === w.count) w.redos = 0;
+    else if (shown && shown < w.count && w.redos++ < 2) frame.srcdoc = w.doc;
+  });
+  return w;
 }
-$("previewFrame").addEventListener("load", () => {
-  const f = $("previewFrame"), d = f.contentDocument;
-  if (!PV_DOC || !d) return;
-  const w = d.createTreeWalker(d, NodeFilter.SHOW_COMMENT); let n, shown = 0;
-  while ((n = w.nextNode())) { const m = /^dds-proof (\d+)$/.exec(n.data); if (m) shown = +m[1]; }
-  if (shown === PV_WRITES) PV_REDOS = 0;
-  else if (shown && shown < PV_WRITES && PV_REDOS++ < 2) f.srcdoc = PV_DOC;
-});
+// An answer to an older ask (another page or version picked meanwhile, or Preview closed) is
+// dropped, as the Overview's are.
+const PV_FRAME = frameWriter($("previewFrame"));
+let PV_SEQ = 0;
+function pvWrite(doc) { PV_FRAME.write(doc); }
 async function loadPreview() {
   const seq = ++PV_SEQ;
   pvWrite(`<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`);

@@ -112,6 +112,27 @@ test.describe('the Overview is the site', () => {
     await expect(page.locator('#pagesBar .page-pill.on .pp-name')).toHaveText('Visit');
   });
 
+  // Item 100 too: a second draw a few milliseconds after the first could be dropped when the first
+  // finished loading late, leaving the Overview on its first drawing. "links walk the site in place"
+  // caught it under load: its links weren't there to click. The frame is given the newest again.
+  test('the Overview left on an older drawing is given the newest again', async ({ page }) => {
+    await mount(page, '/presence.html');
+    const frame = page.frameLocator('#siteFrame');
+    await expect(frame.locator('h1').first()).toHaveText('Marlow’s Kitchen');
+    await page.evaluate(() => (window as any).loadSiteStage(true));   // a second drawing, so there is an older one
+    await expect.poll(() => page.evaluate('SS_FRAME.count')).toBeGreaterThan(1);
+    await expect(frame.locator('h1').first()).toHaveText('Marlow’s Kitchen');
+    const newest = (await page.evaluate('SS_FRAME.count')) as number;
+    // as the browser left it: the frame on the drawing before the newest
+    await page.evaluate((n) => new Promise<void>((done) => {
+      const f = document.getElementById('siteFrame') as HTMLIFrameElement;
+      f.addEventListener('load', () => done(), { once: true });
+      f.srcdoc = `<h1>An older drawing</h1><!--dds-proof ${n - 1}-->`;
+    }), newest);
+    await expect(frame.locator('h1').first()).toHaveText('Marlow’s Kitchen');
+    expect(await page.evaluate('SS_FRAME.count')).toBe(newest);   // the same drawing again, not a new read
+  });
+
   test('a deep link doesn’t draw the site until the Overview is opened', async ({ page }) => {
     let reads = 0;
     await page.route('**/functions/v1/presence/preview**', async (r: Route) => { reads++; await r.fallback(); });
@@ -753,6 +774,9 @@ test.describe('Pages: every page and the menu in one place', () => {
     const writes = await mount(page, '/presence.html#pages', withPages());
     await page.locator('#btnPagesAddLink').click();
     const panel = page.locator('#linkSettings');
+    // the panel puts the cursor in its first field 30 ms after opening; typing before then
+    // lands there (seen on a tablet under load: the link went into the label)
+    await expect(panel.getByLabel('Label in the menu')).toBeFocused();
     await panel.getByLabel('Label in the menu').fill('Order');
     await panel.getByLabel('Links to').fill('not a link');
     await panel.getByRole('button', { name: 'Add to the menu' }).click();
@@ -1021,7 +1045,7 @@ test.describe('one preview screen', () => {
     await mount(page, '/presence.html#preview', OWN);
     const frame = page.frameLocator('#previewFrame');
     await expect(frame.locator('#main > section').first()).toBeVisible();
-    const newest = (await page.evaluate('PV_WRITES')) as number;
+    const newest = (await page.evaluate('PV_FRAME.count')) as number;
     // as the browser left it: the frame on the loading line, the write before the page
     await page.evaluate((n) => new Promise<void>((done) => {
       const f = document.getElementById('previewFrame') as HTMLIFrameElement;
@@ -1030,7 +1054,7 @@ test.describe('one preview screen', () => {
     }), newest);
     await expect(frame.locator('#main > section').first()).toBeVisible();
     await expect(frame.getByText('Loading your draft…')).toHaveCount(0);
-    expect(await page.evaluate('PV_WRITES')).toBe(newest);   // the same page again, not a new read
+    expect(await page.evaluate('PV_FRAME.count')).toBe(newest);   // the same page again, not a new read
   });
   test('it lists every page of the site, the owner’s own included, and has no template chooser', async ({ page }) => {
     await mount(page, '/presence.html#preview', OWN);
@@ -1757,8 +1781,12 @@ test.describe('move the welcome section among the others', () => {
   test('a built-in section moves past its visible neighbour, and the last one can’t go further down', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
     await frame.locator('section[data-dds-core="about"]').hover();
+    await frame.locator('body').evaluate((b) => b.setAttribute('data-e2e-old', ''));
     await barButton(frame, 'Move this section down').click();
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
+    // the move draws the page again; a hover on the page about to go leaves no bar on the new one
+    await expect(frame.locator('body[data-e2e-old]')).toHaveCount(0);
+    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
     await frame.locator('section[data-dds-core="offerings"]').hover();
     await expect(barButton(frame, 'Move this section down')).toHaveClass(/dc-off/);   // added sections follow the built-in ones
   });

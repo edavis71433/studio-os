@@ -88,6 +88,9 @@ async function mountCanvas(page: Page, opts: { html?: string; settings?: Record<
   await page.route('**/functions/v1/presence/preview**', (route: Route) =>
     route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: opts.html ?? PAGE_HTML(SECTIONS) }));
   if (opts.beforeGoto) await opts.beforeGoto(page);
+  // the editor's tip comes up 0.4 s after opening, and on a phone it can sit over the section a
+  // test has just hovered: seen, it stays away (list item 108)
+  await page.addInitScript(() => { try { const s = JSON.parse(localStorage.getItem('dds-hints') || '{}'); localStorage.setItem('dds-hints', JSON.stringify({ ...s, 'edit-tap': 1, 'edit-doubleclick': 1 })); } catch { /* storage may be denied */ } });
   await page.goto('/presence.html#design');
   // visual refresh: the builder sits under the site's top row with the sub-view
   // tab strip marking Design — the canvas itself is unchanged
@@ -749,7 +752,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await canvasReplaced(frame);
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
     await page.waitForTimeout(800);                                // a second repaint would show here
-    expect(await canvasScrollY(frame)).toBeGreaterThan(before - 50);
+    await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);   // once it settles, as below
   });
 
   test('a session that held a repaint off and ends with nothing to save keeps the place too', async ({ page }) => {
@@ -1132,7 +1135,8 @@ test.describe('G13 in-place canvas text editor', () => {
     await canvasReplaced(frame);
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
     await page.waitForTimeout(800);                                // a second repaint would show here
-    expect(await canvasScrollY(frame)).toBeGreaterThan(before - 50);
+    // read it once it settles: a read during a redraw sees the new page before its scroll is put back
+    await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
   });
 
   test('a panel edit written by a page switch still starts the new page at the top', async ({ page }) => {
@@ -2087,10 +2091,14 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.locator('dialog input').fill('our-story');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(onPill(page)).toHaveText('Our story');
+    await expect(frame.locator('#about-us')).toHaveCount(0);   // the renamed page is drawn (here it has no About section)
+    await markCanvas(frame);
     await undo(page);
     await expect(onPill(page)).toHaveText('About');
+    // Undo draws the page again; an Enter pressed on the page about to go is lost with it
+    // (once in 60 on a phone)
+    await canvasReplaced(frame);
     await expect(frame.locator('#about-us')).toBeAttached();
-    await expect(frame.locator('#dds-dc-bar')).toBeAttached();
     const count = puts.length;
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Back on about');
     await page.keyboard.press('Enter');
