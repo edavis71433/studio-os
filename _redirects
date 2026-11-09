@@ -154,6 +154,10 @@ https://tools.davisdigitalstudio.com/robots.txt    /tools-robots.txt    200!
 /visual-studio               /visual-studio.html   200
 /agency.html                  /agency              301!
 /agency                      /agency.html          200
+/sites.html                   /sites               301!
+/sites                       /sites.html           200
+/domains.html                 /domains             301!
+/domains                     /domains.html         200
 /snapshot-history.html        /snapshot-history    301!
 /snapshot-history            /snapshot-history.html   200
 /timeline.html                /timeline            301!

@@ -128,7 +128,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const drawnKeys = (nav) => drawn(nav).map(s=>s.key);
   const hiddenHrefs = (nav) => nav.flatMap(s=>s.items.filter(i=>i.hidden).map(i=>i.href));
   const allHrefs = (nav) => nav.flatMap(s=>s.items.map(i=>i.href.split('#')[0]));
-  ok('nav: studio level draws exactly Home · Inbox · Customers · Pipeline · Projects · Files · Analytics · Your website · Settings', drawnKeys(agency).join(',')==='home,inbox,customers,pipeline,projects,files,analytics,website,settings');
+  // builder list item 43 (Nov 2026): Sites, right after Home
+  ok('nav: studio level draws exactly Home · Sites · Inbox · Customers · Pipeline · Projects · Files · Analytics · Your website · Settings', drawnKeys(agency).join(',')==='home,sites,inbox,customers,pipeline,projects,files,analytics,website,settings');
   ok('nav cut: studio level — Your website and Settings are the utilities (foot of the sidebar), each a plain item', drawn(agency).filter(s=>s.utility).map(s=>s.label).join('·')==='Your website·Settings' && drawn(agency).every(s=>s.items.filter(i=>!i.hidden).length===1));
   ok('nav cut: nothing is deleted — Contacts, Broadcasts, Visual Studio, Analytics, Add a customer, the builder pages, Sharing, Help stay as ⌘K entries', ['/contacts.html','/broadcasts.html','/visual-studio.html','/agency.html#add','/presence.html#business','/presence.html#design','/presence.html#addpage','/presence.html#domain','/presence.html#publish','/presence.html#history','/sharing.html','/help.html'].every(h=>hiddenHrefs(agency).includes(h)));
   ok('nav cut: no page is reachable from two menu entries (drawn hrefs are unique)', (()=>{const hs=drawn(agency).map(s=>s.items.find(i=>!i.hidden).href);return new Set(hs).size===hs.length;})());

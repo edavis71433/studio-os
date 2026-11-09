@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: 'unsafe-inline'; object-src 'none'; base-uri 'self'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Search — Vermilion &amp; Vine</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Search Vermilion &amp; Vine.">
+<link rel="canonical" href="https://vermilionandvine.example/search/">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vermilion &amp; Vine">
+<meta property="og:title" content="Search — Vermilion &amp; Vine">
+<meta property="og:description" content="Search Vermilion &amp; Vine.">
+<meta property="og:url" content="https://vermilionandvine.example/search/">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Search — Vermilion &amp; Vine">
+<meta name="twitter:description" content="Search Vermilion &amp; Vine.">
+<style>:root{--ink:#1a1a1c;--soft:#5f5a52;--paper:var(--bg,#f6f3ec);--accent:#6d232a;--line:#ddd6c8}
+html{font-size:calc(100% * var(--font-scale,1))}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-body,"Iowan Old Style",Palatino,Georgia,serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:17px}
+h1{font-size:clamp(2.6rem,7vw,4.6rem);line-height:1.1;font-family:var(--font-display,Georgia,serif);font-weight:600}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}
+.wrap{max-width:1080px;margin:0 auto;padding:0 26px}
+header.site{border-top:3px double var(--ink)}
+.nav{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 0 0;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--font-display,Georgia,serif);font-weight:600;font-size:1.9rem;color:var(--ink);text-decoration:none}
+nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap;justify-content:center;padding:8px 0 12px}
+nav.primary a{display:inline-block;padding:6px 14px;text-decoration:none;color:#5f5a52;font-weight:600;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase}
+.hero{padding:84px 0 56px;text-align:center}
+</style>
+<link rel="stylesheet" href="/assets/site.css">
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+
+<header class="site">
+<div class="wrap nav">
+  <a class="brand" href="/">Vermilion &amp; Vine</a>
+  <nav class="primary" aria-label="Main">
+<ul>
+<li>
+<a href="/">Home</a>
+</li>
+<li>
+<a href="/services/">Services</a>
+</li>
+<li class="has-sub">
+<a href="/about/" aria-haspopup="true">About<span class="sub-caret" aria-hidden="true">▾</span>
+</a>
+<ul class="subnav">
+<li>
+<a href="/our-work/">Our work</a>
+</li>
+<li>
+<a href="/faq/">Questions</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="/updates/">Updates</a>
+</li>
+<li>
+<a href="/contact/">Contact</a>
+</li>
+</ul>
+</nav>
+  <form class="sitesearch" role="search" action="/search/" method="get">
+<span class="ss-ic" aria-hidden="true">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+<circle cx="11" cy="11" r="7"/>
+<line x1="21" y1="21" x2="16.5" y2="16.5"/>
+</svg>
+</span>
+<input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120">
+</form>
+</div>
+</header>
+<main id="main">
+<section class="block wrap search-page">
+<h1>Search</h1>
+<form class="searchmain" role="search" action="/search/" method="get">
+  <label class="sr-only" for="search-q" style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search this site</label>
+  <input type="search" id="search-q" name="q" placeholder="Search this site…" autocomplete="off" maxlength="120">
+</form>
+<p class="search-status" id="search-status" role="status" aria-live="polite">
+</p>
+<ol class="search-results" id="search-results">
+</ol>
+<noscript>
+<p class="search-note">Search needs JavaScript turned on. In the meantime you can browse: <a href="/">Home</a> · <a href="/services/">Services</a> · <a href="/faq/">FAQ</a> · <a href="/updates/">Updates</a> · <a href="/contact/">Contact</a>.</p>
+</noscript>
+</section>
+<script>(function(){
+var inp=document.getElementById('search-q'),out=document.getElementById('search-results'),st=document.getElementById('search-status');
+if(!inp||!out)return;
+var DOCS=null,LOADED=false;
+var KIND={page:'Page',service:'Service',update:'Update',faq:'Question'}
+;
+function qparam(){try{return new URLSearchParams(location.search).get('q')||'';}
+catch(e){return '';}
+}
+function match(docs,query){
+  var q=String(query||'').toLowerCase().trim();if(!q)return [];
+  var tokens=q.split(/\s+/).filter(Boolean);var scored=[];
+  docs.forEach(function(d,i){
+    var title=String(d.t||'').toLowerCase();
+    var hay=(title+' '+String(d.s||'')+' '+((d.g||[]).join(' '))).toLowerCase();
+    var score=0,ok=true;
+    tokens.forEach(function(tk){if(title.indexOf(tk)>=0)score+=3;else if(hay.indexOf(tk)>=0)score+=1;}
+);
+    if(score===0)return;
+    tokens.forEach(function(tk){if(hay.indexOf(tk)<0)ok=false;}
+);
+    if(!ok)return;
+    if(title.indexOf(q)===0)score+=4;else if(hay.indexOf(q)>=0)score+=2;
+    scored.push({d:d,score:score,i:i}
+);
+  }
+);
+  scored.sort(function(a,b){return b.score-a.score||a.i-b.i;}
+);
+  return scored.slice(0,40).map(function(x){return x.d;}
+);
+}
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+function render(q){
+  while(out.firstChild)out.removeChild(out.firstChild);
+  if(!q){st.textContent='';return;}
+  if(!LOADED){st.textContent='Searching…';return;}
+  var res=match(DOCS||[],q);
+  st.textContent=res.length?(res.length+' result'+(res.length===1?'':'s')+' for “'+q+'”'):('No results for “'+q+'”. Try another word.');
+  res.forEach(function(d){
+    var li=el('li','search-hit');var a=el('a',null,null);a.href=d.u;
+    a.appendChild(el('span','sh-title',d.t));
+    a.appendChild(el('span','sh-kind',KIND[d.k]||''));
+    if(d.s)a.appendChild(el('span','sh-snip',d.s));
+    li.appendChild(a);out.appendChild(li);
+  }
+);
+}
+function load(){
+  fetch('/search-index.json',{headers:{accept:'application/json'}
+}
+).then(function(r){return r.json();}
+).then(function(j){DOCS=Array.isArray(j)?j:[];LOADED=true;render(inp.value.trim());}
+).catch(function(){LOADED=true;st.textContent='Search is unavailable right now.';}
+);
+}
+var seed=qparam();if(seed){inp.value=seed;}
+inp.addEventListener('input',function(){render(inp.value.trim());}
+);
+render(inp.value.trim());load();
+}
+)();</script>
+</main>
+<footer class="site">
+<div class="wrap">
+  <div class="cols">
+    <div>
+<h2>Vermilion &amp; Vine</h2>
+<address>5119 York Boulevard<br>Los Angeles, CA 90042</address>
+<p>
+<a href="tel:3235550142">(323) 555-0142</a>
+<br>
+<a href="mailto:hello@vermilionandvine.example">hello@vermilionandvine.example</a>
+</p>
+<p>
+<a href="https://instagram.com/vermilionvine.example" rel="noopener">Instagram</a>
+</p>
+</div>
+    <div>
+<table class="hours" data-pr="location.hours">
+<caption>Hours</caption>
+<tbody>
+<tr data-day="mon">
+<th scope="row">Monday</th>
+<td>Closed</td>
+</tr>
+<tr data-day="tue">
+<th scope="row">Tuesday</th>
+<td>5pm–10pm</td>
+</tr>
+<tr data-day="wed">
+<th scope="row">Wednesday</th>
+<td>5pm–10pm</td>
+</tr>
+<tr data-day="thu">
+<th scope="row">Thursday</th>
+<td>5pm–11pm</td>
+</tr>
+<tr data-day="fri">
+<th scope="row">Friday</th>
+<td>12pm–2:30pm, 5pm–12am</td>
+</tr>
+<tr data-day="sat">
+<th scope="row">Saturday</th>
+<td>10am–2:30pm, 5pm–12am</td>
+</tr>
+<tr data-day="sun">
+<th scope="row">Sunday</th>
+<td>10am–3pm</td>
+</tr>
+</tbody>
+</table>
+<div class="holiday">
+<strong>Holiday hours</strong>
+<ul>
+<li>Thanksgiving (2026-11-26): Closed</li>
+<li>Christmas Eve (2026-12-24): 12pm–8pm</li>
+</ul>
+</div>
+</div>
+  </div>
+  <div class="credit">
+<span>© Vermilion &amp; Vine</span>
+<span>
+<a href="/privacy/">Privacy</a> · <a href="/accessibility/">Accessibility</a>
+</span>
+<span>Site by Davis Digital Studio</span>
+</div>
+</div>
+</footer>
+</body>
+</html>

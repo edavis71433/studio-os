@@ -53,6 +53,10 @@
 # cheap), the same policy the .html paths and the service worker already use.
 /agency
   Cache-Control: no-cache, must-revalidate
+/sites
+  Cache-Control: no-cache, must-revalidate
+/domains
+  Cache-Control: no-cache, must-revalidate
 /today
   Cache-Control: no-cache, must-revalidate
 /inbox

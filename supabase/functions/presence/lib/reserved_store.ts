@@ -7,6 +7,7 @@ import { svc } from './db.ts';
 
 export const RESERVED_NAMES = {
   savedViews: '__saved_views__',          // sales review item 31
+  sitePins: '__site_pins__',              // builder list item 45: each member's pinned sites (agency/sites.ts)
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
   stageNames: '__stage_names__',          // sales review item 38
   stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes

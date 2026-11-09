@@ -687,15 +687,15 @@ test.describe('Batch A regressions — shell', () => {
     const read = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dds-p-deep').trim());
     // explicit toggle blocks (the shell theme toggle stamps data-theme)
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
-    expect(await read()).toBe('#cdb6f2');
+    expect(await read()).toBe('#d7c8fb');   // look refresh E (Nov 2026)
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
-    expect(await read()).toBe('#2a1b4a');
+    expect(await read()).toBe('#3d2185');
     // OS-scheme blocks (no explicit toggle)
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
     await page.emulateMedia({ colorScheme: 'dark' });
-    expect(await read()).toBe('#cdb6f2');
+    expect(await read()).toBe('#d7c8fb');   // look refresh E (Nov 2026)
     await page.emulateMedia({ colorScheme: 'light' });
-    expect(await read()).toBe('#2a1b4a');
+    expect(await read()).toBe('#3d2185');
   });
 });
 

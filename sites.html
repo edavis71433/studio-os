@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sites — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- Studio level, never scoped: a stray ?client= (the nav carries the drill-in scope
+     onto every link) is dropped BEFORE the deferred shell reads the URL, as on Home. -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way agency.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}   /* a view's own display rule (the grid is display:grid) must never beat hidden */
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ── the list-view header (agency.html's .lhead anatomy) + the Sites · Domains tabs ── */
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
+  .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer;min-height:36px}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px)}
+  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
+  .tabs a:hover{color:var(--p);background:var(--p-soft)}
+  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
+  .search{width:100%;font-family:inherit;font-size:14.5px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);margin-bottom:var(--dds-s4,16px)}
+  .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 var(--dds-s3,12px)}
+
+  /* ── the cards: a live picture of each site, then the facts and three doors ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--dds-s4,16px)}
+  .scard{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden;min-width:0;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .scard:hover{border-color:var(--p)}
+  .thumb{position:relative;aspect-ratio:16/10;overflow:hidden;background:var(--p-soft);border-bottom:1px solid var(--line)}
+  /* the home page is drawn at desktop width (1280×800) and scaled to the card (--k, set from the card's width) */
+  .thumb iframe{position:absolute;top:0;left:0;width:1280px;height:800px;border:0;transform-origin:0 0;transform:scale(var(--k,.25));pointer-events:none;background:#fff;opacity:0;transition:opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out)}
+  .thumb iframe.on{opacity:1}
+  .tfall{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--dds-s1,4px);padding:var(--dds-s4,16px);text-align:center;color:var(--p);font-weight:600;font-size:14px;overflow-wrap:anywhere}
+  .tfall small{display:block;font-weight:500;font-size:12px;color:var(--soft)}
+  .tfall .ini{width:44px;height:44px;border-radius:var(--dds-r,8px);background:var(--card);color:var(--p);display:grid;place-items:center;font-size:18px;font-weight:700;box-shadow:var(--shadow)}
+  .tpin{position:absolute;z-index:1;top:var(--dds-s2,8px);left:var(--dds-s2,8px);font-size:11.5px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:2px var(--dds-s2,8px);box-shadow:var(--shadow)}
+  .sbody{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:6px;flex:1}
+  .shead{display:flex;align-items:flex-start;gap:var(--dds-s2,8px)}
+  .sname{font-size:15.5px;font-weight:600;line-height:1.3;flex:1;min-width:0;overflow-wrap:anywhere}
+  .sname a{color:inherit;text-decoration:none}
+  .sname a:hover{color:var(--p)}
+  .more{flex:0 0 auto;font:inherit;font-size:16px;line-height:1;border:1px solid transparent;background:transparent;color:var(--soft);border-radius:var(--dds-r,8px);min-width:36px;min-height:36px;cursor:pointer}
+  .more:hover,.more[aria-expanded="true"]{border-color:var(--line);color:var(--p)}
+  .saddr{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;font-size:13px;min-width:0}
+  .saddr a{color:var(--soft);text-decoration:none;overflow-wrap:anywhere}
+  .saddr a:hover{color:var(--p);text-decoration:underline}
+  .sline{font-size:12.5px;color:var(--soft)}
+  .sline b{font-weight:600;color:var(--ink)}
+  .sline.warn{color:var(--warn)} .sline.bad{color:var(--bad)}
+  .sline a{color:inherit}
+  .sacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:var(--dds-s2,8px)}
+  .sbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
+  .sbtn:hover{border-color:var(--p);color:var(--p)}
+  .sbtn.main{background:var(--p);border-color:var(--p);color:#fff}
+  .sbtn.main:hover{filter:brightness(1.06);color:#fff}
+  /* dark mode fills with the light accent, which wants dark ink (shell.css's rule for its own buttons: 7.6:1) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sbtn.main,:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .sbtn.main,:root[data-theme="dark"] .btn:not(.ghost){color:#171320}
+  @media (max-width:767px){.sbtn,.more,.lbtn,.seg button{min-height:44px}}
+
+  .pill{font-size:12px;font-weight:500;padding:2px var(--dds-s2,8px);border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--soft)}
+  .pill.live{background:var(--good-soft);color:var(--good)} .pill.needs,.pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:#f7e3e3;color:var(--bad)}
+  .tagchip{display:inline-block;font-size:11px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px var(--dds-s2,8px);margin:2px var(--dds-s1,4px) 0 0}
+
+  /* ── the table (agency.html's .tscroll anatomy: it scrolls in its own box) ── */
+  .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
+  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}
+  .tscroll thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
+  .tscroll thead th .thb{font:inherit;color:inherit;background:none;border:none;padding:var(--dds-s3,12px) var(--dds-s4,16px);width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:var(--dds-s1,4px)}
+  .tscroll thead th .thb:hover{color:var(--p)}
+  .tscroll thead th .arrow{font-size:10px;color:var(--p)}
+  .tscroll tbody tr{cursor:pointer}
+  .tscroll tbody tr:hover{background:var(--p-soft)}
+  .tscroll tbody tr:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+  .tscroll tbody td{padding:var(--dds-s3,12px) var(--dds-s4,16px);border-bottom:1px solid var(--line);vertical-align:middle}
+  .tscroll tbody tr:last-child td{border-bottom:none}
+  .tscroll td .n{font-weight:600}
+  .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
+  .tscroll td.when{white-space:nowrap;font-size:13px;color:var(--soft)}
+  .tscroll th.acts,.tscroll td.acts{width:1%;white-space:nowrap;text-align:right}
+  .avs{display:flex;flex-wrap:wrap;gap:3px}
+  .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--p-soft);color:var(--p)}
+  .av.client{background:var(--good-soft);color:var(--good)}
+  .av.more{background:var(--bg);color:var(--soft)}
+
+  /* ── the one open ⋯ menu, fixed under its button (agency.html's .rowmenu) ── */
+  .rowmenu{position:fixed;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);box-shadow:var(--shadow);padding:6px;min-width:220px;text-align:left}
+  .rowmenu button,.rowmenu a{display:block;width:100%;font:inherit;font-size:13.5px;text-align:left;background:none;border:none;border-radius:var(--dds-r-sm,6px);padding:var(--dds-s2,8px) 10px;color:var(--ink);cursor:pointer;text-decoration:none}
+  .rowmenu button:hover,.rowmenu button:focus-visible,.rowmenu a:hover,.rowmenu a:focus-visible{background:var(--p-soft);color:var(--p);outline:none}
+
+  /* ── Duplicate site (a dialog, agency.html's custDlg anatomy) ── */
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:440px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dbody{padding:var(--dds-s6,24px);max-height:calc(84vh - 22px);overflow:auto}
+  .dbody h3{font-family:var(--sans);font-weight:600;font-size:19px;margin:0 0 var(--dds-s3,12px)}
+  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:10px 0 var(--dds-s1,4px)}
+  .dbody input{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
+  .dbody input:focus{border-color:var(--p)}
+  .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
+  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
+  .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
+  .row2{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s4,16px)}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer;min-height:40px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn:disabled{opacity:.6;cursor:default}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
+  .muted{color:var(--soft);font-size:14px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<div id="rowMenuHost"></div>
+<!-- Duplicate site (item 45): a new customer, set up the way Add a customer does it,
+     whose site then starts from this one's setup (POST /agency/sites/:id/duplicate) -->
+<dialog id="dupDlg" aria-labelledby="dupHead">
+  <form id="dupForm" class="dbody">
+    <div id="dup-fields">
+      <h3 id="dupHead">Duplicate site</h3>
+      <p class="note" id="dupFrom" style="margin-top:0"></p>
+      <label for="dup-biz">New business name</label>
+      <input id="dup-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+      <label for="dup-name">Their name</label>
+      <input id="dup-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+      <label for="dup-email">Their email</label>
+      <input id="dup-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
+      <p class="note">This sets them up as a new customer and emails them a sign-in link, as Add a customer does. Their site starts with this one’s look, services, FAQs, voice and colors. Business details, photos and reviews are never copied, and nothing on this site changes.</p>
+      <div class="row2"><button type="button" class="btn ghost" id="dup-cancel">Cancel</button><button type="submit" class="btn" id="dup-submit">Duplicate + invite</button></div>
+    </div>
+    <div id="dup-done" style="display:none"></div>
+  </form>
+</dialog>
+
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
+// Every client's website, the way Squarespace's dashboard and Wix's Sites table
+// show them: a card with a live picture of the home page, its address, status,
+// plan and renewal, who can edit, and Website · Analytics · Settings; or a table
+// (Name · Team · Plan · Published · Last updated · Tags). Pinned sites come
+// first, then the ones you opened last. Everything comes from GET /agency/sites
+// (agency/sites.ts); Needs you is Home's own list, laid over the status words.
+//
+// The pictures (agency/sites.ts explains why it is not the live address): each
+// card asks GET /agency/sites/:id/thumb for its home page only when it scrolls
+// near the screen, two at a time, and keeps the answer for this visit. The cards
+// are built once per load and never rebuilt by search, sort or a pin (search hides
+// them, order moves them with CSS), so a drawn picture is never drawn twice.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
+const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});};
+const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+const scoped=(path,id)=>path+'?client='+encodeURIComponent(id);
+
+let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
+let NEXT={};   // Home's Needs you, by site (/agency/needs-you next_by_site)
+const DISPLAY_KEY='dds-display:sites';
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}return'cards';})();
+let SORT=null;   // null = the server's order (pinned, then last opened); else {key,dir}
+
+// ── the words on a card ──
+function statusOf(s){
+  const n=NEXT[s.site_id];
+  if(n)return{w:'Needs you',cls:'needs',why:String(n.what||''),href:/^\//.test(String(n.href||''))?String(n.href):'/agency.html'};
+  const cls=s.state==='live'?'live':s.state==='down'?'bad':(s.state==='offline'||s.state==='paused')?'warn':'';
+  return{w:s.state_words||'',cls,why:'',href:''};
+}
+function planLine(p){
+  if(!p)return'';
+  const r=p.renews||{},at=day(r.at);
+  const when=r.kind==='trial'&&at?'Trial ends '+at:r.kind==='renews'&&at?'Renews '+at:r.kind==='ends'&&at?'Ends '+at:'No renewal date';
+  const st=p.status==='paused'?' · Paused':p.status==='lapsed'?' · Lapsed':'';
+  return `<b>${esc(p.words)}</b>${p.term?' · '+esc(p.term==='annual'?'Yearly':'Monthly'):''} · ${esc(when)}${esc(st)}`;
+}
+function teamWords(team){
+  const st=(team||[]).filter(t=>t.side==='studio'),cl=(team||[]).filter(t=>t.side==='client');
+  const meIn=st.some(t=>t.me),others=st.length-(meIn?1:0);
+  let a=meIn?(others?`You + ${others} in your studio`:'You'):(st.length?`${st.length} in your studio`:'');
+  const b=cl.length?`${cl.length} on their side`:'';
+  return [a,b].filter(Boolean).join(' · ')||'No one yet';
+}
+const whoLabel=(t)=>(t.me?'You':t.who)+' — '+(t.side==='studio'?'your studio':'their side')+', '+t.role+(t.invited?' (invited)':'');
+function domainLine(s){
+  if(!s.domain||!s.domain_expires_at)return'';
+  const days=Math.round((new Date(s.domain_expires_at)-Date.now())/86400000);
+  if(days<0)return`<div class="sline bad">${esc(s.domain)} expired ${esc(day(s.domain_expires_at))}</div>`;
+  return`<div class="sline${days<=30?' warn':''}">Domain renews ${esc(day(s.domain_expires_at))}</div>`;
+}
+
+// ── the cards: built once per load ──
+function cardHtml(s,i){
+  const st=statusOf(s);
+  const addr=s.address?`<a href="${esc(s.address)}" target="_blank" rel="noopener" aria-label="${esc(hostOf(s.address))} (opens the live site)">${esc(hostOf(s.address))}</a>`:'<span>No address yet</span>';
+  const fall=s.thumb?`<div class="ini">${esc(initial(s.name))}</div>`:`<div class="ini">${esc(initial(s.name))}</div>${esc(s.domain||s.name||'')}<small>Lives on their own host</small>`;
+  return `<article class="scard" data-site="${esc(s.site_id)}" style="order:${i}" aria-label="${esc(s.name||'(unnamed)')}">
+    <div class="thumb" data-thumb="${esc(s.site_id)}" aria-hidden="true"><div class="tfall">${fall}</div>${s.pinned?'<span class="tpin">Pinned</span>':''}</div>
+    <div class="sbody">
+      <div class="shead"><h2 class="sname">${META.can_open?`<a href="${esc(scoped('/presence.html',s.site_id))}">${esc(s.name||'(unnamed)')}</a>`:esc(s.name||'(unnamed)')}</h2>${menuBtnHtml(s)}</div>
+      <div class="saddr">${addr}<span class="pill ${st.cls}" data-pill="${esc(s.site_id)}"${st.why?` title="${esc(st.why)}"`:''}>${esc(st.w)}</span></div>
+      <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
+      <div class="sline">${planLine(s.plan)}</div>
+      ${domainLine(s)}
+      <div class="sline" title="${esc((s.team||[]).map(whoLabel).join('\n'))}">Can edit: ${esc(teamWords(s.team))}</div>
+      ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
+      ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
+      <div class="sacts">${doorsHtml(s)}</div>
+    </div>
+  </article>`;
+}
+// the three doors into the client; a seat that can't open a client (the server says) gets the live site only
+function doorsHtml(s){
+  if(!META.can_open)return s.address&&s.state!=='not_live'?`<a class="sbtn" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:'';
+  return `<a class="sbtn main" href="${esc(scoped('/presence.html',s.site_id))}">Website</a><a class="sbtn" href="${esc(scoped('/analytics.html',s.site_id))}">Analytics</a><a class="sbtn" href="${esc(scoped('/settings.html',s.site_id))}">Settings</a>`;
+}
+function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, open">⋯</button>`;}
+
+// ── the table: columns that sort; re-rendered freely (it has no pictures) ──
+const COLS=[
+  ['name','Name',(s)=>String(s.name||'').toLowerCase()],
+  ['team','Team',(s)=>(s.team||[]).length],
+  ['plan','Plan',(s)=>String((s.plan&&s.plan.words)||'').toLowerCase()],
+  ['published','Published',(s)=>s.published_at||''],
+  ['updated','Last updated',(s)=>s.updated_at||''],
+  ['tags','Tags',(s)=>(s.tags||[]).join(',').toLowerCase()],
+];
+function avatars(team){
+  const t=team||[];const shown=t.slice(0,5);
+  return `<div class="avs">${shown.map(m=>`<span class="av${m.side==='client'?' client':''}" title="${esc(whoLabel(m))}">${esc(m.me?'Y':initial(m.who))}</span>`).join('')}${t.length>5?`<span class="av more" title="${esc(t.slice(5).map(whoLabel).join('\n'))}">+${t.length-5}</span>`:''}</div><span class="sr-only">${esc(t.map(whoLabel).join('; ')||'No one yet')}</span>`;
+}
+function tableHtml(list){
+  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
+  const trs=list.map(s=>{const st=statusOf(s);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}>
+    <td><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span></div></td>
+    <td>${avatars(s.team)}</td>
+    <td>${esc((s.plan&&s.plan.words)||'')}</td>
+    <td class="when">${s.published_at?esc(day(s.published_at)):'<span class="muted">Not yet</span>'}</td>
+    <td class="when">${s.updated_at?esc(day(s.updated_at)):'—'}</td>
+    <td>${(s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</td>
+    <td class="acts">${menuBtnHtml(s)}</td></tr>`;}).join('');
+  return `<div class="tscroll"><table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+// ── search: name, address, tags and who can edit ──
+const matches=(s)=>{const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
+// the server's order (pinned in pin order, then last opened, then name), or a column's
+function ordered(){
+  const list=SITES.slice();
+  if(SORT){const col=COLS.find(c=>c[0]===SORT.key)||COLS[0];list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});}
+  return list;
+}
+
+function headHtml(shown){
+  return `<header class="lhead">
+    <div class="lrow1">
+      <span class="obj-ic" aria-hidden="true">🌐</span>
+      <h1 id="pagehead" tabindex="-1">Sites</h1>
+      <div class="seg" role="group" aria-label="Display as">
+        <button type="button" id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+        <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+      </div>
+      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+    </div>
+    <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>
+    <nav class="tabs" aria-label="Sites and domains"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a></nav>
+  </header>`;
+}
+function lmetaText(shown){
+  const m=Math.floor((Date.now()-LOADED_AT)/60000);
+  const sorted=SORT?`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`:'Pinned first, then the ones you opened last';
+  return `${shown} site${shown===1?'':'s'} · ${esc(sorted)} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
+}
+
+// render: the frame (header, search, the two views) once per load; after that
+// search and sort only show, hide and move what is there
+function render(){
+  const shown=SITES.filter(matches).length;
+  let h=headHtml(shown);
+  h+=`<label class="sr-only" for="search">Search sites</label><input class="search" id="search" type="search" placeholder="Search by name, address, tag or person…" value="${esc(Q)}">`;
+  if(META.partial)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
+  if(!SITES.length){
+    h+=`<div class="center"><p class="muted">No client sites yet.</p><p style="margin-top:14px"><a class="btn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center">+ Add a customer</a></p></div>`;
+  }else{
+    h+=`<div class="grid" id="grid"${DISPLAY==='cards'?'':' hidden'}>${SITES.map(cardHtml).join('')}</div>`;
+    h+=`<div id="tableHost"${DISPLAY==='table'?'':' hidden'}></div>`;
+    h+=`<div class="center" id="noMatch" hidden><p class="muted">No sites match that.</p></div>`;
+  }
+  $('main').innerHTML=h;
+  wireFrame();
+  applyView();
+}
+function applyView(){
+  const list=ordered(),shown=list.filter(matches);
+  const grid=$('grid');
+  if(grid){
+    list.forEach((s,i)=>{const c=grid.querySelector('[data-site="'+CSS.escape(s.site_id)+'"]');if(c){c.style.order=String(i);c.hidden=!matches(s);}});
+    if(DISPLAY==='cards')watchThumbs();
+  }
+  const th=$('tableHost');
+  if(th&&DISPLAY==='table'){th.innerHTML=tableHtml(shown);wireTable();}
+  const nm=$('noMatch');if(nm)nm.hidden=!(SITES.length&&!shown.length);
+  if(th)th.hidden=DISPLAY!=='table'||!shown.length;
+  const lm=$('lmeta');if(lm)lm.innerHTML=lmetaText(shown.length);
+  paintMenu();
+}
+function wireFrame(){
+  const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;MENU_OPEN=null;applyView();});
+  const dc=$('dispCards'),dt=$('dispTable');
+  const setD=(v)=>{if(DISPLAY===v)return;DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}
+    $('dispCards').setAttribute('aria-pressed',v==='cards'?'true':'false');$('dispTable').setAttribute('aria-pressed',v==='table'?'true':'false');
+    const g=$('grid');if(g)g.hidden=v!=='cards';MENU_OPEN=null;applyView();};
+  if(dc)dc.addEventListener('click',()=>setD('cards'));
+  if(dt)dt.addEventListener('click',()=>setD('table'));
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();});mountNeeds();});
+  const grid=$('grid');
+  if(grid){
+    grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));}});
+    sizeThumbs(grid);
+  }
+}
+function wireTable(){
+  document.querySelectorAll('#tableHost [data-sort]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.getAttribute('data-sort');
+    SORT=SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:(k==='published'||k==='updated'||k==='team')?-1:1};
+    applyView();const nb=document.querySelector('#tableHost [data-sort="'+k+'"]');if(nb)nb.focus();
+  }));
+  document.querySelectorAll('#tableHost tr[data-row]').forEach(tr=>{
+    const go=(e)=>{if(e.target.closest('button,a'))return;location.href=scoped('/presence.html',tr.getAttribute('data-row'));};
+    tr.addEventListener('click',go);
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();go(e);}});
+  });
+  document.querySelectorAll('#tableHost [data-menu]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();toggleMenu(b.getAttribute('data-menu'));}));
+}
+
+// ── the live pictures: on screen only, two at a time, once per visit ──
+const THUMBS=new Map();          // site id → {html, at}
+const THUMB_TTL=9*60*1000;       // the photo links inside expire after ten minutes
+const THUMB_MAX=2;
+let THUMB_Q=[],THUMB_BUSY=0;
+const IO=('IntersectionObserver' in window)?new IntersectionObserver((entries)=>{for(const e of entries){if(e.isIntersecting){IO.unobserve(e.target);queueThumb(e.target.getAttribute('data-thumb'));}}},{rootMargin:'240px 0px'}):null;
+function watchThumbs(){
+  document.querySelectorAll('#grid .thumb[data-thumb]').forEach(el=>{
+    if(el.dataset.watched||el.closest('.scard').hidden)return;
+    const s=SITES.find(x=>x.site_id===el.getAttribute('data-thumb'));if(!s||!s.thumb)return;
+    el.dataset.watched='1';
+    if(IO)IO.observe(el);else queueThumb(s.site_id);
+  });
+}
+function queueThumb(id){if(!id||THUMB_Q.includes(id))return;THUMB_Q.push(id);pumpThumbs();}
+function pumpThumbs(){while(THUMB_BUSY<THUMB_MAX&&THUMB_Q.length){const id=THUMB_Q.shift();THUMB_BUSY++;drawThumb(id).catch(()=>{}).finally(()=>{THUMB_BUSY--;pumpThumbs();});}}
+async function drawThumb(id){
+  let hit=THUMBS.get(id);
+  if(!hit||Date.now()-hit.at>THUMB_TTL){
+    const r=await api('/agency/sites/'+encodeURIComponent(id)+'/thumb');
+    if(!r.ok||!r.body||!r.body.data||typeof r.body.data.html!=='string')return;   // the card keeps its letter
+    hit={html:r.body.data.html,at:Date.now()};THUMBS.set(id,hit);
+  }
+  const box=document.querySelector('#grid [data-thumb="'+CSS.escape(id)+'"]');if(!box||box.querySelector('iframe'))return;
+  const s=SITES.find(x=>x.site_id===id);
+  const f=document.createElement('iframe');
+  // scripts stay off (no allow-scripts): the picture can't run code, count a visit or send a form
+  f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');
+  f.setAttribute('referrerpolicy','no-referrer');f.title='Picture of '+((s&&s.name)||'this site')+'’s home page';
+  f.addEventListener('load',()=>f.classList.add('on'),{once:true});
+  f.srcdoc=hit.html;box.appendChild(f);
+}
+// every picture is drawn at 1280px wide and scaled to its card
+let RO=null;
+function sizeThumbs(grid){
+  const fit=()=>{const t=grid.querySelector('.scard:not([hidden]) .thumb');if(t&&t.clientWidth)grid.style.setProperty('--k',String(t.clientWidth/1280));};
+  if(RO)RO.disconnect();
+  if('ResizeObserver' in window){RO=new ResizeObserver(fit);RO.observe(grid);}else window.addEventListener('resize',fit);
+  fit();
+}
+
+// ── the ⋯ menu: Pin · Duplicate site · View live site · Open record ──
+let MENU_OPEN=null,PIN_BUSY=false;
+function toggleMenu(id){MENU_OPEN=MENU_OPEN===id?null:id;paintMenu();const first=document.querySelector('#rowMenuHost [role="menuitem"]');if(first)first.focus();}
+function menuHtml(s){
+  const live=s.address&&s.state!=='not_live';
+  return `<div class="rowmenu" role="menu" data-menufor="${esc(s.site_id)}" aria-label="More for ${esc(s.name||'this site')}">
+    ${META.can_pin?`<button type="button" role="menuitem" data-pin="${esc(s.site_id)}">${s.pinned?'Unpin':'Pin to top'}</button>`:''}
+    ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
+    ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
+    ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
+  </div>`;
+}
+function paintMenu(){
+  const host=$('rowMenuHost');if(!host)return;
+  document.querySelectorAll('[data-menu]').forEach(b=>b.setAttribute('aria-expanded',b.getAttribute('data-menu')===MENU_OPEN&&isShown(b)?'true':'false'));
+  const s=MENU_OPEN?SITES.find(x=>x.site_id===MENU_OPEN):null;
+  const btn=s&&visibleMenuBtn(s.site_id);
+  if(!s||!btn){MENU_OPEN=null;host.innerHTML='';return;}
+  host.innerHTML=menuHtml(s);
+  const m=host.firstElementChild;const r=btn.getBoundingClientRect();
+  const below=r.bottom+4+m.offsetHeight<=window.innerHeight-8;
+  m.style.top=(below?r.bottom+4:Math.max(8,r.top-4-m.offsetHeight))+'px';
+  m.style.left=Math.max(8,Math.min(window.innerWidth-m.offsetWidth-8,r.right-m.offsetWidth))+'px';
+  m.addEventListener('click',(e)=>e.stopPropagation());
+  m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();const id=MENU_OPEN;MENU_OPEN=null;paintMenu();const b=visibleMenuBtn(id);if(b)b.focus();}});
+  const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
+  const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
+}
+const isShown=(el)=>!!(el&&el.offsetParent!==null);
+function visibleMenuBtn(id){return [...document.querySelectorAll('[data-menu="'+CSS.escape(id)+'"]')].find(isShown)||null;}
+document.addEventListener('click',()=>{if(MENU_OPEN){MENU_OPEN=null;paintMenu();}});
+window.addEventListener('scroll',()=>{if(MENU_OPEN)paintMenu();},{passive:true});
+window.addEventListener('resize',()=>{if(MENU_OPEN)paintMenu();});
+
+// Pin (item 45): yours alone, kept on the studio's own site; the cards move with CSS order
+async function togglePin(id){
+  if(PIN_BUSY)return;const s=SITES.find(x=>x.site_id===id);if(!s)return;
+  PIN_BUSY=true;const want=!s.pinned;
+  try{
+    const r=await apiSend('PUT','/agency/sites/'+encodeURIComponent(id)+'/pin',{pinned:want});
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.',true);return;}
+    const pins=(r.body.data&&Array.isArray(r.body.data.pins))?r.body.data.pins:[];
+    SITES.forEach(x=>{x.pinned=pins.includes(x.site_id);});
+    // pinned first in pin order, then the server's order for the rest
+    const rest=SITES.filter(x=>!x.pinned);SITES=pins.map(p=>SITES.find(x=>x.site_id===p)).filter(Boolean).concat(rest);
+    document.querySelectorAll('#grid .scard').forEach(c=>{const x=SITES.find(y=>y.site_id===c.getAttribute('data-site'));const t=c.querySelector('.thumb');let tag=t&&t.querySelector('.tpin');
+      if(x&&x.pinned&&t&&!tag){tag=document.createElement('span');tag.className='tpin';tag.textContent='Pinned';t.appendChild(tag);}else if(x&&!x.pinned&&tag)tag.remove();});
+    MENU_OPEN=null;applyView();toast(want?(s.name||'Site')+' is pinned to the top.':(s.name||'Site')+' is unpinned.');
+    const b=visibleMenuBtn(id);if(b)b.focus();
+  }catch(_){toast('That didn’t save.',true);}
+  finally{PIN_BUSY=false;}
+}
+
+// ── Duplicate site (item 45): set up the customer (POST /sales/customers, the Add a
+//    customer flow), then start their new site from this one. One submit handler. ──
+let DUP_SITE=null,DUP_BUSY=false;
+function openDuplicate(id){
+  const s=SITES.find(x=>x.site_id===id);if(!s)return;
+  DUP_SITE=id;$('dupHead').textContent='Duplicate '+(s.name||'this site');
+  $('dupFrom').textContent='A new customer’s site, started from '+(s.name||'this site')+'.';
+  ['dup-biz','dup-name','dup-email'].forEach(k=>{$(k).value='';});
+  $('dup-fields').style.display='';$('dup-done').style.display='none';$('dup-done').innerHTML='';
+  const b=$('dup-submit');b.disabled=false;b.textContent='Duplicate + invite';
+  $('dupDlg').showModal();setTimeout(()=>$('dup-biz').focus(),20);
+}
+$('dup-cancel').onclick=()=>$('dupDlg').close();
+$('dupForm').onsubmit=async(e)=>{
+  e.preventDefault();if(DUP_BUSY)return;
+  const src=SITES.find(x=>x.site_id===DUP_SITE);if(!src)return;
+  const business_name=$('dup-biz').value.trim(),name=$('dup-name').value.trim(),email=$('dup-email').value.trim();
+  if(!business_name){toast('Name the new business.',true);$('dup-biz').focus();return;}
+  if(!email){toast('Enter their email — that’s where the sign-in invitation goes.',true);$('dup-email').focus();return;}
+  DUP_BUSY=true;const btn=$('dup-submit');btn.disabled=true;btn.textContent='Setting up…';
+  let heading='',line='',ok=false;
+  try{
+    const r=await apiSend('POST','/sales/customers',{mode:'provision',name:name||undefined,business_name,email,edition:'presence'});
+    const d=(r.body&&r.body.data)||{};
+    if(!r.ok){toast((r.body&&r.body.message)||'We couldn’t set them up just now.',true);return;}
+    if(d.requested||d.already_exists){heading='Nothing was copied';line=esc(business_name)+' already has a Studio OS account, so their site isn’t new. Duplicate only starts a new site.';ok=true;}
+    else if(!d.site_id){heading='Set up, but nothing was copied';line='Their account is ready, but their new site didn’t come back to us. Open it from Customers and use a starter kit instead.';ok=true;}
+    else{
+      const k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:d.site_id});
+      ok=true;
+      if(k.ok){const a=(k.body&&k.body.data)||{};const got=[a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?a.applied.offerings+' service'+(a.applied.offerings===1?'':'s'):'',a.applied&&a.applied.faqs?a.applied.faqs+' FAQ'+(a.applied.faqs===1?'':'s'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
+        heading='Site duplicated';line=esc(business_name)+'’s site starts with '+esc(got.length?got.join(', '):'this site’s setup')+'. '+(d.invited===false?'The invitation email to '+esc(email)+' didn’t go out — share their sign-in page instead.':'Invitation sent to '+esc(email)+'.');}
+      else{heading='Set up, but nothing was copied';line=esc((k.body&&k.body.message)||'Copying the setup didn’t go through.')+' Their account is ready — try a starter kit from Home.';}
+    }
+  }catch(_){toast('We couldn’t set them up just now.',true);}
+  finally{DUP_BUSY=false;if(!ok){btn.disabled=false;btn.textContent='Duplicate + invite';}}
+  if(!ok)return;
+  $('dup-fields').style.display='none';
+  const done=$('dup-done');
+  done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+esc(heading)+'</h3><p>'+line+'</p></div><div class="row2"><button type="button" class="btn" id="dup-close">Done</button></div>';
+  done.style.display='';
+  const cl=$('dup-close');if(cl){cl.focus();cl.onclick=()=>$('dupDlg').close();}
+  load(true);
+};
+
+// ── Home's Needs you, laid over the status words (the same list, so the two never disagree) ──
+let NSEQ=0;
+async function mountNeeds(){
+  const gen=++NSEQ;
+  let r;try{r=await api('/agency/needs-you');}catch(_){return;}
+  if(gen!==NSEQ||!r.ok||!r.body||!r.body.data)return;   // best-effort: without it the cards keep the website's own state
+  NEXT=r.body.data.next_by_site||{};
+  for(const s of SITES){
+    const st=statusOf(s);
+    document.querySelectorAll('[data-pill="'+CSS.escape(s.site_id)+'"]').forEach(p=>{p.className='pill '+st.cls;p.textContent=st.w;if(st.why)p.title=st.why;else p.removeAttribute('title');});
+    document.querySelectorAll('[data-why="'+CSS.escape(s.site_id)+'"]').forEach(l=>{l.hidden=!st.why;l.innerHTML=st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:'';});
+  }
+  if(DISPLAY==='table')applyView();
+}
+
+function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Sites lists the websites a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your website →</a></p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){
+  $('main').innerHTML=`<div class="center"><h2>We couldn’t load your sites just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="btn">Try again</button></div>`;
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
+}
+
+// soft=true (↻, or after a change): a failure keeps the cards and says so
+async function load(soft){
+  const gen=++REQ_SEQ;
+  let r;try{r=await api('/agency/sites');}catch(_){r={ok:false,status:0,body:{}};}
+  if(gen!==REQ_SEQ)return;   // a newer load started; this answer is stale
+  if(!r.ok){
+    if(soft&&LOADED_AT){toast('Couldn’t refresh just now.',true);return;}
+    if(r.status===401){signedOut();return;}
+    if(r.status===403){notAgency();return;}
+    trouble();return;
+  }
+  SITES=Array.isArray(r.body.data)?r.body.data:[];
+  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,partial:!!r.body.partial};
+  LOADED_AT=Date.now();MENU_OPEN=null;
+  render();
+}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    mountNeeds();
+    await load();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>

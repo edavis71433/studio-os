@@ -11,19 +11,33 @@
    token NAMES are unchanged, so every page that aliases --dds-* picks the new
    look up without edits; the new tokens below (--dds-r*, --dds-info*,
    --dds-side-w) are additive. */
+/* ── Look refresh E, "Fresh & bold" (Nov 2026) ───────────────────────────────
+   Eric picked Direction E of five Figma directions (studio file "Studio OS —
+   look refresh directions"): a lavender canvas, white cards that float on a
+   soft shadow, bigger corners, pill buttons in a violet gradient, a floating
+   sidebar, gradient avatars and a gradient greeting on Home. Names are
+   unchanged again; the values move, and these are new: --dds-up (a raised
+   inner surface), --dds-grad (the greeting), --dds-grad-brand (the brand mark
+   and avatars), --dds-grad-btn + --dds-on-p (the one filled button and its
+   label), --dds-side-gap (the floating sidebar's inset). Every text pair is
+   AA (4.5:1) on bg, card and up, in both themes, and on every gradient stop. */
 :root{
-  --dds-bg:#f7f7f9; --dds-card:#fff; --dds-ink:#15141a; --dds-soft:#5c5a66; --dds-faint:#6f6d7a; --dds-line:#e6e6ec;
-  --dds-line-strong:#d2d2db;
-  --dds-p:#5b3fa0; --dds-p-deep:#2a1b4a; --dds-p-soft:#f1edfa;
-  --dds-good:#15713d; --dds-good-soft:#e6f5ec; --dds-warn:#975208; --dds-warn-soft:#fdf2e2; --dds-bad:#c43c3c; --dds-bad-soft:#fdeaea;
-  --dds-info:#2a6fb5; --dds-info-soft:#e8f1fb;
-  --dds-shadow:0 1px 2px rgba(21,20,26,.04);
-  --dds-shadow-pop:0 8px 28px rgba(21,20,26,.12),0 1px 2px rgba(21,20,26,.06);
+  --dds-bg:#f3f3f8; --dds-card:#fff; --dds-ink:#171522; --dds-soft:#55526a; --dds-faint:#69667d; --dds-line:#e7e6ef;
+  --dds-line-strong:#d6d4e2;
+  --dds-p:#6d3fd4; --dds-p-deep:#3d2185; --dds-p-soft:#f0ebfd;
+  --dds-good:#11744a; --dds-good-soft:#e2f4ea; --dds-warn:#94530a; --dds-warn-soft:#fcefdb; --dds-bad:#bf3535; --dds-bad-soft:#fdeaea;
+  --dds-info:#245fa0; --dds-info-soft:#e6effa;
+  --dds-shadow:0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10);
+  --dds-shadow-pop:0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06);
+  --dds-up:#f7f6fb;
+  --dds-grad:linear-gradient(135deg,#4a2c8c 0%,#6436c4 55%,#7d3fb8 100%);
+  --dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);
+  --dds-grad-btn:linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%); --dds-on-p:#fff;
   --dds-sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --dds-serif:'Fraunces',"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --dds-mono:'Geist Mono','SF Mono',ui-monospace,monospace;
-  --dds-r-sm:6px; --dds-r:8px; --dds-r-lg:10px; --dds-r-xl:14px;
-  --dds-shell-h:54px; --dds-side-w:232px;
+  --dds-r-sm:8px; --dds-r:12px; --dds-r-lg:16px; --dds-r-xl:20px;
+  --dds-shell-h:54px; --dds-side-w:232px; --dds-side-gap:12px;
 }
 /* ── Design tokens for spacing and motion (benchmark item 11, 2026-10) ────────
    The one sheet every page pulls its numbers from — docs/design/DESIGN-SYSTEM.md
@@ -36,8 +50,9 @@
      s2 8   between buttons, chips s6 24  between sections
      s3 12  inside a row           s7 32  page gutter
      s4 16  card padding           s8 40  bottom of the page
-   Corners — sm 6 inputs/small icons · r 8 buttons/menus · lg 10 cards/lists ·
-   xl 14 dialogs/toasts · 999px pill for chips and toggles.
+   Corners (look refresh E) — sm 8 inputs/small icons · r 12 menus/rows ·
+   lg 16 cards/lists · xl 20 dialogs/toasts/the greeting · 999px pill for
+   buttons, chips and toggles.
    Motion — three speeds, one curve: fast 120ms hover/toggles/chips · base
    200ms menus/toasts/panels · slow 320ms drawers/page sections; ease-out.
    Reduce motion → all three are 0ms: things appear, nothing slides. */
@@ -51,19 +66,23 @@
 @media (max-width:760.98px){:root{--dds-s4:12px; --dds-s5:16px; --dds-s7:16px}}
 @media (prefers-reduced-motion:reduce){:root{--dds-t-fast:0ms; --dds-t-base:0ms; --dds-t-slow:0ms}}
 @media (prefers-color-scheme:dark){:root{
-  --dds-bg:#141318; --dds-card:#1c1b22; --dds-ink:#ededf0; --dds-soft:#a6a4b0; --dds-faint:#8e8c99; --dds-line:#2a2932;
-  --dds-line-strong:#3a3944;
-  --dds-p:#b79ceb; --dds-p-deep:#cdb6f2; --dds-p-soft:#272136; --dds-good:#8bbf9f; --dds-good-soft:#1f2a24; --dds-warn:#d3ac6e; --dds-warn-soft:#2a2316; --dds-bad:#e08b83; --dds-bad-soft:#2e1f1f;
+  --dds-bg:#131120; --dds-card:#1d1a2e; --dds-ink:#edeaf7; --dds-soft:#b3aecb; --dds-faint:#9792b0; --dds-line:#2d2944;
+  --dds-line-strong:#403a5e;
+  --dds-p:#b79cf5; --dds-p-deep:#d7c8fb; --dds-p-soft:#2c2347; --dds-good:#7fd3a5; --dds-good-soft:#1c2f26; --dds-warn:#e3b06b; --dds-warn-soft:#2f2514; --dds-bad:#f09a92; --dds-bad-soft:#35201f;
   --dds-info:#8ab8e8; --dds-info-soft:#1c2633;
-  --dds-shadow:0 1px 2px rgba(0,0,0,.3);
-  --dds-shadow-pop:0 8px 28px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3);
+  --dds-shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -10px rgba(0,0,0,.55);
+  --dds-shadow-pop:0 20px 48px -12px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.4);
+  --dds-up:#262239;
+  --dds-grad:linear-gradient(135deg,#3c2378 0%,#56309f 55%,#6f3aa6 100%);
+  --dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);
+  --dds-grad-btn:linear-gradient(135deg,#c4b0fa 0%,#dcb4f0 100%); --dds-on-p:#171320;
 }}
 /* Four-block contract: every token the @media blocks flip must ALSO appear in
    both explicit-toggle blocks, or a user whose toggle disagrees with the OS
    scheme gets mixed palettes (crm.html aliases --dds-good/--dds-warn for its
    timeline accents, plus --dds-*-soft and --dds-shadow). */
-:root[data-theme="light"]{--dds-bg:#f7f7f9;--dds-card:#fff;--dds-ink:#15141a;--dds-soft:#5c5a66;--dds-faint:#6f6d7a;--dds-line:#e6e6ec;--dds-line-strong:#d2d2db;--dds-p:#5b3fa0;--dds-p-deep:#2a1b4a;--dds-p-soft:#f1edfa;--dds-bad:#c43c3c;--dds-bad-soft:#fdeaea;--dds-good:#15713d;--dds-good-soft:#e6f5ec;--dds-warn:#975208;--dds-warn-soft:#fdf2e2;--dds-info:#2a6fb5;--dds-info-soft:#e8f1fb;--dds-shadow:0 1px 2px rgba(21,20,26,.04);--dds-shadow-pop:0 8px 28px rgba(21,20,26,.12),0 1px 2px rgba(21,20,26,.06)}
-:root[data-theme="dark"]{--dds-bg:#141318;--dds-card:#1c1b22;--dds-ink:#ededf0;--dds-soft:#a6a4b0;--dds-faint:#8e8c99;--dds-line:#2a2932;--dds-line-strong:#3a3944;--dds-p:#b79ceb;--dds-p-deep:#cdb6f2;--dds-p-soft:#272136;--dds-bad:#e08b83;--dds-bad-soft:#2e1f1f;--dds-good:#8bbf9f;--dds-good-soft:#1f2a24;--dds-warn:#d3ac6e;--dds-warn-soft:#2a2316;--dds-info:#8ab8e8;--dds-info-soft:#1c2633;--dds-shadow:0 1px 2px rgba(0,0,0,.3);--dds-shadow-pop:0 8px 28px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3)}
+:root[data-theme="light"]{--dds-bg:#f3f3f8;--dds-card:#fff;--dds-ink:#171522;--dds-soft:#55526a;--dds-faint:#69667d;--dds-line:#e7e6ef;--dds-line-strong:#d6d4e2;--dds-p:#6d3fd4;--dds-p-deep:#3d2185;--dds-p-soft:#f0ebfd;--dds-bad:#bf3535;--dds-bad-soft:#fdeaea;--dds-good:#11744a;--dds-good-soft:#e2f4ea;--dds-warn:#94530a;--dds-warn-soft:#fcefdb;--dds-info:#245fa0;--dds-info-soft:#e6effa;--dds-shadow:0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10);--dds-shadow-pop:0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06);--dds-up:#f7f6fb;--dds-grad:linear-gradient(135deg,#4a2c8c 0%,#6436c4 55%,#7d3fb8 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%);--dds-on-p:#fff}
+:root[data-theme="dark"]{--dds-bg:#131120;--dds-card:#1d1a2e;--dds-ink:#edeaf7;--dds-soft:#b3aecb;--dds-faint:#9792b0;--dds-line:#2d2944;--dds-line-strong:#403a5e;--dds-p:#b79cf5;--dds-p-deep:#d7c8fb;--dds-p-soft:#2c2347;--dds-bad:#f09a92;--dds-bad-soft:#35201f;--dds-good:#7fd3a5;--dds-good-soft:#1c2f26;--dds-warn:#e3b06b;--dds-warn-soft:#2f2514;--dds-info:#8ab8e8;--dds-info-soft:#1c2633;--dds-shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -10px rgba(0,0,0,.55);--dds-shadow-pop:0 20px 48px -12px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.4);--dds-up:#262239;--dds-grad:linear-gradient(135deg,#3c2378 0%,#56309f 55%,#6f3aa6 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#c4b0fa 0%,#dcb4f0 100%);--dds-on-p:#171320}
 
 /* One keyboard-focus ring for every shelled page (audit E3: 17 pages had none). */
 html.dds-has-shell :focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
@@ -386,8 +405,8 @@ html.dds-embed .dds-waffle{display:none!important}
       later inline blocks. Covers client/help/projects/sharing/crm/inbox/pipeline/
       contacts/get-started/leads/schedule/agency/developer. */
 :root[data-theme="dark"]{
-  --good:#8bbf9f; --good-soft:#1f2a24; --warn:#d3ac6e; --warn-soft:#2a2316;
-  --faint:#948bad; --p-soft:#241d38; --bad:#e08b83; --danger:#e08b83;
+  --good:#7fd3a5; --good-soft:#1c2f26; --warn:#e3b06b; --warn-soft:#2f2514;
+  --faint:#9792b0; --p-soft:#2c2347; --bad:#f09a92; --danger:#f09a92;
 }
 
 /* 4) Minimum touch target (WCAG 2.5.8) on phones — one central floor kills the
@@ -590,3 +609,102 @@ html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:bl
    native select, so it draws its own arrow (batch C's .dds-bulk fix). */
 .dds-pick{-webkit-appearance:none;appearance:none;font:inherit;font-size:14px;color:var(--ink);background-color:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 30px 8px 10px;min-height:40px;max-width:100%;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}
 @media (max-width:767px){.dds-pick{min-height:44px}}
+
+/* ══ Look refresh E ("Fresh & bold", Nov 2026): the chrome ════════════════════
+   The tokens above already re-skin every page (canvas, cards, corners, the
+   card shadow). What follows is the frame itself: the brand mark and avatars
+   in the brand gradient, a sidebar that floats as a card, nav rows as soft
+   pills, a pill search, and the one filled button in the button gradient. */
+.dds-brand .mark{background:var(--dds-grad-brand);color:#fff;font-family:var(--dds-sans);font-weight:700;font-size:12.5px;border-radius:var(--dds-r-sm,8px)}
+#dds-ctxbar .av{background:var(--dds-grad-brand);color:#fff}
+.dds-search{border-radius:999px}
+.dds-ic .dot{background:var(--dds-grad-brand);box-shadow:0 0 0 2px var(--dds-card)}
+@media (min-width:761px){
+  /* the sidebar floats: a card inset by --dds-side-gap, and the page starts past it */
+  html.dds-side body{padding-left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2)}
+  html.dds-side #dds-shell{top:var(--dds-side-gap);left:var(--dds-side-gap);bottom:var(--dds-side-gap);
+    background:var(--dds-card);border:1px solid var(--dds-line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--dds-shadow);padding:14px 12px 12px;gap:3px}
+  html.dds-side .dds-brand{padding:2px 6px 12px;font-size:14.5px;font-weight:650;letter-spacing:-.01em}
+  html.dds-side .dds-brand .mark{width:26px;height:26px;font-size:13px}
+  html.dds-side #dds-waffle{top:14px;right:12px}
+  html.dds-side #dds-search{height:36px;background:var(--dds-bg);border-color:transparent;border-radius:999px;margin:0 0 10px;padding:0 12px}
+  html.dds-side #dds-search:hover{border-color:var(--dds-line-strong)}
+  html.dds-side .dds-nav{gap:2px}
+  html.dds-side .dds-nav .sec > .it{height:36px;border-radius:var(--dds-r,12px);font-size:13.5px;color:var(--dds-soft)}
+  html.dds-side .dds-nav .sec > .it:hover{background:color-mix(in srgb,var(--dds-p) 7%,transparent);color:var(--dds-ink)}
+  html.dds-side .dds-nav .sec.active > .it{background:var(--dds-p-soft);color:var(--dds-p);font-weight:600}
+  html.dds-side .dds-nav .sec .menu a{border-radius:var(--dds-r,12px)}
+  html.dds-side .dds-nav .sec .menu a.here{background:var(--dds-p-soft);color:var(--dds-p);font-weight:600}
+  html.dds-side .dds-nav .sec.active.open:has(.menu a.here) > .it{background:transparent;color:var(--dds-ink)}
+  html.dds-side #dds-ctxbar{background:var(--dds-up);border-color:transparent;border-radius:var(--dds-r,12px)}
+  html.dds-side #dds-ctxbar .acts a{border-radius:999px;background:var(--dds-card)}
+  html.dds-side .dds-right{border-top-color:var(--dds-line)}
+  html.dds-side .dds-ic{width:34px;height:34px;border-radius:999px}
+  html.dds-side .dds-pop{left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2 + 8px)}
+  html.dds-side .dds-drawer{top:calc(var(--dds-side-gap) + 44px);left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2 + 8px)}
+}
+/* phones and tablets: the bars keep their places; the bottom bar gets icons
+   over its words and the current one sits on a soft pill */
+@media (max-width:760.98px){
+  #dds-mbar{padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px -12px rgba(23,21,34,.18)}
+  #dds-mbar a,#dds-mbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px 4px 6px;font-size:11.5px;font-weight:600;color:var(--dds-soft);border-radius:var(--dds-r,12px)}
+  #dds-mbar .nic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  #dds-mbar a[aria-current="page"]{color:var(--dds-p);background:var(--dds-p-soft)}
+  #dds-mbar .mlbl{display:inline-flex;align-items:center;gap:4px}
+  #dds-mbar .mdot{background:var(--dds-grad-brand)}
+}
+/* the one filled button, wherever the shell draws one */
+.dds-empty .act .primary,.dds-tour-card button.next,.dds-req button.yes{background:var(--dds-grad-btn);border-color:transparent;color:var(--dds-on-p)}
+.dds-empty .act button,.dds-empty .act a,.dds-tour-card button,.dds-req button{border-radius:999px}
+.dds-palette .box{border-radius:var(--dds-r-xl,20px)}
+.dds-palette input{font-size:17px}
+.dds-pop,.dds-nav .sec .menu{border-radius:var(--dds-r-lg,16px);box-shadow:var(--dds-shadow-pop)}
+
+/* ══ Look refresh E: the shared page anatomy ══════════════════════════════════
+   The parts every studio page draws the same way (the list header, segmented
+   toggles, filter chips, the search box, tables, cards and buttons), styled
+   ONCE here so every page moves together. Scoped to html.dds-app (shell.js
+   stamps it on every shelled page but the website builder, which keeps its
+   own controls, and embedded frames) and written one step more specific than
+   the pages' own rules, so it wins whether a page loads shell.css before or
+   after its own <style>. */
+/* list headers: the page title is the one serif on the page, bigger */
+html.dds-app .lhead h1,html.dds-app .lhead #viewBtn{font-family:var(--dds-serif);font-weight:600;letter-spacing:-.015em}
+html.dds-app .lhead #viewBtn .car{font-family:var(--dds-sans);font-size:13px}
+/* the object tile is a small gradient dot at every width (no emoji tile) */
+html.dds-app .lhead .obj-ic{width:12px;height:12px;min-width:12px;border-radius:50%;background:var(--dds-grad-brand);font-size:0;color:transparent;box-shadow:none;margin-right:2px}
+@media (min-width:761px){
+  html.dds-app .lhead h1{font-size:30px;line-height:1.15}
+  html.dds-app .lhead #viewBtn{font-size:28px;line-height:1.15}
+}
+@media (max-width:760.98px){
+  html.dds-app .lhead h1{font-size:24px;line-height:1.2}
+  html.dds-app .lhead #viewBtn{font-size:19px;line-height:1.2}
+}
+/* segmented toggles (Table · Cards, List · Board · Table): a pill track, the
+   chosen one a raised white pill */
+html.dds-app .seg,html.dds-app .viewtog{display:inline-flex;gap:2px;padding:3px;border:0;border-radius:999px;background:color-mix(in srgb,var(--dds-ink) 6%,transparent);overflow:visible}
+html.dds-app .seg button,html.dds-app .viewtog .chip{border:0;border-radius:999px;background:transparent;color:var(--dds-soft);font-weight:500;box-shadow:none}
+html.dds-app .seg button[aria-pressed="true"],html.dds-app .seg button[aria-selected="true"],html.dds-app .seg button.on,html.dds-app .viewtog .chip.on{background:var(--dds-card);color:var(--dds-ink);font-weight:600;box-shadow:0 1px 2px rgba(23,21,34,.10),0 1px 1px rgba(23,21,34,.04)}
+/* filter chips: pills */
+html.dds-app .filters button{border-radius:999px;padding-left:14px;padding-right:14px}
+html.dds-app .filters button[aria-pressed="true"]{background:var(--dds-p-soft);color:var(--dds-p);border-color:transparent;font-weight:600}
+/* the search box: a pill */
+html.dds-app input.search,html.dds-app .search input{border-radius:999px;background:var(--dds-card)}
+/* tables and cards ride the card tokens; the table head sits on the raised surface */
+html.dds-app .tscroll{border-color:var(--dds-line)}
+html.dds-app .tscroll thead th{background:var(--dds-up)}
+/* the one filled button: the button gradient, a pill. Every page names it
+   .btn.primary or button.primary (agency's bare .btn is its own, see agency.html) */
+html.dds-app .btn.primary,html.dds-app button.primary,html.dds-app a.btn.primary{background:var(--dds-grad-btn);border-color:transparent;color:var(--dds-on-p);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--dds-p) 70%,transparent)}
+html.dds-app .btn.primary:hover,html.dds-app button.primary:hover{filter:brightness(1.06)}
+html.dds-app .btn.primary:disabled,html.dds-app button.primary:disabled{box-shadow:none}
+/* the rest of the buttons: pills too */
+html.dds-app .btn,html.dds-app a.btn,html.dds-app .rowact,html.dds-app .lbtn{border-radius:999px}
+/* dark: the chosen segment is the lighter, raised one */
+@media (prefers-color-scheme:dark){
+  html.dds-app:not([data-theme="light"]) .seg button[aria-pressed="true"],html.dds-app:not([data-theme="light"]) .seg button[aria-selected="true"],html.dds-app:not([data-theme="light"]) .seg button.on,html.dds-app:not([data-theme="light"]) .viewtog .chip.on{background:color-mix(in srgb,var(--dds-ink) 14%,var(--dds-card));box-shadow:none}
+}
+html.dds-app[data-theme="dark"] .seg button[aria-pressed="true"],html.dds-app[data-theme="dark"] .seg button[aria-selected="true"],html.dds-app[data-theme="dark"] .seg button.on,html.dds-app[data-theme="dark"] .viewtog .chip.on{background:color-mix(in srgb,var(--dds-ink) 14%,var(--dds-card));box-shadow:none}
+/* a page's own .sec (Pipeline's detail sections) must not space out the nav */
+.dds-nav .sec{margin:0}
