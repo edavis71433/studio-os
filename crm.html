@@ -168,6 +168,7 @@
   .uprow .due{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
   .uprow.overdue .due{color:var(--bad);font-weight:700}
   .uprow.overdue .ut{color:var(--bad)}
+  .uprow.today .due{color:var(--warn);font-weight:700}
   .uprow input[type=checkbox]{margin-top:var(--dds-s1,4px);accent-color:var(--p)}
   .uprow a{color:inherit;text-decoration:none}
   .uprow a:hover{color:var(--p)}
@@ -435,7 +436,9 @@ const agHref=(page,params)=>'/'+page+'?'+params+'&client=';
 // carryScopeGlobally can't rewrite it onto the customer's own site.
 const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client=':h;};
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
+// item 65: "today" / "yesterday" are local calendar days, not 24-hour spans (a call
+// at 10pm read "today" until 10pm the next day)
+function when(iso){if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const d=Math.round((Date.parse(recTodayYmd()+'T00:00:00Z')-Date.parse(recTodayYmd(t)+'T00:00:00Z'))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
 const fmtC=(c)=>{const v=(Number(c)||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});}   // batch C: one money format;
 const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)+'T12:00:00Z');if(isNaN(t))return'';return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 // ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
@@ -459,7 +462,10 @@ function moneyBuckets(list,todayYmd,pending){
   for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
   return b;
 }
-function recTodayYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// item 65: EVERY "today" on the record is this one (a moment in ms → its local day)
+function recTodayYmd(ms){const d=ms==null?new Date():new Date(ms);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// a picked day sent as local noon, so the server never files it under a neighbouring day
+function recDayAtNoon(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));return m?new Date(+m[1],+m[2]-1,+m[3],12).toISOString():undefined;}
 const invState=(v)=>moneyState(v,recTodayYmd());
 // still WAITING on the client (upcoming + overdue) — a processing payment is on its way, not owed
 const invWaiting=(list)=>(list||[]).filter(v=>{const s=invState(v);return s==='upcoming'||s==='overdue';});
@@ -554,7 +560,7 @@ let ACT_EARLY=null;
 async function loadRecord(){
   const rq=recordQuery();
   if(!rq){ picker(); return; }
-  { const q0=QP(); if(q0.get('client')&&!q0.get('deal')&&!q0.get('project')&&!q0.get('contact')&&!q0.get('client_id')) ACT_EARLY=api('/crm/activity?').catch(()=>null); }
+  { const q0=QP(); if(q0.get('client')&&!q0.get('deal')&&!q0.get('project')&&!q0.get('contact')&&!q0.get('client_id')) ACT_EARLY=api('/crm/activity?today='+recTodayYmd()).catch(()=>null); }
   const r=await api('/crm/record'+rq);
   if(r.status===403){ $('main').innerHTML=`<div class="center"><h2>This lives in your studio workspace.</h2><p class="muted">${esc((r.body&&r.body.message)||'Only your studio can open a client record.')}</p></div>`; return; }
   if(!r.ok){ trouble(); return; }
@@ -1270,7 +1276,7 @@ function wireBilling(host,d){
 // the small inline forms: invoice · deposit · retainer
 function billingForm(kind){
   const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=recTodayYmd();   // item 65: after 5pm in Los Angeles the UTC slice refused today as a due date
   if(kind==='retainer'){
     host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
   }else{
@@ -1406,7 +1412,7 @@ async function loadActivity(){
   const scopedCustomer=!!(REC.sections&&REC.sections.overview);   // the scope header alone resolves the identity server-side
   if(!q.length&&!scopedCustomer){ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};renderRail();return;}
   const early=ACT_EARLY; ACT_EARLY=null;   // item 45: the first load uses the read that started beside the record's
-  const r=(early&&scopedCustomer&&(await early))||await api('/crm/activity?'+q.join('&'));
+  const r=(early&&scopedCustomer&&(await early))||await api('/crm/activity?'+q.concat('today='+recTodayYmd()).join('&'));   // item 65: the band's overdue on the local day
   if(seq!==ACT_SEQ)return;
   const d=(r.ok&&r.body.data)||{};
   if(r.ok&&Array.isArray(d.items)){
@@ -1461,14 +1467,16 @@ async function loadActivityFallback(q,seq){
   // instead of racing loadPanels' parallel /sales/deals read
   await DEAL_READY.catch(()=>{});
   if(seq!==undefined&&seq!==ACT_SEQ)return;   // superseded while waiting on the deal read
-  const today=new Date().toISOString().slice(0,10); const upcoming=[];
+  // item 65: the local day; a to-do due today is "due today" all day, overdue only from tomorrow
+  const today=recTodayYmd(); const upcoming=[];
+  const isToday=(v)=>!!(v&&String(v).slice(0,10)===today);
   const dealHref=ids.deal?agHref('pipeline.html','deal='+encodeURIComponent(ids.deal)):null;
-  for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),href:dealHref});
+  for(const t of tasks)if(t.status==='open')upcoming.push({kind:'task',id:t.id,title:t.title||'To-do',due:t.due_date||null,overdue:!!(t.due_date&&String(t.due_date).slice(0,10)<today),dueToday:isToday(t.due_date),href:dealHref});
   const d=DEAL&&DEAL.deal;
-  if(d&&liveNextStep(d))upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),href:dealHref});
+  if(d&&liveNextStep(d))upcoming.push({kind:'next_step',id:null,title:'Next step — '+d.next_step,due:d.next_step_at||null,overdue:!!(d.next_step_at&&String(d.next_step_at).slice(0,10)<today),dueToday:isToday(d.next_step_at),href:dealHref});
   // item 2: only an invoice still WAITING on the client belongs here, and its
   // overdue flag is the one formula's word (a processing payment is on its way)
-  for(const iv of invWaiting((DEAL&&DEAL.invoices)||[]))upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:invState(iv)==='overdue',href:dealHref});
+  for(const iv of invWaiting((DEAL&&DEAL.invoices)||[]))upcoming.push({kind:'invoice',id:null,title:'Unpaid invoice'+(iv.title?' — '+iv.title:'')+(iv.amount_cents?' ('+fmtC(iv.amount_cents)+')':''),due:iv.due_date||null,overdue:invState(iv)==='overdue',dueToday:isToday(iv.due_date),href:dealHref});
   upcoming.sort((a,b)=>{if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:a.due>b.due?1:0;});
   ACT={items,upcoming,reply_to:md.reply_to||null,reply_support_to:md.reply_support_to||null,failed:false};
 }
@@ -1563,7 +1571,7 @@ function renderComposer(){
     const kinds=[['call',si('phone')+' Call'],['email',si('mail')+' Email'],['meeting',si('users')+' Meeting'],['note',si('pencil')+' Note']];
     html+=`<div class="kindchips" role="group" aria-label="What are you logging?">${kinds.map(k=>`<button data-lk="${k[0]}"${LOGKIND===k[0]?' class="on" aria-pressed="true"':' aria-pressed="false"'}>${k[1]}</button>`).join('')}</div>
       <textarea id="logBody" style="margin-top:9px" placeholder="What happened? (optional for calls/emails/meetings)" aria-label="Activity notes"></textarea>
-      <div class="composer-row"><label for="logDate" style="font-size:12.5px;color:var(--faint)">When</label><input type="date" id="logDate" max="${new Date().toISOString().slice(0,10)}" value="${new Date().toISOString().slice(0,10)}" aria-label="When it happened"><span class="spacer"></span><button class="primary" id="logGo">Log it</button></div>`;
+      <div class="composer-row"><label for="logDate" style="font-size:12.5px;color:var(--faint)">When</label><input type="date" id="logDate" max="${recTodayYmd()}" value="${recTodayYmd()}" aria-label="When it happened"><span class="spacer"></span><button class="primary" id="logGo">Log it</button></div>`;
   }else if(COMPOSER==='task'){
     html+=`<input type="text" id="taskTitle" placeholder="What needs doing?" aria-label="To-do title" maxlength="200" style="width:100%">
       <div class="composer-row"><label for="taskDue" style="font-size:12.5px;color:var(--faint)">Due</label><input type="date" id="taskDue" aria-label="Due date"><span class="spacer"></span><button class="primary" id="taskGo">Add to-do</button></div>`;
@@ -1614,7 +1622,7 @@ async function logActivity(){
   const body=($('logBody')&&$('logBody').value||'').trim();
   if(LOGKIND==='note'&&!body){toast('Write a short note.');return;}
   const btn=$('logGo'); btn.disabled=true;
-  const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',{kind:LOGKIND,body,occurred_at:($('logDate')&&$('logDate').value)||undefined});
+  const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',{kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value)});
   if(r.ok){if($('logBody'))$('logBody').value='';if($('logDate'))$('logDate').value='';toast('Logged.');await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
@@ -1646,13 +1654,18 @@ function renderFilters(){
 // ── Upcoming & Overdue band ──────────────────────────────────────────────────
 function renderUpcoming(){
   const host=$('upband'); if(!host)return;
-  const ups=ACT.upcoming||[];
+  // item 65: every row's day is judged here on the local day, whatever the server sent
+  // (a server before this change judged it on the UTC day, overdue from 4pm in Los Angeles).
+  // Each row on the band is still waiting (an open to-do, a live next step, an unpaid
+  // invoice), so a passed day is overdue and today's is "due today".
+  const today=recTodayYmd();
+  const ups=(ACT.upcoming||[]).map(u=>{const day=u&&u.due?String(u.due).slice(0,10):'';return{...u,overdue:!!(day&&day<today),dueToday:!!(day&&day===today)};});
   if(!ups.length){host.innerHTML='';return;}
   host.innerHTML=`<div class="upband"><div class="bt">Upcoming &amp; overdue</div>`+ups.map(u=>{
     const icon=u.kind==='invoice'?si('receipt'):u.kind==='next_step'?'→':'';
     const box=u.kind==='task'&&u.id?`<input type="checkbox" data-updone="${esc(u.id)}" aria-label="Mark done: ${esc(u.title)}">`:(icon?`<span aria-hidden="true">${icon}</span>`:'');
     const title=u.href?`<a href="${esc(pinHref(u.href))}">${esc(u.title)}</a>`:esc(u.title);
-    return `<div class="uprow ${u.overdue?'overdue':''}">${box}<span class="ut" style="min-width:0">${title}</span><span class="due">${u.overdue?'overdue · ':''}${esc(dueLabel(u.due))}</span></div>`;
+    return `<div class="uprow ${u.overdue?'overdue':u.dueToday?'today':''}">${box}<span class="ut" style="min-width:0">${title}</span><span class="due">${u.overdue?'overdue · '+esc(dueLabel(u.due)):u.dueToday?'due today':esc(dueLabel(u.due))}</span></div>`;
   }).join('')+`</div>`;
   host.querySelectorAll('[data-updone]').forEach(cb=>cb.addEventListener('change',async()=>{
     cb.disabled=true;

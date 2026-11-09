@@ -503,6 +503,25 @@ export function summarizePipeline(deals: unknown, nowIso: string, windowDays = W
   };
 }
 
+// ── item 65: "today" is the CALLER's calendar day ──
+/** A page sends its browser-local date as ?today=YYYY-MM-DD so an invoice due
+ *  today is never counted overdue on the studio's evening (the server's UTC day
+ *  turns over at 4pm in Los Angeles). Anything else (missing, malformed, not a
+ *  real day, or more than one day from the UTC day, which no time zone is) falls
+ *  back to the server's UTC day, so an older page reads exactly as before. */
+export function callerToday(raw: unknown, nowIso: string): string {
+  const utc = String(nowIso || '').slice(0, 10);
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return utc;
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  const d = new Date(t);
+  if (d.getUTCFullYear() !== +m[1] || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) return utc;
+  const u = Date.parse(utc + 'T00:00:00Z');
+  if (!Number.isFinite(u) || Math.abs(t - u) > 86400_000) return utc;
+  return s;
+}
+
 // ── pagination (bounded list queries — no unbounded scans) ──
 export const DEFAULT_PAGE = 25;
 export const MAX_PAGE = 100;
