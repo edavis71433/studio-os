@@ -4,7 +4,8 @@
 // lib/industry_vocab — a plumber gets "Services" + @type:Plumber; a salon gets
 // HairSalon; a restaurant gets Menu/@type:Restaurant. Same laws as every template:
 // snapshot in → FileMap out; no network, no clock (snapshot timestamps only), no
-// randomness, zero JavaScript emitted. Accessibility/SEO/performance are
+// randomness, no JavaScript beyond the first-party search, tag filter and Open now
+// line (item 99). Accessibility/SEO/performance are
 // properties of this file, never author responsibilities.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
@@ -110,6 +111,7 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .strip{background:var(--ink);color:#e7e7ef;font-size:.92rem}
 .strip .wrap{display:flex;gap:22px;flex-wrap:wrap;padding:12px 24px}
 .strip a{color:#c7c4f5}
+.open-now{font-weight:700}.open-now.yes{color:#8fd0a5}.open-now.no{color:#f0b9ad}
 .block{padding:calc(60px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--wash)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;margin-top:8px}
@@ -120,6 +122,7 @@ nav.primary a[aria-current="page"]{color:#fff;background:var(--accent)}
 .svc .pr{color:var(--accent-dark);font-weight:800;margin-top:10px}
 .svc img{width:100%;height:auto;border-radius:var(--radius,12px);margin-top:12px}
 .cat-h{margin-top:38px;padding-bottom:8px;border-bottom:2px solid var(--wash)}
+h2.cat-h{margin-bottom:0;font-size:1.12rem;letter-spacing:-.02em}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius,18px);padding:24px;box-shadow:0 4px 24px rgba(22,23,40,.05)}
 blockquote.t p{font-size:1.05rem}
@@ -163,6 +166,18 @@ ${SEARCH_CSS}`;
 const CRITICAL = `:root{--ink:#16171d;--soft:#636471;--paper:var(--bg,#ffffff);--accent:#4f46e5;--line:#eaeaf1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.4rem,6vw,4rem);line-height:1.08;letter-spacing:-.03em;font-weight:800}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 14px;text-decoration:none;color:#636471;font-weight:600}.hero{padding:88px 0 56px}`;
 
 // ═════════ partials ═════════
+
+const OPEN_NOW_JS = `(function(){var el=document.getElementById('open-now');var d=document.getElementById('hours-data');if(!el||!d)return;try{var cfg=JSON.parse(d.textContent);if(!cfg.days||!Object.keys(cfg.days).length)return;var now=new Date(new Date().toLocaleString('en-US',{timeZone:cfg.tz}));var ds=['sun','mon','tue','wed','thu','fri','sat'];var key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');var day=(cfg.ex&&cfg.ex[key])?cfg.ex[key]:cfg.days[ds[now.getDay()]];var mins=now.getHours()*60+now.getMinutes();var open=false;if(day&&!day.closed)for(var i=0;i<day.iv.length;i++){var a=day.iv[i][0],b=day.iv[i][1];if(b<=a)b+=1440;if(mins>=a&&mins<b)open=true;if(b>1440&&mins+1440>=a&&mins+1440<b)open=true}var tr=document.querySelector('table.hours tr[data-day="'+ds[now.getDay()]+'"]');if(tr)tr.setAttribute('data-today','');el.textContent=open?'Open now':'Closed now';el.className='open-now '+(open?'yes':'no')}catch(e){el.textContent=''}})();`;
+
+function hoursData(c: SnapshotContent): string {
+  const loc = loc0(c)!;
+  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+  const days: Record<string, { closed: boolean; iv: number[][] }> = {};
+  for (const d of loc.hours) days[d.day] = { closed: !!d.closed, iv: (d.intervals || []).map((i) => [toMin(i.open), toMin(i.close)]) };
+  const ex: Record<string, { closed: boolean; iv: number[][] }> = {};
+  for (const e of loc.holiday_exceptions || []) ex[e.date] = { closed: !!e.closed, iv: (e.intervals || []).map((i) => [toMin(i.open), toMin(i.close)]) };
+  return JSON.stringify({ tz: loc.timezone, days, ex });
+}
 
 function hoursTable(c: SnapshotContent, caption: string): string {
   const loc = loc0(c)!;
@@ -288,7 +303,9 @@ ${o.body}
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
-</body>
+${o.body.includes('id="open-now"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
+<script>${OPEN_NOW_JS}</script>
+` : ''}</body>
 </html>`;
 }
 
@@ -341,6 +358,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
   // The address strip belongs under the welcome section and moves with it; with
   // the welcome section removed it keeps its old place at the top.
   const strip = (loc0(c) || tel || maps) ? `<div class="strip"><div class="wrap">
+  <span id="open-now" class="open-now" aria-live="polite"></span>
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
@@ -372,7 +390,7 @@ ${strip}`,
 function offeringsBody(c: SnapshotContent, v: ReturnType<typeof vocabFor>): string {
   const cats = orderedCats(c);
   return `<section class="block wrap"><h1>${esc(v.offeringLabel)}</h1>
-${cats.map((cat) => `<div><h3 class="cat-h">${esc(cat)}</h3><div class="svc-grid">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
+${cats.map((cat) => `<div><h2 class="cat-h">${esc(cat)}</h2><div class="svc-grid">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.media ? img(o.media, '(max-width:640px) 100vw, 320px') : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
 </div></div>`).join('')}
 ${cats.length === 0 ? `<p>Our ${esc(v.offeringLabel.toLowerCase())} are being updated — check back soon.</p>` : ''}</section>`;
@@ -557,12 +575,13 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   }, extras);
 
   const letter = (i.business_name || 'B').trim()[0]?.toUpperCase() || 'B';
-  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#23635a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#f7f7f5" text-anchor="middle">${esc(letter)}</text></svg>`;
+  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#4f46e5" data-accent="fill"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#f7f7f5" text-anchor="middle">${esc(letter)}</text></svg>`;
 
-  const lastmod = snapshot.created_at.slice(0, 10);
+  // item 99: no page records when it last changed, so only a post (its own date) carries one
+  const lastmod = '';
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
   const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
-  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)
   {

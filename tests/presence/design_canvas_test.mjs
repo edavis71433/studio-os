@@ -629,7 +629,7 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   const inject = extractFn(html, 'dcInjectCanvas');
   ok(/addEventListener\("dblclick"/.test(inject) && /ipeStart\(/.test(inject) && /eeDoubleClickTarget\(el2\)/.test(inject), 'dcInjectCanvas wires dblclick → in-place edit on a stamped field; otherwise the section panel, or a message naming the tab that holds a core section\'s words (never a dead double-click)');
   ok(/DC_MODE !== "edit"/.test(inject), 'the dblclick wiring is Edit-mode-gated at EVENT time (Comments-mode chrome never edits)');
-  ok(/if \(IPE\) return;/.test(inject), 'the hover toolbar is suppressed while a session is active');
+  ok(/if \(IPE \|\| DC_MODE !== "edit"\) return;/.test(inject), 'the hover toolbar is suppressed while a session is active, and outside Edit mode (item 99)');
   const start = extractFn(html, 'ipeStart');
   ok(/plaintext-only/.test(start), 'plain fields request contenteditable=plaintext-only (rich formatting cannot enter)');
   ok(/setAttribute\("role", "textbox"\)/.test(start) && /aria-label/.test(start), 'a11y: the session element becomes an aria-labelled textbox');

@@ -172,6 +172,8 @@ export function searchBoxHtml(): string {
 }
 
 /** The /search/ page body — a search field, a live results region, and a <noscript>
+ *  (item 99: the label hides itself, since no template defines .sr-only, and the field
+ *  waits to be chosen instead of taking the keyboard as the page opens)
  *  browse map so the page is useful even with scripting off. The client script
  *  (searchClientScript) is appended by the caller. */
 export function searchPageBody(esc: Esc, opts: SearchIndexOpts): string {
@@ -180,7 +182,7 @@ export function searchPageBody(esc: Esc, opts: SearchIndexOpts): string {
   return `<section class="block wrap search-page">
 <h1>Search</h1>
 <form class="searchmain" role="search" action="/search/" method="get">
-  <label class="sr-only" for="search-q">Search this site</label>
+  <label class="sr-only" for="search-q" style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search this site</label>
   <input type="search" id="search-q" name="q" placeholder="Search this site…" autocomplete="off" maxlength="120">
 </form>
 <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
@@ -240,7 +242,6 @@ function load(){
 var seed=qparam();if(seed){inp.value=seed;}
 inp.addEventListener('input',function(){render(inp.value.trim());});
 render(inp.value.trim());load();
-inp.focus();
 })();`;
   return `<script>${js.replace(/<\//g, '<\\/')}</script>`;
 }

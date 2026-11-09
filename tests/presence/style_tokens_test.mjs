@@ -33,7 +33,7 @@ for (const slug of TEMPLATES) {
 {
   const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/restaurant-classic/1.0.0/fixture.json', ROOT)));
   const css = Object.entries(renderSnapshot(fx, SITE)).filter(([k]) => k.startsWith('assets/') && k.endsWith('.css')).map(([, v]) => String(v)).join('\n');
-  ok('[restaurant-classic] the menu’s category headings follow the body font', /\.menu-cat h3\{[^}]*font-family:var\(--font-body/.test(css));
+  ok('[restaurant-classic] the menu’s category headings follow the body font', /\.menu-cat h2\{[^}]*font-family:var\(--font-body/.test(css));
 }
 
 const failed = results.filter((r) => !r.p);

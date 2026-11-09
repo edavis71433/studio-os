@@ -10506,6 +10506,7 @@ async function dcSetMode(mode) {
     const msg = $("dcTwMsg"); if (msg) msg.textContent = "";
   }
   DC_MODE = mode; dcModeSync();
+  if (mode !== "edit" && DC_HIDEBAR) DC_HIDEBAR();   // item 99: on a phone the toolbar stays up after a tap, so Comments would inherit its Delete
   if (mode === "comments") {
     if (!CM_ON) await cmToggle();   // the G11 ON path — joins an in-flight load rather than no-opping
     if (DC_MODE !== "comments") { if (CM_ON) cmToggle(); }   // user left while threads loaded — run the OFF path
@@ -12716,7 +12717,7 @@ function dcInjectCanvas(doc, main, live) {
     return b;
   };
   const showBar = (el2) => {
-    if (IPE) return;   // G13 slice 2: the hover toolbar sleeps while a text session is active
+    if (IPE || DC_MODE !== "edit") return;   // G13 slice 2: the toolbar sleeps while a text session is active; item 99: and outside Edit mode, since Comments never edits
     clearTimeout(ds.hideT);
     if (ds.current && ds.current !== el2) ds.current.classList.remove("dc-hot");
     ds.current = el2; el2.classList.add("dc-hot");
@@ -12865,6 +12866,7 @@ function dcInjectCanvas(doc, main, live) {
   }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
+  DC_HIDEBAR = () => { try { hideBar(); } catch (_) {} };
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
   // dropdowns). The header/footer are global, so this edits the menu on every page.
   try {
@@ -12889,6 +12891,7 @@ function dcInjectCanvas(doc, main, live) {
 // carries data-gap = the BLOCKS_WORK index to insert before. The pointer-drag ghost
 // snaps to these (pdGaps reads them), and a click opens the picker AT that spot. ──
 let DC_SHOWBAR = null;
+let DC_HIDEBAR = null;   // item 99: leaving Edit mode puts away a toolbar a tap left up
 function dcBlockSections(main) {
   const out = [];
   Array.prototype.forEach.call(main.querySelectorAll(":scope > section, :scope > nav.block-toc"), (el2) => {
@@ -12965,7 +12968,7 @@ function dcBuildTree(main) {
   });
   const add = el("button", "dc-tree-addpage", "＋ Add a page"); add.type = "button";
   add.addEventListener("click", dcAddPage);
-  host.appendChild(add);
+  if (!CM_ON) host.appendChild(add);   // item 99: adding a page is editing, so Comments mode leaves it out
 }
 // One page row in the tree (Home or a custom page).
 function dcPageTreeRow(pg, cur) {
@@ -12984,7 +12987,7 @@ function dcPageTreeRow(pg, cur) {
   const acts = el("span", "dc-tree-acts");
   const m = el("button", null, "⋯"); m.type = "button"; m.title = pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page";
   m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
-  acts.appendChild(m); row.appendChild(acts);
+  acts.appendChild(m); if (!CM_ON) row.appendChild(acts);   // item 99: the page menu edits, so Comments mode leaves it out
   return row;
 }
 // The sections of the currently-open page, nested (indented) under its page row.
@@ -13022,14 +13025,14 @@ function dcTreeChildRow(colEl, bi, k, span) {
   const row = el("div", "dc-tree-row child");
   row.dataset.colof = String(bi); row.dataset.k = String(k);
   const dragSpec = { kind: "movecol", bi: bi, from: k, zone: "treecol", label: "Column " + (k + 1), icon: uiIcon("columns") };
-  row.appendChild(dcTreeGrab(dragSpec));   // touch drags start on the ⠿ handle; the row keeps pan-y
-  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = "Select this column on the page — drag to reorder the columns";
+  if (!CM_ON) row.appendChild(dcTreeGrab(dragSpec));   // touch drags start on the ⠿ handle; the row keeps pan-y. Item 99: no reordering in Comments mode
+  const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button"; mainBtn.title = CM_ON ? "Select this column on the page" : "Select this column on the page — drag to reorder the columns";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: uiIcon("columns") }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", "Column " + (k + 1)));
   txt.appendChild(el("span", "dc-tree-meta", "width " + (span || "?") + "/12"));
   mainBtn.appendChild(txt);
-  mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
+  if (!CM_ON) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
   mainBtn.addEventListener("click", () => {
     if (pdConsumeClick()) return;   // the click that follows a real drag
     try { colEl.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
@@ -13042,7 +13045,7 @@ function dcTreeChildRow(colEl, bi, k, span) {
   const set = el("button"); set.innerHTML = uiIcon("cog", 14); set.type = "button"; set.title = "Edit this column"; set.setAttribute("aria-label", "Edit column " + (k + 1));
   set.addEventListener("click", (e) => { e.stopPropagation(); eeEditBlock(bi); });
   acts.appendChild(set);
-  row.appendChild(acts);
+  if (!CM_ON) row.appendChild(acts);   // item 99: Comments mode offers no editing; the comment badge stays
   return row;
 }
 // Item 85: a live redraw swaps one section's element in place and leaves this list standing,
@@ -13068,15 +13071,15 @@ function dcTreeRow(el2, c) {
   // Touch drags start on the ⠿ handle (touch-action:none, like the canvas grip);
   // the row keeps pan-y so the tree scrolls, and drags from it are mouse-only.
   const dragSpec = isBlock ? { kind: "move", from: c.bi, zone: "tree", label: name, icon: icon } : null;
-  if (isBlock) row.appendChild(dcTreeGrab(dragSpec));
+  if (isBlock && !CM_ON) row.appendChild(dcTreeGrab(dragSpec));   // item 99: no reordering in Comments mode
   const mainBtn = el("button", "dc-tree-main"); mainBtn.type = "button";
-  mainBtn.title = isBlock ? "Select this on the page — drag to reorder your sections" : "Select this on the page";
+  mainBtn.title = isBlock && !CM_ON ? "Select this on the page — drag to reorder your sections" : "Select this on the page";
   mainBtn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: icon }));
   const txt = el("span", "dc-tree-txt");
   txt.appendChild(el("span", "dc-tree-name", name));
   txt.appendChild(el("span", "dc-tree-meta", meta));
   mainBtn.appendChild(txt);
-  if (isBlock) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
+  if (isBlock && !CM_ON) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
   mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(dcTreeEl(el2, c), row); });
   row.appendChild(mainBtn);
   // G11: per-section comment badge (count when open notes exist; quiet icon to
@@ -13110,7 +13113,7 @@ function dcTreeRow(el2, c) {
     acts.appendChild(mkA(uiIcon("cog", 14), "Edit this section", () => eeEditCore(c.view)));
     if (c.key) acts.appendChild(mkA(uiIcon("eyeoff", 14), "Hide this section", () => eeHideKey(c.key)));
   }
-  row.appendChild(acts);
+  if (!CM_ON) row.appendChild(acts);   // item 99: Comments mode offers no editing; the comment badge stays
   return row;
 }
 function dcTreeSelect(el2, row) {

@@ -8,7 +8,7 @@
 // 2px navy rule; tabular numerals on prices/stats; a dark-navy trust strip
 // carrying the contact details. Same engine, same laws as every template:
 // snapshot in → FileMap out; no network, no clock (snapshot timestamps only),
-// no randomness, zero JavaScript beyond the shared first-party search/tag
+// no randomness, zero JavaScript beyond the shared first-party search/tag and Open now (item 99)
 // scripts. Accessibility/SEO/performance are properties of this file, never
 // author responsibilities.
 import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
@@ -126,6 +126,7 @@ nav.primary a[aria-current="page"]{color:var(--accent);border-bottom-color:var(-
 .strip{background:var(--accent);color:#d9e1f0;font-size:.92rem;font-variant-numeric:tabular-nums}
 .strip .wrap{display:flex;gap:24px;flex-wrap:wrap;padding:12px 24px}
 .strip a{color:#b9cdea}
+.open-now{font-weight:700}.open-now.yes{color:#8fd0a5}.open-now.no{color:#f0b9ad}
 .block{padding:calc(60px * var(--spacing-scale,1)) 0}
 .block.alt{background:var(--wash)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:8px}
@@ -136,6 +137,7 @@ nav.primary a[aria-current="page"]{color:var(--accent);border-bottom-color:var(-
 .svc .pr{color:var(--steel-dark);font-weight:800;margin-top:10px;font-variant-numeric:tabular-nums}
 .svc img{width:100%;height:auto;border-radius:var(--radius,6px);margin-top:12px}
 .cat-h{margin-top:38px;border-left:3px solid var(--accent);padding-left:12px}
+h2.cat-h{margin-bottom:0;font-size:1.08rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--steel);border-bottom:2px solid var(--accent);border-radius:var(--radius,10px);padding:24px}
 blockquote.t p{font-size:1.02rem}
@@ -183,6 +185,18 @@ ${SEARCH_CSS}`;
 const CRITICAL = `:root{--ink:#1c2434;--soft:#4a556a;--paper:var(--bg,#ffffff);--accent:#1b2a4a;--steel:#4a6fa5;--line:#c9d5e6;--wash:#eef2f8}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.3px}h1{font-size:clamp(2.1rem,5vw,3.15rem);line-height:1.14;letter-spacing:-.015em;font-weight:800;color:var(--accent)}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--accent);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-top:4px solid var(--accent);border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:18px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4a556a;font-weight:600;border-bottom:2px solid transparent}.hero{padding:72px 0 60px}.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center}.hero-panel{background:var(--wash);border:1px solid var(--line);border-bottom:2px solid var(--accent);border-radius:var(--radius,10px);padding:26px 28px}@media (max-width:860px){.hero-grid{grid-template-columns:1fr;gap:28px}}`;
 
 // ═════════ partials ═════════
+
+const OPEN_NOW_JS = `(function(){var el=document.getElementById('open-now');var d=document.getElementById('hours-data');if(!el||!d)return;try{var cfg=JSON.parse(d.textContent);if(!cfg.days||!Object.keys(cfg.days).length)return;var now=new Date(new Date().toLocaleString('en-US',{timeZone:cfg.tz}));var ds=['sun','mon','tue','wed','thu','fri','sat'];var key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');var day=(cfg.ex&&cfg.ex[key])?cfg.ex[key]:cfg.days[ds[now.getDay()]];var mins=now.getHours()*60+now.getMinutes();var open=false;if(day&&!day.closed)for(var i=0;i<day.iv.length;i++){var a=day.iv[i][0],b=day.iv[i][1];if(b<=a)b+=1440;if(mins>=a&&mins<b)open=true;if(b>1440&&mins+1440>=a&&mins+1440<b)open=true}var tr=document.querySelector('table.hours tr[data-day="'+ds[now.getDay()]+'"]');if(tr)tr.setAttribute('data-today','');el.textContent=open?'Open now':'Closed now';el.className='open-now '+(open?'yes':'no')}catch(e){el.textContent=''}})();`;
+
+function hoursData(c: SnapshotContent): string {
+  const loc = loc0(c)!;
+  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+  const days: Record<string, { closed: boolean; iv: number[][] }> = {};
+  for (const d of loc.hours) days[d.day] = { closed: !!d.closed, iv: (d.intervals || []).map((i) => [toMin(i.open), toMin(i.close)]) };
+  const ex: Record<string, { closed: boolean; iv: number[][] }> = {};
+  for (const e of loc.holiday_exceptions || []) ex[e.date] = { closed: !!e.closed, iv: (e.intervals || []).map((i) => [toMin(i.open), toMin(i.close)]) };
+  return JSON.stringify({ tz: loc.timezone, days, ex });
+}
 
 function hoursTable(c: SnapshotContent, caption: string): string {
   const loc = loc0(c)!;
@@ -308,7 +322,9 @@ ${o.body}
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
-</body>
+${o.body.includes('id="open-now"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
+<script>${OPEN_NOW_JS}</script>
+` : ''}</body>
 </html>`;
 }
 
@@ -385,6 +401,7 @@ function homeBody(c: SnapshotContent, site: SiteConfig, v: ReturnType<typeof voc
   // The address strip belongs under the welcome section and moves with it; with
   // the welcome section removed it keeps its old place at the top.
   const strip = (loc0(c) || tel || maps || mail) ? `<div class="strip"><div class="wrap">
+  <span id="open-now" class="open-now" aria-live="polite"></span>
   ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}
   ${mail ? `<span>${mail}</span>` : ''}
@@ -417,7 +434,7 @@ ${strip}`,
 function offeringsBody(c: SnapshotContent, v: ReturnType<typeof vocabFor>): string {
   const cats = orderedCats(c);
   return `<section class="block wrap"><h1>${esc(v.offeringLabel)}</h1>
-${cats.map((cat) => `<div><h3 class="cat-h">${esc(cat)}</h3><div class="svc-grid">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
+${cats.map((cat) => `<div><h2 class="cat-h">${esc(cat)}</h2><div class="svc-grid">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
   <div class="svc"${prE('offering', o.id)}><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.media ? img(o.media, '(max-width:640px) 100vw, 320px') : ''}${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</div>`).join('')}
 </div></div>`).join('')}
 ${cats.length === 0 ? `<p>Our ${esc(v.offeringLabel.toLowerCase())} are being updated — check back soon.</p>` : ''}</section>`;
@@ -602,12 +619,13 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   }, extras);
 
   const letter = (i.business_name || 'B').trim()[0]?.toUpperCase() || 'B';
-  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1b2a4a"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle">${esc(letter)}</text></svg>`;
+  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1b2a4a" data-accent="fill"/><text x="32" y="44" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle">${esc(letter)}</text></svg>`;
 
-  const lastmod = snapshot.created_at.slice(0, 10);
+  // item 99: no page records when it last changed, so only a post (its own date) carries one
+  const lastmod = '';
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
   const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
-  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)
   {

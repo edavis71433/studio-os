@@ -169,7 +169,20 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
-  return injectCsp(injectAnalytics(injectDevLayer(t.render(snapshot, t.manifest, site), snapshot.dev_customization), counting ? site.siteId : undefined));
+  const drawn = tintFavicon(t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  return injectCsp(injectAnalytics(injectDevLayer(drawn, snapshot.dev_customization), counting ? site.siteId : undefined));
+}
+
+// Item 99: the favicon wears the accent the site chose (a palette, a brand kit or Developer
+// Mode), as the page's buttons and links do. Each template marks the part that carries it
+// with data-accent="fill" or "stroke"; with no accent chosen it keeps the template's own.
+// A template that keeps its own colours over the style layer (Slate) keeps its favicon too.
+export const FIXED_COLOR_TEMPLATES = new Set(['slate']);
+export function tintFavicon(fileMap: FileMap, accent: unknown, templateSlug: string): FileMap {
+  const svg = fileMap['favicon.svg'];
+  if (typeof svg !== 'string' || typeof accent !== 'string' || !/^#[0-9a-fA-F]{3,8}$/.test(accent) || FIXED_COLOR_TEMPLATES.has(templateSlug)) return fileMap;
+  const tinted = svg.replace(/<[^>]*\bdata-accent="(fill|stroke)"[^>]*>/g, (tag, attr) => tag.replace(new RegExp(`\\b${attr}="#[0-9a-fA-F]{3,8}"`), `${attr}="${accent}"`));
+  return tinted === svg ? fileMap : { ...fileMap, 'favicon.svg': tinted };
 }
 
 // ── Published-site Content-Security-Policy (defense-in-depth) ────────────────

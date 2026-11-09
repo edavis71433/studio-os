@@ -2288,3 +2288,43 @@ test.describe('G13 in-place canvas text editor', () => {
     expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[0].subtitle).toBe('Written since');
   });
 });
+
+// List item 99 (Nov 8 2026): Comments mode is for notes. Its canvas toolbar used to offer Move,
+// Duplicate, Cut, Hide and Delete (and Delete worked), and the Contents list kept its move and
+// remove buttons, its drag handles and Add a page beside the comment badges. On a phone a
+// toolbar a tap had left up carried into Comments mode.
+test.describe('Comments mode offers no editing (item 99)', () => {
+  test('the section toolbar and the Contents list edit only in Edit mode', async ({ page }) => {
+    const { frame, puts } = await mountCanvas(page);
+    const first = frame.locator('section.block-richtext');
+    // a phone brings the toolbar with a tap, a mouse with a hover
+    const phone = (page.viewportSize()?.width || 1200) < 768;
+    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover());
+    await point(first);
+    await expect(frame.locator('#dds-dc-bar button', { hasText: 'Delete' })).toBeVisible();   // Edit mode: the toolbar is there
+    await page.locator('#dcModeSeg [data-dcmode="comments"]').click();
+    await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(frame.locator('#dds-dc-bar.on')).toHaveCount(0);                              // the toolbar went away with Edit mode
+    if (!phone) {   // on a phone the Contents sheet covers the canvas in Comments mode
+      await point(frame.locator('section.block-cta'));
+      await point(first);
+      await page.waitForTimeout(300);
+      await expect(frame.locator('#dds-dc-bar.on')).toHaveCount(0);                            // and doesn't come back on a section
+    }
+    await expect(page.locator('#designTreeList .dc-tree-row').first()).toBeAttached();
+    await expect(page.locator('#designTreeList .dc-tree-acts')).toHaveCount(0);                // no move, settings or remove buttons
+    await expect(page.locator('#designTreeList .dc-tree-grab')).toHaveCount(0);                // no drag handles
+    await expect(page.locator('#designTreeList .dc-tree-addpage')).toHaveCount(0);             // no Add a page
+    expect(puts.length).toBe(0);
+    // back in Edit mode, all of it returns
+    if (phone) await page.getByRole('button', { name: /Collapse/ }).click();
+    await page.locator('#dcModeSeg [data-dcmode="edit"]').click();
+    await expect(page.locator('#dcModeSeg [data-dcmode="edit"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#designTreeList .dc-tree-acts').first()).toBeAttached();
+    await expect(page.locator('#designTreeList .dc-tree-grab').first()).toBeAttached();
+    await expect(page.locator('#designTreeList .dc-tree-addpage')).toBeAttached();
+    await point(frame.locator('section.block-cta'));
+    await point(first);
+    await expect(frame.locator('#dds-dc-bar button', { hasText: 'Delete' })).toBeVisible();
+  });
+});
