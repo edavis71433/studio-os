@@ -1246,6 +1246,10 @@ async function boot(){
   }catch(_){trouble();}
 }
 boot();
+// bold redesign part 1: something made from + Create (a deal, a call, an invoice,
+// a to-do) shows here without a reload — the numbers, the pipeline strip, My tasks
+// and Needs you read again
+document.addEventListener('dds:created',()=>{if(!ME)return;mountStudio();mountNeeds(true);});
 
 
 // ── the Ask box (from today.html): the answer, then the sources it drew on ──

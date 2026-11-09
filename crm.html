@@ -1306,6 +1306,8 @@ function renderFilesTab(host){
 // the newest request's outcome (server path OR fallback) is allowed to touch
 // ACT and render.
 let ACT_SEQ=0;
+// bold redesign part 1: a call, to-do or invoice made from + Create lands on this timeline
+document.addEventListener('dds:created',()=>{if(!REC||!REC.identity)return;Promise.resolve().then(loadActivity).catch(()=>{/* the timeline keeps its last good read */});});
 async function loadActivity(){
   const seq=++ACT_SEQ;
   const ids=idParams(); const q=[];

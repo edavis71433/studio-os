@@ -175,7 +175,12 @@ test.describe('App shell', () => {
       const mbar = page.locator('#dds-mbar');
       await expect(mbar.locator('a[href^="/agency"]')).toContainText('Home');
       await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
-      await mbar.locator('#dds-mbar-menu').click();
+      // bold redesign part 1: Home · Inbox · + · Pipeline · Customers; every other place is in the launcher
+      await expect(mbar.locator(':scope > a, :scope > button')).toHaveCount(5);
+      await expect(mbar.locator('#dds-mbar-create')).toHaveAttribute('aria-label', 'Create');
+      await expect(mbar.locator('a[href^="/pipeline"]')).toContainText('Pipeline');
+      await expect(mbar.locator('a[href^="/customers"]')).toContainText('Customers');
+      await page.locator('#dds-waffle').click();
       await expect(page.locator('#dds-drawer .g a')).toHaveText(['Home', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
     }
     // a hidden child page still lights its owner: Analytics lives under Home, Visual Studio under Files
@@ -542,21 +547,26 @@ test.describe('Context bar (slice 7)', () => {
     await expect(waffle).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('mobile: the bottom bar is unchanged and the waffle panel is the mobile nav', async ({ page }, testInfo) => {
+  test('mobile: the bottom bar is Home · Inbox · + · Pipeline · Customers, and the waffle panel is the mobile nav', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'phone-only behaviour');
     await installApp(page);
     await page.goto('/today.html');
-    // the bottom bar: Home · Inbox (badge) · Menu — exactly as before slice 7
+    // bold redesign part 1: Pipeline and Customers no longer hide behind Menu
     const mbar = page.locator('#dds-mbar');
     await expect(mbar).toBeVisible();
     await expect(mbar.locator('a[href^="/today"]')).toContainText('Home');
     await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
     await expect(mbar.locator('.mdot')).toHaveText('2');       // attention badge intact
+    await expect(mbar.locator('#dds-mbar-create')).toBeVisible();
+    await expect(mbar.locator('a[href^="/pipeline"]')).toContainText('Pipeline');
+    await expect(mbar.locator('a[href^="/customers"]')).toContainText('Customers');
+    await expect(mbar.locator('#dds-mbar-menu')).toHaveCount(0);
     // the flat items hide; the waffle stays in the top bar
     await expect(page.locator('.dds-nav')).toBeHidden();
     await expect(page.locator('#dds-waffle')).toBeVisible();
-    // Menu opens the SAME full-capability panel the burger sheet used to hold
-    await mbar.locator('#dds-mbar-menu').click();
+    // the waffle opens the SAME full-capability panel the burger sheet used to hold
+    const opener = page.locator('#dds-waffle');
+    await opener.click();
     const panel = page.locator('#dds-drawer');
     await expect(panel).toBeVisible();
     for (const label of ['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']) {
@@ -566,16 +576,30 @@ test.describe('Context bar (slice 7)', () => {
     // Escape closes the sheet and hands focus back to the control that opened it
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
-    await expect(mbar.locator('#dds-mbar-menu')).toBeFocused();
-    await expect(mbar.locator('#dds-mbar-menu')).toHaveAttribute('aria-expanded', 'false');
-    // Menu toggles it open and closed again (aria-expanded tracks)
-    await mbar.locator('#dds-mbar-menu').click();
+    await expect(opener).toBeFocused();
+    await expect(opener).toHaveAttribute('aria-expanded', 'false');
+    // it toggles open and closed again (aria-expanded tracks)
+    await opener.click();
     await expect(panel).toBeVisible();
-    await mbar.locator('#dds-mbar-menu').click();
+    await opener.click();
     await expect(panel).toBeHidden();
-    // the waffle opens the same panel too
-    await page.locator('#dds-waffle').click();
+  });
+
+  test('mobile: inside a client the bar keeps its Menu, and Menu opens the client’s list', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'phone-only behaviour');
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    const mbar = page.locator('#dds-mbar');
+    await expect(mbar.locator('#dds-mbar-create')).toHaveCount(0);   // + Create is the studio's own book, never inside a client
+    const menu = mbar.locator('#dds-mbar-menu');
+    await menu.click();
+    const panel = page.locator('#dds-drawer');
     await expect(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(menu).toBeFocused();
+    await expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
@@ -593,9 +617,12 @@ test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@to
   for (const opener of ['#dds-mbar-menu', '#dds-waffle']) {
     test(`mobile: the drawer opened by ${opener} navigates when an item is tapped`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== 'mobile', 'touch + the phone sheet');
-      await installApp(page);
+      // the bar's Menu lives where + Create doesn't (inside a client); an owner's drawer opens from the waffle
+      const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      if (opener === '#dds-mbar-menu') await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+      else await installApp(page);
       await installIosFocusSemantics(page);
-      await page.goto('/today.html');
+      await page.goto(opener === '#dds-mbar-menu' ? `/today.html?client=${CLIENT}` : '/today.html');
       const panel = page.locator('#dds-drawer');
       await page.locator(opener).tap();
       await expect(panel).toBeVisible();
@@ -614,12 +641,12 @@ test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@to
     await installIosFocusSemantics(page);
     await page.goto('/today.html');
     const panel = page.locator('#dds-drawer');
-    await page.locator('#dds-mbar-menu').tap();
+    await page.locator('#dds-waffle').tap();
     await expect(panel).toBeVisible();
     // the exact iOS moment: focus leaves with relatedTarget === null
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await expect(panel).toBeVisible();
-    await expect(page.locator('#dds-mbar-menu')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#dds-waffle')).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('mobile: the drawer’s LAST row clears the bottom bar and is tappable', async ({ page }, testInfo) => {
@@ -634,7 +661,7 @@ test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@to
     await page.locator('.dds-hint').getByRole('button', { name: 'Got it' }).click();
     await expect(page.locator('.dds-hint')).toHaveCount(0);   // it fades for 200ms before it goes
     const panel = page.locator('#dds-drawer');
-    await page.locator('#dds-mbar-menu').tap();
+    await page.locator('#dds-waffle').tap();
     await expect(panel).toBeVisible();
     // this nav is longer than the sheet — the last row is only reachable by
     // scrolling, which is where the bottom bar used to sit on top of it

@@ -50,7 +50,7 @@ test.describe('Wave 2 bets', () => {
     const sheet = page.locator('.dds-keys');
     await expect(sheet).toHaveClass(/\bopen\b/);
     await expect(sheet).toContainText('Keyboard shortcuts');
-    await expect(sheet.locator('kbd')).toHaveText([/^(⌘K|Ctrl K)$/, '/', 'n', '?', 'Esc']);   // the first row follows the host platform (⌘K on a Mac, Ctrl K elsewhere)
+    await expect(sheet.locator('kbd')).toHaveText([/^(⌘K|Ctrl K)$/, '/', 'n', 'c', '?', 'Esc']);   // the first row follows the host platform (⌘K on a Mac, Ctrl K elsewhere); c opens + Create (bold redesign, part 1)
     await expect(sheet).not.toContainText('In the Inbox');                           // the Inbox keys list only there
     await page.keyboard.press('Escape');
     await expect(sheet).not.toHaveClass(/\bopen\b/);

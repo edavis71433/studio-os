@@ -1663,6 +1663,8 @@ document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.
 // the skeleton + error surfaces are for hard loads only (the leads.html
 // contract). NOTE: load must always be WRAPPED when passed as a handler —
 // a click event in the first slot would become its soft flag.
+// bold redesign part 1: a deal made from + Create shows on the list or board at once
+document.addEventListener('dds:created',(e)=>{if(e.detail&&(e.detail.kind==='deal'||e.detail.kind==='invoice'))load(true);});
 async function load(soft){
   const gen=++REQ_SEQ;   // request-generation guard: only the NEWEST read may paint
   renderSummary(gen);    // refresh the numbers whenever the pipeline reloads (add/move/convert)

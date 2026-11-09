@@ -531,7 +531,12 @@
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     dot: '<circle cx="12" cy="12" r="3"/>',
-    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>'
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    phone: '<path d="M5 4h3.5l1.8 4.6-2.3 1.4a11 11 0 0 0 5 5l1.4-2.3L18 14.5V18a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+    receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    send: '<path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
@@ -598,6 +603,8 @@
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
       brandHtml +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
+      // bold redesign part 1: + Create from anywhere (studio level only; see canCreate)
+      (canCreate() ? '<button type="button" class="dds-create" id="dds-create" data-dds-create aria-haspopup="menu" aria-expanded="false">' + icon('plus') + '<span>Create</span></button>' : '') +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
@@ -655,6 +662,12 @@
       if (!s.utility && !firstPrimary && vis.length) firstPrimary = vis[0];
       vis.forEach(function (i) { if (!inboxItem && (i.key === 'inbox' || i.key === 'messages')) inboxItem = i; });
     });
+    // Bold redesign part 1: where + Create is yours (studio level), the bar is
+    // Home · Inbox · + · Pipeline · Customers — Pipeline and Customers no longer
+    // hide behind Menu (the top bar's launcher keeps every other place).
+    var pipeItem = null, custItem = null;
+    (nav || []).forEach(function (s) { visibleItems(s).forEach(function (i) { if (!pipeItem && i.key === 'pipeline') pipeItem = i; if (!custItem && i.key === 'customers') custItem = i; }); });
+    var five = !isReviewer && canCreate() && pipeItem && custItem;
     var home = isReviewer ? { href: '/client.html', label: 'Updates' }
       : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
       : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
@@ -662,6 +675,20 @@
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)
+    var curSec = function (href, key) { var on = normalizePath(href) === herePath || activeSectionKey(nav, activeKey) === key; return on ? ' aria-current="page"' : ''; };
+    if (five) {
+      bar.classList.add('five');
+      bar.innerHTML =
+        '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon('home') + '<span class="mlbl">' + esc(home.label) + '</span></a>' +
+        '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' +
+        '<button type="button" id="dds-mbar-create" class="mcreate" data-dds-create aria-haspopup="menu" aria-expanded="false" aria-label="Create">' + icon('plus') + '</button>' +
+        '<a href="' + esc(withScope(pipeItem.href)) + '"' + curSec(pipeItem.href, 'pipeline') + '>' + icon('pipeline') + '<span class="mlbl">' + esc(pipeItem.label) + '</span></a>' +
+        '<a href="' + esc(withScope(custItem.href)) + '"' + curSec(custItem.href, 'customers') + '>' + icon('customers') + '<span class="mlbl">' + esc(custItem.label) + '</span></a>';
+      document.body.appendChild(bar);
+      var mc = document.getElementById('dds-mbar-create');
+      if (mc) mc.addEventListener('click', function (e) { e.stopPropagation(); openCreateMenu(mc); });
+      return;
+    }
     bar.innerHTML =
       '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>' +
       (inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '') +
@@ -677,6 +704,8 @@
 
   var docWired = false;   // wire() may run again on a re-render — document-level listeners register ONCE
   function wire(nav) {
+    var cb = root.querySelector('#dds-create');
+    if (cb) cb.addEventListener('click', function (e) { e.stopPropagation(); openCreateMenu(cb); });
     // section dropdowns — click-invoked (never hover), slice-2 popup contract:
     // a keyboard invocation focuses the first item (pointer clicks leave focus
     // on the trigger — menu-button pattern), arrows move, Escape closes back to
@@ -796,7 +825,7 @@
   // Opening ANY of them closes all the others — never two at once. (The ⌘K
   // palette is a modal overlay above them; it closes them on open instead.)
   function closeAllLayers() {
-    closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
+    closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts(); closeCreateMenu(false);
   }
 
   // ── command palette ──
@@ -1297,7 +1326,7 @@
       keys.addEventListener('click', function (e) { e.stopPropagation(); });
       keys.querySelector('#dds-keys-close').addEventListener('click', closeShortcuts);
     }
-    var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button'], ['?', 'These shortcuts'], ['Esc', 'Close whatever is open']];
+    var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button']].concat(canCreate() ? [['c', 'Create — a call, a deal, an invoice…']] : []).concat([['?', 'These shortcuts'], ['Esc', 'Close whatever is open']]);
     var html = rows.map(keyRow).join('');
     if (normalizePath(location.pathname) === '/inbox') html += '<div class="grp">In the Inbox</div>' + INBOX_KEYS.map(keyRow).join('');
     keys.querySelector('.body').innerHTML = html;
@@ -1310,6 +1339,10 @@
     if (typingIn(e.target)) return;
     if (e.key === '/') { if (modalOpen()) return; e.preventDefault(); openPalette(); }
     else if (e.key === '?') { if (modalOpen()) return; e.preventDefault(); toggleShortcuts(); }
+    else if (e.key === 'c' && !e.shiftKey && canCreate()) {
+      if (modalOpen() || crLayer) return;
+      e.preventDefault(); openCreateMenu(document.getElementById('dds-create') || document.getElementById('dds-mbar-create'));
+    }
     else if (e.key === 'n' && !e.shiftKey) {
       if (modalOpen()) return;
       var t = findNewAction();
@@ -1874,6 +1907,399 @@
   window.ddsLacks = function (need) {
     return (' ' + (document.documentElement.getAttribute('data-dds-lacks') || '') + ' ').indexOf(' ' + need + ' ') >= 0;
   };
+
+  // ── Bold redesign, part 1: + Create from anywhere ────────────────────────────
+  // One button (the sidebar's + Create on a computer, the big + in the phone bar)
+  // opens the everyday things to make. Log a call, New deal, Send an invoice and
+  // Add a to-do open in a drawer beside the page — no page change, and you pick
+  // who INSIDE the form, so you never open a record first. Send a proposal, Add a
+  // customer and Send an update open their own screens. Everything here is the
+  // studio's own sales book, so the button only shows at studio level (never
+  // drilled into a client, never for a client) and its reads and writes go out
+  // with no client scope. The routes are the ones the record and Pipeline use:
+  // POST /sales/deals, /sales/deals/:id/activity, /tasks and /invoice.
+  var CREATE_ITEMS = [
+    { k: 'call', key: 'c', label: 'Log a call', sub: 'Pick who, say how it went', icon: 'phone' },
+    { k: 'deal', key: 'd', label: 'New deal', sub: 'Name, value and who — lands on the board', icon: 'pipeline' },
+    { k: 'invoice', key: 'i', label: 'Send an invoice', sub: 'Who, what for, how much — with a pay link', icon: 'receipt' },
+    { k: 'proposal', key: 'p', label: 'Send a proposal', sub: 'From your services, signed online', icon: 'files' },
+    { k: 'customer', key: 'u', label: 'Add a customer', sub: 'Their workspace, or just their email', icon: 'customers' },
+    { k: 'todo', key: 't', label: 'Add a to-do', sub: 'For you, with a date', icon: 'check' },
+    { k: 'update', key: 's', label: 'Send an update', sub: 'One email to a list of people', icon: 'send' }
+  ];
+  var CR_STAGE = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
+  var crMenu = null, crLayer = null, crOpener = null, crDeals = null, crPeople = {};
+  function canCreate() {
+    if (!CTX || isReviewerCtx()) return false;
+    if (CTX.scope && (CTX.scope.site_id || CTX.scope.name)) return false;
+    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline'; });
+  }
+  // studio-level calls: the shell's own headers, and NO client scope
+  function capi(path, method, body) {
+    var init = { method: method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN } };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    return fetch(FN + path, init)
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
+      .catch(function () { return { ok: false, status: 0, body: {} }; });
+  }
+  function crMoney(c) { var v = (Number(c) || 0) / 100; return '$' + v.toLocaleString('en-US', Number.isInteger(v) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function crCents(s) { var n = Number(String(s || '').replace(/[$,\s]/g, '')); return isFinite(n) && n > 0 ? Math.round(n * 100) : 0; }
+  function crInitials(s) { return String(s || '?').trim().split(/\s+/).filter(function (w) { return /[\p{L}\p{N}]/u.test(w); }).slice(0, 2).map(function (w) { return Array.from(w)[0].toUpperCase(); }).join('') || '?'; }
+  function crYmd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function crDay(which) {
+    var d = new Date(); d.setHours(12, 0, 0, 0);
+    if (which === 'tomorrow') d.setDate(d.getDate() + 1);
+    else if (which === 'friday') { var add = (5 - d.getDay() + 7) % 7; d.setDate(d.getDate() + (add || 7)); }
+    else if (which === 'nextweek') { var toMon = (8 - d.getDay()) % 7; d.setDate(d.getDate() + (toMon || 7)); }
+    else if (/^\+\d+$/.test(which)) d.setDate(d.getDate() + Number(which.slice(1)));
+    return crYmd(d);
+  }
+  function crShort(ymd) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || ''); if (!m) return ''; return new Date(+m[1], +m[2] - 1, +m[3], 12).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+  function crToast(m, bad, action) { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok', action); }
+  function crDone(kind, detail) { try { document.dispatchEvent(new CustomEvent('dds:created', { detail: Object.assign({ kind: kind }, detail || {}) })); } catch (_) { /* */ } }
+
+  // the deals the pickers search: the newest 100 (open first), with their people
+  function crLoadDeals() {
+    if (crDeals) return Promise.resolve(crDeals);
+    return capi('/sales/deals?limit=100').then(function (r) {
+      var list = (r.ok && r.body && Array.isArray(r.body.data)) ? r.body.data : [];
+      var open = list.filter(function (d) { return d && d.id && d.stage !== 'won' && d.stage !== 'lost'; });
+      var closed = list.filter(function (d) { return d && d.id && (d.stage === 'won' || d.stage === 'lost'); });
+      crDeals = open.concat(closed);
+      var ids = []; crDeals.forEach(function (d) { if (d.contact_id && ids.indexOf(d.contact_id) < 0 && !crPeople[d.contact_id]) ids.push(d.contact_id); });
+      if (!ids.length) return crDeals;
+      return capi('/sales/contacts?limit=100&ids=' + ids.slice(0, 100).join(',')).then(function (c) {
+        ((c.ok && c.body && Array.isArray(c.body.data)) ? c.body.data : []).forEach(function (p) { if (p && p.id) crPeople[p.id] = p; });
+        return crDeals;
+      });
+    });
+  }
+  function crDealSub(d) {
+    var p = d.contact_id && crPeople[d.contact_id];
+    return [p && (p.name || p.email), CR_STAGE[d.stage] || d.stage, Number(d.expected_value_cents) > 0 ? crMoney(d.expected_value_cents) : ''].filter(Boolean).join(' · ');
+  }
+  function crDealRow(d, on) {
+    return '<button type="button" class="dds-cr-opt" data-deal="' + esc(d.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="dds-cr-av" aria-hidden="true">' + esc(crInitials(d.title)) + '</span><span class="dds-cr-ot"><b>' + esc(d.title || 'A deal') + '</b><small>' + esc(crDealSub(d)) + '</small></span>' + (on ? '<span class="dds-cr-tick" aria-hidden="true">' + icon('check') + '</span>' : '') + '</button>';
+  }
+  // a deal picker: recent deals, then a search over titles and the people on them
+  function crDealPicker(host, onPick) {
+    var picked = null, q = '', seq = 0, matches = null;
+    host.innerHTML = '<div class="dds-cr-search">' + icon('search') + '<input type="search" autocomplete="off" placeholder="A name, business or deal…" aria-label="Search your deals and people"></div><div class="dds-cr-hint" aria-live="polite">Loading your deals…</div><div class="dds-cr-opts" role="group" aria-label="Deals"></div>';
+    var inp = host.querySelector('input'), hint = host.querySelector('.dds-cr-hint'), opts = host.querySelector('.dds-cr-opts');
+    function paint() {
+      if (!crDeals) return;
+      var ql = q.toLowerCase();
+      var list = !ql ? crDeals.slice(0, 6) : crDeals.filter(function (d) {
+        var p = d.contact_id && crPeople[d.contact_id];
+        return String(d.title || '').toLowerCase().indexOf(ql) >= 0 || (p && [p.name, p.email, p.company].join(' ').toLowerCase().indexOf(ql) >= 0) || (matches && d.contact_id && matches[d.contact_id]);
+      }).slice(0, 8);
+      if (picked && list.indexOf(picked) < 0) list = [picked].concat(list).slice(0, 8);
+      hint.textContent = !crDeals.length ? 'No deals yet — add one with New deal first.' : ql ? (list.length ? '' : 'Nothing matches “' + q + '”.') : (picked ? '' : 'Recent');
+      opts.innerHTML = list.map(function (d) { return crDealRow(d, d === picked); }).join('');
+    }
+    opts.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-deal]'); if (!b) return;
+      var id = b.getAttribute('data-deal');
+      picked = crDeals.filter(function (d) { return d.id === id; })[0] || null;
+      paint(); onPick(picked);
+      var nb = opts.querySelector('[data-deal="' + id + '"]'); if (nb) nb.focus();
+    });
+    var deb = null;
+    inp.addEventListener('input', function () {
+      q = inp.value.trim(); matches = null; paint();
+      clearTimeout(deb);
+      if (q.length < 2) return;
+      var mine = ++seq;
+      deb = setTimeout(function () {
+        capi('/sales/contacts?limit=20&q=' + encodeURIComponent(q)).then(function (r) {
+          if (mine !== seq) return;
+          matches = {};
+          ((r.ok && r.body && Array.isArray(r.body.data)) ? r.body.data : []).forEach(function (p) { if (p && p.id) { matches[p.id] = 1; crPeople[p.id] = crPeople[p.id] || p; } });
+          paint();
+        });
+      }, 220);
+    });
+    crLoadDeals().then(function () { paint(); }, function () { hint.textContent = 'Your deals wouldn’t load just now.'; });
+    return { focus: function () { inp.focus(); }, get: function () { return picked; } };
+  }
+  function crChips(name, items, on) {
+    return '<div class="dds-cr-chips" role="group" aria-label="' + esc(name) + '">' + items.map(function (it) {
+      return '<button type="button" class="dds-cr-chip" data-v="' + esc(it[0]) + '" aria-pressed="' + (it[0] === on ? 'true' : 'false') + '">' + esc(it[1]) + '</button>';
+    }).join('') + '</div>';
+  }
+  function crWireChips(host, onPick) {
+    host.addEventListener('click', function (e) {
+      var b = e.target.closest('.dds-cr-chip'); if (!b) return;
+      var grp = b.parentNode, was = b.getAttribute('aria-pressed') === 'true';
+      Array.prototype.forEach.call(grp.querySelectorAll('.dds-cr-chip'), function (x) { x.setAttribute('aria-pressed', 'false'); });
+      if (!(was && grp.hasAttribute('data-toggle'))) b.setAttribute('aria-pressed', 'true');
+      onPick(grp, b.getAttribute('aria-pressed') === 'true' ? b.getAttribute('data-v') : '');
+    });
+  }
+  function crPicked(grp) { var b = grp && grp.querySelector('.dds-cr-chip[aria-pressed="true"]'); return b ? b.getAttribute('data-v') : ''; }
+
+  // ── the menu ──
+  function closeCreateMenu(back) {
+    if (!crMenu) return;
+    crMenu.classList.remove('open');
+    var b = crOpener; crOpener = null;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dds-create]'), function (x) { x.setAttribute('aria-expanded', 'false'); });
+    if (back && b) { try { b.focus(); } catch (_) { /* */ } }
+  }
+  function openCreateMenu(opener) {
+    if (!canCreate()) return;
+    if (crMenu && crMenu.classList.contains('open')) { closeCreateMenu(true); return; }
+    closeAllLayers();
+    if (!crMenu) {
+      crMenu = el('<div class="dds-cr-menu" role="menu" aria-label="Create"></div>');
+      crMenu.innerHTML = '<div class="dds-cr-mh">Create</div>' + CREATE_ITEMS.map(function (it) {
+        return '<button type="button" role="menuitem" class="dds-cr-mi" data-cr="' + it.k + '"><span class="dds-cr-mic" aria-hidden="true">' + icon(it.icon) + '</span><span class="dds-cr-mt"><b>' + esc(it.label) + '</b><small>' + esc(it.sub) + '</small></span><kbd aria-hidden="true">' + it.key.toUpperCase() + '</kbd></button>';
+      }).join('');
+      document.body.appendChild(crMenu);
+      crMenu.addEventListener('click', function (e) { var b = e.target.closest('[data-cr]'); if (b) { var o = crOpener; closeCreateMenu(false); startCreate(b.getAttribute('data-cr'), o); } });
+      crMenu.addEventListener('keydown', function (e) {
+        var items = Array.prototype.slice.call(crMenu.querySelectorAll('[data-cr]')), i = items.indexOf(document.activeElement);
+        if (e.key === 'Escape') { e.preventDefault(); closeCreateMenu(true); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+        else if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1) {
+          var hit = CREATE_ITEMS.filter(function (it) { return it.key === e.key.toLowerCase(); })[0];
+          if (hit) { e.preventDefault(); var o = crOpener; closeCreateMenu(false); startCreate(hit.k, o); }
+        }
+      });
+      document.addEventListener('click', function (e) {
+        if (!crMenu || !crMenu.classList.contains('open')) return;
+        if (crMenu.contains(e.target) || (e.target.closest && e.target.closest('[data-dds-create]'))) return;
+        closeCreateMenu(false);
+      });
+    }
+    crOpener = opener || document.getElementById('dds-create');
+    if (crOpener) crOpener.setAttribute('aria-expanded', 'true');
+    var phone = !(window.matchMedia && window.matchMedia('(min-width:761px)').matches);
+    crMenu.classList.toggle('sheet', phone);
+    crMenu.style.top = crMenu.style.left = '';
+    if (!phone && crOpener) { var r = crOpener.getBoundingClientRect(); crMenu.style.top = Math.max(8, r.top) + 'px'; crMenu.style.left = (r.right + 10) + 'px'; }
+    crMenu.classList.add('open');
+    var f = crMenu.querySelector('[data-cr]'); if (f) f.focus();
+  }
+
+  // ── the drawer ──
+  function closeCreate() {
+    if (!crLayer) return;
+    var L = crLayer; crLayer = null;
+    L.back.remove(); L.box.remove();
+    document.documentElement.classList.remove('dds-cr-open');
+    if (L.opener && document.contains(L.opener)) { try { L.opener.focus(); } catch (_) { /* */ } }
+  }
+  function crDrawer(title, sub, bodyHtml, foot, primary) {
+    closeCreate();
+    var back = el('<div class="dds-cr-back"></div>');
+    var box = el('<aside class="dds-cr" role="dialog" aria-modal="true" aria-labelledby="dds-cr-h"></aside>');
+    box.innerHTML = '<div class="dds-cr-head"><div><h2 id="dds-cr-h">' + esc(title) + '</h2>' + (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div><button type="button" class="dds-cr-x" aria-label="Close">' + '×' + '</button></div>' +
+      '<div class="dds-cr-body">' + bodyHtml + '</div>' +
+      '<div class="dds-cr-foot"><p class="dds-cr-note">' + (foot || '') + '</p><button type="button" class="dds-cr-cancel">Cancel</button><button type="button" class="dds-cr-go">' + esc(primary) + '</button></div>';
+    document.body.appendChild(back); document.body.appendChild(box);
+    document.documentElement.classList.add('dds-cr-open');
+    back.addEventListener('click', closeCreate);
+    box.querySelector('.dds-cr-x').addEventListener('click', closeCreate);
+    box.querySelector('.dds-cr-cancel').addEventListener('click', closeCreate);
+    box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeCreate(); } });
+    crLayer = { back: back, box: box, opener: crOpener || document.getElementById('dds-create') };
+    return box;
+  }
+  function crBusy(box, on, label) { var g = box.querySelector('.dds-cr-go'); g.disabled = on; if (label) g.textContent = label; }
+  function crError(box, msg) { var n = box.querySelector('.dds-cr-err'); if (!n) { n = el('<p class="dds-cr-err" role="alert"></p>'); box.querySelector('.dds-cr-body').appendChild(n); } n.textContent = msg; }
+
+  function startCreate(kind, opener) {
+    crOpener = opener || crOpener || document.getElementById('dds-create');
+    if (kind === 'proposal') return createProposal();
+    if (kind === 'customer') {
+      var add = document.getElementById('addCust');
+      if (add) { add.click(); return; }
+      location.assign('/agency.html#add'); return;
+    }
+    if (kind === 'update') { location.assign('/broadcasts.html'); return; }
+    if (kind === 'call') return createCall();
+    if (kind === 'deal') return createDeal();
+    if (kind === 'invoice') return createInvoice();
+    if (kind === 'todo') return createTodo();
+  }
+  window.ddsCreate = function (kind, opener) { if (canCreate()) startCreate(kind, opener); };
+
+  function createCall() {
+    var box = crDrawer('Log a call', 'From anywhere — no need to open their record first.',
+      '<p class="dds-cr-l" id="cr-who-l">Who did you talk to?</p><div id="cr-who"></div>' +
+      '<p class="dds-cr-l">How did it go?</p>' + crChips('How did it go?', [['talked', 'We talked'], ['voicemail', 'Left a voicemail'], ['noanswer', 'No answer']], 'talked') +
+      '<label class="dds-cr-l" for="cr-notes">What did you say?</label><textarea id="cr-notes" rows="4" maxlength="2000" placeholder="What you agreed, what they asked…"></textarea>' +
+      '<label class="dds-cr-l" for="cr-next">Next step <span>(optional)</span></label><input id="cr-next" maxlength="200" placeholder="e.g. Send the revised logo">' +
+      '<div data-toggle="1" class="dds-cr-chips" role="group" aria-label="When">' + [['tomorrow', 'Tomorrow'], ['friday', 'Friday'], ['nextweek', 'Next week']].map(function (c) { return '<button type="button" class="dds-cr-chip" data-v="' + c[0] + '" aria-pressed="' + (c[0] === 'tomorrow' ? 'true' : 'false') + '">' + c[1] + '</button>'; }).join('') + '</div>',
+      'Saved on the deal’s timeline, and as when you last spoke.', 'Log call');
+    var deal = null;
+    var picker = crDealPicker(box.querySelector('#cr-who'), function (d) {
+      deal = d;
+      var p = d && d.contact_id && crPeople[d.contact_id], first = p && String(p.name || '').trim().split(/\s+/)[0];
+      crBusy(box, false, first ? 'Log call with ' + first : 'Log call');
+    });
+    crWireChips(box, function () {});
+    picker.focus();
+    box.querySelector('.dds-cr-go').addEventListener('click', function () {
+      if (!deal) { crError(box, 'Pick who you talked to.'); picker.focus(); return; }
+      var how = crPicked(box.querySelector('.dds-cr-chips[aria-label="How did it go?"]')) || 'talked', when = crPicked(box.querySelector('.dds-cr-chips[aria-label="When"]'));
+      var notes = box.querySelector('#cr-notes').value.trim(), next = box.querySelector('#cr-next').value.trim();
+      var lead = how === 'voicemail' ? 'Left a voicemail' : how === 'noanswer' ? 'No answer' : '';
+      var body = lead ? lead + (notes ? ' — ' + notes : '.') : notes;
+      crBusy(box, true, 'Logging…');
+      capi('/sales/deals/' + encodeURIComponent(deal.id) + '/activity', 'POST', { kind: 'call', body: body }).then(function (r) {
+        if (!r.ok) { crBusy(box, false, 'Log call'); crError(box, (r.body && r.body.message) || 'That didn’t save — try again in a moment.'); return; }
+        var after = next ? capi('/sales/deals/' + encodeURIComponent(deal.id) + '/tasks', 'POST', when ? { title: next, due_date: crDay(when) } : { title: next }) : Promise.resolve({ ok: true });
+        return after.then(function (t) {
+          closeCreate();
+          crToast(t.ok ? ('Call logged on ' + (deal.title || 'the deal') + (next ? ' — to-do added' + (when ? ' for ' + crShort(crDay(when)) : '') : '') + '.') : 'Call logged. The next step didn’t save — add it on the deal.', !t.ok);
+          crDone('call', { deal_id: deal.id });
+        });
+      });
+    });
+  }
+  function createDeal() {
+    var box = crDrawer('New deal', 'It lands on your pipeline board.',
+      '<label class="dds-cr-l" for="cr-title">What’s the deal?</label><input id="cr-title" maxlength="200" placeholder="e.g. Harbor Dental — new website">' +
+      '<label class="dds-cr-l" for="cr-value">Value <span>(optional)</span></label><div class="dds-cr-money"><span aria-hidden="true">$</span><input id="cr-value" inputmode="decimal" placeholder="0" aria-describedby="cr-value-h"></div><p class="dds-cr-h" id="cr-value-h">What you expect it to be worth.</p>' +
+      '<p class="dds-cr-l">Who is it with? <span>(optional)</span></p><div id="cr-person"></div>' +
+      '<p class="dds-cr-l">Stage</p>' + crChips('Stage', [['lead', 'New lead'], ['qualified', 'Qualified'], ['proposal', 'Proposal sent'], ['contract', 'Agreement out']], 'lead'),
+      'You can add their proposal, agreement and invoices from the deal.', 'Add deal');
+    crWireChips(box, function () {});
+    var person = null, ph = box.querySelector('#cr-person');
+    ph.innerHTML = '<div class="dds-cr-search">' + icon('search') + '<input type="search" autocomplete="off" placeholder="Search your contacts…" aria-label="Search your contacts"></div><div class="dds-cr-opts" role="group" aria-label="Contacts"></div>';
+    var pin = ph.querySelector('input'), popts = ph.querySelector('.dds-cr-opts'), pseq = 0, pdeb = null, plist = [];
+    function ppaint() {
+      popts.innerHTML = plist.map(function (p) { var on = person && person.id === p.id; return '<button type="button" class="dds-cr-opt" data-person="' + esc(p.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="dds-cr-av" aria-hidden="true">' + esc(crInitials(p.name || p.email)) + '</span><span class="dds-cr-ot"><b>' + esc(p.name || p.email || 'Someone') + '</b><small>' + esc([p.company, p.email].filter(Boolean).join(' · ')) + '</small></span>' + (on ? '<span class="dds-cr-tick" aria-hidden="true">' + icon('check') + '</span>' : '') + '</button>'; }).join('');
+    }
+    pin.addEventListener('input', function () {
+      var q = pin.value.trim(); clearTimeout(pdeb); var mine = ++pseq;
+      if (q.length < 2) { plist = person ? [person] : []; ppaint(); return; }
+      pdeb = setTimeout(function () { capi('/sales/contacts?limit=6&q=' + encodeURIComponent(q)).then(function (r) { if (mine !== pseq) return; plist = (r.ok && r.body && Array.isArray(r.body.data)) ? r.body.data.slice(0, 6) : []; ppaint(); }); }, 220);
+    });
+    popts.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-person]'); if (!b) return;
+      var id = b.getAttribute('data-person');
+      person = (person && person.id === id) ? null : (plist.filter(function (p) { return p.id === id; })[0] || null);
+      ppaint();
+    });
+    box.querySelector('#cr-title').focus();
+    box.querySelector('.dds-cr-go').addEventListener('click', function () {
+      var title = box.querySelector('#cr-title').value.trim();
+      if (!title) { crError(box, 'Give the deal a name.'); box.querySelector('#cr-title').focus(); return; }
+      var cents = crCents(box.querySelector('#cr-value').value);
+      var stage = crPicked(box.querySelector('.dds-cr-chips')) || 'lead';
+      var payload = { title: title, stage: stage };
+      if (cents) payload.expected_value_cents = cents;
+      if (person) payload.contact_id = person.id;
+      crBusy(box, true, 'Adding…');
+      capi('/sales/deals', 'POST', payload).then(function (r) {
+        if (!r.ok || !r.body || !r.body.data) { crBusy(box, false, 'Add deal'); crError(box, (r.body && r.body.message) || 'That didn’t save — try again in a moment.'); return; }
+        var d = r.body.data; crDeals = null;
+        closeCreate();
+        crToast('Deal added: ' + (d.title || title) + '.', false, { label: 'Open', onClick: function () { location.assign('/pipeline.html?deal=' + encodeURIComponent(d.id)); } });
+        crDone('deal', { deal_id: d.id });
+      });
+    });
+  }
+  function createInvoice() {
+    var box = crDrawer('Send an invoice', 'They get an email with a Pay button — card or bank.',
+      '<p class="dds-cr-l">Who is it for?</p><div id="cr-for"></div>' +
+      '<label class="dds-cr-l" for="cr-what">What for</label><input id="cr-what" maxlength="200" placeholder="e.g. Website — deposit">' +
+      '<label class="dds-cr-l" for="cr-amt">Amount</label><div class="dds-cr-money big"><span aria-hidden="true">$</span><input id="cr-amt" inputmode="decimal" placeholder="0.00"></div><div id="cr-quick"></div>' +
+      '<p class="dds-cr-l">Kind</p>' + crChips('Kind', [['service', 'Invoice'], ['deposit', 'Deposit']], 'service') +
+      '<p class="dds-cr-l">Due</p>' + crChips('Due', [['+0', 'On receipt'], ['+7', '7 days'], ['+14', '14 days'], ['+30', '30 days']], '+14') +
+      '<div class="dds-cr-prev" id="cr-prev" aria-live="polite"></div>',
+      'Your usual payment reminders follow it.', 'Send invoice');
+    var deal = null;
+    function preview() {
+      var cents = crCents(box.querySelector('#cr-amt').value), due = crPicked(box.querySelector('.dds-cr-chips[aria-label="Due"]')) || '+14';
+      var p = deal && deal.contact_id && crPeople[deal.contact_id], first = p && String(p.name || '').trim().split(/\s+/)[0];
+      box.querySelector('#cr-prev').innerHTML = deal ? '<p class="dds-cr-pk">' + (first ? 'What ' + esc(first) + ' gets' : 'What they get') + '</p><p><b>' + esc(box.querySelector('#cr-what').value.trim() || 'Invoice') + '</b> — ' + esc(cents ? crMoney(cents) : '$0') + ', due ' + esc(due === '+0' ? 'on receipt' : crShort(crDay(due))) + '</p><span class="dds-cr-pay" aria-hidden="true">Pay ' + esc(cents ? crMoney(cents) : '') + '</span>' : '';
+      crBusy(box, false, cents ? 'Send ' + crMoney(cents) + ' invoice' : 'Send invoice');
+    }
+    function quick() {
+      var v = deal ? Number(deal.expected_value_cents) || 0 : 0, h = box.querySelector('#cr-quick');
+      h.innerHTML = v ? '<div class="dds-cr-chips" role="group" aria-label="Quick amounts"><button type="button" class="dds-cr-chip q" data-amt="' + Math.round(v / 2) + '">50% of the deal · ' + esc(crMoney(Math.round(v / 2))) + '</button><button type="button" class="dds-cr-chip q" data-amt="' + v + '">Full · ' + esc(crMoney(v)) + '</button></div>' : '';
+    }
+    crDealPicker(box.querySelector('#cr-for'), function (d) {
+      deal = d; quick();
+      var w = box.querySelector('#cr-what'); if (d && !w.value.trim()) w.value = d.title || '';
+      preview();
+    });
+    box.addEventListener('click', function (e) {
+      var q = e.target.closest('[data-amt]');
+      if (q) { box.querySelector('#cr-amt').value = (Number(q.getAttribute('data-amt')) / 100).toFixed(2); preview(); return; }
+    });
+    crWireChips(box, function () { preview(); });
+    box.querySelector('#cr-amt').addEventListener('input', preview);
+    box.querySelector('#cr-what').addEventListener('input', preview);
+    function send(force) {
+      if (!deal) { crError(box, 'Pick who it’s for.'); return; }
+      var cents = crCents(box.querySelector('#cr-amt').value);
+      if (cents < 50) { crError(box, 'Enter the amount.'); box.querySelector('#cr-amt').focus(); return; }
+      var groups = box.querySelectorAll('.dds-cr-chips[aria-label="Kind"], .dds-cr-chips[aria-label="Due"]');
+      var purpose = crPicked(groups[0]) || 'service', due = crPicked(groups[1]) || '+14';
+      var title = box.querySelector('#cr-what').value.trim();
+      var payload = { amount_cents: cents, purpose: purpose, due_date: crDay(due) };
+      if (title) payload.title = title;
+      if (force) payload.force = true;
+      crBusy(box, true, 'Sending…');
+      capi('/sales/deals/' + encodeURIComponent(deal.id) + '/invoice', 'POST', payload).then(function (r) {
+        if (r.body && r.body.error === 'amount_mismatch') {
+          crBusy(box, false, 'Send invoice');
+          crError(box, r.body.message || 'There’s already an open invoice on this deal for a different amount.');
+          var err = box.querySelector('.dds-cr-err');
+          if (err && !err.querySelector('button')) { var again = el('<button type="button" class="dds-cr-again">Send a second invoice</button>'); again.addEventListener('click', function () { send(true); }); err.appendChild(again); }
+          return;
+        }
+        if (!r.ok) { crBusy(box, false, 'Send invoice'); crError(box, (r.body && r.body.message) || 'That didn’t send — try again in a moment.'); return; }
+        closeCreate();
+        var url = r.body && (r.body.url || (r.body.data && r.body.data.stripe_url));
+        if (r.body && r.body.emailed) crToast('Invoice sent — ' + crMoney(cents) + ' to ' + (deal.title || 'the deal') + '.');
+        else crToast('Invoice made, but it wasn’t emailed — copy the pay link from the deal.', true, url ? { label: 'Copy link', onClick: function () { try { navigator.clipboard.writeText(url); } catch (_) { /* */ } } } : undefined);
+        crDone('invoice', { deal_id: deal.id });
+      });
+    }
+    box.querySelector('.dds-cr-go').addEventListener('click', function () { send(false); });
+    preview();
+  }
+  function createTodo() {
+    var box = crDrawer('Add a to-do', 'It shows in My tasks on Home, with its date.',
+      '<label class="dds-cr-l" for="cr-todo">What needs doing?</label><input id="cr-todo" maxlength="200" placeholder="e.g. Send the photos">' +
+      '<p class="dds-cr-l">About</p><div id="cr-about"></div>' +
+      '<p class="dds-cr-l">When</p>' + crChips('When', [['+0', 'Today'], ['tomorrow', 'Tomorrow'], ['friday', 'Friday'], ['nextweek', 'Next week'], ['', 'No date']], 'tomorrow'),
+      '', 'Add to-do');
+    var deal = null;
+    crDealPicker(box.querySelector('#cr-about'), function (d) { deal = d; });
+    crWireChips(box, function () {});
+    box.querySelector('#cr-todo').focus();
+    box.querySelector('.dds-cr-go').addEventListener('click', function () {
+      var title = box.querySelector('#cr-todo').value.trim();
+      if (!title) { crError(box, 'Say what needs doing.'); box.querySelector('#cr-todo').focus(); return; }
+      if (!deal) { crError(box, 'Pick the deal it’s about.'); return; }
+      var when = crPicked(box.querySelector('.dds-cr-chips[aria-label="When"]'));
+      crBusy(box, true, 'Adding…');
+      capi('/sales/deals/' + encodeURIComponent(deal.id) + '/tasks', 'POST', when ? { title: title, due_date: crDay(when) } : { title: title }).then(function (r) {
+        if (!r.ok) { crBusy(box, false, 'Add to-do'); crError(box, (r.body && r.body.message) || 'That didn’t save — try again in a moment.'); return; }
+        closeCreate();
+        crToast('To-do added' + (when ? ' for ' + crShort(crDay(when)) : '') + '.');
+        crDone('todo', { deal_id: deal.id });
+      });
+    });
+  }
+  function createProposal() {
+    var box = crDrawer('Send a proposal', 'Pick the deal; its proposal opens with your services ready to add.',
+      '<p class="dds-cr-l">Which deal?</p><div id="cr-prop"></div>', '', 'Open its proposal');
+    var deal = null;
+    crDealPicker(box.querySelector('#cr-prop'), function (d) { deal = d; });
+    box.querySelector('.dds-cr-go').addEventListener('click', function () {
+      if (!deal) { crError(box, 'Pick the deal.'); return; }
+      location.assign('/pipeline.html?deal=' + encodeURIComponent(deal.id) + '&dtab=billing');
+    });
+  }
 
   function boot() {
     mountFrame();
