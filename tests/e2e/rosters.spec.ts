@@ -64,13 +64,13 @@ test.describe('Customers list view', () => {
     await expect(page.locator('tbody tr td:nth-child(2)').last()).toContainText('Acme Bakery');
   });
 
-  test('the fixed-view dropdown filters client-side (Needs attention)', async ({ page }) => {
+  test('the fixed-view dropdown filters client-side (Needs you)', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
     await page.locator('#viewBtn').click();
     await page.locator('#viewMenu [data-view="attention"]').click();
-    await expect(page.locator('#viewBtn')).toContainText('Needs attention');
+    await expect(page.locator('#viewBtn')).toContainText('Needs you');   // Home's word for it (bold redesign, part 2)
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
     await expect(page.locator('.lmeta')).toContainText('1 customer');
@@ -106,9 +106,10 @@ test.describe('Customers list view', () => {
     await expect(page.locator('#viewMenu')).toBeVisible();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'true');
     // outside click → the ONE document-level delegated closer (ported from
-    // inbox.html). Click the object icon: it sits LEFT of the dropdown, so the
-    // open menu never covers it (at phone widths the menu overlaps .lmeta).
-    await page.locator('.obj-ic').click();
+    // inbox.html). Click the space beside the title: it sits RIGHT of the
+    // dropdown on the title's line, so the open menu (below the title) never
+    // covers it (at phone widths the menu overlaps .lmeta).
+    await page.locator('.lrow1 .sp').click();
     await expect(page.locator('#viewMenu')).toBeHidden();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
     // Escape closes and hands focus back to the trigger
@@ -143,7 +144,13 @@ test.describe('Customers list view', () => {
     // "Their website" is a row action (only with a customer site); "Open record" rides every row
     await expect(page.locator('tbody [data-web]')).toHaveCount(2);
     await expect(page.locator('tbody [data-rec]')).toHaveCount(await page.locator('tbody tr').count());
+    // bold redesign, part 2: the row opens a preview beside the list, and the
+    // record is one click from it
     await page.locator('tbody tr').first().locator('td').nth(1).click();   // the first cell is the row's checkbox (sales review item 31)
+    const pv = page.locator('#cprev');
+    await expect(pv.getByRole('heading', { level: 2 })).toHaveText('Acme Bakery');
+    await expect(page).toHaveURL(/customers\.html/);
+    await pv.getByRole('link', { name: 'Open full record' }).click();
     await expect(page).toHaveURL(/crm\.html\?client=site-acme$/);
   });
 });

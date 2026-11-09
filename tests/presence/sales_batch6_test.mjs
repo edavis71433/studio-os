@@ -61,7 +61,8 @@ ok('the reserved store is site-scoped on every read and write', (store.match(/si
 const cust = read('customers.html');
 ok('Customers: Mark offers Active and On hold only (Complete emails the client a survey)', /<option value="active">Active<\/option><option value="on_hold">On hold<\/option><\/select>/.test(cust) && !/<option value="complete">/.test(cust));
 ok('Customers: the import connects by email, never sets up an account', /api\('\/sales\/customers','POST',\{mode:'connect',/.test(cust));
-ok('Customers: a row\'s checkbox never opens the record', /if\(e\.target\.closest\('button,input,td\.pick'\)\)return;openCustomer/.test(cust));
+// bold redesign (Nov 2026): a row opens the preview beside the list; its checkbox (and its own buttons and links) still never do
+ok('Customers: a row\'s checkbox never opens the preview (or the record)', /if\(e\.target\.closest\('button,input,td\.pick,a'\)\)return;openPreview/.test(cust));
 const pipe = read('pipeline.html');
 ok('Pipeline: Mark as not a fit only moves deals the board could move', /if\(!boardCanMove\(d\.stage,'lost'\)\)\{skip\+\+;continue;\}/.test(pipe));
 ok('Pipeline: won and lost rows are skipped on import', /if\(it\.stage==='won'\|\|it\.stage==='lost'\)return'skipped';/.test(pipe));
