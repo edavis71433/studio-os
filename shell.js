@@ -754,7 +754,7 @@
   }
   function placeSiteSwitch(btn, pop) {
     var r = btn.getBoundingClientRect();
-    pop.style.right = 'auto';
+    pop.style.right = 'auto'; pop.style.bottom = 'auto';   // the sidebar layout pins panels to the bottom; this one hangs from its button
     var left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left));
     var below = r.bottom + 6 + pop.offsetHeight <= window.innerHeight - 8;
     pop.style.left = left + 'px';

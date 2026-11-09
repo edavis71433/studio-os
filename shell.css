@@ -147,9 +147,9 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-sites-pop .q{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--dds-line);border-radius:var(--dds-r);background:var(--dds-bg);color:var(--dds-ink);margin-bottom:6px}
 .dds-sites-pop .q:focus{outline:2px solid var(--dds-p);outline-offset:1px;border-color:var(--dds-p)}
 .dds-sites-pop .list{max-height:min(52vh,380px);overflow:auto}
-.dds-sites-pop .row.site{display:flex;align-items:center;gap:10px;min-height:44px}
+.dds-pop.dds-sites-pop .row.site{display:flex;flex-wrap:nowrap;align-items:center;gap:10px;min-height:44px;box-sizing:border-box}
 .dds-sites-pop .row.site .av{width:28px;height:28px;border-radius:50%;background:var(--dds-grad-brand,var(--dds-p));color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center;flex:0 0 auto}
-.dds-sites-pop .row.site .tx{min-width:0;display:flex;flex-direction:column}
+.dds-sites-pop .row.site .tx{flex:1 1 0%;min-width:0;display:flex;flex-direction:column}
 .dds-sites-pop .row.site .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dds-sites-pop .row.site .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0}
 .dds-sites-pop .row.site.now{background:var(--dds-p-soft)} .dds-sites-pop .row.site.now .n{color:var(--dds-p)}
