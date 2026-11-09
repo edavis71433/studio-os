@@ -357,6 +357,33 @@
   @media (max-width:760px){.rec-head .actbar{flex:1 1 100%;justify-content:flex-start}}
   .path button.pstep.done::before{content:"✓ ";font-weight:700}
   #markComplete{border-radius:999px;padding:9px 18px;font-weight:600;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border:0;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+
+  /* ══ Bold redesign — the record, part B: Activity first; the rail is cards ══ */
+  #sumcards{display:flex;flex-direction:column;gap:var(--dds-s3,12px);margin-bottom:var(--dds-s3,12px)}
+  #sumcards .card.sc{margin:0}
+  #sumcards:empty{display:none}
+  .sc{padding:14px 16px}
+  .sc-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .sc-h h2{font-family:var(--sans);font-size:15px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc-link{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
+  .sc-link:hover{text-decoration:underline}
+  .sc>.sc-link{margin-top:8px}
+  .sc-list{list-style:none;padding:0;margin:0}
+  .sc-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .sc-list li:last-child{border-bottom:0}
+  .sc-list .sc-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc-list b{font-variant-numeric:tabular-nums}
+  .sc-chip{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--dds-up,#f7f6fb);color:var(--soft);white-space:nowrap}
+  .sc-chip.good{background:var(--good-soft);color:var(--good)} .sc-chip.warn{background:var(--warn-soft);color:var(--warn)} .sc-chip.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+  .sc-pct{font-size:14px;color:var(--p);font-variant-numeric:tabular-nums}
+  .sc-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:2px 0 8px}
+  .sc-bar span{display:block;height:100%;border-radius:999px;background:var(--dds-grad-btn,var(--p))}
+  .sc-sub{font-size:12.5px;margin:0}
+  .sc-dl{margin:0}
+  .sc-dl>div{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13px}
+  .sc-dl dt{color:var(--soft)} .sc-dl dd{margin:0;font-weight:600;text-align:right}
+  .sc-none{font-size:13px;margin:0}
+  @media (pointer:coarse){.sc-link{min-height:44px;display:inline-flex;align-items:center}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -488,10 +515,12 @@ const EXPANDED=new Set();
 // Phase 1 overhaul: the record is THE hub. Billing (proposals · agreement ·
 // invoices · retainer, with their actions) lives here now; Delivery reads as
 // "Project" because that is what the owner calls it.
-const TAB_LABEL={details:'Details',deal:'Deal',billing:'Billing',delivery:'Project',files:'Files'};
-const TAB_ORDER=['details','deal','billing','delivery','files'];
+// Bold redesign, part B (Nov 2026): Activity comes first — the call box and
+// message box open, then the history — and the record opens on it.
+const TAB_LABEL={activity:'Activity',details:'Details',deal:'Deal',billing:'Billing',delivery:'Project',files:'Files'};
+const TAB_ORDER=['activity','details','deal','billing','delivery','files'];
 // old deep links keep working (inbox.html links ?tab=messages; older links carry overview)
-const TAB_ALIAS={overview:'details',messages:'details',deal:'deal',billing:'billing',invoices:'billing',money:'billing',delivery:'delivery',project:'delivery',details:'details',files:'files'};
+const TAB_ALIAS={activity:'activity',overview:'details',messages:'activity',deal:'deal',billing:'billing',invoices:'billing',money:'billing',delivery:'delivery',project:'delivery',details:'details',files:'files'};
 
 // Build the query for /crm/record from whatever the URL carries.
 function recordQuery(){
@@ -502,8 +531,11 @@ function recordQuery(){
 function idParams(){ // the identity keys carried onto sub-requests / links
   const id=(REC&&REC.identity)||{}; return {client:id.customer_site_id||scopeParam()||'', deal:id.deal_id||'', project:id.project_id||'', contact:id.contact_id||''};
 }
+// the record has a history to show (the old rail's rule): a project, a deal, a client, or a scoped customer
+const hasActivity=()=>!!(idParams().project||idParams().deal||(REC&&REC.identity&&REC.identity.client_id)||(REC&&REC.sections&&REC.sections.overview));
 function availTabs(){
   const s=(REC&&REC.sections)||{}; const out=[];
+  if(hasActivity())out.push('activity');
   if(s.details||s.overview)out.push('details');
   if(s.deal)out.push('deal');
   if(s.deal)out.push('billing');
@@ -528,7 +560,7 @@ async function loadRecord(){
   if(!r.ok){ trouble(); return; }
   REC=r.body.data||{};
   // sales review item 38: the studio's own stage names, read at studio level (they live on the studio's site)
-  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const chs=s.ok&&s.body&&s.body.data&&s.body.data.chances;if(chs&&typeof chs==='object'){STAGE_CHANCE=chs;try{renderHighlights();}catch(_){}}const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
+  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const chs=s.ok&&s.body&&s.body.data&&s.body.data.chances;if(chs&&typeof chs==='object'){STAGE_CHANCE=chs;try{renderHighlights();renderSummaryCards();}catch(_){}}const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
   // Canonical addressing: a converted customer is addressed by their SITE so the
   // scope (x-dds-scope-site) is right for the profile + notes + activity. If we
   // arrived by ?deal=/?contact= but the canonical key is the customer site and it
@@ -541,7 +573,8 @@ async function loadRecord(){
   const want=QP().get('tab');
   if(want==='messages')FOCUS_COMPOSER=true;
   const avail=availTabs();
-  const mapped=TAB_ALIAS[want]||TAB_ALIAS[REC.default_tab]||'';
+  // the record opens on Activity unless a link names a tab
+  const mapped=want?(TAB_ALIAS[want]||''):(avail.includes('activity')?'activity':(TAB_ALIAS[REC.default_tab]||''));
   TAB=avail.includes(mapped)?mapped:(avail[0]||'');
   renderShell();
   if(TAB)showTab(TAB,true);
@@ -586,8 +619,8 @@ function renderShell(){
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
+        <div id="sumcards"></div>
         <div id="dcard"></div>
-        <div class="card acard" id="acard"><div class="spin" role="status" aria-label="Loading activity"></div></div>
       </aside>
     </div>`;
   document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
@@ -607,6 +640,7 @@ function renderShell(){
   HL_EDIT=false;   // the shell rebuild destroyed any open editor — never leave the flag stale
   renderHighlights();
   renderActions();
+  renderSummaryCards();
   renderDetailsCard();
 }
 
@@ -624,6 +658,36 @@ const SVG={
   found:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
+// ── Bold redesign, part B: the rail's summary cards — the money, the project
+// and the deal at a glance, each a door to its own tab (the contact card follows)
+const SC_SOURCE={manual:'Added by you',enquiry:'An enquiry',form:'Your website',import:'Imported',referral:'A referral'};
+const SC_STATUS={active:'In progress',on_hold:'On hold',complete:'Complete',archived:'Archived',planning:'Planning'};
+function renderSummaryCards(){
+  const host=$('sumcards'); if(!host)return;
+  const d=DEAL&&!DEAL.error&&DEAL.deal; const inv=(DEAL&&!DEAL.error&&DEAL.invoices)||[]; const pj=PROJ&&!PROJ.error&&PROJ.project;
+  const out=[];
+  if(d&&d.id){
+    const rows=inv.slice(0,4).map(v=>{const st=invState(v);
+      const chip=st==='paid'?'<span class="sc-chip good">Paid</span>':st==='overdue'?'<span class="sc-chip bad">Overdue</span>':st==='processing'?'<span class="sc-chip">On its way</span>':v.due_date?`<span class="sc-chip warn">Due ${esc(dueLabel(v.due_date))}</span>`:'<span class="sc-chip">Open</span>';
+      return `<li><span class="sc-t">${esc(v.title||'Invoice')}</span><b>${esc(fmtC(v.amount_cents))}</b>${chip}</li>`;}).join('');
+    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:'<p class="muted sc-none">No invoices yet.</p>'}${inv.length>4?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
+  }
+  if(pj){
+    const ms=(PROJ.milestones||[]),done=ms.filter(m=>/^(done|complete|completed)$/.test(String(m.status||''))).length,pct=ms.length?Math.round(done*100/ms.length):null;
+    const sub=[SC_STATUS[pj.status]||String(pj.status||'').replace('_',' '),pj.launch_date?'launch '+dueLabel(pj.launch_date):''].filter(Boolean).join(' · ');
+    out.push(`<section class="card sc" aria-labelledby="sc-proj"><div class="sc-h"><h2 id="sc-proj">${esc(pj.name||'Project')}</h2>${pct!=null?`<b class="sc-pct">${pct}%</b>`:''}</div>${pct!=null?`<div class="sc-bar" aria-hidden="true"><span style="width:${pct}%"></span></div>`:''}${sub?`<p class="muted sc-sub">${esc(sub)}</p>`:''}<button type="button" class="sc-link" data-sc="delivery">Open the project →</button></section>`);
+  }
+  if(d&&d.id){
+    const ch=STAGE_CHANCE[d.stage];
+    const rows=[['Value',fmtC(d.expected_value_cents)],['Stage',stageLabel(d.stage)],(ch!=null&&d.stage!=='won'&&d.stage!=='lost')?['Chance',ch+'%']:null,d.expected_close?['Closes',dueLabel(d.expected_close)]:null,d.source?['How they found you',SC_SOURCE[d.source]||String(d.source)]:null].filter(Boolean);
+    out.push(`<section class="card sc" aria-labelledby="sc-deal"><div class="sc-h"><h2 id="sc-deal">${esc(d.title||'The deal')}</h2></div><dl class="sc-dl">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl><button type="button" class="sc-link" data-sc="deal">Open the deal →</button></section>`);
+  }
+  host.innerHTML=out.join('');
+  host.querySelectorAll('[data-sc]').forEach(b=>b.addEventListener('click',()=>{const k=b.getAttribute('data-sc');
+    if(k==='invoice'){openBilling('invoice');return;}
+    if(!availTabs().includes(k))return;
+    showTab(k);const tb=$('tabbody');if(tb)tb.scrollIntoView({behavior:'smooth',block:'start'});const t=$('tab-'+k);if(t)t.focus({preventScroll:true});}));
+}
 // The "Customer details" card in the rail: the contact facts always in view,
 // so the operator never leaves Billing to find a phone number. Edit opens the
 // Details tab, where the full form lives.
@@ -724,6 +788,7 @@ function openBilling(which){
 // Bring the rail composer forward on the requested publisher tab. On narrow
 // screens the rail sits above the tabs, so scrolling to it is the whole move.
 function focusComposer(tab){
+  if(TAB!=='activity'&&availTabs().includes('activity'))showTab('activity');
   COMPOSER=tab; renderComposer();
   const host=$('acard'); if(host)host.scrollIntoView({behavior:'smooth',block:'start'});
   setTimeout(()=>{const f=document.querySelector('#composer textarea, #composer input[type=text]');if(f)f.focus({preventScroll:true});},250);
@@ -737,8 +802,8 @@ async function loadPanels(){
   const ids=idParams(); const s=(REC&&REC.sections)||{};
   const jobs=[];
   if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();renderDetailsCard();if(TAB==='details')showTab(TAB,true);}));
-  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
-  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();renderHighlights();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
+  if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();renderSummaryCards();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
+  if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();renderHighlights();renderSummaryCards();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
 }
@@ -891,6 +956,7 @@ function showTab(tab,initial){
   if(!initial)setTabUrl(tab);
   const host=$('tabbody'); if(!host)return;
   host.setAttribute('aria-labelledby','tab-'+tab);
+  if(tab==='activity'){host.innerHTML='<div class="card acard" id="acard"><div class="spin" role="status" aria-label="Loading activity"></div></div>';if(ACT_LOADED)renderRail();return;}
   if(tab==='details')return loadDetails(host);
   if(tab==='deal')return renderDealTab(host);
   if(tab==='billing')return renderBillingTab(host);
@@ -1461,7 +1527,9 @@ function insertSavedReplies(taId){
     ta.parentNode.insertBefore(sel,ta);
   });
 }
+let ACT_LOADED=false;   // the history has been read once (the Activity tab can draw it at once after that)
 function renderRail(){
+  ACT_LOADED=true;
   const host=$('acard'); if(!host)return;
   if(ACT.failed){host.innerHTML='<p class="muted">Couldn’t load this record’s activity just now. <button id="actRetry" style="font-size:12.5px;padding:5px 12px">Try again</button></p>';const rt=$('actRetry');if(rt)rt.addEventListener('click',loadActivity);return;}
   const draft=snapComposer();
