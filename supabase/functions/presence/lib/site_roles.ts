@@ -111,6 +111,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['configure', [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
+    '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
     '(POST|DELETE) /foundations/(domain|zone)',
     '(POST|PUT|DELETE) /foundations/zone/records',
     'PUT /foundations/dns',

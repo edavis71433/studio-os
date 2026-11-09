@@ -65,6 +65,9 @@ const CONTROLS = [
   ['POST /calendar/link', 'connections.html', `make(mk, 'POST', 'Your calendar link is ready.')`, ['id="calMake" data-needs="configure"']],   // sales review item 46
   ['POST /calendar/link', 'connections.html', `make(nw, 'POST', 'Your new calendar link is ready.')`, ['id="calNew" data-needs="configure"']],
   ['DELETE /calendar/link', 'connections.html', `make(off, 'DELETE', 'Your calendar link is off.')`, ['id="calOff" data-needs="configure"']],
+  ['POST /email/log-address', 'connections.html', `make(mk, 'POST', 'Your log address is ready.')`, ['id="logMake" data-needs="configure"']],   // sales review item 69
+  ['POST /email/log-address', 'connections.html', `make(nw, 'POST', 'Your new log address is ready.')`, ['id="logNew" data-needs="configure"']],
+  ['DELETE /email/log-address', 'connections.html', `make(off, 'DELETE', 'Your log address is off.')`, ['id="logOff" data-needs="configure"']],
 ];
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
@@ -99,7 +102,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 35, String(routes.length));
+  ok('the decided delete and configure lists were read', routes.length === 37, String(routes.length));   // item 69: POST and DELETE /email/log-address
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
