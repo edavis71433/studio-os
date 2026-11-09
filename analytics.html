@@ -685,6 +685,7 @@ function reportBody(key,d){
     const grp=(list,col)=>list.length?rTable([col,'Deals','Value'],list.map(g=>`<tr><td>${esc(g.label)}</td><td>${g.count}</td><td>${esc(money(g.value_cents))}</td></tr>`)):'<p class="muted">None in the last 12 months.</p>';
     return `<p class="rep-sum"><b>${d.won.count} won</b> (${esc(money(d.won.value_cents))}) · <b>${d.lost.count} not a fit</b> (${esc(money(d.lost.value_cents))})${d.win_rate_pct==null?'':` · ${d.win_rate_pct}% won`}</p>`
       +'<h4>Won, by where the deal came from</h4>'+grp(d.won_by_source,'Came from')
+      +(Array.isArray(d.won_by_found_via)?'<h4>Won, by how they found you</h4>'+grp(d.won_by_found_via,'Found you through'):'')   // item 69
       +'<h4>Not a fit, by the reason given</h4>'+grp(d.lost_by_reason,'Reason');
   }
   if(key==='enquiries'){

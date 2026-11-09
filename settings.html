@@ -78,6 +78,9 @@
   .plan .team{color:var(--soft);margin:0} .plan .team a{color:var(--p);text-decoration:none;font-weight:500} .plan .team a:hover{text-decoration:underline}
   .plan .aside{color:var(--faint);font-size:12.5px;margin:10px 0 0}
   .closeacct{margin-top:var(--dds-s5,20px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
+  .dlrow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--dds-s3,12px);margin-top:var(--dds-s4,16px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}   /* item 69 */
+  .dlrow b{font-size:14px;font-weight:600} .dlrow .hint{font-size:12.5px;color:var(--faint);margin-top:2px;max-width:46ch}
+  @media (max-width:767px){.dlrow .btn{min-height:44px}}
   .closeacct summary{cursor:pointer;font-size:12.5px;color:var(--faint)}
   .closeacct p{color:var(--faint);font-size:12.5px;margin:10px 0}
   .closeacct .btn{margin-right:var(--dds-s2,8px)}
@@ -144,6 +147,11 @@
   <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
     <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
     <div class="plan" id="plan" aria-live="polite"></div>
+    <!-- sales review item 69: walk out with everything — one zip of spreadsheets (GET /sales/export) -->
+    <div class="dlrow" id="dlRow">
+      <div><b>Download my data</b><div class="hint">One zip of spreadsheets: customers, contacts, deals, proposals, agreements, invoices and payments, enquiries, support requests and tasks.</div></div>
+      <button class="btn sm" type="button" id="dlData">Download my data</button>
+    </div>
     <details class="closeacct" id="deleteCard">
       <summary>Close your account</summary>
       <p>This asks us to delete your account and everything in it after a short cooling-off period. Your published site comes down, and this can’t be undone once completed. Download everything you own first, from <a href="/presence.html#export">Domain &amp; email</a>. That stays open until deletion.</p>
@@ -241,6 +249,20 @@ async function api(path, method, body) {
   return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
 }
 const toast = (m, bad) => { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok'); };
+// sales review item 69: "Download my data" — the zip arrives as a file, so this one fetch reads bytes, not JSON
+async function downloadMyData() {
+  const b = $('dlData'); if (!b) return;
+  const was = b.textContent; b.disabled = true; b.textContent = 'Preparing…';
+  try {
+    const r = await fetch(FN + '/sales/export', { headers: H() });
+    if (!r.ok) { const j = await r.json().catch(() => null); toast(nice(j, 'The download didn’t start — try again in a moment.'), true); return; }
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a'); a.href = url; a.download = 'studio-data-' + new Date().toISOString().slice(0, 10) + '.zip';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('Downloaded — the zip is in your Downloads folder.');
+  } catch (_) { toast('The download didn’t start — try again in a moment.', true); }
+  finally { b.disabled = false; b.textContent = was; }
+}
 const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.test(b.message) && b.message.length < 200) ? b.message : fallback;
 
 // ── the eight areas. Each card routes to where the thing already lives; a card
@@ -676,6 +698,7 @@ function signedOut() {
       else setStatus('domains', { text: `Emails go out from ${d.from} · couldn’t check it just now`, cls: 'warn' });
     }).catch(() => {});
     wireDeletion();
+    { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
     if (location.hash === '#team') { const sec = $('team'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }

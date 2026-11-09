@@ -601,7 +601,10 @@ const SI={phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0
 const svgi=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const ACTKINDS=[['call',svgi('phone')+' Call'],['email',svgi('mail')+' Email'],['meeting',svgi('users')+' Meeting'],['note',svgi('pencil')+' Note']];
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
-let DEALS_LOADED=false;   // item 65: renamed stages repaint the list only once the deals are here (no walkthrough flash)
+let DEALS_LOADED=false;
+// item 69: "How did they find you?" — the server's list (lib/found_via.ts), mirrored
+const FOUND_VIA=['Google','Referral','Word of mouth','Social','Repeat client','Website','Other'];
+const foundOpts=(v)=>`<option value="">Not recorded</option>`+FOUND_VIA.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('');   // item 65: renamed stages repaint the list only once the deals are here (no walkthrough flash)
 // The roster read's page size = the server's MAX_PAGE (lib/sales_lifecycle.ts
 // clampLimit). A bare read gets clamped to DEFAULT_PAGE=25, which silently
 // truncated the roster (and its meta "total") to the newest 25 — worst on the
@@ -2510,6 +2513,8 @@ async function openDeal(id){
           <input id="ed-value" type="number" step="0.01" min="0" value="${d.expected_value_cents?(d.expected_value_cents/100):''}" placeholder="2500" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
           <label class="mut" for="ed-close" style="display:block;margin-top:8px">Expected close</label>
           <input id="ed-close" type="date" value="${esc(d.expected_close||'')}" style="padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+          <label class="mut" for="ed-found" style="display:block;margin-top:8px">How did they find you?</label>
+          <select id="ed-found" class="dds-pick">${foundOpts(d.found_via)}</select>
           <label class="mut" for="ed-next" style="display:block;margin-top:8px">Next step</label>
           <div class="row2"><input type="text" id="ed-next" placeholder="e.g. Call Friday about the proposal" value="${esc(d.next_step||'')}" style="flex:1"><input type="date" id="ed-nextat" value="${esc(d.next_step_at||'')}" style="max-width:160px" aria-label="Next step date"></div>
           <label class="mut" for="ed-notes-${d.id}" style="display:block;margin-top:8px">Notes</label>
@@ -2692,7 +2697,7 @@ async function openDeal(id){
       await link(cid);
       return nc.deduped?dedupeNote(nc.data,cn,ce):null;
     };
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
     // The stage's preset to-dos FILL the input — they never post on their own, so
