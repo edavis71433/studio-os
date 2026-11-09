@@ -282,6 +282,16 @@ const KEY_ICON = { google_analytics:'chart', google_tag_manager:'tag', google_se
 const iconFor = (key) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[KEY_ICON[key]]||ICONS.link}</svg>`;
 
 // the customer's own numbers, in plain words (from the read cache)
+// Item 95: "as of today", "as of yesterday", or the date in words, as the rest of the page says it.
+function asOfWords(iso){
+  const day=String(iso).slice(0,10), d=new Date(day+'T12:00:00');
+  if(isNaN(d))return day;
+  const ymd=(x)=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  const now=new Date(), y=new Date(now); y.setDate(now.getDate()-1);
+  if(day===ymd(now))return 'today';
+  if(day===ymd(y))return 'yesterday';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
 function dataLine(d){
   if(!d) return '';
   const bits=[];
@@ -303,7 +313,7 @@ function dataLine(d){
   if(d.calls!=null) bits.push(esc(d.calls)+' calls');
   if(d.direction_requests!=null) bits.push(esc(d.direction_requests)+' direction requests');
   if(!bits.length) return '';
-  const asof = d.as_of ? `<span class="asof">as of ${esc(String(d.as_of).slice(0,10))}</span>` : '';
+  const asof = d.as_of ? `<span class="asof"> · as of ${esc(asOfWords(d.as_of))}</span>` : '';   // item 95: it ran into the last number, as a raw date
   return `<div class="data">${bits.join(' · ')}${asof}</div>`;
 }
 

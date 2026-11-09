@@ -8,7 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { approvalOverduePeriod } from '../lib/approvals.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcAll } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { ensureProjectForDeal, ensureBridge, reconcileChecklistFacts } from '../lib/service_bridge.ts';
 import { offerCsat, csatRatingsForProject } from '../lib/csat.ts';
@@ -282,6 +282,36 @@ export async function handleProjectReport(req: Request, jwt: string, site: SiteR
   const csatRatings = await csatRatingsForProject(site.id, id);   // service edge #1: computed CSAT average
   const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null, csatRatings }, nowIso());
   return json({ data: { project: { id: project.id, name: project.name, status: project.status, start_date: project.start_date, target_date: project.target_date }, summary, generated_at: nowIso(), is_studio_view: studio } }, 200, cors);
+}
+
+/** Item 86: the Projects roster's Progress and Open approvals columns and Today's "Waiting on
+ *  clients" card, for many projects in one read. They asked /projects/:id/report once per
+ *  project, up to 60 at a time. Counts the same rows the report counts for these two numbers,
+ *  with the same visibility rule: the client side sees only client-visible projects and rows.
+ *  Each table is read once for all of them, in pages, so the row cap can't shorten a count. */
+export const PROGRESS_BATCH_MAX = 60;
+export async function handleProjectsProgress(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const asked = (new URL(req.url).searchParams.get('ids') || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => UUID_RE.test(s));
+  const ids = [...new Set(asked)].slice(0, PROGRESS_BATCH_MAX);
+  if (!ids.length) return json({ data: {} }, 200, cors);
+  const studio = await isStudioSide(jwt, site, principal);
+  const inIds = `in.(${ids.join(',')})`;
+  const [pj, tasks, approvals] = await Promise.all([
+    svc(`presence_projects?id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,client_visible`),
+    svcAll(`presence_tasks?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible`, 'id'),
+    svcAll(`presence_approvals?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible`, 'id'),
+  ]);
+  if (!pj.ok) return json({ error: 'read_failed', message: 'The projects couldn’t be read just now.' }, 502, cors);
+  const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number }> = {};
+  for (const p of rows(pj)) {
+    if (!studio && !p.client_visible) continue;
+    const mine = <T extends { project_id: string }>(list: T[]) => list.filter((x) => x.project_id === p.id);
+    out[p.id] = {
+      progress: progressOf(forViewer(mine(tasks), studio)),
+      pending_approvals: forViewer(mine(approvals), studio).filter((a: any) => a.status === 'pending').length,
+    };
+  }
+  return json({ data: out }, 200, cors);
 }
 
 export async function handleProjectStatus(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {

@@ -395,10 +395,12 @@ ok('today: recents render as-cached with data-noscope (the shell\'s scope-carry 
 // cache (projectReport). The pin still requires the card's DATA SOURCE to be
 // /projects + per-project /report — rerouting the card to any other read (or
 // bypassing the cache) must redden this.
-ok('today: Waiting-on-clients uses the Projects roster\'s own source (/projects + per-project /report, via the REPORTS cache)',
+// Item 86 (Nov 8 2026): one /projects/progress read for every project's count, with the
+// per-project /report (through the REPORTS cache) left as the fallback while the server lacks it.
+ok('today: Waiting-on-clients uses the Projects roster\'s own source (/projects + /projects/progress, the per-project /report as the fallback)',
   today.includes("apiGet('/projects')") && today.includes("apiGet('/projects/'+id+'/report')")
-  && /waitingCard\(\)\{[\s\S]*?projectReport\(p\.id\)/.test(today)
-  && today.includes('summary&&r.summary.pending_approvals'));
+  && /waitingCard\(\)\{[\s\S]*?apiGet\('\/projects\/progress\?ids='[\s\S]*?projectReport\(p\.id\)/.test(today)
+  && today.includes('batch[p.id].pending_approvals') && today.includes('summary?.pending_approvals'));
 ok('today: feed rows keep the .moment.todo identity the attention math is pinned on',
   today.includes('class="moment attn todo"'));
 ok('today: the greeting sub line carries the date (dateLine) before the needs count',
@@ -501,8 +503,9 @@ ok('portal (D1a): the bell panel opens with the badge\'s label — bellSinceLabe
 // the boot GET and the mark-seen POST carry the same gate.
 ok('portal: opening the bell REFETCHES /client/notifications (client persona only)',
   /const open=async\(\)=>\{[\s\S]{0,700}?if\(PORTAL\.persona==='client'\)\{[\s\S]{0,400}?await api\('\/client\/notifications'\)/.test(portal));
+// Item 86 (Nov 8 2026): the notifications and the Google ask go out together, still for a client only.
 ok('portal: the boot notifications GET is persona-gated (reviewer boots with zero /client/* reads)',
-  portal.includes("PORTAL.persona==='client'?await api('/client/notifications').catch(()=>null):null"));
+  /const \[n,a\]=PORTAL\.persona==='client'\?await Promise\.all\(\[\s*api\('\/client\/notifications'\)\.catch\(\(\)=>null\),\s*api\('\/connections\/ask'[\s\S]{0,160}?\]\):\[null,null\];/.test(portal));
 ok('portal: the mark-seen POST is persona-gated too — after the failed-read skip, before the POST',
   /if\(PORTAL\.notifsFailed\)return;[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
 // PS3: Recent-updates rows share the queue-row anatomy (icon from moment_type,

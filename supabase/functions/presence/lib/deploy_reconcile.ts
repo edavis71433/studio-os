@@ -50,6 +50,8 @@ export async function reconcileOnePublish(p: InflightPublish, nowMs: number): Pr
   if (outcome === 'live') {
     await svc(`presence_publishes?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', completed_at: nowIso }) });
     await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: nowIso }) });
+    // item 90: the timed-section sweep works out the new snapshot's next instant (best-effort; see routes/publish.ts)
+    await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: null }) }).catch(() => {});
     // The OTHER door to "live" — an async deploy that finished after the request
     // returned. The checklist's "Site live" step must tick from both, or a slow
     // deploy silently costs the studio 10%. Same idempotent tick as routes/publish.ts;

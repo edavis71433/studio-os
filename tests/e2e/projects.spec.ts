@@ -288,6 +288,34 @@ test.describe('Projects list view', () => {
     await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
   });
 
+  // Item 86: one read answers Progress and Open approvals for every row on screen.
+  test('Progress and Open approvals come from one read for every row (item 86)', async ({ page }) => {
+    await pinTable(page);
+    const PROGRESS = { data: {
+      p1: { progress: { pct: 75, done: 3, total: 4 }, pending_approvals: 3 },
+      p2: { progress: { pct: 100, done: 2, total: 2 }, pending_approvals: 0 },
+      p3: { progress: { pct: 0, done: 0, total: 1 }, pending_approvals: 0 },
+    } };
+    await installApp(page, { api: { ...API, '/projects/progress': PROGRESS } });
+    const asked: string[] = [];
+    page.on('request', (r) => { const u = new URL(r.url()); if (/\/projects\/(progress|[^/]+\/report)$/.test(u.pathname)) asked.push(u.pathname.split('/presence')[1] + u.search); });
+    await page.goto('/projects.html');
+    await expect(page.locator('tbody tr[data-id="p1"]')).toContainText('3/4 tasks');
+    await expect(page.locator('tbody tr[data-id="p1"] .badge.wait')).toHaveText('3 waiting');
+    await expect(page.locator('tbody tr[data-id="p3"]')).toContainText('0/1 tasks');
+    expect(asked.filter((a) => a.startsWith('/projects/progress'))).toHaveLength(1);
+    expect(new URLSearchParams(asked[0].split('?')[1]).get('ids')!.split(',').sort()).toEqual(['p1', 'p2', 'p3']);
+    expect(asked.filter((a) => a.endsWith('/report'))).toEqual([]);
+  });
+  test('while the server lacks that read, each row’s report still fills it in (item 86)', async ({ page }) => {
+    await pinTable(page);
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/projects/progress**', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/projects.html');
+    await expect(page.locator('tbody tr[data-id="p1"]')).toContainText('3/6 tasks');
+    await expect(page.locator('tbody tr[data-id="p1"] .badge.wait')).toHaveText('2 waiting');
+  });
+
   test('ensureReports fans out only to VISIBLE rows when a searched roster reloads', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });
@@ -704,7 +732,7 @@ test.describe('Project record — client-upload origin (A10)', () => {
 // top-layer dialog + the mobile layout-viewport widening (courting the wide
 // roster table) put the Create button beyond the visible viewport, so taps
 // never reached it. Pinned with the table view behind the dialog on purpose.
-test.describe('Projects — the New-project dialog on phones (SS6 pin)', () => {
+test.describe('Projects — the New-project dialog on phones (SS6 pin)', { tag: '@layout' }, () => {
   test('create submits over the pinned roster table: POST /projects lands and the new record opens', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });

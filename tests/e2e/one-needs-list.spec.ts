@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
 
 // Sales review, Nov 2026 — one "needs you" list and one Home for a studio:
@@ -87,6 +87,40 @@ test.describe('item 23 — one Home for a studio', () => {
     await page.goto('/today.html');
     await expect(page.locator('#greeting')).toBeVisible();
     await expect(page).toHaveURL(/\/today\.html$/);
+  });
+
+  // Item 86: Today used to make all of its reads, and only then send a studio Home.
+  const TODAY_ONLY = ['/moments', '/marketplace/features', '/client/projects', '/analytics/dashboard', '/bookings/appointments', '/commerce/example-data'];
+  const readsOf = (page: Page) => {
+    const reads: string[] = [];
+    page.on('request', (r) => { const u = new URL(r.url()); if (r.method() === 'GET' && u.pathname.includes('/functions/v1/presence')) reads.push(u.pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
+    return reads;
+  };
+  test('a studio that landed here before goes Home before any of Today’s own reads (item 86)', async ({ page }) => {
+    await page.addInitScript(() => { try { localStorage.setItem('dds-today-studio', '1'); } catch { /* denied */ } });
+    await installApp(page, { api: HOME_API });
+    const reads = readsOf(page);
+    await page.goto('/today.html');
+    await expect(page).toHaveURL(/\/agency\.html$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // Home is headed Home since the sales side's final pass
+    for (const p of TODAY_ONLY) expect(reads, p).not.toContain(p);
+  });
+  test('a studio here for the first time goes Home as soon as its context is in, not after the slow reads (item 86)', async ({ page }) => {
+    await installApp(page, { api: HOME_API });
+    await page.route('**/functions/v1/presence/moments**', async (route) => { await new Promise((r) => setTimeout(r, 6000)); return route.fallback(); });
+    await page.goto('/today.html');
+    await expect(page).toHaveURL(/\/agency\.html$/, { timeout: 3000 });
+    // and the next landing skips Today's reads
+    expect(await page.evaluate(() => localStorage.getItem('dds-today-studio'))).toBe('1');
+  });
+  test('a plain owner’s Today reads the account context once, from the shell (item 86)', async ({ page }) => {
+    await installApp(page);
+    const reads = readsOf(page);
+    await page.goto('/today.html');
+    await expect(page.locator('#greeting')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(reads.filter((p) => p === '/portal/context')).toHaveLength(1);
+    expect(await page.evaluate(() => localStorage.getItem('dds-today-studio'))).toBe('0');
   });
 
   test('Home carries Recent wins (the last 90 days, each opening its deal) and the Ask box', async ({ page }) => {

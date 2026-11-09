@@ -21,7 +21,7 @@ import { providerByKey } from '../connected/providers.ts';
 import { connectableFor, profileOf } from '../connected/inventory.ts';
 import { connectionReason } from '../connected/contract.ts';
 import type { EditionKey } from '../connected/contract.ts';
-import { APP_URL, isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens, signAsk, verifyAsk } from '../connected/auth.ts';
+import { APP_URL, isGoogle, isOAuth, oauthConfigured, authorizeUrl, exchangeCode, revokeToken, signState, verifyState, refreshTokens, signAsk, verifyAsk } from '../connected/auth.ts';
 import { saveTokens, loadTokens, disconnect as storeDisconnect, getConnectionConfig, setConnectionConfig, markStatus, setConnection } from '../connected/store.ts';
 import { sendEmail, validEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
@@ -51,10 +51,21 @@ const ACTIVATION_EXTRA: Record<string, string> = {
   google_analytics: 'The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/analytics.readonly scope to its consent screen, and enable the Google Analytics Data API and Google Analytics Admin API on the project.',
   google_business_profile: 'The same Google Cloud app Search Console uses works here — add the https://www.googleapis.com/auth/business.manage scope to its consent screen, request Business Profile API access from Google at support.google.com/business/contact/api_default (the quota stays at zero until they approve it), then enable the My Business Account Management, My Business Business Information, Google My Business and Business Profile Performance APIs on the project.',
 };
-function activationHelp(key: string, providerName: string): { message: string; missing: string[]; redirect_uri: string; docs: string } {
+export function activationHelp(key: string, providerName: string): { message: string; missing: string[]; redirect_uri: string; docs: string } {
   const K = key.toUpperCase();
-  const missing = [`CONNECTED_${K}_CLIENT_ID`, `CONNECTED_${K}_CLIENT_SECRET`, 'CONNECTION_ENC_KEY'];
   const extra = ACTIVATION_EXTRA[key] ? ` ${ACTIVATION_EXTRA[key]}` : '';
+  // Item 95: a Google product signs in with the studio's own Google app, the one the back office
+  // uses (connected/auth.ts credsSource, since PR 149). The help named only each product's own
+  // pair, which nobody needs to make any more.
+  if (isGoogle(key)) {
+    const missing = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'CONNECTION_ENC_KEY'];
+    return {
+      message: `${providerName} isn’t switched on yet. It signs in with the studio’s Google app, the one the back office uses: set ${missing.join(', ')} as Supabase Edge Function secrets, and add ${APP_URL}/connections-callback.html to that app’s redirect URIs.${extra} Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
+      missing, redirect_uri: `${APP_URL}/connections-callback.html`,
+      docs: 'docs/presence/ENV-AND-SECRETS.md',
+    };
+  }
+  const missing = [`CONNECTED_${K}_CLIENT_ID`, `CONNECTED_${K}_CLIENT_SECRET`, 'CONNECTION_ENC_KEY'];
   return {
     message: `${providerName} isn’t switched on yet — it needs its ${providerName} app registered and three Supabase Edge Function secrets set: ${missing.join(', ')}. The app’s redirect URI must be ${APP_URL}/connections-callback.html.${extra} Nothing is wrong with your account; this is a one-time setup on the Studio side.`,
     missing, redirect_uri: `${APP_URL}/connections-callback.html`,

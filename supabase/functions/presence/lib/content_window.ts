@@ -93,3 +93,30 @@ export function blocksNeedRewindow(blocks: unknown, liveIso: string, nowIso: str
     && ((b as any).show_from || (b as any).show_until)
     && visibilityChanged(b as any, liveIso, nowIso));
 }
+
+/** Every section a snapshot's settings can put on the site: the home page's and each of
+ *  the owner's own pages'. The render hides a section outside its window on any page, but
+ *  the sweep looked only at the home page, so a timed section on another page never
+ *  appeared or came down by itself (item 90, Nov 8 2026). Pure. */
+export function windowedBlocks(settings: unknown): unknown[] {
+  const s = (settings && typeof settings === 'object') ? settings as { blocks?: unknown; pages?: unknown } : {};
+  const home = Array.isArray(s.blocks) ? s.blocks : [];
+  const pages = Array.isArray(s.pages) ? (s.pages as Array<{ blocks?: unknown }>).flatMap((p) => (p && Array.isArray(p.blocks) ? p.blocks : [])) : [];
+  return [...home, ...pages];
+}
+
+/** The next instant after `afterIso` at which any of these sections appears or comes down,
+ *  or null when none ever will. A window that starts after it ends never shows, so it has
+ *  no such instant. The sweep stores this at each site and reads the site again only once
+ *  it has passed (item 90). Pure. */
+export function nextWindowBoundary(blocks: unknown, afterIso: string): string | null {
+  if (!Array.isArray(blocks)) return null;
+  let next: string | null = null;
+  for (const b of blocks) {
+    if (!b || typeof b !== 'object') continue;
+    const from = (b as any).show_from || undefined, until = (b as any).show_until || undefined;
+    if (from && until && from > until) continue;
+    for (const at of [from, until]) if (at && at > afterIso && (!next || at < next)) next = at;
+  }
+  return next;
+}

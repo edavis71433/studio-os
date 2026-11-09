@@ -262,7 +262,7 @@ function render(){
     </div>
     <div id="stage"></div>
     <div class="card">
-      <div class="hh"><h2>Recent broadcasts</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh broadcasts" title="Refresh">${IC.refresh}</button></div>
+      <div class="hh"><h2>Recent updates</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh your updates" title="Refresh">${IC.refresh}</button></div>
       ${histMeta()}
       ${histBody()}
     </div>`;
@@ -279,7 +279,7 @@ function histMeta(){
   return `<div class="lmeta" id="bcMeta">${BROADCASTS.length} broadcast${BROADCASTS.length===1?'':'s'}${lastSent?' · last sent '+esc(when(lastSent)):''} · ${esc(updatedLabel())}</div>`;
 }
 function histBody(){
-  if(!LIST_OK)return `<div class="notice" id="bcNotice"><span>Your broadcast history couldn’t load just now.</span> <button class="ghost" id="bcRetry" type="button">Try again</button></div>`;
+  if(!LIST_OK)return `<div class="notice" id="bcNotice"><span>Your past updates couldn’t load just now.</span> <button class="ghost" id="bcRetry" type="button">Try again</button></div>`;
   return BROADCASTS.length?BROADCASTS.map(bcCard).join(''):`<div class="empty"><span class="eic" aria-hidden="true">${IC.mail}</span><p>Nothing sent yet — your first update will show up here.</p></div>`;
 }
 function bcCard(b){

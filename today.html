@@ -598,9 +598,12 @@ async function waitingCard(){
   const act=projects.filter(p=>p&&p.id&&p.status!=='complete'&&p.status!=='archived').slice(0,6);
   if(!act.length)return;
   const rows=[];
+  // Item 86: one read for every project's open approvals (/projects/progress). Until the
+  // server has that route, the per-project reports still answer.
+  let batch=null;
+  try{const b=(await apiGet('/projects/progress?ids='+act.map(p=>p.id).join(','))).data;if(b&&typeof b==='object'&&!Array.isArray(b))batch=b;}catch(e){if(e!==404)return;}
   await Promise.all(act.map(async(p)=>{
-    const r=await projectReport(p.id);
-    const n=Number((r&&r.summary&&r.summary.pending_approvals)||0);
+    const n=batch?Number((batch[p.id]&&batch[p.id].pending_approvals)||0):Number(((await projectReport(p.id))||{}).summary?.pending_approvals||0);
     if(n>0)rows.push({id:p.id,name:p.name||'A project',n});
   }));
   if(!rows.length)return;
@@ -768,7 +771,12 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // only when that site has sales, and the enquiries tile only when one waits.
   const enq = feed && feed.enquiries;
   const top = clientFactsHtml(facts) + alertBandHtml(rcv) + statStripHtml(statTiles(facts && !salesActivity(summary) ? null : summary, facts && !(Array.isArray(enq) && enq.length) ? null : enq));
+  // The shell's banner for a studio's request to work with this owner sits at the top of main
+  // (shell.js paintStudioRequests). Item 86: Today now draws after the shell's context arrives,
+  // which is just after that banner is painted, so the banner is kept rather than wiped.
+  const studioAsk = document.getElementById('dds-studio-req');
   $('main').innerHTML = top + `<div class="cols${railEmpty?' norail':''}" id="home-cols"><div class="colmain" id="col-main">${main}</div><aside class="colrail" id="col-rail" aria-label="At a glance"${railEmpty?' hidden':''}>${rail}</aside></div>`;
+  if(studioAsk) $('main').insertBefore(studioAsk, $('main').firstChild);
   // "what comes with your business" — the Industry Pack, made invisible. Secondary
   // context, so it opens inside the collapsible "More about your business" below.
   const feats = (features && features.features) || [];
@@ -945,16 +953,34 @@ function trouble(){
     <p style="margin-top:14px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;
 }
 
+// The shell is a deferred script, so it runs after this one: until the page has parsed,
+// window.ddsContext isn't there yet, and reading the context ourselves made it twice.
+const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>document.addEventListener('DOMContentLoaded', r, { once: true })) : Promise.resolve();
 (async function init(){
   try{
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if(!TOKEN){ signedOut(); return; }
+    // Sales review item 23 (Nov 2026): a studio has ONE Home — Customers
+    // (agency.html). This page stays the plain owner's Today and a client's
+    // Overview (?client=); a studio account at studio level is sent home.
+    // Item 86: it used to make every read below first. A browser that brought a studio here
+    // before asks only for the context; otherwise the reads go out with it, and the move to
+    // Home happens the moment the context lands, not after the rest.
+    const ctxRead = SHELL_READY.then(()=>window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null));   // PERF: the shell's /portal/context
+    const studioHome = (c)=>!!(c && c.is_agency && !(c.scope && c.scope.site_id) && !new URLSearchParams(location.search).get('client'));
+    let seenStudio = false; try{ seenStudio = localStorage.getItem('dds-today-studio') === '1'; }catch(_){ /* storage denied */ }
+    if(seenStudio){ const c = await ctxRead; if(studioHome(c && c.data)){ location.replace('/agency.html'); return; } }
+    ctxRead.then((c)=>{
+      const yes = studioHome(c && c.data);
+      try{ localStorage.setItem('dds-today-studio', yes ? '1' : '0'); }catch(_){ /* storage denied */ }
+      if(yes) location.replace('/agency.html');
+    });
     let feedFailed = false;
     const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example, rec] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
-      (window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null)),   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
+      ctxRead,   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
       apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
@@ -966,11 +992,8 @@ function trouble(){
       (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/commerce/example-data').catch(()=>null)),   // benchmark 12: are the trial's example rows still here? (never for a drilled-in operator; hidden on a failed/404 read)
       (new URLSearchParams(location.search).get('client')?apiGet('/crm/record?client='+encodeURIComponent(new URLSearchParams(location.search).get('client'))).catch(()=>null):Promise.resolve(null)),   // item 24: a client's Overview leads with their facts (studio only — anyone else gets a 403 → null)
     ]);
-    // Sales review item 23 (Nov 2026): a studio has ONE Home — Customers
-    // (agency.html). This page stays the plain owner's Today and a client's
-    // Overview (?client=); a studio account at studio level is sent home.
     const c0 = ctx && ctx.data;
-    if(c0 && c0.is_agency && !(c0.scope && c0.scope.site_id) && !new URLSearchParams(location.search).get('client')){ location.replace('/agency.html'); return; }
+    if(studioHome(c0)) return;   // on its way Home (above)
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
     let facts = null;

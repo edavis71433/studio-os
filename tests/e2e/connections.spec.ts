@@ -498,3 +498,16 @@ test.describe('Connections — ask the client to connect their Google', () => {
     await expect(page.locator('#askClient')).toHaveCount(0);
   });
 });
+
+// Item 95: the date ran into the last number ("4 from searchas of 2026-11-08"), as a raw date.
+test('a connection’s numbers end with a separated, plain-words date', async ({ page }) => {
+  await installApp(page);
+  await page.goto('/connections.html');
+  const words = await page.evaluate(() => {
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
+    const text = (iso: string) => { const div = document.createElement('div'); div.innerHTML = (window as any).dataLine({ search_clicks: 4, as_of: iso }); return div.textContent; };
+    return [text(ymd(now)), text(ymd(y)), text('2026-03-02')];
+  });
+  expect(words).toEqual(['4 from search · as of today', '4 from search · as of yesterday', '4 from search · as of Mar 2']);
+});

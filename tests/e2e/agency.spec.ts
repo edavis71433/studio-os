@@ -178,7 +178,7 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('tbody tr')).toContainText('Marlow’s Kitchen');
     await expect(page.locator('.lmeta')).toContainText('1 business ·');
     await page.locator('[data-view="owed"]').click();
-    await expect(page.locator('#main')).toContainText('No clients match that.');   // no receivables in this fixture → nobody owes
+    await expect(page.locator('#main')).toContainText('No customers match that.');   // no receivables in this fixture → nobody owes
   });
 
   test('search re-renders never destroy the input, its caret POSITION, or focus (the L bug)', async ({ page }) => {
@@ -200,7 +200,7 @@ test.describe('Agency portfolio', () => {
     await expect(rows).toContainText('Marlow’s Kitchen');
   });
 
-  test('failed portfolio read: couldn’t-load + Try-again refetches — NEVER "No clients yet"', async ({ page }) => {
+  test('failed portfolio read: couldn’t-load + Try-again refetches — NEVER "No customers yet"', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     let calls = 0;
     await page.route(PF_RE, (route) => {
@@ -210,7 +210,7 @@ test.describe('Agency portfolio', () => {
     });
     await page.goto('/agency.html');
     await expect(page.locator('#main')).toContainText('We couldn’t load your portfolio just now.');
-    await expect(page.locator('#main')).not.toContainText('No clients yet');   // failure ≠ empty
+    await expect(page.locator('#main')).not.toContainText('No customers yet');   // failure ≠ empty
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
     expect(calls).toBe(2);   // Try-again really refetched
@@ -240,7 +240,7 @@ test.describe('Agency portfolio', () => {
   test('a genuinely EMPTY portfolio still earns the honest first-run copy', async ({ page }) => {
     await installApp(page, { api: { ...agencyApi, '/agency/portfolio': { data: [] }, '/studio/customers': { data: [] } } });   // nothing on either list
     await page.goto('/agency.html');
-    await expect(page.locator('#main')).toContainText('No clients yet.');
+    await expect(page.locator('#main')).toContainText('No customers yet.');
     await expect(page.locator('#main').getByRole('button', { name: '+ Add a customer' })).toBeVisible();   // onboarding lives on the home page now
   });
 

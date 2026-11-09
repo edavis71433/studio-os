@@ -32,6 +32,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { ownerReplyTo } from '../lib/service_bridge.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import {
@@ -256,9 +257,14 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
 async function notifyCustomer(siteId: string, appt: any, status: string): Promise<void> {
   const to = String(appt.customer_email || '');
   if (!to) return;                                            // phone-only booking → no email to send
-  const ident = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0];
-  const biz = ident?.business_name || 'the team';
-  const brand = await loadEmailBrand(siteId);
+  // One wave: the business name, its brand, and where "just reply" goes — the
+  // business owner's own email (item 72), never the platform's.
+  const [identR, brand, replyTo] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
+    loadEmailBrand(siteId),
+    ownerReplyTo(siteId),
+  ]);
+  const biz = rows(identR)[0]?.business_name || 'the team';
   const when = humanSlot(String(appt.slot_start_local || '')) || String(appt.slot_start_local || '');
   const price = priceText(appt.price_cents);
   const head = status === 'confirmed' ? 'Your booking is confirmed' : 'We got your booking request';
@@ -275,7 +281,7 @@ async function notifyCustomer(siteId: string, appt: any, status: string): Promis
     `<p style="color:#666;font-size:.9rem">Need to change or cancel? Just reply to this email.</p>`;
   // A booking confirmation is transactional (a direct response to the customer's own
   // action) → critical:true survives an opt-out but still respects bounces.
-  await sendEmail(to, `${head} — ${appt.type_name}`, body, brand, { critical: true });
+  await sendEmail(to, `${head} — ${appt.type_name}`, body, brand, { critical: true, replyTo });
 }
 
 async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): Promise<void> {
@@ -458,14 +464,17 @@ export async function handleBookingMark(site: SiteRow, id: string, action: 'comp
 async function notifyCustomerCanceled(siteId: string, appt: any, reason: string): Promise<void> {
   const to = String(appt.customer_email || '');
   if (!to) return;
-  const ident = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0];
-  const biz = ident?.business_name || 'the team';
-  const brand = await loadEmailBrand(siteId);
+  const [identR, brand, replyTo] = await Promise.all([   // a reply reaches the business (item 72)
+    svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
+    loadEmailBrand(siteId),
+    ownerReplyTo(siteId),
+  ]);
+  const biz = rows(identR)[0]?.business_name || 'the team';
   const when = humanSlot(String(appt.slot_start_local || '')) || String(appt.slot_start_local || '');
   const body =
     `<p>Your booking with ${esc(biz)} has been canceled.</p>` +
     `<p><b>${esc(appt.type_name)}</b> — ${esc(when)}</p>` +
     (reason ? `<p style="color:#666">${esc(reason.slice(0, 300))}</p>` : '') +
     `<p style="color:#666;font-size:.9rem">You’re welcome to book another time whenever it suits you.</p>`;
-  await sendEmail(to, `Booking canceled — ${appt.type_name}`, body, brand, { critical: true });
+  await sendEmail(to, `Booking canceled — ${appt.type_name}`, body, brand, { critical: true, replyTo });
 }

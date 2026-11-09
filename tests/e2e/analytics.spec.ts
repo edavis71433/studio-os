@@ -128,7 +128,7 @@ test.describe('Analytics (Business dashboard)', () => {
   // The segmented control is plain buttons (no popup, no focusout guard), so an
   // iOS tap — which blurs without focusing anything — has nothing to break.
   // Pinned with the iOS focus semantics anyway: see tests/e2e/helpers/ios-focus.ts.
-  test('touch: tapping a period segment actually switches the period', async ({ page }, testInfo) => {
+  test('touch: tapping a period segment actually switches the period', { tag: '@touch' }, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await installIosFocusSemantics(page);
@@ -402,7 +402,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(page.getByRole('heading', { name: 'Sales' })).toBeVisible();
     // the band is the studio's sales relationship WITH this client — same
     // numbers, different meaning, so it is stated rather than guessed at
-    await expect(page.getByText('Your deal and invoices with this client.')).toBeVisible();
+    await expect(page.getByText('Your deal and invoices with this customer.')).toBeVisible();
     // and the client's actual invoices are there — not "No invoices yet"
     await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
     await expect(page.getByText('No wins yet')).toHaveCount(0);
@@ -636,7 +636,7 @@ const AGENCY_CTX = { data: {
   plan_key: 'presence', upsell: null,
 } };
 const PORTFOLIO = { data: {
-  headline: 'Across 3 clients, here’s what stands out.',
+  headline: 'Across 3 customers, here’s what stands out.',
   client_count: 3,
   insights: [
     { key: 'growing', title: 'New inquiries', sentence: '2 of your 3 clients have new inquiries waiting.', number: 2, detail: 'Marlow’s Kitchen, Beacon Plumbing', tone: 'good' },
@@ -663,15 +663,15 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // the same title row as the business dashboard, one h1, an "All clients" chip
     await expect(dashHead(page)).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('.subline .chip')).toHaveText('All clients');
+    await expect(page.locator('.subline .chip')).toHaveText('All customers');
     await expect(page.getByText(/^As of /)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
-    await expect(page.getByText('Across 3 clients, here’s what stands out.')).toBeVisible();
+    await expect(page.getByText('Across 3 customers, here’s what stands out.')).toBeVisible();
     // the stat strip — every number derived from the payload ('Needs attention'
     // is both a tile and an insight title, so tiles are looked up by strip)
     const kpi = (name: string) => tileOf(page, '#portfolioStats', name);
-    await expect(kpi('Clients').locator('.v')).toHaveText('3');
-    await expect(kpi('Clients').getByRole('link', { name: 'Open Studio' })).toHaveAttribute('href', '/agency.html');
+    await expect(kpi('Customers').locator('.v')).toHaveText('3');
+    await expect(kpi('Customers').getByRole('link', { name: 'Open Studio' })).toHaveAttribute('href', '/agency.html');
     await expect(kpi('Needs attention').locator('.v')).toHaveText('1');
     await expect(kpi('Enquiries waiting').locator('.v')).toHaveText('4');   // 3 + 1 + 0
     await expect(kpi('Sites live').locator('.v')).toHaveText('2');
@@ -793,8 +793,8 @@ test.describe('Analytics (Agency portfolio lens)', () => {
       route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
     await page.goto('/analytics.html');
     await expect(dashHead(page)).toBeVisible();
-    await expect(tileOf(page, '#portfolioStats', 'Clients').locator('.v')).toHaveText('3');
-    await expect(page.getByText('The client-by-client list wouldn’t load just now')).toBeVisible();
+    await expect(tileOf(page, '#portfolioStats', 'Customers').locator('.v')).toHaveText('3');
+    await expect(page.getByText('The customer-by-customer list wouldn’t load just now')).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(0);
   });
 
@@ -811,15 +811,15 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // trade three good rows for the couldn't-load line (loadDash discipline)
     rosterFails = true;
     await page.getByRole('button', { name: 'Refresh' }).click();
-    await expect(page.getByText('Couldn’t refresh the client list just now.')).toBeVisible();
+    await expect(page.getByText('Couldn’t refresh the customer list just now.')).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // last-good kept
-    await expect(page.getByText('The client-by-client list wouldn’t load just now')).toHaveCount(0);
+    await expect(page.getByText('The customer-by-customer list wouldn’t load just now')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Marlow’s Kitchen' })).toBeVisible();
   });
 
   test('all-quiet renders ONLY on a successful empty read', async ({ page }) => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': { data: {
-      headline: 'All 3 clients are quiet and current — nothing needs you.',
+      headline: 'All 3 customers are quiet and current — nothing needs you.',
       client_count: 3, insights: [], websites: PORTFOLIO.data.websites,
     } } } });
     await page.goto('/analytics.html');
@@ -830,17 +830,17 @@ test.describe('Analytics (Agency portfolio lens)', () => {
 
   test('zero clients: never "every client is current" — a calm first-client line instead', async ({ page }) => {
     await installApp(page, { api: { ...AGENCY_API,
-      '/analytics/portfolio': { data: { headline: 'No clients yet.', client_count: 0, insights: [], websites: [] } },
+      '/analytics/portfolio': { data: { headline: 'No customers yet.', client_count: 0, insights: [], websites: [] } },
       '/agency/portfolio': { data: [] },
     } });
     await page.goto('/analytics.html');
     await expect(dashHead(page)).toBeVisible();
     // the all-quiet wording would contradict an empty portfolio
-    await expect(page.getByText('Every client is current')).toHaveCount(0);
+    await expect(page.getByText('Every customer is current')).toHaveCount(0);
     await expect(page.getByText('Nothing to watch yet.')).toBeVisible();
-    await expect(page.getByText('Add your first client from your Studio tools')).toBeVisible();
+    await expect(page.getByText('Add your first customer from your Studio tools')).toBeVisible();
     // the rollup keeps its own no-clients empty state
-    await expect(page.getByText('No clients yet', { exact: false }).first()).toBeVisible();
+    await expect(page.getByText('No customers yet', { exact: false }).first()).toBeVisible();
   });
 
   // ── the Search Console band: every CTA lands somewhere that can act ──────────

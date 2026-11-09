@@ -571,14 +571,23 @@ async function ensureCustomers(){
     CUSTMAP=map; return true;
   }catch(_){return false;}
 }
-// per-project report summaries (the existing /projects/:id/report route) for the
-// Progress + Open approvals columns — parallel, cached, best-effort. SS6: the
-// fan-out is capped to the rows the roster actually SHOWS (search included) —
-// the interim answer until the D6 batch endpoint ships.
+// the Progress + Open approvals columns, for the rows the roster actually SHOWS (search
+// included, SS6) — cached, best-effort. Item 86: one read for all of them
+// (/projects/progress); it used to be one /projects/:id/report per row, up to 60. While the
+// server hasn't that route yet (pages go live before the functions deploy) the per-project
+// reads still fill it in.
 async function ensureReports(){
   const ids=visRows().map(p=>p.id).filter(id=>id&&!REPORTS[id]).slice(0,60);
   if(!ids.length)return false;
   let changed=false;
+  try{
+    const r=await api('/projects/progress?ids='+ids.join(','));
+    const got=r&&r.data;
+    if(got&&typeof got==='object'&&!Array.isArray(got)){
+      ids.forEach(id=>{if(got[id]){REPORTS[id]=got[id];changed=true;}});
+      return changed;
+    }
+  }catch(e){if(!(e&&e.status===404))return changed;}
   await Promise.allSettled(ids.map(id=>api('/projects/'+id+'/report').then(r=>{const s=r&&r.data&&r.data.summary;if(s){REPORTS[id]=s;changed=true;}}).catch(()=>{})));
   return changed;
 }

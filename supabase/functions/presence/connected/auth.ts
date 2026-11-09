@@ -42,7 +42,7 @@ const OAUTH: Record<string, OAuthEndpoints> = {
 };
 
 const ENVKEY = (k: string) => k.toUpperCase();
-const isGoogle = (providerKey: string) => !!OAUTH[providerKey] && OAUTH[providerKey].authorize.startsWith('https://accounts.google.com/');
+export const isGoogle = (providerKey: string) => !!OAUTH[providerKey] && OAUTH[providerKey].authorize.startsWith('https://accounts.google.com/');
 /** Where a provider's app credentials come from: its own CONNECTED_<KEY> pair,
  *  else, for a Google product, the studio's Google app (GOOGLE_CLIENT_ID and
  *  _SECRET, first set up for the older back office). Eric's call on Nov 8 2026:
