@@ -116,7 +116,7 @@ export function twoUnpaidInARow(
   localYmd: string, resumedAt?: string | null,
 ): boolean {
   const counted = (invoices || [])
-    .filter((v) => v && v.status !== 'void' && (!resumedAt || String(v.created_at || '') > String(resumedAt)))
+    .filter((v) => v && v.status !== 'void' && (!resumedAt || (Date.parse(String(v.created_at || '')) || 0) > (Date.parse(String(resumedAt)) || 0)))
     .sort((a, b) => String(b.recurring_on || '').localeCompare(String(a.recurring_on || '')));
   if (counted.length < 2) return false;
   return counted.slice(0, 2).every((v) => v.status === 'open' && !v.processing_since && isYmd(v.due_date) && v.due_date < localYmd);

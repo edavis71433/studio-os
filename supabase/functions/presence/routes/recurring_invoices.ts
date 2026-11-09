@@ -21,7 +21,7 @@
 // writes and sends. Studio-gated and site-scoped like every authed /sales/* route.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { raiseNotice, clearNotice, clearNoticePrefix } from '../lib/notice.ts';
+import { raiseNotice, clearNoticePrefix } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
 import {
   localClock, sendDue, headsUpDue, twoUnpaidInARow, afterSend, resumeOn, nextOccurrence,
@@ -68,8 +68,12 @@ async function contactOf(siteId: string, deal: any): Promise<{ email: string; wh
     return { email: String(c?.email || ''), who: String(c?.company || c?.name || deal?.title || '') };
   } catch { return { email: '', who: String(deal?.title || '') }; }
 }
+// The heads-up is news, not an ask: once it's wrong (sent, skipped, paused,
+// changed) it is removed outright rather than dismissed, so its key is free and
+// the sweep raises a fresh one if that date is still coming (after Resume or Change).
 async function clearHeadsUp(clientId: string | null, s: any): Promise<void> {
-  if (clientId && s?.next_on) await clearNotice(clientId, 'invoice_upcoming', headsUpPeriod(s.deal_id, s.id, s.next_on));
+  if (!clientId || !s?.next_on) return;
+  await svc(`presence_plan_notices?client_id=eq.${clientId}&kind=eq.invoice_upcoming&period=eq.${encodeURIComponent(headsUpPeriod(s.deal_id, s.id, s.next_on))}`, { method: 'DELETE' }).catch(() => {});
 }
 
 // ═══ SEND ONE (the sweep, and Start with a first date of today) ═══
@@ -163,11 +167,16 @@ export async function runRecurringInvoices(limit = 20): Promise<{ sent: number; 
   const clientOf = new Map(rows(sitesQ).map((r) => [String(r.id), r.client_id || null]));
   const zone = new Map(rows(zonesQ).map((r) => [String(r.site_id), String(r.timezone || '')]));
   const nowMs = Date.now();
+  // the heads-ups already up, read once (a raised one is never raised again)
+  const ahead = due.filter((s) => headsUpDue(s, localClock(zone.get(String(s.site_id)), nowMs).ymd));
+  const upQ = ahead.length ? await svc(`presence_plan_notices?kind=eq.invoice_upcoming&period=in.(${ahead.map((s) => `"${headsUpPeriod(s.deal_id, s.id, s.next_on)}"`).join(',')})&select=period&limit=${ahead.length}`) : null;
+  const up = new Set(rows(upQ || {}).map((n) => String(n.period)));
   let sends = 0;
   for (const s of due) {
     const local = localClock(zone.get(String(s.site_id)), nowMs);
     const clientId = clientOf.get(String(s.site_id)) || null;
     if (headsUpDue(s, local.ymd) && clientId) {
+      if (!upQ?.ok || up.has(headsUpPeriod(s.deal_id, s.id, s.next_on))) continue;
       try {
         const deal = await loadDeal(s.site_id, s.deal_id);
         if (!deal) continue;   // a removed deal: its schedule ends on the day instead
@@ -286,6 +295,8 @@ export async function handleRecurringAction(_req: Request, site: SiteRow, princi
     const nextOn = nextOccurrence(s.next_on, Number(s.anchor_day), s.every as RecurringEvery);
     const row = await write(`status=in.(active,paused)&next_on=eq.${s.next_on}`, { next_on: nextOn });
     if (!row) return conflict();
+    // an invoice made for the skipped date whose pay link never came (Stripe was down) never reached them: it goes too
+    await svc(`presence_invoices?recurring_id=eq.${id}&recurring_on=eq.${s.next_on}&site_id=eq.${site.id}&status=eq.open&stripe_url=is.null&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});
     await clearHeadsUp(clientId, s);
     await dealEvent(site.id, s.deal_id, 'recurring_invoice', principal, { detail: { action: 'skipped', recurring_id: id, title: s.title, on: s.next_on } });
     return json({ data: row, skipped: s.next_on, next_on: nextOn, every: everyLabel(s.every) }, 200, cors);

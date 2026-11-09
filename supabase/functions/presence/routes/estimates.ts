@@ -153,7 +153,7 @@ export async function handleEstimateDecide(req: Request, id: string, cors: Recor
   const e = rows(await svc(`presence_estimates?id=eq.${id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=${EST_COLS}&limit=1`))[0];
   if (!e) return json({ error: 'not_found', message: 'This estimate is no longer available.' }, 404, cors);
   if (e.status === decision) return json({ data: { status: e.status }, already: true }, 200, cors);   // a second tap
-  if (decision === 'approved' && estimateExpired(e, nowIso())) return json({ error: 'expired', message: 'This estimate has expired — ask your studio for an updated one. Nothing is lost.' }, 409, cors);
+  if (decision === 'approved' && estimateExpired(e, nowIso())) return json({ error: 'expired', message: 'This estimate has expired — ask your studio for a new one. Nothing is lost.' }, 409, cors);
   if (!canDecideEstimate(e.status, decision)) return json({ error: 'bad_state', message: 'This estimate was already answered.' }, 409, cors);
   const note = clean(b.note, 500);
   const up = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=id,deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },

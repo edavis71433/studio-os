@@ -100,7 +100,6 @@ const TERMINAL_OK = [
   { kind: 'deal_signed', marker: 'estimate:', why: 'estimate:<deal>:<estimate> — an estimate is approved once; turning THAT estimate into a proposal or an invoice is terminal, and a new estimate mints a new id' },
   { kind: 'deal_followup', marker: 'estdeclined:', why: 'estdeclined:<deal>:<estimate> — an estimate gets one answer; a fresh estimate mints a new id' },
   { kind: 'deal_followup', marker: 'pausePeriod(', why: 'recurpause:<deal>:<schedule>:<date> — one row per send date that could not go out; resuming clears it, and a later pause is on a later date' },
-  { kind: 'invoice_upcoming', marker: 'headsUpPeriod(', why: 'recurnext:<deal>:<schedule>:<date> — one heads-up per send date; sending, skipping or changing THAT date ends it, and the next date is a new key' },
   { kind: 'deal_followup', marker: 'reviewAskPeriod(', why: 'reviewask:<project id> — list item 29 asks a finished project\'s client for a review once, ever, by design (a silent ledger row); a reopened and re-finished project is not asked twice' },
 ];
 const clearedRaises = raises.filter((r) => r.kind && clearedKinds.has(r.kind));

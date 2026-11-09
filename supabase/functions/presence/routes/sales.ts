@@ -1331,7 +1331,7 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
     const noteLine = note ? `<p>${note.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.replace(/^[^—]*/, (w) => w.toLowerCase())} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 

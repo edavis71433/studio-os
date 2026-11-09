@@ -115,6 +115,7 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
   ok('2: its own pay link, for this invoice', v.stripe_url === `https://pay.example.test/${v.id}` && stripe.filter((x) => x.path === '/v1/payment_links').length === 1 && stripe.find((x) => x.path === '/v1/payment_links').idem === `plink-${v.id}`);
   const m = mail[0];
   ok('2: one email to the client, the usual invoice email', mail.length === 1 && m.to === 'riley@example.org' && m.subject === `${v.title} — $500.00` && /Pay \$500\.00 securely/.test(m.html) && m.html.includes(`https://pay.example.test/${v.id}`));
+  ok('2: the first line keeps the month\'s capital ("a website care — December 2026")', m.html.includes(`sent you a ${v.title.replace(/^[^—]*/, (w) => w.toLowerCase())} for`) && /— [A-Z][a-z]+ \d{4} for/.test(m.html), m.html.slice(0, 300));
   ok('2: it says which invoice it is and when it\'s due', m.html.includes(`This is your monthly invoice for Website care. It’s due ${R.dayLabel(day(14))}.`), m.html.slice(0, 400));
   ok('2: their reply comes back to the Inbox', m.reply_to === `${SITE}@reply.example.com`);
   const sent = events('invoice_sent')[0];
@@ -213,8 +214,11 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
   const pauseRow = (on) => ({ id: crypto.randomUUID(), client_id: OWNER, site_id: SITE, kind: 'deal_followup', period: `recurpause:${DEAL}:${S1}:${on}`, status: 'active', headline: 'Recurring invoice paused — x' });
   world({ presence_recurring_invoices: [schedule({ next_on: day(2) })], presence_plan_notices: [heads(day(2))] });
   const p = await act(S1, 'pause');
-  ok('7: Pause → paused by you, and its heads-up goes', p.status === 200 && sched().status === 'paused' && sched().paused_reason === 'manual' && notices('invoice_upcoming')[0].status === 'dismissed' && recEvents('paused')[0].detail.reason === 'manual');
+  ok('7: Pause → paused by you, and its heads-up goes', p.status === 200 && sched().status === 'paused' && sched().paused_reason === 'manual' && notices('invoice_upcoming').length === 0 && recEvents('paused')[0].detail.reason === 'manual');
   ok('7: Pause twice changes nothing', (await act(S1, 'pause')).body.already === true && recEvents('paused').length === 1);
+  await act(S1, 'resume');
+  const back = await RI.runRecurringInvoices(20);
+  ok('7: Pause then Resume with the date still ahead → the heads-up comes back', back.heads_up === 1 && notices('invoice_upcoming').length === 1 && notices('invoice_upcoming')[0].status === 'active');
 
   world({ presence_recurring_invoices: [schedule({ status: 'paused', paused_reason: 'unpaid', next_on: day(-5) })], presence_plan_notices: [pauseRow(day(-5)), { ...pauseRow(day(-36)), period: `recurpause:${DEAL}:${S1}:${day(-36)}` }, { ...pauseRow(day(-5)), period: `recurpause:${DEAL}:${S2}:${day(-5)}` }] });
   const r = await act(S1, 'resume');
@@ -230,12 +234,15 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
   world({ presence_recurring_invoices: [schedule({ next_on: '2026-12-31', anchor_day: 31 })], presence_plan_notices: [{ ...heads('2026-12-31') }] });
   const sk = await act(S1, 'skip');
   ok('7: Skip this one → the one after, on the usual day (Dec 31 → Jan 31)', sk.status === 200 && sched().next_on === '2027-01-31' && sk.body.skipped === '2026-12-31' && recEvents('skipped')[0].detail.on === '2026-12-31');
-  ok('7: …its heads-up goes, nothing is billed', notices('invoice_upcoming')[0].status === 'dismissed' && invoices().length === 0 && mail.length === 0);
+  ok('7: …its heads-up goes, nothing is billed', notices('invoice_upcoming').length === 0 && invoices().length === 0 && mail.length === 0);
+  world({ presence_recurring_invoices: [schedule()], presence_invoices: [{ id: uuid('b'), site_id: SITE, deal_id: DEAL, title: 'Website care — X', amount_cents: 50000, status: 'open', purpose: 'service', recurring_id: S1, recurring_on: day(-1), stripe_url: null, deleted_at: null }, { id: uuid('c'), site_id: SITE, deal_id: DEAL, title: 'Website care — Y', amount_cents: 50000, status: 'open', purpose: 'service', recurring_id: S1, recurring_on: day(-32), stripe_url: 'https://pay.example.test/c', deleted_at: null }] });
+  await act(S1, 'skip');
+  ok('7: Skip takes down that date\'s invoice if its pay link never came, and leaves sent ones alone', !!invoices().find((v) => v.id === uuid('b')).deleted_at && !invoices().find((v) => v.id === uuid('c')).deleted_at);
 
   world({ presence_recurring_invoices: [schedule({ next_on: day(10), sent_count: 3 })], presence_plan_notices: [heads(day(10))] });
   const c = await change(S1, { amount_cents: 60000, next_on: day(12), title: 'Care plan' });
   ok('7: Change → the new amount, name and date; the day moves with the date', c.status === 200 && sched().amount_cents === 60000 && sched().title === 'Care plan' && sched().next_on === day(12) && sched().anchor_day === Number(day(12).slice(8)));
-  ok('7: …the old heads-up goes, and the deal says so', notices('invoice_upcoming')[0].status === 'dismissed' && recEvents('changed')[0].detail.amount_cents === 60000 && recEvents('changed')[0].detail.on === day(12));
+  ok('7: …the old heads-up goes, and the deal says so', notices('invoice_upcoming').length === 0 && recEvents('changed')[0].detail.amount_cents === 60000 && recEvents('changed')[0].detail.on === day(12));
   ok('7: Change can\'t set fewer times than have gone out', (await change(S1, { times: 2 })).status === 422);
   ok('7: Change to a past date is refused', (await change(S1, { next_on: day(-1) })).status === 422);
 

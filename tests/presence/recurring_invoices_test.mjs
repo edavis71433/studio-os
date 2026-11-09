@@ -80,6 +80,8 @@ const ok = (n, c, note = '') => { if (c) { pass++; console.log('PASS ', n); } el
   ok('5: a voided one isn\'t owed, so the two before it count', R.twoUnpaidInARow([v('2026-09-01'), v('2026-10-01'), v('2026-11-01', { status: 'void' })], today));
   ok('5: the newest two decide, in date order', !R.twoUnpaidInARow([v('2026-11-01', { status: 'paid' }), v('2026-09-01'), v('2026-10-01')], today));
   ok('5: after Resume, the ones sent before it don\'t count', !R.twoUnpaidInARow([v('2026-10-01'), v('2026-11-01')], today, '2026-11-25T00:00:00Z'));
+  ok('5: times compare as times, whatever their written form', !R.twoUnpaidInARow([v('2026-10-01', { created_at: '2026-11-25T10:00:00.5+00:00' }), v('2026-11-01', { created_at: '2026-11-25T10:00:00+00:00' })], today, '2026-11-25T10:00:00.900Z')
+    && R.twoUnpaidInARow([v('2026-10-01', { created_at: '2026-11-25T11:00:00+00:00' }), v('2026-11-01', { created_at: '2026-11-25T12:00:00+00:00' })], today, '2026-11-25T10:00:00.900Z'));
 }
 
 // ═══ 6. after a send, resume ═══
