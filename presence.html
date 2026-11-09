@@ -5343,7 +5343,7 @@ async function openPublishPreview(publishId) {
   await loadPreview();
 }
 function openStage() { lastFocus = document.activeElement; $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("btnStageClose").focus(); }
-function closePreview() { PV.template = ""; $("stage").classList.remove("on"); document.body.style.overflow = ""; $("previewFrame").srcdoc = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
+function closePreview() { PV.template = ""; $("stage").classList.remove("on"); document.body.style.overflow = ""; PV_SEQ++; pvWrite(""); if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } }
 $("btnStageClose").addEventListener("click", closePreview);
 // Escape closes the stage and nothing beneath it: it is the topmost layer, but the Design
 // panels' capture handler and the shell's (an expanded sidebar section reads as an open
@@ -5384,28 +5384,46 @@ window.addEventListener("message", (e) => {
 // Item 85: Hide or a move from the canvas also drew the page into the Preview screen,
 // hidden behind Edit mode: two full renders for one Hide. Opening Preview draws it anyway.
 function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")) loadPreview(); }
+// Item 100: two writes to the frame a few milliseconds apart could leave it on the first. A
+// draft that came back quickly stayed on "Loading your draft…" for good, the page itself sitting
+// unused in srcdoc: the loading line finished loading after the page was written, and the
+// browser dropped the page. So every write is numbered, and a frame that finishes loading an
+// older one is given the newest again (twice in a row at most, so nothing can loop). An answer
+// to an older ask (another page or version picked meanwhile, or Preview closed) is dropped, as
+// the Overview's are.
+let PV_SEQ = 0, PV_WRITES = 0, PV_DOC = "", PV_REDOS = 0;
+function pvWrite(doc) {
+  PV_DOC = doc ? doc + `<!--dds-proof ${++PV_WRITES}-->` : ""; PV_REDOS = 0;
+  $("previewFrame").srcdoc = PV_DOC;
+}
+$("previewFrame").addEventListener("load", () => {
+  const f = $("previewFrame"), d = f.contentDocument;
+  if (!PV_DOC || !d) return;
+  const w = d.createTreeWalker(d, NodeFilter.SHOW_COMMENT); let n, shown = 0;
+  while ((n = w.nextNode())) { const m = /^dds-proof (\d+)$/.exec(n.data); if (m) shown = +m[1]; }
+  if (shown === PV_WRITES) PV_REDOS = 0;
+  else if (shown && shown < PV_WRITES && PV_REDOS++ < 2) f.srcdoc = PV_DOC;
+});
 async function loadPreview() {
-  const frame = $("previewFrame");
-  frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
+  const seq = ++PV_SEQ;
+  pvWrite(`<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`);
   try {
     const q = (PV.launchId ? `launch_id=${PV.launchId}&page=${encodeURIComponent(PV.page)}` : PV.publishId ? `publish_id=${PV.publishId}&page=${encodeURIComponent(PV.page)}` : `version=${PV.ver}&page=${encodeURIComponent(PV.page)}`) + (PV.template ? `&template=${encodeURIComponent(PV.template)}` : "");
     let html = await apiHtml(`/preview?${q}`);
+    if (seq !== PV_SEQ) return;
     html = html.replace("</body>", `<script>document.addEventListener("click",function(e){var a=e.target.closest("a");if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("/")===0){e.preventDefault();var p=h.split("#")[0];if(p.slice(-1)!=="/"&&p.indexOf(".")<0)p+="/";parent.postMessage({presenceNav:p},"*")}else if(h.indexOf("http")===0){e.preventDefault();window.open(h,"_blank","noopener")}});<\/script></body>`);
-    frame.srcdoc = html;
+    pvWrite(html);
   } catch (err) {
+    if (seq !== PV_SEQ) return;
     // a plain line and one Try again — never raw JSON, never "Proofing…" forever
-    frame.srcdoc = `<div style="font-family:Georgia,serif;color:#574d68;padding:56px 24px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err && err.notHtml ? "We couldn’t load that page just now." : nice(err))}<p style="margin-top:18px"><button type="button" onclick="parent.postMessage({presenceRetry:1},'*')" style="font:600 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-style:normal;color:#5b3fa0;background:#fff;border:1px solid #5b3fa0;border-radius:8px;padding:12px 18px;min-height:44px;cursor:pointer">Try again</button></p></div>`;
+    pvWrite(`<div style="font-family:Georgia,serif;color:#574d68;padding:56px 24px;text-align:center;max-width:420px;margin:0 auto;font-size:17px;line-height:1.6;font-style:italic">${esc(err && err.notHtml ? "We couldn’t load that page just now." : nice(err))}<p style="margin-top:18px"><button type="button" onclick="parent.postMessage({presenceRetry:1},'*')" style="font:600 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-style:normal;color:#5b3fa0;background:#fff;border:1px solid #5b3fa0;border-radius:8px;padding:12px 18px;min-height:44px;cursor:pointer">Try again</button></p></div>`);
   }
 }
 
-// ══ Click-to-edit in the live proof (AEM Universal-Editor pattern) ════════════
-// The proof (#previewFrame) is a SAME-ORIGIN srcdoc of the real render engine.
-// On each load we inject editor-ONLY chrome INTO the iframe document: hover a
-// section → a floating Edit / Move up / Move down / Hide cluster; click a section
-// → its editor opens (a block panel expands + scrolls, or the core-section tab
-// opens). Nothing here touches the published render (render.ts / site_blocks
-// output) — this chrome exists only in this editor's preview, never on the served
-// site. No external origins, no CSP change: everything is same-origin DOM work.
+// ══ Which section is which, for the Edit canvas ═══════════════════════════════
+// Item 100: this also gave the Preview screen (#previewFrame) a hover toolbar of its
+// own (Edit, ↑, ↓, Hide) and sent a click on a section off to edit it. Preview is a
+// visitor's view now; the map and the actions below serve Edit mode's canvas.
 //
 // Mapping (G13, server-stamped): renderSiteBlocks stamps every block section
 // with `data-dds-src` (its TRUE stored-list index — the render's own resolve
@@ -5428,8 +5446,8 @@ const DDS_CORE_VIEW = { hero: "business", about: "business", offerings: "offerin
 let DDS_SIDMAP = null;
 // G13 fix: local remap over the DOM's data-dds-src stamps — null = identity.
 // The canvas DOM only re-stamps on reload, so after ANY local list edit the
-// stamped indices are stale against BLOCKS_WORK; every splice site (dcMove /
-// eeMoveBlock via dcPermuteIndex, delete / cut / duplicate / paste / add via
+// stamped indices are stale against BLOCKS_WORK; every splice site (dcMove via
+// dcPermuteIndex, delete / cut / duplicate / paste / add via
 // dcShiftIndex) composes its shift into this map through dcComposeSrcMap, and
 // dcInjectCanvas resets it when the fresh render (fresh stamps) lands.
 // eeClassify applies it before bounds-check; -1 = that section was deleted.
@@ -5487,16 +5505,6 @@ function eeDoubleClickTarget(secEl) {
   if (EE_CORE_TOAST) EE_CORE_TOAST.remove();
   EE_CORE_TOAST = toastAction(`These words come from your ${eeTabWord(c.view)} tab.`, "Edit them there", () => eeEditCore(c.view), 8000);   // the name, tagline and About text can be typed right here (ideStart)
 }
-function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder swap + save
-  const o = BLOCKS_WORK; const ni = bi + dir; if (ni < 0 || ni >= o.length) return;
-  [o[ni], o[bi]] = [o[bi], o[ni]];
-  // G13 fix (review finding 1): an adjacent swap IS a one-slot move — compose
-  // the same dcPermuteIndex dcMove composes, so the proof's stale src stamps
-  // keep resolving until the save's reload re-stamps them.
-  dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, bi, ni));
-  if ($("blocksCard")) renderBlocksCard();
-  saveBlocks().then(previewIfOpen);              // persist, then redraw the proof if it's on screen (item 85)
-}
 function eeHideKey(key) {                        // reuse the sections-visibility machinery
   if (!key) return;
   Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => [...new Set([...sectionsHiddenNow(), key])])).then(previewIfOpen);
@@ -5528,96 +5536,9 @@ function eeClassify(el) {
   if (core) return { kind: "core", view: DDS_CORE_VIEW[core] || "design", key: Object.prototype.hasOwnProperty.call(DDS_CORE_VIEW, core) ? core : null };
   return { kind: "core", view: "design", key: null };   // unstamped → the structure studio
 }
-function eeEditTarget(el) { const c = eeClassify(el); if (c.kind === "block") eeEditBlock(c.bi); else eeEditCore(c.view); }
-// Inject the hover/click chrome into the proof document (called on every load).
-function eeInjectChrome(doc, main) {
-  if (!doc.getElementById("dds-ee-style")) {
-    const st = doc.createElement("style"); st.id = "dds-ee-style";
-    st.textContent =
-      ".dds-ee-on{outline:2px solid #2a6fb5!important;outline-offset:-2px;cursor:pointer}" +
-      "#dds-ee-bar{position:absolute;z-index:2147483000;display:none;gap:4px;background:#15141a;border-radius:9px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:system-ui,-apple-system,sans-serif}" +
-      "#dds-ee-bar.on{display:flex}" +
-      "#dds-ee-bar button{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 10px;cursor:pointer}" +
-      "#dds-ee-bar button:hover{background:rgba(255,255,255,.32)}" +
-      "#dds-ee-bar button:disabled{opacity:.4;cursor:default}" +
-      "#dds-ee-bar button:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
-      "[data-dds-ee]:focus-visible{outline:2px solid #2a6fb5;outline-offset:-2px}";
-    (doc.head || doc.documentElement).appendChild(st);
-  }
-  let bar = doc.getElementById("dds-ee-bar");
-  if (!bar) { bar = doc.createElement("div"); bar.id = "dds-ee-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
-  let current = null, hideT = null;
-  const win = doc.defaultView;
-  const place = (el) => {
-    const r = el.getBoundingClientRect();
-    bar.style.top = Math.max(2, r.top + win.scrollY + 4) + "px";
-    bar.style.left = Math.max(2, r.right + win.scrollX - bar.offsetWidth - 6) + "px";
-  };
-  const hideBar = () => { bar.classList.remove("on"); if (current) { current.classList.remove("dds-ee-on"); current = null; } };
-  const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 140); };
-  const keepBar = () => clearTimeout(hideT);
-  bar.addEventListener("mouseenter", keepBar);
-  bar.addEventListener("mouseleave", scheduleHide);
-  const mkBtn = (label, aria, fn, disabled) => {
-    const b = doc.createElement("button"); b.type = "button"; b.textContent = label; b.setAttribute("aria-label", aria);
-    if (disabled) b.disabled = true;
-    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) fn(); });
-    return b;
-  };
-  const showBar = (el) => {
-    clearTimeout(hideT);
-    if (current && current !== el) current.classList.remove("dds-ee-on");
-    current = el; el.classList.add("dds-ee-on");
-    const c = eeClassify(el);
-    bar.textContent = "";
-    if (c.kind === "block") {
-      const len = (BLOCKS_WORK || []).length;
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(c.bi)));
-      bar.appendChild(mkBtn("↑", "Move section up", () => eeMoveBlock(c.bi, -1), c.bi <= 0));
-      bar.appendChild(mkBtn("↓", "Move section down", () => eeMoveBlock(c.bi, 1), c.bi >= len - 1));
-      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(el.getAttribute("data-dds-key") || ddsKeyFor(c.bi))));
-    } else {
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
-      if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Styles → Your home page)", () => eeHideKey(c.key)));
-    }
-    bar.classList.add("on");
-    place(el);
-  };
-  // G13: refresh the sid→index lookup from the server sidecar, then wire every
-  // top-level section (identity read straight off the stamps — no id alignment).
-  ddsRebuildSidMap();
-  const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
-  Array.prototype.forEach.call(targets, (el) => {
-    if (el.hasAttribute("data-dds-ee")) return;
-    el.setAttribute("data-dds-ee", "1");
-    el.setAttribute("tabindex", "0");
-    const c = eeClassify(el);
-    el.setAttribute("aria-label", (c.kind === "block" ? "Editable section" : "Editable section") + " — press Enter to edit");
-    el.addEventListener("mouseenter", () => showBar(el));
-    el.addEventListener("mouseleave", scheduleHide);
-    el.addEventListener("focus", () => showBar(el));
-    el.addEventListener("blur", scheduleHide);
-    el.addEventListener("click", (e) => {
-      if (e.target.closest("a,button,input,select,textarea,label,summary")) return;   // let real controls behave
-      e.preventDefault(); eeEditTarget(el);
-    });
-    el.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); eeEditTarget(el); }
-    });
-  });
-}
-(function installClickToEdit() {
-  const frame = $("previewFrame"); if (!frame) return;
-  frame.addEventListener("load", () => {
-    let doc; try { doc = frame.contentDocument; } catch (_) { return; }
-    if (!doc || !doc.body) return;
-    // Only the editable draft gets chrome — not a live / kept / launch snapshot.
-    if (!(PV.ver === "draft" && !PV.publishId && !PV.launchId)) return;
-    const main = doc.getElementById("main"); if (!main) return;
-    if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();
-    try { eeInjectChrome(doc, main); } catch (_) { /* chrome is best-effort; never break the proof */ }
-  });
-})();
+// Item 100: the Preview screen is a visitor's view. It used to carry its own hover
+// toolbar (Edit, ↑, ↓, Hide) with a second move engine, and a click on a section left
+// Preview to edit it. Editing lives in Edit mode's canvas alone.
 
 /* ── the publish ritual (identical /changes + /publish + /publishes) ── */
 // Slice B: the Page ▾ menu's "Publish later" deep-links INTO the ritual (it stays
@@ -11647,8 +11568,8 @@ function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.default
 
 // ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
 // saveBlocks() PUTs /settings then refreshDesignPreview(), which reloads the iframe;
-// the load handler re-injects the chrome and restores scroll. Same auto-save the
-// modal proof's eeMoveBlock already uses — nothing goes live until Publish.
+// the load handler re-injects the chrome and restores scroll. Nothing goes live
+// until Publish.
 function dcAddAt(type, gap) { const def = BLOCK_DEFS.find((x) => x.type === type); if (!def) return; dcCaptureScroll(); addBlockAt(def, gap); if (MEDIA_FILL_TYPES.has(type)) { const bi = DC_FOCUS_BI; DC_FOCUS_BI = null; eeEditBlock(bi); } else { saveBlocks(); } }
 // PURE — where list index bi lands after ONE move of `from` to resolved slot
 // `to` (dndDropIndex). The single permutation both stale-map compensations

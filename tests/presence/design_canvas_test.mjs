@@ -286,15 +286,14 @@ const mkSrcMaps = () => new Function(
 }
 {
   // Every splice site composes, BEFORE its splice (pre-splice length = the
-  // stamp domain when the map is fresh). eeMoveBlock is a one-slot MOVE and
-  // reuses dcPermuteIndex, exactly like dcMove.
+  // stamp domain when the map is fresh). The Preview screen's own move (eeMoveBlock)
+  // went with item 100, so dcMove is the one move left.
   for (const [fn, kind] of [['dcDelete', '-1'], ['dcCutBlock', '-1'], ['dcDuplicate', '1'], ['dcPasteAt', '1'], ['addBlockAt', '1']]) {
     const s = extractFn(html, fn);
     ok(new RegExp('dcComposeSrcMap\\(BLOCKS_WORK\\.length, \\(v\\) => dcShiftIndex\\(v, [^,]+, ' + kind + '\\)\\)').test(s), fn + ' composes dcShiftIndex(…, ' + (kind === '-1' ? 'removal' : 'insertion') + ') into DDS_SRCMAP');
     ok(s.indexOf('dcComposeSrcMap(') < s.indexOf('.splice('), fn + ' composes BEFORE its splice (the pre-splice length is the stamp domain)');
   }
-  const eeMove = extractFn(html, 'eeMoveBlock');
-  ok(/dcComposeSrcMap\(o\.length, \(v\) => dcPermuteIndex\(v, bi, ni\)\)/.test(eeMove), 'eeMoveBlock (adjacent swap = one-slot move) composes dcPermuteIndex like dcMove');
+  ok(!html.includes('function eeMoveBlock('), 'item 100: the Preview screen has no move engine of its own; dcMove is the one move');
 }
 ok(/route === "\/settings" && j && j\.data && j\.data\.section_meta/.test(html), 'api() captures the /settings section_meta sidecar into S.sectionMeta (the ONE writer)');
 
@@ -694,7 +693,7 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
   ok(/if \(DP_REPAINT_HELD\) \{ DP_REPAINT_HELD = false; dcCaptureScroll\(\); refreshDesignPreview\(\); \}/.test(extractFn(html, 'ipeEnd')), 'the repaint a session held off runs when that session ends, and keeps the scroll');
   const sb = extractFn(html, 'putBlocks');
   ok(/closest\("#blocksCard"\)/.test(sb), 'saveBlocks skips the panel rebuild under a focused panel input (the §3 clobber hazard, closed)');
-  ok(!/ipeStart/.test(extractFn(html, 'eeInjectChrome')), 'the read-only stage proof gets NO text editing (its bar is unchanged)');
+  ok(!html.includes('function eeInjectChrome(') && !html.includes('installClickToEdit') && !html.includes('dds-ee-bar'), 'item 100: the Preview screen is a visitor’s view: no toolbar, no move engine, no click-to-edit');
   const wrap = extractFn(html, 'ipeWrapSel');
   ok(/surroundContents|extractContents/.test(wrap) && !/execCommand/.test(wrap), 'B/I use direct Range wrapping — not the deprecated execCommand');
   // ── review F-4: native formatting outside the keydown intercept (context
