@@ -235,12 +235,30 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
   ok('Escape stays inside the editor wherever focus is (the panel behind closes on Escape)', ed.includes("if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation();") && ed.includes("document.addEventListener('keydown', onKey, true);") && ed.includes("document.removeEventListener('keydown', onKey, true);"));
   ok('a button disabled under focus hands focus back to the editor', ed.includes('if (f && f !== dlg && f.disabled && dlg.contains(f)) dlg.focus();'));
   ok('a file dropped on the open editor is not uploaded', files.includes("if(document.querySelector('dialog[open]'))return;"));
-  ok('presence.html is untouched by this', !read('presence.html').includes('image-editor.js'));
   // "Cut out the subject": offered only when the page brings a service; a busy edge runs it by itself
   ok('the cut-out is offered only when the page brings a service', ed.includes("${o.cutout ? `<div class=\"ie-cutbox\">") && ed.includes("const cutBtn = $('ie-cut');"));
   ok('Remove background on a busy photo runs the cut-out by itself (a plain one keeps the free tool)', ed.includes('if (autoCut && st.bg.on && cut && !dragging) { autoCut = false; if (cut.ref && cut.plain < 0.55) setTimeout(runCutout, 0); }'));
   ok('a cut-out made once is reused: Undo and “Put the background back” never ask the service again', ed.includes("if (cutPic) { st.cutout = true; st.bg.on = false; commit(); schedule();") && ed.includes("const pic = () => (st.cutout && cutPic ? cutPic : { img, w: W0, h: H0 });"));
   ok('a failed cut-out says why and changes nothing', ed.includes("if (!pc) { sync(); schedule(); sayCut(String((res && res.error) ||"));
+}
+
+// ═══ 9. how the builder's photo picker uses it (found Nov 9 while building item 39) ═══
+{
+  const pres = read('presence.html'), files = read('files.html');
+  const v = (page) => (/s\.src ?= ?['"]\/image-editor\.js\?v=(\d+)['"]/.exec(page) || [])[1];
+  ok('the builder loads the editor on first use, at the same ?v= as Files', !!v(pres) && v(pres) === v(files), `builder v=${v(pres)}, files v=${v(files)}`);
+  const edit = pres.slice(pres.indexOf('async function editInPicker('), pres.indexOf('const editedName ='));
+  ok('the picker opens the ORIGINAL (the untransformed file), never the small thumbnail', edit.includes('const src = d && (d.thumb_fallback || d.download_url);') && !/\bm\.thumb\b/.test(edit));
+  ok('the copy is what the slot gets, and only while the same picker is open', edit.includes('if (pickerCb !== cb) return;\n  closeSheet("pickerScrim");\n  cb(res.value.id);'));
+  const save = pres.slice(pres.indexOf('async function saveEditedCopy('), pres.indexOf('// "Cut out the subject" (files.html'));
+  ok('saving goes through the same upload door, with a content hash', save.includes('api("POST", "/media/upload-url", { mime: out.mime, bytes: out.blob.size') && save.includes('content_hash: (await blobHash(out.blob)) || undefined'));
+  ok('the copy names its original and keeps its folder, tags and caption', save.includes('edited_from: a.id') && save.includes('body.collection = a.collection') && save.includes('body.tags = a.tags') && save.includes('body.caption = meta.caption'));
+  ok('a private photo’s copy is made private before it is named', save.indexOf('{ client_private: true }') > 0 && save.indexOf('{ client_private: true }') < save.indexOf('const body = { name: editedName'));
+  ok('saving never replaces or deletes the original', !/\/replace|"DELETE"|rollback/.test(save + edit));
+  ok('a failed upload keeps the editor open with the reason', save.includes('return { error: err && (err.status || err.offline) ? nice(err) :') && save.includes('return { error: "The upload didn’t finish'));
+  ok('Edit sits beside the photo’s own button, never inside it, and only on photos', pres.includes('const EDITABLE_PHOTO = /^image\\/(jpeg|png|webp)$/;') && pres.includes('wrap.append(cell, b);') && pres.includes('EDITABLE_PHOTO.test(m.mime || "") ? pickerEditWrap(cell, m, onEdit) : cell'));
+  const pf = pres.slice(pres.indexOf('function pfPaint('), pres.indexOf('function pfPick('));
+  ok('only the picker offers it: the editor panel’s Files tab drags its photos onto the canvas', pres.includes('}, editInPicker);') && pf.length > 0 && !pf.includes('editInPicker'));
 }
 
 const passed = results.filter((r) => r.p).length;
