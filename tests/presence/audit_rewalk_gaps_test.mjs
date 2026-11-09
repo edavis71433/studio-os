@@ -59,12 +59,17 @@ const notice = read('supabase/functions/presence/lib/notice.ts');
 ok('gap 4: noted only — the welcome card shows once and is not measured as a regression (no pin, by design)', true);
 
 // ═══ gap 5 · the rail cards no longer depend on /health carrying facts ═══
+// Item 84 (Nov 8 2026): those cards now sit on the tabs that show them (the page markers on
+// Pages, the health check and the address on Search, what happened on Versions), and each tab
+// reads its own the first time it opens. The Overview shows none of them and reads none.
 {
-  const loadToday = presence.slice(presence.indexOf('async function loadToday()'), presence.indexOf('/* ── the concierge\'s letters'));
+  const loadToday = presence.slice(presence.indexOf('async function loadToday('), presence.indexOf('/* ── the concierge\'s letters'));
   const facts = presence.slice(presence.indexOf('function renderFactsProse()'), presence.indexOf('\n}\n', presence.indexOf('function renderFactsProse()')));
-  ok('gap 5: loadToday() asks for the board extras itself', /renderFactsProse\(\);[\s\S]*?hbLoadBoardExtras\(\);/.test(loadToday));
+  const goFn = presence.slice(presence.indexOf('function go(view, early)'), presence.indexOf('\n}\n', presence.indexOf('function go(view, early)')));
+  ok('gap 5: the Overview\'s load asks for none of the board extras', loadToday.includes('readChanges()') && !/hbLoadBoardExtras/.test(loadToday));
+  ok('gap 5: Pages, Search and Versions each ask for their own', ['pages', 'search', 'history'].every((v) => goFn.includes(`hbLoadBoardExtras("${v}")`)));
   ok('gap 5: renderFactsProse() no longer gates them behind `facts`', !/hbLoadBoardExtras/.test(facts) && /if \(!f\) return;/.test(facts));
-  ok('gap 5: hbLoadBoardExtras still runs once (HB_ASKED.extras guard)', /function hbLoadBoardExtras\(\) \{\n  if \(HB_ASKED\.extras\) return; HB_ASKED\.extras = true;/.test(presence));
+  ok('gap 5: each extra is read once (HB_ASKED guards)', ['pages" && !HB_ASKED.tree', 'search" && !HB_ASKED.health', 'history" && !HB_ASKED.timeline'].every((g) => presence.includes(`if (view === "${g})`)));
 }
 
 const failed = results.filter((r) => !r.p);

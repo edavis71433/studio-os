@@ -150,7 +150,11 @@ test.describe('where everything else went', () => {
     await expect(page.locator('#pagesList .hb-row').first()).toContainText('Home');
     await page.goto('/presence.html#health');
     await expect(page.locator('#view-search')).toBeVisible();
+    await page.waitForTimeout(700);   // and it stays there: it used to jump to the Overview after 0.2 s
+    await expect(page.locator('#view-search')).toBeVisible();
     await page.goto('/presence.html#activity');
+    await expect(page.locator('#view-history')).toBeVisible();
+    await page.waitForTimeout(700);
     await expect(page.locator('#view-history')).toBeVisible();
     await expect(page.locator('#view-history h1.doc')).toHaveText('Versions');
     // the versions come first; what happened to the site follows them
@@ -932,6 +936,38 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')[0].body.blocks[0].title).toBe('Typed live');
   });
 
+  // Item 85: changed sections were found against the saved list, so leaving a field the live
+  // drawing already showed asked for the same drawing again.
+  test('leaving a field the canvas already shows asks for no second drawing (item 85)', async ({ page }) => {
+    const { frame, asked } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const title = page.locator('#blocksCard input').first();
+    await title.click();
+    await title.press('ControlOrMeta+a');
+    await title.pressSequentially('Typed live', { delay: 30 });
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('Typed live');
+    await page.waitForTimeout(400);   // the last keystroke's drawing is in
+    const drawn = asked.length;
+    await title.blur();
+    await page.waitForTimeout(600);   // past the 200 ms a drawing waits, before the save leaves at 700
+    expect(asked.length).toBe(drawn);
+  });
+  // Each live drawing used to rebuild the whole Contents list and every add-section line.
+  test('a live drawing leaves the Contents list and the add-section lines standing (item 85)', async ({ page }) => {
+    const { frame } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const firstRow = '#designTreeList .dc-tree-row.block';
+    await page.evaluate((sel) => { (document.querySelector(sel) as any).__kept = true; }, firstRow);
+    await frame.locator('.dc-ins').first().evaluate((n: any) => { n.__kept = true; });
+    await page.locator('#blocksCard input').first().fill('A fresh heading');
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('A fresh heading');
+    expect(await page.evaluate((sel) => !!(document.querySelector(sel) as any).__kept, firstRow)).toBe(true);
+    expect(await frame.locator('.dc-ins').first().evaluate((n: any) => !!n.__kept)).toBe(true);
+    // and that row still picks out the section drawn in its place
+    await page.evaluate((sel) => (document.querySelector(sel + ' .dc-tree-main') as HTMLElement).click(), firstRow);
+    await expect(frame.locator('#main > section[data-dds-src="0"]')).toHaveClass(/dc-hot/);
+  });
+
   test('a section added or removed waits for the full redraw instead', async ({ page }) => {
     const { asked } = await setup(page);
     await page.evaluate(() => (window as any).dcDuplicate(0));
@@ -1357,7 +1393,8 @@ test.describe('Load the latest shows what was loaded', () => {
     ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: LOADED }) })
     : route.fallback());
   test('the announcement and the home page’s section order show the loaded values, in their places', async ({ page }) => {
-    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    // Edit mode, where the home page's section list lives (item 84 mounts it when Edit mode opens)
+    await mount(page, '/presence.html#design', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
     await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th');
     await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'About', 'What you offer', 'Testimonials', 'Questions']);
     const placeBefore = await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!));
@@ -1428,6 +1465,180 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     await page.waitForLoadState('networkidle');
     expect(await place()).toBe(before);
     expect(reads).toEqual([]);
+  });
+});
+
+test.describe('the website editor reads what it shows, when it shows it (item 84)', () => {
+  // Every GET to the server, by path, in the order asked.
+  const readsOf = (page: Page) => {
+    const reads: string[] = [];
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (r.method() === 'GET' && u.pathname.includes('/functions/v1/presence')) reads.push(u.pathname.replace(/^.*\/functions\/v1\/presence/, ''));
+    });
+    return reads;
+  };
+  // What each tab reads for itself, which the Overview shows none of.
+  const EXTRAS: Record<string, string[]> = {
+    '#pages': ['/content-tree'],
+    '#search': ['/website-health', '/foundations/domain', '/search/health'],
+    '#versions': ['/website-timeline'],
+    '#media': ['/knowledge/docs'],
+    '#business': ['/monitor/connection'],
+    '#design': ['/dev/customization', '/dev/brand-kit', '/site/templates', '/blocks/suggested'],
+  };
+  const go = (page: Page, hash: string) => page.evaluate((h) => { location.hash = h; }, hash);
+
+  test('the site’s picture, health and the changes count go out before the slow reads answer, and no tab’s extras are read', async ({ page }) => {
+    await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    // Load again with the site's own record slow: nothing the Overview shows waits for it.
+    let siteAnswered = false;
+    const asked: string[] = [];
+    await page.route('**/functions/v1/presence/site', async (route: Route) => { await new Promise((r) => setTimeout(r, 800)); siteAnswered = true; return route.fallback(); });
+    page.on('request', (r) => { if (!siteAnswered && r.url().includes('/functions/v1/presence')) asked.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
+    const reads = readsOf(page);
+    await page.reload();
+    await expect(page.frameLocator('#siteFrame').locator('h1').first()).toHaveText('Marlow’s Kitchen');
+    await page.waitForLoadState('networkidle');
+    expect(asked).toEqual(expect.arrayContaining(['/preview', '/health', '/changes']));
+    for (const p of Object.values(EXTRAS).flat()) expect(reads, p).not.toContain(p);
+    expect(reads.filter((p) => p === '/preview')).toHaveLength(1);
+    // The shell reads the account context; the page takes its copy instead of a second read.
+    expect(reads.filter((p) => p === '/portal/context')).toHaveLength(1);
+  });
+
+  test('each tab reads its own extras the first time it opens, and not again', async ({ page }) => {
+    const reads = readsOf(page);
+    await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    for (const [hash, own] of Object.entries(EXTRAS)) {
+      const before = reads.length;
+      await go(page, hash);
+      await expect.poll(() => own.filter((p) => !reads.slice(before).includes(p)), { message: hash }).toEqual([]);
+    }
+    // A second round of every tab. Not a wait for a quiet network: the tablet keeps a font
+    // request open in Edit mode, so the network never goes quiet there.
+    await page.waitForTimeout(500);
+    const before = reads.length;
+    for (const hash of Object.keys(EXTRAS)) { await go(page, hash); await page.waitForTimeout(150); }
+    await page.waitForTimeout(800);
+    for (const p of Object.values(EXTRAS).flat()) expect(reads.slice(before), p).not.toContain(p);
+  });
+
+  test('coming back to the Overview reads health again only after a save', async ({ page }) => {
+    const reads = readsOf(page);
+    const writes = await mount(page, '/presence.html');
+    await page.waitForLoadState('networkidle');
+    const healthReads = () => reads.filter((p) => p === '/health').length;
+    expect(healthReads()).toBe(1);
+    // A wait for a quiet network returns at once after the first load, so these give a read
+    // the time it would take to go out.
+    await go(page, '#pages');
+    await page.waitForTimeout(400);
+    await go(page, '#today');
+    await page.waitForTimeout(800);
+    expect(healthReads()).toBe(1);   // nothing saved since, so nothing new to read
+    await go(page, '#business');
+    await page.locator('#f-business_name').fill('Marlow’s Bistro');
+    await expect.poll(() => writes.filter((w) => w.path === '/identity').length).toBe(1);
+    await go(page, '#today');
+    await expect.poll(healthReads).toBe(2);
+  });
+
+  test('the template list and the style settings are each read once when Edit mode opens', async ({ page }) => {
+    const reads = readsOf(page);
+    await mount(page, '/presence.html#design');
+    await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+    await page.waitForLoadState('networkidle');
+    expect(reads.filter((p) => p === '/dev/customization')).toHaveLength(1);
+    expect(reads.filter((p) => p === '/site/templates')).toHaveLength(1);
+  });
+});
+
+test.describe('words typed in a section’s panel while its save lands are kept (item 77)', () => {
+  // A list section's panel: one item field is finished (its save leaves 0.7 s later), the
+  // next field is focused before that save comes back, and typed in after. The save's answer
+  // used to replace the page's list with fresh copies while the panel, left alone because
+  // someone was typing, kept writing into the old ones: nothing saved, the words were gone.
+  const putsOf = (writes: Write[]) => writes.filter((w) => w.path === '/settings' && w.method === 'PUT' && w.body && Array.isArray(w.body.blocks));
+  type Editor = { name: string; block: Record<string, unknown>; first: [string, number, string]; next: [string, number, string]; saved: (b: any) => unknown };
+  const EDITORS: Editor[] = [
+    { name: 'Team', block: { type: 'team', title: 'Our team', members: [{ name: 'Ana', role: 'Chef' }, { name: 'Ben' }] },
+      first: ['Name', 0, 'Rosa'], next: ['Role (optional)', 0, 'Head chef'], saved: (b) => b.members[0] },
+    { name: 'Accordion', block: { type: 'accordion', title: 'Questions', items: [{ summary: 'Parking?', body: 'Out back.' }, { summary: 'Dogs?', body: 'On the patio.' }] },
+      first: ['Label (what people click to expand)', 0, 'Is there parking?'], next: ['The details inside…', 0, 'Free, behind the building.'], saved: (b) => b.items[0] },
+    { name: 'Tabs', block: { type: 'tabs', title: 'Services', tabs: [{ label: 'Lunch', body: 'Noon to three.' }, { label: 'Dinner', body: 'Five to ten.' }] },
+      first: ['Tab label (what people click)', 0, 'Brunch'], next: ['What’s inside this tab…', 0, 'Weekends, nine to two.'], saved: (b) => b.tabs[0] },
+    { name: 'Carousel', block: { type: 'carousel', title: 'Slides', slides: [{ image_id: 'm1', caption: 'One' }, { image_id: 'm2', caption: 'Two' }] },
+      first: ['Caption (optional)', 0, 'The front room'], next: ['Caption (optional)', 1, 'The patio'], saved: (b) => b.slides.map((x: any) => x.caption) },
+    { name: 'Progress bars', block: { type: 'progress', title: 'How it’s going', items: [{ label: 'Design', percent: 50 }, { label: 'Build', percent: 20 }] },
+      first: ['Label (e.g. Design, Capacity)', 0, 'Planning'], next: ['Label (e.g. Design, Capacity)', 1, 'Building'], saved: (b) => b.items.map((x: any) => x.label) },
+    { name: 'Buttons', block: { type: 'buttons', title: 'Get in touch', buttons: [{ label: 'Call', url: 'tel:5550100', style: 'primary' }] },
+      first: ['Button label (e.g. Get a quote)', 0, 'Book a table'], next: ['Where it goes (link)', 0, 'https://example.com/book'], saved: (b) => b.buttons[0] },
+    { name: 'Columns', block: { type: 'columns', title: 'Why us', columns: [{ body: 'Fresh.' }, { body: 'Local.' }] },
+      first: ['This column’s text…', 0, 'Fresh every morning.'], next: ['This column’s text…', 1, 'From farms nearby.'], saved: (b) => b.columns.map((x: any) => x.body) },
+    { name: 'Feature cards', block: { type: 'cards', title: 'What we do', cards: [{ heading: 'Catering' }, { heading: 'Events' }] },
+      first: ['Card title', 0, 'Private dining'], next: ['A line of text (optional)', 0, 'Up to twenty guests.'], saved: (b) => b.cards[0] },
+    { name: 'Photo gallery', block: { type: 'gallery', title: 'Photos', image_ids: ['m1', 'm2'] },
+      first: ['Caption (optional)', 0, 'The bar'], next: ['Caption (optional)', 1, 'The kitchen'], saved: (b) => b.captions },
+    { name: 'Before & after', block: { type: 'before_after', title: 'Our work', items: [{ before_id: 'm1', after_id: 'm2' }, { before_id: 'm3', after_id: 'm4' }] },
+      first: ['Caption (optional)', 0, 'The old counter'], next: ['Caption (optional)', 1, 'The new floor'], saved: (b) => b.items.map((x: any) => x.caption) },
+  ];
+  const EXPECT: Record<string, unknown> = {
+    'Team': { name: 'Rosa', role: 'Head chef' },
+    'Accordion': { summary: 'Is there parking?', body: 'Free, behind the building.' },
+    'Tabs': { label: 'Brunch', body: 'Weekends, nine to two.' },
+    'Carousel': ['The front room', 'The patio'],
+    'Progress bars': ['Planning', 'Building'],
+    'Buttons': { label: 'Book a table', url: 'https://example.com/book' },
+    'Columns': ['Fresh every morning.', 'From farms nearby.'],
+    'Feature cards': { heading: 'Private dining', text: 'Up to twenty guests.' },
+    'Photo gallery': ['The bar', 'The kitchen'],
+    'Before & after': ['The old counter', 'The new floor'],
+  };
+  for (const e of EDITORS) {
+    test(`${e.name}: the next field’s words save after the first field’s save comes back`, async ({ page }) => {
+      const type = String(e.block.type);
+      const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main"><section id="a" data-dds-sid="${type}" data-dds-key="block_${type}" data-dds-src="0" class="block"><h2 data-dds-field="title">${e.block.title}</h2></section></main></body></html>`;
+      const writes = await mount(page, '/presence.html#design', { __html: html, '/settings': { data: { blocks: [e.block], section_meta: { blocks: [{ sid: type, key: `block_${type}`, src_index: 0 }], pages: {} } } } });
+      await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+      await page.waitForLoadState('networkidle');
+      await page.evaluate(() => (window as any).eeEditBlock(0));
+      // the panel opens with the caret in the section's heading
+      await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.value)).toBe(e.block.title);
+      const card = page.locator('#blocksCard');
+      const first = card.getByPlaceholder(e.first[0], { exact: true }).nth(e.first[1]);
+      const next = card.getByPlaceholder(e.next[0], { exact: true }).nth(e.next[1]);
+      await first.fill(e.first[2]);
+      await next.focus();   // the first field is finished: its save leaves 0.7 s later
+      await expect.poll(() => putsOf(writes).length).toBe(1);
+      await page.waitForTimeout(300);   // and its answer lands while the next field has the caret
+      await expect(next).toBeFocused();
+      await next.fill(e.next[2]);
+      await next.blur();
+      await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(2);
+      expect(e.saved(putsOf(writes)[1].body.blocks[0])).toMatchObject(EXPECT[e.name] as object);
+      await expect(page.locator('#dcWhisper')).not.toHaveText(/Unsaved|Not saved/);
+    });
+  }
+  // The gallery's captions already wrote to the section as it stands; its remove button didn't.
+  test('Photo gallery: a photo removed after a save comes back is removed', async ({ page }) => {
+    const block = { type: 'gallery', title: 'Photos', image_ids: ['m1', 'm2'] };
+    const html = '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main"><section id="a" data-dds-sid="gallery" data-dds-key="block_gallery" data-dds-src="0" class="block"><h2 data-dds-field="title">Photos</h2></section></main></body></html>';
+    const writes = await mount(page, '/presence.html#design', { __html: html, '/settings': { data: { blocks: [block], section_meta: { blocks: [{ sid: 'gallery', key: 'block_gallery', src_index: 0 }], pages: {} } } } });
+    await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.value)).toBe('Photos');
+    const caption = page.locator('#blocksCard').getByPlaceholder('Caption (optional)', { exact: true });
+    await caption.nth(0).fill('The bar');
+    await caption.nth(1).focus();
+    await expect.poll(() => putsOf(writes).length).toBe(1);
+    await page.waitForTimeout(300);
+    await page.locator('#blocksCard button[title="Remove"]').nth(1).click();
+    await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(2);
+    expect(putsOf(writes)[1].body.blocks[0]).toMatchObject({ image_ids: ['m1'], captions: ['The bar'] });
   });
 });
 

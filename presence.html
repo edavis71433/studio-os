@@ -2130,14 +2130,17 @@ function go(view, early) {
   document.querySelectorAll("#dock button").forEach((b) => { const on = b.dataset.tab === view || (b.dataset.tab === "sections" && view !== "today"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   window.scrollTo({ top: 0 });
   if (early) return;   // the pre-data switch: the view is on screen, its loaders run on the real route below
+  // Item 84: a tab's own extras are read the first time it opens, never at start-up.
   if (view === "today") { loadToday(); }
-  if (view === "pages") { hbLoadBoardExtras(); renderPagesList(); renderRecent(); }
+  if (view === "pages") { hbLoadBoardExtras("pages"); renderPagesList(); renderRecent(); }
   closeTodoPanel();
-  if (view === "history") { loadHistory(); hbLoadBoardExtras(); }
-  if (view === "media") loadMedia();
+  if (view === "history") { loadHistory(); hbLoadBoardExtras("history"); }
+  if (view === "media") { loadMedia(); if (!TAB_ASKED.knowledge) { TAB_ASKED.knowledge = true; renderKnowledgeDocs(); } }
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
-  if (view === "search") { loadSearch(); hbLoadBoardExtras(); }
+  if (view === "search") { loadSearch(); hbLoadBoardExtras("search"); mountSearchCard(); }
+  if (view === "business" && !TAB_ASKED.monitor) { TAB_ASKED.monitor = true; renderMonitorCard(); }
+  if (view === "design") mountEditCards();
   // CP-2.5: the live proof warms on entry. Item 85: already on a drawn canvas (a section's
   // Edit, its cog, a double-click on a picture) nothing has changed, so nothing is drawn
   // again; that full redraw 350 ms later also left sections below a new one resolving one
@@ -4885,12 +4888,35 @@ function hbTreePage(pg) {
   if (!HB_TREE || !Array.isArray(HB_TREE.pages)) return null;
   return HB_TREE.pages.find((t) => t.path === pg.path) || null;
 }
-function hbLoadBoardExtras() {
-  if (HB_ASKED.extras) return; HB_ASKED.extras = true;
-  api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
-  api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); }).catch(() => {});
-  api("GET", "/website-timeline").then((r) => { HB_TIMELINE = r.data || null; renderActivity(); }).catch(() => {});
-  api("GET", "/foundations/domain").then((r) => { HB_DOMAIN = (r && r.data) || null; renderDomainCard(); }).catch(() => { HB_DOMAIN = undefined; });
+// Item 84: each tab reads only its own, the first time it opens: the page markers for Pages,
+// the health check and the address for Search, what happened for Versions. The Overview,
+// which shows none of them, used to read all four at start-up.
+function hbLoadBoardExtras(view) {
+  if (view === "pages" && !HB_ASKED.tree) {
+    HB_ASKED.tree = true;
+    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
+  }
+  if (view === "search" && !HB_ASKED.health) {
+    HB_ASKED.health = true;
+    api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); }).catch(() => {});
+    api("GET", "/foundations/domain").then((r) => { HB_DOMAIN = (r && r.data) || null; renderDomainCard(); }).catch(() => { HB_DOMAIN = undefined; });
+  }
+  if (view === "history" && !HB_ASKED.timeline) {
+    HB_ASKED.timeline = true;
+    api("GET", "/website-timeline").then((r) => { HB_TIMELINE = r.data || null; renderActivity(); }).catch(() => {});
+  }
+}
+// Item 84: the Files list's pasted menus and the Business tab's "already live elsewhere" card
+// are read when their tab first opens.
+const TAB_ASKED = {};
+// Edit mode's cards (Styles, the template gallery, the sections list, the forms) read four
+// things between them. They're mounted the first time Edit mode opens; after that a reload
+// redraws them as before.
+let EDIT_CARDS = false;
+function mountEditCards() {
+  if (EDIT_CARDS) return;
+  EDIT_CARDS = true;
+  remountInPlace("designCard", mountDesignCard);
 }
 function renderDomainCard() {
   const card = $("domainCard"); if (!card) return;
@@ -4960,10 +4986,15 @@ function renderActivity() {
     more.onclick = () => { HB_ACTIVITY_ALL = !HB_ACTIVITY_ALL; renderActivity(); more.focus(); };
   }
 }
-// #health · #pages · #activity land on the overview card that replaced a retired page
-function hbScrollTo(id) {
-  go("today");
-  setTimeout(() => { const n = $(id); if (n && !n.hidden) { n.scrollIntoView({ behavior: "smooth", block: "start" }); if (n.hasAttribute("tabindex")) n.focus({ preventScroll: true }); } }, 400);
+// #health and #activity land on the card that replaced a retired page
+function hbScrollTo(id, tries = 8) {
+  // The route has already opened the tab the card sits on (Search, Versions). This used to open
+  // the Overview first, from when the cards were there, so an old #health or #activity link
+  // showed its tab for a moment and then left it. The card's read may still be on its way
+  // (item 84), so it looks again for a couple of seconds.
+  const n = $(id);
+  if (n && !n.hidden) { n.scrollIntoView({ behavior: "smooth", block: "start" }); if (n.hasAttribute("tabindex")) n.focus({ preventScroll: true }); return; }
+  if (tries > 0) setTimeout(() => hbScrollTo(id, tries - 1), 250);
 }
 // the four tiles — each one a door to where the number is dealt with
 let HB_SEARCH = null, HB_ASKED = {};
@@ -4972,13 +5003,18 @@ let HB_LOOKS_ASKED = false;
 // the rail: Photos — three thumbnails and the count
 
 /* ── today: the board + the concierge's letters ── */
-async function loadToday() {
+// Item 84: a full load hands in health and the changes count already on their way with its
+// first wave (`first`). Coming back to the Overview reads them again only if this page has
+// saved something since: the changes count follows every save on its own.
+let TODAY_READ_AT = -1;   // WRITES_ANSWERED when health and the changes count were last read
+async function loadToday(first) {
   loadSiteStage();
+  if (!first && S.health && TODAY_READ_AT === WRITES_ANSWERED && !DRAFT_WRITES_OUT) return;
   try {
-    const [h, c] = await Promise.all([api("GET", "/health"), readChanges()]);   // M9: seed the optimistic-lock version
-    S.health = h.data; S.changes = c.data;
+    const at = WRITES_ANSWERED;
+    const [h, c] = await (first || Promise.all([api("GET", "/health"), readChanges()]));   // M9: seed the optimistic-lock version
+    S.health = h.data; S.changes = c.data; TODAY_READ_AT = at;
     renderFactsProse();
-    hbLoadBoardExtras();   // the health check and your address, for the Search tab; what happened, for Versions
     renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
   } catch (err) { toast(nice(err), true); }
 }
@@ -4986,11 +5022,14 @@ async function loadToday() {
 // The draft, as the render engine draws it, in view mode: links and forms are
 // guarded, nothing is editable here. Edit site opens the same page to build on.
 let SS_LOADED = false, SS_STALE = true, SS_SEQ = 0, SS_PATH = "/";
+let SS_PENDING = false;   // item 84: a draw on its way; asked again meanwhile, it isn't drawn twice
 function loadSiteStage(force) {
   const frame = $("siteFrame"); if (!frame || !$("view-today").classList.contains("on")) return;
   if (SS_LOADED && !SS_STALE && !force) return;
+  if (SS_PENDING && !force) return;
   const seq = ++SS_SEQ;
-  apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).then((html) => {
+  SS_PENDING = true;
+  apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).finally(() => { if (seq === SS_SEQ) SS_PENDING = false; }).then((html) => {
     if (seq !== SS_SEQ) return;
     SS_LOADED = true; SS_STALE = false;
     frame.srcdoc = html;
@@ -5149,7 +5188,7 @@ function renderFactsProse() {
   if (f.last_publish.label !== "—") { const lp = el("span", null, "Last published " + String(f.last_publish.label).replace(/^[A-Za-z]{3}, /, "")); lp.title = hbCap(f.last_publish.detail); parts.push(lp); }
   parts.forEach((n, i) => { if (i) w.insertBefore(el("span", "dot", "·"), whisperNode); w.insertBefore(n, whisperNode); });
   if (parts.length) w.insertBefore(el("span", "dot", "·"), whisperNode);
-  renderPagesList();
+  if ($("view-pages").classList.contains("on")) renderPagesList();   // item 84: opening Pages draws it
 }
 function renderRecent() {
   const c = S.changes;
@@ -5241,6 +5280,14 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* pri
 const PV = { ver: "draft", dev: "desktop", page: "/", publishId: null, template: "", launchId: null };
 // ── Phase CP-1 (FD-T8): try another look — preview-only until "Use this look" ──
 let LOOKS = null;   // { current: {slug}, templates: [{slug,name,version}] }
+// Item 84: one read of the template list for the gallery and the Template card (each read it
+// at start-up). Setting LOOKS back to null, as a template change does, reads it again.
+let LOOKS_READ = null;
+function loadLooks() {
+  if (LOOKS) return Promise.resolve(LOOKS);
+  if (!LOOKS_READ) LOOKS_READ = api("GET", "/site/templates").then((r) => (LOOKS = r.data)).finally(() => { LOOKS_READ = null; });
+  return LOOKS_READ;
+}
 // PT-2C: each family's visual signature for the preview cards. Unknown/future
 // families fall back to a neutral swatch derived from the platform accent.
 const LOOK_SWATCH = {
@@ -6638,6 +6685,7 @@ function fillSingles() {
   renderHours();
   renderSearchPreview();
 }
+const SHELL_LOADED = document.readyState === "loading" ? new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true })) : Promise.resolve();
 async function refreshAll() {
   // The website-content reads are TOLERANT: a plan without the website feature
   // (e.g. a Customers-only plan opening #settings) must still get this page —
@@ -6649,12 +6697,18 @@ async function refreshAll() {
   DRAFT_SEED = true;   // everything is read again below, so the next read's version is the page's
   const soft = (p) => p.catch((e) => (e && (e.status === 403 || e.status >= 500) ? { data: [] } : Promise.reject(e)));
   const tagged = (name, p) => p.catch((e) => { if (e && typeof e.message === "string") e.message = "[" + name + "] " + e.message; throw e; });
+  // Item 84: the Overview's own two reads go out with the first wave, not after it.
+  const todayFirst = Promise.all([api("GET", "/health"), readChanges()]);
+  todayFirst.catch(() => {});   // loadToday reports a failure
   const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
     tagged("site", api("GET", "/site")),
     soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
     soft(api("GET", "/media")), soft(api("GET", "/settings")),
     // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-    (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject()).catch(() => api("GET", "/portal/context").catch(() => null)),
+    // Item 84: this script runs before the deferred shell.js, so window.ddsContext usually
+    // didn't exist yet and the page read the context a second time. The shell has run by
+    // DOMContentLoaded; its handoff waits for its own read, or gives up after 2.5 s.
+    SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null)),
   ]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
@@ -6669,7 +6723,7 @@ async function refreshAll() {
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
-  fillSingles(); await loadToday();
+  fillSingles(); await loadToday(todayFirst);
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
   // Item 80: these cards mount once. On a reload (Load the latest, a restore, an accepted
@@ -6677,8 +6731,9 @@ async function refreshAll() {
   // so a restored announcement or section order shows; never while someone types in one.
   remountInPlace("annCard", mountAnnouncementCard);
   remountSectionsCard();
-  remountInPlace("designCard", mountDesignCard);
-  mountSearchCard();
+  if (EDIT_CARDS) remountInPlace("designCard", mountDesignCard);   // item 84: not before Edit mode first opens
+  else if ($("view-design").classList.contains("on")) mountEditCards();
+  if ($("view-search").classList.contains("on")) mountSearchCard();
 }
 // Draw a once-mounted card again from what's loaded, where it was (a placeholder holds its
 // spot while a mount that reads first is out); absent, mount it fresh. If the new one
@@ -7593,7 +7648,7 @@ const FIXED_COLOR_TEMPLATES = new Set(["slate"]);
 async function mountDesignCard(fresh = true) {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   if (fresh) {   // a remount right after this page's own save already holds the tokens
-    try { const r = await api("GET", "/dev/customization"); DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; DESIGN_FONTS = (r.data && r.data.font_library) || []; }
+    try { const r = await api("GET", "/dev/customization"); DESIGN_DEV = r.data || null; DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; DESIGN_FONTS = (r.data && r.data.font_library) || []; }
     catch (_) { return; } // not an owner/developer on this site → no card
   }
  
@@ -7672,11 +7727,11 @@ async function mountDesignCard(fresh = true) {
 // Item 85: asked once per page. An owner without the capability has no card to find, so
 // every redraw of the Styles cards used to ask the server again.
 let DEV_CSS_ALLOWED = null;
+let DESIGN_DEV = null;   // item 84: the colors card's read of /dev/customization, which this card reuses
 async function mountDevCssCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("devCssCard") || DEV_CSS_ALLOWED === false) return;
-  let data;
-  try { data = (await api("GET", "/dev/customization")).data; }
-  catch (_) { return; }
+  let data = DESIGN_DEV;
+  if (!data) { try { data = (await api("GET", "/dev/customization")).data; } catch (_) { return; } }
   DEV_CSS_ALLOWED = !!(data && data.can_edit_css);
   if (!DEV_CSS_ALLOWED) return;   // owners see the palette, not the advanced editor
 
@@ -8524,7 +8579,7 @@ async function undoSync(rec, vals, r) {
   if (rec.route === "/identity") { S.identity = { ...(S.identity || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/location") { S.location = { ...(S.location || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/bookings/settings") { BK.settings = { ...BK.settings, ...vals }; if ($("view-bookings").classList.contains("on")) loadBookings(); }
-  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
+  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; if (EDIT_CARDS) remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
@@ -8537,7 +8592,7 @@ async function undoSync(rec, vals, r) {
     // item 85: in place (they used to drop to the bottom of the Styles panel), and the colors
     // and fonts card from the tokens it holds: a settings step doesn't change them
     remountSectionsCard();
-    remountInPlace("designCard", () => mountDesignCard(false), true);
+    if (EDIT_CARDS) remountInPlace("designCard", () => mountDesignCard(false), true);
     fillSingles();
     if ($("ann-text")) { $("ann-text").value = S.settings.announcement_text || ""; $("ann-url").value = S.settings.announcement_url || ""; $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10); }
   }
@@ -8588,6 +8643,9 @@ function blocksSaveSoon(ms) {
 // sections stale, so it waits for the full redraw.
 let LIVE_T = null, LIVE_SEQ = 0, LIVE_PROBE = false, LIVE_TYPING = null;
 let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list save clears it
+// Item 85: each section as the live redraw last drew it, by index. Null: the canvas shows the
+// saved list, as after a full redraw.
+let LIVE_DRAWN = null;
 function dcLiveFromPanel() { LIVE_WANTED = true; dcLiveSoon(); }
 const LIVE_TYPE_OK = new Set(["title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
   "features", "stats", "process", "pricing", "certifications", "events", "social", "link_list", "service_areas"]);
@@ -8598,10 +8656,13 @@ async function dcLiveNow() {
   if (!main || IPE || IDE || DDS_SRCMAP || DC_MODE !== "edit" || !BLOCKS_WORK || DC_HIST_LAST == null) return;
   let saved; try { saved = JSON.parse(DC_HIST_LAST); } catch (_) { return; }
   if (!Array.isArray(saved) || saved.length !== BLOCKS_WORK.length) return;
-  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === JSON.stringify(saved[i]) ? -1 : i)).filter((i) => i >= 0);
+  // Against what the canvas shows: leaving a field the live redraw already drew asked for the
+  // same drawing again (item 85).
+  const shown = (i) => (LIVE_DRAWN && LIVE_DRAWN.has(i) ? LIVE_DRAWN.get(i) : JSON.stringify(saved[i]));
+  const changed = BLOCKS_WORK.map((b, i) => (JSON.stringify(b) === shown(i) ? -1 : i)).filter((i) => i >= 0);
   if (!changed.length || changed.length > 2) return;
   const seq = ++LIVE_SEQ, opened = DC_PAGE_OPENS, list = JSON.parse(JSON.stringify(BLOCKS_WORK));
-  let swapped = false;
+  let swapped = false, cols = false;
   for (const i of changed) {
     let html;
     try { html = (await api("POST", "/preview/section", { blocks: list, index: i })).data.html; } catch (_) { return; }   // the save's redraw still comes
@@ -8613,8 +8674,12 @@ async function dcLiveNow() {
     const nu = tpl.content.firstElementChild;
     if (nu) old.replaceWith(nu); else old.hidden = true;   // an emptied section draws nothing, as on the site
     swapped = true;
+    if (list[i] && list[i].type === "columns") cols = true;
+    (LIVE_DRAWN = LIVE_DRAWN || new Map()).set(i, JSON.stringify(list[i]));
   }
-  if (swapped) try { dcInjectCanvas(doc, main); } catch (_) { /* chrome is best-effort */ }
+  // The Contents list's rows find a swapped section again when clicked (dcTreeRow); a Columns
+  // section's rows hold its columns too, so that one rebuilds the list.
+  if (swapped) try { dcInjectCanvas(doc, main, true); if (cols) dcBuildTree(main); } catch (_) { /* chrome is best-effort */ }
 }
 async function blocksSaveNow() {
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;
@@ -9307,7 +9372,13 @@ function renderBlocksCard() {
     card.appendChild(sub);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
-    if (idx === focusIdx) setTimeout(() => { try { sub.scrollIntoView({ behavior: "smooth", block: "center" }); ti.focus(); } catch (_) {} }, 40);
+    // Item 77: someone already typing in this section's fields keeps the caret; on a busy
+    // phone the timer can fire late, and the next words went into the heading.
+    if (idx === focusIdx) setTimeout(() => { try {
+      sub.scrollIntoView({ behavior: "smooth", block: "center" });
+      const ae = document.activeElement;
+      if (!(ae && ae !== ti && sub.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) ti.focus();
+    } catch (_) {} }, 40);
   });
   if (solo === null) card.appendChild(blkGap(BLOCKS_WORK.length));   // #3/#4 — trailing "+" insert point / drop-line target
   if ($("designTray")) renderBlockTray();   // #3 — keep the tray's "already added" states in sync
@@ -9565,6 +9636,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   if (def.mediaKind === "gallery") {
     // Wave-2 G18: only the gallery block carries per-image captions + the zoom
     // lightbox — partners shares this picker but stores neither key.
@@ -9579,7 +9651,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--clay,#a3423a);color:var(--fill-ink,#fff);cursor:pointer;font-size:13px;line-height:1";
       // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
       // caption with it (the server re-validates the same alignment).
-      x.addEventListener("click", () => { commitTitle(); blk.image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
+      x.addEventListener("click", () => { commitTitle(); cur().image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
       chip.appendChild(x); cell.appendChild(chip);
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
@@ -9630,15 +9702,15 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
         cell.appendChild(el("span", "hint", j ? "After" : "Before"));
         if (pair[key]) cell.appendChild(mediaThumb(pair[key]));
         const pb = el("button", null, pair[key] ? "Change" : "Choose"); pb.type = "button"; pb.style.cssText = miniBtn;
-        pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.items[k][key] = id; renderBlocksCard(); } }); });
+        pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().items[k][key] = id; renderBlocksCard(); } }); });
         cell.appendChild(pb); pics.appendChild(cell);
       });
       row.appendChild(pics);
       const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = pair.caption || ""; cap.style.cssText = inputCss + ";margin-top:8px";
-      cap.addEventListener("change", () => { blk.items[k].caption = cap.value.trim(); });
+      cap.addEventListener("change", () => { cur().items[k].caption = cap.value.trim(); });
       row.appendChild(cap);
       const rm = el("button", null, "Remove pair"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm); sub.appendChild(row);
     });
     const add = el("button", null, "+ Add a pair"); add.type = "button"; add.style.cssText = miniBtn;
@@ -9651,23 +9723,24 @@ function renderTeamBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const members = Array.isArray(blk.members) ? blk.members : [];
   members.forEach((m, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap";
     const photo = el("div"); photo.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px";
     if (m.media_id) photo.appendChild(mediaThumb(m.media_id));
     const pb = el("button", null, m.media_id ? "Change photo" : "Add photo"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.members[k].media_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().members[k].media_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb);
     const fields = el("div"); fields.style.cssText = "flex:1;min-width:180px";
     const nm = el("input"); nm.type = "text"; nm.placeholder = "Name"; nm.value = m.name || ""; nm.style.cssText = inputCss;
     const role = el("input"); role.type = "text"; role.placeholder = "Role (optional)"; role.value = m.role || ""; role.style.cssText = inputCss;
     const bio = el("input"); bio.type = "text"; bio.placeholder = "Short bio (optional)"; bio.value = m.bio || ""; bio.style.cssText = inputCss;
-    const commit = () => { blk.members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: blk.members[k].media_id }; };
+    const commit = () => { cur().members[k] = { name: nm.value.trim(), role: role.value.trim() || undefined, bio: bio.value.trim() || undefined, media_id: cur().members[k]?.media_id }; };
     [nm, role, bio].forEach((inp) => inp.addEventListener("change", commit));
     fields.append(nm, role, bio, aiField(bio, { field: "", write: false }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.members.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().members.splice(k, 1); renderBlocksCard(); });
     row.append(photo, fields, rm); sub.appendChild(row);
   });
   const add = el("button", null, "+ Add person"); add.type = "button"; add.style.cssText = miniBtn;
@@ -9679,6 +9752,7 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const items = Array.isArray(blk.items) ? blk.items : [];
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9686,11 +9760,11 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
     const bd = el("textarea"); bd.value = it.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "The details inside…";
     bd.rows = Math.max(3, (it.body || "").split("\n").length + 1);
     bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
-    const commit = () => { blk.items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
+    const commit = () => { cur().items[k] = { summary: sm.value.trim(), body: bd.value.trim() }; };
     sm.addEventListener("change", commit); bd.addEventListener("change", commit);
     row.append(sm, aiField(sm, { field: "question", write: false }), bd, aiField(bd, { field: "answer" }));
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (items.length < 10) {
@@ -9704,6 +9778,7 @@ function renderTabsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const tabs = Array.isArray(blk.tabs) ? blk.tabs : [];
   tabs.forEach((t, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9712,17 +9787,17 @@ function renderTabsBlockBody(blk, idx, sub, ti) {
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
     if (t.image_id) photo.appendChild(mediaThumb(t.image_id));
     const pb = el("button", null, t.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.tabs[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().tabs[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb);
     const bd = el("textarea"); bd.value = t.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "What’s inside this tab…";
     bd.rows = Math.max(3, (t.body || "").split("\n").length + 1);
     bd.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.6;box-sizing:border-box";
-    const commit = () => { blk.tabs[k] = { label: lb.value.trim(), body: bd.value.trim(), image_id: blk.tabs[k].image_id || undefined }; };
+    const commit = () => { cur().tabs[k] = { label: lb.value.trim(), body: bd.value.trim(), image_id: cur().tabs[k]?.image_id || undefined }; };
     [lb, bd].forEach((inp) => inp.addEventListener("change", commit));
     row.append(lb, photo, bd, aiField(bd, {}));
     if (tabs.length > 1) {
       const rm = el("button", null, "Remove tab"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.tabs.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().tabs.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9739,18 +9814,19 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const slides = Array.isArray(blk.slides) ? blk.slides : (blk.slides = []);
   slides.forEach((sl, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start";
     if (sl.image_id) row.appendChild(mediaThumb(sl.image_id));
     const col = el("div"); col.style.cssText = "flex:1;min-width:0";
     const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.value = sl.caption || ""; cap.style.cssText = inputCss;
-    cap.addEventListener("change", () => { blk.slides[k].caption = cap.value.trim() || undefined; });
+    cap.addEventListener("change", () => { cur().slides[k].caption = cap.value.trim() || undefined; });
     const acts = el("div"); acts.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
     const ch = el("button", null, sl.image_id ? "Change image" : "Choose image"); ch.type = "button"; ch.style.cssText = miniBtn;
-    ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { blk.slides[k].image_id = id; renderBlocksCard(); } }); });
+    ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().slides[k].image_id = id; renderBlocksCard(); } }); });
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.slides.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().slides.splice(k, 1); renderBlocksCard(); });
     acts.append(ch, rm);
     col.append(cap, acts); row.appendChild(col); sub.appendChild(row);
   });
@@ -9765,6 +9841,7 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
 function renderProgressBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const items = Array.isArray(blk.items) ? blk.items : (blk.items = []);
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
@@ -9773,12 +9850,12 @@ function renderProgressBlockBody(blk, idx, sub, ti) {
     const pct = el("input"); pct.type = "number"; pct.min = "0"; pct.max = "100"; pct.value = String(typeof it.percent === "number" ? it.percent : 60);
     pct.style.cssText = "width:74px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
     pctWrap.append(pct, el("span", "hint", "%"));
-    const commit = () => { blk.items[k] = { label: lb.value.trim(), percent: Math.max(0, Math.min(100, parseInt(pct.value, 10) || 0)) }; };
+    const commit = () => { cur().items[k] = { label: lb.value.trim(), percent: Math.max(0, Math.min(100, parseInt(pct.value, 10) || 0)) }; };
     lb.addEventListener("change", commit); pct.addEventListener("change", commit);
     row.append(lb, pctWrap);
     if (items.length > 1) {
       const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.items.splice(k, 1); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().items.splice(k, 1); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9795,6 +9872,7 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const buttons = Array.isArray(blk.buttons) ? blk.buttons : [];
   buttons.forEach((bt, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9803,11 +9881,11 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     const stWrap = el("label", "hint", "Style "); const st = el("select");
     [["primary", "Filled"], ["outline", "Outline"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((bt.style || "primary") === v) o.selected = true; st.appendChild(o); });
     st.style.cssText = "font:inherit;font-size:13px;margin-left:6px;padding:4px 6px;border:1px solid var(--line,#ddd);border-radius:8px"; stWrap.appendChild(st);
-    const commit = () => { blk.buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
+    const commit = () => { cur().buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
     [lb, ur, st].forEach((inp) => inp.addEventListener("change", commit));
     row.append(lb, aiField(lb, { field: "button label" }), ur, stWrap);
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.buttons.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().buttons.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (buttons.length < 3) {
@@ -9821,6 +9899,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const cols = Array.isArray(blk.columns) ? blk.columns : [];
   cols.forEach((c, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -9828,7 +9907,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
     if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
     const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.columns[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().columns[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb); row.appendChild(photo);
     const bd = el("textarea"); bd.value = c.body || ""; bd.setAttribute("data-k", "body_md"); bd.placeholder = "This column’s text…";
     bd.rows = Math.max(3, (c.body || "").split("\n").length + 1);
@@ -9844,7 +9923,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const WIDTHS = [[0, "Auto (equal)"], [3, "¼ — narrow"], [4, "⅓"], [6, "½ — half"], [8, "⅔"], [9, "¾ — wide"], [12, "Full row"]];
     WIDTHS.forEach(([v, lab]) => { const o = el("option", null, lab); o.value = String(v); if ((c.span || 0) === v) o.selected = true; wsel.appendChild(o); });
     wrap.appendChild(wsel);
-    const commit = () => { const o = { body: bd.value.trim(), image_id: blk.columns[k].image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; const sp = parseInt(wsel.value, 10) || 0; if (sp) o.span = sp; blk.columns[k] = o; };
+    const commit = () => { const o = { body: bd.value.trim(), image_id: cur().columns[k]?.image_id || undefined }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; const sp = parseInt(wsel.value, 10) || 0; if (sp) o.span = sp; cur().columns[k] = o; };
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
     wsel.addEventListener("change", () => { commit(); renderBlocksCard(); });
     row.append(bd, aiField(bd, {}), bl, bu, wrap);
@@ -9855,13 +9934,13 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     const cLab = el("label", "hint", "Or drop a component here: "); cLab.style.fontWeight = "600";
     const cSel = el("select"); cSel.style.cssText = "padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-left:6px";
     [["", "— none (use the text above) —"], ["video", "Video"], ["features", "Feature list"], ["stats", "Stats / numbers"], ["pricing", "Pricing"], ["table", "Table"], ["title", "Heading"], ["richtext", "Rich text"], ["link_list", "Link list"], ["accordion", "Accordion"]].forEach(([v, lab]) => { const o = el("option", null, lab); o.value = v; if (((c.block && c.block.type) || "") === v) o.selected = true; cSel.appendChild(o); });
-    cSel.addEventListener("change", () => { commit(); const t = cSel.value; if (!t) { delete blk.columns[k].block; } else { const d = BLOCK_DEFS.find((x) => x.type === t); blk.columns[k].block = d ? emptyBlock(d) : { type: t }; } renderBlocksCard(); });
+    cSel.addEventListener("change", () => { commit(); const t = cSel.value; if (!t) { delete cur().columns[k].block; } else { const d = BLOCK_DEFS.find((x) => x.type === t); cur().columns[k].block = d ? emptyBlock(d) : { type: t }; } renderBlocksCard(); });
     cLab.appendChild(cSel); compRow.appendChild(cLab);
-    if (c.block && c.block.type) { const host = el("div"); host.style.cssText = "margin-top:8px"; renderCellBlockEditor(c.block, (nb) => { blk.columns[k].block = nb; }, host); compRow.appendChild(host); }
+    if (c.block && c.block.type) { const host = el("div"); host.style.cssText = "margin-top:8px"; renderCellBlockEditor(c.block, (nb) => { cur().columns[k].block = nb; }, host); compRow.appendChild(host); }
     row.appendChild(compRow);
     if (cols.length > 1) {
       const rm = el("button", null, "Remove column"); rm.type = "button"; rm.style.cssText = miniBtn;
-      rm.addEventListener("click", () => { commitTitle(); blk.columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
+      rm.addEventListener("click", () => { commitTitle(); cur().columns.splice(k, 1); dcRebalanceSpans(BLOCKS_WORK[idx]); renderBlocksCard(); });
       row.appendChild(rm);
     }
     sub.appendChild(row);
@@ -9935,24 +10014,25 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
+  const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
   const cards = Array.isArray(blk.cards) ? blk.cards : [];
   cards.forEach((c, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
     const photo = el("div"); photo.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
     if (c.image_id) photo.appendChild(mediaThumb(c.image_id));
     const pb = el("button", null, c.image_id ? "Change image" : "Add image (optional)"); pb.type = "button"; pb.style.cssText = miniBtn;
-    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { blk.cards[k].image_id = id || undefined; renderBlocksCard(); }); });
+    pb.addEventListener("click", () => { commitTitle(); openPicker((id) => { cur().cards[k].image_id = id || undefined; renderBlocksCard(); }); });
     photo.appendChild(pb); row.appendChild(photo);
     const hd = el("input"), tx = el("input"), lk = el("input");
     hd.placeholder = "Card title"; hd.value = c.heading || "";
     tx.placeholder = "A line of text (optional)"; tx.value = c.text || "";
     lk.placeholder = "Link (optional)"; lk.value = c.link || "";
     [hd, tx, lk].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-    const commit = () => { blk.cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: blk.cards[k].image_id || undefined, link: lk.value.trim() || undefined }; };
+    const commit = () => { cur().cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: cur().cards[k]?.image_id || undefined, link: lk.value.trim() || undefined }; };
     [hd, tx, lk].forEach((inp) => inp.addEventListener("change", commit));
     row.append(hd, tx, aiField(tx, { field: "caption" }), lk);
     const rm = el("button", null, "Remove card"); rm.type = "button"; rm.style.cssText = miniBtn;
-    rm.addEventListener("click", () => { commitTitle(); blk.cards.splice(k, 1); renderBlocksCard(); });
+    rm.addEventListener("click", () => { commitTitle(); cur().cards.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
   });
   if (cards.length < 8) {
@@ -10346,7 +10426,7 @@ function mountSectionsCard() {
 async function mountLookCard() {
   const host = $("designHost"); if (!host || $("lookCard")) return;
   let looks = null;
-  try { looks = (await api("GET", "/site/templates")).data; } catch (_) { return; }
+  try { looks = await loadLooks(); } catch (_) { return; }
   if (!looks || (looks.templates || []).length < 2) return;
   const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Template"));
@@ -10635,7 +10715,7 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
 // see it full size first. Fine styling is the card below ("Colors and fonts").
 async function mountTemplateGallery() {
   const host = $("designGallery"); if (!host) return;
-  try { if (!LOOKS) LOOKS = (await api("GET", "/site/templates")).data; } catch (_) { return; }
+  try { await loadLooks(); } catch (_) { return; }
   if (!LOOKS || !(LOOKS.templates || []).length) return;   // no template data → leave hidden
   host.hidden = false;
   renderTemplateGallery();
@@ -12519,7 +12599,10 @@ function ideRelease() {   // the redraw a session or its save held off
   DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview();
 }
 // ── inject the editing chrome into the rendered preview document ─────────────
-function dcInjectCanvas(doc, main) {
+// live: one section was swapped in place by the live redraw (dcLiveNow). Its neighbours, the
+// add-section lines between them and the Contents list still stand, so only the new section
+// is wired (item 85); a full redraw rebuilds all of it.
+function dcInjectCanvas(doc, main, live) {
   const win = doc.defaultView;
   if (!doc.getElementById("dds-dc-style")) {
     const st = doc.createElement("style"); st.id = "dds-dc-style";
@@ -12676,8 +12759,11 @@ function dcInjectCanvas(doc, main) {
   // successful save→reload re-stamps and converges. The per-splice
   // compensation (dcComposeSrcMap at every BLOCKS_WORK splice) shrinks that
   // window; worst case is one mis-resolved hover, never a crash.
-  ddsRebuildSidMap();
-  DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
+  if (!live) {
+    ddsRebuildSidMap();
+    DDS_SRCMAP = null;   // fresh canvas DOM = fresh data-dds-src stamps — the local-edit remap is consumed
+    LIVE_DRAWN = null;   // and it shows the saved list
+  }
   // G13 slice 2: a reload replaced any active session's document — its text was
   // already banked by refreshDesignPreview's pre-repaint commit; the stale
   // handle can't be restored, so drop it and let a deferred burst-save through.
@@ -12788,9 +12874,9 @@ function dcInjectCanvas(doc, main) {
     const h = main.querySelector(':scope > [data-dds-core="hero"]');
     if (h && h.hasAttribute("data-dds-movable") !== DC_HERO_MOVES) { DC_HERO_MOVES = h.hasAttribute("data-dds-movable"); remountSectionsCard(); }
   }
-  dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
+  if (!live) dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
-  dcBuildTree(main);           // left-rail Content Tree of every component on the page
+  if (!live) dcBuildTree(main);           // left-rail Content Tree of every component on the page
 }
 
 // ── AEM insertion targets: a clickable/droppable "＋ Add section" bar at every gap
@@ -12954,6 +13040,13 @@ function dcTreeChildRow(colEl, bi, k, span) {
   row.appendChild(acts);
   return row;
 }
+// Item 85: a live redraw swaps one section's element in place and leaves this list standing,
+// so a row whose element has gone finds the section now drawn at its place in the list.
+function dcTreeEl(el2, c) {
+  if (el2.isConnected || !c || c.kind !== "block") return el2;
+  const doc = dcFrameDoc(), main = doc && doc.getElementById("main");
+  return (main && Array.prototype.find.call(main.children, (n) => { const k = eeClassify(n); return k.kind === "block" && k.bi === c.bi; })) || el2;
+}
 function dcTreeRow(el2, c) {
   const isBlock = c && c.kind === "block";
   const b = isBlock ? (BLOCKS_WORK[c.bi] || {}) : null;
@@ -12979,7 +13072,7 @@ function dcTreeRow(el2, c) {
   txt.appendChild(el("span", "dc-tree-meta", meta));
   mainBtn.appendChild(txt);
   if (isBlock) mainBtn.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") pdStart(e, dragSpec, mainBtn); });
-  mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(el2, row); });
+  mainBtn.addEventListener("click", () => { if (pdConsumeClick()) return; dcTreeSelect(dcTreeEl(el2, c), row); });
   row.appendChild(mainBtn);
   // G11: per-section comment badge (count when open notes exist; quiet icon to
   // start a thread). Block rows only — keyed by the stable section id, so the
@@ -13370,9 +13463,10 @@ function refreshSiteStatus(force) {
     }
     $("gate").hidden = true; $("app").hidden = false;
     routeHashEarly();   // the asked-for view is on screen before a single read lands
+    // Item 84: the Overview is the site's picture, and drawing it needs none of the reads below;
+    // it waited behind all eight. The Overview's own load finds it on its way.
+    loadSiteStage();
     await refreshAll();
-    renderKnowledgeDocs();
-    renderMonitorCard();
     // The plan card and the welcome are the owner's (same rule as the billing and
     // deletion cards in refreshAll). A drilled-in operator gets the client's notices
     // from the bell and Today, and the server refuses both routes under a scope.
