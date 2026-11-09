@@ -13,7 +13,7 @@ Built and operated solo by [Eric Davis](https://github.com/edavis71433). This is
 | **Website builder** | Eight templates, a section editor on a live canvas, pages and menus, versions and checkpoints, preview links with comments, scheduled publishing, custom domains |
 | **On the live site** | Contact forms, bookings, reviews, and a first-party visit counter — no third-party tracking |
 | **Customers & pipeline** | Contacts, customer records, deals and stages, to-dos, saved views, reports |
-| **Money** | Proposals, agreements with e-signature, invoices, deposits and payment schedules, retainers (Stripe); the platform's own plans and trials |
+| **Money** | Estimates, proposals, agreements with e-signature, invoices (one-off, scheduled or recurring), deposits, retainers (Stripe); the platform's own plans and trials |
 | **Projects & client portal** | Projects, tasks, milestones, deliverables and approvals; a separate signed-in portal where clients see progress, message, upload and pay |
 | **Studios** | A studio works inside its clients' sites through a checked scope, with roles for its team and for the client's own people |
 | **AI** | Drafting and rewriting copy, a site reviewer, a brand guardian, a growth coach, image generation — metered against the plan's AI allowance |
@@ -61,8 +61,8 @@ Postgres (row-level security)  +  Storage  +  Auth  +  pg_cron
 
 As of November 2026:
 
-- **63 Playwright specs** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
-- **324 Deno suites** for the server and the pages' logic, plus a typecheck of the whole function
+- **64 Playwright specs** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
+- **327 Deno suites** for the server and the pages' logic, plus a typecheck of the whole function
 - **Accessibility assertions** via `@axe-core/playwright` on key pages
 - **Five GitHub Actions workflows**: `ci`, `e2e`, `deploy` (by hand, after the checks), `rollback`, `schema-dump`
 
