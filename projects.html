@@ -284,6 +284,8 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
+const qh=(s)=>(window.ddsQuote?window.ddsQuote.html(s,esc):esc(s));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // Oct 2026 review: scoped into a client (?client=<their site>), every read on
 // this page used to go to the CLIENT's site — where no project lives (projects
@@ -957,7 +959,7 @@ async function loadMessages(id){
   try{
     const {data}=await api('/projects/'+id+'/messages?limit=30');
     if(seq!==PROJ_SEQ)return;
-    const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="empty">No messages yet — say hello.</div>';
+    const items=(data||[]).slice().reverse().map(m=>`<div class="item"><div><div class="t">${qh(m.body)}</div><div class="mut">${esc(m.author_kind)}${m.audience==='internal'?' · internal note':''}</div></div></div>`).join('')||'<div class="empty">No messages yet — say hello.</div>';
     $('msgList').innerHTML=items;
     const host=$('msgForm');
     // per-project id + data-dds-draft: a half-written message survives an accidental close/refresh (shell.js draft preservation)
@@ -1008,7 +1010,7 @@ async function openStudioSupport(rid,pid,opts){
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
-    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${qh(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
     // Saved replies (service edge #4): the bodies live in a JS map keyed by id so
     // nothing goes into an attribute; the <select> only carries escaped titles.
     const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
@@ -1055,7 +1057,7 @@ async function openStudioSupportFull(rid){
     const resolved=rq.status==='resolved'||rq.status==='closed';
     const isStudio=(k)=>k==='staff'||k==='operator'||k==='system';
     const thread=[]; if(rq.body)thread.push({author_kind:rq.requester_kind||'client',body:rq.body,created_at:rq.created_at}); thread.push(...msgs);
-    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${esc(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
+    const rowsHtml=thread.map(m=>`<div class="item"><div><div class="t">${qh(m.body)}</div><div class="mut">${isStudio(m.author_kind)?'You':'Client'}${m.created_at?' · '+esc(when(m.created_at)):''}</div></div></div>`).join('')||'<div class="empty">No messages yet.</div>';
     const replies=((srRes&&srRes.data&&srRes.data.replies)||[]); const replyMap={}; replies.forEach(x=>{replyMap[x.id]=x.body;});
     const pickerHtml=replies.length?`<select id="srf-canned-${rid}" aria-label="Insert a saved reply" style="margin-bottom:6px"><option value="">Insert a saved reply…</option>${replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select>`:'';
     $('detailInner').innerHTML=`

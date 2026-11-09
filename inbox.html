@@ -326,6 +326,15 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
+const qh=(s)=>(window.ddsQuote?window.ddsQuote.html(s,esc):esc(s));
+// item 71: who a support reply reaches, and how. A customer has a portal; someone who
+// wrote in by email as a contact has none, but answering the email lands back here.
+function replyReach(it){
+  const name=it&&it.name&&it.name!=='Support request'?esc(it.name):'';
+  if(it&&it.client_id)return name?name+' gets an email and sees it in their portal':'They get an email and see it in their portal';
+  return name?name+' gets your reply by email and can answer it there':'They get your reply by email and can answer it there';
+}
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -1048,7 +1057,7 @@ function renderTL(host,items){
     const head=it.body
       ?`<button class="ti-head" data-x="${esc(it.id)}" aria-expanded="${open?'true':'false'}"><span class="ti-car" aria-hidden="true">${open?'▾':'▸'}</span><span class="ti-title">${esc(it.title)}</span>${meta}</button>`
       :`<div class="ti-head"><span class="ti-title">${esc(it.title)}</span>${meta}</div>`;
-    const bodyHtml=(it.body&&open)?`<div class="ti-body">${esc(it.body)}</div>`:'';
+    const bodyHtml=(it.body&&open)?`<div class="ti-body">${qh(it.body)}</div>`:'';
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
   host.innerHTML=html;
@@ -1160,10 +1169,10 @@ async function paneSupport(host,it){
   // item 34: the server's priority and assignee win over the feed's
   it.priority=String(req.priority||it.priority||'normal');it.assigned_to=req.assigned_to?String(req.assigned_to):'';
   const prioSel=`<label>Priority <select id="supPrio">${['low','normal','high','urgent'].map(v=>`<option value="${v}"${v===it.priority?' selected':''}>${PRIO_LABEL[v]}</option>`).join('')}</select></label>`;
-  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div><div class="triage" id="supTriage">${prioSel}<span id="supAsgWrap"></span></div></div>`;
+  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${qh(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div><div class="triage" id="supTriage">${prioSel}<span id="supAsgWrap"></span></div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
-    h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
+    h+=`<div class="bub ${mine?'studio':''}">${qh(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
   }
   pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
   const ps=$('supPrio');if(ps)ps.addEventListener('change',()=>setSupportField(it,'priority',ps.value,ps));
@@ -1180,7 +1189,7 @@ async function paneSupport(host,it){
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
   const lastClientMsg=[...msgs].reverse().find(m=>m.author_kind==='client'||m.author_kind==='customer');
   $('supDraft').addEventListener('click',()=>draftReply('supBody',`A short, friendly reply from the studio to a support request "${String(req.subject||'Support request').slice(0,80)}": "${String((lastClientMsg&&lastClientMsg.body)||req.body||'').slice(0,240)}"`,$('supDraft')));
   // one send path: post the reply; "Reply and resolve" then ends the wait too

@@ -165,7 +165,7 @@ async function insertDeduped(table: string, row: Record<string, unknown>, extern
   return { ok: false };
 }
 
-interface SiteIdentity { kind: 'client' | 'contact'; id: string; contactId: string | null; emails: string[]; candidates: number; projectId: string | null }
+interface SiteIdentity { kind: 'client' | 'contact'; id: string; contactId: string | null; emails: string[]; candidates: number; projectId: string | null; name: string }
 
 /** Resolve the inbound sender to a KNOWN identity ON THIS SITE. `clients` is
  *  matched by email (ilike, then an EXACT in-memory recheck — ilike only ever
@@ -180,7 +180,7 @@ async function matchSiteIdentity(siteId: string, fromEmail: string): Promise<Sit
   // 1) clients matched by email OR contact_email (ilike over-matches → exact recheck).
   //    SB1: okRows — a non-ok clients read 502s (see okRows), it is NOT read as "no
   //    such client" (which would silently 200-drop a genuine sender as unknown).
-  const clientRows = okRows(await svc(`clients?or=(email.ilike.${enc},contact_email.ilike.${enc})&deleted_at=is.null&select=id,email,contact_email,contact_id,created_at&order=created_at.asc,id.asc&limit=25`))
+  const clientRows = okRows(await svc(`clients?or=(email.ilike.${enc},contact_email.ilike.${enc})&deleted_at=is.null&select=id,name,email,contact_email,contact_id,created_at&order=created_at.asc,id.asc&limit=25`))
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase() || String(c.contact_email || '').toLowerCase() === fromEmail.toLowerCase());
   const clientIds = clientRows.map((c) => String(c.id)).filter((id) => UUID_RE.test(id));
   if (clientIds.length) {
@@ -193,15 +193,15 @@ async function matchSiteIdentity(siteId: string, fromEmail: string): Promise<Sit
     if (hit) {
       const link = links.find((l) => String(l.customer_client_id) === String(hit.id));   // created_at.desc → newest first
       const projectId = link?.project_id && UUID_RE.test(String(link.project_id)) ? String(link.project_id) : null;
-      return { kind: 'client', id: String(hit.id), contactId: hit.contact_id ? String(hit.contact_id) : null, emails: [hit.email, hit.contact_email].filter((e) => e && String(e).trim()).map(String), candidates: clientRows.filter((c) => bridged.has(String(c.id))).length, projectId };
+      return { kind: 'client', id: String(hit.id), contactId: hit.contact_id ? String(hit.contact_id) : null, emails: [hit.email, hit.contact_email].filter((e) => e && String(e).trim()).map(String), candidates: clientRows.filter((c) => bridged.has(String(c.id))).length, projectId, name: String(hit.name || '').trim() };
     }
   }
   // 2) a CRM contact on THIS site (site-scoped), matched the same way
-  const contactRows = okRows(await svc(`presence_contacts?site_id=eq.${siteId}&email=ilike.${enc}&deleted_at=is.null&select=id,email,created_at&order=created_at.asc,id.asc&limit=25`))
+  const contactRows = okRows(await svc(`presence_contacts?site_id=eq.${siteId}&email=ilike.${enc}&deleted_at=is.null&select=id,name,email,created_at&order=created_at.asc,id.asc&limit=25`))
     .filter((c) => String(c.email || '').toLowerCase() === fromEmail.toLowerCase());
   if (contactRows.length) {
     const c = contactRows[0];
-    return { kind: 'contact', id: String(c.id), contactId: null, emails: [c.email].filter((e) => e && String(e).trim()).map(String), candidates: contactRows.length, projectId: null };
+    return { kind: 'contact', id: String(c.id), contactId: null, emails: [c.email].filter((e) => e && String(e).trim()).map(String), candidates: contactRows.length, projectId: null, name: String(c.name || '').trim() };
   }
   return null;
 }
@@ -454,7 +454,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     // portal path, so a client replying in both places sends ONE email.
     await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${refTarget.id}`,
-      customerClientId: match.kind === 'client' ? match.id : null, projectId: refTarget.project_id || null,
+      customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: refTarget.project_id || null,
       subject: String(refTarget.subject || subject || '').slice(0, 200), excerpt: text || subject,
       href: refTarget.project_id ? `/crm.html?project=${refTarget.project_id}&tab=messages` : `/projects.html?support=${refTarget.id}`,
     }).catch(() => {});
@@ -494,7 +494,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       // shared across both doors and a client who emails AND posts sends one.
       await notifyStudioOfClientAction({
         agencySiteId: siteId, kind: 'client_message', threadKey: `proj:${match.projectId}`,
-        customerClientId: match.kind === 'client' ? match.id : null, projectId: match.projectId,
+        customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: match.projectId,
         subject: String(subject || '').slice(0, 200), excerpt: text || subject,
         href: `/crm.html?project=${match.projectId}&tab=messages`,
       }).catch(() => {});
@@ -543,7 +543,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     // common shape for emailed-in clients and contacts alike.
     await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${target.id}`,
-      customerClientId: match.kind === 'client' ? match.id : null, projectId: target.project_id || null,
+      customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: target.project_id || null,
       subject: String(target.subject || subject || '').slice(0, 200), excerpt: text || subject,
       href: target.project_id ? `/crm.html?project=${target.project_id}&tab=messages` : `/projects.html?support=${target.id}`,
     }).catch(() => {});
@@ -563,7 +563,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   // A brand-new emailed-in request — the operator hears about it like a portal one.
   await notifyStudioOfClientAction({
     agencySiteId: siteId, kind: 'client_request', threadKey: `req:${newReq.row?.id || externalId}`,
-    customerClientId: match.kind === 'client' ? match.id : null, projectId: null,
+    customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: null,
     subject: String(subject || `Email from ${from_name || from_email}`).slice(0, 200), excerpt: text || subject,
     href: newReq.row?.id ? `/projects.html?support=${newReq.row.id}` : '/inbox.html',
   }).catch(() => {});

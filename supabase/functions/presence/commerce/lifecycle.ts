@@ -800,7 +800,7 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
         const brand = await loadEmailBrand(inv.site_id);
         const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''));
         const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand, { siteId: inv.site_id }).catch(() => {});   // their answer lands in the Inbox
       } catch { /* the owner notice already carries it */ }
     }
   }
@@ -971,7 +971,7 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
         const brand = await loadEmailBrand(doc.site_id);
         const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : 'Review the proposal'} →</a>`;
         sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`,
-          `<p>Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.</p><p class="cta">${btn}</p>`, brand).catch(() => {});
+          `<p>Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.</p><p class="cta">${btn}</p>`, brand, { siteId: doc.site_id }).catch(() => {});
         reminded++;
       } catch { /* the owner notice already recorded the attempt */ }
     }

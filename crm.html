@@ -353,6 +353,8 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
+const qh=(s)=>(window.ddsQuote?window.ddsQuote.html(s,esc):esc(s));
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const QP=()=>new URLSearchParams(location.search);
@@ -1621,7 +1623,7 @@ function renderMergedTimeline(host){
     let bodyHtml='';
     if(it.body&&open){
       const noteId=(it.kind==='note'&&/note:([0-9a-f-]{36})$/i.test(it.id))?it.id.match(/note:([0-9a-f-]{36})$/i)[1]:'';
-      bodyHtml=`<div class="ti-body">${esc(it.body)}${noteId?`<div class="note-acts"><button data-delnote="${esc(noteId)}">Remove note</button></div>`:''}${it.href?`<div style="margin-top:5px"><a class="ti-link" href="${esc(pinHref(it.href))}">open →</a></div>`:''}</div>`;
+      bodyHtml=`<div class="ti-body">${qh(it.body)}${noteId?`<div class="note-acts"><button data-delnote="${esc(noteId)}">Remove note</button></div>`:''}${it.href?`<div style="margin-top:5px"><a class="ti-link" href="${esc(pinHref(it.href))}">open →</a></div>`:''}</div>`;
     }
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
