@@ -85,6 +85,10 @@ export interface NeedsInput {
      *  since converted, lost or deleted is not a row (dealNoticeIds / staleDealNotices) */
     deals?: Record<string, { stage?: string | null; converted_client_id?: string | null; deleted_at?: string | null }>;
   };
+  /** Home's Snooze (bold redesign, sales item 70): row key → when it wakes (ISO).
+   *  A row asleep at nowIso leaves the list, the total (the bell) and the
+   *  roster's Next, and travels under `snoozed` instead. */
+  snoozed?: Record<string, string>;
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
 }
@@ -457,16 +461,41 @@ export function emptyLine(i: NeedsInput): string {
   return d === null ? `${name} owes ${money(v.amount_cents)}.` : `${name} owes ${money(v.amount_cents)}, due ${shortDate(v.due_date)}.`;
 }
 
+// ── Snooze (bold redesign, sales item 70) ──────────────────────────────────
+// A row keeps its key ('<kind>:<id>') for as long as it needs you, so a snooze
+// is just that key and the day it wakes. It is studio-wide: one person snoozes,
+// the whole studio's list and bell agree. When the thing itself is dealt with,
+// the row goes and the snooze is never seen again.
+export const SNOOZE_MAX_DAYS = 30;
+export const SNOOZE_KEY_RE = /^[a-z_]+:\S{1,300}$/;
+/** The keys still asleep at `nowIso`; a wake time that has passed or can't be read wakes the row. */
+export function asleepKeys(snoozed: Record<string, string> | undefined, nowIso: string): Set<string> {
+  const now = Date.parse(nowIso), out = new Set<string>();
+  for (const [k, until] of Object.entries(snoozed || {})) { const t = Date.parse(String(until)); if (Number.isFinite(t) && t > now) out.add(k); }
+  return out;
+}
+/** When a snooze of `days` (1–30, whole days) wakes: that many days on, at the same time. Null when out of range. */
+export function snoozeUntil(nowIso: string, days: unknown): string | null {
+  const n = Number(days), t = Date.parse(nowIso);
+  if (!Number.isInteger(n) || n < 1 || n > SNOOZE_MAX_DAYS || !Number.isFinite(t)) return null;
+  return new Date(t + n * 86400000).toISOString();
+}
+
 /** What the /agency/needs-you route returns. */
 export function needsYouPayload(i: NeedsInput, cap = NEEDS_YOU_CAP) {
-  const all = buildNeedsYou(i);
+  const every = buildNeedsYou(i);
+  const asleep = asleepKeys(i.snoozed, i.nowIso);
+  const all = asleep.size ? every.filter((r) => !asleep.has(r.key)) : every;
+  // what's asleep, soonest to wake first, each with its wake time
+  const snoozed = every.filter((r) => asleep.has(r.key)).map((r) => ({ ...r, until: String(i.snoozed![r.key]) }))
+    .sort((a, b) => a.until.localeCompare(b.until));
   const { rows, more, rest } = capNeedsYou(all, cap);
   // item 96: the waiting enquiries and support requests more than a month old, across
   // the whole list (rows and rest carry only the first 48), for Home's "Clear" offer
   const today = ymdOf(i.nowIso) || '';
   const old = all.filter((r) => r.clear && r.at && (daysBetween(r.at, today) ?? 0) > OLD_DAYS);
   return {
-    rows, more, rest, total: all.length,
+    rows, more, rest, total: all.length, snoozed,
     old: { count: old.length, items: old.map((r) => r.clear!) },
     empty_line: all.length ? '' : emptyLine(i),
     next_by_site: nextBySite(all),

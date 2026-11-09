@@ -338,6 +338,136 @@
   .rowact:hover{background:var(--p-soft);border-color:transparent}
   .badge,.pill{font-weight:600}
   .search{border-radius:999px;padding-left:18px}
+
+  /* ══ The bold redesign of Home (sales list item 70, Nov 2026) ══════════════
+     The greeting and a Today card side by side; then one list with tabs (Needs
+     you · My tasks · Waiting on them · Snoozed), each row with its own verb and
+     Snooze and Done; "Go through them" shows the list one at a time. */
+  #top.has-today{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--dds-s4,16px);align-items:stretch;margin-bottom:var(--dds-s5,20px)}
+  #top.has-today .top.hero{margin-bottom:0}
+  @media (max-width:1099px){#top.has-today{grid-template-columns:1fr}}
+  @media (max-width:760px){#top .todaycard{display:none}}
+  .hero .hrow .hdate{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.78)}
+  .hero .hrow .sep{color:rgba(255,255,255,.5)}
+  .hero .hi{margin-top:10px}
+  button.hchip{font:inherit;font-size:13px;cursor:pointer}
+  button.hchip:hover{background:rgba(255,255,255,.26)}
+  .hchip[aria-pressed="true"]{background:#fff;color:#3d2185;border-color:#fff}
+  button.hgo{font:inherit;font-size:14px;font-weight:650;border:0;cursor:pointer;padding:10px 20px;box-shadow:0 10px 24px -12px rgba(0,0,0,.5)}
+  .todaycard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-xl,20px);box-shadow:var(--shadow);padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+  .todaycard h2{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:650;margin:0 0 6px}
+  .todaycard h2 svg{width:18px;height:18px;stroke:var(--p);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .todaycard a{display:flex;gap:12px;align-items:baseline;font-size:13px;color:var(--ink);text-decoration:none;padding:5px 0;line-height:1.35}
+  .todaycard a:hover .tt{color:var(--p)}
+  .todaycard .tw{flex:0 0 56px;font-weight:600;color:var(--p);font-size:12.5px}
+  .todaycard .tw.late{color:var(--bad)}
+  .todaycard .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .todaycard .tq{font-size:13px;color:var(--soft);margin:2px 0 0}
+  /* the list */
+  .qcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-xl,20px);box-shadow:var(--shadow);padding:12px 20px 14px}
+  .qbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 0 10px;border-bottom:1px solid var(--line)}
+  .qtabs{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--ink) 6%,transparent);max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .qtabs::-webkit-scrollbar{display:none}
+  .qtabs [role=tab]{font:inherit;font-size:13.5px;font-weight:500;color:var(--soft);background:transparent;border:0;border-radius:999px;padding:7px 14px;cursor:pointer;white-space:nowrap;min-height:34px}
+  .qtabs [role=tab] .qn{margin-left:2px;font-weight:600;color:var(--faint)}
+  .qtabs [role=tab][aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:650;box-shadow:0 1px 2px rgba(23,21,34,.10),0 1px 1px rgba(23,21,34,.04)}
+  .qtabs [role=tab][aria-selected="true"] .qn{color:var(--p)}
+  .qtabs [role=tab]:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+  .qfilter{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--soft)}
+  .qfilter button{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:var(--p-soft);border:0;border-radius:999px;padding:5px 12px;cursor:pointer}
+  .qpanel[hidden]{display:none}
+  .qpanel #my-tasks,.qpanel .rcard.need{border:0;box-shadow:none;padding:0;margin:0;background:transparent;border-radius:0}
+  .qpanel #my-tasks .rh{display:none}
+  .qpanel .trows{margin-top:4px}
+  .need .row{padding:12px 0}
+  .need .row:first-child{border-top:0}
+  .need .t .nm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .need .t .nm b{font-size:14px}
+  .need .t .what{display:block;font-size:13px;color:var(--soft);margin-top:2px}
+  .kchip{display:inline-block;font-size:11.5px;font-weight:600;line-height:1.5;padding:1px 9px;border-radius:999px;background:var(--dds-up,#f7f6fb);color:var(--soft)}
+  .kchip.bad{background:var(--dds-bad-soft,#fdeaea);color:var(--dds-bad,#bf3535)}
+  .kchip.warn{background:var(--dds-warn-soft,#fcefdb);color:var(--dds-warn,#94530a)}
+  .kchip.violet{background:var(--p-soft);color:var(--p)}
+  .kchip.info{background:var(--dds-info-soft,#e6effa);color:var(--dds-info,#245fa0)}
+  .need .av{background:var(--dds-grad-brand,var(--p));color:#fff}
+  .need .ra{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+  .qlink{font:inherit;font-size:13px;font-weight:500;color:var(--soft);background:none;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;min-height:36px}
+  .qlink:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 6%,transparent)}
+  .qlink:disabled{opacity:.5;cursor:default}
+  .need a.rowact{font-size:13.5px;padding:8px 18px;min-height:38px;display:inline-flex;align-items:center}
+  .need a.rowact.primary{background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border-color:transparent;box-shadow:0 8px 18px -10px color-mix(in srgb,var(--p) 85%,transparent)}
+  .need .row .until{font-size:12.5px;color:var(--soft);white-space:nowrap}
+  @media (max-width:760px){
+    /* a phone's greeting is the greeting, the count and Go through them (the list is right below) */
+    .hero .hrow .rolebadge,.hero .hchips button.hchip{display:none}
+    .hero .hchips{margin-top:14px}
+    button.hgo{width:100%;justify-content:center;min-height:48px}
+    .hero .acts{margin-top:10px}
+    .hero .acts .btn{width:auto;min-height:44px;background:rgba(255,255,255,.16);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.28)}
+    .qtabs{display:flex;width:100%;box-sizing:border-box}
+    .qtabs [role=tab]{flex:1 0 auto;padding:7px 10px;font-size:12.5px}
+    .need .t .what{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .qcard{padding:8px 14px 10px;border-radius:var(--dds-r-lg,16px)}
+    .need .ra .qlink{display:none}           /* on a phone, Snooze and Done live in "Go through them" */
+    .need .t .nm .kchip{display:none}
+    .qfilter{margin-left:0}
+  }
+  /* "Go through them": one at a time, on the brand gradient */
+  dialog.focus{border:0;padding:0;margin:0;width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:none;background:var(--dds-grad,#4a2c8c);color:#fff;font-family:var(--sans)}
+  dialog.focus::backdrop{background:rgba(23,21,34,.5)}
+  html.focus-on body{overflow:hidden}   /* the page behind stays put */
+  .fwrap{min-height:100%;display:flex;flex-direction:column;padding:28px 40px 32px;box-sizing:border-box}
+  .fwrap:focus{outline:none}
+  .fhead{display:flex;align-items:center;gap:14px}
+  .fhead .fcount{font-size:14px;font-weight:650}
+  .fdots{display:flex;gap:5px}
+  .fdots i{width:9px;height:5px;border-radius:999px;background:rgba(255,255,255,.35)}
+  .fdots i.on{width:26px;background:#fff}
+  .fkeys{margin-left:auto;font-size:12.5px;color:rgba(255,255,255,.75)}
+  .fx{width:40px;height:40px;border-radius:999px;border:0;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;cursor:pointer}
+  .fx svg{width:18px;height:18px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round}
+  .fmid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 0}
+  .fcard{width:min(700px,100%);box-sizing:border-box;background:var(--card);color:var(--ink);border-radius:24px;padding:32px 36px 26px;box-shadow:0 30px 60px -24px rgba(0,0,0,.55);touch-action:pan-y}
+  .fwho{display:flex;align-items:center;gap:14px}
+  .fwho .av{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--dds-grad-brand,var(--p));color:#fff;font-size:17px;font-weight:700;flex:0 0 auto}
+  .fwho b{display:block;font-size:16px;font-weight:650}
+  .fwho small{display:block;font-size:13px;color:var(--soft);margin-top:2px}
+  .fwho .kchip{margin-left:auto}
+  .fwhat{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1.2;letter-spacing:-.015em;margin:20px 0 10px}
+  .fwhen{font-size:14px;color:var(--soft);margin:0 0 20px}
+  .facts{display:flex;flex-wrap:wrap;gap:10px}
+  .facts a,.facts button{font:inherit;font-size:14.5px;font-weight:600;min-height:46px;padding:0 22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer}
+  .facts .fgo{background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border:0;box-shadow:0 10px 22px -12px color-mix(in srgb,var(--p) 90%,transparent)}
+  .facts .fdone{background:var(--card);color:var(--ink);border:1px solid var(--line-strong,var(--line))}
+  .ffoot{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:13.5px}
+  .ffoot button{font:inherit;font-size:13.5px;color:var(--soft);background:none;border:0;padding:6px 0;cursor:pointer}
+  .ffoot button:hover{color:var(--ink)}
+  .ffoot .fnext{margin-left:auto;color:var(--p);font-weight:600;text-align:right}
+  .fpeek{width:min(640px,92%);box-sizing:border-box;background:rgba(255,255,255,.12);border-radius:18px;padding:18px 26px;font-size:14px;font-weight:500;color:rgba(255,255,255,.9);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .fswipe{display:none;text-align:center;font-size:13px;color:rgba(255,255,255,.75);margin:0}
+  .fdone-all{text-align:center}
+  .fdone-all h2{font-family:var(--serif);font-size:30px;margin:0 0 8px;color:#fff}
+  .fdone-all p{color:rgba(255,255,255,.85);margin:0 0 20px}
+  .fdone-all button{font:inherit;font-size:15px;font-weight:650;color:#3d2185;background:#fff;border:0;border-radius:999px;padding:12px 26px;cursor:pointer}
+  dialog.focus :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .fcard :focus-visible{outline-color:var(--p)}
+  @media (max-width:760px){
+    .fwrap{padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+    .fkeys,.fdots{display:none}
+    .fhead .fcount{font-size:14px}
+    .fx{margin-left:auto}
+    .fmid{justify-content:flex-start;padding-top:18px}
+    .fcard{padding:22px 20px 18px;border-radius:22px}
+    .fwhat{font-size:23px;margin:16px 0 8px}
+    .fwho .av{width:42px;height:42px;font-size:14px}
+    .facts{flex-direction:column}
+    .facts a,.facts button{width:100%}
+    .ffoot .fnext{display:none}
+    .ffoot .fskip{margin-left:auto;color:var(--p);font-weight:600}
+    .fpeek{display:none}
+    .fswipe{display:block;margin-top:auto}
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .need a.rowact.primary,:root:not([data-theme="light"]) .facts .fgo{color:var(--dds-on-p,#171320)}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -346,10 +476,10 @@
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
   <div id="top"></div>
-  <!-- look refresh E: the numbers and the pipeline sit right under the greeting;
-       the greeting already says what needs you and links to it -->
-  <section id="studio" aria-label="Your studio" hidden></section>
+  <!-- the bold redesign (sales item 70): what needs you comes first, as one list
+       with its actions on each row; the numbers and the pipeline follow -->
   <section id="needs" aria-label="Needs you" hidden></section>
+  <section id="studio" aria-label="Your studio" hidden></section>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <section class="ask" id="askSec" aria-labelledby="askHead" hidden>
     <h2 id="askHead">Have a question?</h2>
@@ -412,6 +542,8 @@
 
 <!-- Save as a starter kit (from the roster row's ⋯): POST /agency/kits — the kit
      is then offered under "Start from a kit" in Add a customer. Kits left the home. -->
+<!-- "Go through them": what needs you, one at a time (item 70) -->
+<dialog id="focusDlg" class="focus" aria-labelledby="fcount"></dialog>
 <dialog id="kitDlg" aria-label="Save as a starter kit">
   <form id="kitForm" class="dbody">
     <h3>Save as a starter kit</h3>
@@ -872,7 +1004,8 @@ async function load(soft){
         attention:0,leads_waiting:0,search_issues:0,billing_issue:false,domain:null,domain_registrar:null,domain_expires_at:null,open_support:Number(c.open_support||0),project_count:Number(c.project_count||0),bridge_only:true});
     });
   }
-  if(ar&&ar.ok&&ar.body&&ar.body.data&&Array.isArray(ar.body.data.items))OWED=groupReceivables(ar.body.data.items);   // a failed read keeps the last good totals
+  if(ar&&ar.ok&&ar.body&&ar.body.data&&Array.isArray(ar.body.data.items)){OWED=groupReceivables(ar.body.data.items);AR_ITEMS=ar.body.data.items;}   // a failed read keeps the last good totals
+  if(AR_ITEMS){paintToday();if(NEEDS||NEEDS_FAILED||MYTASKS)paintNeeds();}   // item 70: Today and Waiting on them read the same invoices
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
   render();
@@ -895,31 +1028,51 @@ function greetWord(){const h=new Date().getHours();return h<12?'Good morning':h<
 function todayWords(){try{return new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}catch(_){return'';}}
 function renderTop(){
   const t=$('top');if(!t)return;
-  t.innerHTML=`<div class="top hero"><div class="hrow"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
+  t.classList.add('has-today');
+  t.innerHTML=`<div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
     <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div>
-    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
+    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>
+    <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside>`;
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
-  paintHero();
+  paintHero();paintToday();
 }
+// Item 70: the greeting says how many things need you and how many are money,
+// each kind is a chip that narrows the list below to it, and "Go through them"
+// opens the list one at a time.
 function paintHero(){
   const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
-  const bits=[todayWords()];
-  if(LOADED_ONCE){const n=CLIENTS.length;bits.push(n+' customer'+(n===1?'':'s'));}
-  if(NEEDS){const n=Number(NEEDS.total||0);bits.push(n?n+(n===1?' needs':' need')+' you':'nothing needs you');}
-  sub.textContent=bits.filter(Boolean).join(' · ');
-  if(!NEEDS){chips.innerHTML='';return;}
-  const all=(NEEDS.rows||[]).concat(NEEDS.rest||[]);
+  if(!NEEDS){sub.textContent=NEEDS_FAILED?'':'Checking what needs you…';chips.innerHTML='';return;}
+  const total=Number(NEEDS.total||0),all=needAll();
+  const money=all.filter(r=>r.kind==='money').length;
+  sub.textContent=total?(total+(total===1?' thing needs you':' things need you')+(money&&all.length>=total?'. '+(money===total?(total===1?'It’s money.':'All of them are money.'):money+(money===1?' is':' are')+' money.'):'.')):'Nothing needs you right now.';
   if(!all.length){chips.innerHTML='<span class="hchip">All caught up</span>';return;}
-  let h='';
-  // per-kind counts only when the payload holds every row; otherwise the honest total
-  if(all.length>=Number(NEEDS.total||0)){
+  let h=`<button type="button" class="hgo" id="goThrough">Go through them →</button>`;
+  // per-kind counts only when the payload holds every row; otherwise the total says it
+  if(all.length>=total){
     const counts={},order=[];
     all.forEach(r=>{const k=heroKind(r.kind);if(!counts[k]){counts[k]=0;order.push(k);}counts[k]++;});
-    h+=order.slice(0,3).map(k=>{const n=counts[k],w=HERO_KIND[k];return `<a class="hchip" href="#needs" data-noscope="1"><span class="hn">${n}</span> ${esc(n===1?w[0]:w[1])}</a>`;}).join('');
-  }else h+=`<a class="hchip" href="#needs" data-noscope="1"><span class="hn">${Number(NEEDS.total||0)}</span> need you</a>`;
-  const first=all[0];
-  if(first&&first.href)h+=`<a class="hgo" href="${esc(first.href)}" data-noscope="1">${esc(first.verb||'Open')} — ${esc(first.name||'')} →</a>`;
+    h+=order.slice(0,3).map(k=>{const n=counts[k],w=HERO_KIND[k];return `<button type="button" class="hchip" data-kind="${esc(k)}" aria-pressed="${QKIND===k?'true':'false'}" aria-controls="needs"><span class="hn">${n}</span> ${esc(n===1?w[0]:w[1])}</button>`;}).join('');
+  }
   chips.innerHTML=h;
+  const go=$('goThrough');if(go)go.addEventListener('click',(e)=>openFocus(go,e.detail===0));
+  chips.querySelectorAll('button.hchip').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.getAttribute('data-kind');QKIND=QKIND===k?'':k;QTAB='needs';NEEDS_EXPANDED=QKIND?true:NEEDS_EXPANDED;
+    paintNeeds();paintHero();
+    const host=$('needs');if(host&&host.scrollIntoView)host.scrollIntoView({block:'start',behavior:'smooth'});
+  }));
+}
+// The Today card: what is due today or already late (your next steps, to-dos
+// and project tasks), then money coming due this week. Dates only: nothing here
+// has a time of day.
+function paintToday(){
+  const el=$('todayRows');if(!el)return;
+  if(!MYTASKS&&!AR_ITEMS){el.innerHTML=STUDIO_DONE?'<p class="tq">Nothing is due today.</p>':'<p class="tq">Looking…</p>';return;}
+  const today=localYmd(),rows=[];
+  (MYTASKS?MYTASKS.items:[]).forEach(t=>{const d=t.due?daysBetween(today,t.due):null;if(d==null||d>0)return;rows.push({d,w:d<0?'Late':'Today',late:d<0,txt:t.title+(t.context?' · '+t.context:''),href:t.href});});
+  (AR_ITEMS||[]).forEach(v=>{if(!openInvoice(v)||!v.due_date)return;const d=daysBetween(today,v.due_date);if(d==null||d<0||d>7)return;rows.push({d:d+0.5,w:d===0?'Today':'In '+d+(d===1?' day':' days'),late:false,txt:'Invoice '+money(v.amount_cents)+' due · '+invoiceWho(v),href:invoiceHref(v)});});
+  rows.sort((a,b)=>a.d-b.d);
+  if(!rows.length){el.innerHTML='<p class="tq">Nothing is due today.</p>';return;}
+  el.innerHTML=rows.slice(0,5).map(r=>`<a href="${esc(r.href)}" data-noscope="1"><span class="tw${r.late?' late':''}">${esc(r.w)}</span><span class="tt">${esc(r.txt)}</span></a>`).join('')+(rows.length>5?`<p class="tq">+ ${rows.length-5} more under My tasks</p>`:'');
 }
 
 // ── the studio strip (one home, Oct 2026 studio audit change 3): the money tiles,
@@ -1052,8 +1205,8 @@ function myTasksHtml(){
   return h+'<div class="rfoot"><a href="/pipeline.html" data-noscope="1">Pipeline →</a> · <a href="/projects.html" data-noscope="1">Projects →</a></div></div>';
 }
 function paintMyTasks(){
-  const el=$('my-tasks');if(!el||!MYTASKS)return;
-  el.outerHTML=myTasksHtml();wireMyTasks();
+  if(!$('my-tasks')||!MYTASKS)return;
+  paintNeeds();paintToday();   // item 70: My tasks is a tab of the list
 }
 function wireMyTasks(){
   const card=$('my-tasks');if(!card)return;
@@ -1082,17 +1235,17 @@ async function mountStudio(){
   const [summary,deals,mine]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
   if(gen!==SSEQ)return;
   MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
+  DEALS=Array.isArray(deals)?deals:null;STUDIO_DONE=true;
+  paintNeeds();paintToday();   // item 70: My tasks and Waiting on them are tabs of the list now
   const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
-  const tasks=!!(MYTASKS&&(MYTASKS.items.length||MYTASKS.partial));
-  if(!tiles.length&&!tasks&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
+  if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
   let h='';
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
   if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(statHtml).join('')}</div></div>`;
   h+=strip;
-  if(tasks||todos.length||top.length||wins.length){
+  if(todos.length||top.length||wins.length){
     h+='<div class="two">';
-    if(tasks)h+=myTasksHtml();
     if(todos.length){const late=todos.some(r=>r.days!=null&&r.days<0);
       h+=`<div class="rcard" id="this-week"><p class="rh">This week · ${todos.length}</p><div class="rrows">${todos.map(r=>`<a href="/crm.html?deal=${encodeURIComponent(r.id)}" data-noscope="1"><span${r.days!=null&&r.days<0?' class="late"':''}>${esc(r.title)}${r.deal?' <span style="color:var(--soft);font-weight:400">· '+esc(r.deal)+'</span>':''}</span><span class="rn${r.days!=null&&r.days<=0?' due':''}">${esc(dueLabel(r.at))}</span></a>`).join('')}</div>${late?'':'<p class="quiet">Nothing overdue.</p>'}<div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;}
     if(top.length)h+=`<div class="rcard" id="key-deals"><p class="rh">Key deals</p><div class="rrows">${top.map(d=>`<a href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1">${esc(d.title||'A deal')}<span class="rn">${esc(money(d.expected_value_cents))}</span></a>`).join('')}</div><div class="rfoot"><a href="/pipeline.html">Pipeline →</a></div></div>`;
@@ -1100,7 +1253,6 @@ async function mountStudio(){
     h+='</div>';
   }
   host.hidden=false;host.innerHTML=h;
-  wireMyTasks();
 }
 
 // ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by
@@ -1246,6 +1398,10 @@ async function boot(){
   }catch(_){trouble();}
 }
 boot();
+// + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
+// call, sent an invoice or added a to-do: the numbers, My tasks and Needs you
+// catch up without a reload
+window.addEventListener('dds:created',()=>{if(!ME)return;mountStudio();mountNeeds(true);});
 
 
 // ── the Ask box (from today.html): the answer, then the sources it drew on ──
@@ -1276,33 +1432,240 @@ function mountAsk(){
 //    unpublished changes. Each row: "Name — what" · when · one verb. The same
 //    payload names each client's Next on the roster. Failure renders an HONEST
 //    "wouldn't load" line + Try again — never silent absence. ──
-let NSEQ=0,NEEDS=null,NEEDS_EXPANDED=false;
-const initials=(n)=>String(n||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole
-function needRowHtml(r){
+let NSEQ=0,NEEDS=null,NEEDS_EXPANDED=false,NEEDS_FAILED=false;
+// item 70: the tab showing, the hero chip narrowing Needs you to one kind, and the
+// reads the other tabs use (the studio strip's deals and tasks, the roster's invoices)
+let QTAB='needs',QKIND='',DEALS=null,AR_ITEMS=null,STUDIO_DONE=false;
+const initials=(n)=>String(n||'?').trim().split(/\s+/).filter(w=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(w)).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; item 70: "&" or "—" is not a word
+const cap1=(t)=>{t=String(t||'');return t?t.charAt(0).toUpperCase()+t.slice(1):t;};
+const KIND_CHIP={money:['Money','bad'],enquiry:['Enquiry','violet'],support:['Support','info'],message:['Message','violet'],deal:['Deal','warn'],broken:['Website','bad'],plan:['Plan','info'],publish:['Website','warn'],account:['Account',''],notice:['Notice','']};
+const needAll=()=>NEEDS?(NEEDS.rows||[]).concat(NEEDS.rest||[]):[];
+const SNOOZE_DAYS=2;
+const snoozeOk=()=>!!(NEEDS&&NEEDS.snooze_ready);
+// How Done puts a row away, through the route that owns the thing — or null,
+// when only doing the thing itself clears it (money, a broken site, a plan).
+function doneOf(r){
+  if(!r)return null;
+  const c=r.clear,ids=c&&Array.isArray(c.ids)?c.ids.filter(Boolean):[];
+  if(c&&c.kind==='enquiry'&&ids.length)return{title:'Marks it read. It stays in the Inbox.',run:()=>Promise.all(ids.map(id=>apiSend('POST','/forms/inbox/'+encodeURIComponent(id),{status:'read'},c.site_id||'')))};
+  if(c&&c.kind==='support'&&ids.length)return{title:'Closes the request. It stays in the Inbox.',run:()=>Promise.all(ids.map(id=>apiSend('PATCH','/support/'+encodeURIComponent(id),{status:'closed'})))};
+  let m=/^deal:([0-9a-f-]{36})$/i.exec(r.key||'');
+  if(m)return{title:'Marks the next step done.',run:()=>apiSend('PATCH','/sales/deals/'+encodeURIComponent(m[1]),{next_step:'',next_step_at:''})};
+  m=/^notice:([0-9a-f-]{36})$/i.exec(r.key||'');
+  if(m)return{title:'Clears it from your list.',run:()=>apiSend('POST','/commerce/notices/dismiss',{id:m[1]})};
+  return null;
+}
+function needLine(r){return cap1(r.what)+(r.when?' · '+r.when:'');}
+function needRowHtml(r,i){
+  const chip=KIND_CHIP[r.kind]||['',''],done=doneOf(r);
   return `<div class="row" data-need="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span>
-    <div class="t"><b>${esc(r.name)}</b> — ${esc(r.what)}${r.when?`<span class="when">${esc(r.when)}</span>`:''}</div>
-    <a class="rowact" href="${esc(r.href)}" data-noscope="1">${esc(r.verb)}</a></div>`;
+    <div class="t"><span class="nm"><b>${esc(r.name)}</b>${chip[0]?` <span class="kchip ${chip[1]}">${esc(chip[0])}</span>`:''}</span><span class="what">${esc(needLine(r))}</span></div>
+    <div class="ra">${snoozeOk()?`<button type="button" class="qlink" data-snooze="${esc(r.key)}" aria-label="${esc('Snooze for '+SNOOZE_DAYS+' days: '+r.name)}">Snooze</button>`:''}${done?`<button type="button" class="qlink" data-ndone="${esc(r.key)}" title="${esc(done.title)}" aria-label="${esc('Done: '+r.name)}">Done</button>`:''}<a class="rowact${i===0?' primary':''}" href="${esc(r.href)}" data-noscope="1">${esc(r.verb)}</a></div></div>`;
+}
+// Waiting on them: proposals and agreements out, and invoices sent but not yet
+// late (a late one is under Needs you). The deals and invoices the page already read.
+const openInvoice=(v)=>!!(v&&String(v.status||'open')==='open'&&!v.processing_since&&v.state!=='processing'&&v.state!=='paid');
+function invoiceWho(v){const c=v&&v.customer_site_id?(CLIENTS||[]).find(x=>x.site_id===v.customer_site_id):null;return(c&&c.name)||v.deal||v.title||'Invoice';}
+const invoiceHref=(v)=>v&&v.deal_id?'/crm.html?deal='+encodeURIComponent(v.deal_id)+'&tab=billing':'/pipeline.html#outstanding';
+function waitingRows(){
+  if(!DEALS&&!AR_ITEMS)return null;
+  const today=localYmd(),out=[];
+  (DEALS||[]).forEach(d=>{
+    if(!d||!d.id||isWonDeal(d)||(d.stage!=='proposal'&&d.stage!=='contract'))return;
+    const days=daysBetween(String(d.updated_at||'').slice(0,10),today);
+    out.push({key:'wait:deal:'+d.id,name:d.title||'A deal',line:(d.stage==='proposal'?'Proposal sent':'Agreement out')+(days!=null&&days>0?' · '+days+(days===1?' day':' days')+' ago':''),href:'/pipeline.html?deal='+encodeURIComponent(d.id),sort:String(d.updated_at||'')});
+  });
+  (AR_ITEMS||[]).forEach(v=>{
+    if(!openInvoice(v))return;const d=v.due_date?daysBetween(today,v.due_date):null;if(d!=null&&d<0)return;
+    out.push({key:'wait:inv:'+v.id,name:invoiceWho(v),line:'Invoice '+money(v.amount_cents)+(d==null?' · no due date':d===0?' · due today':' · due '+dueLabel(v.due_date)),href:invoiceHref(v),sort:String(v.due_date||v.created_at||'')});
+  });
+  return out.sort((a,b)=>a.sort.localeCompare(b.sort));
+}
+function wakeWords(iso){const t=Date.parse(String(iso||''));if(!Number.isFinite(t))return'later';const d=new Date(t);const days=daysBetween(localYmd(),d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2));return days===1?'tomorrow':days!=null&&days<7?d.toLocaleDateString('en-US',{weekday:'long'}):d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function needsPanelHtml(){
+  if(!NEEDS)return NEEDS_FAILED?`<div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`:'<p class="quiet">Checking what needs you…</p>';
+  const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
+  const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  if(!rows.length)return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
+  let shown=NEEDS_EXPANDED?rows.concat(rest):rows;
+  if(QKIND)shown=rows.concat(rest).filter(r=>heroKind(r.kind)===QKIND);
+  const left=QKIND?0:NEEDS_EXPANDED?Math.max(0,more-rest.length):more;
+  const old=Number((NEEDS.old&&NEEDS.old.count)||0);   // item 96: waited over a month, and can be cleared from here
+  const oldLine=old&&!QKIND?`<p class="qold" id="needsOld">${old} of these ${old===1?'has':'have'} waited over a month. <button type="button" class="linkbtn" id="needsClearOld">Clear ${old===1?'it':'them'}</button></p>`:'';
+  return `<div class="rcard need" id="needsList">${oldLine}${shown.map(needRowHtml).join('')||'<p class="quiet">Nothing of that kind left.</p>'}${
+    left>0?`<p class="qmore"><button type="button" class="linkbtn" id="needsMore">+ ${left} more</button></p>`:''}${partial}</div>`;
+}
+function waitPanelHtml(){
+  const w=waitingRows()||[];
+  if(!w.length)return '<div class="rcard need"><p class="quiet" style="margin:0">Nothing is waiting on a customer.</p></div>';
+  return `<div class="rcard need" id="waitList">${w.map(r=>`<div class="row" data-wait="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span><div class="t"><span class="nm"><b>${esc(r.name)}</b></span><span class="what">${esc(r.line)}</span></div><div class="ra"><a class="rowact" href="${esc(r.href)}" data-noscope="1">Open</a></div></div>`).join('')}</div>`;
+}
+function snoozedPanelHtml(){
+  const z=(NEEDS&&NEEDS.snoozed)||[];
+  if(!z.length)return '<div class="rcard need"><p class="quiet" style="margin:0">Nothing is snoozed.</p></div>';
+  return `<div class="rcard need" id="snoozedList">${z.map(r=>`<div class="row" data-snoozed="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span><div class="t"><span class="nm"><b>${esc(r.name)}</b></span><span class="what">${esc(needLine(r))}</span></div><div class="ra"><span class="until">Back ${esc(wakeWords(r.until))}</span><button type="button" class="rowact" data-wake="${esc(r.key)}">Bring back</button></div></div>`).join('')}</div>`;
+}
+function queueTabs(){
+  const t=[{k:'needs',label:'Needs you',n:NEEDS?Number(NEEDS.total||0):null}];
+  if(MYTASKS)t.push({k:'tasks',label:'My tasks',n:MYT_ALL?MYTASKS.total:MYTASKS.items.filter(x=>!x.later).length});   // what's next; everything once Show all is on (item 53)
+  const w=waitingRows();if(w)t.push({k:'wait',label:'Waiting on them',n:w.length});
+  const z=(NEEDS&&NEEDS.snoozed)||[];if(z.length||QTAB==='snoozed')t.push({k:'snoozed',label:'Snoozed',n:z.length});
+  return t;
 }
 function paintNeeds(){
-  const host=$('needs');if(!host||!NEEDS)return;
-  const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
-  const shown=NEEDS_EXPANDED?rows.concat(rest):rows;
-  const left=NEEDS_EXPANDED?Math.max(0,more-rest.length):more;
-  const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  const host=$('needs');if(!host)return;
   host.hidden=false;
   paintHero();
-  if(!rows.length){
-    host.innerHTML=`<h2 class="qhead">Needs you</h2><div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
+  const tabs=queueTabs();
+  if(!tabs.some(x=>x.k===QTAB))QTAB='needs';
+  const kindWords=QKIND&&HERO_KIND[QKIND]?HERO_KIND[QKIND][1]:'';
+  const panel=QTAB==='tasks'?myTasksHtml():QTAB==='wait'?waitPanelHtml():QTAB==='snoozed'?snoozedPanelHtml():needsPanelHtml();
+  host.innerHTML=`<div class="qcard" id="queue"><div class="qbar"><div class="qtabs" role="tablist" aria-label="Your list">${tabs.map(x=>`<button type="button" role="tab" id="qt-${x.k}" aria-controls="qp-${x.k}" aria-selected="${x.k===QTAB?'true':'false'}" tabindex="${x.k===QTAB?'0':'-1'}">${esc(x.label)}${x.n!=null?` <span class="qn">${x.n}</span>`:''}</button>`).join('')}</div>${
+    QTAB==='needs'&&QKIND?`<span class="qfilter">Only ${esc(kindWords)} <button type="button" id="qfilterOff">Show all</button></span>`:''}</div>
+    <div class="qpanel" role="tabpanel" id="qp-${QTAB}" aria-labelledby="qt-${QTAB}">${panel}</div></div>`;
+  wireQueue();
+}
+function wireQueue(){
+  const host=$('needs');if(!host)return;
+  const tabs=[...host.querySelectorAll('[role=tab]')];
+  tabs.forEach((b,i)=>{
+    b.addEventListener('click',()=>{QTAB=b.id.slice(3);paintNeeds();const nb=$('qt-'+QTAB);if(nb)nb.focus();});
+    b.addEventListener('keydown',(e)=>{
+      let j=-1;if(e.key==='ArrowRight')j=(i+1)%tabs.length;else if(e.key==='ArrowLeft')j=(i-1+tabs.length)%tabs.length;else if(e.key==='Home')j=0;else if(e.key==='End')j=tabs.length-1;
+      if(j<0)return;e.preventDefault();QTAB=tabs[j].id.slice(3);paintNeeds();const nb=$('qt-'+QTAB);if(nb)nb.focus();
+    });
+  });
+  const off=$('qfilterOff');if(off)off.addEventListener('click',()=>{QKIND='';NEEDS_EXPANDED=false;paintNeeds();const t=$('qt-needs');if(t)t.focus();});
+  const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+  const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{const n=(NEEDS.rows||[]).length;NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(n+1)+') a');if(a)a.focus();}});
+  const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
+  host.querySelectorAll('[data-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeRow(b.getAttribute('data-snooze'),b)));
+  host.querySelectorAll('[data-ndone]').forEach(b=>b.addEventListener('click',()=>doneRow(b.getAttribute('data-ndone'),b)));
+  host.querySelectorAll('[data-wake]').forEach(b=>b.addEventListener('click',()=>wakeRow(b.getAttribute('data-wake'),b)));
+  if(QTAB==='tasks')wireMyTasks();
+}
+// After Snooze or Done the list changes here at once; the bell recounts on the
+// server (the write forgot the kept total), and the next visit reads it fresh.
+function dropRow(key){
+  if(!NEEDS)return null;
+  const all=needAll(),r=all.find(x=>x.key===key);if(!r)return null;
+  const cap=Math.max((NEEDS.rows||[]).length,8),left=all.filter(x=>x!==r);
+  NEEDS.rows=left.slice(0,cap);NEEDS.rest=left.slice(cap);
+  NEEDS.total=Math.max(0,Number(NEEDS.total||0)-1);NEEDS.more=Math.max(0,NEEDS.total-NEEDS.rows.length);
+  return r;
+}
+function focusAfter(key){   // keyboard users land on the next row's verb, not on <body>
+  const rows=[...document.querySelectorAll('#needsList .row')];const at=rows.findIndex(x=>x.getAttribute('data-need')===key);
+  return()=>{const now=[...document.querySelectorAll('#needsList .row')];const row=now[Math.min(Math.max(at,0),now.length-1)];const f=(row&&row.querySelector('a.rowact'))||$('qt-needs');if(f)f.focus();};
+}
+async function snoozeRow(key,btn){
+  const r=needAll().find(x=>x.key===key);if(!r)return false;
+  if(btn)btn.disabled=true;
+  let res;try{res=await apiSend('POST','/agency/needs-you/snooze',{key,days:SNOOZE_DAYS});}catch(_){res={ok:false,body:{}};}
+  if(!res.ok){if(btn)btn.disabled=false;toast((res.body&&res.body.message)||'That didn’t snooze — try again in a moment.',true);return false;}
+  const refocus=btn?focusAfter(key):null;
+  const until=(res.body&&res.body.data&&res.body.data.until)||null;
+  dropRow(key);NEEDS.snoozed=((NEEDS.snoozed||[]).filter(x=>x.key!==key)).concat([Object.assign({},r,{until})]);
+  paintNeeds();if(refocus)refocus();
+  if(window.ddsToast)window.ddsToast('Snoozed until '+wakeWords(until)+': '+r.name,'ok',{label:'Undo',onClick:()=>wakeRow(key)});
+  try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}
+  return true;
+}
+async function wakeRow(key,btn){
+  if(btn)btn.disabled=true;
+  let res;try{res=await apiSend('POST','/agency/needs-you/wake',{key});}catch(_){res={ok:false,body:{}};}
+  if(!res.ok){if(btn)btn.disabled=false;toast((res.body&&res.body.message)||'That didn’t change — try again in a moment.',true);return false;}
+  if(NEEDS)NEEDS.snoozed=(NEEDS.snoozed||[]).filter(x=>x.key!==key);
+  if(QTAB==='snoozed'&&NEEDS&&!NEEDS.snoozed.length)QTAB='needs';   // the last one back: show where it went
+  toast('It’s back on your list.');
+  try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}
+  mountNeeds(true);   // back in its own place in the order
+  return true;
+}
+async function doneRow(key,btn){
+  const r=needAll().find(x=>x.key===key),d=doneOf(r);if(!d)return false;
+  if(btn)btn.disabled=true;
+  let res;try{res=await d.run();}catch(_){res={ok:false,body:{}};}
+  const list=Array.isArray(res)?res:[res],bad=list.find(x=>!x||!x.ok);
+  if(bad){if(btn)btn.disabled=false;toast((bad&&bad.body&&bad.body.message)||'That didn’t save — try again in a moment.',true);return false;}
+  const refocus=btn?focusAfter(key):null;
+  dropRow(key);paintNeeds();if(refocus)refocus();
+  toast('Done: '+r.name);
+  try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}
+  return true;
+}
+
+// ── "Go through them" (item 70): what needs you, one at a time, in the list's
+//    order (or just the kind a chip picked). Do it, mark it done, snooze it or
+//    skip it; → skips, Esc leaves; on a phone, swipe left to skip. ──
+let FOCUS=null;
+const XSVG='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function openFocus(opener,viaKey){
+  const list=QKIND?needAll().filter(r=>heroKind(r.kind)===QKIND):needAll();
+  if(!list.length)return;
+  FOCUS={list:list.slice(),i:0,opener:opener||null,cleared:0,keys:!!viaKey};
+  const d=$('focusDlg');if(!d)return;
+  paintFocus();
+  try{d.showModal();}catch(_){d.setAttribute('open','');}
+  document.documentElement.classList.add('focus-on');
+  focusInFocus();
+}
+// a keyboard lands on the card's verb (ring and all); after a tap or a click,
+// focus sits on the view itself, so no button looks already pressed
+function focusInFocus(){
+  const d=$('focusDlg');if(!d||!FOCUS)return;
+  const g=FOCUS.keys?(d.querySelector('.fgo')||d.querySelector('.fend')):d.querySelector('.fwrap');
+  if(g)try{g.focus({preventScroll:true});}catch(_){g.focus();}
+}
+function closeFocus(){
+  const d=$('focusDlg');if(d&&d.open){try{d.close();}catch(_){d.removeAttribute('open');}}
+}
+function paintFocus(){
+  const d=$('focusDlg'),F=FOCUS;if(!d||!F)return;
+  const n=F.list.length;
+  if(F.i>=n){
+    d.innerHTML=`<div class="fwrap" tabindex="-1"><div class="fhead"><span class="fcount" id="fcount">Needs you</span><button type="button" class="fx" aria-label="Close">${XSVG}</button></div>
+      <div class="fmid"><div class="fdone-all"><h2>${F.cleared?'That’s the list.':'You’ve seen them all.'}</h2><p>${F.cleared?F.cleared+(F.cleared===1?' thing':' things')+' off your plate. ':''}Anything you skipped is still on Home.</p><button type="button" class="fend">Back to Home</button></div></div></div>`;
+    d.querySelector('.fx').addEventListener('click',closeFocus);d.querySelector('.fend').addEventListener('click',closeFocus);
+    focusInFocus();
     return;
   }
-  const total=Number(NEEDS.total||rows.length);
-  const old=Number((NEEDS.old&&NEEDS.old.count)||0);   // item 96: waited over a month, and can be cleared from here
-  const oldLine=old?`<p class="qold" id="needsOld">${old} of these ${old===1?'has':'have'} waited over a month. <button type="button" class="linkbtn" id="needsClearOld">Clear ${old===1?'it':'them'}</button></p>`:'';
-  host.innerHTML=`<h2 class="qhead">Needs you · ${total}</h2><div class="rcard need" id="needsList">${oldLine}${shown.map(needRowHtml).join('')}${
-    left>0?`<p class="qmore"><button type="button" class="linkbtn" id="needsMore">+ ${left} more</button></p>`:''}${partial}</div>`;
-  const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(rows.length+1)+') a');if(a)a.focus();}});
-  const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
+  const r=F.list[F.i],chip=KIND_CHIP[r.kind]||['',''],done=doneOf(r),next=F.list[F.i+1];
+  const dots=Array.from({length:Math.min(n,12)},(_,k)=>`<i${k===Math.min(F.i,11)?' class="on"':''}></i>`).join('');
+  d.innerHTML=`<div class="fwrap" tabindex="-1"><div class="fhead"><span class="fcount" id="fcount">${QKIND?'':'Needs you · '}${F.i+1} of ${n}</span><span class="fdots" aria-hidden="true">${dots}</span><span class="fkeys">Esc to leave · → to skip</span><button type="button" class="fx" aria-label="Close">${XSVG}</button></div>
+    <div class="fmid"><article class="fcard" aria-live="polite">
+      <div class="fwho"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span><div><b>${esc(r.name)}</b>${r.when?`<small>${esc(r.when)}</small>`:''}</div>${chip[0]?`<span class="kchip ${chip[1]}">${esc(chip[0])}</span>`:''}</div>
+      <h2 class="fwhat">${esc(cap1(r.what))}.</h2>
+      <div class="facts"><a class="fgo" href="${esc(r.href)}" data-noscope="1">${esc(r.verb)}</a>${done?`<button type="button" class="fdone" title="${esc(done.title)}">Mark done</button>`:''}</div>
+      <div class="ffoot">${snoozeOk()?`<button type="button" class="fsnooze">Snooze ${SNOOZE_DAYS} days</button>`:''}<button type="button" class="fskip">Skip for now</button>${next?`<button type="button" class="fnext">Next: ${esc(next.name)} — ${esc(next.what)} →</button>`:''}</div>
+    </article>${next?`<div class="fpeek" aria-hidden="true">${esc(next.name)} — ${esc(next.what)}</div>`:''}</div>
+    <p class="fswipe">Swipe left to skip${done?', right when it’s done':''}</p></div>`;
+  const skip=()=>{F.i++;paintFocus();focusInFocus();};
+  const take=async(fn,btn)=>{if(await fn(r.key,btn)){F.list.splice(F.i,1);F.cleared++;paintFocus();focusInFocus();}};
+  d.querySelector('.fx').addEventListener('click',closeFocus);
+  d.querySelector('.fskip').addEventListener('click',skip);
+  const nx=d.querySelector('.fnext');if(nx)nx.addEventListener('click',skip);
+  const sz=d.querySelector('.fsnooze');if(sz)sz.addEventListener('click',()=>take(snoozeRow,sz));
+  const dn=d.querySelector('.fdone');if(dn)dn.addEventListener('click',()=>take(doneRow,dn));
+  // a swipe on the card: left skips, right marks it done (when it can be)
+  const card=d.querySelector('.fcard');let x0=null,y0=null;
+  card.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse')return;x0=e.clientX;y0=e.clientY;});
+  card.addEventListener('pointerup',(e)=>{if(x0==null)return;const dx=e.clientX-x0,dy=e.clientY-y0;x0=null;if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx))return;if(dx<0)skip();else if(dn)take(doneRow,dn);});
 }
+(function(){
+  const d=document.getElementById('focusDlg');if(!d)return;
+  d.addEventListener('pointerdown',()=>{if(FOCUS)FOCUS.keys=false;},true);
+  d.addEventListener('keydown',(e)=>{
+    if(!FOCUS)return;
+    if(e.key!=='Escape')FOCUS.keys=true;
+    if(e.key==='ArrowRight'&&!(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName))){e.preventDefault();const b=d.querySelector('.fskip');if(b)b.click();}
+  });
+  d.addEventListener('close',()=>{
+    document.documentElement.classList.remove('focus-on');
+    const op=FOCUS&&FOCUS.opener;FOCUS=null;paintNeeds();
+    const back=op&&document.contains(op)?op:$('goThrough');if(back)back.focus();
+  });
+})();
 // Item 96: enquiries and support requests that have waited over a month leave the
 // list in one go, after an in-place "are you sure". An enquiry is marked read and a
 // support request closed, the same as the Inbox's own buttons, so each stays in the
@@ -1335,14 +1698,13 @@ async function mountNeeds(fresh){
   let r;try{r=await api('/agency/needs-you'+(fresh?'?fresh=1':''));}catch(_){r={ok:false,status:0,body:{}};}   // fresh: just after a change here, never a shared run
   if(gen!==NSEQ)return;   // a newer read started — drop this one
   if(!r.ok||!r.body.data||typeof r.body.data!=='object'){
-    host.hidden=false;
-    host.innerHTML=`<h2 class="qhead">Needs you</h2>
-      <div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`;
-    const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+    if(!NEEDS){NEEDS_FAILED=true;paintNeeds();}   // a failed re-read keeps the last good list
     return;
   }
+  NEEDS_FAILED=false;
   const d=r.body.data;
-  NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{},old:(d.old&&typeof d.old==='object')?d.old:null};   // old: item 96's over-a-month count and what Clear changes
+  NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{},old:(d.old&&typeof d.old==='object')?d.old:null,
+    snoozed:Array.isArray(d.snoozed)?d.snoozed:[],snooze_ready:d.snooze_ready===true};   // old: item 96's over-a-month count and what Clear changes; snoozed: item 70
   NEEDS_EXPANDED=false;
   // final pass (Nov 8, batch B): the bell's badge is this list's total — hand it over, so the shell doesn't build the list again
   try{if(window.ddsBellSet)window.ddsBellSet(NEEDS.total);}catch(_){}

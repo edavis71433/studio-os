@@ -76,14 +76,16 @@ test.describe('item 53 — My tasks shows each project\'s next step', () => {
     await installApp(page, { api: { ...HOME, '/sales/my-tasks': { data: { items: [step('t1', 'Domain connected', 1, false), step('t3', 'Site live', 3, true), step('t2', 'Handover', 2, true)], total: 3, partial: false } } } });
     await page.route(`**/functions/v1/presence/projects/${P1}/tasks/t1`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' }));
     await page.goto('/agency.html');
+    const tab = page.locator('#qt-tasks');   // item 70: My tasks is a tab of Home's list, and the tab carries the count
+    await expect(tab).toHaveText('My tasks 1');
+    await tab.click();
     const card = page.locator('#my-tasks');
-    await expect(card.locator('.rh')).toHaveText('My tasks · 1');
     await expect(card.locator('.trow')).toHaveCount(1);
     await card.getByRole('button', { name: 'Done: Domain connected' }).click();
     await expect(card.locator('.trow')).toHaveText([/Handover/]);                       // the lowest place on the checklist, not the first in the list
     await card.getByRole('button', { name: 'Show all 2' }).click();
     await expect(card.locator('.trow')).toHaveCount(2);
-    await expect(card.locator('.rh')).toHaveText('My tasks · 2');
+    await expect(tab).toHaveText('My tasks 2');
   });
 });
 

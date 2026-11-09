@@ -171,6 +171,7 @@ test.describe('batch C — picking, confirming and focus', () => {
     await installApp(page, { api: HOME });
     await page.goto('/agency.html');
     await expect(page.locator('#pagehead')).toHaveText('Home');
+    await page.locator('#qt-tasks').click();   // item 70: My tasks is a tab of Home's list
     const card = page.locator('#my-tasks');
     await card.getByRole('button', { name: 'Done: Price the add-ons' }).click();
     await expect(card.getByRole('button', { name: 'Done: Send the photos' })).toBeFocused();
