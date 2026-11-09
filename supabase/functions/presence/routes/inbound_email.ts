@@ -28,6 +28,8 @@ import {
   receivedEmailId, envelopeOf, mergeReceived, splitQuotedReply,
 } from '../lib/inbound_email.ts';
 import { notifyStudioOfClientAction } from '../lib/service_bridge.ts';
+import { logTokenIn } from '../lib/email_log.ts';
+import { handleLoggedEmail } from './email_log.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -325,6 +327,20 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   //      could fix 502s, so Resend redelivers instead of the reply being lost.
   let data: any = hook;
   const emailId = receivedEmailId(hook);
+  // (5a) item 69: a message BCC'd to a studio's private log address is the studio's
+  //      OWN email to a client, to be logged on their deal, never a client's reply.
+  //      Checked before the self-sender drop below (the sender is the studio).
+  //      A BCC shows only in the envelope (received_for) or bcc, so those count here.
+  const listOf = (v: unknown): unknown[] => (Array.isArray(v) ? v : v ? [v] : []);
+  const logToken = logTokenIn([...listOf(hook.to), ...listOf(hook.cc), ...listOf(hook.bcc), ...listOf(hook.received_for)], inboundDomain);
+  if (logToken) {
+    if (!emailId) return handleLoggedEmail(hook, logToken);
+    const full = await fetchReceivedEmail(emailId);
+    if (full === 'retry') return json({ error: 'fetch_failed' }, 502);
+    if (full === 'gone') return dropAck('email_not_found');
+    if (full === 'too_large') return dropAck('too_large');
+    return handleLoggedEmail(mergeReceived(hook, full), logToken);
+  }
   if (emailId) {
     const env = envelopeOf(hook);
     if (!env.from_email) return dropAck('unparseable');

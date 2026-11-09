@@ -58,7 +58,8 @@ import { handleStockSearch, handleStockImport } from './routes/stock.ts';
 import { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } from './routes/content_library.ts';
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 import { handleEmailSending } from './routes/email_sending.ts';
-import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data   // sales review item 69: the sending-domain line
+import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
+import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 import { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } from './routes/booking.ts';
@@ -313,6 +314,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/email/inbound' && method === 'POST') {
     const { handleInboundEmail } = await import('./routes/inbound_email.ts');
     return handleInboundEmail(req);
+  }
+  // Sales review item 69: the open counter in an emailed update (a 1×1 image the
+  // person's email app fetches). Public by design: the signature in the path is
+  // the key, and it only ever stamps that one send's first open (a HEAD stamps nothing).
+  const openPx = route.match(/^\/email\/open\/([0-9a-f-]{36})\.([A-Za-z0-9_-]{32})\.gif$/i);
+  if (openPx && (method === 'GET' || method === 'HEAD')) {
+    const { handleEmailOpen, PIXEL_HEADERS } = await import('./lib/email_engagement.ts');
+    return method === 'HEAD' ? new Response(null, { status: 200, headers: PIXEL_HEADERS }) : await handleEmailOpen(openPx[1], openPx[2]);
   }
   // Sales review item 46: the private calendar link Google Calendar (or Apple,
   // Outlook) reads on its own schedule — no session; the 160-bit token in the
@@ -703,7 +712,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
-  if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs   // sales review item 69: which address mail goes out from, and is it verified
+  if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
     const { handleCalendarLink } = await import('./routes/calendar.ts');
     return handleCalendarLink(req, site, principal, cors);

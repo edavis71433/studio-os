@@ -277,8 +277,10 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
       // ONE 200-row window feeds BOTH this conversation channel and
       // /crm/activity's system events — two windows would dedupe apart.
       dealId ? svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${AS}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=200`).then(arr).catch(() => null) : Promise.resolve([] as any[]),
-      // email broadcasts this client actually received
-      ident.emails.length ? svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at&order=created_at.desc&limit=50`).then(arr).catch(() => null) : Promise.resolve([] as any[]),
+      // email broadcasts this client actually received — and (item 69) whether they
+      // opened each; before APPLY-0144 there is no opened_at, so read without it
+      ident.emails.length ? svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at,opened_at&order=created_at.desc&limit=50`)
+        .then((r) => r.ok ? arr(r) : svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at&order=created_at.desc&limit=50`).then(arr)).catch(() => null) : Promise.resolve([] as any[]),
     ]);
     // newest open wins — computed across the UNION (project-scoped + project-less)
     // sorted by created_at, so an older project-less ticket can never outrank a
@@ -331,7 +333,7 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
     }
     if (sends) {
       const subj = new Map<string, string>(broadcasts.map((b: any) => [String(b.id), String(b.subject || 'A studio update')]));
-      for (const x of [...sends].reverse()) items.push({ id: `${x.broadcast_id}:${x.created_at}`, kind: 'broadcast', from: 'studio', subject: subj.get(String(x.broadcast_id)) || 'A studio update', body: '', created_at: x.created_at });
+      for (const x of [...sends].reverse()) items.push({ id: `${x.broadcast_id}:${x.created_at}`, kind: 'broadcast', from: 'studio', subject: subj.get(String(x.broadcast_id)) || 'A studio update', body: '', created_at: x.created_at, opened: !!x.opened_at });
     }
     items.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     return { items, projectId, clientId, dealId, agencySiteId: AS, replySupportTo, deal: dealRow, dealEvents };

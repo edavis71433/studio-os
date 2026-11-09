@@ -462,11 +462,13 @@ function render(surface){
     html += `<section class="sec"><div class="sec-h"><h2>${esc(g)}</h2></div><div class="list">${(groups[g]||[]).map(row).join('')}</div></section>`;
   }
   html += `<section class="sec" id="calSec" hidden></section>`;   // sales review item 46
+  html += `<section class="sec" id="logSec" hidden></section>`;   // sales review item 69: the log-this-email address
   html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();
   paintAskClient(entries);
   paintCalendar();
+  paintEmailLog();
 }
 
 // ── Sales review item 46: your bookings and dated tasks in Google Calendar ────
@@ -511,6 +513,51 @@ async function paintCalendar(){
   const off = $('calOff'); if(off) off.addEventListener('click', async () => {
     if(!(await askConfirm('Turn the calendar link off?', 'Calendars using it stop getting your bookings and tasks.', 'Turn it off'))) return;
     make(off, 'DELETE', 'Your calendar link is off.');
+  });
+}
+
+// ── Sales review item 69: "log this email" — BCC a private address and the email
+// lands on the client's deal and record as "You logged an email". The studio's own
+// address (not while a client is in view); making or turning it off is a setting.
+let LOG = null;
+async function logApi(method){ try { const r = await fetch(FN+'/email/log-address', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
+async function paintEmailLog(){
+  const host = $('logSec'); if(!host || SCOPE) return;
+  if(!LOG){ const r = await logApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; LOG = d; }   // an older server: no card
+  const c = LOG; let inner;
+  if(!c.available){
+    inner = `<p class="calp">Email replies aren’t set up on this account yet, so there’s no address to give.</p>`;
+  } else if(!c.can_manage){
+    inner = `<p class="calp">${c.on ? 'Your studio’s log address is on.' : 'No log address yet.'} The owner makes it and can turn it off.</p>`;
+  } else if(!c.address){
+    inner = `<p class="calp">Email a client from Gmail or Outlook and keep a copy here: add a private address in <b>Bcc</b>, and the email lands on their deal and record as “You logged an email”.</p>
+      <div class="calacts"><button type="button" class="btn" id="logMake" data-needs="configure">Make my log address</button></div>`;
+  } else {
+    inner = `<p class="calp">Your private log address:</p>
+      <div class="calurl"><input id="logAddr" type="text" readonly value="${esc(c.address)}" aria-label="Your private log address"><button type="button" class="btn" id="logCopy">Copy</button></div>
+      <ol class="calsteps"><li>Write to a client from your own email as usual.</li><li>Put this address in <b>Bcc</b> (your client won’t see it).</li><li>Send. It lands on their deal within a minute, matched by their email address.</li></ol>
+      <p class="calp quiet">Only email sent from your studio’s own addresses is logged, and only to people already in your contacts or customers. Keep the address to yourself.</p>
+      <div class="calacts"><button type="button" class="btn" id="logNew" data-needs="configure">Make a new address</button><button type="button" class="btn ghost" id="logOff" data-needs="configure">Turn it off</button></div>`;
+  }
+  host.innerHTML = `<div class="sec-h"><h2>Email</h2></div><div class="list"><div class="calbox"><div class="calt">Log emails you send</div>${inner}</div></div>`;
+  host.hidden = false;
+  const make = async (btn, method, okMsg) => {
+    btn.disabled = true;
+    const r = await logApi(method);
+    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    LOG = (r.body && r.body.data) || {}; toast(okMsg); paintEmailLog();
+  };
+  const mk = $('logMake'); if(mk) mk.addEventListener('click', () => make(mk, 'POST', 'Your log address is ready.'));
+  const cp = $('logCopy'); if(cp) cp.addEventListener('click', async () => {
+    const u = $('logAddr'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.'); }
+  });
+  const nw = $('logNew'); if(nw) nw.addEventListener('click', async () => {
+    if(!(await askConfirm('Make a new address?', 'The old address stops working, so email sent to it isn’t logged any more.', 'Make a new address'))) return;
+    make(nw, 'POST', 'Your new log address is ready.');
+  });
+  const off = $('logOff'); if(off) off.addEventListener('click', async () => {
+    if(!(await askConfirm('Turn the log address off?', 'Email sent to it stops being logged.', 'Turn it off'))) return;
+    make(off, 'DELETE', 'Your log address is off.');
   });
 }
 

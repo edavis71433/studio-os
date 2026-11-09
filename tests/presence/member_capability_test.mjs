@@ -19,6 +19,7 @@
 for (const [k, v] of Object.entries({
   SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example',
   NETLIFY_AUTH_TOKEN: 'fake', AWS_ACCESS_KEY_ID: 'fake', AWS_SECRET_ACCESS_KEY: 'fake', AWS_REGION: 'us-east-1', ROUTE53_ENABLED: '1', DNS_ZONE_ENABLED: '1',
+  RESEND_INBOUND_DOMAIN: 'reply.example.com',   // item 69: the log address needs a reply domain to be made
 })) Deno.env.set(k, v);
 
 const P = '../../supabase/functions/presence';
@@ -46,6 +47,7 @@ const { handleLaunchDecide } = await import(`${P}/routes/launches.ts`);
 const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
+const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -141,6 +143,7 @@ const DECIDED = {
     'POST /foundations/zone', 'POST /foundations/zone/records', 'POST /preview/settings', 'POST /site/offline',
     'POST /site/online', 'PUT /bookings/settings', 'PUT /foundations/dns', 'PUT /foundations/zone/records',
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
+    'POST /email/log-address', 'DELETE /email/log-address',
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -298,6 +301,8 @@ const CHANGED = [
   { name: 'PUT /sales/stages', body: { names: { lead: 'Enquiry' } }, run: (r, p) => handleSalesStages(r, A, p, cors) },
   { name: 'POST /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },     // sales review item 46
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
+  { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
+  { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
 ];
@@ -423,6 +428,7 @@ const WRITE_HANDLERS = [
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
+  'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

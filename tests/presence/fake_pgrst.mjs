@@ -10,8 +10,8 @@
 //
 // It understands the filters the presence function uses: eq / neq / is /
 // in.(…) / like / ilike / gte / lte / gt / lt, not.<op>, or=(…) with quoted
-// values; select is ignored (whole rows come back); order (first key) and
-// limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
+// values, and a jsonb path column (detail->>key); select is ignored (whole rows
+// come back); order (first key) and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
 // partial unique index) answer 409 like the database. PATCH and DELETE apply
 // to every matching row. A user JWT (anything but the service key) sees only
@@ -34,7 +34,8 @@ export function installFakePostgrest(opts = {}) {
   const test = (row, col, expr) => {
     const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt)\.(.*)$/s.exec(expr);
     if (!m) return true;
-    const [, not, op, raw] = m; const v = row[col]; let r;
+    // a JSON path (detail->>message_id) reads inside a jsonb column, as text, like PostgREST
+    const [, not, op, raw] = m; const jp = /^(\w+)->>(\w+)$/.exec(col); const v = jp ? (row[jp[1]] && typeof row[jp[1]] === 'object' && row[jp[1]][jp[2]] != null ? String(row[jp[1]][jp[2]]) : null) : row[col]; let r;
     if (op === 'eq') r = v !== null && v !== undefined && String(v) === unq(raw);
     else if (op === 'neq') r = String(v ?? '') !== unq(raw);
     else if (op === 'is') r = raw === 'null' ? (v === null || v === undefined) : String(v) === raw;

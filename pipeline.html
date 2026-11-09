@@ -580,6 +580,8 @@ const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).incl
 const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed'};
+// item 69: the client opened a document's page (mirrors crm/deal_activity.ts openedLine by hand)
+const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request'};
 function evtLabel(e){
   const d=(e&&e.detail)||{};
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
@@ -589,8 +591,10 @@ function evtLabel(e){
   if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
   if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer charge paid':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
+  if(e.kind==='doc_opened')return 'They opened your '+(OPENED_WHAT[d.what]||'document');
   return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
 }
+const evtDateTime=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';return evtDate(iso)+', '+t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});};
 const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:'short',day:'numeric'};if(t.getFullYear()!==new Date().getFullYear())o.year='numeric';return t.toLocaleDateString('en-US',o);};
 // Calm relative date ("today" / "3 days ago") — mirrors the server's humanWhen so
 // "Last contacted …" reads the same everywhere.
@@ -2431,7 +2435,8 @@ async function openDeal(id){
     const todayStr=new Date().toISOString().slice(0,10);
     const tlItems=data.timeline||[];
     const tlHtml=tlItems.length?tlItems.map(it=>{
-      const when=it.backdated?`${evtDate(it.at)} · logged ${evtDate(it.logged_at)}`:evtDate(it.at);
+      // item 69: an open shows its time too — "Nov 8, 3:12 PM" tells you whether to call
+      const when=it.backdated?`${evtDate(it.at)} · logged ${evtDate(it.logged_at)}`:it.kind==='doc_opened'?evtDateTime(it.at):evtDate(it.at);
       const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
       return `<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}</div></div></li>`;
     }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
@@ -2469,7 +2474,7 @@ async function openDeal(id){
     if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
     const billN=(openInv.length+procInv.length)?`${openInv.length+procInv.length} open`:'';
     const tlN=tlItems.length?String(tlItems.length):'';
-    const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
+    const latestHtml=tlItems.length?`<ul class="tl tl-mini">${tlItems.slice(0,3).map(it=>`<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(it.kind==='doc_opened'?evtDateTime(it.at):evtDate(it.at))}</div></div></li>`).join('')}</ul>`:'<div class="mut">No activity yet — log a call or a note under Activity.</div>';
     const dtabBtn=(k,label,n)=>`<button type="button" role="tab" data-dtab="${k}" id="dtab-${k}" aria-controls="dpanel-${k}" aria-selected="false" tabindex="-1">${label}${n?`<span class="n">${esc(n)}</span>`:''}</button>`;
     const dpanel=(k)=>`<div class="dtab" id="dpanel-${k}" role="tabpanel" aria-labelledby="dtab-${k}" data-dtab-panel="${k}" hidden>`;
     const qlKindBtns=ACTKINDS.map((k,i)=>`<button type="button" class="kb${i===0?' on':''}" data-k="${k[0]}" aria-pressed="${i===0?'true':'false'}">${k[1]}</button>`).join('');   // k[1] is our own icon + word (ACTKINDS), never input — escaping it printed the icon's code as text

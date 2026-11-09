@@ -158,7 +158,8 @@ async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal
 async function docLink(kind: DocKind, id: string, siteId: string): Promise<string | null> {
   const secret = linkSecret();
   if (!secret) return null;
-  const token = await signDocToken({ t: 'doc', k: kind, id, site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }, secret);
+  // e: 1 = this copy went out in an email, so opening it is the client opening it (item 69)
+  const token = await signDocToken({ t: 'doc', k: kind, id, site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400, e: 1 }, secret);
   return docViewerUrl(token);
 }
 
@@ -167,6 +168,22 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
   const { actor, actor_kind } = actorOf(principal);
   await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ deal_id: dealId, site_id: siteId, kind, actor, actor_kind, ...extra }) }).catch(() => {});
+}
+
+/** Item 69 ("did they open it?"): the first time the client opens a document's
+ *  page, the deal says so — "They opened your proposal". The conditional stamp is
+ *  the once-guard: only the request that sets first_viewed_at writes the line, so
+ *  reloads and a second tab add nothing. Proposals have had the column since 0107;
+ *  agreements and invoices get it in 0144 (before that the stamp fails and nothing
+ *  is written). Never throws. */
+const OPEN_SYS: Principal = { kind: 'public', userId: 'client-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'doc-open' } as Principal;
+async function firstOpen(table: 'presence_proposals' | 'presence_contracts' | 'presence_invoices', id: string, siteId: string, dealId: unknown, what: 'proposal' | 'agreement' | 'invoice' | 'deposit'): Promise<void> {
+  try {
+    if (!UUID_RE.test(String(id || ''))) return;
+    const r = await svc(`${table}?id=eq.${id}&site_id=eq.${siteId}&first_viewed_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ first_viewed_at: nowIso() }) });
+    if (!r.ok || !rows(r)[0] || !UUID_RE.test(String(dealId || ''))) return;
+    await dealEvent(siteId, String(dealId), 'doc_opened', OPEN_SYS, { detail: { what, doc_id: id } });
+  } catch { /* an open is a nicety */ }
 }
 
 /** R1: auto-advance the deal stage AND record the stage_change (pipeline history
@@ -2202,18 +2219,23 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     const deal = rows(await svc(`presence_deals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title&limit=1`))[0];
     if (!deal) return json({ error: 'not_found' }, 404, cors);
     const { proposal, proposal_pending, contract, contract_pending } = await flowDocuments(tok.site_id, tok.id);
-    if (proposal && !proposal.first_viewed_at) { svc(`presence_proposals?id=eq.${proposal.id}&site_id=eq.${tok.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ first_viewed_at: nowIso() }) }).catch(() => {}); }
+    // Item 69: each document the client can actually read counts as opened (firstOpen).
+    const opens: Promise<void>[] = [];
+    if (proposal && !proposal.first_viewed_at) opens.push(firstOpen('presence_proposals', proposal.id, tok.site_id, tok.id, 'proposal'));
     // chosen = the agreement may be read: the proposal is accepted, or the deal
     // never had one in play. Between versions (proposal_pending) it stays locked.
     const chosen = proposal ? proposal.status === 'accepted' : !proposal_pending;
     const contractOut = !contract ? null
       : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
+    if (contract && chosen) opens.push(firstOpen('presence_contracts', contract.id, tok.site_id, tok.id, 'agreement'));
     let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null } | null = null;
     try {
-      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
+      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=id,amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
       if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
+      if (dep && deposit?.url) opens.push(firstOpen('presence_invoices', String(dep.id), tok.site_id, tok.id, 'deposit'));   // the pay button is in front of them
     } catch { /* optional — the page says "nothing to pay right now" */ }
+    await Promise.all(opens);
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
     return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit } }, 200, cors);
   }
@@ -2221,18 +2243,19 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
     // back to the pre-0107 shape so a deploy ahead of the migration never breaks the
     // public proposal view.
-    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&limit=1`);
-    if (!pr.ok) pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&limit=1`);
-    const p = rows(pr)[0];
-    if (!p) return json({ error: 'not_found' }, 404, cors);
-    // stamp the FIRST open so the operator knows the prospect saw it (best-effort;
-    // no-ops before the migration adds the column).
-    if (!p.first_viewed_at) { svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ first_viewed_at: nowIso() }) }).catch(() => {}); }
+    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&limit=1`);
+    if (!pr.ok) pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status&limit=1`);
+    const { deal_id: propDeal, ...p } = rows(pr)[0] || {} as any;
+    if (!p.id) return json({ error: 'not_found' }, 404, cors);
+    // stamp the FIRST open so the operator knows the prospect saw it — and (item 69)
+    // say so on the deal (best-effort; no-ops before the migration adds the column).
+    if (!p.first_viewed_at) await firstOpen('presence_proposals', tok.id, tok.site_id, propDeal, 'proposal');
     const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
     return json({ data: { kind: 'proposal', brand, expired, ...p } }, 200, cors);
   }
-  const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at&limit=1`))[0];
-  if (!c) return json({ error: 'not_found' }, 404, cors);
+  const { deal_id: conDeal, ...c } = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at&limit=1`))[0] || {} as any;
+  if (!c.id) return json({ error: 'not_found' }, 404, cors);
+  await firstOpen('presence_contracts', tok.id, tok.site_id, conDeal, 'agreement');   // item 69
   return json({ data: { kind: 'contract', brand, ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
 }
 
@@ -2261,8 +2284,11 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
     return htmlResp(renderDocument('proposal', p, brand));
   }
   if (tok.k === 'invoice') {
-    const v = rows(await svc(`presence_invoices?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at&limit=1`))[0];
-    if (!v) return htmlResp(errPage('This invoice is no longer available.'), 404);
+    const { deal_id: invDeal, ...v } = rows(await svc(`presence_invoices?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at&limit=1`))[0] || {} as any;
+    if (!v.id) return htmlResp(errPage('This invoice is no longer available.'), 404);
+    // Item 69: the copy linked from the invoice EMAIL (e: 1) counts as the client opening
+    // it; the drawer's own Open/print link never does.
+    if (tok.e === 1) await firstOpen('presence_invoices', tok.id, tok.site_id, invDeal, v.purpose === 'deposit' ? 'deposit' : 'invoice');
     return htmlResp(renderDocument('invoice', v, brand));
   }
   const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`))[0];

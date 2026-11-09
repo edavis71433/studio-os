@@ -22,6 +22,7 @@
 import { svc } from './db.ts';
 import { renderMarkdown } from './markdown.ts';
 import { sendEmail, validEmail } from '../commerce/account.ts';
+import { openPixelTag, openPixelUrl } from './email_engagement.ts';
 import { loadEmailBrand, type EmailBrand } from './email_brand.ts';
 import { isSuppressed } from '../routes/email_infra.ts';
 import { normalizeLists } from './saved_views.ts';
@@ -283,9 +284,11 @@ export interface BroadcastRow { id: string; site_id: string; subject: string; bo
 export interface DispatchDeps extends SendableDeps {
   loadBrand?: (siteId: string) => Promise<EmailBrand>;
   sendFn?: (to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }) => Promise<boolean>;
-  // claim a per-recipient send slot: 'inserted' = go ahead, 'duplicate' = already
-  // sent (skip — the send-once guard), 'error' = infra failure.
-  claimFn?: (broadcastId: string, siteId: string, email: string) => Promise<'inserted' | 'duplicate' | 'error'>;
+  // claim a per-recipient send slot: 'inserted' (or { id } — the new row, item 69's
+  // open counter needs it) = go ahead, 'duplicate' = already sent (skip — the
+  // send-once guard), 'error' = infra failure.
+  claimFn?: (broadcastId: string, siteId: string, email: string) => Promise<Claim>;
+  pixelFn?: (sendId: string) => Promise<string>;
   markFailedFn?: (broadcastId: string, email: string) => Promise<void>;
   recordSkippedFn?: (broadcastId: string, siteId: string, email: string) => Promise<void>;
   resolveFn?: (siteId: string, key: AudienceKey) => Promise<{ recipients: Recipient[]; suppressed: number; audience: number }>;
@@ -293,17 +296,20 @@ export interface DispatchDeps extends SendableDeps {
   dailyCap?: number;
 }
 
+export type Claim = 'inserted' | { id: string } | 'duplicate' | 'error';
 /** Insert a send-log row, ignoring duplicates. The unique(broadcast_id, lower(email))
  *  index makes this the send-once guard: an already-mailed address returns an empty
- *  representation ⇒ 'duplicate'. */
-async function defaultClaim(broadcastId: string, siteId: string, email: string): Promise<'inserted' | 'duplicate' | 'error'> {
+ *  representation ⇒ 'duplicate'. A new row answers with its id. */
+async function defaultClaim(broadcastId: string, siteId: string, email: string): Promise<Claim> {
   const r = await svc('presence_broadcast_sends', {
     method: 'POST',
     headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
     body: JSON.stringify({ broadcast_id: broadcastId, site_id: siteId, email: email.toLowerCase(), status: 'sent' }),
   });
   if (!r.ok) return 'error';
-  return Array.isArray(r.json) && r.json.length ? 'inserted' : 'duplicate';
+  if (!Array.isArray(r.json) || !r.json.length) return 'duplicate';
+  const id = String(r.json[0]?.id || '');
+  return id ? { id } : 'inserted';
 }
 async function defaultMarkFailed(broadcastId: string, email: string): Promise<void> {
   await svc(`presence_broadcast_sends?broadcast_id=eq.${broadcastId}&email=eq.${encodeURIComponent(email.toLowerCase())}`,
@@ -344,11 +350,13 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
     if (c === 'duplicate') { already++; continue; }   // send-once guard: already mailed
     if (c === 'error') { failed++; continue; }
     const tokens: MergeTokens = { firstName: r.firstName, businessName };
+    // Item 69: the open counter — a 1×1 image naming this send's row (lib/email_engagement.ts).
+    const pixel = typeof c === 'object' ? openPixelTag(await (deps.pixelFn || openPixelUrl)(c.id).catch(() => '')) : '';
     // sendEmail is the ONE send point: it re-checks suppression and attaches the
     // RFC-8058 one-click List-Unsubscribe header — inherited, never re-implemented.
     // R1: pass the broadcast's own site so a recipient's REPLY lands on that
     // site's inbound address (<siteId>@<inbound-domain>) → /email/inbound.
-    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens), brand, { siteId: b.site_id });
+    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens) + pixel, brand, { siteId: b.site_id });
     if (ok) sent++;
     else { failed++; await markFailed(b.id, r.email).catch(() => {}); }
   }

@@ -34,6 +34,7 @@ const delivery = read('supabase/functions/presence/routes/client_delivery.ts');
 const mig86 = read('supabase/migrations/0086_presence_invoices.sql');
 const mig117 = read('supabase/migrations/0117_deal_event_delete_kinds.sql');
 const mig118 = read('supabase/migrations/0118_deal_event_invoice_voided.sql');
+const mig144 = read('supabase/migrations/0144_email_opens.sql');   // item 69: the newest kind list (doc_opened)
 const mig116 = read('supabase/migrations/0116_operator_activity_notices.sql');
 const mig119 = read('supabase/migrations/0119_notice_invoice_void_paid.sql');
 const stripeLib = read('supabase/functions/presence/commerce/stripe.ts');
@@ -76,10 +77,12 @@ const I_OTHER = '88888888-8888-4888-8888-888888888888';       // another tenant'
   ok('0118 documents its rollback', /rollback:/.test(mig118));
   ok('0118 says it must be applied BEFORE the function deploy (dealEvent fails silently)',
     /BEFORE DEPLOYING THE FUNCTION/i.test(mig118) && /silent/i.test(mig118));
-  // and the code writes ONLY kinds the constraint allows
+  // and the code writes ONLY kinds the CURRENT constraint (0144's) allows
+  const current = kinds(mig144);
+  ok('0144 carries every kind 0118 allowed forward', current.length > 0 && now.every((k) => current.includes(k)), now.filter((k) => !current.includes(k)).join(','));
   for (const k of sales.match(/dealEvent\([^,]+, [^,]+, '([a-z_]+)'/g) || []) {
     const kind = k.match(/'([a-z_]+)'$/)[1];
-    ok(`sales.ts writes deal-event kind '${kind}' — allowed by the check`, now.includes(kind));
+    ok(`sales.ts writes deal-event kind '${kind}' — allowed by the check`, current.includes(kind));
   }
 }
 
