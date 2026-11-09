@@ -92,7 +92,7 @@ a{color:var(--accent)}a:hover{color:var(--accent-dark)}
 .skip:focus{left:0}
 .wrap{max-width:960px;margin:0 auto;padding:0 20px}
 header.site{background:var(--cream);border-bottom:1px solid var(--line)}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
 .nav.centered{flex-direction:column;gap:8px;justify-content:center;text-align:center}
 .brand{font-size:1.35rem;color:var(--ink);text-decoration:none}
 nav.primary ul{display:flex;gap:6px;list-style:none;flex-wrap:wrap}
@@ -100,7 +100,7 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 nav.primary a:hover{background:rgba(140,59,46,.08)}
 nav.primary a[aria-current=page]{color:var(--accent);font-weight:600}
 main{display:block}
-.hero{padding:64px 0 40px;text-align:center}
+.hero{padding-top:64px;padding-bottom:40px;text-align:center}
 .hero .tagline{font-size:1.15rem;color:var(--soft);max-width:38rem;margin:14px auto 0}
 .hero-img{margin-top:32px}.hero-img img{width:100%;max-width:860px;border-radius:14px;display:block;margin:0 auto}
 .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
@@ -117,7 +117,7 @@ main{display:block}
 .strip .wrap{display:flex;gap:10px 24px;justify-content:center;flex-wrap:wrap;text-align:center}
 .strip a{color:#f7f1e8}
 .notice{background:#7a2f24;color:#fff;padding:12px 0;text-align:center;font-weight:600}
-section.block{padding:calc(44px * var(--spacing-scale,1)) 0}
+.block{padding-top:calc(44px * var(--spacing-scale,1));padding-bottom:calc(44px * var(--spacing-scale,1))}
 section.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .menu-cat{margin-bottom:34px}
 .menu-cat h2{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:var(--font-body,system-ui,sans-serif);font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
@@ -171,7 +171,7 @@ footer.site table.hours td,footer.site table.hours th{color:#cfc4b2}
 ${BLOCK_CSS}
 ${SEARCH_CSS}`;
 
-const CRITICAL = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:#faf6ef;--accent:#8c3b2e;--line:#e7ddd0}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--cream);color:var(--ink);line-height:1.65;font-size:16.5px}h1,.brand{font-family:Georgia,'Times New Roman',serif;font-weight:400;line-height:1.2}h1{font-size:clamp(2rem,5.5vw,3.2rem)}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:960px;margin:0 auto;padding:0 20px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}nav.primary ul{display:flex;gap:6px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:var(--ink)}.hero{padding:64px 0 40px;text-align:center}`;
+const CRITICAL = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:#faf6ef;--accent:#8c3b2e;--line:#e7ddd0}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--cream);color:var(--ink);line-height:1.65;font-size:16.5px}h1,.brand{font-family:Georgia,'Times New Roman',serif;font-weight:400;line-height:1.2}h1{font-size:clamp(2rem,5.5vw,3.2rem)}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:960px;margin:0 auto;padding:0 20px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}nav.primary ul{display:flex;gap:6px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:var(--ink)}.hero{padding-top:64px;padding-bottom:40px;text-align:center}`;
 
 // tiny static "open now" script — reads a JSON data island; runs in the browser
 // (renderer itself never touches a clock). <1KB.

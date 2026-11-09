@@ -1877,7 +1877,7 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-divider{padding-top:0;padding-bottom:0}
 .block-divider hr{border:none;border-top:1px solid var(--line);margin:0}
 .div-small{--div-gap:16px}.div-medium{--div-gap:36px}.div-large{--div-gap:64px}
-.block-divider.div-line{margin:var(--div-gap,36px) 0}
+.block-divider.div-line{margin-top:var(--div-gap,36px);margin-bottom:var(--div-gap,36px)}
 .div-space{height:var(--div-gap,36px)}
 .block-columns .cols{display:grid;gap:24px;grid-template-columns:1fr;margin-top:6px}
 .block-columns .col-media img{width:100%;border-radius:10px;display:block;margin-bottom:10px}

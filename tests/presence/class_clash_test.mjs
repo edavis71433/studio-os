@@ -46,8 +46,8 @@ const OWNERS = {
   process: ['sections', 'the How it works steps; Atelier restyles them'],
   'bk-done-ic': ['sections', 'the booking widget’s done mark; Atelier restyles it'],
   prose: ['template', 'written words: a post, the about story, an answer; the Text, Accordion, Tabs, Columns and Spotlight sections carry it too, and the section styles’ spacing reaches only theirs'],
-  'block--bg-accent': ['sections', 'a section’s brand-colour band; Restaurant Classic restyles its Features cards on it'],
-  'block--bg-dark': ['sections', 'a section’s dark band; Restaurant Classic restyles its Features cards on it'],
+  'block--bg-accent': ['sections', 'a section’s brand-colour band; the templates with light Features cards turn them see-through on it'],
+  'block--bg-dark': ['sections', 'a section’s dark band; the templates with light Features cards turn them see-through on it'],
 };
 
 // ── reading markup and stylesheets ──
