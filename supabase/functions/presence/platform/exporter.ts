@@ -67,7 +67,7 @@ export async function buildExport(site: SiteRow): Promise<SiteExport> {
   // the rendered site — portable, framework-free HTML through the ONE renderer
   let website: Record<string, string> | null = null;
   try {
-    const fm = t!.render(
+    const fm = await t!.render(
       { content: structuredClone(snapshot.content), content_contract_version: snapshot.content_contract_version, template_slug: site.template_slug, template_version: site.template_version, created_at: now },
       t!.manifest,
       { baseUrl: site.custom_domain ? `https://${site.custom_domain}` : 'https://example.com' },

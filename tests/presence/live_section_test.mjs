@@ -103,11 +103,11 @@ function topElements(html) {
 const firstTag = (html) => (html.replace(/^\s*(?:<!--[\s\S]*?-->\s*)*/, '').match(/^<[a-z][a-z0-9-]*\b[^>]*>/i) || [''])[0];
 const photoPaths = (html) => [...new Set(html.match(/\/(?:img\/[0-9a-f]{8}-\d+\.(?:webp|avif)|files\/[0-9a-f]{8}\.[a-z0-9]+)/g) || [])];
 /** The home page the draft preview draws from this list. */
-function draftPage(list, slug, version, man) {
+async function draftPage(list, slug, version, man) {
   const draft = { presence_identity: [], presence_locations: [], presence_offerings: [], presence_testimonials: [], presence_faqs: [], presence_posts: [], presence_redirects: [], presence_dev_customizations: [],
     presence_media: rows.presence_media, presence_reviews: rows.presence_reviews, presence_content_library: rows.presence_content_library, presence_settings: [{ blocks: list }] };
   const { snapshot } = buildSnapshot(draft, man, { templateSlug: slug, templateVersion: version, now: NOW });
-  return String(renderSnapshot(withSampleWords(snapshot), { baseUrl: 'https://preview.invalid' })['index.html']).replaceAll('https://preview.invalid', '');
+  return String((await renderSnapshot(withSampleWords(snapshot), { baseUrl: 'https://preview.invalid' }))['index.html']).replaceAll('https://preview.invalid', '');
 }
 {
   const miss = { drew: [], stamp: [], one: [], page: [], unlisted: [], noPhoto: [] };
@@ -118,7 +118,7 @@ function draftPage(list, slug, version, man) {
     const version = latestTemplateVersion(slug), man = getTemplate(slug, version).manifest;
     for (const types of lists) {
       const list = types.map((t) => SAMPLE_BLOCKS[t]);
-      const page = draftPage(list, slug, version, man);
+      const page = await draftPage(list, slug, version, man);
       for (const [i, type] of types.entries()) {
         const r = await draftSectionHtml(SITE, man, list, i, NOW), at = `${slug}: ${type}`;
         if (!r.html) { miss.drew.push(at); continue; }

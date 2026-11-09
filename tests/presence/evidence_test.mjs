@@ -20,8 +20,8 @@ const fixture = JSON.parse(read('supabase/functions/presence/templates/restauran
 const T = getTemplate('restaurant-classic', '1.0.0');
 const NOW = '2026-07-06T12:00:00.000Z';
 
-function renderFileMap(content) {
-  const fm = T.render(
+async function renderFileMap(content) {
+  const fm = await T.render(
     { content: structuredClone(content), content_contract_version: 1, template_slug: 'restaurant-classic', template_version: '1.0.0', created_at: NOW },
     T.manifest, { baseUrl: 'https://observe.invalid' },
   );
@@ -32,9 +32,12 @@ function renderFileMap(content) {
 const pagesOf = (fm) => Object.keys(fm).filter((k) => k.endsWith('.html'))
   .map((k) => ({ path: k === 'index.html' ? '/' : '/' + k.replace(/\/index\.html$/, '/'), html: fm[k] }));
 
+// Every healthy input draws the same fixture, so it is drawn once (drawing is async since
+// item 107) and each input gets its own copy.
+const HEALTHY_FM = await renderFileMap(normalizeSnapshotContent(structuredClone(fixture.content)));
 function healthyInput(overrides = {}) {
   const draft = normalizeSnapshotContent(structuredClone(fixture.content));
-  const fm = renderFileMap(draft);
+  const fm = structuredClone(HEALTHY_FM);
   return {
     site: { id: '00000000-0000-4000-8000-000000000001', status: 'live', template_slug: 'restaurant-classic', template_version: '1.0.0', netlify_site_id: 'nf-1', custom_domain: null, client_id: 'c1', last_published_at: NOW },
     now: NOW,

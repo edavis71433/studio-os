@@ -15,7 +15,7 @@ async function write(dir: string, files: FileMap) {
     if (typeof body === 'string') await Deno.writeTextFile(full, body); else await Deno.writeFile(full, body);
   }
 }
-const { templates, sections, ph } = allPages();
+const { templates, sections, ph } = await allPages();
 for (const [slug, files] of Object.entries(templates)) await write(`${out}/templates/${slug}`, { ...files, ...ph });
 for (const [type, files] of Object.entries(sections)) await write(`${out}/sections/${type}`, { ...files, ...ph });
 await Deno.writeTextFile(`${out}/sources.json`, JSON.stringify(await pictureSources(), null, 1) + '\n');

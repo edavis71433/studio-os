@@ -26,35 +26,35 @@ const withGallery = (fx, extra = {}) => { const s = structuredClone(fx); const d
 // ═══ 1. what a site keeps ═══
 for (const slug of TEMPLATES) {
   const own = fixture(slug);
-  const shipped = renderSnapshot(own, SITE), builder = renderSnapshot(own, SITE, { allSectionStyles: true });
+  const shipped = await renderSnapshot(own, SITE), builder = await renderSnapshot(own, SITE, { allSectionStyles: true });
   const s = cssOf(shipped), b = cssOf(builder);
   ok(`[${slug}] a site with no sections ships none of the section styles`, !s.css.includes('.gallery{') && !s.css.includes('.bk-slot{') && !s.css.includes('.lb{') && !s.css.includes('.ff-canvas{') && !s.css.includes('block--bg-tint') && !s.css.includes(':where('));
   ok(`[${slug}] …which is over 30 KB lighter than the whole set`, b.css.length - s.css.length > 30_000, `${b.css.length} → ${s.css.length}`);
-  ok(`[${slug}] the builder's drawing keeps the section styles whole`, b.css.includes(BLOCK_CSS) && cssOf(renderForBuilder(own)).css.includes(BLOCK_CSS));
+  ok(`[${slug}] the builder's drawing keeps the section styles whole`, b.css.includes(BLOCK_CSS) && cssOf(await renderForBuilder(own)).css.includes(BLOCK_CSS));
   // (a redirect stub isn't a page)
   const broken = pages(shipped).filter(([, v]) => !v.includes('http-equiv="refresh"')).filter(([, v]) => { const m = /<link rel="stylesheet" href="\/([^"]+)">/.exec(v); return !m || m[1] !== s.key; }).map(([k]) => k);
   ok(`[${slug}] every page links the stylesheet the site ships`, broken.length === 0, broken.slice(0, 3).join(', '));
   const sameElse = pages(shipped).every(([k, v]) => v.split(`/${s.key}`).join('') === String(builder[k]).split(`/${b.key}`).join(''));
   ok(`[${slug}] the pages are the builder's pages, but for the stylesheet's name`, sameElse && Object.keys(shipped).length === Object.keys(builder).length);
 
-  const full = renderSnapshot(fullFixture(slug), SITE), fc = cssOf(full);
+  const full = await renderSnapshot(fullFixture(slug), SITE), fc = cssOf(full);
   ok(`[${slug}] the full sample carries exactly the section styles its pages use`, fc.css.includes(sectionStyles(classesOf(full))) && !fc.css.includes(BLOCK_CSS));
   ok(`[${slug}] …the booking widget's steps too, though its script builds them`, fc.css.includes('.bk-slot{') && fc.css.includes('.bk-services{'));
 }
 {
   // a site that adds a gallery gets a stylesheet of a new name, so a visitor's year-long copy can't miss its rules
   const own = fixture('harbor');
-  const before = cssOf(renderSnapshot(own, SITE)), after = cssOf(renderSnapshot(withGallery(own), SITE));
+  const before = cssOf(await renderSnapshot(own, SITE)), after = cssOf(await renderSnapshot(withGallery(own), SITE));
   ok('adding a gallery adds its rules', after.css.includes('.gallery{') && !before.css.includes('.gallery{'));
   ok('…under a new stylesheet name', before.key !== after.key);
-  const zoom = cssOf(renderSnapshot(withGallery(own, { zoom: true }), SITE)).css;
+  const zoom = cssOf(await renderSnapshot(withGallery(own, { zoom: true }), SITE)).css;
   ok('the photo viewer and its animation come only with a zoom gallery', zoom.includes('.lb:target{display:flex}') && zoom.includes('@keyframes lb-zoom') && !after.css.includes('.lb{') && !after.css.includes('@keyframes'));
-  const twice = [renderSnapshot(withGallery(own), SITE), renderSnapshot(withGallery(own), SITE)].map((f) => JSON.stringify(Object.entries(f)));
+  const twice = [await renderSnapshot(withGallery(own), SITE), await renderSnapshot(withGallery(own), SITE)].map((f) => JSON.stringify(Object.entries(f)));
   ok('the same site draws the same bytes twice', twice[0] === twice[1]);
   // Developer Mode markup counts: a class it borrows keeps its rule
   const dev = structuredClone(own); dev.dev_customization = { theme_tokens: {}, custom_css: '', custom_html: '<div class="btn-row"><a class="btn btn-outline" href="/contact/">Call us</a></div>' };
-  const dc = cssOf(renderSnapshot(dev, SITE)).css;
-  ok('Developer Mode markup keeps the section rules it borrows', dc.includes('.btn-row{') && dc.includes('.btn-outline{') && !cssOf(renderSnapshot(own, SITE)).css.includes('.btn-row{'));
+  const dc = cssOf(await renderSnapshot(dev, SITE)).css;
+  ok('Developer Mode markup keeps the section rules it borrows', dc.includes('.btn-row{') && dc.includes('.btn-outline{') && !cssOf(await renderSnapshot(own, SITE)).css.includes('.btn-row{'));
   // the builder's preview and the studio's site cards share cache entries, so both keep every rule
   for (const f of ['supabase/functions/presence/routes/preview.ts', 'supabase/functions/presence/agency/sites.ts']) {
     const src = Deno.readTextFileSync(new URL(`../../${f}`, import.meta.url));
@@ -98,7 +98,7 @@ for (const slug of TEMPLATES) {
 
 // ═══ 4. the Features section's grid, on every template ═══
 for (const slug of TEMPLATES) {
-  const { css } = cssOf(renderSnapshot(fixture(slug), SITE));
+  const { css } = cssOf(await renderSnapshot(fixture(slug), SITE));
   ok(`[${slug}] the template draws the Features grid and its items`, /(^|\n)\.svc-grid\{[^}]*display:grid/.test(css) && /(^|\n)\.svc\{/.test(css));
 }
 
