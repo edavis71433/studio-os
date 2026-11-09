@@ -118,6 +118,29 @@ html.dds-embed #detailWrap{padding-top:0}
   }
   @media (pointer:coarse){.dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next{min-height:44px}}
   @media (prefers-reduced-motion:reduce){dialog.dprev{animation:none}}
+
+  /* ══ Bold redesign — the one-screen proposal: services as chips, the lines,
+     and what the client sees beside them ══ */
+  .pb{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:16px;align-items:start;margin-top:8px}
+  @media (max-width:900px){.pb{grid-template-columns:1fr}}
+  .pb-l{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:4px 0 6px}
+  .pb-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .pb-chip{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer}
+  .pb-chip::before{content:"+ ";color:var(--p);font-weight:700}
+  .pb-chip[aria-pressed="true"]{background:var(--p-soft);border-color:transparent;color:var(--p);font-weight:600}
+  .pb-chip[aria-pressed="true"]::before{content:"✓ "}
+  .pb-view{position:sticky;top:16px;background:var(--dds-up,#f7f6fb);border-radius:var(--dds-r-lg,16px);padding:12px 14px}
+  .pb-card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,12px);padding:14px 16px;box-shadow:var(--shadow)}
+  .pb-biz{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--soft)}
+  .pb-mark{width:18px;height:18px;border-radius:5px;background:var(--dds-grad-brand,var(--p))}
+  .pb-title{font-weight:650;font-size:15px;margin:8px 0 10px}
+  .pb-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0}
+  .pb-row b{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pb-total{border-top:1px solid var(--line);margin-top:4px;padding-top:8px;font-weight:700}
+  .pb-total b{font-size:16px}
+  .pb-cta{margin-top:12px;text-align:center;border-radius:999px;padding:10px;font-weight:600;font-size:13.5px;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff)}
+  .pb-foot{font-size:12px;margin:8px 2px 0}
+  @media (pointer:coarse){.pb-chip{min-height:44px}}
 </style>
 <style>
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
@@ -3174,6 +3197,14 @@ async function openDeal(id){
         const hide=hasCat?' style="display:none"':'';
         return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" min="1" step="1" class="pl-qty" value="1" placeholder="Qty" aria-label="Quantity" title="Quantity" style="max-width:64px"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price each (USD)" aria-label="Price each in dollars" style="max-width:140px"></div></div>`;};
       const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
+      // Bold redesign (Nov 2026): a proposal is one screen — your services as
+      // chips to tap (a second tap takes it off), the lines below, and beside
+      // them exactly what the client will see, redrawn as you type.
+      const ct=(data&&data.contact)||{};
+      const first=String(ct.name||'').trim().split(/\s+/)[0]||'';
+      const forWho=String(ct.company||ct.name||'').trim();
+      const svcChips=hasCat?`<p class="pb-l">Add from your services</p><div class="pb-chips" role="group" aria-label="Add from your services">${SERVICES.map((s,i)=>`<button type="button" class="pb-chip" data-svc="${i}" aria-pressed="false">${esc(s.name)} · ${esc(money(s.price_cents)||'$0')}</button>`).join('')}</div>`:'';
+      const sees=first?('What '+first+' sees'):'What they see';
       // Seed one row per prefilled item (revise/clone), else a single blank row.
       const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
       const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:est?`<div class="mut" style="margin-top:8px">They’ll see each line and the total, with Approve or Not now. Nothing is charged.</div>`:'';
@@ -3186,7 +3217,7 @@ async function openDeal(id){
         <div class="row2" style="margin-top:6px"><label class="mut" style="min-width:120px">Tax %</label>
           <input type="number" step="0.01" id="plTaxPct" placeholder="0" aria-label="Tax percent" style="max-width:120px"></div>
         <div id="plBreak" class="mut" style="margin-top:8px"></div></div>`;
-      host.innerHTML=`<div style="margin-top:8px">${headNote}${hint}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev?'Save & send →':'Save & send →'}</button></div></div>`;
+      host.innerHTML=`<div class="pb"><div class="pb-edit">${headNote}${hint}${svcChips}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev||!first?'Save & send →':'Send to '+esc(first)+' →'}</button></div></div><aside class="pb-view" aria-label="${esc(sees)}"><p class="pb-l">${esc(sees)}</p><div class="pb-card" id="plPreview"></div><p class="mut pb-foot">${est?'They can approve it or say not now. Nothing is charged.':'One link: they read it and accept it there.'}</p></aside></div>`;
       const hintLink=$('plManageHint'); if(hintLink) hintLink.onclick=(e)=>{e.preventDefault();openManageServices();};
       const wirePick=(sel)=>{ if(!sel) return; const row=sel.closest('.prop-line'); const box=row.querySelector('.pl-custom'); const lab=row.querySelector('.pl-label'); const pr=row.querySelector('.pl-price');
         sel.onchange=()=>{ const v=sel.value;
@@ -3201,7 +3232,7 @@ async function openDeal(id){
       const revealFilled=()=>host.querySelectorAll('.prop-line').forEach(row=>{const lab=row.querySelector('.pl-label');const box=row.querySelector('.pl-custom');const sel=row.querySelector('.pl-pick');if(lab&&lab.value&&box){box.style.display='';if(sel)sel.value='__custom__';}});
       // Live breakdown — mirrors the server's computeProposalTotals exactly.
       const collectPricing=()=>{const mode=$('plDiscMode').value;const dv=parseFloat($('plDiscVal').value||'0');let discount=null;if(mode==='percent'&&dv>0)discount={mode:'percent',value:dv};else if(mode==='fixed'&&dv>0)discount={mode:'fixed',value:Math.round(dv*100)};const tv=parseFloat($('plTaxPct').value||'0');const tax_pct=(tv>0)?tv:null;return{discount,tax_pct};};
-      const recalc=()=>{const items=collectItems();const pr=collectPricing();const meta={};if(pr.discount)meta.discount=pr.discount;if(pr.tax_pct!=null)meta.tax_pct=pr.tax_pct;const T=propTotals([...items,{__meta__:meta}]);const showB=T.discount>0||T.tax>0;$('plBreak').innerHTML=showB?`Subtotal ${money0(T.subtotal)} · Discount −${money0(T.discount)} · Tax +${money0(T.tax)} · <strong>Total ${money0(T.total)}</strong>`:`Total ${money0(T.total)}`;};
+      const recalc=()=>{const items=collectItems();const pr=collectPricing();const meta={};if(pr.discount)meta.discount=pr.discount;if(pr.tax_pct!=null)meta.tax_pct=pr.tax_pct;const T=propTotals([...items,{__meta__:meta}]);paintPreview(items,T);const showB=T.discount>0||T.tax>0;$('plBreak').innerHTML=showB?`Subtotal ${money0(T.subtotal)} · Discount −${money0(T.discount)} · Tax +${money0(T.tax)} · <strong>Total ${money0(T.total)}</strong>`:`Total ${money0(T.total)}`;};
       host.querySelectorAll('.prop-line').forEach(wireRow);
       restoreDrafts();
       // Prefill (revise/clone): fill each row from the prior's items, and the
@@ -3214,6 +3245,30 @@ async function openDeal(id){
       $('plDiscMode').onchange=()=>{$('plDiscVal').style.display=$('plDiscMode').value?'':'none';recalc();};
       $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);
       $('plMore').onclick=()=>{host.querySelector('#plMore').closest('.row2').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();recalc();};
+      // hoisted on purpose: a restored draft can fire input (and so recalc) before this line runs
+      var bizN='';
+      function paintPreview(items,T){
+        const pv=$('plPreview');if(!pv)return;
+        const rows=items.map(it=>`<div class="pb-row"><span>${esc(it.label)}${it.qty>1?' × '+it.qty:''}</span><b>${esc(money(it.unit_cents*it.qty)||'$0')}</b></div>`).join('');
+        pv.innerHTML=`<div class="pb-biz"><span class="pb-mark" aria-hidden="true"></span><span>${esc(bizN||'Your studio')}</span></div><div class="pb-title">${est?'Estimate':'Proposal'}${forWho?' for '+esc(forWho):''}</div>${rows||'<p class="mut">Add a line and it shows here.</p>'}${T.discount>0?`<div class="pb-row mut"><span>Discount</span><b>−${esc(money(T.discount))}</b></div>`:''}${T.tax>0?`<div class="pb-row mut"><span>Tax</span><b>${esc(money(T.tax))}</b></div>`:''}<div class="pb-row pb-total"><span>Total</span><b>${esc(money(T.total)||'$0')}</b></div><div class="pb-cta" aria-hidden="true">${est?'Approve':'Accept proposal'}</div>`;
+        const lines=[...host.querySelectorAll('.prop-line')];
+        host.querySelectorAll('[data-svc]').forEach(b=>{const i=b.getAttribute('data-svc'),sv=SERVICES[+i];const on=lines.some(r=>{const sel=r.querySelector('.pl-pick'),lab=r.querySelector('.pl-label');return (sel&&sel.value===i)||(!!sv&&!!lab&&lab.value.trim()===sv.name);});b.setAttribute('aria-pressed',on?'true':'false');});
+      }
+      bizName().then(n=>{bizN=n||'';if(host.isConnected&&$('plPreview'))recalc();});
+      host.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{
+        const i=b.getAttribute('data-svc'),sv=SERVICES[+i];if(!sv)return;
+        const rows=[...host.querySelectorAll('.prop-line')];
+        const has=rows.find(r=>{const sel=r.querySelector('.pl-pick'),lab=r.querySelector('.pl-label');return (sel&&sel.value===i)||(lab&&lab.value.trim()===sv.name);});
+        if(has){   // a second tap takes it off (the last line is cleared, not removed)
+          if(rows.length>1)has.remove();else{const sel=has.querySelector('.pl-pick');if(sel){sel.value='';sel.onchange();}else{has.querySelector('.pl-label').value='';has.querySelector('.pl-price').value='';}}
+          recalc();b.focus();return;
+        }
+        let row=rows.find(r=>!r.querySelector('.pl-label').value.trim()&&!r.querySelector('.pl-price').value);
+        if(!row){$('plMore').click();const all=host.querySelectorAll('.prop-line');row=all[all.length-1];}
+        const sel=row.querySelector('.pl-pick');
+        if(sel){sel.value=i;sel.onchange();}else{row.querySelector('.pl-label').value=sv.name;row.querySelector('.pl-price').value=sv.price_cents/100;recalc();}
+        b.focus();
+      }));
       const clearPropDrafts=()=>{if(!rev&&window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
       const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:Math.max(1,Math.trunc(parseFloat((r.querySelector('.pl-qty')||{}).value||'1'))||1),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save writes the record (revise → vN+1 that supersedes the prior); Save &
