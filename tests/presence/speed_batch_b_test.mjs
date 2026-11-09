@@ -89,6 +89,11 @@ let total;
   const up = f.body?.data?.update_notices;
   ok('3: the full answer carries the feed\'s update rows for the bell', Array.isArray(up) && up.length === 1 && up[0].kind === 'invoice_paid' && up[0].tier === 'update', JSON.stringify(up));
   ok('3: …and only update rows', (up || []).every((n) => n.tier === 'update'));
+  // final pass, batch D: invoices that couldn't be read used to come back as "nothing owed"
+  db.fail.add('presence_invoices');
+  const p = await res(await AGR.handleAgency(req('GET', '/agency/needs-you?fresh=1'), '/agency/needs-you', 'GET', member, owner, cors));
+  db.fail.delete('presence_invoices');
+  ok('3: invoices that couldn\'t be read make the list "partial"', f.body?.data?.partial === false && p.status === 200 && p.body?.data?.partial === true, JSON.stringify([f.body?.data?.partial, p.body?.data?.partial]));
 }
 
 // ═══ 4. the record's activity ═══

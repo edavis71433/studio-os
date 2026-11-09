@@ -30,7 +30,8 @@ const RECORD_API = {
 
 test.describe('the record after a win (items 49–52)', () => {
   test('no stale next step; the tip and tile read the project; the site is hosted elsewhere', async ({ page }) => {
-    await installApp(page, { api: RECORD_API });
+    // final pass, batch D: one real upcoming row, so the band below is checked where it lives (#upband)
+    await installApp(page, { api: { ...RECORD_API, '/crm/activity': { data: { items: [], upcoming: [{ kind: 'invoice', title: 'Deposit invoice', due: '2030-12-01', overdue: false }] } } } });
     await page.goto(`/crm.html?client=${CLIENT}`);
     const tile = page.locator('#hlpanel .hl').filter({ hasText: 'Next step' });
     await expect(tile).toContainText('Open their project to see what’s left');
@@ -38,7 +39,10 @@ test.describe('the record after a win (items 49–52)', () => {
     await expect(page.locator('.path-guide')).toContainText('Their project is 70% along.');
     await expect(page.locator('#dcard')).toContainText('Website: hosted elsewhere');
     await expect(page.locator('#dcard')).not.toContainText('not yet');
-    await expect(page.locator('#upcoming, .upcoming').filter({ hasText: 'Sign Contract' })).toHaveCount(0);
+    // the record's Upcoming & overdue band shows what the server sends, never the won deal's old step
+    // (the rule that drops it is buildUpcoming's, pinned in tests/presence/sales_batch11_test.mjs)
+    await expect(page.locator('#upband')).toContainText('Deposit invoice');
+    await expect(page.locator('#upband')).not.toContainText('Sign Contract');
   });
 
   test('"Add their business name" opens the editor on that box; the card\'s Edit opens it too', async ({ page }) => {

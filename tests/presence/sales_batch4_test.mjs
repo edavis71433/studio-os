@@ -24,9 +24,17 @@ ok('the context says whether the site is live', /site_live: !!siteLive,/.test(ws
 ok('the Overview reads the record under the client\'s scope', /apiGet\('\/crm\/record\?client='\+encodeURIComponent\(new URLSearchParams\(location\.search\)\.get\('client'\)\)\)\.catch\(\(\)=>null\)/.test(today));
 ok('…and the project at studio level (no scope header)', /function apiGetStudio\(path\)\{[^}]*'x-dds-scope-site':''/.test(today) && /apiGetStudio\('\/projects\/'\+encodeURIComponent\(pid\)\)/.test(today));
 ok('only a studio (or platform staff) gets the band', /if\(c0 && \(c0\.is_agency \|\| c0\.is_operator\) && rec && rec\.data && rec\.data\.identity\)/.test(today));
-ok('a hosted-elsewhere site is never called live', /if\(ed==='monitor'\)t\.push\(\{id:'cf-site',k:'Website',v:'Hosted elsewhere'/.test(today));
-ok('an older server without site_live draws no Website tile', /else if\(ctx&&typeof ctx\.site_live==='boolean'\)/.test(today));
-ok('a failed project read drops both project tiles', /if\(p\)\{   \/\/ a failed project read drops both project tiles/.test(today));
+// final pass, batch D: clientFacts runs here exactly as the page has it (these three were source
+// pins — one of them matched a code comment)
+const cfSrc = (today.match(/function clientFacts\(rec,proj,ctx\)\{[\s\S]*?\n  return t;\n\}/) || [''])[0];
+const clientFacts = cfSrc ? new Function('location', 'money', 'scopeHref', cfSrc + '\nreturn clientFacts;')({ search: '?client=s1' }, (c) => '$' + c / 100, (h) => h) : null;
+const recP = { identity: { project_id: 'p1', customer_site_id: 's1' }, highlights: { owed_cents: 0 } };
+const factIds = (t) => (t || []).map((x) => x.id);
+const site = (ctx) => (clientFacts(recP, null, ctx) || []).find((x) => x.id === 'cf-site');
+ok('a hosted-elsewhere site is never called live', !!clientFacts && site({ edition: 'monitor', site_live: true })?.v === 'Hosted elsewhere');
+ok('an older server without site_live draws no Website tile', !!clientFacts && !site({ edition: 'presence' }) && site({ edition: 'presence', site_live: false })?.v === 'Not live yet');
+ok('a failed project read drops both project tiles (never a fake "nothing waiting")', !!clientFacts && !factIds(clientFacts(recP, null, {})).some((i) => i === 'cf-project' || i === 'cf-waiting'));
+ok('…and a project that reads shows both, counting what waits on the client', !!clientFacts && (() => { const t = clientFacts(recP, { project: { name: 'Site', status: 'active' }, progress: { pct: 40 }, tasks: [{ client_action_required: true, status: 'todo' }, { client_action_required: true, status: 'done' }] }, {}); return factIds(t).includes('cf-project') && t.find((x) => x.id === 'cf-waiting')?.v === '1'; })());
 ok('the client\'s own sales tiles stay only with sales of their own', /statTiles\(facts && !salesActivity\(summary\) \? null : summary,/.test(today));
 
 // ── 25 ──
