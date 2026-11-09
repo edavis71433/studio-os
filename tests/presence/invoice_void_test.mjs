@@ -272,7 +272,8 @@ const notice = (id) => world.notices.find((r) => r.id === id);
   ok('race (paid mid-flight): refused with 409', raced.status === 409, String(raced.status));
   ok('race (paid mid-flight): the operator is told the payment landed, not a generic error', raced.body?.error === 'already_paid' && /landed/i.test(raced.body?.message || ''));
   ok('race (paid mid-flight): the invoice is still paid — the void did NOT overwrite it', inv(I_OPEN_SENT)?.status === 'paid');
-  ok('race (paid mid-flight): the PATCH matched no row', world.patches.filter((p) => p.table === 'presence_invoices').every((p) => p.rows === 0));
+  const voidPatches = world.patches.filter((p) => p.table === 'presence_invoices');
+  ok('race (paid mid-flight): the PATCH matched no row', voidPatches.length > 0 && voidPatches.every((p) => p.rows === 0));
   ok('race (paid mid-flight): the money notice was NOT cleared — the invoice is real', notice('n1')?.status === 'active');
   ok('race (paid mid-flight): no audit event was fabricated', world.events.length === 0);
 

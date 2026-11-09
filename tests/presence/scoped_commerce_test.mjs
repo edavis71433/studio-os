@@ -445,7 +445,8 @@ for (const [method, route, body, status] of [['GET', '/commerce/plans', undefine
   reset();
   const own = await call('jwt-owner-a', 'GET', '/portal/feed');
   ok('feed: an owner still gets Done on their own billing row', flagOf(own, N.A_PAY) === true);
-  ok('feed: an owner still can\'t clear a protected row', own.body?.data?.notices?.filter((n) => n.kind === 'publish_failed').every((n) => n.dismissible === false));
+  const failedNotices = (own.body?.data?.notices || []).filter((n) => n.kind === 'publish_failed');
+  ok('feed: an owner still can\'t clear a protected row', failedNotices.length > 0 && failedNotices.every((n) => n.dismissible === false));
   reset();
   const shown = await call('jwt-studio', 'GET', '/portal/feed', { scope: SITE_A });
   const offered = shown.body.data.notices.filter((n) => n.dismissible);

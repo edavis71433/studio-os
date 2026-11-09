@@ -86,7 +86,8 @@ const aud = (m, key) => m.get(key)?.audience;
   const blame = /\b(you failed|you forgot|you should have|your fault|neglect)\b/i;
   const offenders = optTemplates.filter((t) => denylist.test(t.headline) || denylist.test(t.summary) || denylist.test(t.bundleWord) || blame.test(t.headline) || blame.test(t.summary));
   ok('language: optimization moments carry no jargon, no scores, no blame, no alarm', offenders.length === 0, offenders.map((t) => t.recRule).join(','));
-  ok('language: recommendations expose no score/grade/percentage anywhere', REC_RULES.filter((r) => r.judgmentRule.startsWith('opt_')).every((r) => !/\b(score|grade|percent|rating|ranking)\b|%/i.test(r.title + ' ' + r.expected_benefit)));
+  const optRules = REC_RULES.filter((r) => r.judgmentRule.startsWith('opt_'));
+  ok('language: recommendations expose no score/grade/percentage anywhere', optRules.length > 0 && optRules.every((r) => !/\b(score|grade|percent|rating|ranking)\b|%/i.test(r.title + ' ' + r.expected_benefit)));
 }
 
 // ═══ 5. determinism ═══

@@ -162,12 +162,15 @@ const NOW_JAN = '2027-01-20T12:00:00Z';  // Valentine's (Feb 14) is 25 days out 
 // ═══ 7. no automatic execution — structurally ═══
 {
   const evJan = upcomingEvents(NOW_JAN, '2025-06-10');
-  const opps = coachOpportunities({ facts: FACTS, pack: RESTAURANT, events: evJan, evidence: [{ type: 'content.faqs_none', human: 'No FAQs.', resource: 'faqs' }], nowIso: NOW_JAN });
+  // a thin description too, so an editor handoff is among them
+  const opps = coachOpportunities({ facts: FACTS, pack: RESTAURANT, events: evJan, evidence: [{ type: 'content.faqs_none', human: 'No FAQs.', resource: 'faqs' },
+    { type: 'content.description_thin', human: 'The business description is under 40 words.', resource: 'identity' }], nowIso: NOW_JAN });
   const WRITER_KINDS = ['identity_copy', 'faqs', 'offering_descriptions', 'post', 'starter_site'];
   const EDITOR_KINDS = ['edit_identity', 'edit_faq', 'edit_offering', 'edit_post', 'site_polish'];
+  const writerOpps = opps.filter((o) => o.handoff.route === 'writer'), editorOpps = opps.filter((o) => o.handoff.route === 'editor');
   ok('execution: every handoff routes ONLY to writer | editor | manual', opps.every((o) => ['writer', 'editor', 'manual'].includes(o.handoff.route)));
-  ok('execution: writer handoffs use only REAL writer contract kinds', opps.filter((o) => o.handoff.route === 'writer').every((o) => WRITER_KINDS.includes(o.handoff.kind)));
-  ok('execution: editor handoffs use only REAL editor contract kinds', opps.filter((o) => o.handoff.route === 'editor').every((o) => EDITOR_KINDS.includes(o.handoff.kind)));
+  ok('execution: writer handoffs use only REAL writer contract kinds', writerOpps.length > 0 && writerOpps.every((o) => WRITER_KINDS.includes(o.handoff.kind)));
+  ok('execution: editor handoffs use only REAL editor contract kinds', editorOpps.length > 0 && editorOpps.every((o) => EDITOR_KINDS.includes(o.handoff.kind)));
   ok('execution: email/social/review/referral NEVER get an AI draft path — the Coach never sends or posts',
     ['email_campaign', 'social_campaign', 'review_request', 'referral_campaign', 'trust_building'].every((a) => {
       const d = deriveCoachHandoff(a);

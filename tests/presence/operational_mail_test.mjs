@@ -159,9 +159,10 @@ ok('B1: the derived scan covers every operational alert site (>= 8)', OPS_SENDS.
 // resolver that would have to inline a function to be right.
 {
   const sb = read('supabase/functions/presence/lib/service_bridge.ts');
+  const alertSends = callsOf(sb, 'sendEmail').filter((a) => firstArg(a) === 'to');
   ok('B1 lib/service_bridge.ts: the studio notification (OPS_ALERT_EMAIL is its last recipient rung) is critical',
     /Deno\.env\.get\('OPS_ALERT_EMAIL'\)/.test(sb) &&
-    callsOf(sb, 'sendEmail').filter((a) => firstArg(a) === 'to').every((a) => hasCritical(a)));
+    alertSends.length > 0 && alertSends.every((a) => hasCritical(a)));
 }
 
 // The weekly digest is the one operational send whose recipient is bound to a

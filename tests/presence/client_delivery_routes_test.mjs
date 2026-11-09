@@ -99,10 +99,11 @@ ok('documents: portal view_url mints via docViewerUrl (site-origin doc.html view
     !/client_name/.test(cd) && !/clientsByMedia|clientByMedia/.test(cd));
   ok('isolation: the pure core is imported by the operator route only (not the client door)',
     /clientsByMedia/.test(assetsRoute) && /export function clientsByMedia/.test(dam) && !/clientsByMedia/.test(cd));
+  const reviewerGets = ws.match(/method === 'GET'[^\n]*/g) || [];
   ok('isolation: GET /assets is operator-only — a reviewer\'s only /assets door is POST :id/status',
     /export function reviewerAllowed/.test(ws)
     && ws.includes("method === 'POST' && /^\\/assets\\/[0-9a-f-]{36}\\/status$/")
-    && (ws.match(/method === 'GET'[^\n]*/g) || []).every((l) => /portal\/context|portal\/feed/.test(l) && !/assets/.test(l)));
+    && reviewerGets.length > 0 && reviewerGets.every((l) => /portal\/context|portal\/feed/.test(l) && !/assets/.test(l)));
   ok('present(): the client fields are ADDITIVE — undefined for a file that was never delivered',
     /client_id: c\?\.client_id \|\| undefined/.test(assetsRoute) && /client_name: c\?\.client_name \|\| undefined/.test(assetsRoute) && /project_id: c\?\.project_id \|\| undefined/.test(assetsRoute));
   ok('present(): only the LIST handler ever supplies a client — every other call site omits it',

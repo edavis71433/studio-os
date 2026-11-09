@@ -133,7 +133,8 @@ let total;
   ok('4: every channel is there', ['message', 'support', 'enquiry', 'booking', 'activity', 'broadcast'].every((k) => kinds(k).length > 0) && /Holiday hours/.test(String(kinds('broadcast')[0].title)), JSON.stringify([...new Set(items.map((i) => i.kind))]));
   ok('4: one timeline, newest first', items.length > 200 && items.every((it, i) => i === 0 || String(items[i - 1].at) >= String(it.at)));
   ok('4: a reply goes to the newest open request', r.body?.data?.reply_support_to === `/support/${R3}/messages`, String(r.body?.data?.reply_support_to));
-  ok('4: every read stays on this studio\'s site', db.log.filter((c) => c.method === 'GET' && /presence_(support|project_messages|deal_events|appointments|broadcast_sends)/.test(c.url)).every((c) => c.url.includes(`site_id=eq.${STUDIO}`)));
+  const ownReads = db.log.filter((c) => c.method === 'GET' && /presence_(support|project_messages|deal_events|appointments|broadcast_sends)/.test(c.url));
+  ok('4: every read stays on this studio\'s site', ownReads.length > 0 && ownReads.every((c) => c.url.includes(`site_id=eq.${STUDIO}`)));
 }
 
 // ═══ 5. the support repair ═══

@@ -382,6 +382,8 @@ const WRITES = [
   { name: 'PUT /settings (a page)', method: 'PUT', route: '/settings', body: { blocks: [{ id: 'hero-2', type: 'hero', title: 'New' }] }, needs: 'edit', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').blocks[0].id === 'hero-2' },
   { name: 'PUT /settings (verification code)', method: 'PUT', route: '/settings', body: { google_site_verification: 'abc' }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').google_site_verification === 'abc' },
   { name: 'PUT /settings (automation switch)', method: 'PUT', route: '/settings', body: { deal_nudges: true }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').deal_nudges === true },
+  // deep pass, Part 7.11: the review switch (list item 29) and its days; a staff seat has no configure
+  { name: 'PUT /settings (the review switch and its days)', method: 'PUT', route: '/settings', body: { review_requests: true, review_request_after_days: 5 }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').review_requests === true && row('presence_settings').review_request_after_days === 5 },
   { name: 'PUT /settings (content and a code together)', method: 'PUT', route: '/settings', body: { announcement_text: 'Now open', google_site_verification: 'abc' }, needs: 'configure', table: 'presence_settings', status: 200, rlsStatus: 502, run: (r, db, p) => handleSettings(r, db, A, p, cors), saved: () => row('presence_settings').google_site_verification === 'abc' && row('presence_settings').announcement_text === 'Now open' },
   { name: 'PUT /brand/profile', method: 'PUT', route: '/brand/profile', body: { mission: 'New mission' }, needs: 'edit', table: 'presence_brand_profile', status: 200, rlsStatus: 502, run: (r, db, p) => handleBrandProfilePut(r, db, A, p, cors), saved: () => row('presence_brand_profile').mission === 'New mission' },
   { name: 'POST /pages/duplicate', method: 'POST', route: '/pages/duplicate', body: { slug: '' }, needs: 'edit', table: 'presence_settings', status: 201, rlsStatus: 502, run: (r, db, p) => handlePageDuplicate(r, db, A, p, cors), saved: () => row('presence_settings').pages.length === 1 },
@@ -431,6 +433,20 @@ for (const w of WRITES) {
   ok(`${w.name} owner: ${w.status} and saved`, out.status === w.status && w.saved());
   ok(`${w.name} owner: under their JWT and the anon key`, writesOn(w.table).length === 1 && writesOn(w.table).every((c) => c.role === 'user' && c.token === 'jwt-owner' && c.apikey === 'ANON-KEY'));
   ok(`${w.name} owner: the change event says client`, T.presence_change_events[0]?.actor_kind === 'client');
+}
+// deep pass, Part 7.11: a day count the review switch can't use is refused whole, even from
+// the owner, and nothing is written (the page keeps the box in range; this is the server's half)
+for (const days of [0, 91, -3, 'soon']) {
+  reset();
+  const seed = JSON.stringify(T.presence_settings.filter((x) => x.site_id === SITE_A));
+  const out = await answer(await handleSettings(req('PUT', '/settings', { review_requests: true, review_request_after_days: days }), dbFor(owner), A, owner, cors));
+  ok(`review switch: ${JSON.stringify(days)} days is refused, and nothing is written`, out.status === 422 && out.body.error === 'validation_failed' && out.body.fields?.[0]?.field === 'review_request_after_days'
+    && writesOn('presence_settings').length === 0 && T.presence_change_events.length === 0 && JSON.stringify(T.presence_settings.filter((x) => x.site_id === SITE_A)) === seed, `${out.status} ${JSON.stringify(out.body).slice(0, 120)}`);
+}
+{
+  reset();
+  const out = await answer(await handleSettings(req('PUT', '/settings', { review_request_after_days: 2.9 }), dbFor(owner), A, owner, cors));
+  ok('review switch: a part day is cut to whole days', out.status === 200 && row('presence_settings').review_request_after_days === 2, `${out.status} ${row('presence_settings').review_request_after_days}`);
 }
 
 // ═══ 7. the role table is what the routes obey, not a coincidence of this list ═══

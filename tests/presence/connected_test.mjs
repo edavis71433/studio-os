@@ -42,7 +42,8 @@ const CATS = ['search', 'local_listing', 'analytics', 'social', 'reviews', 'sche
   ok('future writes are DECLARED (so the write architecture is supportable) but built by no adapter',
     CONNECTED_PROVIDERS.some((p) => p.futureWrites.length > 0) && CONNECTED_PROVIDERS.every((p) => p.status !== 'read_write'));
   // least privilege: an auth’d provider requests at least one explicit scope
-  ok('least privilege: providers that authenticate declare explicit scopes', CONNECTED_PROVIDERS.filter((p) => p.auth !== 'none').every((p) => p.scopes.length > 0));
+  const authed = CONNECTED_PROVIDERS.filter((p) => p.auth !== 'none');
+  ok('least privilege: providers that authenticate declare explicit scopes', authed.length > 0 && authed.every((p) => p.scopes.length > 0));
 }
 
 // ═══ 3. the customer surface speaks business, not APIs ═══

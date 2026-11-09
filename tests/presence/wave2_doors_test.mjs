@@ -40,7 +40,7 @@ ok('⌘K "team" → Settings’ Team (studio) / Sharing & access (owner)', hits(
 ok('⌘K "kit" → Starter kits on the studio home', hits(studio, 'kit')[0]?.href === '/agency.html#kits');
 ok('⌘K "client" → Customers (studio + owner)', hits(studio, 'client').some((h) => h.href === '/customers.html') && hits(owner, 'client')[0]?.href === '/customers.html');
 ok('⌘K "health" → the Health Center for platform staff only', hits(staff, 'health').some((h) => h.href === '/admin-health.html') && !hits(studio, 'health').some((h) => h.href === '/admin-health.html'));
-ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => flatten(staff).filter((i) => i.key === k).every((i) => i.hidden)));
+ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => { const e = flatten(staff).filter((i) => i.key === k); return e.length > 0 && e.every((i) => i.hidden); }));
 ok('the website’s "health check" desc still answers "health" for an owner (no regression)', hits(owner, 'health').some((h) => h.href === '/presence.html'));
 
 // ═══ change 11: the Health Center's door. Item 96 (Nov 8) moved it from the studio's
