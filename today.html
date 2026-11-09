@@ -176,6 +176,28 @@
   .abtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* the stat strip — crm.html's .hl-panel anatomy (icon tile · label · value · sub);
      a 1px line-coloured gap draws the hairlines however the tiles wrap */
+  /* item 129 (Nov 9 2026): a client's Overview opens on their website, as Squarespace's
+     site home does: the picture of the home page, its status, and Edit site */
+  .wdeck{display:grid;grid-template-columns:minmax(220px,38%) 1fr;margin-top:var(--dds-s5,20px);border:1px solid var(--line);border-radius:var(--dds-r-xl,16px);overflow:hidden;background:var(--card);box-shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06))}
+  .wpic{position:relative;min-height:170px;background:var(--accent-soft);overflow:hidden}
+  .wpic iframe{position:absolute;top:0;left:0;width:1280px;height:800px;border:0;transform-origin:0 0;transform:scale(var(--wk,.25));pointer-events:none;background:#fff;opacity:0;transition:opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out)}
+  .wpic iframe.on{opacity:1}
+  .wfall{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:16px;text-align:center;color:var(--accent);font-weight:600;font-size:14px}
+  .wfall small{font-weight:500;font-size:12px;color:var(--soft)} .wfall .ini{width:44px;height:44px;border-radius:var(--dds-r,8px);background:var(--card);display:grid;place-items:center;font-size:18px;font-weight:700;box-shadow:var(--dds-shadow,0 1px 2px rgba(0,0,0,.08))}
+  .wpic a.wlink{position:absolute;inset:0;z-index:2}
+  .wtx{display:flex;flex-direction:column;gap:6px;padding:16px 20px 18px;min-width:0}
+  .weye{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .wname{font-family:var(--serif,Georgia,serif);font-weight:600;font-size:22px;line-height:1.15;letter-spacing:-.01em;margin:0}
+  .wname a{color:inherit;text-decoration:none} .wname a:hover{color:var(--accent)}
+  .wline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--soft)}
+  .wline a{color:var(--soft)} .wline.warn{color:var(--warn)}
+  .wpill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--soft)}
+  .wpill.live{background:var(--good-soft);color:var(--good)} .wpill.warn{background:var(--warn-soft);color:var(--warn)} .wpill.bad{background:var(--dds-bad-soft,#f7e3e3);color:var(--dds-bad,#9a4242)}
+  .wacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+  .wbtn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:7px 14px;text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
+  .wbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .wbtn.main{background:var(--dds-grad-btn,var(--accent));border-color:transparent;color:var(--dds-on-p,#fff)} .wbtn.main:hover{filter:brightness(1.06);color:var(--dds-on-p,#fff)}
+  @media (max-width:700px){.wdeck{grid-template-columns:1fr}.wpic{min-height:0}.wname{font-size:19px}.wbtn{min-height:44px}}   /* the height comes from the script (width × 0.625): an aspect-ratio here fed the height back into the width, without end */
   .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin-top:var(--dds-s5,20px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--line);overflow:hidden}
   .hl{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);min-width:0;background:var(--card);color:inherit;text-decoration:none}
   .hl:hover{background:var(--bg)}
@@ -452,6 +474,55 @@ function alertBandHtml(rcv){
   const keys=['paid','processing','upcoming','overdue'].filter(k=>k!=='paid'||paidRows);
   const buckets=keys.map(k=>`<span class="mb ${MONEY_TONE[k]||''}" data-bucket="${k}"><b>${esc(money(b[k].cents))}</b> ${esc(MONEY_WORD[k])}${k==='paid'?` <i>(${esc(String(rcv.paid_window_days||30))} days)</i>`:''}</span>`).join('');
   return `<div class="alert" id="money-due"><span class="ico" aria-hidden="true">${svg('owed')}</span><div class="t">${text}<div class="mbuckets" aria-label="Money by state">${buckets}</div></div><div class="aacts">${acts}</div></div>`;
+}
+// ── item 129 (Nov 9 2026): their website up top. The same row the Sites page shows
+// for this client (GET /agency/sites, a studio-level read), so the two never disagree;
+// the picture is the Sites page's own (GET /agency/sites/:id/thumb), drawn in a frame
+// with scripts off. Without the row (a seat that can't see Sites, a failed read) the
+// Overview stays as it was: the Website tile below still says live or not. ──
+const wDay=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});};
+const wHost=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+function siteDeckHtml(s){
+  const id=s.site_id,sc=(p)=>p+'?client='+encodeURIComponent(id);
+  const tone=s.state==='live'?'live':s.state==='down'?'bad':(s.state==='offline'||s.state==='paused')?'warn':'';
+  const live=s.address&&s.state!=='not_live';
+  const ini=String(s.name||'?').trim().charAt(0).toUpperCase();
+  const fall=s.thumb?`<div class="ini">${esc(ini)}</div>`:`<div class="ini">${esc(ini)}</div>${esc(s.domain||s.name||'')}<small>Lives on their own host</small>`;
+  const when=[s.published_at?'Published '+wDay(s.published_at):(s.state==='not_live'?'Not published yet':''),s.updated_at?'Edited '+wDay(s.updated_at):''].filter(Boolean).join(' · ');
+  const acts=s.state==='elsewhere'
+    ?`${live?`<a class="wbtn main" href="${esc(s.address)}" target="_blank" rel="noopener">Open their site</a>`:''}<a class="wbtn" href="${esc(sc('/settings.html'))}">Settings</a>`
+    :`<a class="wbtn main" href="${esc(sc('/presence.html'))}">Edit site</a>${live?`<a class="wbtn" href="${esc(s.address)}" target="_blank" rel="noopener">View live</a>`:''}${s.unpublished_changes&&s.state!=='not_live'?`<a class="wbtn" href="${esc(sc('/presence.html'))}#publish">Publish changes</a>`:''}<a class="wbtn" href="${esc(sc('/analytics.html'))}">Analytics</a>`;
+  return `<section class="wdeck" id="client-site" aria-label="Their website">
+    <div class="wpic" data-wthumb="${esc(id)}"><div class="wfall" aria-hidden="true">${fall}</div>${s.state!=='elsewhere'?`<a class="wlink" href="${esc(sc('/presence.html'))}" aria-label="Edit ${esc(s.name||'their')} website"></a>`:''}</div>
+    <div class="wtx">
+      <span class="weye">Their website</span>
+      <h2 class="wname">${s.address?`<a href="${esc(s.address)}" target="_blank" rel="noopener">${esc(wHost(s.address))}</a>`:esc(s.name||'Their website')}</h2>
+      <div class="wline"><span class="wpill ${tone}" id="wstate">${esc(s.state_words||'')}</span>${when?`<span>${esc(when)}</span>`:''}</div>
+      ${s.unpublished_changes&&s.state!=='not_live'?'<div class="wline warn">Changes waiting to be published</div>':''}
+      ${s.state==='not_live'?'<div class="wline">Nothing is public yet. Open the editor to finish it and publish.</div>':''}
+      <div class="wacts">${acts}</div>
+    </div>
+  </section>`;
+}
+async function mountSiteDeck(){
+  const id=new URLSearchParams(location.search).get('client');if(!id)return;
+  let r;try{r=await apiGetStudio('/agency/sites');}catch(_){return;}
+  const rows=r&&Array.isArray(r.data)?r.data:[];const s=rows.find(x=>x.site_id===id);if(!s)return;
+  const main=$('main');if(!main||document.getElementById('client-site'))return;
+  const host=document.createElement('div');host.innerHTML=siteDeckHtml(s);const deck=host.firstElementChild;
+  const facts=document.getElementById('client-facts');
+  if(facts)main.insertBefore(deck,facts);else main.insertBefore(deck,main.firstChild);
+  if(!s.thumb)return;
+  const pic=deck.querySelector('.wpic');
+  const fit=()=>{if(pic.clientWidth)pic.style.setProperty('--wk',String(pic.clientWidth/1280));pic.style.height=Math.round(pic.clientWidth*0.625)+'px';pic.style.minHeight='0';};   // the picture sets the height; the 170px floor is for the letter alone
+  fit();if('ResizeObserver' in window)new ResizeObserver(fit).observe(pic);else window.addEventListener('resize',fit);
+  let t;try{t=await apiGetStudio('/agency/sites/'+encodeURIComponent(id)+'/thumb');}catch(_){return;}
+  if(!t||!t.data||typeof t.data.html!=='string'||pic.querySelector('iframe'))return;
+  const f=document.createElement('iframe');
+  f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');f.setAttribute('referrerpolicy','no-referrer');
+  f.title='Picture of '+(s.name||'their')+' home page';
+  f.addEventListener('load',()=>f.classList.add('on'),{once:true});
+  f.srcdoc=t.data.html;pic.appendChild(f);
 }
 // ── Sales review item 24 (Nov 2026): a studio drilled into a client (?client=)
 // sees the CLIENT's facts first — their project, what waits on them, what they
@@ -1006,6 +1077,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);
+    if(c0 && (c0.is_agency || c0.is_operator) && new URLSearchParams(location.search).get('client')) mountSiteDeck();
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();
