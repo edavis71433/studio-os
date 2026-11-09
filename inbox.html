@@ -348,6 +348,13 @@
   #leadSendDeal{border-radius:999px;font-weight:600}
   .lead-hint{font-size:12px;color:var(--faint);margin:6px 2px 0}
   #leadDraft::before{content:"✦ ";color:var(--p)}
+  /* ══ Bold redesign — the Inbox list: Needs reply · Enquiries · Support · All
+     under the search, one segmented row, each with its count ══ */
+  .lhead .vseg{display:flex;width:100%;margin-top:var(--dds-s2,8px);gap:2px}
+  .lhead .vseg button{flex:1 1 auto;min-width:0;font:inherit;font-size:12.5px;font-weight:500;padding:6px 8px;white-space:nowrap;cursor:pointer}
+  .lhead .vseg .n{font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px}
+  .lhead .vseg button[aria-pressed="true"] .n{color:var(--p)}
+  @media (pointer:coarse){.lhead .vseg button{min-height:40px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -449,7 +456,7 @@ let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest
 // lead_followup notice's href (Oct 2026 audit, gap 2): the reply is one click
 // from the nudge, not two. Read once at boot; openLinkedRow() acts on it.
 const HASH_LINK=(()=>{const raw=String(location.hash||'').slice(1);const i=raw.indexOf('?');return {view:i<0?raw:raw.slice(0,i),sel:i<0?'':(new URLSearchParams(raw.slice(i+1)).get('sel')||'')};})();
-let VIEW=['messages','ok','enquiries','website','support'].indexOf(HASH_LINK.view)>=0?HASH_LINK.view:'everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
+let VIEW=['needs','messages','ok','enquiries','website','support'].indexOf(HASH_LINK.view)>=0?HASH_LINK.view:'everything',SEL='',ACTIVE=-1,COLLAPSED=false,Q='';
 // the Enquiries view's own narrowing (the old Enquiries page's controls):
 // status chip · kind · order. Open = still in play (new, read, replied,
 // converted); Not a fit / archived only under All.
@@ -489,16 +496,38 @@ document.addEventListener('click',(e)=>{
   if(vm&&vb&&!vm.hidden&&!e.target.closest('.viewdd')){vm.hidden=true;vb.setAttribute('aria-expanded','false');}
   if(om&&ob&&!om.hidden&&!e.target.closest('.ovf')){om.hidden=true;ob.setAttribute('aria-expanded','false');}
 });
-const VIEWS=[['everything','Everything'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['website','Website'],['support','Support & requests']];
+const VIEWS=[['everything','Everything'],['needs','Needs reply'],['messages','Messages'],['ok','Needs your OK'],['enquiries','Enquiries'],['website','Website'],['support','Support & requests']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
+// Bold redesign (Nov 2026): the views people reach for most sit under the search
+// as one row, each with its count (the title's menu still lists every view).
+// "Needs reply" is exactly what the line under them calls "waiting for a reply".
+const VCHIPS=[['needs','Needs reply'],['enquiries','Enquiries'],['support','Support'],['everything','All']];
 // The Enquiries view lists the QUEUE rows (every enquiry from /forms/inbox, one
 // row each, any status); every other view lists the feed's per-person rows. If
 // the /forms/inbox read failed, Enquiries falls back to the feed's rows.
-const viewMatch=(it)=>{
-  if(VIEW==='enquiries')return it.kind==='lead'&&(LEADS_FAILED?!it.queue:!!it.queue);
+const matchView=(v,it)=>{
+  if(v==='enquiries')return it.kind==='lead'&&(LEADS_FAILED?!it.queue:!!it.queue);
   if(it.queue)return false;
-  return VIEW==='everything'||(VIEW==='messages'&&it.kind==='message')||(VIEW==='ok'&&it.kind==='approval')||(VIEW==='website'&&(it.kind==='approval'||it.kind==='lead'))||(VIEW==='support'&&it.kind==='support');
+  return v==='everything'||(v==='needs'&&!!(it.unread||it.needs))||(v==='messages'&&it.kind==='message')||(v==='ok'&&it.kind==='approval')||(v==='website'&&(it.kind==='approval'||it.kind==='lead'))||(v==='support'&&it.kind==='support');
 };
+const viewMatch=(it)=>matchView(VIEW,it);
+// a chip's count: what that view would list under the client/project lens (the
+// search narrows the list, not the counts); Enquiries counts the open ones, the
+// queue's own default
+function vchipCount(v){
+  let rows=ITEMS.filter(it=>matchView(v,it)).filter(lensMatch);
+  if(v==='enquiries')rows=rows.filter(it=>{const st=String((it.lead||{}).status||'new');return st!=='archived'&&st!=='not_a_fit';});
+  return rows.length+(v==='everything'?SYSROWS.filter(lensMatch).length:0);
+}
+function paintVchips(){
+  const host=$('vseg');if(!host)return;
+  host.innerHTML=VCHIPS.map(([v,l])=>`<button type="button" data-vchip="${v}" aria-pressed="${VIEW===v?'true':'false'}">${l} <span class="n">${vchipCount(v)}</span></button>`).join('');
+  host.querySelectorAll('[data-vchip]').forEach(b=>b.addEventListener('click',()=>{
+    const v=b.getAttribute('data-vchip');if(v===VIEW)return;
+    VIEW=v;renderConsole();renderList();renderPane();
+    const nb=document.querySelector('#vseg [data-vchip="'+v+'"]');if(nb)nb.focus();
+  }));
+}
 // what the Everything view counts — the queue's rows are the Enquiries view's own
 const inboxCount=()=>ITEMS.filter(x=>!x.queue).length+SYSROWS.length;
 
@@ -637,6 +666,7 @@ function renderConsole(){
           </div>
         </div>
         <input class="search" id="q" type="search" aria-label="Search conversations" placeholder="Search conversations…" value="${esc(Q)}">
+        <div class="seg vseg" id="vseg" role="group" aria-label="Show"></div>
         <div class="lfilters" id="lfilters" hidden></div>
         ${VIEW==='enquiries'?enqToolbar():''}
         <div class="lmeta" id="lmeta"></div>
@@ -882,6 +912,7 @@ function renderList(){
     const oldN=convs.filter(i=>(i.unread||i.needs)&&oldOf(i)).length;
     $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest`;
   }
+  paintVchips();   // the counts follow the data and the lens
   // partial-failure honesty: one of the two reads failed (loadData renders the
   // surviving half) — say so instead of presenting a quietly complete inbox
   const ln=$('lnotice');
