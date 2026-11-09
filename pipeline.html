@@ -17,6 +17,38 @@ html.dds-embed body{padding-top:0!important;background:transparent}
 html.dds-embed #listWrap{display:none!important}
 html.dds-embed .backbar{display:none!important}
 html.dds-embed #detailWrap{padding-top:0}
+
+  /* ══ Bold redesign — Pipeline (Nov 2026): the board first. Chips with counts
+     over the board, each column's chance beside its count, the person on each
+     card, and "+ Add a deal" at the foot of a column. ══ */
+  .bchips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
+  .bchip{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .bchip .n{font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+  .bchip:hover{border-color:color-mix(in srgb,var(--p) 45%,var(--line));color:var(--ink)}
+  .bchip[aria-pressed="true"]{background:var(--p-soft);border-color:transparent;color:var(--p);font-weight:600}
+  .bchip[aria-pressed="true"] .n{color:var(--p)}
+  .col-h{flex-wrap:wrap;row-gap:2px}
+  .col-sub{flex:1 0 100%;display:flex;align-items:baseline;gap:8px;min-height:0}
+  .col-sub:empty{display:none}
+  .col-ch{font-size:11.5px;font-weight:600;color:var(--p);font-variant-numeric:tabular-nums}
+  .col-ch:not([hidden])::after{content:" chance";font-weight:500;color:var(--faint)}
+  .bc-who{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:var(--soft);min-width:0}
+  .bc-who span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bc-av{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#fff;background:var(--dds-grad-brand,var(--p))}
+  .bc-v{color:var(--ink);font-weight:600}
+  .bc-src{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 8px}
+  .col-add{margin-top:6px}
+  .col-addbtn{width:100%;font:inherit;font-size:12.5px;font-weight:600;color:var(--soft);background:transparent;border:1px dashed var(--dds-line-strong,var(--line));border-radius:var(--dds-r,8px);padding:8px;cursor:pointer;text-align:left}
+  .col-addbtn:hover{color:var(--p);border-color:var(--p)}
+  .qadd{background:var(--card);border:1px solid var(--p);border-radius:var(--dds-r,8px);padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 0 0 3px color-mix(in srgb,var(--p) 14%,transparent)}
+  .qadd input{font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+  .qa-row{display:flex;gap:6px;align-items:center}
+  .qa-v{display:flex;align-items:center;gap:4px;flex:1;min-width:0;color:var(--soft);font-size:13px}
+  .qa-go{font:inherit;font-size:12.5px;font-weight:600;border:0;border-radius:999px;padding:6px 12px;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);cursor:pointer}
+  .qa-go:disabled{opacity:.6}
+  .qa-hint{font-size:11px;margin:0}
+  .qa-err{font-size:12px;color:var(--bad);margin:0}
+  @media (pointer:coarse){.bchip,.col-addbtn,.qa-go{min-height:44px}.qadd input{min-height:44px;font-size:16px}}
 </style>
 <style>
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
@@ -648,7 +680,9 @@ const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return 
 // The chosen display (List · Board · Table) persists across visits. Embed mode
 // (the record page's Deal tab) never sees the list side, so it's exempt.
 const VIEW_KEY='dds-display:pipeline';
-if(!EMBED){try{const v=localStorage.getItem(VIEW_KEY);if(v==='board'||v==='table')VIEW=v;}catch(_){/* storage may be denied */}}
+// Bold redesign (Pipeline, Nov 2026): the board is the default; List and Table
+// stay one click away and the choice is remembered.
+if(!EMBED){VIEW='board';try{const v=localStorage.getItem(VIEW_KEY);if(v==='list'||v==='board'||v==='table')VIEW=v;}catch(_){/* storage may be denied */}}
 // Signing links returned by /send (emailed OR not), kept for this session so a
 // "not-emailed" doc always shows a persistent "copy the signing link" — never a
 // silently-unsent agreement again. Keyed by proposal/contract id.
@@ -1534,6 +1568,7 @@ async function renderSummary(gen){
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
     :tile('Win rate',wr.pct+'%',`${wr.won} of ${wr.won+wr.lost}${(wr.window_days||0)>=3650?', all time':`, last ${wr.window_days||90} days`}`,'rate','info');
+  STAGE_CHANCE={};(s.by_stage||[]).forEach(b=>{if(b&&b.stage&&b.chance!=null&&isFinite(Number(b.chance)))STAGE_CHANCE[b.stage]=Number(b.chance);});paintChances();
   const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}${b.chance!=null?` · ${b.chance}%`:''}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
   // AR tile — "who owes me money" across all deals, in one glance (open invoices).
   const ar=s.ar||{}; let arT='';
@@ -1678,7 +1713,7 @@ async function load(soft){
     // limit = the server's MAX_PAGE (see FETCH_LIMIT) — never the 25-row default.
     const qs=new URLSearchParams({limit:String(FETCH_LIMIT)});
     if(!board&&FILTER)qs.set('stage',FILTER);
-    const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays()]);   // the board's stale threshold rides the same wave (best-effort)
+    const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays(),board?ensureContactNames():null]);   // the board's stale threshold and its cards' people ride the same wave (best-effort; neither ever rejects)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];DEALS_LOADED=true;
     // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
@@ -1751,7 +1786,36 @@ function visibleDeals(){
 // it, so the Board meta can never count deals the board doesn't render
 // (SS5 item 2: won/lost/converted are outcomes the board deliberately hides;
 // the board-foot line explains where they live).
-function boardVisible(){return visibleDeals().filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);}
+function boardOpen(){return visibleDeals().filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id);}
+function boardVisible(){return boardOpen().filter(d=>bchipMatch(BCHIP,d));}
+// ── Bold redesign (Pipeline): the board answers the real questions with chips —
+// who needs a nudge (stalled, Settings' "stale after"), what should close this
+// month (expected close), what came in from your website — each with its count.
+let BCHIP='all',STAGE_CHANCE={},BOARD_NAMES_ASKED=false;
+const BCHIPS=[['all','All open'],['nudge','Needs a nudge'],['closing','Closing this month'],['web','From your website']];
+const monthKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
+const fromWeb=(d)=>/^(form|enquiry)$/i.test(String(d.source||''));
+function bchipMatch(k,d){
+  if(k==='nudge')return dealStaleAfter(d,Date.now(),STALE_DAYS);
+  if(k==='closing')return String(d.expected_close||'').slice(0,7)===monthKey();
+  if(k==='web')return fromWeb(d);
+  return true;
+}
+function bchipsHtml(){
+  const open=boardOpen();
+  return `<div class="bchips" role="group" aria-label="Show on the board">${BCHIPS.map(([k,l])=>{const n=open.filter(d=>bchipMatch(k,d)).length;const on=BCHIP===k;if(!n&&!on&&k!=='all')return'';return `<button type="button" class="bchip" data-bchip="${k}" aria-pressed="${on?'true':'false'}">${esc(l)} <span class="n">${n}</span></button>`;}).join('')}</div>`;
+}
+// the column head's chance (item 69, Settings › The chance each stage closes), once the summary says it
+function paintChances(){document.querySelectorAll('[data-chance]').forEach(n=>{const c=STAGE_CHANCE[n.getAttribute('data-chance')];n.textContent=(c!=null)?c+'%':'';n.hidden=c==null;});}
+function paintWho(){
+  if(!CONTACT_NAME)return;
+  document.querySelectorAll('#board .bcard[data-id]').forEach(c=>{
+    if(c.querySelector('.bc-who'))return;
+    const d=DEALS.find(x=>String(x.id)===c.getAttribute('data-id'));const who=d&&d.contact_id&&CONTACT_NAME[d.contact_id];if(!who)return;
+    const t=c.querySelector('.bc-t');if(t)t.insertAdjacentHTML('afterend',`<div class="bc-who"><span class="bc-av" aria-hidden="true">${esc(dealIni(who))}</span><span>${esc(who)}</span></div>`);
+  });
+}
+const dealIni=(s)=>{const w=String(s||'').trim().split(/\s+/).filter(x=>/^[\p{L}\p{N}]/u.test(x));return w.length?(Array.from(w[0])[0]+(w[1]?Array.from(w[1])[0]:'')).toUpperCase():'?';};
 function renderMeta(){
   const el=$('lmeta'); if(!el)return;
   const board=VIEW==='board';
@@ -2104,9 +2168,12 @@ function boardCard(d,today){
   const stale=dealStaleAfter(d,Date.now(),STALE_DAYS);
   const staleN=staleDaysFor(d.stage,STALE_DAYS);
   const staleBadge=stale?`<span class="bc-stale" title="No movement in ${staleN}+ days — worth a nudge">${svgi('hourglass')} Stalled</span>`:'';
+  const who=(d.contact_id&&CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'';
+  const whoRow=who?`<div class="bc-who"><span class="bc-av" aria-hidden="true">${esc(dealIni(who))}</span><span>${esc(who)}</span></div>`:'';
+  const web=fromWeb(d)?'<span class="bc-src">From your website</span>':'';
   const canMove=boardMoveTargets(d.stage).length>0;
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
-  return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}<div class="bc-actions">${moveBtn}</div></article>`;
+  return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${whoRow}${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}${web}<div class="bc-actions">${moveBtn}</div></article>`;
 }
 // Sales review item 30: the board keeps its outcomes in view. Won is collapsed to
 // this month's count and value (the summary's own number once it has loaded, the
@@ -2140,17 +2207,46 @@ function renderBoard(){
     const ds=open.filter(d=>d.stage===stg);
     const sum=ds.reduce((a,d)=>a+(d.expected_value_cents||0),0);   // per-column total value (pipeline health at a glance)
     const cards=ds.map(d=>boardCard(d,today)).join('')||'<div class="bempty mut">Nothing here yet</div>';
-    return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span>${sum?`<span class="col-val">${money(sum)}</span>`:''}</header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div></section>`;
+    const ch=STAGE_CHANCE[stg];
+    return `<section class="col" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span><span class="col-sub"><span class="col-ch" data-chance="${stg}" title="The chance a deal here closes (Settings)"${ch==null?' hidden':''}>${ch==null?'':ch+'%'}</span>${sum?`<span class="col-val">${money(sum)}</span>`:''}</span></header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div><div class="col-add" data-add="${stg}"><button type="button" class="col-addbtn" data-addbtn="${stg}">+ Add a deal</button></div></section>`;
   }).join('');
-  const terminal=DEALS.length-open.length;
-  host.innerHTML=`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
-    +(open.length?'':'<div class="mut" style="margin-top:12px">No open deals yet. Add one to start the pipeline.</div>')
+  const all=boardOpen(),terminal=DEALS.length-all.length;   // a chip narrows the board, never the won/not-a-fit count
+  // the person on each card: the names ride the deals read on a board load; switched to
+  // from List or Table, they're asked once and filled into the cards in place (never a
+  // redraw under an open menu or a half-typed "+ Add a deal")
+  if(!CONTACT_NAME&&!BOARD_NAMES_ASKED){BOARD_NAMES_ASKED=true;ensureContactNames().then(paintWho);}
+  host.innerHTML=bchipsHtml()+`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
+    +(open.length?'':`<div class="mut" style="margin-top:12px">${all.length?'Nothing here — try “All open”.':'No open deals yet. Add one to start the pipeline.'}</div>`)
     +(terminal>0?`<div class="mut board-foot">${terminal} won or not-a-fit deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
   wireBoard();
   const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});
 }
+// "+ Add a deal" in a column: a name and a value, Enter adds it to that stage (POST /sales/deals), Esc puts the button back
+function openQuickAdd(stg){
+  const box=document.querySelector(`[data-add="${stg}"]`);if(!box)return;
+  box.innerHTML=`<form class="qadd" novalidate><input class="qa-t" maxlength="200" autocomplete="off" placeholder="Deal name or business" aria-label="New deal in ${esc(stageLabel(stg))}: name"><div class="qa-row"><span class="qa-v"><span aria-hidden="true">$</span><input class="qa-amt" inputmode="decimal" autocomplete="off" placeholder="Value" aria-label="Value (optional)"></span><button type="submit" class="qa-go">Add</button></div><p class="qa-hint mut">Enter adds it · Esc cancels</p><p class="qa-err" role="alert" hidden></p></form>`;
+  const f=box.querySelector('form'),t=f.querySelector('.qa-t'),a=f.querySelector('.qa-amt'),err=f.querySelector('.qa-err');
+  const back=()=>{box.innerHTML=`<button type="button" class="col-addbtn" data-addbtn="${stg}">+ Add a deal</button>`;const b=box.querySelector('button');b.addEventListener('click',()=>openQuickAdd(stg));b.focus();};
+  f.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();back();}});
+  f.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const title=t.value.trim();if(!title){err.textContent='Give the deal a name.';err.hidden=false;t.focus();return;}
+    const raw=a.value.trim(),cents=raw?amountCents(raw):0;
+    if(raw&&!(cents>0)){err.textContent='That value doesn’t look like an amount.';err.hidden=false;a.focus();return;}
+    const go=f.querySelector('.qa-go');go.disabled=true;err.hidden=true;
+    try{
+      await api('/sales/deals','POST',cents?{title,stage:stg,expected_value_cents:cents}:{title,stage:stg});
+      toast('Added to '+stageLabel(stg));
+      await load(true);
+      const nb=document.querySelector(`[data-addbtn="${stg}"]`);if(nb)nb.focus();
+    }catch(x){go.disabled=false;err.textContent=nice(x);err.hidden=false;}
+  });
+  t.focus();
+}
 function wireBoard(){
   const host=$('board');
+  host.querySelectorAll('[data-bchip]').forEach(b=>b.addEventListener('click',()=>{BCHIP=b.getAttribute('data-bchip');renderBoard();renderMeta();const nb=host.querySelector(`[data-bchip="${BCHIP}"]`);if(nb)nb.focus();}));
+  host.querySelectorAll('[data-addbtn]').forEach(b=>b.addEventListener('click',()=>openQuickAdd(b.getAttribute('data-addbtn'))));
   const move=async(id,to)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to});PENDING_BACK='';toast('Moved to '+stageLabel(to));load();if(!$('detailWrap').hidden&&CURRENT_DEAL===id)openDeal(id);}catch(e){toast(nice(e),true);}};   // any pending back-confirm is against the OLD stage — drop it (mirrors crm.html moveStage)
   host.querySelectorAll('.bcard').forEach(c=>{
     const isCtrl=(e)=>e&&e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu');
@@ -3199,7 +3295,7 @@ async function boot(){
     else{wireViews();wireMore();loadSavedViews();
       // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
       api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
-    if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
+    if(VIEW!=='list')setView(VIEW); else await load();   // restore the display (syncs the toggle; the board unless List was chosen), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
     // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"
     else if(location.hash==='#outstanding'){try{history.replaceState(null,'',location.pathname+location.search);}catch(_){}openReceivables();}
