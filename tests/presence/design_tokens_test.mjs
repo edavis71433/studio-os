@@ -27,7 +27,7 @@ for (const [k, v] of Object.entries(STEPS)) ok(`spacing: --dds-${k} is ${v}`, ne
 ok('spacing: --dds-gutter is s7 and --dds-card-pad is s4', /--dds-gutter:var\(--dds-s7\)/.test(css) && /--dds-card-pad:var\(--dds-s4\)/.test(css));
 ok('spacing: the scale is declared ONCE (a :root block, not per theme)', (css.match(/--dds-s1:/g) || []).length === 1);
 ok('spacing: under 761px the scale shrinks one step (s4 → 12, s5 → 16, s7 → 16)', /@media \(max-width:760\.98px\)\{:root\{--dds-s4:12px; --dds-s5:16px; --dds-s7:16px\}\}/.test(css));
-ok('corners: sm 6 · r 8 · lg 10 · xl 14', /--dds-r-sm:6px; --dds-r:8px; --dds-r-lg:10px; --dds-r-xl:14px;/.test(css));
+ok('corners (look refresh E): sm 8 · r 12 · lg 16 · xl 20', /--dds-r-sm:8px; --dds-r:12px; --dds-r-lg:16px; --dds-r-xl:20px;/.test(css));
 ok('motion: fast 120ms · base 200ms · slow 320ms · ease-out', /--dds-t-fast:120ms; --dds-t-base:200ms; --dds-t-slow:320ms; --dds-ease:ease-out;/.test(css));
 ok('motion: the ladder is declared once', (css.match(/--dds-t-fast:120ms/g) || []).length === 1);
 ok('motion: reduce-motion sets all three durations to 0ms', /@media \(prefers-reduced-motion:reduce\)\{:root\{--dds-t-fast:0ms; --dds-t-base:0ms; --dds-t-slow:0ms\}\}/.test(css));

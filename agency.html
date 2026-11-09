@@ -156,8 +156,8 @@
   #studio{margin-bottom:var(--dds-s6,24px)}
   .numbers .nhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--dds-s3,12px)}
   .numbers .nhead .qhead{margin-bottom:var(--dds-s2,8px)}
-  .numbers .nall{font-size:13px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
-  .numbers .nall:hover{text-decoration:underline}
+  .nall{font-size:13px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
+  .nall:hover{text-decoration:underline}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden;margin-bottom:var(--dds-s3,12px)}
   .stat{display:flex;gap:var(--dds-s3,12px);align-items:center;padding:var(--dds-s4,16px) var(--dds-s4,16px);border-right:1px solid var(--line);color:inherit;text-decoration:none;min-width:0}
   .stat:last-child{border-right:0} .stat:hover .sv{color:var(--p)}
@@ -242,6 +242,102 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026) ═════════════════════════════
+     The greeting card, number cards with a trend line, the pipeline strip,
+     gradient avatars and pill buttons. Everything on them is read, never made
+     up: a trend shows only when the deal list is complete. */
+  .wrap{padding-top:var(--dds-s6,24px)}
+  .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;padding:9px 18px;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  .btn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  /* the greeting */
+  .top.hero{position:relative;display:block;background:var(--dds-grad);color:#fff;border-radius:var(--dds-r-xl,20px);padding:24px 28px 22px;margin-bottom:var(--dds-s6,24px);overflow:hidden;box-shadow:0 22px 44px -24px rgba(74,44,140,.7)}
+  .top.hero::before{content:"";position:absolute;right:-90px;top:-120px;width:340px;height:340px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.20),rgba(255,255,255,0));pointer-events:none}
+  .hero .hrow{position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .hero .brand{font-family:var(--sans);font-size:13.5px;font-weight:600;color:#fff}
+  .hero .rolebadge{background:rgba(255,255,255,.16);color:#fff;font-size:12px;padding:3px 10px}
+  .hero .hi{position:relative;font-family:var(--serif);font-weight:600;font-size:36px;line-height:1.08;letter-spacing:-.02em;margin:14px 0 6px;color:#fff}
+  .hero .hsub{position:relative;font-size:14px;color:rgba(255,255,255,.9)}
+  .hero .hchips{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px)}
+  .hero .hchips:empty{display:none}
+  .hchip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 13px;text-decoration:none;white-space:nowrap}
+  a.hchip:hover{background:rgba(255,255,255,.26)}
+  .hchip .hn{font-weight:700}
+  .hgo{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#3d2185;background:#fff;border-radius:999px;padding:7px 15px;text-decoration:none;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .hgo:hover{background:#f3eefe}
+  .hero .acts{position:absolute;top:22px;right:24px}
+  .hero .btn{background:#fff;color:#3d2185;box-shadow:0 8px 20px -10px rgba(0,0,0,.45)}
+  .hero .btn:hover{filter:none;background:#f3eefe}
+  .hero a:focus-visible,.hero button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  @media (max-width:759px){
+    .top.hero{padding:20px 18px 18px;border-radius:var(--dds-r-lg,16px)}
+    .hero .hi{font-size:28px;margin-top:10px}
+    .hero .acts{position:static;margin-top:var(--dds-s4,16px)}
+    .hero .btn{width:100%;min-height:44px}
+    .hchip,.hgo{min-height:44px}
+  }
+  /* section headings read as headings now */
+  .qhead{font-size:16px;color:var(--ink);font-weight:600;letter-spacing:-.005em;margin:0 0 var(--dds-s3,12px)}
+  .numbers .nhead .qhead{margin-bottom:var(--dds-s3,12px)}
+  /* the number cards: each its own card; the won card carries a trend line */
+  .stats{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--dds-s4,16px);background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible;margin-bottom:var(--dds-s6,24px)}
+  .stat{flex-direction:column;align-items:stretch;gap:var(--dds-s1,4px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow);padding:16px 18px;transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .stat:last-child{border-right:1px solid var(--line)}
+  .stat:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 16px 32px -16px rgba(23,21,34,.22)}
+  .stat:hover .sv{color:inherit}
+  .stat .shead{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s2,8px)}
+  .stat .sk{font-size:12.5px;font-weight:500;color:var(--soft)}
+  .stat .sline{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--dds-s3,12px)}
+  .stat .sv{font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.1}
+  .stat .sv.good,.stat .sv.warn{color:var(--ink)}
+  .stat .ss{font-size:12.5px;color:var(--soft)}
+  .stat .spark{flex:0 0 auto;width:96px;height:32px;overflow:visible}
+  .stat .spark polyline{fill:none;stroke:var(--good);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .stat .spark .area{fill:color-mix(in srgb,var(--good) 14%,transparent);stroke:none}
+  .stat .spark circle{fill:var(--good)}
+  .dchip{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap;background:var(--bg);color:var(--soft)}
+  .dchip.up{background:var(--good-soft);color:var(--good)}
+  .dchip.warn{background:var(--warn-soft);color:var(--warn)}
+  @media (prefers-reduced-motion:reduce){.stat:hover{transform:none}}
+  /* the pipeline strip: the open stages, each with its count and biggest deals */
+  .pipe{margin:0 0 var(--dds-s6,24px)}
+  .pipe .nhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--dds-s3,12px)}
+  .pipe .qsub{font-weight:400;color:var(--soft);font-size:13.5px}
+  .pcols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--dds-s3,12px)}
+  @media (max-width:1023px){.pcols{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:759px){
+    .pcols{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:2px 16px 10px;scroll-padding:0 16px}
+    .pcol{flex:0 0 72%;scroll-snap-align:start}
+    .pdeal,.pcol .pmore{min-height:44px}
+    .pcol .pmore{display:flex;align-items:center}
+  }
+  .pcol{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow);padding:12px;display:flex;flex-direction:column;gap:var(--dds-s2,8px);min-width:0}
+  .pcol .ph{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:12.5px;font-weight:600;color:var(--soft)}
+  .pcol .pdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--pc,var(--p))}
+  .pcol.s-lead{--pc:var(--p)} .pcol.s-qualified{--pc:var(--warn)} .pcol.s-proposal{--pc:#d0679f} .pcol.s-contract{--pc:var(--dds-info,#245fa0)}
+  .pcol .pct{margin-left:auto;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+  .pcol .pval{font-size:12px;color:var(--faint);margin-top:-4px}
+  .pdeal{display:block;background:var(--dds-up,#f7f6fb);border:1px solid transparent;border-radius:var(--dds-r,12px);padding:8px 10px;text-decoration:none;color:var(--ink);min-width:0}
+  .pdeal:hover{border-color:var(--p)}
+  .pdeal .pn{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pdeal .pv{display:block;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .pcol .pnone{font-size:12.5px;color:var(--faint);padding:6px 2px}
+  .pcol .pmore{font-size:12px;color:var(--soft);text-decoration:none;padding:0 2px}
+  .pcol .pmore:hover{color:var(--p)}
+  /* cards and rows */
+  .rcard{padding:var(--dds-s4,16px) var(--dds-s5,20px)}
+  .rcard .rh{font-size:15px;color:var(--ink);font-weight:600;margin:0 0 var(--dds-s2,8px)}
+  .two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--dds-s4,16px);margin-bottom:var(--dds-s6,24px)}
+  .need .av,.client .av{background:var(--dds-grad-brand);color:#fff;font-weight:700}
+  .client .av{border-radius:50%}
+  .client{transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .client:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
+  @media (prefers-reduced-motion:reduce){.client:hover{transform:none}}
+  .rowact{border-color:var(--dds-line-strong,#d6d4e2);padding:5px 14px}
+  .rowact:hover{background:var(--p-soft);border-color:transparent}
+  .badge,.pill{font-weight:600}
+  .search{border-radius:999px;padding-left:18px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -250,8 +346,10 @@
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
   <div id="top"></div>
-  <section id="needs" aria-label="Needs you" hidden></section>
+  <!-- look refresh E: the numbers and the pipeline sit right under the greeting;
+       the greeting already says what needs you and links to it -->
   <section id="studio" aria-label="Your studio" hidden></section>
+  <section id="needs" aria-label="Needs you" hidden></section>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <section class="ask" id="askSec" aria-labelledby="askHead" hidden>
     <h2 id="askHead">Have a question?</h2>
@@ -687,8 +785,12 @@ function positionMenu(){
   const host=$('rowMenuHost');const m=host&&host.firstElementChild;const b=MENU_OPEN&&document.querySelector('[data-menu="'+MENU_OPEN+'"]');
   if(!m||!b)return;
   const r=b.getBoundingClientRect();
-  // below the button, or above it when the button sits near the bottom edge
-  const below=r.bottom+4+m.offsetHeight<=window.innerHeight-8;
+  // below the button, or above it when the button sits near the bottom edge —
+  // on a phone the bottom edge is the top of the shell's bottom bar (#dds-mbar),
+  // which sits over the page and would cover the menu's last items
+  const bar=document.getElementById('dds-mbar');
+  const barH=bar&&getComputedStyle(bar).display!=='none'?bar.getBoundingClientRect().height:0;
+  const below=r.bottom+4+m.offsetHeight<=window.innerHeight-barH-8;
   m.style.top=(below?r.bottom+4:Math.max(8,r.top-4-m.offsetHeight))+'px';
   m.style.left=Math.max(8,Math.min(window.innerWidth-m.offsetWidth-8,r.right-m.offsetWidth))+'px';
 }
@@ -774,16 +876,50 @@ async function load(soft){
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
   render();
+  paintHero();
 }
 
 // ── the top row: who you are, + Add a customer. Item 96: platform health moved to
 //    the account menu (staff only), and the role reads as words, not its code ──
 const ROLE_WORDS={owner:'Owner',admin:'Admin',account_manager:'Account manager',content_strategist:'Content strategist',designer:'Designer',developer:'Developer',support:'Support',readonly:'View only'};
 const roleWords=(r)=>ROLE_WORDS[r]||(r?String(r).replace(/_/g,' ').replace(/^\w/,(c)=>c.toUpperCase()):'Member');
+// Look refresh E (Nov 2026): the top row is a greeting card — the studio and the
+// role, the day, how many customers and how many things need you, what kinds
+// they are (each a link down to Needs you) and the first one as a button. All
+// of it comes from the reads the page already makes; nothing is guessed.
+// an enquiry row can hold several enquiries ("3 new enquiries"), so the rows that
+// want a reply (enquiries, support, messages) count as conversations, together
+const HERO_KIND={reply:['to reply to','to reply to'],money:['unpaid invoice','unpaid invoices'],deal:['deal waiting on you','deals waiting on you'],broken:['site problem','site problems'],plan:['plan to apply','plans to apply'],publish:['site to publish','sites to publish'],account:['account item','account items'],notice:['notice','notices']};
+const heroKind=(k)=>(k==='enquiry'||k==='support'||k==='message')?'reply':(HERO_KIND[k]?k:'notice');
+function greetWord(){const h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+function todayWords(){try{return new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}catch(_){return'';}}
 function renderTop(){
   const t=$('top');if(!t)return;
-  t.innerHTML=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><div class="acts"><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
+  t.innerHTML=`<div class="top hero"><div class="hrow"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
+    <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div>
+    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
+  paintHero();
+}
+function paintHero(){
+  const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
+  const bits=[todayWords()];
+  if(LOADED_ONCE){const n=CLIENTS.length;bits.push(n+' customer'+(n===1?'':'s'));}
+  if(NEEDS){const n=Number(NEEDS.total||0);bits.push(n?n+(n===1?' needs':' need')+' you':'nothing needs you');}
+  sub.textContent=bits.filter(Boolean).join(' · ');
+  if(!NEEDS){chips.innerHTML='';return;}
+  const all=(NEEDS.rows||[]).concat(NEEDS.rest||[]);
+  if(!all.length){chips.innerHTML='<span class="hchip">All caught up</span>';return;}
+  let h='';
+  // per-kind counts only when the payload holds every row; otherwise the honest total
+  if(all.length>=Number(NEEDS.total||0)){
+    const counts={},order=[];
+    all.forEach(r=>{const k=heroKind(r.kind);if(!counts[k]){counts[k]=0;order.push(k);}counts[k]++;});
+    h+=order.slice(0,3).map(k=>{const n=counts[k],w=HERO_KIND[k];return `<a class="hchip" href="#needs" data-noscope="1"><span class="hn">${n}</span> ${esc(n===1?w[0]:w[1])}</a>`;}).join('');
+  }else h+=`<a class="hchip" href="#needs" data-noscope="1"><span class="hn">${Number(NEEDS.total||0)}</span> need you</a>`;
+  const first=all[0];
+  if(first&&first.href)h+=`<a class="hgo" href="${esc(first.href)}" data-noscope="1">${esc(first.verb||'Open')} — ${esc(first.name||'')} →</a>`;
+  chips.innerHTML=h;
 }
 
 // ── the studio strip (one home, Oct 2026 studio audit change 3): the money tiles,
@@ -812,14 +948,77 @@ function recentWins(list){
     .sort((a,b)=>b.ms-a.ms).slice(0,4).map(x=>x.d);
 }
 function keyDeals(list){return(Array.isArray(list)?list:[]).filter(d=>d&&d.id&&OPEN_STAGES.indexOf(d.stage)>=0).sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0)).slice(0,5);}
-function statTiles(s){
+// Look refresh E: won · open · outstanding, each its own card. The won card
+// carries a six-month line and "vs last month" — drawn from the deal list with
+// the server's own rule (lib/sales_lifecycle.ts summarizePipeline: a deal is won
+// when it was converted or marked won, and it closed in the month of
+// converted_at, else updated_at), and ONLY when that list is complete (under
+// the 100 it asks for); this month's point is the summary's own figure.
+const DEAL_PAGE=100;
+const isWonDeal=(d)=>!!(d&&(d.converted_client_id||d.converted_at||d.stage==='won'||d.stage==='converted'));
+function monthKeys(n){const d=new Date(),out=[];for(let i=n-1;i>=0;i--){const m=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-i,1));out.push(m.toISOString().slice(0,7));}return out;}
+const monthShort=(key)=>{const m=/^(\d{4})-(\d{2})/.exec(key);return m?new Date(Date.UTC(+m[1],+m[2]-1,15)).toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}):'';};
+function wonSeries(deals,thisMonthCents){
+  if(!Array.isArray(deals)||deals.length>=DEAL_PAGE)return null;   // a cut-off list would draw a false line
+  const keys=monthKeys(6),vals=keys.map(()=>0);
+  for(const d of deals){if(!isWonDeal(d))continue;const i=keys.indexOf(String(d.converted_at||d.updated_at||'').slice(0,7));if(i>=0)vals[i]+=Math.max(0,Math.trunc(Number(d.expected_value_cents)||0));}
+  vals[vals.length-1]=Math.max(0,Number(thisMonthCents)||0);
+  return{keys,vals};
+}
+function sparkSvg(vals){
+  const w=96,h=32,pad=3,n=vals.length,max=Math.max.apply(null,vals.concat([1]));
+  const pts=vals.map((v,i)=>[pad+(w-2*pad)*i/(n-1),h-pad-(h-2*pad)*v/max]);
+  const line=pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const last=pts[n-1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false"><polygon class="area" points="${pad},${h-pad} ${line} ${w-pad},${h-pad}"/><polyline points="${line}"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.5"/></svg>`;
+}
+function statTiles(s,deals){
   const t=[];const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   if(!s||typeof s!=='object')return t;
-  const ar=s.ar;
-  if(ar&&typeof ar.outstanding_cents==='number'){const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice')+(od?' · '+od+' overdue':''):'All paid up',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html'});}
-  if(s.won_month&&typeof s.won_month.value_cents==='number'){const n=Number(s.won_month.count)||0;t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',tone:'good',href:'/pipeline.html'});}
-  if(s.open&&typeof s.open.count==='number'){const n=s.open.count;t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',tone:'',href:'/pipeline.html'});}
+  const ar=s.ar,complete=Array.isArray(deals)&&deals.length<DEAL_PAGE;
+  if(s.won_month&&typeof s.won_month.value_cents==='number'){
+    const n=Number(s.won_month.count)||0,ser=wonSeries(deals,s.won_month.value_cents);
+    let chip=null,spark=null;
+    if(ser){
+      const cur=ser.vals[5],prev=ser.vals[4],diff=cur-prev,mon=monthShort(ser.keys[4]);
+      if(cur||prev)chip=diff>0?{txt:'+'+money(diff)+' vs '+mon,cls:'up'}:diff<0?{txt:'−'+money(-diff)+' vs '+mon,cls:''}:{txt:'Same as '+mon,cls:''};
+      if(ser.vals.some(v=>v>0))spark=ser.vals;
+    }
+    t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',tone:'good',href:'/pipeline.html',chip,spark});
+  }
+  if(s.open&&typeof s.open.count==='number'){
+    const n=s.open.count;let chip=null;
+    if(complete){const wk=Date.now()-7*86400000;const fresh=deals.filter(d=>d&&OPEN_STAGES.indexOf(d.stage)>=0&&!isWonDeal(d)&&Date.parse(String(d.created_at||''))>=wk).length;if(fresh)chip={txt:'+'+fresh+' this week',cls:'up'};}
+    t.push({id:'stat-open',k:'Open deals',v:String(n),s:n?money(s.open.value_cents)+' in play':'Pipeline is clear',tone:'',href:'/pipeline.html',chip});
+  }
+  if(ar&&typeof ar.outstanding_cents==='number'){
+    const n=Number(ar.count)||0,od=Number(ar.overdue_count)||0;
+    t.push({id:'stat-owed',k:'Outstanding',v:money(ar.outstanding_cents),s:n?plur(n,'invoice'):'All paid up',tone:ar.outstanding_cents>0?'warn':'',href:'/pipeline.html',chip:od?{txt:od+' overdue',cls:'warn'}:null});
+  }
   return t;
+}
+function statHtml(t){
+  return `<a class="stat" role="listitem" id="${esc(t.id)}" href="${esc(t.href)}"><div class="shead"><span class="sk">${esc(t.k)}</span>${t.chip?`<span class="dchip ${esc(t.chip.cls)}">${esc(t.chip.txt)}</span>`:''}</div><div class="sline"><span class="sv ${esc(t.tone)}">${esc(t.v)}</span>${t.spark?sparkSvg(t.spark):''}</div><div class="ss">${esc(t.s)}</div></a>`;
+}
+// the pipeline strip: the four open stages from the summary's by_stage (counts and
+// values over EVERY deal), each with its two biggest deals from the list in hand.
+// It replaces Key deals; an older server without by_stage keeps Key deals.
+function pipelineStripHtml(s,deals){
+  const stages=(s&&Array.isArray(s.by_stage))?s.by_stage.filter(x=>x&&OPEN_STAGES.indexOf(x.stage)>=0):[];
+  const open=stages.reduce((a,b)=>a+(Number(b.count)||0),0);
+  if(!stages.length||!open)return'';
+  const list=Array.isArray(deals)?deals:[];
+  let h=`<div class="pipe" id="pipeline-strip"><div class="nhead"><h2 class="qhead">Pipeline <span class="qsub">· ${esc(money((s.open&&s.open.value_cents)||0))} in play</span></h2><a class="nall" href="/pipeline.html" data-noscope="1">Open pipeline →</a></div><div class="pcols" role="list" aria-label="Open deals by stage">`;
+  for(const st of stages){
+    const cnt=Number(st.count)||0;
+    const ds=list.filter(d=>d&&d.id&&d.stage===st.stage&&!isWonDeal(d)).sort((a,b)=>(Number(b.expected_value_cents)||0)-(Number(a.expected_value_cents)||0)).slice(0,2);
+    const more=Math.max(0,cnt-ds.length);
+    h+=`<div class="pcol s-${esc(st.stage)}" role="listitem"><div class="ph"><span class="pdot" aria-hidden="true"></span>${esc(st.label||st.stage)}<span class="pct">${cnt}</span></div>${cnt?`<div class="pval">${esc(money(st.value_cents))}</div>`:''}`;
+    h+=ds.length?ds.map(d=>`<a class="pdeal" href="/pipeline.html?deal=${encodeURIComponent(d.id)}" data-noscope="1"><span class="pn">${esc(d.title||'A deal')}</span><span class="pv">${esc(money(d.expected_value_cents))}</span></a>`).join(''):(cnt?'':'<p class="pnone">Nothing here</p>');
+    if(more>0)h+=`<a class="pmore" href="/pipeline.html" data-noscope="1">+ ${more} more</a>`;
+    h+='</div>';
+  }
+  return h+'</div></div>';
 }
 // ── My tasks (sales review item 29, Nov 2026): every open deal next step and
 //    to-do and the studio's own project tasks, from GET /sales/my-tasks (the rule
@@ -883,13 +1082,14 @@ async function mountStudio(){
   const [summary,deals,mine]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
   if(gen!==SSEQ)return;
   MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
-  const tiles=statTiles(summary);const todos=MYTASKS?[]:weekTodos(deals);const top=keyDeals(deals);const wins=recentWins(deals);
+  const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
   const tasks=!!(MYTASKS&&(MYTASKS.items.length||MYTASKS.partial));
   if(!tiles.length&&!tasks&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
   let h='';
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
-  if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(t=>`<a class="stat" role="listitem" id="${esc(t.id)}" href="${esc(t.href)}"><div><div class="sk">${esc(t.k)}</div><div class="sv ${esc(t.tone)}">${esc(t.v)}</div><div class="ss">${esc(t.s)}</div></div></a>`).join('')}</div></div>`;
+  if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(statHtml).join('')}</div></div>`;
+  h+=strip;
   if(tasks||todos.length||top.length||wins.length){
     h+='<div class="two">';
     if(tasks)h+=myTasksHtml();
@@ -1090,6 +1290,7 @@ function paintNeeds(){
   const left=NEEDS_EXPANDED?Math.max(0,more-rest.length):more;
   const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
   host.hidden=false;
+  paintHero();
   if(!rows.length){
     host.innerHTML=`<h2 class="qhead">Needs you</h2><div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
     return;

@@ -196,6 +196,15 @@
   .delfacts{list-style:none;padding:0;margin:10px 0 0}
   .delfacts li{font-size:14px;padding:6px 0 6px var(--dds-s5,20px);position:relative;color:var(--ink)}
   .delfacts li::before{content:'•';position:absolute;left:4px;color:var(--p)}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026): this page's touch-ups. The
+     tokens and the shared anatomy come from shell.css. ══ */
+  .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-color:transparent;border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  .c{transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .c:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
+  .c .acts button,.c .acts a{border-radius:999px}
+  @media (prefers-reduced-motion:reduce){.c:hover{transform:none}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>

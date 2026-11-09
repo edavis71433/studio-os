@@ -262,6 +262,52 @@
   .sheet-foot .save{background:var(--p);color:#fff;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s5,20px);font:inherit;font-weight:600;cursor:pointer}
   .sheet-foot .save:disabled{opacity:.6;cursor:default}
   .empty{padding:10px 2px}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026) ═════════════════════════════
+     The list floats on the canvas as cards; the reading pane is one card;
+     avatars wear the brand gradient; buttons are pills (the one filled button
+     comes from shell.css). Layout, order and every control are unchanged. */
+  .console{gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s3,12px) var(--dds-s3,12px) 0}
+  .lpane{background:transparent;border-right:0}
+  @media (max-width:1100px){.lpane{width:21rem}}
+  .lhead{border-bottom:0;padding:6px 4px 10px}
+  #viewBtn{font-family:var(--serif);font-weight:600;font-size:24px;letter-spacing:-.015em;padding:2px 8px}
+  html.dds-side .lpane .lhead #viewBtn{font-size:24px}
+  #viewBtn .car{font-family:var(--sans);font-size:13px;color:var(--soft)}
+  .crow button{white-space:nowrap}
+  .lhead .search{background:var(--card);border-color:var(--line);padding:9px 16px;box-shadow:0 1px 2px rgba(23,21,34,.04)}
+  .lfilters select,.ebar select{background-color:var(--card)}
+  #rows{display:flex;flex-direction:column;gap:var(--dds-s2,8px);padding:2px 4px 12px}
+  .row{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow);padding:12px 12px 12px 22px;transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .row:hover{background:var(--card);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 12px 24px -14px rgba(23,21,34,.22)}
+  .row[aria-selected="true"]{background:var(--p-soft);border-color:color-mix(in srgb,var(--p) 45%,transparent);box-shadow:var(--shadow)}
+  .row.sysrow{opacity:.8}
+  @media (prefers-reduced-motion:reduce){.row:hover{transform:none}}
+  .lgroup{padding:10px 8px 2px}
+  .unread-dot{left:8px}
+  .avatar{background:var(--dds-grad-brand);color:#fff}
+  .row.sysrow .avatar{background:var(--dds-up,#f7f6fb)}
+  .cmbadge{background:var(--dds-grad-brand)}
+  .edge{width:14px;border:0;border-radius:999px;background:transparent;align-self:center;height:44px}
+  .edge:hover{background:var(--p-soft)}
+  .rpane{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
+  .phead{background:transparent;padding:var(--dds-s4,16px) var(--dds-s5,20px)}
+  .pname{font-family:var(--serif);font-size:22px;letter-spacing:-.01em}
+  .pbody .card{background:var(--dds-up,#f7f6fb);border-color:transparent;box-shadow:none}
+  .pcomposer{background:var(--dds-up,#f7f6fb);border-top:0;margin:0 var(--dds-s3,12px) var(--dds-s3,12px);border-radius:var(--dds-r-lg,16px);padding:var(--dds-s3,12px) var(--dds-s4,16px)}
+  .pcomposer textarea{background:var(--card);border-radius:var(--dds-r,12px)}
+  .bub{border-radius:18px}
+  .bub.studio{border-bottom-right-radius:6px}
+  .bub:not(.studio){border-bottom-left-radius:6px}
+  button,a.btnlink,button.btnlink,.pback{border-radius:999px}
+  .edge{border-radius:999px}
+  .ti .ti-icon{box-shadow:0 0 0 3px var(--card)}
+  dialog,.sheet{border-radius:var(--dds-r-xl,20px)}
+  @media (max-width:759px){
+    .console{padding:var(--dds-s3,12px) var(--dds-s3,12px) 0;gap:0}
+    .lpane{width:100%}
+    .console.pane-open .rpane{border-radius:var(--dds-r-lg,16px)}
+  }
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>

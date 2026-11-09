@@ -495,9 +495,9 @@ test.describe('Agency portfolio', () => {
       el.remove();
       return c;
     }, v);
-    expect(await probe('--warn')).toBe('rgb(211, 172, 110)');   // --dds-warn dark, not the light #775d31
-    expect(await probe('--good')).toBe('rgb(139, 191, 159)');   // --dds-good dark
-    expect(await probe('--warn-soft')).toBe('rgb(42, 35, 22)'); // the soft pair follows too
+    expect(await probe('--warn')).toBe('rgb(227, 176, 107)');   // --dds-warn dark (#e3b06b, look refresh E), not the light #775d31
+    expect(await probe('--good')).toBe('rgb(127, 211, 165)');   // --dds-good dark (#7fd3a5)
+    expect(await probe('--warn-soft')).toBe('rgb(47, 37, 20)'); // the soft pair follows too (#2f2514)
   });
 
   test('non-agency accounts are turned away, not shown an empty portfolio', async ({ page }) => {
@@ -968,5 +968,78 @@ test.describe('Agency home — the Health Center door and the kits anchor', () =
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
     expect(new URL(page.url()).hash).toBe('');
     await expect(page.locator('#kits, .kitcard')).toHaveCount(0);
+  });
+});
+
+// ── Look refresh E (Nov 2026): the greeting, the number cards and the pipeline
+// strip. Everything on them is read from what Home already fetches; the trend
+// line and "vs last month" show only when the deal list is complete (under the
+// 100 Home asks for), and the strip replaces Key deals only when the summary
+// carries by_stage.
+test.describe('Agency home — look refresh E', () => {
+  const NEEDS_ROWS = [
+    { key: 'money:i1', kind: 'money', site_id: 'a1', client_id: null, name: 'Marlow’s Kitchen', what: 'invoice $1,200 is overdue by 4 days', when: 'Sent Oct 28', verb: 'Resend', href: `/pipeline.html?deal=${DEAL}` },
+    { key: 'enquiry:e1', kind: 'enquiry', site_id: 'a2', client_id: null, name: 'Bright Dental', what: '3 new enquiries through their website', when: 'Nov 6', verb: 'Reply', href: '/inbox.html#enquiries' },
+    { key: 'support:s1', kind: 'support', site_id: 'a3', client_id: null, name: 'Cedar Garage', what: 'support request: new photos', when: 'Opened Nov 5', verb: 'Reply', href: '/inbox.html#support' },
+  ];
+  const stage = (s: string, label: string, count: number, value_cents: number) => ({ stage: s, label, count, value_cents });
+  const SUMMARY = (homeApi['/sales/summary'] as { data: Record<string, unknown> }).data;
+  const withStages = { data: { ...SUMMARY, by_stage: [stage('lead', 'New lead', 0, 0), stage('qualified', 'Qualified', 0, 0), stage('proposal', 'Proposal sent', 1, 500000), stage('contract', 'Agreement out', 0, 0)] } };
+  const lastMonth = () => { const n = new Date(); return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - 1, 12, 12)).toISOString(); };
+  const DEALS = [
+    { id: DEAL, title: 'Cedar Garage — new website', stage: 'proposal', expected_value_cents: 500000, converted_client_id: null, created_at: past(1), updated_at: past(1) },
+    { id: 'won-now', title: 'Bright Dental — redesign', stage: 'won', expected_value_cents: 800000, converted_client_id: 'c2', converted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'won-before', title: 'Marlow’s Kitchen — menu', stage: 'won', expected_value_cents: 300000, converted_client_id: 'c1', converted_at: lastMonth(), updated_at: lastMonth() },
+  ];
+
+  test('the greeting names the studio and role, how many need you, what kinds (replies together) and the first one', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/agency/needs-you': needsYou(NEEDS_ROWS) } });
+    await page.goto('/agency.html');
+    await expect(page.locator('#top .hero .brand')).toHaveText('Bright Studio');
+    await expect(page.locator('#heroSub')).toContainText('3 need you');
+    // an enquiry row can hold several enquiries, so replies count as conversations
+    await expect(page.locator('#heroChips .hchip')).toHaveText(['1 unpaid invoice', '2 to reply to']);
+    await expect(page.locator('#heroChips .hchip').first()).toHaveAttribute('href', '#needs');
+    const go = page.locator('#heroChips .hgo');
+    await expect(go).toHaveText('Resend — Marlow’s Kitchen →');
+    await expect(go).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
+    await expect(page.locator('h1')).toHaveCount(1);   // the greeting is not a heading; Home's one h1 stays
+  });
+
+  test('nothing needs you: one quiet chip, no button', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/agency/needs-you': needsYou([]) } });
+    await page.goto('/agency.html');
+    await expect(page.locator('#heroSub')).toContainText('nothing needs you');
+    await expect(page.locator('#heroChips .hchip')).toHaveText(['All caught up']);
+    await expect(page.locator('#heroChips .hgo')).toHaveCount(0);
+  });
+
+  test('the pipeline strip reads by_stage, names the biggest deal in each stage, and replaces Key deals', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/sales/summary': withStages, '/sales/deals': { data: DEALS } } });
+    await page.goto('/agency.html');
+    const strip = page.locator('#pipeline-strip');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('.pcol')).toHaveCount(4);
+    await expect(strip.locator('.pcol.s-proposal .pct')).toHaveText('1');
+    await expect(strip.locator('.pcol.s-proposal .pdeal')).toContainText('Cedar Garage');
+    await expect(strip.locator('.pcol.s-proposal .pdeal')).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
+    await expect(strip.locator('.pcol.s-lead .pnone')).toHaveText('Nothing here');
+    await expect(page.locator('#key-deals')).toHaveCount(0);
+  });
+
+  test('won: a trend line and "vs last month" from a complete deal list — and none from a cut-off one', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/sales/deals': { data: DEALS } } });
+    await page.goto('/agency.html');
+    const won = page.locator('#stat-won');
+    await expect(won).toContainText('$8,000');
+    await expect(won.locator('.dchip')).toContainText('+$5,000 vs ');   // $8,000 this month (the summary's figure) vs $3,000 last month
+    await expect(won.locator('svg.spark')).toHaveCount(1);
+    // 100 deals = the page Home asks for: the list may be cut off, so no line and no comparison
+    const full = Array.from({ length: 100 }, (_, i) => ({ id: `d${i}`, title: `Deal ${i}`, stage: 'lead', expected_value_cents: 1000, created_at: past(40), updated_at: past(40) }));
+    await installApp(page, { api: { ...homeApi, '/sales/deals': { data: full } } });
+    await page.goto('/agency.html');
+    await expect(page.locator('#stat-won')).toContainText('$8,000');
+    await expect(page.locator('#stat-won .dchip')).toHaveCount(0);
+    await expect(page.locator('#stat-won svg.spark')).toHaveCount(0);
   });
 });

@@ -349,6 +349,23 @@ html.dds-embed #detailWrap{padding-top:0}
   #detailInner .dkv svg{width:15px;height:15px;stroke:var(--faint);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   #detailInner .dkv .muted{color:var(--faint)}
   #detailInner .tl-mini .tl-i{padding:var(--dds-s2,8px) 0}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026): this page's touch-ups. The
+     tokens and the shared anatomy come from shell.css. ══ */
+  .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  .btn.danger{background:var(--warn);box-shadow:none}
+  /* the numbers: each its own card, as on Home */
+  .stats{gap:var(--dds-s3,12px);border:0;background:transparent;overflow:visible;box-shadow:none}
+  .stats .st{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
+  .stats .st:first-child{border-left:1px solid var(--line)}
+  .stats .v{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .stats .ico{border-radius:12px}
+  .card{box-shadow:var(--shadow);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .card:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
+  .col{border-color:transparent;border-radius:var(--dds-r-lg,16px)}
+  .bcard{border-radius:var(--dds-r,12px);box-shadow:var(--shadow)}
+  @media (prefers-reduced-motion:reduce){.card:hover{transform:none}}
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>
