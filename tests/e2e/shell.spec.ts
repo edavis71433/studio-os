@@ -172,10 +172,16 @@ test.describe('App shell', () => {
     await expect(page.locator('.dds-nav .sec.active > a[data-href="/agency.html"]')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);                                     // no client card at studio level
     if (testInfo.project.name === 'mobile') {
+      // item 70 (the bold redesign): a studio's phone bar is the sales loop,
+      // Home · Inbox · + · Pipeline · Customers; the rest is the App Launcher
       const mbar = page.locator('#dds-mbar');
       await expect(mbar.locator('a[href^="/agency"]')).toContainText('Home');
       await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
-      await mbar.locator('#dds-mbar-menu').click();
+      await expect(mbar.locator('a[href^="/pipeline"]')).toContainText('Pipeline');
+      await expect(mbar.locator('a[href^="/customers"]')).toContainText('Customers');
+      await expect(mbar.locator('#dds-mbar-create')).toBeVisible();
+      await expect(mbar.locator('#dds-mbar-menu')).toHaveCount(0);
+      await page.locator('#dds-waffle').click();
       await expect(page.locator('#dds-drawer .g a')).toHaveText(['Home', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
     }
     // a hidden child page still lights its owner: Analytics lives under Home, Visual Studio under Files

@@ -672,6 +672,7 @@ let DTAB='overview';
 let WANT_CONVERT=false;    // sales review item 22: ?deal=X#convert opens Billing at "Convert to customer" (Home's Convert, the signed notice, a won row)
 let WANT_CONVERT_NEXT=false;   // a won-but-not-a-customer row was opened: land on Convert
 let WANT_SCHEDULE=false;   // crm.html's "Payment schedule" link (…?deal=X#schedule): open the builder once the deal renders
+let WANT_PROPOSAL=false;   // "+ Create → Send a proposal" (…?deal=X&compose=proposal): Billing, with a new proposal open — or the draft already there
 // ONE filled button per view (studio audit 2026-10, change 7): a control above
 // the tabs names the tabs it is primary for; on any other tab it goes quiet.
 function applyTabPrimaries(tab){
@@ -2348,7 +2349,7 @@ async function openDeal(id){
   if(CURRENT_DEAL!==id)PENDING_BACK='';  // a back-confirm strip never carries over to another deal
   // the tab: a ?dtab= deep link on a fresh open; an in-view refresh keeps the current one
   // (?tab= is an alias — the record links crm.html-style; #schedule opens Billing and the schedule builder, studio audit change 12)
-  if(CURRENT_DEAL!==id){const q=new URLSearchParams(location.search);const u=q.get('dtab')||q.get('tab');WANT_SCHEDULE=location.hash==='#schedule';WANT_CONVERT=location.hash==='#convert'||WANT_CONVERT_NEXT;WANT_CONVERT_NEXT=false;DTAB=DTAB_KEYS.includes(u)?u:((WANT_SCHEDULE||WANT_CONVERT)?'billing':'overview');}
+  if(CURRENT_DEAL!==id){const q=new URLSearchParams(location.search);const u=q.get('dtab')||q.get('tab');WANT_SCHEDULE=location.hash==='#schedule';WANT_CONVERT=location.hash==='#convert'||WANT_CONVERT_NEXT;WANT_CONVERT_NEXT=false;WANT_PROPOSAL=q.get('compose')==='proposal';DTAB=DTAB_KEYS.includes(u)?u:((WANT_SCHEDULE||WANT_CONVERT||WANT_PROPOSAL)?'billing':'overview');}
   CURRENT_DEAL=id;
   history.replaceState(null,'','?deal='+id+(scope()?'&client='+scope():'')+(DTAB!=='overview'?'&dtab='+DTAB:''));
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
@@ -3144,6 +3145,8 @@ async function openDeal(id){
     // the record's "Payment schedule" link lands on #schedule (studio audit change 12): open the builder straight away, once
     if(WANT_SCHEDULE){WANT_SCHEDULE=false;if(setupPlanBtn)setupPlanBtn.click();}   // the replaceState above already dropped the hash
     if(WANT_CONVERT){WANT_CONVERT=false;const cb=$('convert')||$('convWrap');if(cb&&cb.scrollIntoView)cb.scrollIntoView({block:'center'});const btn=$('convert');if(btn)btn.focus({preventScroll:true});}
+    // "+ Create → Send a proposal": once, a new proposal opens; a draft that's already here is the one to send (never a second draft)
+    if(WANT_PROPOSAL){WANT_PROPOSAL=false;if(draftProp){const sb=SEND_BOTH?$('sendBothBtn'):$('detailInner').querySelector('[data-send-proposal="'+draftProp.id+'"]');if(sb){if(sb.scrollIntoView)sb.scrollIntoView({block:'center'});sb.focus({preventScroll:true});}toast('This deal already has a draft proposal — here it is, ready to send.');}else{const ap=$('addProp');if(ap)ap.click();}}
     const conv=$('convert'); if(conv) conv.onclick=()=>{
       // two-step confirm (no confirm() dialog). Service language, not SaaS: the
       // labels say WHAT KIND OF WORK this is; the values stay the same edition
