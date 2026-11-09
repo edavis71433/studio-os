@@ -34,6 +34,15 @@ for (const [name, wf] of [['deploy.yml', DEPLOY], ['rollback.yml', ROLLBACK]]) {
   ok(`${name}: no typed input is pasted into a script`, !scripts.includes('github.event.inputs'));
 }
 
+// ── One at a time (Nov 9 2026) ───────────────────────────────────────────────
+// Two dispatches used to run side by side, and the older could land last. A production
+// deploy or rollback now waits its turn in one shared queue; staging has its own.
+const queue = (wf) => wf.match(/^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (\w+)$/m);
+const dq = queue(DEPLOY), rq = queue(ROLLBACK);
+ok('a production deploy waits for the one before it', dq?.[1] === "deploy-${{ github.event_name == 'workflow_dispatch' && 'production' || 'staging' }}" && dq?.[2] === 'false', dq?.[0]);
+ok('a rollback waits in the same queue as the deploys of its environment', rq?.[1] === "deploy-${{ inputs.environment == 'production' && 'production' || 'staging' }}" && rq?.[2] === 'false', rq?.[0]);
+ok('the queue is set for the whole run, ahead of the jobs', DEPLOY.indexOf('\nconcurrency:') < DEPLOY.indexOf('\njobs:') && ROLLBACK.indexOf('\nconcurrency:') < ROLLBACK.indexOf('\njobs:'));
+
 // ── The browser gate's real step, against a stand-in gh ──────────────────────
 const GATE = DEPLOY.match(/id: browser-gate\n[\s\S]*?run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
 ok('the browser gate step is found', !!GATE);
