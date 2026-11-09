@@ -79,6 +79,36 @@ test.describe('Send an update — who, what, and what they see (bold redesign)',
     expect(sends).toHaveLength(0);
   });
 
+  test('Send me a test saves the draft and emails only you; nothing goes to the list', async ({ page }) => {
+    await installApp(page, { api: API });
+    await draftOnPost(page);
+    const tests: string[] = [], sends: string[] = [];
+    await page.route(`**/functions/v1/presence/broadcasts/${D_ID}/test`, (route) => {
+      tests.push(route.request().method());
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, to: 'owner@example.com' } }) });
+    });
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/send$/.test(new URL(r.url()).pathname)) sends.push(r.url()); });
+    await page.goto('/broadcasts.html');
+    await page.locator('#subj').fill('Spring');
+    await page.locator('#bodytx').fill('Hi {{first_name}}');
+    await page.getByRole('button', { name: 'Send me a test' }).click();
+    await expect(page.getByText('Test sent to owner@example.com — only you got it.').first()).toBeVisible();
+    expect(tests).toEqual(['POST']);
+    expect(sends).toHaveLength(0);
+    await expect(page.locator('#stage')).toBeEmpty();   // a test opens nothing — the real send still goes through Preview & send
+  });
+
+  test('Send me a test before the server has it says so calmly', async ({ page }) => {
+    await installApp(page, { api: API });
+    await draftOnPost(page);
+    await page.route(`**/functions/v1/presence/broadcasts/${D_ID}/test`, (route) => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
+    await page.goto('/broadcasts.html');
+    await page.locator('#subj').fill('Spring');
+    await page.locator('#bodytx').fill('Hi');
+    await page.getByRole('button', { name: 'Send me a test' }).click();
+    await expect(page.getByText(/Test emails aren’t switched on yet/).first()).toBeVisible();
+  });
+
   test('a phone: the lists are chips, and the send button stays in reach above the bar', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone layout under test');
     await installApp(page, { api: API });

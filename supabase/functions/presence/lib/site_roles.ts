@@ -178,6 +178,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /broadcasts/draft-assist',
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,
+    `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/contacts/${ID}/restore`,

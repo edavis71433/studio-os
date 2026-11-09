@@ -364,6 +364,20 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
   return { sent, failed, already, skipped: suppressed, recipients: recipients.length };
 }
 
+/** "Send me a test" (bold redesign, Nov 2026): the draft to ONE address — the
+ *  signed-in person's own; the route never takes an address from the request —
+ *  through the ONE send point (suppression + one-click unsubscribe inherited),
+ *  the subject marked [Test], the fill-ins as the preview shows them ("there").
+ *  Nothing is claimed, counted or recorded: a test never touches the send-once
+ *  guard, the daily cap, the open counter or the history. */
+export async function sendBroadcastTest(b: BroadcastRow, to: string, deps: Pick<DispatchDeps, 'loadBrand' | 'sendFn'> = {}): Promise<boolean> {
+  const loadBrand = deps.loadBrand || loadEmailBrand;
+  const send = deps.sendFn || sendEmail;
+  const brand = await loadBrand(b.site_id);
+  const tokens: MergeTokens = { firstName: 'there', businessName: brand?.name || 'us' };
+  return send(to, '[Test] ' + renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens), brand, { siteId: b.site_id });
+}
+
 /** Atomically CLAIM a scheduled broadcast for dispatch: flip scheduled→sending and
  *  return the row ONLY to the caller that won the flip (so two ticks never both
  *  dispatch the same send). */
