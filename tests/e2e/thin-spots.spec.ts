@@ -1,5 +1,5 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
-import { installApp, ALL_FEATURES } from './helpers/app';
+import { installApp, ALL_FEATURES, answerAsks, askedSoFar } from './helpers/app';
 
 // ── Deep pass, Part 7.11 (list item 111): the thin spots in the Nov 8 work, a test each ──
 // The Welcome panel when its status read fails, and a live site taken offline from it; a
@@ -72,10 +72,10 @@ test.describe('the Welcome panel’s status', () => {
     await page.route('**/functions/v1/presence/site/offline', (r) => { sent++; off = '2026-11-08T12:00:00Z'; return r.fulfill({ json: { data: { ok: true } } }); });
     await page.locator('#ssTodo').click();
     await expect(page.locator('#siteStatusBadge')).toHaveText('Public');
-    let question = '';
-    page.once('dialog', (d) => { question = d.message(); return d.accept(); });
+    await answerAsks(page);
     await page.locator('#siteStatusBtn').click();
     await expect.poll(() => sent).toBe(1);
+    const question = (await askedSoFar(page)).join('\n');
     expect(question).toContain('Take Marlow’s Kitchen OFFLINE now?');
     expect(question).toContain('Visitors immediately stop seeing your website.');
     expect(question).toContain('Nothing is deleted');
@@ -91,7 +91,7 @@ test.describe('the Welcome panel’s status', () => {
     await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: status(null) } }));
     await page.route('**/functions/v1/presence/site/offline', (r) => { sent++; return r.fulfill({ json: { data: { ok: true } } }); });
     await page.locator('#ssTodo').click();
-    page.once('dialog', (d) => d.dismiss());
+    await answerAsks(page, false);
     await page.locator('#siteStatusBtn').click();
     await expect(page.locator('#siteStatusBadge')).toHaveText('Public');
     await page.waitForTimeout(300);
