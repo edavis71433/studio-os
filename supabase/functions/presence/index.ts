@@ -71,7 +71,7 @@ import { handleSalesExport } from './routes/sales_export.ts';   // sales review 
 import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice } from './routes/estimates.ts';   // sales review item 47
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
-const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } = lazyRoutes(() => import('./routes/broadcasts.ts'));
+const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } = lazyRoutes(() => import('./routes/reviews.ts'));
@@ -692,6 +692,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'PATCH') return handleBroadcastUpdate(req, site, m[1], cors);
     m = route.match(/^\/broadcasts\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleBroadcastSend(req, site, principal, m[1], cors);
+    m = route.match(/^\/broadcasts\/([0-9a-f-]{36})\/test$/);
+    if (m && method === 'POST') return handleBroadcastTest(site, principal, m[1], cors);   // bold redesign: "Send me a test" — your own address only
     m = route.match(/^\/broadcasts\/([0-9a-f-]{36})\/cancel$/);
     if (m && method === 'POST') return handleBroadcastCancel(site, m[1], cors);
   }

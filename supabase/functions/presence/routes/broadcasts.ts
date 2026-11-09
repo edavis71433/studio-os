@@ -14,6 +14,7 @@
 //   PATCH /broadcasts/:id             — edit a draft
 //   POST  /broadcasts/:id/send        — send now, or {scheduled_at} to schedule
 //   POST  /broadcasts/:id/cancel      — cancel a scheduled broadcast
+//   POST  /broadcasts/:id/test        — "Send me a test": the draft to YOUR OWN address only, marked [Test]
 //   POST  /broadcasts/lists           — keep a list of picked people {name, people} (items 31 + 39)
 //   DELETE /broadcasts/lists/:id      — remove a picked list (refused while a scheduled send uses it)
 import { json } from '../../_shared/http.ts';
@@ -24,12 +25,13 @@ import {
   SEGMENTS, isSegmentKey, segmentLabel, validSubject, cleanSubject, cleanBody,
   scheduleDecision, resolveSendable, audienceCount, dispatchBroadcast,
   knownEmails, keepKnown, sentInLastDay, dailySendCap, overDailyCap, dailyCapMessage, DailyCapError,
-  buildEmailHtml, renderSubject, type SegmentKey, type BroadcastRow,
+  buildEmailHtml, renderSubject, sendBroadcastTest, type SegmentKey, type BroadcastRow,
   isAudienceKey, isListKey, loadPickedLists, type AudienceKey,
 } from '../lib/broadcast.ts';
 import { normalizeLists, normalizePeople, newId, MAX_LISTS } from '../lib/saved_views.ts';
 import { loadEngagement } from '../lib/email_engagement.ts';
 import { updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -265,6 +267,26 @@ export async function handleBroadcastSend(req: Request, site: SiteRow, principal
     if (e instanceof DailyCapError) return json({ error: 'daily_cap', message: dailyCapMessage(e.used, e.n, e.cap), used: e.used, cap: e.cap, recipient_count: e.n }, 429, cors);
     return json({ error: 'send_failed', message: 'The send hit a snag — nothing further went out. Try again.' }, 502, cors);
   }
+}
+
+// ── "Send me a test" (bold redesign, Nov 2026): the draft to the signed-in
+// person's own address — never one from the request, so this can't mail anyone
+// else — marked [Test]. Nothing changes on the broadcast: no claim, no count
+// toward the day's cap, no history. Ten tests an hour per studio (each is a
+// real email). The owner still previews and presses Send for the list.
+export async function handleBroadcastTest(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'not_found' }, 404, cors);
+  const to = String(principal.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: 'no_email', message: 'Your sign-in has no email address to send a test to.' }, 400, cors);
+  const b = await loadBroadcast(site.id, id);
+  if (!b) return json({ error: 'not_found', message: 'That broadcast isn’t here.' }, 404, cors);
+  if (b.status !== 'draft' && b.status !== 'scheduled') return json({ error: 'not_testable', message: 'This update has already gone out.' }, 409, cors);
+  if (!validSubject(b.subject)) return json({ error: 'no_subject', message: 'Add a subject line first.' }, 400, cors);
+  if (!String(b.body || '').trim()) return json({ error: 'no_body', message: 'Write a message first.' }, 400, cors);
+  if (!(await rateAllow(`broadcast_test:${site.id}`, 10, 3600))) return tooMany(cors, 600);
+  const sent = await sendBroadcastTest(b as BroadcastRow, to).catch(() => false);
+  return sent ? json({ data: { ok: true, to } }, 200, cors)
+    : json({ error: 'send_failed', message: 'The test didn’t send — nothing went to your list. Try again in a moment.' }, 502, cors);
 }
 
 // ── AI draft-assist (optional): PROPOSE a subject + body the owner edits/approves.
