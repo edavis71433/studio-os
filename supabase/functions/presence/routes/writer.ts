@@ -10,6 +10,7 @@
 import { json } from '../../_shared/http.ts';
 import type { SiteDb } from '../lib/db.ts';
 import { generateDraft, acceptDraft, discardDraft } from '../writer/engine.ts';
+import { draftAsFound } from '../lib/optimistic_lock.ts';
 import { rewriteSnippet, REWRITE_ACTIONS } from '../writer/rewrite.ts';
 import type { RewriteAction } from '../writer/rewrite.ts';
 import { anthropicModel } from '../writer/model.ts';
@@ -125,7 +126,7 @@ export async function handleWriterAccept(req: Request, site: SiteRow, draftId: s
   try { body = await req.json(); } catch { /* option required below */ }
   const option = Number.isInteger(body?.option) ? Number(body.option) : -1;
   if (option < 0 || option > 2) return json({ error: 'bad_option', message: 'Choose which direction you’d like to keep.' }, 400, cors);
-  const res = await acceptDraft(site, draftId, option, (body?.edits as never) || null, principal);
+  const res = await acceptDraft(site, draftId, option, (body?.edits as never) || null, principal, await draftAsFound(req));
   if (!res.ok) {
     const msg = res.error === 'not_found' ? 'That draft is gone already.' : 'That didn’t apply — your draft is unchanged and nothing was lost.';
     return json({ error: res.error || 'accept_failed', message: msg }, res.error === 'not_found' ? 404 : 502, cors);

@@ -107,7 +107,7 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   ok('wiring: the page holds the version a write\'s answer names', /r\.headers\.get\("X-Draft-Version"\)/.test(html));
   ok('wiring: a read\'s version is taken only when the page holds none, or with a full load', /c\.data\.draft_hash && \(DRAFT_SEED \|\| !S\.draftHash\)/.test(html) && /DRAFT_SEED = true;/.test(html));
   ok('wiring: Publish names what was reviewed without the page taking it', /REVIEWED && !S\.draftHash/.test(html) && /api\("POST", "\/publish", undefined, REVIEWED \|\| S\.draftHash\)/.test(html) && !/S\.draftHash = c\.draft_hash/.test(html));
-  ok('tenant: the guard hashes THIS site (site-scoped via draftHashForSite)', /await draftVersionBefore\(req, site\)/.test(lock) && /hashFor: \(s: SiteRow\) => Promise<string \| null> = draftHashForSite\)/.test(lock) && /hashFor\(site\)/.test(lock));
+  ok('tenant: the guard hashes THIS site (site-scoped via readDraft)', /await draftVersionBefore\(req, site\)/.test(lock) && /read: DraftReader = readDraft\)/.test(lock) && /read: read\(site\)/.test(lock));
 }
 
 // ── the version a write leaves (Nov 2026): no network, the hash is a stub ──
@@ -116,8 +116,8 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   const cors = { 'Access-Control-Allow-Origin': 'https://x' };
   const put = (route, ifMatch, method = 'PUT') => new Request('http://x/functions/v1/presence' + route, { method, headers: ifMatch === undefined ? {} : { 'If-Match': ifMatch } });
   const answer = (status = 200) => new Response(JSON.stringify({ data: { ok: true } }), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-  // the draft as the stub hashes it: `now` before the write, `after` once it lands
-  const draftAt = () => { const d = { now: 'V0', calls: 0 }; d.hash = async () => { d.calls++; return d.now; }; return d; };
+  // the draft as the stub reads it: `now` before the write, `after` once it lands
+  const draftAt = () => { const d = { now: 'V0', calls: 0 }; d.read = async () => { d.calls++; return { hash: d.now }; }; return d; };
 
   for (const r of ['/settings', '/identity', '/offerings/1', '/media/1', '/redirects', '/dev/brand-kit', '/restore-to-draft']) ok(`moves: ${r}`, movesDraft('PUT', r) && movesDraft('post', r));
   for (const r of ['/publish', '/notes', '/writer/generate', '/publishes/checkpoints', '/reviews/request']) ok(`moves: ${r} doesn't`, !movesDraft('POST', r));
@@ -125,9 +125,9 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
 
   {
     const d = draftAt(); const req = put('/settings', 'V0');
-    await noteDraftBefore(req, '/settings', site, d.hash);
+    await noteDraftBefore(req, '/settings', site, d.read);
     d.now = 'V1';   // the write lands
-    const res = await withDraftVersion(req, answer(), d.hash);
+    const res = await withDraftVersion(req, answer(), d.read);
     ok('answer: the draft where the caller said → the version the write left', res.headers.get(DRAFT_VERSION_HEADER) === 'V1');
     ok('answer: a cross-origin page may read it', res.headers.get('Access-Control-Expose-Headers') === DRAFT_VERSION_HEADER);
     ok('answer: status, body and CORS pass through', res.status === 200 && (await res.json()).data.ok === true && res.headers.get('Access-Control-Allow-Origin') === 'https://x');
@@ -135,55 +135,55 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   }
   {
     const d = draftAt(); d.now = 'V0-theirs'; const req = put('/media/1', 'V0');
-    await noteDraftBefore(req, '/media/1', site, d.hash);
+    await noteDraftBefore(req, '/media/1', site, d.read);
     d.now = 'V1';
-    const res = await withDraftVersion(req, answer(), d.hash);
+    const res = await withDraftVersion(req, answer(), d.read);
     ok('answer: the draft had moved without the caller (an unchecked route) → the caller\'s own version back, so its next checked write is refused', res.headers.get(DRAFT_VERSION_HEADER) === 'V0');
     ok('answer: and no second hash for it', d.calls === 1);
   }
   {
     const d = draftAt(); const req = put('/settings', 'V0');
-    await noteDraftBefore(req, '/settings', site, d.hash);
-    const res = await withDraftVersion(req, answer(422), d.hash);
+    await noteDraftBefore(req, '/settings', site, d.read);
+    const res = await withDraftVersion(req, answer(422), d.read);
     ok('answer: a write that failed names nothing', res.headers.get(DRAFT_VERSION_HEADER) === null && res.status === 422);
   }
   {
     const d = draftAt(); const req = put('/settings', undefined);
-    await noteDraftBefore(req, '/settings', site, d.hash);
-    const res = await withDraftVersion(req, answer(), d.hash);
+    await noteDraftBefore(req, '/settings', site, d.read);
+    const res = await withDraftVersion(req, answer(), d.read);
     ok('answer: a write that named no version isn\'t looked at, and names nothing', d.calls === 0 && res.headers.get(DRAFT_VERSION_HEADER) === null);
   }
   {
     const d = draftAt(); const req = put('/notes', 'V0', 'POST');
-    await noteDraftBefore(req, '/notes', site, d.hash);
-    const a = answer(); const res = await withDraftVersion(req, a, d.hash);
+    await noteDraftBefore(req, '/notes', site, d.read);
+    const a = answer(); const res = await withDraftVersion(req, a, d.read);
     ok('answer: a write that doesn\'t move the draft is passed through untouched', res === a && d.calls === 0);
   }
   {
     const req = put('/settings', 'V0');
     await noteDraftBefore(req, '/settings', site, async () => { throw new Error('db down'); });
-    const a = answer(); const res = await withDraftVersion(req, a, async () => 'V1');
+    const a = answer(); const res = await withDraftVersion(req, a, async () => ({ hash: 'V1' }));
     ok('answer: a hash that failed before the write lets the write through, naming nothing', res === a);
   }
   {
     const d = draftAt(); const req = put('/settings', 'V0');
-    await noteDraftBefore(req, '/settings', site, d.hash);
+    await noteDraftBefore(req, '/settings', site, d.read);
     const a = answer(); const res = await withDraftVersion(req, a, async () => { throw new Error('db down'); });
     ok('answer: a hash that failed after the write names nothing', res === a);
   }
   {
     const req = put('/settings', 'V0');
     await noteDraftBefore(req, '/settings', site, async () => null);
-    const a = answer(); const res = await withDraftVersion(req, a, async () => 'V1');
+    const a = answer(); const res = await withDraftVersion(req, a, async () => ({ hash: 'V1' }));
     ok('answer: no template to hash with names nothing', res === a);
   }
   {
     const d = draftAt(); const req = put('/settings', 'V0');
-    await noteDraftBefore(req, '/settings', site, d.hash);
+    await noteDraftBefore(req, '/settings', site, d.read);
     const stale = await guardStaleDraft(req, site, cors);
     ok('guard: reuses the hash taken before the router (no second serialize)', stale === null && d.calls === 1);
     const req2 = put('/settings', 'OLD');
-    const d2 = draftAt(); await noteDraftBefore(req2, '/settings', site, d2.hash);
+    const d2 = draftAt(); await noteDraftBefore(req2, '/settings', site, d2.read);
     const refused = await guardStaleDraft(req2, site, cors);
     ok('guard: still refuses a version the draft has left', refused !== null && refused.status === 409 && (await refused.json()).current_hash === 'V0' && d2.calls === 1);
   }

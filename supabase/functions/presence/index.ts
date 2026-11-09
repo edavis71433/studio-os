@@ -534,7 +534,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/publishes\/checkpoints\/([0-9a-f-]{36})(\/restore)?$/);
     if (m) {
-      if (m[2] === '/restore' && method === 'POST') return handleCheckpointRestore(site, principal, m[1], cors);
+      if (m[2] === '/restore' && method === 'POST') return handleCheckpointRestore(req, site, principal, m[1], cors);
       if (!m[2] && method === 'DELETE') return handleCheckpointDelete(site, principal, m[1], cors);
     }
   }

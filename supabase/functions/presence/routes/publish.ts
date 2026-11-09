@@ -24,7 +24,7 @@ import { publishActorKind, actorKindCheckViolation, legacyActorKind } from '../l
 import { describeChanges } from '../lib/diff.ts';
 import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { tickChecklistForCustomerSite, emailCustomerSiteLive } from '../lib/service_bridge.ts';
-import { readIfMatch, preconditionOutcome, staleConflictBody } from '../lib/optimistic_lock.ts';
+import { readIfMatch, preconditionOutcome, staleConflictBody, draftAsFound } from '../lib/optimistic_lock.ts';
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
@@ -537,7 +537,7 @@ export async function handleCheckpointSave(req: Request, site: SiteRow, principa
 /** POST /publishes/checkpoints/:id/restore — bring a checkpoint back into the
  *  draft (a safety point). Reuses the shared draft-writer; the live site is
  *  untouched until the owner publishes. */
-export async function handleCheckpointRestore(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+export async function handleCheckpointRestore(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_request', message: 'Which checkpoint should we bring back?' }, 400, cors);
   const l = await svc(`presence_launches?id=eq.${id}&site_id=eq.${site.id}&status=eq.${CHECKPOINT_STATUS}&select=name,snapshot_id&limit=1`);
   const row = l.json?.[0];
@@ -546,7 +546,7 @@ export async function handleCheckpointRestore(site: SiteRow, principal: Principa
   const s = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization&limit=1`);
   const snap = s.json?.[0];
   if (!snap) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
-  const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`);
+  const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`, await draftAsFound(req));
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
   return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft. Your previous draft was set aside as a safety copy — nothing was lost.` } }, 200, cors);
 }
