@@ -46,7 +46,10 @@ const HOME_API = {
 
 test.describe('item 11 — one number, one list, at studio level', () => {
   test('the badge is Home\'s total; the bell\'s Needs-you tab lists Home\'s rows; news stays under Updates', async ({ page }) => {
-    await installApp(page, { api: HOME_API });
+    // final pass, batch D: the context hands back an older kept number (7, marked stale), so a
+    // badge that kept the context's number reads 7 here, not Home's 3
+    const stale = { data: { ...STUDIO_CTX.data, attention_count: 7, attention_stale: true } };
+    await installApp(page, { api: { ...HOME_API, '/portal/context': stale } });
     await page.goto('/agency.html');
     await expect(page.locator('#needs .qhead')).toHaveText('Needs you · 3');
     await expect(page.locator('#dds-bell .dot')).toHaveText('3');

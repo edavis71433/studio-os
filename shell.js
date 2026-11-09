@@ -209,14 +209,26 @@
       document.head.appendChild(st);
     }
     // ── saved views: GET/PUT /sales/views (one read per page) ──
+    var VIEWS_OK = false;
     function views(list) {
-      if (!VIEWS_P) VIEWS_P = req('/sales/views').then(function (r) { return r && r.ok && r.body && r.body.data ? r.body.data : null; }).catch(function () { return null; });
+      if (!VIEWS_P) VIEWS_P = req('/sales/views').then(function (r) { var d = r && r.ok && r.body && r.body.data ? r.body.data : null; VIEWS_OK = !!d; return d; }).catch(function () { VIEWS_OK = false; return null; });
       return VIEWS_P.then(function (all) { return all ? (all[list] || []) : null; });
     }
     function saveViews(list, arr) {
-      return req('/sales/views', 'PUT', { list: list, views: arr }).then(function (r) {
-        if (!r || !r.ok || !r.body || !r.body.data) return null;
-        VIEWS_P = Promise.resolve(r.body.data); return r.body.data[list] || [];
+      // final pass (Nov 8, batch D): a page whose views couldn't be read builds its list from
+      // nothing, and saving that list replaced the team's saved views. Read again first and keep
+      // every view the page didn't know about; if the read fails again, don't save.
+      var ready = VIEWS_OK ? Promise.resolve(arr) : (VIEWS_P = null, views(list).then(function (cur) {
+        if (cur === null) return null;
+        var mine = arr || [];
+        return cur.filter(function (v) { return !mine.some(function (a) { return (a.id && a.id === v.id) || String(a.name || '').toLowerCase() === String(v.name || '').toLowerCase(); }); }).concat(mine);
+      }));
+      return ready.then(function (body) {
+        if (!body) return null;
+        return req('/sales/views', 'PUT', { list: list, views: body }).then(function (r) {
+          if (!r || !r.ok || !r.body || !r.body.data) return null;
+          VIEWS_P = Promise.resolve(r.body.data); VIEWS_OK = true; return r.body.data[list] || [];
+        });
       }).catch(function () { return null; });
     }
     // ── a small named prompt (a <dialog>, never window.prompt) ──
@@ -273,6 +285,9 @@
     // ── CSV: the contacts importer's parser, shared ──
     function parseCsv(text) {
       var rows = [], row = [], cell = '', inQ = false;
+      // final pass (Nov 8, batch D): Excel starts a "CSV UTF-8" file with a byte-order mark. The
+      // importers' header match trims it off, but the first cell kept it, so the reader drops it here
+      text = String(text || ''); if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       for (var i = 0; i < text.length; i++) {
         var ch = text[i];
         if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += ch; }

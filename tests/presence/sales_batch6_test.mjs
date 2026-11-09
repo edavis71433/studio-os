@@ -18,6 +18,10 @@ eq('a view needs a name', V.normalizeView({ base: 'active' }), null);
 const v1 = V.normalizeView({ id: 'view-0001', name: '  Waiting on us ', base: 'attention', q: 'bakery', cols: ['name', 'open_support', 'open_support', 'Bad Key!', 'status'], sort: { key: 'name', dir: -3 } });
 eq('a view keeps its parts, cleaned', v1, { id: 'view-0001', name: 'Waiting on us', base: 'attention', q: 'bakery', cols: ['name', 'open_support', 'status'], sort: { key: 'name', dir: -1 } });
 ok('a missing or odd id gets a fresh one', /^[0-9a-f-]{36}$/.test(V.normalizeView({ id: 'x y', name: 'A' }).id));
+// final pass (Nov 8, batch D): a sort written as words — "desc" used to read as NaN and sort ascending
+eq('a sort given as "desc" or "asc" (any case) is understood', ['desc', 'DESC ', 'asc', 'Asc', -1, 1, '-1', 'sideways'].map((dir) => V.normalizeView({ name: 'A', sort: { key: 'name', dir } }).sort.dir), [-1, -1, 1, 1, -1, 1, -1, 1]);
+eq('at most twelve columns are kept, in the order given', V.normalizeView({ name: 'A', cols: Array.from({ length: 15 }, (_, i) => 'col' + String.fromCharCode(97 + i)) }).cols, Array.from({ length: 12 }, (_, i) => 'col' + String.fromCharCode(97 + i)));
+ok('MAX_COLS is twelve', V.MAX_COLS === 12);
 eq('an odd base or sort is dropped', [V.normalizeView({ name: 'A', base: 'DROP TABLE' }).base, V.normalizeView({ name: 'A', sort: { key: '' } }).sort], ['', null]);
 const list = V.normalizeViewList([{ id: 'aaaaaa', name: 'One' }, { id: 'bbbbbb', name: 'one' }, { id: 'cccccc', name: 'Two' }, null, { name: '' }]);
 eq('one view per name (the later wins), junk dropped', list.map((v) => v.id), ['bbbbbb', 'cccccc']);

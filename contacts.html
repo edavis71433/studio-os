@@ -762,6 +762,7 @@ $('custForm').onsubmit=async(e)=>{
 // parses, previews, and POSTs. Handles quoted fields; maps common headers. ──
 function parseCsv(text){
   const rows=[];let row=[],cell='',inQ=false;
+  text=String(text||'');if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);   // final pass, batch D: drop Excel's byte-order mark (the header match trims it; the cell kept it)
   for(let i=0;i<text.length;i++){const ch=text[i];
     if(inQ){if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else inQ=false;}else cell+=ch;}
     else if(ch==='"')inQ=true;

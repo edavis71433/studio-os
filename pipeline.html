@@ -1910,6 +1910,17 @@ async function bulkLost(){
 // item 32: deals from a CSV — the contacts importer's flow (shell.js). Each row
 // makes (or reuses, by email) its contact, then the deal at its open stage.
 const STAGE_WORDS=[[/won|closed ?won/,'won'],[/lost|not a fit|closed ?lost|dead/,'lost'],[/contract|agreement|negotiat|sign/,'contract'],[/proposal|quote|estimate/,'proposal'],[/qualif/,'qualified'],[/lead|new|open|prospect/,'lead']];
+// final pass (Nov 8, batch D): an amount as a spreadsheet writes it — "$2,400", "2400.50",
+// "1.200,50" (Excel set to European numbers) or "1 200,50". The LAST separator followed by
+// one or two digits is the decimal point; any other separators group thousands. Keeping only
+// digits and dots turned "1.200,50" into 1.2005 — 120 cents. Never negative.
+function amountCents(raw){
+  const t=String(raw==null?'':raw).replace(/[^0-9.,]/g,'');if(!t)return 0;
+  const m=/[.,](\d{1,2})$/.exec(t);
+  const whole=(m?t.slice(0,m.index):t).replace(/[.,]/g,'');
+  const v=parseInt(whole||'0',10)*100+(m?parseInt(m[1].length===1?m[1]+'0':m[1],10):0);
+  return Number.isFinite(v)&&v>0?v:0;
+}
 function importDeals(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{back:'#importDeals',
@@ -1926,7 +1937,7 @@ function importDeals(){
       const who=o.name||[o.first,o.last].filter(Boolean).join(' ');
       const title=o.title||o.company||who;if(!title)return null;
       const sw=String(o.stage||'').toLowerCase();let stage='lead';for(const [re,k2] of STAGE_WORDS){if(re.test(sw)){stage=k2;break;}}
-      const v=Math.round(parseFloat(String(o.value||'').replace(/[^0-9.]/g,''))*100);
+      const v=amountCents(o.value);
       const d=/^\d{4}-\d{2}-\d{2}$/.test(o.close||'')?o.close:(Number.isFinite(Date.parse(o.close||''))?new Date(Date.parse(o.close)).toISOString().slice(0,10):'');
       return{title,stage,value_cents:Number.isFinite(v)?v:0,email:String(o.email||'').toLowerCase(),name:who,company:o.company||'',close:d};
     },

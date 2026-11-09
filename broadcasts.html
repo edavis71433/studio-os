@@ -271,7 +271,7 @@ function render(){
 // audience picker — or its honest failure notice when the segments read failed
 function segsHtml(){
   if(!SEG_OK)return `<div class="notice" id="segNotice"><span>Your lists couldn’t load just now, so a send can’t be counted honestly yet.</span> <button class="ghost sm" id="segRetry" type="button">Try again</button></div>`;
-  return SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" type="button" data-seg="${esc(s.key)}" aria-pressed="${s.key===SEL?'true':'false'}"><span class="dot" aria-hidden="true"></span><span><span>${esc(s.label)}</span>${s.description?`<span class="d">${esc(s.description)}</span>`:''}</span> <span class="n">${s.count}</span></button>`).join('')||'<span class="nolists" style="padding:10px 12px">No lists yet.</span>';
+  return SEGMENTS.map(s=>`<button class="seg ${s.key===SEL?'on':''}" type="button" data-seg="${esc(s.key)}" aria-pressed="${s.key===SEL?'true':'false'}"><span class="dot" aria-hidden="true"></span><span><span>${esc(s.label)}</span>${s.description?`<span class="d">${esc(s.description)}</span>`:''}</span> <span class="n">${s.count==null?'<span title="Couldn’t count just now">—</span>':s.count}</span></button>`).join('')||'<span class="nolists" style="padding:10px 12px">No lists yet.</span>';
 }
 function histMeta(){
   if(!LIST_OK)return '';

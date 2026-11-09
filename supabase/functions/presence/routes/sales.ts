@@ -22,7 +22,7 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
@@ -320,7 +320,12 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
 // One reserved JSON row (lib/reserved_store.ts); every write is normalized
 // (lib/saved_views.ts). PUT replaces ONE list's views and returns them all.
 export async function handleSalesViews(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  if (req.method === 'GET') return json({ data: normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews)) }, 200, cors);
+  if (req.method === 'GET') {
+    // final pass (Nov 8, batch D): a failed read is not "no saved views" — the page then built
+    // its list from nothing, and its next save replaced the team's views
+    try { return json({ data: normalizeViews(await readReservedJsonOrThrow(site.id, RESERVED_NAMES.savedViews)) }, 200, cors); }
+    catch { return json({ error: 'read_failed', message: 'Your saved views couldn’t load just now.' }, 502, cors); }
+  }
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     if (!isViewList(b?.list)) return json({ error: 'validation', message: 'Which list are these views for?' }, 422, cors);
@@ -553,7 +558,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  return json({ data: await loadReceivables(site) }, 200, cors);
+  try { return json({ data: await loadReceivables(site) }, 200, cors); }
+  catch { return json({ error: 'read_failed', message: 'Who owes you couldn’t load just now.' }, 502, cors); }   // batch D: never "all paid up" on a failed read
 }
 /** The receivables payload itself — shared with the agency home's "Needs you"
  *  (agency/routes.ts), so the money rows there, the roster's Outstanding column
@@ -568,6 +574,10 @@ export async function loadReceivables(site: SiteRow) {
   const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
   let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
   if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
+  // empty book — Who owes you said "all paid up", the overdue report $0 and Home's Needs you
+  // left the money out without saying it was partial. Every caller has its honest path.
+  if (!invR.ok) throw new Error('receivables_read_failed');
   const invs = rows(invR);
   // Oct 2026 benchmark (item 2): the Paid bucket — what landed in the last 30
   // days — rides along so the band can show all four states from ONE list.
