@@ -7391,8 +7391,11 @@ async function mountBrandKitCard() {
   const st = {
     logo_media_id: (kit && kit.logo_media_id) || (S.settings && S.settings.logo_media_id) || null,
     primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
-    heading_font: (kit && kit.heading_font) || "", body_font: (kit && kit.body_font) || "", corner: (kit && kit.corner) || "",
   };
+  // Item 94: type and corners are set in one place, Colors and fonts below. This card showed
+  // the same two choices again, and the two could disagree on which was ticked. The kit now
+  // takes them as they stand when it is built or re-applied, so it never puts an older one back.
+  const typeAndCorners = () => { const t = DESIGN_TOKENS || {}; return { heading_font: t.font_display || undefined, body_font: t.font_body || undefined, corner: t.radius || "" }; };
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px";
   card.appendChild(el("label", null, "Logo and brand color"));
@@ -7412,16 +7415,12 @@ async function mountBrandKitCard() {
   colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; st.primary = colorInput.value; });
   hexInput.addEventListener("change", () => { const h = normHexJs(hexInput.value); if (h) { st.primary = h; colorInput.value = h; hexInput.value = h; } });
   colorRow.append(colorInput, hexInput); card.appendChild(colorRow);
-  // type (reuse TYPE_PRESETS: a preset sets heading + body as raw stacks) + corners
-  const typeOpts = [{ key: "", name: "Keep current" }].concat(TYPE_PRESETS.filter((t) => t.key));
-  pillRow(card, "Headings & text", typeOpts, (t) => (t.key ? st.heading_font === (t.tokens && t.tokens.font_display) : !st.heading_font),
-    (t) => { st.heading_font = (t.tokens && t.tokens.font_display) || ""; st.body_font = (t.tokens && t.tokens.font_body) || ""; const c = $("brandKitCard"); if (c) c.remove(); mountBrandKitCard(); });
-  pillRow(card, "Corners", CORNER_OPTS, (o) => String(st.corner) === o[1], (o) => { st.corner = o[1]; });
+  card.appendChild(el("div", "hint", "Type and corners are set under Colors and fonts. The kit keeps whatever they are when you apply it."));
   // apply
   const apply = el("button", null, "Build & apply brand kit"); apply.type = "button";
   apply.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:14px;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
   apply.addEventListener("click", async () => {
-    const brand_kit = { logo_media_id: st.logo_media_id, primary: st.primary, heading_font: st.heading_font || undefined, body_font: st.body_font || undefined, corner: st.corner };
+    const brand_kit = { logo_media_id: st.logo_media_id, primary: st.primary, ...typeAndCorners() };
     try {
       const r = await api("PUT", "/dev/brand-kit", { brand_kit });
       DESIGN_TOKENS = (r.data && r.data.applied_tokens) || DESIGN_TOKENS;
@@ -7439,13 +7438,19 @@ async function mountBrandKitCard() {
     const row2 = el("div"); row2.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px";
     const applySaved = el("button", null, "Apply my brand"); applySaved.type = "button";
     applySaved.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer";
-    applySaved.title = "One tap: re-apply your saved brand to the whole site — colors, type and corners";
+    applySaved.title = "One tap: re-apply your saved logo and color to the whole site, with the type and corners you have now";
     row2.appendChild(applySaved);
     row2.appendChild(el("span", "hint", "Re-applies your saved brand to the whole site in one tap."));
     const report = el("div"); report.style.cssText = "margin-top:8px";
     applySaved.addEventListener("click", async () => {
       applySaved.disabled = true; const was = applySaved.textContent; applySaved.textContent = "Applying…";
       try {
+        // the saved kit takes today's type and corners first, so re-applying it can't bring back older ones
+        const now = typeAndCorners();
+        if ((kit.heading_font || undefined) !== now.heading_font || (kit.body_font || undefined) !== now.body_font || String(kit.corner || "") !== now.corner) {
+          await api("PUT", "/dev/brand-kit", { brand_kit: { logo_media_id: kit.logo_media_id || null, primary: kit.primary, ...now } });
+          Object.assign(kit, now);
+        }
         const r = await api("POST", "/dev/brand-kit/apply", {});
         const d = (r && r.data) || {};
         DESIGN_TOKENS = d.applied_tokens || DESIGN_TOKENS;
