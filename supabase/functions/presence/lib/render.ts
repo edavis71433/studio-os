@@ -22,6 +22,7 @@ import { render as harbor_1_0_0 } from '../templates/harbor/1.0.0/render.ts';
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
+import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 
 // ── FD-T2: indexed, lazy-ready template registry ─────────────────────────────
 // slug → version → LOADER. Render resolution goes through this ONE boundary and is
@@ -160,8 +161,10 @@ export function injectDevLayer(fileMap: FileMap, dev: Snapshot['dev_customizatio
  *  layer from the SAME snapshot. This is the ONE render entry — publish, preview,
  *  and restore all call it, so a developer edit is indistinguishable from any
  *  other change: same snapshot → same render → same bytes. Throws only on unknown
- *  template/version or contract-version mismatch — never on content. */
-export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
+ *  template/version or contract-version mismatch — never on content.
+ *  `allSectionStyles` keeps every section style in the stylesheet (the builder's
+ *  canvas, renderForBuilder); without it the site ships only the ones it uses. */
+export function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { allSectionStyles?: boolean } = {}): FileMap {
   const t = getTemplate(snapshot.template_slug, snapshot.template_version);
   if (!t) throw new Error(`unknown template ${snapshot.template_slug}@${snapshot.template_version}`);
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {
@@ -170,7 +173,51 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig): FileMap {
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
   const drawn = tintFavicon(t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
-  return injectCsp(injectAnalytics(injectDevLayer(drawn, snapshot.dev_customization), counting ? site.siteId : undefined));
+  const dressed = injectDevLayer(drawn, snapshot.dev_customization);
+  return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
+}
+
+/** What the builder's canvas and the studio's site cards draw (routes/preview.ts,
+ *  agency/sites.ts). They share the preview cache under one key, so they must draw
+ *  alike. Every section style stays: the canvas swaps in a section drawn on its own
+ *  (POST /preview/section) before the save's full redraw, and that section may use a
+ *  rule nothing else on the page does yet, like the dark band just picked for it. */
+export function renderForBuilder(snapshot: Snapshot): FileMap {
+  return renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' }, { allSectionStyles: true });
+}
+
+// deterministic content hash (fnv1a-64), the one the templates name their stylesheet with
+function fnv(s: string): string {
+  let h1 = 0x811c9dc5, h2 = 0xcbf29ce4;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = (h1 ^ c) >>> 0; h1 = (h1 * 0x01000193) >>> 0;
+    h2 = (h2 ^ ((c << 1) + 1)) >>> 0; h2 = (h2 * 0x01000193) >>> 0;
+  }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+// Item 106: every site ships only the section styles it uses. Each template's stylesheet
+// carries the section styles (BLOCK_CSS) whole; this pass swaps them for the rules the site's
+// pages can use (sectionStyles in lib/site_blocks.ts), read across every page, since a site
+// has one stylesheet. The developer layer is already in, so its markup counts too. The
+// stylesheet's name is its hash and visitors keep it for a year, so the trimmed one gets its
+// own name and every page links to that: a site that adds a gallery can never be served a
+// cached stylesheet without the gallery's rules.
+export function trimSectionStyles(fileMap: FileMap): FileMap {
+  const cssKey = Object.keys(fileMap).find((k) => /^assets\/site-[0-9a-f]+\.css$/.test(k));
+  const css = cssKey ? fileMap[cssKey] : undefined;
+  if (typeof css !== 'string' || !css.includes(BLOCK_CSS)) return fileMap;
+  const classes = new Set<string>();
+  for (const [k, v] of Object.entries(fileMap)) if (k.endsWith('.html') && typeof v === 'string') pageClasses(v, classes);
+  const trimmed = css.replace(BLOCK_CSS, () => sectionStyles(classes));
+  const key = `assets/site-${fnv(trimmed)}.css`;
+  const out: FileMap = {};
+  for (const [k, v] of Object.entries(fileMap)) {
+    if (k === cssKey) out[key] = trimmed;
+    else out[k] = typeof v === 'string' && k.endsWith('.html') ? v.split(`/${cssKey}`).join(`/${key}`) : v;
+  }
+  return out;
 }
 
 // Item 99: the favicon wears the accent the site chose (a palette, a brand kit or Developer

@@ -9,7 +9,7 @@
 // inlined so a lone HTML response is self-contained.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { getTemplate, renderSnapshot, latestTemplateVersion } from '../lib/render.ts';
+import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
 import { serializeDraft, draftSectionHtml } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { previewUrlMap } from '../lib/media.ts';
@@ -118,8 +118,9 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
       cacheHit = true;
     } else {
       // Phase B1: same renderSnapshot as publish/restore — preview is pixel-identical
-      // to production for the same snapshot (incl. the Developer-Mode layer).
-      fileMap = renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' });
+      // to production for the same snapshot (incl. the Developer-Mode layer). It keeps
+      // every section style (item 106) for the canvas's quick section redraws.
+      fileMap = renderForBuilder(snapshot);
       previewCache.set(key, { fileMap, mediaManifest, blockers, warnings });
     }
   } catch (e) {

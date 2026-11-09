@@ -1,7 +1,8 @@
 // ── Which side owns each class name the templates and the sections share ─────────
 //   deno run --allow-read --allow-env tests/presence/class_clash_test.mjs
 // The sections' shared stylesheet (site_blocks BLOCK_CSS) is appended to every template's,
-// so its rules reach template markup too, and a template's rules reach the sections. From
+// so its rules reach template markup too, and a template's rules reach the sections. (A
+// published site keeps only the rules its pages use; these checks read them all.) From
 // July to November 2026 Harbor's "at a glance" labels used `lb`, the class the gallery's
 // photo viewer pins over the whole screen: a dark sheet over every Harbor home page with
 // reviews. Every name both sides use is listed below with its owner:
@@ -44,7 +45,9 @@ const OWNERS = {
   'pgb-pct': ['sections', 'a Progress bar’s figure; Atelier restyles it'],
   process: ['sections', 'the How it works steps; Atelier restyles them'],
   'bk-done-ic': ['sections', 'the booking widget’s done mark; Atelier restyles it'],
-  prose: ['both', 'written words: a post or the about story, and the Text sections; the section styles’ spacing wins on both'],
+  prose: ['template', 'written words: a post, the about story, an answer; the Text, Accordion, Tabs, Columns and Spotlight sections carry it too, and the section styles’ spacing reaches only theirs'],
+  'block--bg-accent': ['sections', 'a section’s brand-colour band; Restaurant Classic restyles its Features cards on it'],
+  'block--bg-dark': ['sections', 'a section’s dark band; Restaurant Classic restyles its Features cards on it'],
 };
 
 // ── reading markup and stylesheets ──
@@ -72,13 +75,16 @@ function selectors(css) {
   return out;
 }
 const named = (text) => new Set([...text.replace(/\[[^\]]*\]|"[^"]*"|'[^']*'/g, '').matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]));
-// what a compound needs of one element: its tag, and the classes outside :is(…)/:not(…)/[…]
+// what a compound needs of one element: its tag, the classes outside :is(…)/:not(…)/[…], and one
+// class of each :is(…)/:where(…) list made only of classes
 const needs = (compound) => {
   let bare = '', d = 0;
   for (const c of compound) { if (c === '(' || c === '[') d++; if (!d) bare += c; if (c === ')' || c === ']') d--; }
-  return { tag: (/^([a-z][a-z0-9]*)/i.exec(bare) || [])[1]?.toLowerCase() || null, classes: [...named(bare)] };
+  const anyOf = [...compound.matchAll(/:(?:is|where)\(([^()]*)\)/g)].map((m) => m[1].split(',').map((x) => x.trim()))
+    .filter((list) => list.every((x) => /^\.[\w-]+$/.test(x))).map((list) => list.map((x) => x.slice(1)));
+  return { tag: (/^([a-z][a-z0-9]*)/i.exec(bare) || [])[1]?.toLowerCase() || null, classes: [...named(bare)], anyOf };
 };
-const fits = (el, n) => (!n.tag || n.tag === el.tag) && n.classes.every((c) => el.classes.has(c));
+const fits = (el, n) => (!n.tag || n.tag === el.tag) && n.classes.every((c) => el.classes.has(c)) && n.anyOf.every((list) => list.some((c) => el.classes.has(c)));
 // Can a selector select one of these elements? Its last compound must fit an element, and each
 // compound before it must fit some element on the same side (the page's shape is not read, so
 // this errs towards "yes").
@@ -100,7 +106,7 @@ function sides(slug) {
   // (the owner's page and the dropdown stay)
   const bare = structuredClone(full);
   bare.content.settings = { ...bare.content.settings, blocks: [], blocks_src: [], pages: [{ ...pages[0], blocks: [], blocks_src: [] }] };
-  const drawn = renderSnapshot(bare, SITE);
+  const drawn = renderSnapshot(bare, SITE, { allSectionStyles: true });
   const css = String(drawn[Object.keys(drawn).find((k) => k.startsWith('assets/'))]);
   return {
     markup: html(renderSnapshot(fixture(slug), SITE)) + '\n' + html(drawn),

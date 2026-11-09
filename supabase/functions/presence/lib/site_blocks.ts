@@ -1769,7 +1769,15 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
 // color-mix of var(--accent) (see the @supports rule in BLOCK_CSS below).
 const TINT_FALLBACK = brandTint('#5b3fa0');
 
-/** The extra CSS the block sections need — appended once to a template's stylesheet.
+// The sections that carry written words in a .prose box. Their spacing and link rules reach
+// only these: :where() adds no weight, so inside a section the rules still win by coming
+// last, and a template's own words (a post, the about story, an answer) keep the template's
+// spacing. A new section that draws .prose joins the list (section_styles_test checks it).
+export const SECTION_PROSE_TYPES = ['block-richtext', 'block-accordion', 'block-tabs', 'block-columns', 'block-spotlight'];
+const SP = `:where(${SECTION_PROSE_TYPES.map((c) => '.' + c).join(',')}) .prose`;
+
+/** The extra CSS the block sections need — appended once to a template's stylesheet,
+ *  and trimmed at render to the rules a site's pages use (sectionStyles below, item 106).
  *  Reuses existing tokens (--accent, --line, --soft…); no external assets. */
 export const BLOCK_CSS = `.stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card.stat{text-align:center}.stat-v{font-size:2rem;font-weight:800;color:var(--accent-dark,var(--accent))}.stat-l{color:var(--soft);font-size:.95rem;margin-top:4px}
@@ -1842,11 +1850,11 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .map-dir{margin-top:6px}
 .map-dir a{font-weight:700;color:var(--accent-dark,var(--accent))}
 .block-richtext .prose,.block-imgtext .it-text .prose{max-width:68ch}
-.prose>*:first-child{margin-top:0}.prose>*:last-child{margin-bottom:0}
-.prose h2,.prose h3{margin:1.1em 0 .4em}.prose p{margin:0 0 .8em}
-.prose ul,.prose ol{margin:0 0 .8em;padding-left:1.3em}.prose li{margin:.2em 0}
-.prose blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
-.prose a{color:var(--accent-dark,var(--accent))}
+${SP}>*:first-child{margin-top:0}${SP}>*:last-child{margin-bottom:0}
+${SP} h2,${SP} h3{margin:1.1em 0 .4em}${SP} p{margin:0 0 .8em}
+${SP} ul,${SP} ol{margin:0 0 .8em;padding-left:1.3em}${SP} li{margin:.2em 0}
+${SP} blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
+${SP} a{color:var(--accent-dark,var(--accent))}
 .block-image .img-fig{margin:0}
 .block-image .img-fig img{width:100%;border-radius:12px;display:block}
 .block-image figcaption{font-size:.9rem;color:var(--soft);margin-top:6px}
@@ -2153,3 +2161,84 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .ff-image img{object-fit:cover;border-radius:10px}
 a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center}
 @media(max-width:620px){.ff-canvas{aspect-ratio:auto}.ff-canvas .ff-el{position:static;width:auto!important;height:auto!important;margin:12px 0}.ff-canvas .ff-image img{height:auto}.ff-canvas .ff-hide-phone{display:none!important}}`;
+
+// ── Item 106 · a site ships only the section styles it uses ──
+// BLOCK_CSS is read once into its rules. A site keeps a rule when one of its selectors can
+// match: every class the selector needs is one the site's pages carry, in their markup or in
+// a script's words (the booking widget builds its steps in the browser). Classes inside
+// :not(), :nth-of-type() and the like are not needed; a :where()/:is() list of plain classes
+// needs one of them. A kept rule keeps only the selectors that can match, an @media or
+// @supports group stays when a rule inside it does, and @keyframes when a kept rule names it.
+// Nothing moves, so the rules that stay meet each other in the order every site had before.
+type CssNode = { sel: string[]; body: string } | { at: string; kids: CssNode[] } | { frames: string; text: string };
+const listParts = (s: string): string[] => {
+  const out: string[] = []; let d = 0, cur = '';
+  for (const c of s) { if (c === '(' || c === '[') d++; else if (c === ')' || c === ']') d--; if (!d && c === ',') { out.push(cur.trim()); cur = ''; } else cur += c; }
+  out.push(cur.trim());
+  return out.filter(Boolean);
+};
+function cssNodes(css: string): CssNode[] {
+  const s = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const walk = (from: number, to: number): CssNode[] => {
+    const out: CssNode[] = [];
+    for (let i = from; i < to;) {
+      const open = s.indexOf('{', i);
+      if (open < 0 || open >= to) break;
+      let d = 1, j = open + 1;
+      while (j < to && d) { if (s[j] === '{') d++; else if (s[j] === '}') d--; j++; }
+      const head = s.slice(i, open).trim(), inner = s.slice(open + 1, j - 1);
+      if (/^@keyframes\s/.test(head)) out.push({ frames: head.split(/\s+/)[1], text: `${head}{${inner}}` });
+      else if (head.startsWith('@')) out.push({ at: head, kids: walk(open + 1, j - 1) });
+      else out.push({ sel: listParts(head), body: inner });
+      i = j;
+    }
+    return out;
+  };
+  return walk(0, s.length);
+}
+/** The classes a selector needs: all of `all`, and one of each `any` list. */
+function selectorNeeds(sel: string): { all: string[]; any: string[][] } {
+  const all: string[] = [], any: string[][] = [];
+  for (let i = 0; i < sel.length;) {
+    const c = sel[i];
+    if (c === '[') { const j = sel.indexOf(']', i); i = j < 0 ? sel.length : j + 1; continue; }
+    if (c === '(') {
+      let d = 1, j = i + 1;
+      while (j < sel.length && d) { if (sel[j] === '(') d++; else if (sel[j] === ')') d--; j++; }
+      const items = listParts(sel.slice(i + 1, j - 1));
+      if (/:(?:is|where)$/.test(sel.slice(0, i)) && items.every((x) => /^\.-?[_a-zA-Z][\w-]*$/.test(x))) any.push(items.map((x) => x.slice(1)));
+      i = j; continue;
+    }
+    const m = c === '.' ? /^\.(-?[_a-zA-Z][\w-]*)/.exec(sel.slice(i)) : null;
+    if (m) { all.push(m[1]); i += m[0].length; continue; }
+    i++;
+  }
+  return { all, any };
+}
+const BLOCK_NODES = cssNodes(BLOCK_CSS);
+const NEEDS = new Map<string, { all: string[]; any: string[][] }>();
+const canMatch = (sel: string, classes: ReadonlySet<string>): boolean => {
+  let n = NEEDS.get(sel);
+  if (!n) NEEDS.set(sel, n = selectorNeeds(sel));
+  return n.all.every((c) => classes.has(c)) && n.any.every((g) => g.some((c) => classes.has(c)));
+};
+
+/** The section styles a site with these classes can use: BLOCK_CSS's rules, in order, less
+ *  every selector that can't match and every group left empty. Pure and deterministic. */
+export function sectionStyles(classes: ReadonlySet<string>): string {
+  const draw = (n: CssNode, named: string | null): string => {
+    if ('sel' in n) { const s = n.sel.filter((x) => canMatch(x, classes)); return s.length ? `${s.join(',')}{${n.body}}` : ''; }
+    if ('at' in n) { const k = n.kids.map((x) => draw(x, named)).join(''); return k ? `${n.at}{${k}}` : ''; }
+    return named !== null && named.includes(n.frames) ? n.text : '';
+  };
+  const named = BLOCK_NODES.map((n) => draw(n, null)).join('');   // the rules alone, to see which @keyframes they name
+  return BLOCK_NODES.map((n) => draw(n, named)).filter(Boolean).join('\n');
+}
+
+/** Every class a page carries: its class attributes, and the words of its scripts (a script
+ *  that builds part of the page names the classes it gives them). Adds to `into`. */
+export function pageClasses(html: string, into: Set<string> = new Set()): Set<string> {
+  for (const m of html.matchAll(/\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) for (const c of (m[1] ?? m[2]).split(/\s+/)) if (c) into.add(c);
+  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) for (const w of m[1].match(/[\w-]+/g) || []) into.add(w);
+  return into;
+}

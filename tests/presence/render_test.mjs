@@ -17,7 +17,7 @@
 import { renderSnapshot, getTemplate } from '../../supabase/functions/presence/lib/render.ts';
 import { validateSnapshot } from '../../supabase/functions/presence/lib/manifest_validate.ts';
 import { renderMarkdown } from '../../supabase/functions/presence/lib/markdown.ts';
-import { BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { sectionStyles, pageClasses } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { vocabFor } from '../../supabase/functions/presence/lib/industry_vocab.ts';
 import { TEMPLATES, fixture as sampleOf, fullFixture, storedSections, PAGE } from './full_fixture.mjs';
 
@@ -242,13 +242,19 @@ const hostilify = (v, key, keep) => {
 };
 
 // The golden's reading copy: a line break between tags and after each rule. The stylesheet's
-// name carries its hash, and the section styles are the same in every template (reviewed in
-// lib/site_blocks.ts's own diff), so the copy calls the stylesheet assets/site.css and leaves
-// the section styles out. The digests still cover every byte of every file.
+// name carries its hash, and the section styles come from one place (reviewed in
+// lib/site_blocks.ts's own diff; a site keeps the ones its pages use), so the copy calls the
+// stylesheet assets/site.css and leaves the section styles out. The digests still cover every
+// byte of every file.
 const GOLDEN = new URL('tests/presence/golden/', ROOT);
-const copyName = (path) => path.replace(/^assets\/site-[0-9a-f]+\.css$/, 'assets/site.css');
-const readable = (body) => String(body)
-  .replace(BLOCK_CSS, '/* the section styles: BLOCK_CSS in lib/site_blocks.ts */')
+const isCss = (path) => /^assets\/site-[0-9a-f]+\.css$/.test(path);
+const copyName = (path) => (isCss(path) ? 'assets/site.css' : path);
+const sectionPart = (files) => {
+  const classes = new Set();
+  for (const [k, v] of Object.entries(files)) if (k.endsWith('.html')) pageClasses(String(v), classes);
+  return sectionStyles(classes);
+};
+const readable = (body, sections = '') => (sections ? String(body).replace(sections, () => '/* the section styles its pages use: BLOCK_CSS in lib/site_blocks.ts, less the rest */') : String(body))
   .replace(/\/assets\/site-[0-9a-f]+\.css/g, '/assets/site.css')
   .replace(/></g, '>\n<')
   .replace(/\}(?!\n|$)/g, '}\n');
@@ -336,7 +342,8 @@ for (const slug of TEMPLATES) {
     const drawn = { ...r1, '_plain/index.html': plain['index.html'] };
     const digest = {};
     for (const k of Object.keys(drawn).sort()) digest[k] = await sha(String(drawn[k]));
-    const copy = Object.fromEntries(Object.entries(drawn).map(([k, v]) => [copyName(k), readable(v)]));
+    const sections = sectionPart(r1);
+    const copy = Object.fromEntries(Object.entries(drawn).map(([k, v]) => [copyName(k), readable(v, isCss(k) ? sections : '')]));
     const gPath = new URL(`${slug}-1.0.0.json`, GOLDEN), cDir = new URL(`${slug}-1.0.0/`, GOLDEN);
     if (UPDATE) {
       await Deno.mkdir(GOLDEN, { recursive: true });
