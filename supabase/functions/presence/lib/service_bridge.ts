@@ -783,3 +783,22 @@ export async function reconcileChecklistFacts(agencySiteId: string, dealId: stri
     if (rows(depQ).length) await tickChecklistStep(agencySiteId, projectId, 'deposit_paid', 'system', 'system');
   } catch { /* the checklist is still usable un-reconciled */ }
 }
+
+/** Item 96 follow-up: when each open support request last saw real activity, for Home's
+ *  "waited over a month": its newest message, or its opening when it has none. updated_at
+ *  can't say: the owner stamp above and other system writes move it (on Nov 8 every July
+ *  request read "changed today" after one). One read for every request, scoped to the
+ *  site; null when it fails, so the caller counts no request as old rather than guess. */
+export async function supportActivity(siteId: string, rowsIn: Array<{ id?: unknown; created_at?: unknown }>): Promise<Record<string, string> | null> {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ids = [...new Set(rowsIn.map((r) => String(r.id || '')).filter((id) => UUID.test(id)))];
+  if (!ids.length || !UUID.test(siteId)) return {};
+  try {
+    const r = await svc(`presence_support_messages?site_id=eq.${siteId}&request_id=in.(${ids.join(',')})&deleted_at=is.null&select=request_id,created_at&order=created_at.desc&limit=1000`);
+    if (!r.ok) return null;
+    const out: Record<string, string> = {};
+    for (const m of rows(r)) { const k = String(m.request_id || ''); if (k && !out[k] && m.created_at) out[k] = String(m.created_at); }
+    for (const row of rowsIn) { const k = String(row.id || ''); if (UUID.test(k) && !out[k] && row.created_at) out[k] = String(row.created_at); }
+    return out;
+  } catch { return null; }
+}

@@ -10,7 +10,7 @@ import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload, dealNoticeIds, staleDealNotices } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
-import { healSupportOwners } from '../lib/service_bridge.ts';
+import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
 import { buildPortalFeed } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite } from '../lib/site.ts';
@@ -680,7 +680,10 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     // through the requester's sign-in (stamped once), or at least their email.
     const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null; requester_name?: string | null }>(supQ);
     if (own && supportRows.length) {
-      const owners = await healSupportOwners(own.id, supportRows);
+      // item 96: when each request last saw a message, read beside the stamp (which can move
+      // updated_at, so updated_at can't say); a failed read leaves every request un-aged
+      const [owners, activity] = await Promise.all([healSupportOwners(own.id, supportRows), supportActivity(own.id, supportRows as Array<{ id?: unknown; created_at?: unknown }>)]);
+      if (activity) for (const r of supportRows) (r as { last_activity_at?: string | null }).last_activity_at = activity[r.id] || null;
       for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; if (owners.nameOf[r.id]) r.requester_name = owners.nameOf[r.id]; }
     }
     const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;

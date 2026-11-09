@@ -60,7 +60,7 @@ export interface NeedsInput {
   /** open / in-progress support requests on the studio's own site */
   // client_id: the write-time stamp (or one healed from the requester's sign-in);
   // requester_name / requester_email: who wrote, when no customer could be named (the contact's name first)
-  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; client_id?: string | null; requester_email?: string | null; requester_name?: string | null; created_at?: string | null; updated_at?: string | null }>;
+  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; client_id?: string | null; requester_email?: string | null; requester_name?: string | null; created_at?: string | null; updated_at?: string | null; last_activity_at?: string | null }>;
   /** the studio's active service links: project → customer */
   serviceLinks?: Array<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>;
   /** the studio's own deals (open stages) with their next step */
@@ -231,7 +231,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         what: subject ? `support request: ${subject}` : 'has an open support request',
         when: `Opened ${ago(s.created_at || s.updated_at, today) || 'recently'}`,
         verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}`,
-        at: s.updated_at || s.created_at || null, clear: { kind: 'support', site_id: null, ids: [String(s.id)] } });   // old = no word on it for a month
+        at: s.last_activity_at ?? null, clear: { kind: 'support', site_id: null, ids: [String(s.id)] } });   // old = no message for a month (routes.ts reads it); unknown = never old
     }
   }
 

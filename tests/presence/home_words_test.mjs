@@ -39,8 +39,9 @@ const base = {
       { id: 'e-arch', site_id: C2, name: 'Cy', created_at: '2026-07-01T10:00:00Z' },     // an archived client's: not on the list at all
     ],
     support: [
-      { id: 's-stale', subject: 'Logo', created_at: '2026-07-03T09:00:00Z', updated_at: '2026-07-04T09:00:00Z' },   // no word for four months
-      { id: 's-live', subject: 'Hours', created_at: '2026-07-03T09:00:00Z', updated_at: '2026-11-05T09:00:00Z' },   // opened in July, answered this week
+      { id: 's-stale', subject: 'Logo', created_at: '2026-07-03T09:00:00Z', updated_at: '2026-11-08T13:59:46Z', last_activity_at: '2026-07-04T09:00:00Z' },   // no message for four months; a system stamp moved updated_at today
+      { id: 's-live', subject: 'Hours', created_at: '2026-07-03T09:00:00Z', updated_at: '2026-11-05T09:00:00Z', last_activity_at: '2026-11-05T09:00:00Z' },   // opened in July, answered this week
+      { id: 's-unread', subject: 'Menu', created_at: '2026-07-03T09:00:00Z', updated_at: '2026-07-03T09:00:00Z' },   // its messages couldn't be read: never counted old
     ],
     own: { site_id: 'own', enquiries: [
       { id: 'o-1', name: 'Dee', email: 'dee@example.com', status: 'new', tier: 'needs_you', created_at: '2026-09-20T10:00:00Z' },
@@ -55,7 +56,8 @@ const base = {
   const has = (kind, id) => items.some((i) => i.kind === kind && i.ids.includes(id));
   ok('old: the enquiry from August, with its client’s account to clear it in', items.some((i) => i.kind === 'enquiry' && i.site_id === C1 && i.ids.join() === 'e-old'));
   ok('old: not last week’s enquiry, nor an archived client’s', !has('enquiry', 'e-new') && !has('enquiry', 'e-arch'));
-  ok('old: a support request with no word on it for a month, not one answered this week', has('support', 's-stale') && !has('support', 's-live'));
+  ok('old: a support request with no message for a month, even one a system stamp touched today; not one answered this week', has('support', 's-stale') && !has('support', 's-live'));
+  ok('old: a support request whose messages couldn’t be read is never counted', !has('support', 's-unread'));
   ok('old: one person’s own enquiries go together, every one of them', items.some((i) => i.kind === 'enquiry' && i.site_id === null && i.ids.slice().sort().join() === 'o-1,o-2'));
   ok('the count is the rows, not the messages in them', p.old.count === 3 && items.length === 3, JSON.stringify(p.old));
 }
