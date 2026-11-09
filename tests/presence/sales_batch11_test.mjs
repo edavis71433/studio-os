@@ -103,7 +103,7 @@ const tasks = T.buildMyTasks({ deals: [], dealTasks: [], taskDeals: [], userId: 
   ] });
 eq('only the next step and a dated one are now; the rest wait', tasks.map((t) => `${t.title}:${t.later ? 'later' : 'now'}`), ['Launch party:now', 'Domain connected:now', 'Handover:later', 'Site live:later']);
 eq('each step carries its place, so Home can move the next one up', tasks.map((t) => t.order), [9, 1, 2, 3]);
-ok('the route reads each step\'s place', /select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300/.test(read('supabase/functions/presence/routes/sales.ts')));
+ok('the route reads each step\'s place', /select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order(&order=[a-z_.,]+)?&limit=300/.test(read('supabase/functions/presence/routes/sales.ts')));
 const home = read('agency.html');
 ok('Home shows what\'s next, counts it, and moves the next step up on Done', /const now=items\.filter\(t=>!t\.later\);/.test(home) && /My tasks · \$\{MYT_ALL\?total:now\.length\}/.test(home) && /x\.later&&x\.parent_id===t\.parent_id/.test(home));
 
@@ -114,7 +114,7 @@ ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.st
 ok('Send an update: a "Your customers" list', B.SEGMENTS[0].key === 'customers' && B.isSegmentKey('customers') && B.isAudienceKey('customers'));
 const bl = read('supabase/functions/presence/lib/broadcast.ts');
 ok('…its people are this studio\'s active customers', /presence_service_links\?agency_site_id=eq\.\$\{siteId\}&status=eq\.active&select=customer_client_id/.test(bl));
-ok('…and it only shows when there are some', /SEGMENTS\.filter\(\(s\) => s\.key !== 'customers' \|\| \(counts\[s\.key\] \?\? 0\) > 0\)/.test(read('supabase/functions/presence/routes/broadcasts.ts')));
+// …and it only shows when there are some: checked by behaviour in sales_reads_harness_test.mjs (final pass, batch D)
 
 // ── items 57–59 (phones) ──
 ok('record: the stage strip opens on the current stage', /const pth=host\.querySelector\('\.path'\),curStep=host\.querySelector\('\.path \.pstep\.current'\);/.test(page));

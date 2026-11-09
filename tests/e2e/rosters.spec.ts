@@ -60,7 +60,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('.lmeta')).toContainText('Sorted by Name — descending');
     // a different column starts ascending
     await page.locator('[data-sort="open_support"]').click();
-    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Needs you');
+    await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Requests');   // final pass, batch C: it counts requests
     await expect(page.locator('tbody tr td:nth-child(2)').last()).toContainText('Acme Bakery');
   });
 

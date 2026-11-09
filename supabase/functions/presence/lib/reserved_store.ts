@@ -20,6 +20,16 @@ const live = (siteId: string, name: string) => `presence_sales_templates?site_id
 const path = (siteId: string, name: string, sel: string) => `${live(siteId, name)}&select=${sel}&order=updated_at.desc&limit=1`;
 const parse = (body: unknown): unknown => { try { return body ? JSON.parse(String(body)) : null; } catch { return null; } };
 
+/** The same read, but a failed read THROWS instead of answering null — for a
+ *  caller that keeps what it read (lib/stage_names.ts) and must never keep a
+ *  failure as if it were "nothing saved". */
+export async function readReservedJsonOrThrow(siteId: string, name: string): Promise<unknown> {
+  const r = await svc(path(siteId, name, 'body'));
+  if (!r.ok) throw new Error('reserved_read_failed');
+  const row = rowsOf(r)[0];
+  return row ? parse(row.body) : null;
+}
+
 /** The stored JSON, or null when there is none or it can't be read. */
 export async function readReservedJson(siteId: string, name: string): Promise<unknown> {
   try {

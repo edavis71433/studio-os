@@ -62,7 +62,10 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     return { sites: [], links: [], clientNames: {}, moments: [], evidence: [], opportunities: [], plans: [], drafts: [], connections: [], reviewReports: [], brandReports: [], lastChange: {}, nowIso };
   }
   const IN = `site_id=in.(${ids.join(',')})`;
-  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ] = await Promise.all([
+  // Speed (final pass, Nov 8: batch B): the customer-links read rides this first
+  // wave, and the three reads that wait on it (the latest runs' evidence, the
+  // client names, their billing) go side by side — six waits became four.
+  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ, slQ] = await Promise.all([
     svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at&limit=1000`),
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
@@ -76,6 +79,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at&limit=2000`),   // Section 3: leads waiting (+ who/when for Needs you)
     svc(`presence_plan_notices?${IN}&status=eq.active&select=site_id,kind&limit=2000`),             // Section 3: attention + billing
     svc(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata&limit=2000`), // DAM-2: files awaiting approval
+    svc(`presence_service_links?customer_site_id=in.(${ids.join(',')})&status=eq.active&select=agency_site_id,customer_site_id,customer_client_id&limit=1000`).catch(() => ({ ok: false, json: [] as unknown[] })),   // item 49: whose customer each site is
   ]);
   const filesPending: Record<string, number> = {};
   for (const m of ((filesQ.json ?? []) as Array<{ site_id: string; metadata: any }>)) {
@@ -92,12 +96,14 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   }
   const runIds = Object.values(latestRun);
   const runToSite = Object.fromEntries(Object.entries(latestRun).map(([s, r]) => [r, s]));
-  const evQ = runIds.length
-    ? await svc(`presence_evidence?run_id=in.(${runIds.join(',')})&severity=in.(critical,warning)&select=run_id,type,severity,human&limit=2000`)
-    : { json: [] as unknown[] };
   const sites = (sitesQ.json ?? []) as Array<PortfolioInput['sites'][0] & { client_id: string }>;
   const clientIds = [...new Set(sites.map((s) => s.client_id))];
-  const namesQ = clientIds.length ? await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : { json: [] };
+  const [evQ, namesQ, entQ] = await Promise.all([
+    runIds.length ? svc(`presence_evidence?run_id=in.(${runIds.join(',')})&severity=in.(critical,warning)&select=run_id,type,severity,human&limit=2000`) : Promise.resolve({ json: [] as unknown[] }),
+    clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
+    // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
+    clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
+  ]);
   const nameByClient = Object.fromEntries(((namesQ.json ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
   // Sales review item 49 (the rest, Nov 8): Home's Needs you, its roster and
   // Analytics lead with the business too — the same reader Customers and the
@@ -105,16 +111,15 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   // failed read leaves the stored names.
   const bizBySite: Record<string, string> = {};
   try {
-    const sl = ((await svc(`presence_service_links?customer_site_id=in.(${ids.join(',')})&status=eq.active&select=agency_site_id,customer_site_id,customer_client_id&limit=1000`)).json ?? []) as Array<{ agency_site_id: string; customer_site_id: string; customer_client_id: string }>;
+    const sl = (Array.isArray(slQ.json) ? slQ.json : []) as Array<{ agency_site_id: string; customer_site_id: string; customer_client_id: string }>;
     const byStudio = new Map<string, typeof sl>();
     for (const l of sl) if (l.agency_site_id && l.customer_site_id && l.customer_client_id) byStudio.set(String(l.agency_site_id), [...(byStudio.get(String(l.agency_site_id)) || []), l]);
-    for (const [studioSite, ls] of byStudio) {
-      const named = await loadCustomerNames(studioSite, ls.map((l) => ({ clientId: String(l.customer_client_id), clientName: nameByClient[String(l.customer_client_id)], customerSiteId: String(l.customer_site_id) })), (path) => svc(path).then((r) => (Array.isArray(r.json) ? r.json as any[] : [])));
-      for (const l of ls) { const n = named[String(l.customer_client_id)]; if (n && n.name && !bizBySite[String(l.customer_site_id)]) bizBySite[String(l.customer_site_id)] = n.name; }
-    }
+    // each studio's names side by side, applied in the same order as before (the first studio's name wins)
+    const studios = [...byStudio];
+    const named = await Promise.all(studios.map(([studioSite, ls]) => loadCustomerNames(studioSite, ls.map((l) => ({ clientId: String(l.customer_client_id), clientName: nameByClient[String(l.customer_client_id)], customerSiteId: String(l.customer_site_id) })), (path) => svc(path).then((r) => (Array.isArray(r.json) ? r.json as any[] : [])))
+      .catch(() => ({} as Awaited<ReturnType<typeof loadCustomerNames>>))));
+    studios.forEach(([, ls], i) => { for (const l of ls) { const n = named[i][String(l.customer_client_id)]; if (n && n.name && !bizBySite[String(l.customer_site_id)]) bizBySite[String(l.customer_site_id)] = n.name; } });
   } catch { /* the stored names stand */ }
-  // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
-  const entQ = clientIds.length ? await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : { json: [] };
   const statusByClient = Object.fromEntries(((entQ.json ?? []) as Array<{ client_id: string; status: string }>).map((e) => [e.client_id, e.status]));
   const billingBySite = Object.fromEntries(sites.map((s) => [s.id, statusByClient[s.client_id] || 'active']));
   return {
@@ -135,7 +140,29 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   };
 }
 
+// ── One gather for requests that arrive together (final pass, Nov 8: batch B) ──
+// Home asks for the portfolio, the archived portfolio and Needs you at the same
+// moment, and each ran the whole gather (≈170 reads cold). Calls for one agency
+// within GATHER_SHARE_MS share one gather. The result is only ever read, never
+// changed; any agency write forgets it, and a failed gather isn't kept.
+export const GATHER_SHARE_MS = 2_000;
+const gathers = new Map<string, { at: number; p: Promise<PortfolioInput> }>();
+export function sharedGather(agencyId: string, nowIso: string): Promise<PortfolioInput> {
+  const hit = gathers.get(agencyId);
+  if (hit && Date.now() - hit.at < GATHER_SHARE_MS) return hit.p;
+  const p = gather(agencyId, nowIso);
+  gathers.set(agencyId, { at: Date.now(), p });
+  p.catch(() => { if (gathers.get(agencyId)?.p === p) gathers.delete(agencyId); });
+  return p;
+}
+/** Forget what this agency's reads are sharing — after any write. */
+export function forgetAgencyReads(agencyId: string): void {
+  gathers.delete(agencyId);
+  for (const k of [...needsRuns.keys()]) if (k.startsWith(agencyId + ':')) needsRuns.delete(k);
+}
+
 export async function handleAgency(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (method !== 'GET') forgetAgencyReads(member.agency_id);
   try {
     return await handleAgencyInner(req, route, method, member, principal, cors);
   } catch (e) {
@@ -159,7 +186,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   if (route === '/agency/portfolio' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
     const url = new URL(req.url);
-    const input = await gather(member.agency_id, now);
+    const input = await sharedGather(member.agency_id, now);
     const all = buildPortfolio(input);
     const rows = filterPortfolio(all, {
       search: url.searchParams.get('search') || undefined,
@@ -178,7 +205,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   // ── work queues + cross-client patterns — from the existing pipeline only ──
   if (route === '/agency/queues' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
-    const input = await gather(member.agency_id, now);
+    const input = await sharedGather(member.agency_id, now);
     return json({ data: { queues: buildQueues(input), patterns: buildPatterns(input) } }, 200, cors);
   }
 
@@ -191,7 +218,12 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   if (route === '/agency/needs-you' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
     const jwt = req.headers.get('x-dds-user-jwt') || '';
-    return json({ data: await computeStudioNeeds(member, principal, jwt, now) }, 200, cors);
+    const q = new URL(req.url).searchParams;
+    // batch B: ?fresh=1 when a page just changed something (never a shared run);
+    // ?only=total is the bell's badge — the same list, just its number
+    const d = await computeStudioNeeds(member, principal, jwt, now, { fresh: q.get('fresh') === '1' });
+    if (q.get('only') === 'total') return json({ data: { total: Number(d.total) || 0, partial: !!d.partial } }, 200, cors);
+    return json({ data: d }, 200, cors);
   }
 
   // ── client management ──
@@ -593,13 +625,35 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
  *  the caller degrades honestly (partial). */
 // ── The studio's ONE "needs you" list (sales review item 11, Nov 2026) ───────
 // Home's list, the bell badge at studio level and the bell's Needs-you tab are
-// this one computation; the Inbox's rows feed it. The bell asks on every page,
-// so the total is kept for NEEDS_TOTAL_TTL_MS per agency (a fresh Home read
-// always recomputes and refreshes it).
+// this one computation; the Inbox's rows feed it.
+// Speed (final pass, Nov 8: batch B): no page boot computes it any more. The
+// total is kept per agency: fresh for NEEDS_TOTAL_TTL_MS, and shown for up to
+// NEEDS_TOTAL_KEEP_MS while the shell refreshes it behind the page
+// (/agency/needs-you?only=total). Calls that arrive together share one run.
 export const NEEDS_TOTAL_TTL_MS = 60_000;
+export const NEEDS_TOTAL_KEEP_MS = 30 * 60_000;
+export const NEEDS_SHARE_MS = 2_000;
 const needsTotals = new Map<string, { at: number; total: number }>();
-export async function computeStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string) {
-    const [input, own] = await Promise.all([gather(member.agency_id, now), ownSiteOf(jwt, principal)]);
+const needsRuns = new Map<string, { at: number; p: Promise<any> }>();
+/** The kept total for a page boot — never computed here. Null when none is kept. */
+export function keptStudioNeedsTotal(agencyId: string): { total: number; fresh: boolean } | null {
+  const hit = needsTotals.get(agencyId);
+  if (!hit) return null;
+  const age = Date.now() - hit.at;
+  return age > NEEDS_TOTAL_KEEP_MS ? null : { total: hit.total, fresh: age < NEEDS_TOTAL_TTL_MS };
+}
+export function computeStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, opts: { fresh?: boolean } = {}) {
+  const key = `${member.agency_id}:${principal.userId || principal.email || ''}`;
+  const hit = needsRuns.get(key);
+  if (!opts.fresh && hit && Date.now() - hit.at < NEEDS_SHARE_MS) return hit.p;
+  if (opts.fresh) gathers.delete(member.agency_id);
+  const p = runStudioNeeds(member, principal, jwt, now);
+  needsRuns.set(key, { at: Date.now(), p });
+  p.catch(() => { if (needsRuns.get(key)?.p === p) needsRuns.delete(key); });
+  return p;
+}
+async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string) {
+    const [input, own] = await Promise.all([sharedGather(member.agency_id, now), ownSiteOf(jwt, principal)]);
     // item 11: the studio site's own Inbox rows (the SAME builder the Inbox and the
     // bell read), so the list, the bell and the Inbox name one set of things
     const ownFeedP: Promise<any> = own ? buildPortalFeed(jwt, own, principal).catch(() => null) : Promise.resolve(null);
@@ -624,10 +678,10 @@ export async function computeStudioNeeds(member: AgencyMember, principal: Princi
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
     // Sales review B2: a request with no stamp and no project names its customer
     // through the requester's sign-in (stamped once), or at least their email.
-    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null }>(supQ);
+    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null; requester_name?: string | null }>(supQ);
     if (own && supportRows.length) {
       const owners = await healSupportOwners(own.id, supportRows);
-      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; }
+      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; if (owners.nameOf[r.id]) r.requester_name = owners.nameOf[r.id]; }
     }
     const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
     const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
@@ -653,9 +707,8 @@ export async function computeStudioNeeds(member: AgencyMember, principal: Princi
         const dr = await svc(`presence_deals?site_id=eq.${own.id}&id=in.(${ids.join(',')})&select=id,stage,converted_client_id,deleted_at`).catch(() => null);
         if (dr && dr.ok && Array.isArray(dr.json)) {
           ownDeals = Object.fromEntries((dr.json as Array<{ id: string; stage: string; converted_client_id: string | null; deleted_at: string | null }>).map((d) => [String(d.id).toLowerCase(), d]));
-          if (own.client_id) for (const n of staleDealNotices(ownFeed.notices || [], ownDeals)) {
-            await clearNotice(String(own.client_id), String(n.kind), String(n.period)).catch(() => {});
-          }
+          // batch B: the stale ones clear side by side, not one after another
+          if (own.client_id) await Promise.all(staleDealNotices(ownFeed.notices || [], ownDeals).map((n) => clearNotice(String(own.client_id), String(n.kind), String(n.period)).catch(() => {})));
         }
       }
     }
@@ -670,14 +723,10 @@ export async function computeStudioNeeds(member: AgencyMember, principal: Princi
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
     needsTotals.set(member.agency_id, { at: Date.now(), total: Number(payload.total) || 0 });
-    return { ...payload, partial, own_site: !!own };
-}
-/** The studio's needs-you total for the bell: the kept one while fresh, else a fresh computation. */
-export async function studioNeedsTotal(member: AgencyMember, principal: Principal, jwt: string): Promise<number> {
-  const hit = needsTotals.get(member.agency_id);
-  if (hit && Date.now() - hit.at < NEEDS_TOTAL_TTL_MS) return hit.total;
-  const d = await computeStudioNeeds(member, principal, jwt, new Date().toISOString());
-  return Number(d.total) || 0;
+    // batch B: the bell's Updates tab — the same feed rows /portal/feed would
+    // have sent, so opening the bell is one call, not two feeds
+    const update_notices = ownFeed ? (ownFeed.notices || []).filter((n: { tier?: string }) => n && n.tier === 'update') : [];
+    return { ...payload, partial, own_site: !!own, update_notices };
 }
 
 async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | null> {

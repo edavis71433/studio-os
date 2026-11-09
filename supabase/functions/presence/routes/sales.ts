@@ -22,8 +22,8 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { normalizeStageNames, stageLabels, loadStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
+import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -308,6 +308,7 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     const custom = normalizeStageNames(b?.names);
     const ok = await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, principal.email || principal.userId || 'system');
+    forgetStageLabels(site.id);   // batch B: the kept names go at once
     return ok ? json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors) : json({ error: 'write_failed', message: 'Your stage names didn’t save — please try again.' }, 502, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -319,7 +320,12 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
 // One reserved JSON row (lib/reserved_store.ts); every write is normalized
 // (lib/saved_views.ts). PUT replaces ONE list's views and returns them all.
 export async function handleSalesViews(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  if (req.method === 'GET') return json({ data: normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews)) }, 200, cors);
+  if (req.method === 'GET') {
+    // final pass (Nov 8, batch D): a failed read is not "no saved views" — the page then built
+    // its list from nothing, and its next save replaced the team's views
+    try { return json({ data: normalizeViews(await readReservedJsonOrThrow(site.id, RESERVED_NAMES.savedViews)) }, 200, cors); }
+    catch { return json({ error: 'read_failed', message: 'Your saved views couldn’t load just now.' }, 502, cors); }
+  }
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     if (!isViewList(b?.list)) return json({ error: 'validation', message: 'Which list are these views for?' }, 422, cors);
@@ -519,6 +525,7 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
 // Site-scoped & studio-gated like every authed /sales/* route.
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
+  const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
   // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
@@ -542,7 +549,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
   // days — three won deals read "100% (1 of 1)" under the old window.
   const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS);
-  const names = await loadStageLabels(site.id).catch(() => null);   // item 38: the studio's own stage names
+  const names = await namesP;   // item 38: the studio's own stage names
   if (names) sum.by_stage = sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label }));
   return json({ data: { ...sum, ar }, truncated: deals.length >= CAP }, 200, cors);
 }
@@ -551,7 +558,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  return json({ data: await loadReceivables(site) }, 200, cors);
+  try { return json({ data: await loadReceivables(site) }, 200, cors); }
+  catch { return json({ error: 'read_failed', message: 'Who owes you couldn’t load just now.' }, 502, cors); }   // batch D: never "all paid up" on a failed read
 }
 /** The receivables payload itself — shared with the agency home's "Needs you"
  *  (agency/routes.ts), so the money rows there, the roster's Outstanding column
@@ -566,6 +574,10 @@ export async function loadReceivables(site: SiteRow) {
   const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
   let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
   if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
+  // empty book — Who owes you said "all paid up", the overdue report $0 and Home's Needs you
+  // left the money out without saying it was partial. Every caller has its honest path.
+  if (!invR.ok) throw new Error('receivables_read_failed');
   const invs = rows(invR);
   // Oct 2026 benchmark (item 2): the Paid bucket — what landed in the last 30
   // days — rides along so the band can show all four states from ONE list.
@@ -635,6 +647,7 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
 export async function handleSalesReports(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const now = nowIso();
   const failed = new Set<string>();
+  const labelsP = loadStageLabels(site.id).catch(() => undefined);   // item 38 names; batch B: read with the others, not after
   const read = async (key: string, path: string) => { try { const r = await svc(path); if (!r.ok) { failed.add(key); return []; } return rows(r); } catch { failed.add(key); return []; } };
   const since24 = new Date(Date.now() - 2 * 366 * 86400_000).toISOString();
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
@@ -647,11 +660,11 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   // when each open deal last moved INTO its current stage
   const open = deals.filter((d: any) => REPORT_OPEN_STAGES.includes(String(d.stage)) && !d.converted_client_id);
   const lastMoveInto: Record<string, string> = {};
-  for (let i = 0; i < open.length; i += 100) {
-    const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x));
-    if (!ids.length) continue;
-    const ev = await read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`);
-    const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
+  const stageOf = new Map(open.map((d: any) => [String(d.id), String(d.stage)]));
+  const openChunks: string[][] = [];
+  for (let i = 0; i < open.length; i += 100) { const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x)); if (ids.length) openChunks.push(ids); }
+  // batch B (final pass, Nov 8): the batches side by side, like the close dates below
+  for (const ev of await Promise.all(openChunks.map((ids) => read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`)))) {
     for (const e of ev) { const k = String(e.deal_id); if (!lastMoveInto[k] && String(e.to_stage) === stageOf.get(k)) lastMoveInto[k] = String(e.created_at); }
   }
   // F5 (final pass): when each closed deal actually closed — its newest move into
@@ -671,7 +684,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   return json({ data: {
     generated_at: now,
     revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
-    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await loadStageLabels(site.id).catch(() => undefined)), partial: failed.has('stages') },
+    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
     overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),
@@ -689,8 +702,8 @@ export async function loadMyTasks(siteId: string, userId: string | null): Promis
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
   const [deals, dealTasks, projectTasks] = await Promise.all([
     read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&limit=200`),
-    read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&limit=300`),
+    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&order=due_date.asc.nullslast,created_at.asc&limit=200`),   // batch B: ordered, so the cap keeps the soonest
+    read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&order=due_date.asc.nullslast,created_at.asc&limit=300`),   // batch B: ordered, so the cap keeps the soonest
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
@@ -823,6 +836,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   const deal = await loadDeal(site.id, id);
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
+    const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
     const [contact, proposals, contracts, events, invoices] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
@@ -849,7 +863,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // dated note) + system events live in the same presence_deal_events table, so
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
-    const stageNames = await loadStageLabels(site.id).catch(() => null);   // item 38: "Moved to <their name for it>"
+    const stageNames = await stageNamesP;   // item 38: "Moved to <their name for it>"
     const timeline = mergeDealTimeline(eventRows).map((it) => (stageNames && it.kind === 'stage_change' ? { ...it, text: renameMovedTo(it.text, stageNames) } : it));
     // Sales review B5: one total per proposal, after discount and tax — the
     // record showed the stored pre-discount subtotal while the deal page added
@@ -1177,7 +1191,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1201,7 +1215,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1220,7 +1234,7 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true });   // a payment link = transactional
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1507,7 +1521,7 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
     return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
       `<p>Your studio has set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
-      brand, { critical: true });   // a payment authorization the client is expecting = transactional
+      brand, { critical: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2077,7 +2091,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine,
-        brand, { critical: true }).catch(() => false);   // their signed legal record = transactional
+        brand, { critical: true, siteId: tok.site_id }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -2519,7 +2533,7 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html">your portal</a>. If anything looks off, just reply and tell me.</p>`,
-  brand, { critical: true }).catch(() => {});   // login access = transactional
+  brand, { critical: true, siteId }).catch(() => {});   // login access = transactional; "message me directly" — their answer lands in the Inbox
   return true;
 }
 

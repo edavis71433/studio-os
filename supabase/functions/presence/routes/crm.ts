@@ -202,126 +202,136 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
   let dealId = qp('deal_id') || qp('deal');
   const AS = rs.studioSiteId;   // the caller's own studio site — never another studio's (S3)
   if (!AS) return { items: [], projectId: '', clientId: '', dealId: '', agencySiteId: '', replySupportTo: null, deal: null, dealEvents: [] };
+  // Final pass (Nov 8, batch B): the reads go in four rounds, side by side
+  // within each — who this is → the relationship's ids → every channel → the
+  // support replies and broadcast subjects — instead of fifteen-plus one after
+  // another (and one read per support request). Items are still pushed channel
+  // by channel in the same order and sorted by time at the end, so the
+  // conversation reads exactly as before.
   if (rs.scoped) {
     clientId = rs.customerClientId;
     if (!projectId && rs.links[0]) projectId = String(rs.links[0].project_id || '');
-  } else {
-    const asked = qp('client_id');
-    if (asked && (await customerOfThisStudio(AS, asked)).ok) clientId = asked;
   }
-  // project → its customer, only for this studio's projects (and, scoped, this customer's)
-  if (projectId) {
-    const lk = one(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${AS}&status=eq.active${rs.scoped && clientId ? `&customer_client_id=eq.${clientId}` : ''}&select=customer_client_id&limit=1`));
-    if (lk) { if (!clientId) clientId = String(lk.customer_client_id || ''); } else projectId = '';
-  }
+  const asked = rs.scoped ? '' : qp('client_id');
+  // round 1 — the customer asked for, and the project's customer (only this studio's projects, and, scoped, this customer's)
+  const [askedOk, lk] = await Promise.all([
+    asked ? customerOfThisStudio(AS, asked).then((x) => x.ok) : Promise.resolve(false),
+    projectId ? svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${AS}&status=eq.active${rs.scoped && clientId ? `&customer_client_id=eq.${clientId}` : ''}&select=customer_client_id&limit=1`).then(one) : Promise.resolve(null),
+  ]);
+  if (askedOk) clientId = asked;
+  if (projectId) { if (lk) { if (!clientId) clientId = String(lk.customer_client_id || ''); } else projectId = ''; }
 
   {
-    // every project on this relationship — a multi-project client loses nothing
-    const projectIds: string[] = projectId ? [projectId] : [];
-    if (clientId) { try { for (const lk of await linksForCustomer(clientId)) { if (String(lk.agency_site_id) !== AS) continue; const p = String(lk.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); } } catch { /* additive */ } }
-    // A client_id-only call (the Inbox reading pane) still deserves a reply
-    // target: adopt the first active bridge link's project as the top-level
-    // projectId so reply_to resolves — the same link list the channel reads
-    // below already consume. A caller that DID pass ?project= is untouched.
-    if (!projectId && projectIds.length) projectId = projectIds[0];
+    // round 2 — every project on this relationship, the deal, the customer's
+    // identity keys, and the heal that stamps their old unstamped requests (it
+    // must land before round 3's stamped read; sales review B2)
     // the deal anchors the enquiry + logged-activity channels; the row also
     // feeds /crm/activity's highlights/upcoming (stage/next_step — tolerant
     // select: those columns land with migration 0089)
-    let srcSub = '';
-    let dealRow: any = null;
-    if (!dealId && clientId) {
-      let r = await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,next_step,next_step_at,source_submission_id&order=updated_at.desc&limit=1`);
-      if (!one(r)) r = await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,source_submission_id&order=updated_at.desc&limit=1`);
-      dealRow = one(r) || null;
-      if (dealRow) { dealId = String(dealRow.id); srcSub = String(dealRow.source_submission_id || ''); }
-    } else if (dealId) {
-      let r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,next_step,next_step_at,source_submission_id&limit=1`);
-      if (!one(r)) r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,source_submission_id&limit=1`);
-      dealRow = one(r) || null;
-      if (dealRow) srcSub = String(dealRow.source_submission_id || '');
-    }
-
-    const items: any[] = [];
-    if (projectIds.length) {
-      for (const m of arr(await svc(`presence_project_messages?project_id=in.(${projectIds.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,project_id,audience,body,author_kind,created_at&order=created_at.desc&limit=300`)).reverse()) {
-        if (m.audience === 'internal') continue;   // internal notes aren't part of the client conversation
-        items.push({ id: m.id, kind: 'message', project_id: m.project_id, from: isClientKind(m.author_kind) ? 'client' : 'studio', body: String(m.body || ''), created_at: m.created_at });
+    const readDeal = async (): Promise<any> => {
+      if (!dealId && clientId) {
+        let r = await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,next_step,next_step_at,source_submission_id&order=updated_at.desc&limit=1`);
+        if (!one(r)) r = await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,source_submission_id&order=updated_at.desc&limit=1`);
+        return one(r) || null;
       }
-    }
-    const ident = clientId ? await customerRequesterKeys(AS, clientId) : { keys: [], emails: [] };
-    // Sales review B2: stamp the studio's old unstamped requests first, so the
-    // stamped read below finds one this customer filed under a sign-in id that
-    // no contact carries.
-    if (clientId) await healUnstampedSupport(AS);
-    const sup: any[] = [];
-    const seen = new Set<string>();
-    const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };
-    if (projectIds.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=in.(${projectIds.join(',')})&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse());
-    // F3: PREFER the write-time client_id stamp (0115) — a stamped project-less
-    // ticket ties to this record even when its requester key (an alternate email,
-    // a GoTrue-resolved uid) matches none of the derived identity keys. Additive
-    // + best-effort: pre-0115 the filter 400s → arr() is [] and the key-matched
-    // read below still serves every legacy row (addSup dedupes the overlap).
-    if (clientId) { try { addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&client_id=eq.${clientId}&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse()); } catch { /* additive */ } }
-    if (ident.keys.length) addSup(arr(await svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${ident.keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`)).reverse());
+      if (dealId) {
+        let r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,next_step,next_step_at,source_submission_id&limit=1`);
+        if (!one(r)) r = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&deleted_at=is.null&select=id,stage,source_submission_id&limit=1`);
+        return one(r) || null;
+      }
+      return null;
+    };
+    const [links, dealRow, ident] = await Promise.all([
+      clientId ? linksForCustomer(clientId).catch(() => [] as any[]) : Promise.resolve([] as any[]),   // additive
+      readDeal(),
+      clientId ? customerRequesterKeys(AS, clientId) : Promise.resolve({ keys: [] as string[], emails: [] as string[] }),
+      clientId ? healUnstampedSupport(AS) : Promise.resolve(),
+    ]);
+    // every project on this relationship — a multi-project client loses nothing
+    const projectIds: string[] = projectId ? [projectId] : [];
+    for (const l of links) { if (String(l.agency_site_id) !== AS) continue; const p = String(l.project_id || ''); if (p && !projectIds.includes(p)) projectIds.push(p); }
+    // A client_id-only call (the Inbox reading pane) still deserves a reply
+    // target: adopt the first active bridge link's project as the top-level
+    // projectId so reply_to resolves. A caller that DID pass ?project= is untouched.
+    if (!projectId && projectIds.length) projectId = projectIds[0];
+    let srcSub = '';
+    if (dealRow) { if (!dealId) dealId = String(dealRow.id); srcSub = String(dealRow.source_submission_id || ''); }
+
+    // round 3 — every channel at once. The capped reads fetch created_at.DESC (so
+    // past the cap the NEWEST rows survive) and are reversed below. Best-effort
+    // channels answer null on failure and are left out, as before.
+    const em = ident.emails.map((e) => encodeURIComponent(`"${e.replace(/"/g, '')}"`)).join(',');
+    const [msgs, supByProject, supByClient, supByKeys, enquiry, bookings, dealEventRows, sends] = await Promise.all([
+      projectIds.length ? svc(`presence_project_messages?project_id=in.(${projectIds.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,project_id,audience,body,author_kind,created_at&order=created_at.desc&limit=300`).then(arr) : Promise.resolve([] as any[]),
+      projectIds.length ? svc(`presence_support_requests?site_id=eq.${AS}&project_id=in.(${projectIds.join(',')})&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`).then(arr) : Promise.resolve([] as any[]),
+      // F3: PREFER the write-time client_id stamp (0115) — a stamped project-less
+      // ticket ties to this record even when its requester key matches none of
+      // the derived identity keys. Additive: pre-0115 the filter 400s → [].
+      clientId ? svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&client_id=eq.${clientId}&deleted_at=is.null&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`).then(arr).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+      ident.keys.length ? svc(`presence_support_requests?site_id=eq.${AS}&project_id=is.null&deleted_at=is.null&requester=in.(${ident.keys.join(',')})&select=id,subject,body,status,requester_kind,created_at&order=created_at.desc&limit=100`).then(arr) : Promise.resolve([] as any[]),
+      // the original website enquiry that started the relationship
+      srcSub ? svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${AS}&select=id,form_kind,message,created_at&limit=1`).then(one).catch(() => null) : Promise.resolve(null),
+      // bookings with the studio (matched on the client's email identity)
+      ident.emails.length ? svc(`presence_appointments?site_id=eq.${AS}&customer_email=in.(${em})&select=id,type_name,slot_start_local,slot_start,note,status,created_at&order=created_at.desc&limit=50`).then(arr).catch(() => null) : Promise.resolve([] as any[]),
+      // logged calls/emails/meetings + sent-document stamps (the deal quick-log).
+      // ONE 200-row window feeds BOTH this conversation channel and
+      // /crm/activity's system events — two windows would dedupe apart.
+      dealId ? svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${AS}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=200`).then(arr).catch(() => null) : Promise.resolve([] as any[]),
+      // email broadcasts this client actually received
+      ident.emails.length ? svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at&order=created_at.desc&limit=50`).then(arr).catch(() => null) : Promise.resolve([] as any[]),
+    ]);
     // newest open wins — computed across the UNION (project-scoped + project-less)
     // sorted by created_at, so an older project-less ticket can never outrank a
     // newer project-scoped one.
+    const sup: any[] = [];
+    const seen = new Set<string>();
+    const addSup = (rows_: any[]) => { for (const s of rows_) { if (!seen.has(String(s.id))) { seen.add(String(s.id)); sup.push(s); } } };
+    addSup([...supByProject].reverse()); addSup([...supByClient].reverse()); addSup([...supByKeys].reverse());
     const openSup = sup.filter((s) => s.status !== 'resolved' && s.status !== 'closed')
       .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     const replySupportTo: string | null = openSup.length ? `/support/${openSup[openSup.length - 1].id}/messages` : null;
-    for (const s of sup) {
-      items.push({ id: s.id, kind: 'support', support_id: s.id, subject: String(s.subject || 'Support request'), status: s.status, from: 'client', body: String(s.body || ''), created_at: s.created_at });
-      for (const r of arr(await svc(`presence_support_messages?request_id=eq.${s.id}&site_id=eq.${AS}&deleted_at=is.null&select=id,body,author_kind,created_at&order=created_at.desc&limit=200`)).reverse()) {
-        items.push({ id: r.id, kind: 'support_reply', support_id: s.id, from: isClientKind(r.author_kind) ? 'client' : 'studio', body: String(r.body || ''), created_at: r.created_at });
+
+    // round 4 — every request's replies in ONE read (newest 200 per request, as
+    // before), and the subjects of the broadcasts they received
+    const supIds = sup.map((x) => String(x.id)).filter((x) => UUID_RE.test(x));
+    const bIds = [...new Set((sends || []).map((x: any) => String(x.broadcast_id)).filter((x: string) => UUID_RE.test(x)))];
+    const [replies, broadcasts] = await Promise.all([
+      supIds.length ? svc(`presence_support_messages?request_id=in.(${supIds.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,request_id,body,author_kind,created_at&order=created_at.desc&limit=${Math.min(200 * supIds.length, 4000)}`).then(arr) : Promise.resolve([] as any[]),
+      bIds.length ? svc(`presence_broadcasts?id=in.(${bIds.join(',')})&select=id,subject&limit=50`).then(arr).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+    ]);
+    const repliesOf = new Map<string, any[]>();
+    for (const r of replies) { const k = String(r.request_id); const a = repliesOf.get(k) || []; if (a.length < 200) { a.push(r); repliesOf.set(k, a); } }
+
+    const items: any[] = [];
+    for (const m of [...msgs].reverse()) {
+      if (m.audience === 'internal') continue;   // internal notes aren't part of the client conversation
+      items.push({ id: m.id, kind: 'message', project_id: m.project_id, from: isClientKind(m.author_kind) ? 'client' : 'studio', body: String(m.body || ''), created_at: m.created_at });
+    }
+    for (const x of sup) {
+      items.push({ id: x.id, kind: 'support', support_id: x.id, subject: String(x.subject || 'Support request'), status: x.status, from: 'client', body: String(x.body || ''), created_at: x.created_at });
+      for (const r of [...(repliesOf.get(String(x.id)) || [])].reverse()) {
+        items.push({ id: r.id, kind: 'support_reply', support_id: x.id, from: isClientKind(r.author_kind) ? 'client' : 'studio', body: String(r.body || ''), created_at: r.created_at });
       }
     }
-    // the original website enquiry that started the relationship
-    if (srcSub) {
-      try {
-        const f = one(await svc(`presence_form_submissions?id=eq.${srcSub}&site_id=eq.${AS}&select=id,form_kind,message,created_at&limit=1`));
-        if (f) items.push({ id: f.id, kind: 'enquiry', from: 'client', subject: 'Website enquiry', body: String(f.message || ''), created_at: f.created_at });
-      } catch { /* channel is additive */ }
+    if (enquiry) items.push({ id: enquiry.id, kind: 'enquiry', from: 'client', subject: 'Website enquiry', body: String(enquiry.message || ''), created_at: enquiry.created_at });
+    for (const a of [...(bookings || [])].reverse()) {
+      if (a.status === 'canceled') continue;
+      const when = String(a.slot_start_local || '').replace('T', ' ') || String(a.slot_start || '').slice(0, 16).replace('T', ' ');
+      items.push({ id: a.id, kind: 'booking', from: 'client', subject: `Booked: ${String(a.type_name || 'a call')}${when ? ` · ${when}` : ''}`, body: String(a.note || ''), created_at: a.created_at });
     }
-    // bookings with the studio (matched on the client's email identity)
-    if (ident.emails.length) {
-      try {
-        const em = ident.emails.map((e) => encodeURIComponent(`"${e.replace(/"/g, '')}"`)).join(',');
-        for (const a of arr(await svc(`presence_appointments?site_id=eq.${AS}&customer_email=in.(${em})&select=id,type_name,slot_start_local,slot_start,note,status,created_at&order=created_at.desc&limit=50`)).reverse()) {
-          if (a.status === 'canceled') continue;
-          const when = String(a.slot_start_local || '').replace('T', ' ') || String(a.slot_start || '').slice(0, 16).replace('T', ' ');
-          items.push({ id: a.id, kind: 'booking', from: 'client', subject: `Booked: ${String(a.type_name || 'a call')}${when ? ` · ${when}` : ''}`, body: String(a.note || ''), created_at: a.created_at });
-        }
-      } catch { /* channel is additive */ }
+    const dealEvents: any[] = [...(dealEventRows || [])].reverse();
+    const SYS = ['proposal_sent', 'contract_sent', 'invoice_sent'];
+    for (const ev of dealEvents) {
+      const d = (ev.detail && typeof ev.detail === 'object') ? ev.detail : {};
+      if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
+        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
+      } else if (SYS.includes(String(ev.kind))) {
+        items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
+      }
     }
-    // logged calls/emails/meetings + sent-document stamps (the deal quick-log).
-    // ONE 200-row window (newest-first, reversed) feeds BOTH this conversation
-    // channel and /crm/activity's system events — two windows would dedupe apart.
-    let dealEvents: any[] = [];
-    if (dealId) {
-      try {
-        dealEvents = arr(await svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${AS}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=200`)).reverse();
-        const SYS = ['proposal_sent', 'contract_sent', 'invoice_sent'];
-        for (const ev of dealEvents) {
-          const d = (ev.detail && typeof ev.detail === 'object') ? ev.detail : {};
-          if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
-            items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
-          } else if (SYS.includes(String(ev.kind))) {
-            items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
-          }
-        }
-      } catch { dealEvents = []; /* channel is additive */ }
-    }
-    // email broadcasts this client actually received
-    if (ident.emails.length) {
-      try {
-        const em = ident.emails.map((e) => encodeURIComponent(`"${e.replace(/"/g, '')}"`)).join(',');
-        const sends = arr(await svc(`presence_broadcast_sends?site_id=eq.${AS}&status=eq.sent&email=in.(${em})&select=broadcast_id,created_at&order=created_at.desc&limit=50`)).reverse();
-        const bIds = [...new Set(sends.map((s) => String(s.broadcast_id)))];
-        const subj = new Map<string, string>();
-        if (bIds.length) for (const b of arr(await svc(`presence_broadcasts?id=in.(${bIds.join(',')})&select=id,subject&limit=50`))) subj.set(String(b.id), String(b.subject || 'A studio update'));
-        for (const s of sends) items.push({ id: `${s.broadcast_id}:${s.created_at}`, kind: 'broadcast', from: 'studio', subject: subj.get(String(s.broadcast_id)) || 'A studio update', body: '', created_at: s.created_at });
-      } catch { /* channel is additive */ }
+    if (sends) {
+      const subj = new Map<string, string>(broadcasts.map((b: any) => [String(b.id), String(b.subject || 'A studio update')]));
+      for (const x of [...sends].reverse()) items.push({ id: `${x.broadcast_id}:${x.created_at}`, kind: 'broadcast', from: 'studio', subject: subj.get(String(x.broadcast_id)) || 'A studio update', body: '', created_at: x.created_at });
     }
     items.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     return { items, projectId, clientId, dealId, agencySiteId: AS, replySupportTo, deal: dealRow, dealEvents };
@@ -339,9 +349,20 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
  *  routes (/crm/messages, /crm/timeline) stay untouched until the UI is off
  *  them. Studio-side only; no new tables ("one log, derived views"). */
 export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // batch B (final pass, Nov 8): whose relationship this is, read beside the studio check
+  const rsP = relationshipScope(jwt, site, principal);
+  rsP.catch(() => { /* judged inside the try below */ });
   if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client record.' }, 403, cors);
   try {
-    const rs = await relationshipScope(jwt, site, principal);
+    const rs = await rsP;
+    const stageNamesP = rs.studioSiteId ? loadStageLabels(rs.studioSiteId).catch(() => null) : Promise.resolve(null);   // item 38 names, kept per site
+    // site-ops events (publishes, approvals, notes, connected, moments) — only
+    // when scoped to a real customer site (the same gate as the old Overview:
+    // un-scoped this would read the operator's OWN site, the crm.html landmine).
+    // They need nothing from the conversation, so they start now.
+    const siteEventsP: Promise<(ActivityItem | null)[]> = rs.scoped   // F1: only inside a customer's own site — never the studio's own timeline
+      ? loadTimeline(site, { includeInternalNotes: true, limit: 60 }).then((tl) => filterTimeline(tl, true).map(mapSiteEvent)).catch(() => [])
+      : Promise.resolve([]);
     const conv = await collectClientConversation(new URL(req.url), rs);
     const AS = conv.agencySiteId;
     const dealId = conv.dealId;
@@ -353,30 +374,20 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     // dedupe apart past 200 events), and the deal row isn't fetched twice.
     const deal: any = conv.deal;
     const dealEvents: any[] = conv.dealEvents;
-    const stageNames = dealEvents.length ? await loadStageLabels(AS).catch(() => null) : null;   // item 38: the studio's own stage names
-    let tasks: any[] = []; let invoices: any[] = [];
-    if (dealId) {
-      try { tasks = arr(await svc(`presence_deal_tasks?site_id=eq.${AS}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`)); } catch { tasks = []; }
-    }
-    if (dealId || conv.clientId) {
-      try {
-        const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${conv.clientId}`;
-        // processing_since lands with migration 0132 (tolerant: pre-0132 shape second)
-        let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
-        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
-        invoices = arr(ir);
-      } catch { invoices = []; }
-    }
-    // site-ops events (publishes, approvals, notes, connected, moments) — only
-    // when scoped to a real customer site (the same gate as the old Overview:
-    // un-scoped this would read the operator's OWN site, the crm.html landmine).
-    let siteEvents: (ActivityItem | null)[] = [];
-    if (rs.scoped) {   // F1: only inside a customer's own site — never the studio's own timeline
-      try {
-        const tl = await loadTimeline(site, { includeInternalNotes: true, limit: 60 });
-        siteEvents = filterTimeline(tl, true).map(mapSiteEvent);
-      } catch { siteEvents = []; }
-    }
+    // batch B: the stage names, the deal's to-dos and its open invoices in one round
+    const readInvoices = async (): Promise<any[]> => {
+      const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${conv.clientId}`;
+      // processing_since lands with migration 0132 (tolerant: pre-0132 shape second)
+      let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
+      if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
+      return arr(ir);
+    };
+    const [stageNames, tasks, invoices, siteEvents] = await Promise.all([
+      dealEvents.length ? stageNamesP : Promise.resolve(null),   // item 38: the studio's own stage names
+      dealId ? svc(`presence_deal_tasks?site_id=eq.${AS}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`).then(arr).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+      (dealId || conv.clientId) ? readInvoices().catch(() => [] as any[]) : Promise.resolve([] as any[]),
+      siteEventsP,
+    ]);
 
     const items = mergeActivity([
       conv.items.map(mapConversationItem),
@@ -408,6 +419,9 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
  *  is set), we hop through the bridge to reach the agency site the deal/project
  *  live on. Un-scoped, `site` already IS the operator's agency site. */
 export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  // batch B (final pass, Nov 8): whose relationship this is, read beside the studio check
+  const rsP = relationshipScope(jwt, site, principal);
+  rsP.catch(() => { /* awaited below */ });
   if (!(await isStudioSide(jwt, principal))) return json({ error: 'forbidden', message: 'Only your studio can open a client record.' }, 403, cors);
   const u = new URL(req.url);
   const qp = (k: string) => { const v = u.searchParams.get(k) || ''; return UUID_RE.test(v) ? v : ''; };
@@ -419,7 +433,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
 
   // Whose relationship this is (F1 + S3): scoped → that customer, on the caller's
   // own studio site; unscoped → the studio site itself, and only its own ids.
-  const rs = await relationshipScope(jwt, site, principal);
+  const rs = await rsP;
   const AS = rs.studioSiteId;
   if (rs.scoped) {
     clientId = rs.customerClientId; customerSiteId = rs.customerSiteId;
@@ -457,10 +471,18 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       if (d) { dealId = String(d.id); if (!clientId && d.converted_client_id) clientId = String(d.converted_client_id); if (!customerSiteId && d.converted_site_id) customerSiteId = String(d.converted_site_id); if (!projectId && d.created_project_id) projectId = String(d.created_project_id); }
     }
 
+    // batch B (final pass, Nov 8): once the ids are known, the header, the
+    // highlights and both related lists only need them — one round, side by
+    // side (they were seven reads one after another). Each part stays
+    // best-effort exactly as before.
     // ── Header (best-effort; the Overview tab fetches rich health separately) ──
-    let header: Record<string, unknown> = { name: '', company: '', email: '', phone: '', status: '' };
-    if (clientId) {
-      const c = one(await svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`));
+    const headerP = (async (): Promise<Record<string, unknown>> => {
+      let header: Record<string, unknown> = { name: '', company: '', email: '', phone: '', status: '' };
+      // the contact is read beside the client and used only when the client gives no name
+      const [c, ct] = await Promise.all([
+        clientId ? svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`).then(one) : Promise.resolve(null),
+        contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`).then(one) : Promise.resolve(null),
+      ]);
       if (c) header = { name: c.name || c.email || 'Client', company: '', email: c.email || c.contact_email || '', phone: '', status: 'customer' };
       // item 22 (second half) + item 49: lead with the business, name the person
       // beside it — the record's own contact first, else the won deal's
@@ -470,11 +492,9 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
           if (nm) header = { ...header, name: nm.name || header.name, company: nm.business_name, person: nm.person_name, phone: nm.phone || '' };
         } catch { /* the plain header stands */ }
       }
-    }
-    if (contactId && !header.name) {
-      const c = one(await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`));
-      if (c) header = { name: c.name || c.email || 'Contact', company: c.company || '', email: c.email || '', phone: c.phone || '', status: 'contact' };
-    }
+      if (contactId && !header.name && ct) header = { name: ct.name || ct.email || 'Contact', company: ct.company || '', email: ct.email || '', phone: ct.phone || '', status: 'contact' };
+      return header;
+    })();
 
     // overview (the relationship health view) reads /crm/profile, which is only
     // SAFE when we can scope to a real customer site — otherwise it would run
@@ -483,41 +503,45 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
     // whenever we can tie the record to a project or a customer.
     // highlights — the pinned key facts (Salesforce highlights panel): deal value +
     // stage + next step, and total owed. Cheap, best-effort; never blocks the record.
-    const highlights: Record<string, unknown> = {};
-    try {
-      if (dealId) {
-        const dv = one(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&select=stage,expected_value_cents,next_step&limit=1`));
-        if (dv) { if (dv.expected_value_cents) highlights.value_cents = Number(dv.expected_value_cents) || 0; if (dv.stage) highlights.stage = String(dv.stage); if (dv.next_step) highlights.next_step = String(dv.next_step); }
-      }
-      if (dealId || clientId) {
+    const highlightsP = (async (): Promise<Record<string, unknown>> => {
+      const highlights: Record<string, unknown> = {};
+      try {
         const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${clientId}`;
-        const owed = arr(await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=amount_cents&limit=100`)).reduce((a, i) => a + (Number(i.amount_cents) || 0), 0);
+        const [dv, inv] = await Promise.all([
+          dealId ? svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&select=stage,expected_value_cents,next_step&limit=1`).then(one) : Promise.resolve(null),
+          (dealId || clientId) ? svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=amount_cents&limit=100`).then(arr) : Promise.resolve([] as any[]),
+        ]);
+        if (dv) { if (dv.expected_value_cents) highlights.value_cents = Number(dv.expected_value_cents) || 0; if (dv.stage) highlights.stage = String(dv.stage); if (dv.next_step) highlights.next_step = String(dv.next_step); }
+        const owed = inv.reduce((a: number, i: any) => a + (Number(i.amount_cents) || 0), 0);
         if (owed) highlights.owed_cents = owed;
-      }
-    } catch { /* highlights are additive — never block the record */ }
+      } catch { /* highlights are additive — never block the record */ }
+      return highlights;
+    })();
 
     // Sales review item 26 (Nov 2026): a repeat customer's projects as a list —
     // the record opened one project, so a second (or an archived first) showed
     // nowhere but the ⌘K palette. Every project actively bridged to this customer
     // on this studio's site (status=eq.active, the bridge's access convention),
     // newest first. Additive and best-effort.
-    let related_projects: Array<{ id: string; name: string; status: string }> = [];
-    try {
-      if (clientId) {
+    const relatedProjectsP = (async (): Promise<Array<{ id: string; name: string; status: string }>> => {
+      try {
+        if (!clientId) return [];
         const pids = [...new Set(arr(await svc(`presence_service_links?customer_client_id=eq.${clientId}&agency_site_id=eq.${AS}&status=eq.active&select=project_id&limit=50`)).map((l) => String(l.project_id || '')).filter((x) => UUID_RE.test(x)))];
-        if (pids.length) related_projects = arr(await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,name,status,created_at&order=created_at.desc&limit=50`))
+        if (!pids.length) return [];
+        return arr(await svc(`presence_projects?id=in.(${pids.join(',')})&site_id=eq.${AS}&deleted_at=is.null&select=id,name,status,created_at&order=created_at.desc&limit=50`))
           .map((p) => ({ id: String(p.id), name: String(p.name || 'Project'), status: String(p.status || 'active') }));
-      }
-    } catch { related_projects = []; }
+      } catch { return []; }
+    })();
     // …and the same for deals: every deal that became this customer (a second
     // site, a retainer after a build), newest first.
-    let related_deals: Array<{ id: string; title: string; stage: string; value_cents: number }> = [];
-    try {
-      if (clientId) {
-        related_deals = arr(await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,title,stage,expected_value_cents,updated_at&order=updated_at.desc&limit=50`))
+    const relatedDealsP = (async (): Promise<Array<{ id: string; title: string; stage: string; value_cents: number }>> => {
+      try {
+        if (!clientId) return [];
+        return arr(await svc(`presence_deals?converted_client_id=eq.${clientId}&site_id=eq.${AS}&deleted_at=is.null&select=id,title,stage,expected_value_cents,updated_at&order=updated_at.desc&limit=50`))
           .map((d) => ({ id: String(d.id), title: String(d.title || 'Deal'), stage: String(d.stage || 'lead'), value_cents: Number(d.expected_value_cents) || 0 }));
-      }
-    } catch { related_deals = []; }
+      } catch { return []; }
+    })();
+    const [header, highlights, related_projects, related_deals] = await Promise.all([headerP, highlightsP, relatedProjectsP, relatedDealsP]);
 
     const sections = { overview: !!customerSiteId, messages: !!(projectId || clientId), deal: !!dealId, delivery: !!projectId, details: !!contactId };
     const default_tab = projectId ? 'delivery' : (dealId ? 'deal' : (customerSiteId ? 'overview' : 'details'));

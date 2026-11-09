@@ -150,7 +150,7 @@ const FAILURE_ALARM_24H = 10;        // sustained failures = something systemic
 async function health(): Promise<any> {
   const secrets = validateSecrets();
   // db reachability + cheap operational reads (exact counts — never fetch-to-count)
-  let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0, stuckRuns = 0;
+  let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0, stuckRuns = 0, lastFailure: any = null;
   try {
     const ping = await svc('presence_sites?select=id&limit=1');
     dbOk = ping.ok;
@@ -164,6 +164,14 @@ async function health(): Promise<any> {
     lastCycle = last.json?.[0] || null;
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
+    // The newest failure in its own words, so the watchdog's email can say WHY.
+    // From Jul to Nov 2026 every tick failed on one refused cleanup step (0141)
+    // and nothing on the alert path said which.
+    if (failures24h > 0) {
+      const lf = await svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}&order=created_at.desc&select=run_type,last_error,created_at&limit=1`);
+      const row = lf.json?.[0];
+      if (row) lastFailure = { run_type: row.run_type, last_error: String(row.last_error || '').slice(0, 300), at: row.created_at };
+    }
     // Runs stuck 'running' past any plausible invocation lifetime = the chain is
     // dying before its own reaper (which is the LAST step of that same chain).
     // Counted here so a persistently-dying tick pages even though nothing ever
@@ -180,7 +188,7 @@ async function health(): Promise<any> {
   const failureAlarm = failures24h >= FAILURE_ALARM_24H || stuckRuns > 0;
   const ok = secrets.ok && dbOk && !cronStale && !failureAlarm;
   const health_center = await computeHealthCenter().catch(() => null);
-  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, stuck_runs: stuckRuns, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, health_center, checked_at: new Date().toISOString() };
+  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, stuck_runs: stuckRuns, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, last_failure: lastFailure, health_center, checked_at: new Date().toISOString() };
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).

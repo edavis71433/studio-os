@@ -189,25 +189,52 @@ export function unownedSupportRows<T extends { id?: unknown; client_id?: unknown
   return (rowsIn || []).filter((r) => r && r.id && !r.client_id && !r.project_id && String(r.requester || '').trim() !== '');
 }
 
-export interface SupportOwners { clientOf: Record<string, string>; emailOf: Record<string, string> }
+export interface SupportOwners { clientOf: Record<string, string>; emailOf: Record<string, string>; nameOf: Record<string, string> }
+// Final pass (Nov 8, batch B): who each requester turned out to be is kept per
+// studio for OWNER_TTL_MS — the heal runs on every Home, Inbox and record read,
+// and re-asked about requesters nobody could match every time (≈0.5 s). The
+// requesters are looked up side by side, and a match stamps all of that
+// requester's requests in one write.
+const OWNER_TTL_MS = 10 * 60_000;
+const requesterOwners = new Map<string, { at: number; cid: string | null; email: string; name: string }>();
+
+/** Item 71 (Nov 8): a request emailed in by a CRM contact (no customer behind it)
+ *  read as the bare email address everywhere. The contact's name on THIS studio's
+ *  site, matched the way the inbound door matches it (ilike over-matches, so an
+ *  exact case-insensitive recheck). '' when there is no such contact. */
+async function contactNameOn(agencySiteId: string, email: string): Promise<string> {
+  try {
+    if (!email || !email.includes('@')) return '';
+    const r = await svc(`presence_contacts?site_id=eq.${agencySiteId}&email=ilike.${encodeURIComponent(email.toLowerCase())}&deleted_at=is.null&select=email,name,created_at&order=created_at.asc&limit=5`);
+    const hit = rows(r).find((c: any) => String(c.email || '').toLowerCase() === email.toLowerCase() && String(c.name || '').trim());
+    return hit ? String(hit.name).trim().slice(0, 120) : '';
+  } catch { return ''; }
+}
 export async function healSupportOwners(agencySiteId: string, rowsIn: Array<{ id?: unknown; client_id?: unknown; project_id?: unknown; requester?: unknown }>): Promise<SupportOwners> {
-  const out: SupportOwners = { clientOf: {}, emailOf: {} };
+  const out: SupportOwners = { clientOf: {}, emailOf: {}, nameOf: {} };
   try {
     const todo = unownedSupportRows(rowsIn);
     if (!agencySiteId || !todo.length) return out;
     const byRequester = new Map<string, string[]>();
     for (const r of todo) { const k = String(r.requester).trim(); const ids = byRequester.get(k) || []; ids.push(String(r.id)); byRequester.set(k, ids); }
-    for (const [requester, ids] of byRequester) {
-      const isUid = SUPPORT_UUID_RE.test(requester);
-      const email = isUid ? await signInEmail(requester) : (requester.includes('@') ? requester : '');
-      const cid = await clientIdForRequester(agencySiteId, { userId: isUid ? requester : null, email });
-      for (const id of ids) {
-        if (cid) {
-          out.clientOf[id] = cid;
-          if (SUPPORT_UUID_RE.test(id)) await svc(`presence_support_requests?id=eq.${id}&site_id=eq.${agencySiteId}&client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: cid }) }).catch(() => null);
-        } else if (email) out.emailOf[id] = email;
+    if (requesterOwners.size > 2000) requesterOwners.clear();   // a bound, never a correctness rule
+    await Promise.all([...byRequester].map(async ([requester, ids]) => {
+      const key = `${agencySiteId}:${requester}`;
+      let who = requesterOwners.get(key);
+      if (!who || Date.now() - who.at > OWNER_TTL_MS) {
+        const isUid = SUPPORT_UUID_RE.test(requester);
+        const email = isUid ? await signInEmail(requester) : (requester.includes('@') ? requester : '');
+        const cid = await clientIdForRequester(agencySiteId, { userId: isUid ? requester : null, email });
+        const name = !cid && email ? await contactNameOn(agencySiteId, email) : '';
+        who = { at: Date.now(), cid, email, name };
+        requesterOwners.set(key, who);
       }
-    }
+      if (who.cid) {
+        for (const id of ids) out.clientOf[id] = who.cid;
+        const stamp = ids.filter((id) => SUPPORT_UUID_RE.test(id));
+        if (stamp.length) await svc(`presence_support_requests?id=in.(${stamp.join(',')})&site_id=eq.${agencySiteId}&client_id=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: who.cid }) }).catch(() => {});
+      } else if (who.email) { for (const id of ids) { out.emailOf[id] = who.email; if (who.name) out.nameOf[id] = who.name; } }
+    }));
   } catch { /* best-effort — a page still renders with what it had */ }
   return out;
 }
@@ -413,6 +440,8 @@ export interface ClientActionNotice {
   threadKey: string;                // the throttle scope: 'proj:<id>' | 'req:<id>' | 'approval:<id>'
   bucket?: boolean;                 // default true (15-min window); false = once, forever (a terminal event)
   customerClientId?: string | null; // who acted — for the "who" line (best-effort)
+  actorName?: string | null;        // who acted, when they are no client (an emailed-in contact): the "who" line's fallback
+  viaEmail?: boolean;               // it came in by email: "New email from …" / "emailed you." instead of the portal's words
   projectId?: string | null;        // which project — for the "what" line (best-effort)
   subject: string;                  // the short what: message subject / filename / request subject / decision
   excerpt?: string;                 // enough of the content to act on without logging in
@@ -489,12 +518,14 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
 
     // WHO acted + WHAT it was about (best-effort; the mail is still sendable
     // without either — mirrors how the booking/lead notifiers degrade).
-    const who = String(whoRow?.name || whoRow?.email || 'A client').slice(0, 80);
+    const who = String(whoRow?.name || whoRow?.email || String(n.actorName || '').trim() || 'A client').slice(0, 80);
     const projectName = String(projRow?.name || '').slice(0, 120);
 
     const subject = String(n.subject || '').slice(0, 200);
-    const excerpt = String(n.excerpt || '').slice(0, 600);
-    const headline = `${HEADLINE[n.kind]} ${who}${projectName ? ` — ${projectName}` : ''}`;
+    // item 71: a long excerpt ends on a whole word with an ellipsis, never mid-word
+    const fullExcerpt = String(n.excerpt || '').trim();
+    const excerpt = fullExcerpt.length <= 600 ? fullExcerpt : `${fullExcerpt.slice(0, 600).replace(/\s+\S*$/, '')}…`;
+    const headline = `${n.viaEmail ? 'New email from' : HEADLINE[n.kind]} ${who}${projectName ? ` — ${projectName}` : ''}`;
 
     // The notice IS the throttle: created===true only on the first insert for
     // this (owner, kind, thread + 15-minute bucket). Pre-0116 the CHECK
@@ -537,14 +568,14 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
     const brand = await loadEmailBrand(n.agencySiteId);
     const link = `${SITE_BASE()}${n.href.startsWith('/') ? n.href : `/${n.href}`}`;
     const html =
-      `<p><b>${escHtml(who)}</b> ${LEAD[n.kind]}</p>` +
+      `<p><b>${escHtml(who)}</b> ${n.viaEmail ? 'emailed you.' : LEAD[n.kind]}</p>` +
       (projectName || subject
         ? `<table style="margin:8px 0;border-collapse:collapse">` +
           (projectName ? `<tr><td style="padding:2px 12px 2px 0;color:#666">Project</td><td><b>${escHtml(projectName)}</b></td></tr>` : '') +
           (subject ? `<tr><td style="padding:2px 12px 2px 0;color:#666">${n.kind === 'client_upload' ? 'File' : n.kind === 'client_approval' ? 'Decision' : 'Subject'}</td><td><b>${escHtml(subject)}</b></td></tr>` : '') +
           `</table>`
         : '') +
-      (excerpt ? `<blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid ${brand.accent};color:#444">${escHtml(excerpt)}</blockquote>` : '') +
+      (excerpt ? `<blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid ${brand.accent};color:#444">${escHtml(excerpt).replace(/\n/g, '<br>')}</blockquote>` : '') +
       `<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open it in your workspace →</a></p>`;
 
     // ⚠ REPLY-TO — the load-bearing detail of this whole helper.

@@ -173,6 +173,57 @@
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   };
 
+  // ── An emailed reply's quoted earlier email (item 71, Nov 2026). A client who
+  //    answers by email sends back the whole thread under their words ("On Sun,
+  //    Nov 8 … wrote:" and every line after it starting with ">"), nested deeper
+  //    with each reply. ddsQuote.split finds that TRAILING quote and nothing else:
+  //    a client who answers INSIDE the quote (their lines between the ">" lines)
+  //    keeps the whole message as it is, and a message that is only a quote is
+  //    never folded to nothing. ddsQuote.html shows the reply and puts the rest
+  //    behind "Show earlier email" — folded, never cut.
+  /* quote-fold:start — pure; tests/presence/inbound_rough_edges_test.mjs runs this exact text */
+  function ddsSplitQuote(text) {
+    var s = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+    var lines = s.split('\n');
+    var ATTR = /\b(wrote|writes|escribió|a écrit|schrieb|scrisse|escreveu)\s*:\s*$/i;
+    var quoted = function (l) { return /^\s*>/.test(l); };
+    var blank = function (l) { return !/\S/.test(l); };
+    var restQuoted = function (from) {
+      var any = false;
+      for (var k = from; k < lines.length; k++) { if (blank(lines[k])) continue; if (!quoted(lines[k])) return false; any = true; }
+      return any;
+    };
+    var start = -1;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i], next = lines[i + 1] || '';
+      if (quoted(l)) { if (restQuoted(i)) { start = i; break; } continue; }
+      // Gmail / Apple Mail: "On <date>, <name> <address> wrote:" — Gmail wraps it, so "wrote:" may sit alone on the next line
+      if (ATTR.test(l) && restQuoted(i + 1)) { start = i; break; }
+      if (/^\s*On\s\S/i.test(l) && ATTR.test(next) && !quoted(next) && restQuoted(i + 2)) { start = i; break; }
+      // Outlook: "-----Original Message-----", or a From: line (under a rule of underscores) followed by Sent:/Date:
+      if (/^\s*-{2,}\s*Original Message\s*-{2,}\s*$/i.test(l)) { start = i; break; }
+      if (/^\s*From:\s*\S/i.test(l) && /^\s*(Sent|Date):\s*\S/i.test(next)) { start = (i > 0 && /^\s*_{8,}\s*$/.test(lines[i - 1])) ? i - 1 : i; break; }
+    }
+    var head = start > 0 ? lines.slice(0, start).join('\n').trim() : '';
+    if (!head) return { text: s.trim(), quoted: '' };
+    return { text: head, quoted: lines.slice(start).join('\n').trim() };
+  }
+  /* quote-fold:end */
+  window.ddsQuote = {
+    split: ddsSplitQuote,
+    html: function (text, esc) {
+      var raw = String(text == null ? '' : text);
+      var p = ddsSplitQuote(raw);
+      if (!p.quoted) return esc(raw);
+      if (!document.getElementById('dds-quoted-css')) {
+        var st = document.createElement('style'); st.id = 'dds-quoted-css';
+        st.textContent = '.dds-quoted{display:block;margin-top:8px;white-space:normal}.dds-quoted>summary{cursor:pointer;font-size:12px;color:var(--faint,#6b6478);min-height:24px;line-height:24px}.dds-quoted-body{white-space:pre-wrap;font-size:12.5px;color:var(--faint,#6b6478);border-left:2px solid var(--line,#e2dff0);padding-left:8px;margin-top:4px}';
+        document.head.appendChild(st);
+      }
+      return esc(p.text) + '<details class="dds-quoted"><summary>Show earlier email</summary><div class="dds-quoted-body">' + esc(p.quoted) + '</div></details>';
+    },
+  };
+
   // ── The list tools Customers, Contacts and Pipeline share (sales review items
   //    31, 32 and 39, Nov 2026): saved views, a column picker, "send an update to
   //    the people you picked" and the CSV import (the contacts importer, shared).
@@ -193,18 +244,42 @@
         + '.dds-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--p,#5b3fa0);border-radius:10px;background:var(--p-soft,#efe9fa);font-size:13.5px}'
         + '.dds-bulk b{margin-right:4px}.dds-bulk button,.dds-bulk select{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
         + '.dds-bulk .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}.dds-bulk .clr{border-color:transparent;background:none;color:var(--p,#5b3fa0)}'
-        + 'td.pick,th.pick{width:34px;padding-right:0!important}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}';
+        + 'td.pick,th.pick{width:34px;padding-right:0!important;cursor:pointer}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}'
+        // final pass (Nov 8, batch C): white on the dark theme's light purple read 2.3:1 — dark text on the filled buttons
+        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-ask button[value=ok],:root:not([data-theme="light"]) .dds-bulk .go,:root:not([data-theme="light"]) .dds-confirm .go{color:#171320}}'
+        + ':root[data-theme="dark"] .dds-ask button[value=ok],:root[data-theme="dark"] .dds-bulk .go,:root[data-theme="dark"] .dds-confirm .go{color:#171320}'
+        // …a confirm that asks in place, where the button was
+        + '.dds-confirm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.dds-confirm .q{font-weight:600}'
+        + '.dds-confirm button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
+        + '.dds-confirm .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}'
+        // …and on a phone every control here is at least 44px, the pick cell included
+        + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}}'
+        // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
+        + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
+        + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}';
       document.head.appendChild(st);
     }
     // ── saved views: GET/PUT /sales/views (one read per page) ──
+    var VIEWS_OK = false;
     function views(list) {
-      if (!VIEWS_P) VIEWS_P = req('/sales/views').then(function (r) { return r && r.ok && r.body && r.body.data ? r.body.data : null; }).catch(function () { return null; });
+      if (!VIEWS_P) VIEWS_P = req('/sales/views').then(function (r) { var d = r && r.ok && r.body && r.body.data ? r.body.data : null; VIEWS_OK = !!d; return d; }).catch(function () { VIEWS_OK = false; return null; });
       return VIEWS_P.then(function (all) { return all ? (all[list] || []) : null; });
     }
     function saveViews(list, arr) {
-      return req('/sales/views', 'PUT', { list: list, views: arr }).then(function (r) {
-        if (!r || !r.ok || !r.body || !r.body.data) return null;
-        VIEWS_P = Promise.resolve(r.body.data); return r.body.data[list] || [];
+      // final pass (Nov 8, batch D): a page whose views couldn't be read builds its list from
+      // nothing, and saving that list replaced the team's saved views. Read again first and keep
+      // every view the page didn't know about; if the read fails again, don't save.
+      var ready = VIEWS_OK ? Promise.resolve(arr) : (VIEWS_P = null, views(list).then(function (cur) {
+        if (cur === null) return null;
+        var mine = arr || [];
+        return cur.filter(function (v) { return !mine.some(function (a) { return (a.id && a.id === v.id) || String(a.name || '').toLowerCase() === String(v.name || '').toLowerCase(); }); }).concat(mine);
+      }));
+      return ready.then(function (body) {
+        if (!body) return null;
+        return req('/sales/views', 'PUT', { list: list, views: body }).then(function (r) {
+          if (!r || !r.ok || !r.body || !r.body.data) return null;
+          VIEWS_P = Promise.resolve(r.body.data); VIEWS_OK = true; return r.body.data[list] || [];
+        });
       }).catch(function () { return null; });
     }
     // ── a small named prompt (a <dialog>, never window.prompt) ──
@@ -217,8 +292,13 @@
         d.querySelector('label').textContent = o.label || 'Name';
         d.querySelector('button[value=ok]').textContent = o.ok || 'Save';
         var inp = d.querySelector('input'); inp.value = o.value || '';
-        var done = false;
-        function finish(v) { if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v); }
+        // batch C: focus goes back where it came from (it was left on <body>). Safari never
+        // focuses a clicked button, so a page names its button (o.back) rather than trusting it
+        var done = false, back = pickBack(o.back, document.activeElement);
+        function finish(v) {
+          if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v);
+          if (back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
+        }
         d.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value.trim(); if (!v) { inp.focus(); return; } finish(v); });
         d.querySelector('button[value=cancel]').addEventListener('click', function () { finish(null); });
         d.addEventListener('cancel', function (e) { e.preventDefault(); finish(null); });
@@ -234,7 +314,7 @@
       if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
       var m = document.createElement('div'); m.className = 'dds-colmenu'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', 'Columns to show');
       m.innerHTML = cols.map(function (c, i) { return '<label><input type="checkbox" data-col="' + esc2(c[0]) + '"' + (hidden.has(c[0]) ? '' : ' checked') + (i === 0 ? ' disabled' : '') + '> ' + esc2(c[1]) + '</label>'; }).join('');
-      host.appendChild(m); anchor.setAttribute('aria-expanded', 'true');
+      host.appendChild(m); anchor.setAttribute('aria-expanded', 'true'); fit(m);
       var first = m.querySelector('input:not([disabled])'); if (first) first.focus();
       m.addEventListener('change', function (e) {
         var k = e.target && e.target.getAttribute('data-col'); if (!k) return;
@@ -256,6 +336,9 @@
     // ── CSV: the contacts importer's parser, shared ──
     function parseCsv(text) {
       var rows = [], row = [], cell = '', inQ = false;
+      // final pass (Nov 8, batch D): Excel starts a "CSV UTF-8" file with a byte-order mark. The
+      // importers' header match trims it off, but the first cell kept it, so the reader drops it here
+      text = String(text || ''); if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       for (var i = 0; i < text.length; i++) {
         var ch = text[i];
         if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += ch; }
@@ -274,7 +357,11 @@
         + '<input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file"><div class="dds-csvprev"></div><p class="muted" style="margin:10px 0 0"><button type="button" class="linkbtn dds-csvx" style="font:inherit;color:var(--p,#5b3fa0);background:none;border:none;padding:0;cursor:pointer">Close</button></p></div>';
       host.querySelector('p').textContent = o.title; host.querySelectorAll('p')[1].textContent = o.help;
       var prev = host.querySelector('.dds-csvprev');
-      host.querySelector('.dds-csvx').addEventListener('click', function () { host.innerHTML = ''; });
+      var opener = pickBack(o.back, document.activeElement);   // batch C: closing the panel gives focus back (it was left on <body>)
+      host.querySelector('.dds-csvx').addEventListener('click', function () {
+        host.innerHTML = '';
+        if (opener && opener.isConnected && opener.focus) try { opener.focus(); } catch (_) { /* */ }
+      });
       host.querySelector('input[type=file]').addEventListener('change', function (e) {
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (text) {
@@ -301,7 +388,68 @@
         });
       });
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style };
+    // ── batch C (final pass, Nov 8) ──
+    // where focus goes back to: the button a page names (shown on screen), else whatever had focus —
+    // never <body> (Safari leaves a clicked button unfocused)
+    function pickBack(named, active) {
+      var n = typeof named === 'string' ? document.querySelector(named) : named;
+      if (n && n.getClientRects && n.getClientRects().length) return n;
+      return (active && active !== document.body && active !== document.documentElement) ? active : null;
+    }
+    // keep a dropdown on screen: on a phone the Columns and Views menus ran off the right edge
+    function fit(m) {
+      try {
+        m.style.transform = ''; var r = m.getBoundingClientRect(), vw = document.documentElement.clientWidth, pad = 8, dx = 0;
+        if (r.right > vw - pad) dx = (vw - pad) - r.right;
+        if (r.left + dx < pad) dx = pad - r.left;
+        if (dx) m.style.transform = 'translateX(' + Math.round(dx) + 'px)';
+      } catch (_) { /* */ }
+    }
+    // a confirm that asks in place: the button steps aside for "the question · [Yes, …] [Cancel]".
+    // The newer pages ask this way (never a pop-up). Focus lands on Cancel, the safe answer.
+    function confirmIn(anchor, o) {
+      style(); o = o || {};
+      return new Promise(function (resolve) {
+        if (!anchor || !anchor.parentNode) { resolve(false); return; }
+        var id = 'ddsCq' + Math.random().toString(36).slice(2, 8);
+        var box = document.createElement('span'); box.className = 'dds-confirm'; box.setAttribute('role', 'group'); box.setAttribute('aria-labelledby', id);
+        box.innerHTML = '<span class="q"></span><button type="button" class="go"></button><button type="button" class="no">Cancel</button>';
+        box.querySelector('.q').id = id; box.querySelector('.q').textContent = o.text || 'Are you sure?';
+        box.querySelector('.go').textContent = o.yes || 'Yes';
+        box.querySelector('.go').setAttribute('aria-describedby', id); box.querySelector('.no').setAttribute('aria-describedby', id);
+        anchor.hidden = true; anchor.parentNode.insertBefore(box, anchor.nextSibling);
+        var done = false;
+        function finish(v) {
+          if (done) return; done = true;
+          if (box.isConnected) box.remove();
+          anchor.hidden = false; resolve(v);
+          if (!v && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+        }
+        box.querySelector('.go').addEventListener('click', function () { finish(true); });
+        box.querySelector('.no').addEventListener('click', function () { finish(false); });
+        box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); finish(false); } });
+        box.querySelector('.no').focus();
+      });
+    }
+    // one polite announcer for the whole page ("3 selected")
+    function announce(text) {
+      style();
+      var n = document.getElementById('dds-sr-status');
+      if (!n) { n = document.createElement('div'); n.id = 'dds-sr-status'; n.className = 'dds-sr'; n.setAttribute('role', 'status'); n.setAttribute('aria-live', 'polite'); document.body.appendChild(n); }
+      n.textContent = ''; setTimeout(function () { n.textContent = String(text || ''); }, 30);
+    }
+    // whole-cell picking: the cell around a row's checkbox toggles it (17px was hard to hit on
+    // a phone), and the new count is announced — the pages' own change handlers do the rest
+    document.addEventListener('click', function (e) {
+      var t = e.target; if (!t || !t.closest) return;
+      var cell = t.closest('td.pick,th.pick'); if (!cell || t.closest('input')) return;
+      var box = cell.querySelector('input[type=checkbox]'); if (box && !box.disabled) box.click();
+    });
+    document.addEventListener('change', function (e) {
+      var t = e.target; if (!t || !t.matches || !t.matches('td.pick input[type=checkbox],th.pick input[type=checkbox]')) return;
+      setTimeout(function () { var b = document.querySelector('.dds-bulk b'); announce(b ? b.textContent : 'None selected'); }, 60);
+    });
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce };
   })();
 
   // ── DOM ──
@@ -756,13 +904,41 @@
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner(badgeCount());
   }
+  // Final pass (Nov 8, batch B): at STUDIO level /portal/context no longer
+  // builds the needs-you list on every page boot. It hands back the kept total
+  // (null when none is kept yet) and attention_stale; the shell then reads just
+  // the total (/agency/needs-you?only=total) behind the page. Home reads the
+  // whole list anyway and hands the bell its number (ddsBellSet), so the shell
+  // skips its own read there. Every new number also goes out as 'dds:attention'
+  // for a page that shows it (Analytics' "things need you" line).
+  function studioTotals() { return !!(CTX && CTX.is_agency && !(CTX.scope && CTX.scope.site_id) && typeof CTX.attention_stale === 'boolean'); }
+  function setAttention(n) {
+    if (!CTX || typeof n !== 'number' || !isFinite(n) || n < 0) return;   // anything short of a good number keeps the last good badge
+    var changed = n !== CTX.attention_count;
+    CTX.attention_count = n; CTX.attention_stale = false;
+    try { window.__ddsContext = CTX; } catch (_) { /* */ }
+    if (changed) paintBell();
+    try { document.dispatchEvent(new CustomEvent('dds:attention', { detail: n })); } catch (_) { /* */ }
+  }
+  var pageSetBell = false, pendingBell = null;
+  window.ddsBellSet = function (n) {
+    pageSetBell = true; markAttentionFresh();
+    if (!CTX) { pendingBell = n; return; }                        // the page beat the shell's own boot read — applied when it lands
+    setAttention(Number(n));
+  };
+  function readStudioTotal(fresh) {
+    return api('/agency/needs-you?only=total' + (fresh ? '&fresh=1' : '')).then(function (r) {
+      if (r && r.ok && r.body && r.body.data) setAttention(r.body.data.total);
+    })['catch'](function () { /* keep the last good badge */ });
+  }
   // Oct 2026 review: a page that just CLEARED a needs-you item (the Inbox
   // resolving a support request) can ask for the badge now, past the throttle.
-  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(); };
-  function refreshAttention() {
+  window.ddsBellRefresh = function () { lastAttentionAt = 0; refreshAttention(true); };
+  function refreshAttention(changed) {
     if (!TOKEN || !CTX) return;                                   // signed out, or the minimal shell — nothing to refresh
     if (Date.now() - lastAttentionAt < ATTENTION_THROTTLE_MS) return;
     markAttentionFresh();                                         // claim the window BEFORE the request
+    if (studioTotals()) { try { readStudioTotal(!!changed); } catch (_) { /* */ } return; }   // batch B: just the studio's total
     try {
       api('/portal/context').then(function (r) {
         if (!r || !r.ok || !r.body || !r.body.data) return;        // a failed read is not "nothing needs you"
@@ -902,8 +1078,17 @@
     // needs-you list, so the Needs-you tab lists exactly those rows (the same
     // read Home heads its list with); Updates keeps the news from the feed.
     var studioLevel = !!(CTX && CTX.is_agency && !(CTX.scope && CTX.scope.site_id));
-    Promise.all([api('/portal/feed'), studioLevel ? api('/agency/needs-you') : Promise.resolve(null)]).then(function (res) {
+    // Final pass (Nov 8, batch B): at studio level ONE call. /agency/needs-you
+    // builds the studio's feed anyway and sends its update rows along
+    // (update_notices); an older server without them gets the feed as before.
+    var nyP = studioLevel ? api('/agency/needs-you') : Promise.resolve(null);
+    var feedP = studioLevel ? nyP.then(function (x) {
+      var dd = x && x.ok && x.body && x.body.data;
+      return (dd && Array.isArray(dd.update_notices)) ? { ok: true, status: 200, body: { data: { notices: dd.update_notices } } } : api('/portal/feed');
+    }) : api('/portal/feed');
+    Promise.all([feedP, nyP]).then(function (res) {
       var r = res[0], ny = res[1];
+      if (ny && ny.ok && ny.body && ny.body.data) setAttention(Number(ny.body.data.total));   // the list in the bell and its badge agree
       var body = notif.querySelector('.body');
       // A FAILED read is not an empty one — never claim "caught up" on an error.
       if (!r.ok || (ny && !ny.ok)) { body.innerHTML = '<div class="muted">We couldn’t check just now — try again in a moment.</div>'; return; }
@@ -1693,6 +1878,10 @@
           CTX = r.body.data; markRoleLimits(CTX); render();
           try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
           markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
+          // batch B: a studio total Home already handed over wins; a stale or
+          // missing one is refreshed behind the page unless Home hands one over first
+          if (pendingBell !== null) { setAttention(Number(pendingBell)); pendingBell = null; }
+          else if (studioTotals() && CTX.attention_stale) setTimeout(function () { if (!pageSetBell) readStudioTotal(false); }, 1200);
           try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
           // PERF: /portal/context is the single most expensive boot read (~17
           // queries incl. 3× auth). The shell already fetched it — publish it so

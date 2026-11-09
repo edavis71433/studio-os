@@ -13,7 +13,7 @@
 // ── mirrors (verbatim) of the pure helpers in today.html ──
 function greet(h){h=h==null?new Date().getHours():h;return h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.';}
 function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
-const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
+const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
 function monthTiles(d){
   d=d||{};const s=d.sales||{};const w=d.website||{};const t=[];
   // D3 sibling: the number is summed EXPECTED deal value — the label says so.
@@ -101,7 +101,7 @@ function customerRows(list){
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
-function initials(n){return String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';}
+function initials(n){return String(n||'').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}
 
 // ── mirrors (verbatim) of the pure helpers in client.html ──
 // Oct 2026 benchmark (item 2): unpaidInvoices runs on the one money formula —
@@ -616,6 +616,10 @@ const DEALS=[
     customerRows(Array.from({length:8},(_,i)=>({client_id:'c'+i,name:'n'}))).length===5 && customerRows(null).length===0 && customerRows('x').length===0);
   ok('initials: first letters of the first two words, "?" when blank',
     initials('Larkspur Kitchen')==='LK' && initials('Fennel Street Designs')==='FS' && initials('cher')==='C' && initials('')==='?');
+  // final pass, batch C: an emoji stays whole and "ß" stays one letter (it upper-cases to "SS")
+  ok('initials: a bracket or dash is never a letter ("Eric (test)" → ET, item 71)', initials('Eric (test)')==='ET' && initials('(Acme) Jordan')==='AJ' && initials('- dash')==='D', initials('Eric (test)'));
+  ok('initials: an emoji or "ß" stays whole', initials('😀 Bakery')==='😀B' && initials('ßen Ölberg')==='ßÖ', initials('😀 Bakery')+' '+initials('ßen Ölberg'));
+  ok('money: whole dollars, or dollars and cents — never rounded away', money(195000)==='$1,950' && money(123450)==='$1,234.50' && money(0)==='$0', money(123450));
 }
 // structural pins — the wiring the mockup sections must keep
 for(const fn of ['daysBetween','ymdParts','dueLabel','todoAt','statTiles','weekTodos','comingUp','customerRows','initials']){

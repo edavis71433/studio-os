@@ -1,0 +1,31 @@
+-- rollback:
+--   revoke execute on function public.prune_evidence_runs(int) from service_role;
+--   (this brings back the failure below, so only for symmetry)
+--
+-- -- The 15-minute run can prune old evidence again (Nov 8 2026) ---------------
+-- 0091 created prune_evidence_runs() and revoked it from public, anon and
+-- authenticated, but never granted it to service_role. Every other
+-- service-role function pairs that revoke with an explicit grant (0008, 0009,
+-- 0010, 0013, 0037, 0081, 0136), because production's default privileges give
+-- new functions to postgres only (0000_baseline): once PUBLIC is revoked, the
+-- service role has nothing left.
+--
+-- WHAT IT BROKE
+--   Every 15-minute run (the "tick") calls this function as its retention step.
+--   On production each call got "permission denied for function
+--   prune_evidence_runs" (HTTP 403 from the API), retention reported
+--   evidence_runs false, and sweepIssues marked the whole tick failed. No tick
+--   has finished "done" in the 90 days the run ledger keeps, so /system/health
+--   has answered ok:false (failure_alarm) the whole time. Nothing a customer
+--   sees depended on it: every other step of each tick ran and succeeded.
+--
+-- WHAT CHANGES
+--   service_role may execute the function. anon and authenticated still may
+--   not. The function itself is unchanged: it deletes evidence runs older than
+--   180 days, keeping each site's latest. Production's oldest run is from
+--   Jul 13 2026, so it deletes nothing before Jan 2027; until then each call
+--   returns 0.
+--
+-- Production apply pack: docs/presence/APPLY-0141-prod.sql
+
+grant execute on function public.prune_evidence_runs(int) to service_role;

@@ -73,17 +73,23 @@ test.describe('item 41 — three buttons on the record', () => {
 
 test.describe('item 45 — the record\'s timeline starts beside the record read', () => {
   test('opened by the customer\'s site, /crm/activity is asked before /crm/record answers', async ({ page }) => {
-    const t: Record<string, number> = {};
-    page.on('request', (r) => { if (/\/crm\/activity/.test(r.url()) && !t.activity) t.activity = Date.now(); });
+    // final pass, batch D: an order of events, not a 600 ms race. The record's answer is held
+    // until the timeline has been asked for; a page that waited for the record first would
+    // reach the 8 s cap with the timeline still unasked, and fail here.
+    let asked = false, notify: () => void = () => {};
+    const seen = new Promise<void>((r) => { notify = r; });
+    page.on('request', (r) => { if (/\/crm\/activity/.test(r.url())) { asked = true; notify(); } });
     await installApp(page, { api: RECORD_API });
+    let askedBeforeAnswer = false;
     await page.route('**/functions/v1/presence/crm/record**', async (route) => {
-      await new Promise((res) => setTimeout(res, 600));
-      t.recordAnswered = Date.now();
+      await Promise.race([seen, new Promise((r) => setTimeout(r, 8000))]);
+      askedBeforeAnswer = asked;
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RECORD) });
     });
     await page.goto(`/crm.html?client=${CLIENT}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Maple Street Studio' })).toBeVisible();
-    expect(t.activity).toBeLessThan(t.recordAnswered);
+    // past the 8 s cap, so a page that waits fails on the line below, not on the heading
+    await expect(page.getByRole('heading', { level: 1, name: 'Maple Street Studio' })).toBeVisible({ timeout: 15_000 });
+    expect(askedBeforeAnswer).toBe(true);
   });
 
   test('opened by a deal, the timeline still waits for the record\'s ids', async ({ page }) => {

@@ -166,27 +166,30 @@ export function scheduleDecision(scheduledAtInput: unknown, nowIso: string):
 const RECIPIENT_CAP = 5000;   // MVP bound: a single broadcast reaches at most this many
 
 /** Raw audience rows for a segment, SITE-SCOPED. Never crosses tenants. */
-export async function fetchAudienceRows(siteId: string, key: AudienceKey): Promise<Array<{ email?: string; name?: string }>> {
+export async function fetchAudienceRows(siteId: string, key: AudienceKey, opts: { strict?: boolean } = {}): Promise<Array<{ email?: string; name?: string }>> {
+  // final pass (Nov 8, batch D): strict, a failed read throws instead of reading as nobody
+  // (the audience picker showed "Contacts · 0" when the contacts couldn't be read)
+  const need = async (path: string) => { const r = await svc(path); if (opts.strict && !r.ok) throw new Error('audience_read_failed'); return rows(r); };
   if (isListKey(key)) {
     const l = (await loadPickedLists(siteId)).find((x) => `list:${x.id}` === key);
     return l ? l.people.slice(0, RECIPIENT_CAP) : [];   // a removed list reaches no one
   }
   if (key === 'customers') {
     // the studio's active service links prove who is a customer of THIS site
-    const links = rows(await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&select=customer_client_id&limit=${RECIPIENT_CAP}`));
+    const links = await need(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&select=customer_client_id&limit=${RECIPIENT_CAP}`);
     const ids = [...new Set(links.map((l: any) => String(l.customer_client_id || '')).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))];
     if (!ids.length) return [];
-    return rows(await svc(`clients?id=in.(${ids.join(',')})&select=name,email,contact_email`)).map((c: any) => ({ email: c.email || c.contact_email || '', name: c.name || '' }));
+    return (await need(`clients?id=in.(${ids.join(',')})&select=name,email,contact_email`)).map((c: any) => ({ email: c.email || c.contact_email || '', name: c.name || '' }));
   }
   if (key === 'contacts') {
-    return rows(await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`));
+    return await need(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`);
   }
   const base = `presence_form_submissions?site_id=eq.${siteId}&spam=is.false&select=email,name,created_at`;
   if (key === 'enquiries_30d') {
     const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-    return rows(await svc(`${base}&created_at=gte.${encodeURIComponent(since)}&limit=${RECIPIENT_CAP}`));
+    return await need(`${base}&created_at=gte.${encodeURIComponent(since)}&limit=${RECIPIENT_CAP}`);
   }
-  return rows(await svc(`${base}&limit=${RECIPIENT_CAP}`));   // 'enquiries'
+  return await need(`${base}&limit=${RECIPIENT_CAP}`);   // 'enquiries'
 }
 
 export interface SendableDeps {
@@ -214,8 +217,8 @@ export async function resolveSendable(siteId: string, key: AudienceKey, deps: Se
 /** Just the audience SIZE (distinct valid, pre-suppression) — the cheap number
  *  behind the segment chips. The honest post-suppression count is computed per
  *  broadcast at preview/send time via resolveSendable. */
-export async function audienceCount(siteId: string, key: AudienceKey): Promise<number> {
-  return normalizeRecipients(await fetchAudienceRows(siteId, key)).length;
+export async function audienceCount(siteId: string, key: AudienceKey, opts: { strict?: boolean } = {}): Promise<number> {
+  return normalizeRecipients(await fetchAudienceRows(siteId, key, opts)).length;
 }
 
 export interface BroadcastRow { id: string; site_id: string; subject: string; body: string; audience: AudienceKey; status?: string }

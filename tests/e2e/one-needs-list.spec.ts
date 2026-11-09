@@ -46,7 +46,10 @@ const HOME_API = {
 
 test.describe('item 11 — one number, one list, at studio level', () => {
   test('the badge is Home\'s total; the bell\'s Needs-you tab lists Home\'s rows; news stays under Updates', async ({ page }) => {
-    await installApp(page, { api: HOME_API });
+    // final pass, batch D: the context hands back an older kept number (7, marked stale), so a
+    // badge that kept the context's number reads 7 here, not Home's 3
+    const stale = { data: { ...STUDIO_CTX.data, attention_count: 7, attention_stale: true } };
+    await installApp(page, { api: { ...HOME_API, '/portal/context': stale } });
     await page.goto('/agency.html');
     await expect(page.locator('#needs .qhead')).toHaveText('Needs you · 3');
     await expect(page.locator('#dds-bell .dot')).toHaveText('3');
@@ -72,11 +75,11 @@ test.describe('item 11 — one number, one list, at studio level', () => {
 });
 
 test.describe('item 23 — one Home for a studio', () => {
-  test('a studio account on the old Home is sent to Customers', async ({ page }) => {
+  test('a studio account on the old Home is sent to the new Home', async ({ page }) => {
     await installApp(page, { api: HOME_API });
     await page.goto('/today.html');
     await expect(page).toHaveURL(/\/agency\.html$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Customers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // final pass, batch C: headed Home, as the nav says
   });
 
   test('a plain owner keeps their Today', async ({ page }) => {

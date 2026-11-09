@@ -14,7 +14,7 @@
   :root{
     --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
     --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#fdeaea);
     --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -115,11 +115,14 @@
   /* sales review item 34: a support request's priority (only High and Urgent show
      on the row) and who has it */
   .prio{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--warn-soft);color:var(--warn);white-space:nowrap}
-  .prio.urgent{background:var(--bad-soft,#f6e3e1);color:var(--bad,#a3423a)}
+  .prio.urgent{background:var(--bad-soft);color:#9b2f2f;font-size:12.5px}   /* final pass, batch C: --bad-soft was never defined (4.2:1 light, 2.1:1 dark); the shared red reads 4.46:1 on it, so a deeper one */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .prio.urgent{color:var(--bad)}}
+  :root[data-theme="dark"] .prio.urgent{color:var(--bad)}
   .asg{flex:0 0 auto;font-size:12px;color:var(--soft);white-space:nowrap}
   .triage{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
   .triage label{display:inline-flex;align-items:center;gap:6px}
   .triage select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:4px 8px;min-height:32px}
+  @media (max-width:767px){.triage select{min-height:44px;-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:10px 6px}}   /* final pass, batch C: 44px on a phone (Safari keeps a native drop-down at its own height, so it's drawn here) */
   .rchip{flex:0 0 auto;font-size:12px;font-weight:500;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--p-soft);color:var(--p);white-space:nowrap}
   .rchip.support{background:var(--warn-soft);color:var(--warn)}
   .rchip.lead{background:var(--good-soft);color:var(--good)}
@@ -323,6 +326,15 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
+const qh=(s)=>(window.ddsQuote?window.ddsQuote.html(s,esc):esc(s));
+// item 71: who a support reply reaches, and how. A customer has a portal; someone who
+// wrote in by email as a contact has none, but answering the email lands back here.
+function replyReach(it){
+  const name=it&&it.name&&it.name!=='Support request'?esc(it.name):'';
+  if(it&&it.client_id)return name?name+' gets an email and sees it in their portal':'They get an email and see it in their portal';
+  return name?name+' gets your reply by email and can answer it there':'They get your reply by email and can answer it there';
+}
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -333,7 +345,8 @@ const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentCo
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
 const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
 // item 54: the badge reads `who` (the name alone) — "Marco · 4 messages" gave "E·"
-const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?');
+// a word's first letter, digit or emoji: "Eric (test)" reads ET, never E( — an emoji or "ß" stays whole (batch C)
+const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?');
 // SC-1: keep the agency drill-in scope on every internal link so a scoped operator
 // stays inside the client they opened.
 function scoped(href){const c=new URLSearchParams(location.search).get('client');if(!c||!href||href.charAt(0)!=='/')return href;const h=href.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c)+(h[1]?'#'+h[1]:'');}
@@ -1045,7 +1058,7 @@ function renderTL(host,items){
     const head=it.body
       ?`<button class="ti-head" data-x="${esc(it.id)}" aria-expanded="${open?'true':'false'}"><span class="ti-car" aria-hidden="true">${open?'▾':'▸'}</span><span class="ti-title">${esc(it.title)}</span>${meta}</button>`
       :`<div class="ti-head"><span class="ti-title">${esc(it.title)}</span>${meta}</div>`;
-    const bodyHtml=(it.body&&open)?`<div class="ti-body">${esc(it.body)}</div>`:'';
+    const bodyHtml=(it.body&&open)?`<div class="ti-body">${qh(it.body)}</div>`:'';
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
   host.innerHTML=html;
@@ -1157,10 +1170,10 @@ async function paneSupport(host,it){
   // item 34: the server's priority and assignee win over the feed's
   it.priority=String(req.priority||it.priority||'normal');it.assigned_to=req.assigned_to?String(req.assigned_to):'';
   const prioSel=`<label>Priority <select id="supPrio">${['low','normal','high','urgent'].map(v=>`<option value="${v}"${v===it.priority?' selected':''}>${PRIO_LABEL[v]}</option>`).join('')}</select></label>`;
-  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${esc(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div><div class="triage" id="supTriage">${prioSel}<span id="supAsgWrap"></span></div></div>`;
+  let h=`<div class="card"><div class="who">${esc(req.subject||'Support request')}</div>${req.body?`<div class="body">${qh(req.body)}</div>`:''}<div class="muted" style="margin-top:8px;font-size:12.5px">Opened ${esc(when(req.created_at))}${it.name&&it.name!=='Support request'?' · '+esc(it.name):''}</div><div class="triage" id="supTriage">${prioSel}<span id="supAsgWrap"></span></div></div>`;
   for(const m of msgs){
     const mine=m.author_kind!=='client'&&m.author_kind!=='customer';
-    h+=`<div class="bub ${mine?'studio':''}">${esc(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
+    h+=`<div class="bub ${mine?'studio':''}">${qh(m.body||'')}<span class="bwhen">${mine?'You':'Client'} · ${esc(when(m.created_at))}</span></div>`;
   }
   pb.innerHTML=h;pb.scrollTop=pb.scrollHeight;
   const ps=$('supPrio');if(ps)ps.addEventListener('change',()=>setSupportField(it,'priority',ps.value,ps));
@@ -1177,7 +1190,7 @@ async function paneSupport(host,it){
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="muted" style="font-size:12px">${it.name&&it.name!=='Support request'?esc(it.name)+' gets an email and sees it in their portal':'They get an email and see it in their portal'}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
   const lastClientMsg=[...msgs].reverse().find(m=>m.author_kind==='client'||m.author_kind==='customer');
   $('supDraft').addEventListener('click',()=>draftReply('supBody',`A short, friendly reply from the studio to a support request "${String(req.subject||'Support request').slice(0,80)}": "${String((lastClientMsg&&lastClientMsg.body)||req.body||'').slice(0,240)}"`,$('supDraft')));
   // one send path: post the reply; "Reply and resolve" then ends the wait too

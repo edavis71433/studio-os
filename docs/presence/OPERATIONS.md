@@ -57,7 +57,7 @@ The platform keeps observing with no operator present.
 - **`POST /system/run`** (secret-gated by `SCHEDULER_SECRET`, no session — handled before principal resolution): runs a **cycle** over active sites (status `ready`/`live` backed by an active entitlement), each site through the same frozen pipeline the operator runs by hand — `runEvidence(site,'schedule')` → judgment → recommendation → moments (+ coach on the weekly sweep). One site's failure never stops another.
 - **Retry & recovery:** every unit of work is a `presence_scheduled_runs` row (queued → running → done/failed) with `attempts`/`max_attempts`. `task:'retry'` drains failed runs still under their ceiling and re-runs them — automatic recovery.
 - **Bounded per invocation** (least-recently-updated first); *cadence is the scaling knob*.
-- **Scheduling** (`supabase/ops/schedule-presence-cron.sql`): pg_cron + pg_net — tick every 15 min (LIVE cadence since Jul 2026; Vault-stored secret), retry hourly, coach weekly, GSC daily. Cross-region watchdog: `supabase/ops/watchdog-cron.sql`. Run once per project with the ref filled in.
+- **Scheduling** (`supabase/ops/schedule-presence-cron.sql`): pg_cron + pg_net — `presence-cycle` tick every 15 min (LIVE cadence since Jul 2026), `presence_gsc_sync` daily 07:00 UTC, `presence_ga4_sync` daily 07:30 UTC. Each job reads Vault `presence_scheduler_secret` when it runs and sends it in the request body, never in the job text or the address. No hourly retry or weekly coach job (Nov 2026; the next tick runs a failed site again). Cross-region watchdog: `supabase/ops/watchdog-cron.sql`. Run once per project with the ref filled in.
 
 ## 7. Operational reliability
 
