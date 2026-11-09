@@ -101,7 +101,7 @@ const SITE = { baseUrl: 'https://vermilionandvine.example' };
 // ═══ 2. published render → <picture> with avif + webp + <img> fallback ═══
 {
   const fixture = JSON.parse(read('supabase/functions/presence/templates/restaurant-classic/1.0.0/fixture.json'));
-  const files = renderSnapshot(fixture, SITE);
+  const files = await renderSnapshot(fixture, SITE);
   const html = Object.entries(files).filter(([k]) => k.endsWith('.html')).map(([, v]) => String(v)).join('\n');
 
   ok('2 emits <picture> wrapper', html.includes('<picture>'));
@@ -143,7 +143,7 @@ const SITE = { baseUrl: 'https://vermilionandvine.example' };
       width: 1600, height: 1000,
     }],
   }];
-  const bHtml = Object.entries(renderSnapshot(withBlock, SITE)).filter(([k]) => k.endsWith('.html')).map(([, v]) => String(v)).join('\n');
+  const bHtml = Object.entries(await renderSnapshot(withBlock, SITE)).filter(([k]) => k.endsWith('.html')).map(([, v]) => String(v)).join('\n');
   const galleryPic = (bHtml.match(/<picture>[\s\S]*?<\/picture>/g) || []).find((p) => p.includes('/img/room-'));
   ok('2 gallery block rendered as <picture>', !!galleryPic);
   if (galleryPic) {

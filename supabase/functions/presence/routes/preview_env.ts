@@ -120,7 +120,7 @@ async function stagedPreviewHtml(siteId: string, snapshotId: string, page: strin
     const s = site.json?.[0] || {};
     const baseUrl = siteOrigin(s) || 'https://preview.invalid';
     let fileMap: Record<string, string | Uint8Array>;
-    try { fileMap = renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return { status: 500, html: shell('We couldn’t draw this preview.') }; }
+    try { fileMap = await renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return { status: 500, html: shell('We couldn’t draw this preview.') }; }
     hit = { fileMap, mediaManifest: loaded.mediaManifest, blockers: 0, warnings: 0, businessName: (loaded.snapshot.content as any)?.identity?.business_name || '' };
     previewCache.set(key, hit);
   }

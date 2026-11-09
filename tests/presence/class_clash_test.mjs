@@ -98,7 +98,7 @@ function reaches(selector, els) {
 const SITE = { baseUrl: 'https://example.com', formEndpoint: 'https://example.com/forms/submit', bookEndpoint: 'https://example.com/book' };
 const ctx = { esc, attr, safeHref, formEndpoint: SITE.formEndpoint, bookEndpoint: SITE.bookEndpoint };
 const html = (files) => Object.entries(files).filter(([k]) => k.endsWith('.html')).map(([, v]) => String(v)).join('\n');
-function sides(slug) {
+async function sides(slug) {
   const full = fullFixture(slug);
   const { blocks, pages } = full.content.settings;
   const sectionHtml = [...renderSiteBlocks(blocks, ctx), ...renderSiteBlocks(pages[0].blocks, ctx), ...renderSiteBlocks(blocks, { esc, attr, safeHref })].map((b) => b.html).join('\n');
@@ -106,10 +106,10 @@ function sides(slug) {
   // (the owner's page and the dropdown stay)
   const bare = structuredClone(full);
   bare.content.settings = { ...bare.content.settings, blocks: [], blocks_src: [], pages: [{ ...pages[0], blocks: [], blocks_src: [] }] };
-  const drawn = renderSnapshot(bare, SITE, { allSectionStyles: true });
+  const drawn = await renderSnapshot(bare, SITE, { allSectionStyles: true });
   const css = String(drawn[Object.keys(drawn).find((k) => k.startsWith('assets/'))]);
   return {
-    markup: html(renderSnapshot(fixture(slug), SITE)) + '\n' + html(drawn),
+    markup: html(await renderSnapshot(fixture(slug), SITE)) + '\n' + html(drawn),
     css: css.replace(BLOCK_CSS, ''),
     hadSectionStyles: css.includes(BLOCK_CSS),
     sectionHtml,
@@ -134,7 +134,7 @@ function reachProblems(t, owners) {
 // a section's own name on the template's own markup
 const strayProblems = (t, owners) => elements(t.markup).filter((e) => [...e.classes].some((c) => owners[c]?.[0] === 'sections')).map((e) => e.html.slice(0, 80));
 
-const drawn = Object.fromEntries(TEMPLATES.map((slug) => [slug, sides(slug)]));
+const drawn = Object.fromEntries(await Promise.all(TEMPLATES.map(async (slug) => [slug, await sides(slug)])));
 ok('every template’s stylesheet carries the section styles whole (what these checks read)', TEMPLATES.every((s) => drawn[s].hadSectionStyles));
 ok('every owner is template, sections or both, with a reason', Object.values(OWNERS).every(([o, why]) => ['template', 'sections', 'both'].includes(o) && !!why));
 {

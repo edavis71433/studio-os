@@ -120,7 +120,7 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
       // Phase B1: same renderSnapshot as publish/restore — preview is pixel-identical
       // to production for the same snapshot (incl. the Developer-Mode layer). It keeps
       // every section style (item 106) for the canvas's quick section redraws.
-      fileMap = renderForBuilder(snapshot);
+      fileMap = await renderForBuilder(snapshot);
       previewCache.set(key, { fileMap, mediaManifest, blockers, warnings });
     }
   } catch (e) {

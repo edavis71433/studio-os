@@ -56,11 +56,13 @@ const reviews = { items: [
 const COMPANY: Record<string, string[]> = { toc: ['title', 'features', 'process'], divider: ['richtext', 'features'] };
 
 /** Each template's sample site. */
-export function templatePages(): Record<string, FileMap> {
-  return Object.fromEntries(TEMPLATES.map((slug) => [slug, renderSnapshot(fixture(slug), SITE)]));
+export async function templatePages(): Promise<Record<string, FileMap>> {
+  const out: Record<string, FileMap> = {};
+  for (const slug of TEMPLATES) out[slug] = await renderSnapshot(fixture(slug), SITE);
+  return out;
 }
 /** One page per section type, on Business Classic with the built-in sections hidden. */
-export function sectionPages(): Record<string, FileMap> {
+export async function sectionPages(): Promise<Record<string, FileMap>> {
   const out: Record<string, FileMap> = {};
   for (const [type, sample] of Object.entries(SAMPLE_BLOCKS)) {
     const page = fixture('business-classic');
@@ -71,7 +73,7 @@ export function sectionPages(): Record<string, FileMap> {
       blocks: composed.blocks, blocks_src: composed.src,
       sections: { hidden: ['hero', 'about', 'offerings', 'testimonials', 'faqs'], order: [] },
     } as never;
-    out[type] = renderSnapshot(page, SITE);
+    out[type] = await renderSnapshot(page, SITE);
   }
   return out;
 }
@@ -85,16 +87,16 @@ export function placeholderFiles(): Record<string, string> {
 }
 
 /** Every page set, in the one order that numbers the placeholders the same way each time. */
-export function allPages() {
+export async function allPages() {
   media.clear();
-  const templates = templatePages(), sections = sectionPages();
+  const templates = await templatePages(), sections = await sectionPages();
   return { templates, sections, ph: placeholderFiles() };
 }
 
 /** What each picture shows, as a digest: its page, the stylesheet and the placeholders the
  *  page loads. shoot.mjs records it beside the picture; the test compares it with today's. */
 export async function pictureSources(): Promise<Record<string, string>> {
-  const { templates, sections, ph } = allPages();
+  const { templates, sections, ph } = await allPages();
   const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const shown = async (files: FileMap) => {
     const page = String(files['index.html']);

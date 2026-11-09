@@ -15,7 +15,7 @@ const { renderSnapshot, tintFavicon, FIXED_COLOR_TEMPLATES } = await import('../
 const SITE = { baseUrl: 'https://example.test', brand: { credit: 'Site by Davis Digital Studio' } };
 const SLUGS = ['atelier', 'aurora', 'business-classic', 'editorial', 'harbor', 'meadow', 'restaurant-classic', 'slate'];
 const fixture = (slug) => JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
-const drawn = Object.fromEntries(SLUGS.map((s) => [s, renderSnapshot(fixture(s), SITE)]));
+const drawn = Object.fromEntries(await Promise.all(SLUGS.map(async (s) => [s, await renderSnapshot(fixture(s), SITE)])));
 const html = (files) => Object.entries(files).filter(([k]) => k.endsWith('.html'));
 
 // ═══ Open now, on every template's home page ═══
@@ -54,9 +54,9 @@ for (const s of SLUGS) {
 // ═══ the favicon wears the site's accent ═══
 {
   ok('Aurora’s own favicon is its own indigo, not Business Classic’s green', String(drawn.aurora['favicon.svg']).includes('fill="#4f46e5" data-accent="fill"'));
-  const tinted = (s, accent) => { const fx = fixture(s); fx.dev_customization = { theme_tokens: { accent }, custom_css: '', custom_html: '' }; return String(renderSnapshot(fx, SITE)['favicon.svg']); };
-  for (const s of SLUGS.filter((x) => x !== 'slate')) ok(`${s}: a chosen accent colours the favicon`, tinted(s, '#123456').includes('fill="#123456" data-accent="fill"'));
-  ok('Slate keeps its own favicon, as it keeps its own colours', FIXED_COLOR_TEMPLATES.has('slate') && tinted('slate', '#123456') === String(drawn.slate['favicon.svg']));
+  const tinted = async (s, accent) => { const fx = fixture(s); fx.dev_customization = { theme_tokens: { accent }, custom_css: '', custom_html: '' }; return String((await renderSnapshot(fx, SITE))['favicon.svg']); };
+  for (const s of SLUGS.filter((x) => x !== 'slate')) ok(`${s}: a chosen accent colours the favicon`, (await tinted(s, '#123456')).includes('fill="#123456" data-accent="fill"'));
+  ok('Slate keeps its own favicon, as it keeps its own colours', FIXED_COLOR_TEMPLATES.has('slate') && await tinted('slate', '#123456') === String(drawn.slate['favicon.svg']));
   const svg = '<svg><rect fill="#111111" data-accent="fill"/><rect stroke="#222222" data-accent="stroke"/><text fill="#ffffff">A</text></svg>';
   const out = tintFavicon({ 'favicon.svg': svg }, '#abcdef', 'meadow')['favicon.svg'];
   ok('only the marked fill and stroke change; the letter keeps its colour', out === '<svg><rect fill="#abcdef" data-accent="fill"/><rect stroke="#abcdef" data-accent="stroke"/><text fill="#ffffff">A</text></svg>', out);

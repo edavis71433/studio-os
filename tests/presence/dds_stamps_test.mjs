@@ -24,7 +24,7 @@ const STRIP = / data-dds-(?:sid|key|field|md|core|src)="[^"]*"/g;
 // ═══ 1. data-dds-core on every template's home page (fixtures carry all 5 sections) ═══
 for (const slug of TEMPLATES) {
   const fx = JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
-  const out = renderSnapshot(fx, SITE);
+  const out = await renderSnapshot(fx, SITE);
   const home = String(out['index.html']);
   const missing = CORE.filter((k) => !home.includes(` data-dds-core="${k}"`));
   ok(`[${slug}] home page stamps all five core sections (data-dds-core)`, missing.length === 0, missing.join(','));

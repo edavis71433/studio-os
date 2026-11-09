@@ -26,7 +26,7 @@ for (const slug of TEMPLATES) {
     { slug: 'partners-page', title: 'Partners', blocks: [{ type: 'richtext', title: 'Our partners', body: 'We work with **great** people.' }] },
     { slug: 'secret', title: 'Secret Landing', hideNav: true, blocks: [{ type: 'richtext', title: 'Hidden', body: 'Not in the menu.' }] },
   ];
-  const out = renderSnapshot(withPage, SITE);
+  const out = await renderSnapshot(withPage, SITE);
 
   ok(`[${slug}] custom page renders its own file`, typeof out['our-team/index.html'] === 'string' && out['our-team/index.html'].length > 0);
   const pg = out['our-team/index.html'] || '';
@@ -43,14 +43,14 @@ for (const slug of TEMPLATES) {
   const hostile = structuredClone(fixture);
   hostile.content.settings = hostile.content.settings || {};
   hostile.content.settings.pages = [{ slug: 'x', title: '<script>alert(1)</script>', blocks: [{ type: 'features', items: [{ title: '<script>bad()</script>' }] }] }];
-  const hpg = renderSnapshot(hostile, SITE)['x/index.html'] || '';
+  const hpg = (await renderSnapshot(hostile, SITE))['x/index.html'] || '';
   ok(`[${slug}] custom page escapes hostile title + block content`, !hpg.includes('<script>alert') && !hpg.includes('<script>bad') && hpg.includes('&lt;script&gt;'));
 
   // determinism
-  ok(`[${slug}] custom pages render deterministically`, renderSnapshot(withPage, SITE)['our-team/index.html'] === out['our-team/index.html']);
+  ok(`[${slug}] custom pages render deterministically`, (await renderSnapshot(withPage, SITE))['our-team/index.html'] === out['our-team/index.html']);
 
   // no custom pages → the custom file is absent (single-page unchanged)
-  ok(`[${slug}] without custom pages, no extra page file appears`, typeof renderSnapshot(fixture, SITE)['our-team/index.html'] === 'undefined');
+  ok(`[${slug}] without custom pages, no extra page file appears`, typeof (await renderSnapshot(fixture, SITE))['our-team/index.html'] === 'undefined');
 }
 
 const done = fail === 0;

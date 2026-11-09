@@ -170,7 +170,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     ...(fnBase ? { bookEndpoint: `${fnBase}/functions/v1/presence/book/${site.id}` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;
-  try { fileMap = renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
+  try { fileMap = await renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   at('render');
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
