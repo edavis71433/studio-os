@@ -1,7 +1,8 @@
 // ── Picker pictures: the pages to photograph (list item 25) ─────────────────────
 // Pure: builds each template's sample home page and one page per section type, as file
 // maps, with soft placeholder pictures where photos go. render.ts writes them to disk
-// for shoot.mjs; tests/presence/thumbnails_test.mjs checks every section draws.
+// for shoot.mjs; tests/presence/thumbnails_test.mjs checks every section draws, and
+// that each picture was shot from the page as it draws today (pictureSources).
 import { renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
 import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
 import type { Snapshot, FileMap } from '../../supabase/functions/presence/lib/render_types.ts';
@@ -29,7 +30,6 @@ function ref(id: string) {
 }
 const fixture = (slug: string) => {
   const fx = JSON.parse(Deno.readTextFileSync(new URL(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`, ROOT)));
-  fx.template_slug = slug; fx.template_version = '1.0.0';   // one fixture names another template
   // every photo in the sample site becomes a placeholder
   const swap = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(swap);
@@ -82,4 +82,28 @@ export function placeholderFiles(): Record<string, string> {
   const ph: Record<string, string> = {};
   for (const n of media.values()) ph[`ph/${n}.svg`] = placeholder(n);
   return { ...ph, 'ph/price-list.pdf': '%PDF-1.4\n' };
+}
+
+/** Every page set, in the one order that numbers the placeholders the same way each time. */
+export function allPages() {
+  media.clear();
+  const templates = templatePages(), sections = sectionPages();
+  return { templates, sections, ph: placeholderFiles() };
+}
+
+/** What each picture shows, as a digest: its page, the stylesheet and the placeholders the
+ *  page loads. shoot.mjs records it beside the picture; the test compares it with today's. */
+export async function pictureSources(): Promise<Record<string, string>> {
+  const { templates, sections, ph } = allPages();
+  const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const shown = async (files: FileMap) => {
+    const page = String(files['index.html']);
+    const used = Object.keys(files).filter((k) => k.startsWith('assets/')).sort().map((k) => [k, String(files[k])]);
+    for (const n of new Set([...page.matchAll(/\/ph\/(\d+)\.svg/g)].map((m) => m[1]))) used.push([`ph/${n}.svg`, ph[`ph/${n}.svg`]]);
+    return sha(JSON.stringify([['index.html', page], ...used]));
+  };
+  const out: Record<string, string> = {};
+  for (const [slug, files] of Object.entries(templates)) out[`templates/${slug}.jpg`] = await shown(files);
+  for (const [type, files] of Object.entries(sections)) out[`sections/${type}.jpg`] = await shown(files);
+  return out;
 }

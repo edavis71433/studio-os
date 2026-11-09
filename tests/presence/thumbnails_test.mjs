@@ -3,8 +3,10 @@
 // Every section type the builder offers has sample content that draws and a picture; every
 // template has a picture. The pictures are made by scripts/thumbnails (render.ts, then
 // shoot.mjs) and committed: re-run both when a section or template changes how it looks.
+// Each picture is recorded beside the page it shows (tests/presence/golden/pictures.json),
+// so a picture of a page that no longer draws that way fails here (list item 110).
 import { SAMPLE_BLOCKS } from '../../scripts/thumbnails/samples.ts';
-import { sectionPages, drew, TEMPLATES } from '../../scripts/thumbnails/pages.ts';
+import { allPages, pictureSources, drew, TEMPLATES } from '../../scripts/thumbnails/pages.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -29,9 +31,28 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
 
 // every sample still draws through the real renderer
 {
-  const pages = sectionPages();
+  const pages = allPages().sections;
   const missing = offered.filter((t) => !pages[t] || !drew(t, pages[t]));
   ok('every sample draws a section', missing.length === 0, missing.join(', '));
+}
+
+// every picture shows its page as it draws today
+{
+  let record = {};
+  try { record = JSON.parse(Deno.readTextFileSync(new URL('tests/presence/golden/pictures.json', ROOT))); } catch { /* absent */ }
+  const onDisk = ['templates', 'sections'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)).sort();
+  const listed = Object.keys(record).sort();
+  const unrecorded = onDisk.filter((k) => !listed.includes(k)), gone = listed.filter((k) => !onDisk.includes(k));
+  ok('the record lists every picture, and only them', !unrecorded.length && !gone.length, [unrecorded.length ? `not recorded: ${unrecorded.slice(0, 4).join(', ')}` : '', gone.length ? `recorded, no picture: ${gone.join(', ')}` : ''].filter(Boolean).join('; '));
+  const sha = async (b) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const replaced = [];
+  for (const k of onDisk) if (record[k] && record[k].picture !== await sha(Deno.readFileSync(new URL(`thumbs/${k}`, ROOT)))) replaced.push(k);
+  ok('each picture is the one the record describes', replaced.length === 0, replaced.join(', '));
+  const now = await pictureSources();
+  const stale = Object.keys(now).filter((k) => record[k]?.page !== now[k]).sort();
+  ok('no picture is stale: each was shot from its page as it draws today', stale.length === 0, stale.length
+    ? `${stale.length} stale (${stale.slice(0, 6).join(', ')}${stale.length > 6 ? ', …' : ''}); retake them: deno run --allow-read --allow-write --allow-env scripts/thumbnails/render.ts <dir> && node scripts/thumbnails/shoot.mjs <dir>`
+    : '');
 }
 
 const failed = results.filter((r) => !r.p);
