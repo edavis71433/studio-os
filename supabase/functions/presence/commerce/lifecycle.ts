@@ -30,7 +30,7 @@ import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNotice
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
-import { emailOperator, emailBridgedCustomer } from '../lib/service_bridge.ts';
+import { emailOperator, emailBridgedCustomer, ownerReplyTo } from '../lib/service_bridge.ts';
 import { approvalReminderDue, approvalReminderCopy, approvalOverduePeriod, approvalOverdueCopy } from '../lib/approvals.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
@@ -1014,6 +1014,7 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
   const seen = await svc(`presence_plan_notices?kind=eq.booking_reminder&period=in.(${periods})&select=period&limit=${appts.length * 2}`);
   const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
   const clientCache = new Map<string, string>();
+  const replyToCache = new Map<string, Promise<string>>();   // item 72: the owner's address, read once per site
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   let reminded = 0;
   for (const a of appts) {
@@ -1049,6 +1050,8 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
     const to = String(a.customer_email || '');
     if (!to) { reminded++; continue; }                         // (planReminder already excludes phone-only)
     try {
+      let ownerAddress = replyToCache.get(a.site_id);   // started here, read alongside the two below
+      if (!ownerAddress) { ownerAddress = ownerReplyTo(a.site_id); replyToCache.set(a.site_id, ownerAddress); }
       const ident = (await svc(`presence_identity?site_id=eq.${a.site_id}&select=business_name&limit=1`)).json?.[0];
       const biz = ident?.business_name || 'the team';
       const brand = await loadEmailBrand(a.site_id);
@@ -1066,7 +1069,8 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
         `<p style="color:#666;font-size:.9rem">Need to change or cancel? Just reply to this email.</p>`;
       // Transactional (the customer's own booking) → critical:true; suppression is
       // enforced inside sendEmail (opt-out survived, bounce/complaint respected).
-      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true });
+      // "Just reply" reaches the business, not the platform (item 72).
+      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true, replyTo: await ownerAddress });
       reminded++;
     } catch { /* the ledger row already marks this band sent — never re-send */ }
   }
@@ -1353,13 +1357,23 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
   const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length}`);
   const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
   // Item 90: the projects, their clients and the sites' owners in three reads, not three per project.
+  // Item 72: the owners' own addresses ride along (their clients rows join the one clients read, and
+  // one more read takes every site's identity card), so each reply reaches the business that asked.
   const open = due.filter(([id]) => !done.has(reviewAskPeriod(id)));
   if (!open.length) return { asked: 0 };
   const rowsOf = (r: { json: unknown }) => (Array.isArray(r.json) ? r.json : []) as Array<Record<string, any>>;
-  const projects = new Map(rowsOf(await svc(`presence_projects?id=in.(${open.map(([id]) => id).join(',')})&deleted_at=is.null&select=id,site_id,name,status,client_id`)).map((p) => [String(p.id), p]));
-  const clientIds = [...new Set([...projects.values()].map((p) => p.client_id).filter(Boolean))];
-  const clientsById = new Map(clientIds.length ? rowsOf(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,email,name`)).map((c) => [String(c.id), c]) : []);
-  const owners = new Map(rowsOf(await svc(`presence_sites?id=in.(${[...new Set(open.map(([, c]) => c.siteId))].join(',')})&select=id,client_id`)).map((x) => [String(x.id), x.client_id]));
+  const siteIds = [...new Set(open.map(([, c]) => c.siteId))].join(',');
+  const [projR, ownerR, identR] = await Promise.all([
+    svc(`presence_projects?id=in.(${open.map(([id]) => id).join(',')})&deleted_at=is.null&select=id,site_id,name,status,client_id`),
+    svc(`presence_sites?id=in.(${siteIds})&select=id,client_id`),
+    svc(`presence_identity?site_id=in.(${siteIds})&select=site_id,email`),
+  ]);
+  const projects = new Map(rowsOf(projR).map((p) => [String(p.id), p]));
+  const owners = new Map(rowsOf(ownerR).map((x) => [String(x.id), x.client_id]));
+  const identityEmails = new Map(rowsOf(identR).map((x) => [String(x.site_id), String(x.email || '').trim()]));
+  const projectClients = [...projects.values()].map((p) => p.client_id);
+  const clientIds = [...new Set([...projectClients, ...owners.values()].filter(Boolean))];
+  const clientsById = new Map(clientIds.length ? rowsOf(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,email,contact_email,name`)).map((c) => [String(c.id), c]) : []);
   let asked = 0;
   for (const [projectId, c] of open) {
     if (asked >= limit) break;
@@ -1374,9 +1388,12 @@ export async function runReviewRequests(limit = 20): Promise<{ asked: number }> 
     const fresh = await raiseNotice({ siteId: c.siteId, clientId: owner, kind: 'deal_followup', period: reviewAskPeriod(projectId), status: 'dismissed',
       headline: `Review requested — ${p.name || 'a finished project'}`, body: `We asked ${email} for a review, ${sites.get(c.siteId)} days after the project was marked complete.` });
     if (!fresh) continue;
+    // studioRecipient's order (lib/service_bridge.ts): the identity card's email, else the owner's clients row
+    const ownerRow = clientsById.get(String(owner));
+    const replyTo = identityEmails.get(c.siteId) || String(ownerRow?.email || ownerRow?.contact_email || '').trim();
     try {
       const { sendReviewAsk, reviewAskBucket, REVIEW_ASK_WINDOW } = await import('../routes/reviews.ts');
-      if (await sendReviewAsk(c.siteId, email, String(cl?.name || ''))) {
+      if (await sendReviewAsk(c.siteId, email, String(cl?.name || ''), replyTo)) {
         asked++;
         // item 73: counts as this month's ask, so a hand-sent one doesn't follow it within the month
         await rateAllow(await reviewAskBucket(c.siteId, email), 1, REVIEW_ASK_WINDOW);
