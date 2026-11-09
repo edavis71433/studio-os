@@ -130,6 +130,57 @@
   .center{text-align:center;padding:50px var(--dds-s5,20px)}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
+  /* ══ Bold redesign — Send an update (Nov 2026): who gets it, your message and
+     what they see, side by side; the send button says how many it goes to ══ */
+  .wrap{max-width:var(--dds-w-app,1280px)}
+  .up{display:grid;grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(260px,320px);gap:16px;align-items:start;margin-top:var(--dds-s4,16px)}
+  .up>.card{margin-top:0}
+  .up-who .segs{border:0;gap:8px;overflow:visible;border-radius:0}
+  /* each list is a card to pick; #segs outranks the shell's segmented-control .seg (a grey pill) */
+  .up-who #segs .seg{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;font-weight:500;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:10px 12px;box-shadow:none;cursor:pointer}
+  .up-who #segs .seg:hover{border-color:color-mix(in srgb,var(--p) 40%,var(--line))}
+  .up-who #segs .seg.on{background:var(--p-soft);color:var(--p);border-color:color-mix(in srgb,var(--p) 55%,var(--line));box-shadow:0 0 0 2px color-mix(in srgb,var(--p) 16%,transparent)}
+  .up-who #segs .seg .dot{margin-top:2px}
+  .lastup{font-size:12.5px;color:var(--faint);margin:12px 2px 0;line-height:1.45}
+  .vars{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .var{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:var(--p-soft);border:0;border-radius:999px;padding:5px 11px;cursor:pointer}
+  .var:hover{background:color-mix(in srgb,var(--p) 18%,transparent)}
+  .up-acts{margin-top:var(--dds-s4,16px)}
+  #sendUpdate{border-radius:999px;font-weight:600;background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff);padding:0 18px}
+  .up-acts button.ghost{border-radius:999px}
+  .up-see{position:sticky;top:16px;background:var(--dds-up,#f7f6fb)}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 8px}
+  .mail{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:14px 16px;box-shadow:var(--shadow);font-size:13.5px;line-height:1.55;overflow-wrap:anywhere}
+  .mail-from{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--soft)}
+  .mail-mark{width:18px;height:18px;border-radius:5px;background:var(--dds-grad-brand,var(--p));flex:0 0 auto}
+  .mail-subj{font-weight:650;font-size:15px;margin:10px 0 8px}
+  .mail-body p{margin:0 0 8px}
+  .mail-body ul{margin:0 0 8px;padding-left:18px}
+  .mail-ph{color:var(--faint)}
+  .mail-foot{border-top:1px solid var(--line);margin-top:12px;padding-top:8px;font-size:11.5px;color:var(--faint)}
+  .pvnote{font-size:12px;color:var(--faint);margin:8px 2px 0}
+  @media (max-width:1180px){
+    .up{grid-template-columns:minmax(0,1fr) minmax(260px,320px)}
+    .up-who{grid-column:1/-1}
+    .up-who .segs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  }
+  /* narrower still (a tablet): one column — the lists, the message, then what they see */
+  @media (max-width:960px){.up{grid-template-columns:minmax(0,1fr)}.up-see{position:static}}
+  /* a phone: one column — who as chips, the message, what they see — with the send button kept in reach */
+  @media (max-width:760px){
+    .up{grid-template-columns:minmax(0,1fr);gap:12px}
+    .up-see{position:static}
+    .up-who .segs{display:flex;flex-direction:row;overflow-x:auto;scrollbar-width:none;gap:6px;margin:0 -4px;padding:2px 4px}
+    .up-who .segs::-webkit-scrollbar{display:none}
+    .up-who #segs .seg{flex:0 0 auto;width:auto;border-radius:999px;padding:8px 14px;align-items:center;min-height:44px;white-space:nowrap}
+    .up-who #segs .seg .d,.up-who #segs .seg .dot{display:none}
+    .up-who #segs .seg .n{margin-left:6px}
+    .up-acts{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:5;background:var(--card);margin:var(--dds-s4,16px) calc(-1 * var(--dds-s5,20px)) calc(-1 * var(--dds-s5,20px));padding:10px var(--dds-s5,20px);border-top:1px solid var(--line);border-radius:0 0 var(--dds-r-lg,10px) var(--dds-r-lg,10px)}
+    .up-acts .grow{display:none}
+    #sendUpdate{flex:1 1 100%;order:-1;height:44px}
+    .up-acts button.ghost{flex:1;height:40px}
+  }
+  @media (pointer:coarse){.var{min-height:40px}}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:20}
   .toast.show{opacity:1}
@@ -234,15 +285,16 @@ const IC={
 };
 function render(){
   let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/inbox.html">${IC.back}Inbox</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
-    <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">Write one message and send it to your people. You preview it and press send — nothing ever goes out on its own.</p></header>
-    <div class="card">
-      <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2>Who it goes to</h2></div>
-      <p class="hint">Pick a list. Anyone who has unsubscribed is left out automatically.</p>
+    <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></header>
+    <div class="up">
+    <section class="card up-who" aria-labelledby="whoH">
+      <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2 id="whoH">Who gets it</h2></div>
+      <p class="hint plain">Anyone who has unsubscribed is left out automatically.</p>
       <div class="segs" id="segs">${segsHtml()}</div>${SEL.startsWith('list:')&&SEG_OK?'<p class="muted" style="margin:6px 0 0;font-size:12.5px">A list you picked. <button class="ghost sm" id="dropList" data-needs="delete" type="button">Remove this list</button></p>':''}
-    </div>
-    <div class="card">
-      <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2>Your message</h2></div>
-      <p class="hint">A subject line and your note. You can use simple formatting.</p>
+      ${lastLine()}
+    </section>
+    <section class="card up-write" aria-labelledby="writeH">
+      <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2 id="writeH">Your message</h2></div>
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
@@ -253,15 +305,21 @@ function render(){
         <button type="button" data-fmt="list" aria-label="Bulleted list" title="Bulleted list">${IC.list}</button>
         <span class="sp" aria-hidden="true"></span>
         <button type="button" data-fmt="link" aria-label="Link" title="Link">${IC.link}</button>
-        <label class="insvar">${IC.tag}<select id="insvar" aria-label="Insert variable"><option value="">Insert variable</option><option value="{{first_name}}">First name</option><option value="{{business_name}}">Business name</option></select>${IC.car}</label>
       </div>
-      <div class="row">
-        <button class="ghost" id="preview" type="button">Preview →</button>
-        <span class="grow"></span>
-        <button class="primary" id="sendUpdate" type="button">${IC.send}Send update</button>
-      </div>
-      <p class="tokens">Personalize with <code>{{first_name}}</code> and <code>{{business_name}}</code> — they fill in for each person.</p>
+      <div class="vars" role="group" aria-label="Fill in for each person"><button type="button" class="var" data-var="{{first_name}}">+ First name</button><button type="button" class="var" data-var="{{business_name}}">+ Business name</button></div>
       <button class="linkish" id="assist" type="button" title="Ask for a first draft you can edit">${IC.spark}Help me write it</button>
+      <div class="row up-acts">
+        <button class="ghost" id="preview" type="button">Preview</button>
+        <button class="ghost" id="schedule" type="button">Schedule</button>
+        <span class="grow"></span>
+        <button class="primary" id="sendUpdate" type="button">${IC.send}${sendLabel()}</button>
+      </div>
+    </section>
+    <aside class="card up-see" aria-labelledby="seeH">
+      <p class="eyebrow" id="seeH">What they see</p>
+      <div class="mail" id="livePv" aria-live="off"></div>
+      <p class="pvnote">Close to what lands in their inbox. The exact email shows before anything goes out.</p>
+    </aside>
     </div>
     <div id="stage"></div>
     <div class="card">
@@ -270,6 +328,41 @@ function render(){
       ${histBody()}
     </div>`;
   $('main').innerHTML=h;wire();
+}
+// Bold redesign (Nov 2026): the send button says how many it goes to, and the
+// last update sent sits under the lists (from the history this page reads).
+function sendLabel(){
+  if(!SEG_OK)return 'Send update';
+  const s=SEGMENTS.find(x=>x.key===SEL);
+  if(!s||s.count==null)return 'Send update';
+  return `Send to ${s.count} ${s.count===1?'person':'people'}`;
+}
+function lastLine(){
+  if(!LIST_OK)return '';
+  const s=BROADCASTS.filter(b=>b.status==='sent'&&b.sent_at).sort((a,b)=>a.sent_at<b.sent_at?1:-1)[0];
+  return s?`<p class="lastup">Last update: “${esc(s.subject||'(no subject)')}” · sent to ${Number(s.sent_count)||0} · ${esc(when(s.sent_at))}</p>`:'';
+}
+// ── what they see, live: the email renderer's own markdown (lib/markdown.ts:
+// paragraphs, "- " lists, **bold**, *italic*, [text](url)) with the two fill-ins
+// as the server previews them ({{first_name}} → "there"). The exact branded email
+// still shows in Preview & send before anything goes out.
+let BIZ='';   // the name the email signs with (GET /identity, best-effort)
+const fillTokens=(t)=>String(t||'').replace(/\{\{\s*first_name\s*\}\}/g,'there').replace(/\{\{\s*business_name\s*\}\}/g,BIZ||'your business');
+function mdLite(src){
+  const inline=(t)=>esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<i>$1</i>').replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<u>$1</u>');
+  return String(src||'').replace(/\r/g,'').split(/\n{2,}/).filter(b=>b.trim()).map(b=>{
+    const lines=b.split('\n');
+    if(lines.every(l=>/^- /.test(l)))return '<ul>'+lines.map(l=>'<li>'+inline(l.slice(2))+'</li>').join('')+'</ul>';
+    return '<p>'+lines.map(inline).join('<br>')+'</p>';
+  }).join('');
+}
+function paintLive(){
+  const host=$('livePv');if(!host)return;
+  const subj=(($('subj')&&$('subj').value)||'').trim(),body=(($('bodytx')&&$('bodytx').value)||'').trim();
+  host.innerHTML=`<div class="mail-from"><span class="mail-mark" aria-hidden="true"></span>${esc(BIZ||'Your business')}</div>
+    <div class="mail-subj">${subj?esc(fillTokens(subj)):'<span class="mail-ph">Your subject</span>'}</div>
+    <div class="mail-body">${body?mdLite(fillTokens(body)):'<p class="mail-ph">Your message shows here as you write it.</p>'}</div>
+    <div class="mail-foot">You’re getting this from ${esc(BIZ||'your business')} · <u>Unsubscribe</u></div>`;
 }
 // audience picker — or its honest failure notice when the segments read failed
 function segsHtml(){
@@ -313,13 +406,15 @@ function wire(){
     syncDraftFromForm();SEL='contacts';toast('List removed.');load(true);
   });
   const a=$('assist');if(a)a.addEventListener('click',assist);
-  const p=$('preview');if(p)p.addEventListener('click',doPreview);
+  const p=$('preview');if(p)p.addEventListener('click',()=>doPreview());
   // "Send update" takes the same road as Preview: the message is saved as a draft
   // and the Preview & send stage opens — the owner still presses Send there.
   // Nothing goes out from this button on its own (the page's one rule).
-  const su=$('sendUpdate');if(su)su.addEventListener('click',()=>doPreview().then(()=>{const b=$('send');if(b)b.focus();}));
+  const su=$('sendUpdate');if(su)su.addEventListener('click',()=>doPreview().then(()=>{const b=$('send');if(b)b.focus();}));   // bold redesign: it reads "Send to N people →"; the road is the same
   document.querySelectorAll('[data-fmt]').forEach(b=>b.addEventListener('click',()=>applyFormat(b.getAttribute('data-fmt'))));
-  const iv=$('insvar');if(iv)iv.addEventListener('change',()=>{if(iv.value)insertAtCaret(iv.value);iv.value='';});
+  document.querySelectorAll('[data-var]').forEach(b=>{b.addEventListener('mousedown',(e)=>e.preventDefault());b.addEventListener('click',()=>insertAtCaret(b.getAttribute('data-var')));});
+  const sc=$('schedule');if(sc)sc.addEventListener('click',()=>doPreview({scheduleFirst:true}).then(()=>{const w=$('when');if(w)w.focus();}));
+  paintLive();
   document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelBc(b.getAttribute('data-cancel'))));
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>editDraft(b.getAttribute('data-edit'))));
   document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
@@ -329,7 +424,7 @@ function wire(){
   // failure of the OTHER section tear down its last-good render (the ↻ contract)
   const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load(true));
   const br=$('bcRetry');if(br)br.addEventListener('click',()=>load(true));
-  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;});
+  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;paintLive();});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;paintLive();});
   // repaint the drilled-open row; if a list refresh just dropped the DETAILS
   // cache, RE-READ it — the open panel gets fresh counts, never a blank
   if(OPEN){const box=$('d-'+OPEN);if(box){if(DETAILS[OPEN])paintDetail(box,OPEN);else loadDetail(OPEN);}}
@@ -469,12 +564,12 @@ async function ensureDraft(){
   DRAFT=r.body.data;return DRAFT.id;
 }
 
-async function doPreview(){
+async function doPreview(opts){
   if(BUSY)return;BUSY=true;
   const id=await ensureDraft();BUSY=false;if(!id)return;
   const r=await api('/broadcasts/'+id);
   if(!r.ok){toast('Couldn’t build the preview.');return;}
-  stageFor(id,r.body.data,{});
+  stageFor(id,r.body.data,(opts&&opts.scheduleFirst)?{scheduleFirst:true}:{});
 }
 // The ONE preview-and-approve stage — used by the composer's Preview and by
 // Reschedule on a scheduled row (schedule mode preselected, time prefilled).
@@ -587,7 +682,9 @@ async function load(soft){
   syncDraftFromForm();   // a re-render must never eat what's typed in the composer
   render();
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}
+  api('/identity').then((r)=>{const n=r&&r.ok&&r.body&&r.body.data&&r.body.data.business_name;if(n){BIZ=String(n);paintLive();}}).catch(()=>{});   // best-effort: the live preview signs with it
+  await load();}catch(_){trouble();}})();
 </script>
 </body>
 </html>
