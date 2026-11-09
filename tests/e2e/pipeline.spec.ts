@@ -101,9 +101,12 @@ test.describe('Pipeline table view', () => {
   test('the 3-way display toggle persists in localStorage', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
-    // no stored choice → List (today's default), cards render
-    await expect(page.locator('#viewList')).toHaveAttribute('aria-pressed', 'true');
+    // no stored choice → the Board (the default since the bold redesign, Nov 2026)
+    await expect(page.locator('#viewBoard')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#board .col').first()).toBeVisible();
+    await page.locator('#viewList').click();
     await expect(page.locator('#list .card').first()).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('dds-display:pipeline'))).toBe('list');
     await page.locator('#viewTable').click();
     await expect(page.locator('#table table')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('dds-display:pipeline'))).toBe('table');
@@ -122,6 +125,7 @@ test.describe('Pipeline table view', () => {
 // static; only the list re-renders). Money meta uses the page's money0.
 test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
   test('boots under the roster anatomy: .lhead, ONE h1, money meta — zero console errors', async ({ page }) => {
+    await pinList(page);
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -138,6 +142,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
   });
 
   test('↻ soft refresh keeps the last good list and toasts on failure — never the error screen', async ({ page }) => {
+    await pinList(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
     await expect(page.locator('#list .card')).toHaveCount(2);
@@ -155,6 +160,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
   });
 
   test('search filters by title, contact name, and company — the input keeps focus and caret', async ({ page }) => {
+    await pinList(page);
     const contacts = { data: [
       { id: 'ct-1', name: 'Sam Rivera', email: 'sam@example.com', phone: '', company: 'Acme', updated_at: past(1) },
       { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '', company: 'Northwind', updated_at: past(2) },
@@ -191,6 +197,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
 
   test('mobile/tablet: the page body never scrolls horizontally — wide views scroll in their own containers', { tag: '@layout' }, async ({ page, isMobile }) => {
     test.skip(!isMobile, 'touch-viewport pin');
+    await pinList(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
     await expect(page.locator('#list .card')).toHaveCount(2);
@@ -226,6 +233,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
 // ── SS5: request-generation guards (REQ_SEQ/DET_SEQ) + honest boot retry.
 test.describe('SS5 stale-race guards + boot retry', () => {
   test('a slow older roster response can never paint over a newer one (REQ_SEQ)', async ({ page }) => {
+    await pinList(page);
     let releaseSlow!: () => void;
     const slowGate = new Promise<void>((r) => { releaseSlow = r; });
     await installApp(page, { api: API });
@@ -249,6 +257,7 @@ test.describe('SS5 stale-race guards + boot retry', () => {
   });
 
   test('a slow older deal-detail response can never paint over a newer drawer (DET_SEQ)', async ({ page }) => {
+    await pinList(page);
     const DETAIL2 = JSON.parse(JSON.stringify(DEAL_DETAIL));
     DETAIL2.data.deal = { ...DETAIL2.data.deal, id: DEAL2, title: 'Beta rebrand', stage: 'lead' };
     DETAIL2.data.contact = { id: 'ct-2', name: 'Dana Lee', email: 'dana@example.com', phone: '', company: 'Beta', notes: '' };
@@ -271,6 +280,7 @@ test.describe('SS5 stale-race guards + boot retry', () => {
   });
 
   test('a failed boot renders honest trouble with a Try again that recovers in place', async ({ page }) => {
+    await pinList(page);
     await installApp(page, { api: API });
     // a supabase stub whose getSession fails until the test heals it
     await page.route(/@supabase\/supabase-js|\/vendor\/supabase-js/, (route) =>
@@ -296,12 +306,25 @@ test.describe('SS5 stale-race guards + boot retry', () => {
 // the tablist-shaped rows downgraded to what they are (role=group + pressed).
 const pinBoard = (page: import('@playwright/test').Page) =>
   page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'board'); } catch { /* denied */ } });
+// a phone shows one board stage at a time (bold redesign): bring a stage up first
+const showOnPhone = async (page: import('@playwright/test').Page, stage: string) => {
+  if ((page.viewportSize()?.width || 0) <= 760) await page.locator(`[data-stab="${stage}"]`).click();
+};
+const showCardOnPhone = async (page: import('@playwright/test').Page, id: string) => {
+  if ((page.viewportSize()?.width || 0) > 760) return;
+  const stage = await page.locator(`#board .bcard[data-id="${id}"]`).getAttribute('data-stage');
+  if (stage) await page.locator(`[data-stab="${stage}"]`).click();
+};
+// the board is the default since the bold redesign (Nov 2026): tests of the List pin it
+const pinList = (page: import('@playwright/test').Page) =>
+  page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'list'); } catch { /* denied */ } });
 
 test.describe('SS5 board popup contract + group semantics', () => {
   test('the Move menu: opens focused, arrows walk it, Escape closes back to the invoker, outside click dismisses', async ({ page }) => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.click();
     const menu = page.locator('#board .bc-menu');
@@ -332,6 +355,7 @@ test.describe('SS5 board popup contract + group semantics', () => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     const mb = await move.boundingBox();
     expect(mb && mb.height).toBeGreaterThanOrEqual(44);
@@ -343,6 +367,7 @@ test.describe('SS5 board popup contract + group semantics', () => {
   });
 
   test('the filter row and the view toggle are role=group with aria-pressed — no fake tablists', async ({ page }) => {
+    await pinList(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
     await expect(page.locator('#list .card')).toHaveCount(2);
@@ -415,6 +440,7 @@ test.describe('SS5 ?stage=won landing (D1)', () => {
   });
 
   test('chip clicks keep the URL linkable, and closing a deal restores it', async ({ page }) => {
+    await pinList(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
     await page.locator('#filters .chip[data-stage="proposal"]').click();
@@ -434,6 +460,7 @@ test.describe('SS5 ?stage=won landing (D1)', () => {
 // wording is already pinned above (:133, :169, :387).
 test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
   test('the roster read requests limit=100, and a full page drops the "total" claim', async ({ page }) => {
+    await pinList(page);
     let dealsUrl = '';
     // 100 rows = exactly the server cap; one fractional value pins money0's cents pair
     const capped = { data: Array.from({ length: 100 }, (_, i) => ({
@@ -491,6 +518,7 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
   // CONTACT_NAME join — the search index (CONTACT_TEXT) kept the stale set, so
   // searching the new contact's company found nothing until a full reload.
   test('after creating a deal with a new contact, searching that company finds the deal', async ({ page }) => {
+    await pinList(page);
     const DEAL3 = '44444444-4444-4444-8444-444444444444';
     const NEWDEAL = { id: DEAL3, title: 'Gamma site', stage: 'lead', source: 'manual', expected_value_cents: 0, expected_close: null, contact_id: 'ct-3', converted_client_id: null, updated_at: past(0), next_step: null, next_step_at: null, last_contacted_at: null, agreement_signed: false };
     const DETAIL3 = { data: {
@@ -565,6 +593,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await pinBoard(page);
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.click();
     const items = page.locator('#board .bc-menu button');
@@ -599,6 +628,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
     });
     await page.goto('/pipeline.html');
+    await showCardOnPhone(page, DEAL);
     const move = page.locator(`#board .bcard[data-id="${DEAL}"] .bc-move`);
     await move.tap();
     const menu = page.locator('#board .bc-menu');
@@ -613,7 +643,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
   // last option (the menu was the last focusable thing). Since sales review item
   // 30 the board ends with the Won column, so that Tab now lands on "See won
   // deals" — a real element — and the menu closes the ordinary way.
-  test('Tab off the last option lands on the Won column and closes the menu', async ({ page }, testInfo) => {
+  test('Tab off the last option moves on (to the column’s + Add a deal) and closes the menu', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'keyboard Tab order at one width');
     await pinBoard(page);
     await installApp(page, { api: API });
@@ -626,7 +656,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
     await page.keyboard.press('ArrowDown');
     await expect(items.nth(2)).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.locator('#seeWon')).toBeFocused();
+    await expect(page.locator(`#board .col:has(.bcard[data-id="${DEAL}"]) .col-addbtn`)).toBeFocused();
     await expect(page.locator('#board .bc-menu')).toHaveCount(0);
   });
 

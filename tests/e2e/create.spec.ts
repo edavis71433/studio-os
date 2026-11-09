@@ -468,11 +468,12 @@ test.describe('+ Create', () => {
     await installApp(page, { api: FIXTURES });
     const calls = await salesServer(page);
     await page.goto('/pipeline.html');
-    await expect(page.getByRole('button', { name: /Blue Finch — site/ }).first()).toBeVisible();
+    const deal = page.locator(`#board .bcard[data-id="${D1}"], #list .card[data-id="${D1}"]`).first();   // on a phone's board it may sit behind another stage's tab
+    await expect(deal).toBeAttached();
     const reads = () => calls.filter((c) => c.method === 'GET' && c.path === '/sales/deals').length;
     const before = reads();
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'deal' } })));   // what create.js sends after a save
     await expect.poll(reads).toBeGreaterThan(before);
-    await expect(page.getByRole('button', { name: /Blue Finch — site/ }).first()).toBeVisible();
+    await expect(deal).toBeAttached();
   });
 });

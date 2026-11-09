@@ -101,6 +101,7 @@ test('item 54 — a one-word name gets its first letter in the Inbox badge', asy
 });
 
 test('item 55 — a won deal on the Pipeline doesn\'t "close"', async ({ page }) => {
+  await page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:pipeline')) localStorage.setItem('dds-display:pipeline', 'list'); } catch { /* denied */ } });   // the List (the board is the default since Nov 2026)
   const at = new Date().toISOString();
   await installApp(page, { api: {
     '/sales/deals': { data: [
