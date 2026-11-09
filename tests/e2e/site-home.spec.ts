@@ -841,6 +841,30 @@ test.describe('Pages: every page and the menu in one place', () => {
   });
 });
 
+test.describe('the Search tab and its neighbours say what is true (item 95)', () => {
+  test('the Search card names the Connect button and prints no schema word', async ({ page }) => {
+    await mount(page, '/presence.html#search', { '/search/health': { data: { verification: { google: false }, schema: { type: 'LocalBusiness' }, seo_fields: { title: 'Set', description: 'Set' }, links: [] } } });
+    const card = page.locator('#searchCard');
+    await expect(card).toContainText('Google can read your site: the sitemap, each page’s details and your business listing are built in.');
+    await expect(card).toContainText('To see how people find you on Google, connect Google Search Console with the button above.');
+    await expect(card).not.toContainText('LocalBusiness');
+    await expect(card).not.toContainText('code above');
+  });
+  test('a paused plan’s message reaches the owner without the page’s own tag', async ({ page }) => {
+    await mount(page, '/presence.html');
+    await page.route('**/functions/v1/presence/site', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'paused', message: 'Your plan is paused. Your live site stays up.' }) }));
+    await page.reload();
+    await expect(page.locator('#gate')).toContainText('Paused for now');
+    await expect(page.locator('#gate')).toContainText('Your plan is paused. Your live site stays up.');
+    await expect(page.locator('#gate')).not.toContainText('[site]');
+  });
+  test('Draft with help names each field as the form does', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    const text = await page.evaluate(() => (window as any).payloadPreview({ identity: { seo_description: 'Hand-made pasta', seo_title: 'Marlow’s', business_name: 'Marlow’s Kitchen' } }));
+    expect(text).toBe('Search description: Hand-made pasta\n\nSearch headline: Marlow’s\n\nBusiness name: Marlow’s Kitchen');
+  });
+});
+
 test.describe('a section edited in its panel redraws at once (item 26)', () => {
   const setup = async (page: Page) => {
     const writes = await mount(page, '/presence.html#design');
@@ -1602,29 +1626,5 @@ test.describe('the welcome list', () => {
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator('#ssTodo')).toBeHidden();
-  });
-});
-
-test.describe('the Search tab and its neighbours say what is true (item 95)', () => {
-  test('the Search card names the Connect button and prints no schema word', async ({ page }) => {
-    await mount(page, '/presence.html#search', { '/search/health': { data: { verification: { google: false }, schema: { type: 'LocalBusiness' }, seo_fields: { title: 'Set', description: 'Set' }, links: [] } } });
-    const card = page.locator('#searchCard');
-    await expect(card).toContainText('Google can read your site: the sitemap, each page’s details and your business listing are built in.');
-    await expect(card).toContainText('To see how people find you on Google, connect Google Search Console with the button above.');
-    await expect(card).not.toContainText('LocalBusiness');
-    await expect(card).not.toContainText('code above');
-  });
-  test('a paused plan’s message reaches the owner without the page’s own tag', async ({ page }) => {
-    await mount(page, '/presence.html');
-    await page.route('**/functions/v1/presence/site', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'paused', message: 'Your plan is paused. Your live site stays up.' }) }));
-    await page.reload();
-    await expect(page.locator('#gate')).toContainText('Paused for now');
-    await expect(page.locator('#gate')).toContainText('Your plan is paused. Your live site stays up.');
-    await expect(page.locator('#gate')).not.toContainText('[site]');
-  });
-  test('Draft with help names each field as the form does', async ({ page }) => {
-    await mount(page, '/presence.html#business');
-    const text = await page.evaluate(() => (window as any).payloadPreview({ identity: { seo_description: 'Hand-made pasta', seo_title: 'Marlow’s', business_name: 'Marlow’s Kitchen' } }));
-    expect(text).toBe('Search description: Hand-made pasta\n\nSearch headline: Marlow’s\n\nBusiness name: Marlow’s Kitchen');
   });
 });
