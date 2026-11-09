@@ -214,11 +214,12 @@ export function clientsByMedia(
 }
 
 // ── DAM-1 (Files): "where used" — the website-awareness value-add ─────────────
-// A single, complete usage model mirroring exactly what the renderer serializes:
-// settings.logo_media_id, settings.og_media_id, offerings.media_id, posts.hero_
-// media_id. `live` = the asset is in the CURRENT live site (its id is in the live
-// snapshot's media_manifest). The route supplies the labelled refs + the live set.
-export interface UsageRef { surface: string; label: string; live: boolean }
+// A single, complete usage model mirroring exactly what the renderer serializes.
+// `live` = the asset is in the CURRENT live site (its id is in the live snapshot's
+// media_manifest). The route supplies the labelled refs + the live set.
+// `site` (item 115): false for a use that isn't on the website at all — the Brand
+// Kit's email logo, a saved section no page shows, a project file. Absent = true.
+export interface UsageRef { surface: string; label: string; live: boolean; site?: boolean }
 export interface UsageSummary { total: number; live: number; sensitive: boolean; headline: string }
 
 /** Summarize a file's usage into a calm, plain-English headline + a replace-risk
@@ -232,6 +233,207 @@ export function usageSummary(refs: UsageRef[]): UsageSummary {
   else if (total === 1) headline = `Used as ${refs[0].label}.`;
   else headline = `Used in ${total} places${live ? ` — ${live} live on your site` : ''}.`;
   return { total, live, sensitive, headline };
+}
+
+// ── Item 115 (Nov 2026): where a file is used, across the WHOLE draft ────────
+// Where-used used to read four columns: the logo, the share image, services and
+// updates. The renderer resolves media from far more of the settings row: the
+// cover photo, every section on the home page and on each of the owner's own
+// pages (galleries, team photos, before/after pairs, video posters, map pictures,
+// downloads, cards, columns, tabs, slides, free-form pictures), each page's own
+// share image, and the saved sections a page links to. So a gallery photo read
+// "Not on your site" while it was, and Delete and Replace trusted the same short
+// list. This walk reads the row the way the serializer does (home blocks, then
+// pages[].blocks, linked sections through their library item) and names each
+// place in the owner's words: the section names are presence.html's BLOCK_DEFS.
+const MEDIA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SECTION_NAMES: Record<string, string> = {
+  gallery: 'Photo gallery', carousel: 'Carousel', before_after: 'Before & after', image: 'Image', image_text: 'Image + text',
+  video: 'Video', team: 'Team', partners: 'Trusted by', map: 'Map & directions', download: 'Download', columns: 'Columns',
+  cards: 'Feature cards', tabs: 'Tabs', freeform: 'Free-form', spotlight: 'Spotlight', features: 'Features', accordion: 'Accordion',
+};
+// page_seo's keys for the template's own pages (presence.html PG_SEO_KEY); the
+// owner's pages are "page:<slug>". The services page takes the industry's word.
+const BUILT_IN_PAGES: Record<string, string> = { about: 'About', faq: 'FAQ', updates: 'Updates', contact: 'Contact' };
+
+/** Every media-id-shaped string inside a value (a block, a saved section's
+ *  payload). Media ids sit at many depths — a column's nested block, a free-form
+ *  element's image — and a random UUID can't collide with anything else a block
+ *  holds, so collecting them all is exact. Bounded depth. Pure. */
+export function mediaIdsIn(v: unknown, out: Set<string> = new Set(), depth = 0): Set<string> {
+  if (v == null || depth > 12) return out;
+  if (typeof v === 'string') { if (MEDIA_UUID.test(v)) out.add(v.toLowerCase()); return out; }
+  if (Array.isArray(v)) { for (const x of v) mediaIdsIn(x, out, depth + 1); return out; }
+  if (typeof v === 'object') for (const x of Object.values(v as Record<string, unknown>)) mediaIdsIn(x, out, depth + 1);
+  return out;
+}
+
+export interface SettingsMedia {
+  logo_media_id?: string | null; og_media_id?: string | null; cover_media_id?: string | null;
+  blocks?: unknown; pages?: unknown; page_seo?: unknown; brand_kit?: unknown;
+}
+export interface LibraryItem { id: string; name?: string | null; payload?: unknown }
+
+const clip = (v: unknown, n = 60): string => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+const oneId = (v: unknown): string => (typeof v === 'string' && MEDIA_UUID.test(v) ? v.toLowerCase() : '');
+
+/** Where each media id is used in a site's settings row (plus its saved sections).
+ *  Returns id (lowercase) → labelled refs, in page order. Pure. */
+export function settingsMediaUses(s: SettingsMedia | null | undefined, opts: { library?: LibraryItem[]; offeringLabel?: string } = {}): Map<string, UsageRef[]> {
+  const out = new Map<string, UsageRef[]>();
+  if (!s || typeof s !== 'object') return out;
+  const add = (id: string, ref: UsageRef) => {
+    const list = out.get(id) || [];
+    if (!list.some((r) => r.label === ref.label)) list.push(ref);   // two photos of one gallery are one place
+    out.set(id, list);
+  };
+  const lib = new Map((opts.library || []).filter((it) => it && oneId(it.id)).map((it) => [oneId(it.id), it]));
+  const placed = new Set<string>();
+  const logo = oneId(s.logo_media_id);
+  if (logo) add(logo, { surface: 'brand', label: 'your logo (on every page)', live: false });
+  const cover = oneId(s.cover_media_id);
+  if (cover) add(cover, { surface: 'cover', label: 'your cover photo', live: false });
+  const og = oneId(s.og_media_id);
+  if (og) add(og, { surface: 'seo', label: 'your social share image', live: false });
+
+  const sections = (blocks: unknown, where: string) => {
+    if (!Array.isArray(blocks)) return;
+    for (const raw of blocks) {
+      if (!raw || typeof raw !== 'object') continue;
+      const b = raw as Record<string, unknown>;
+      if (b.type === 'linked') {
+        // a link renders its library item's CURRENT content (serializer, CL-LINK)
+        const item = lib.get(oneId(b.ref));
+        if (!item) continue;   // a link to a missing item renders nothing
+        placed.add(oneId(item.id));
+        const label = `the saved section “${clip(item.name) || 'Untitled'}” on ${where}`;
+        for (const id of mediaIdsIn(item.payload)) add(id, { surface: 'section', label, live: false });
+        continue;
+      }
+      const name = SECTION_NAMES[String(b.type || '')];
+      const title = clip(b.title);
+      const label = `${name ? `the ${name} section` : 'a section'}${title ? ` “${title}”` : ''} on ${where}`;
+      for (const id of mediaIdsIn(b)) add(id, { surface: 'section', label, live: false });
+    }
+  };
+  sections(s.blocks, 'your Home page');
+  const pageTitle = new Map<string, string>();
+  for (const p of Array.isArray(s.pages) ? s.pages : []) {
+    if (!p || typeof p !== 'object') continue;
+    const pg = p as Record<string, unknown>;
+    const title = clip(pg.title) || clip(pg.slug) || 'Untitled';
+    if (pg.slug) pageTitle.set(String(pg.slug), title);
+    sections(pg.blocks, `your “${title}” page`);
+  }
+  if (s.page_seo && typeof s.page_seo === 'object') {
+    for (const [key, v] of Object.entries(s.page_seo as Record<string, unknown>)) {
+      const id = oneId((v as Record<string, unknown> | null)?.share_image);
+      if (!id) continue;
+      const page = key.startsWith('page:') ? (pageTitle.get(key.slice(5)) || key.slice(5))
+        : key === 'offerings' ? (opts.offeringLabel || 'Services') : (BUILT_IN_PAGES[key] || key);
+      add(id, { surface: 'page_share', label: `the share image for your “${clip(page)}” page`, live: false });
+    }
+  }
+  // Off the website: the Brand Kit logo rides emails and social cards, and is
+  // only its own place when it isn't also the site's logo (dev.ts saves both).
+  const kit = oneId((s.brand_kit as Record<string, unknown> | null | undefined)?.logo_media_id);
+  if (kit && kit !== logo) add(kit, { surface: 'brand_kit', label: 'your Brand Kit logo (emails and social cards)', live: false, site: false });
+  for (const [id, item] of lib) {
+    if (placed.has(id)) continue;   // its placements already name it
+    const label = `the saved section “${clip(item.name) || 'Untitled'}” (not on a page yet)`;
+    for (const m of mediaIdsIn(item.payload)) add(m, { surface: 'library', label, live: false, site: false });
+  }
+  return out;
+}
+
+/** Item 115: point every reference to `fromId` in a settings row at `toId` —
+ *  the same places settingsMediaUses reads. Returns only the columns that moved,
+ *  so a Replace never rewrites a column it didn't touch. Pure. */
+export function repointSettingsMedia(s: SettingsMedia | null | undefined, fromId: string, toId: string): Partial<Record<keyof SettingsMedia, unknown>> {
+  const patch: Partial<Record<keyof SettingsMedia, unknown>> = {};
+  if (!s || typeof s !== 'object') return patch;
+  const from = fromId.toLowerCase();
+  const swap = (v: unknown, depth = 0): unknown => {
+    if (depth > 12) return v;
+    if (typeof v === 'string') return v.toLowerCase() === from ? toId : v;
+    if (Array.isArray(v)) return v.map((x) => swap(x, depth + 1));
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, swap(x, depth + 1)]));
+    return v;
+  };
+  for (const col of ['logo_media_id', 'og_media_id', 'cover_media_id', 'blocks', 'pages', 'page_seo', 'brand_kit'] as const) {
+    const cur = s[col];
+    if (cur == null) continue;
+    if (!mediaIdsIn(cur).has(from)) continue;
+    patch[col] = swap(cur);
+  }
+  return patch;
+}
+
+// ── Item 115: a photo already in Files, uploaded again ───────────────────────
+// The page hashes a file (SHA-256) before it uploads and asks whether the site
+// already holds it. A row that carries a hash answers exactly; an older row has
+// none (nothing wrote content_hash before this), so it falls back to the same
+// size-and-dimensions match dupKey uses — exact bytes AND exact pixels, which a
+// different photo practically never shares. Documents have no dimensions, so
+// only a hash can match one. Two hashes that differ are two files, whatever
+// their sizes. Pure.
+export interface RepeatProbe { hash?: string | null; bytes?: number | null; width?: number | null; height?: number | null }
+export const HASH_RE = /^[0-9a-f]{64}$/;
+export function sameContent(a: Asset, p: RepeatProbe): 'exact' | 'likely' | null {
+  const ah = String(a.content_hash || ''), ph = String(p.hash || '');
+  if (ah && ph) return ah === ph ? 'exact' : null;
+  if (!p.bytes || !p.width || !p.height) return null;
+  return Number(a.bytes) === Number(p.bytes) && Number(a.width) === Number(p.width) && Number(a.height) === Number(p.height) ? 'likely' : null;
+}
+/** The files that hold the same content as the probe, exact matches first,
+ *  then oldest first (the original, not the latest copy). Pure. */
+export function findRepeats(rows: Asset[], p: RepeatProbe, excludeId = ''): Array<{ asset: Asset; match: 'exact' | 'likely' }> {
+  const seen = new Set<string>();
+  const out: Array<{ asset: Asset; match: 'exact' | 'likely' }> = [];
+  for (const a of rows || []) {
+    if (!a || !a.id || a.id === excludeId || seen.has(a.id)) continue;
+    seen.add(a.id);
+    const match = sameContent(a, p);
+    if (match) out.push({ asset: a, match });
+  }
+  const t = (x: Asset) => Date.parse(x.created_at || '') || 0;
+  return out.sort((x, y) => (x.match === y.match ? t(x.asset) - t(y.asset) : x.match === 'exact' ? -1 : 1));
+}
+
+// ── Items 56 + 115: the storage meter ────────────────────────────────────────
+// The SAME math the upload door refuses on: every live row counts (archived and
+// client-private files still take space), bytes summed (createUpload), and the
+// smaller of the template's file cap (routes/media.ts) and the site quota
+// (media_guard.ts). `level` warns before a refusal, not after one. Pure.
+export interface StorageSummary { used_bytes: number; files: number; max_bytes: number; max_files: number; level: 'ok' | 'low' | 'full' }
+export function storageSummary(rows: Array<{ bytes?: number | null }>, limits: { maxBytes: number; maxFiles: number }): StorageSummary {
+  const files = (rows || []).length;
+  const used = (rows || []).reduce((n, r) => n + (Number(r?.bytes) || 0), 0);
+  const maxB = Math.max(0, Number(limits.maxBytes) || 0), maxF = Math.max(0, Number(limits.maxFiles) || 0);
+  const full = (maxB > 0 && used >= maxB) || (maxF > 0 && files >= maxF);
+  const low = (maxB > 0 && used >= maxB * 0.85) || (maxF > 0 && files >= maxF * 0.9);
+  return { used_bytes: used, files, max_bytes: maxB, max_files: maxF, level: full ? 'full' : low ? 'low' : 'ok' };
+}
+
+// ── Item 56: folders ─────────────────────────────────────────────────────────
+// A folder is the `collection` a file already carries (0063): no new store, and
+// a folder exists while a file is in it. One normalizer for every door that
+// names one, so "Brand  photos" and "Brand photos" never split into two. Pure.
+export function folderName(raw: unknown): string {
+  let s = '';
+  for (const ch of String(raw ?? '')) { const c = ch.codePointAt(0)!; if (c >= 32 && c !== 127) s += ch; }
+  return s.replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+/** POST /assets/folders/move: every file in folder `from` moves to `to` —
+ *  a rename, a merge into another folder, or (to = '') out of folders. Pure. */
+export function normalizeFolderMove(body: unknown): { ok: true; from: string; to: string } | { ok: false; error: string; message: string } {
+  const b = (body || {}) as Record<string, unknown>;
+  const from = folderName(b.from);
+  if (!from) return { ok: false, error: 'no_folder', message: 'Say which folder to change.' };
+  if (typeof b.to !== 'string') return { ok: false, error: 'no_target', message: 'Give the folder a name, or choose to take the files out.' };
+  const to = folderName(b.to);
+  if (to === from) return { ok: false, error: 'same_folder', message: 'That’s the folder’s name already.' };
+  return { ok: true, from, to };
 }
 
 // ── DAM-1 (Files): replace carry-forward — a new version inherits the old file's
@@ -319,8 +521,10 @@ export function normalizeBulkRequest(body: unknown): BulkRequest {
     return { ok: true, action, ids, tag };
   }
   if (action === 'collection') {
-    const collection = String(b.collection ?? '').trim().slice(0, 80);
-    if (!collection) return { ok: false, error: 'no_collection', message: 'Type the collection to move these into.' };
+    // item 56: `clear: true` takes the files out of their folders (collection '')
+    if (b.clear === true) return { ok: true, action, ids, collection: '' };
+    const collection = folderName(b.collection);
+    if (!collection) return { ok: false, error: 'no_collection', message: 'Type the folder to move these into.' };
     return { ok: true, action, ids, collection };
   }
   return { ok: true, action, ids };

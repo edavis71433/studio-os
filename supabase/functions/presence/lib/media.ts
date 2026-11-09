@@ -29,7 +29,7 @@ const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', '
 /** Issue a signed upload URL + create the media row in one call (G1 §8).
  *  Format-aware: images require alt text; documents require a name (stored in the
  *  same alt_text column, which satisfies the a11y CHECK and doubles as the title). */
-export async function createUpload(siteId: string, req: { mime: string; bytes: number; alt_text: string; width?: number; height?: number }) {
+export async function createUpload(siteId: string, req: { mime: string; bytes: number; alt_text: string; width?: number; height?: number; content_hash?: string }) {
   const isDoc = isDocMime(req.mime);
   if (!MIME_ALLOW.has(req.mime)) return { error: 'unsupported_type', message: 'Files must be an image (JPEG, PNG, WebP) or a PDF document.' };
   const cap = isDoc ? MAX_DOC_BYTES : MAX_BYTES;
@@ -69,9 +69,13 @@ export async function createUpload(siteId: string, req: { mime: string; bytes: n
   const j = await r.json().catch(() => null);
   if (!r.ok || !j?.url) return { error: 'upload_url_failed', message: 'We couldn’t start that upload — please try again.' };
 
+  // Item 115: the file's SHA-256, worked out by the page that holds the bytes, so a
+  // later upload of the same file is caught exactly (0063's column; nothing wrote it
+  // before). Only a well-formed hash is kept; a wrong one only blinds that check.
+  const hash = /^[0-9a-f]{64}$/.test(String(req.content_hash || '')) ? String(req.content_hash) : undefined;
   const row = await svc('presence_media', {
     method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: siteId, storage_path: storagePath, alt_text: req.alt_text.trim(), mime: req.mime, bytes: req.bytes, width: req.width ?? null, height: req.height ?? null }),
+    body: JSON.stringify({ site_id: siteId, storage_path: storagePath, alt_text: req.alt_text.trim(), mime: req.mime, bytes: req.bytes, width: req.width ?? null, height: req.height ?? null, ...(hash ? { content_hash: hash } : {}) }),
   });
   if (!row.ok || !row.json?.[0]?.id) return { error: 'row_failed', message: 'We couldn’t register that upload — please try again.' };
 
@@ -109,7 +113,7 @@ export async function importImage(siteId: string, bytes: Uint8Array, mime: strin
 
 /** Delete: refuse while referenced (names the blockers); soft-delete row + remove object. */
 export async function deleteMedia(siteId: string, mediaId: string) {
-  const [off, posts, deliverables, settingsQ] = await Promise.all([
+  const [off, posts, deliverables, settingsQ, libraryQ] = await Promise.all([
     svc(`presence_offerings?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=name`),
     svc(`presence_posts?site_id=eq.${siteId}&hero_media_id=eq.${mediaId}&deleted_at=is.null&select=title`),
     svc(`presence_deliverables?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=title`), // P2-D: a shared deliverable protects its file
@@ -117,7 +121,10 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     // embedded in a content block (gallery/team/before-after/video). Without this,
     // deleting your logo or a gallery photo succeeds silently and the serializer
     // drops it from every page — gone for good after the media_gc window.
-    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks&limit=1`),
+    // Item 115: and the owner's own pages, each page's share image, the Brand Kit
+    // logo, and the saved sections a page can link to.
+    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`),
+    svc(`presence_content_library?site_id=eq.${siteId}&select=name,payload&limit=500`),
   ]);
   const s = Array.isArray(settingsQ.json) ? settingsQ.json[0] : null;
   const siteRefs: string[] = [];
@@ -128,6 +135,12 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     // blocks is a JSON column; media ids live inside it as UUID strings (exact,
     // 36-char — no false substring match between distinct UUIDs).
     if (s.blocks && JSON.stringify(s.blocks).includes(mediaId)) siteRefs.push('a section on your website');
+    if (s.pages && JSON.stringify(s.pages).includes(mediaId)) siteRefs.push('a section on one of your pages');
+    if (s.page_seo && JSON.stringify(s.page_seo).includes(mediaId)) siteRefs.push('a page’s share image');
+    if (s.brand_kit && JSON.stringify(s.brand_kit).includes(mediaId) && s.logo_media_id !== mediaId) siteRefs.push('your Brand Kit logo');
+  }
+  for (const it of Array.isArray(libraryQ.json) ? libraryQ.json : []) {
+    if (it?.payload && JSON.stringify(it.payload).includes(mediaId)) siteRefs.push(`the saved section “${it.name || 'Untitled'}”`);
   }
   const refs = [
     ...(Array.isArray(off.json) ? off.json.map((o: any) => `menu item “${o.name}”`) : []),

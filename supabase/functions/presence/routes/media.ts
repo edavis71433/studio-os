@@ -20,7 +20,7 @@ export async function handleMediaUpload(req: Request, site: SiteRow, principal: 
     return json({ error: 'media_cap', message: `This site supports up to ${cap} images — delete some you’re not using first.` }, 422, cors);
   }
 
-  const res = await createUpload(site.id, { mime: String(body?.mime || ''), bytes: Number(body?.bytes || 0), alt_text: String(body?.alt_text || ''), width: body?.width, height: body?.height });
+  const res = await createUpload(site.id, { mime: String(body?.mime || ''), bytes: Number(body?.bytes || 0), alt_text: String(body?.alt_text || ''), width: body?.width, height: body?.height, content_hash: String(body?.content_hash || '').toLowerCase() });
   if ('error' in res) return json(res, 422, cors);
 
   await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: res.media_id, action: 'create', summary: 'Added a photo', principal, provenance: 'human', fields: ['storage_path', 'alt_text'] });
