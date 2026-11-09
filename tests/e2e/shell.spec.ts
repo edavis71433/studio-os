@@ -422,6 +422,69 @@ test.describe('Context bar (slice 7)', () => {
     await expect(menu.locator('a.rec', { hasText: 'Lea Chan' })).toHaveAttribute('href', '/crm.html?client_id=c-lea');
   });
 
+  // item 44 (Nov 9 2026): jump between sites from inside one, like Wix's All Sites switcher
+  test('item 44 — Switch site on the client card lists every site with a search box; a pick opens that site’s home; All sites in one click', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const rows = [
+      { site_id: CLIENT, name: 'Joe’s Plumbing', address: 'https://joes.example', domain: 'joes.example', state: 'live', state_words: 'Live', tags: ['trades'] },
+      { site_id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', name: 'Bistro Nine', address: 'https://bistro.example', domain: 'bistro.example', state: 'live', state_words: 'Live', tags: ['restaurant'] },
+      { site_id: 'cccccccc-3333-4333-8333-cccccccccccc', name: 'Cafe Eleven', address: '', domain: null, state: 'not_live', state_words: 'Not live yet', tags: [] },
+    ];
+    const scopes: string[] = [];
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => { scopes.push(route.request().headers()['x-dds-scope-site'] ?? 'none'); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rows, partial: false, can_open: true }) }); });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    const bar = page.locator('#dds-ctxbar');
+    const sw = bar.locator('#dds-site-switch');
+    await expect(sw).toHaveText('Switch site');
+    await expect(bar.locator('a')).toHaveText(['Back to studio']);      // the way out is unchanged
+    await sw.click();
+    const pop = page.locator('#dds-sites-pop');
+    await expect(pop).toBeVisible();
+    await expect(sw).toHaveAttribute('aria-expanded', 'true');
+    await expect(pop.locator('#dds-sites-q')).toBeFocused();
+    await expect(pop.locator('.list a.row')).toHaveCount(3);
+    await expect(pop.locator('.list a.row.now')).toContainText('Joe’s Plumbing');
+    await expect(pop.locator('.list a.row.now')).toContainText('here now');
+    await expect(pop.locator('.list a.row').nth(1)).toHaveAttribute('href', '/today.html?client=bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb');   // a site’s own home, as the Sites page opens it
+    await expect(pop.locator('.list a.row').nth(2)).toContainText('No address yet · Not live yet');
+    await expect(pop.locator('a.row.all')).toHaveAttribute('href', '/sites.html');
+    expect(scopes).toEqual(['']);                                           // the list is the studio’s, read at studio level
+    await pop.locator('#dds-sites-q').fill('bist');
+    await expect(pop.locator('.list a.row')).toHaveCount(1);
+    await expect(pop.locator('.list a.row')).toContainText('Bistro Nine');
+    await pop.locator('#dds-sites-q').fill('zzz');
+    await expect(pop.locator('.list .muted')).toHaveText('No site matches that.');
+    await page.keyboard.press('Escape');
+    await expect(pop).toHaveCount(0);
+    await expect(sw).toBeFocused();
+    await expect(sw).toHaveAttribute('aria-expanded', 'false');
+    // a second open reuses the list: still one read
+    await sw.click();
+    await expect(page.locator('#dds-sites-pop .list a.row')).toHaveCount(3);
+    expect(scopes).toEqual(['']);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await expect(page.locator('#dds-sites-pop')).toHaveCount(0);
+    // the account menu: All sites, one click
+    await page.locator('#dds-profile').click();
+    await expect(page.locator('#dds-all-sites')).toHaveAttribute('href', '/sites.html');
+  });
+
+  test('item 44 — the switcher is honest when the list won’t load, and never shows at studio level or to an owner', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await page.locator('#dds-site-switch').click();
+    await expect(page.locator('#dds-sites-pop .list .muted')).toHaveText('Couldn’t load your sites just now.');
+    await expect(page.locator('#dds-sites-pop a.row.all')).toHaveAttribute('href', '/sites.html');   // the Sites page still says what it can
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: false, scope: null } } } });
+    await page.goto('/today.html');
+    await expect(page.locator('#dds-site-switch')).toHaveCount(0);
+    await page.locator('#dds-profile').click();
+    await expect(page.locator('#dds-all-sites')).toHaveCount(0);
+  });
+
   // Phase 1 overhaul: drilled into a client, a CONTEXT CARD says so (a colored
   // band under the top bar on phones). At studio level there is none.
   test('P1 — the client context bar shows when scoped, never at studio level', async ({ page }, testInfo) => {
