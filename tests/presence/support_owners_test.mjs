@@ -138,7 +138,8 @@ eq('nothing at all → "A customer"', by('no')?.name, 'A customer');
 
 // ── 5. the read paths are wired ──
 const ws = read('supabase/functions/presence/routes/workspace.ts');
-ok('Inbox: heals, then shows the email for a row that names nobody', /healSupportOwners\(site\.id, sup\)/.test(ws) && /client: c\.client \|\| owners\.emailOf\[String\(r\.id\)\] \|\| ''/.test(ws));
+// item 71: a contact who emailed in is named first; the email is the last fallback
+ok('Inbox: heals, then shows the email for a row that names nobody', /healSupportOwners\(site\.id, sup\)/.test(ws) && /client: c\.client \|\| owners\.nameOf\[String\(r\.id\)\] \|\| owners\.emailOf\[String\(r\.id\)\] \|\| ''/.test(ws));
 const ag = read('supabase/functions/presence/agency/routes.ts');
 ok('Home: selects client_id and requester, and heals', /select=id,subject,project_id,client_id,requester,created_at,updated_at/.test(ag) && /healSupportOwners\(own\.id, supportRows\)/.test(ag));
 ok('Home: never hands the raw sign-in id to the page', /support: supportRows\.map\(\(\{ requester: _r, \.\.\.row \}\) => row\)/.test(ag));

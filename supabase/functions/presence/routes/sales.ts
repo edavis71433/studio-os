@@ -1191,7 +1191,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1215,7 +1215,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1234,7 +1234,7 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true });   // a payment link = transactional
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1521,7 +1521,7 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
     return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
       `<p>Your studio has set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
-      brand, { critical: true });   // a payment authorization the client is expecting = transactional
+      brand, { critical: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2091,7 +2091,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine,
-        brand, { critical: true }).catch(() => false);   // their signed legal record = transactional
+        brand, { critical: true, siteId: tok.site_id }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -2533,7 +2533,7 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html">your portal</a>. If anything looks off, just reply and tell me.</p>`,
-  brand, { critical: true }).catch(() => {});   // login access = transactional
+  brand, { critical: true, siteId }).catch(() => {});   // login access = transactional; "message me directly" — their answer lands in the Inbox
   return true;
 }
 

@@ -465,3 +465,37 @@ export function mergeReceived(envelope: unknown, full: unknown): Record<string, 
   if (f.authentication && typeof f.authentication === 'object') { delete out.dmarc; delete out.spf; delete out.dkim; }
   return out;
 }
+
+// ── The quoted earlier email under a reply (item 71) ──────────────────────────
+/** An emailed reply arrives with the whole thread quoted under it ("On Sun, Nov 8
+ *  … wrote:" and every ">" line after it). The studio's alert should show only the
+ *  new words. This is the SAME rule as shell.js ddsSplitQuote, which the pages use
+ *  to fold the quote behind "Show earlier email" (tests/presence/
+ *  inbound_rough_edges_test.mjs runs both on the same messages and requires the
+ *  same answer): only a TRAILING quote counts; answers written inside the quote,
+ *  and a message that is only a quote, come back whole. The stored body is never
+ *  cut, so this only decides what is SHOWN. Pure. */
+export function splitQuotedReply(text: unknown): { text: string; quoted: string } {
+  const s = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+  const lines = s.split('\n');
+  const ATTR = /\b(wrote|writes|escribió|a écrit|schrieb|scrisse|escreveu)\s*:\s*$/i;
+  const quoted = (l: string) => /^\s*>/.test(l);
+  const blank = (l: string) => !/\S/.test(l);
+  const restQuoted = (from: number): boolean => {
+    let any = false;
+    for (let k = from; k < lines.length; k++) { if (blank(lines[k])) continue; if (!quoted(lines[k])) return false; any = true; }
+    return any;
+  };
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i], next = lines[i + 1] || '';
+    if (quoted(l)) { if (restQuoted(i)) { start = i; break; } continue; }
+    if (ATTR.test(l) && restQuoted(i + 1)) { start = i; break; }
+    if (/^\s*On\s\S/i.test(l) && ATTR.test(next) && !quoted(next) && restQuoted(i + 2)) { start = i; break; }
+    if (/^\s*-{2,}\s*Original Message\s*-{2,}\s*$/i.test(l)) { start = i; break; }
+    if (/^\s*From:\s*\S/i.test(l) && /^\s*(Sent|Date):\s*\S/i.test(next)) { start = (i > 0 && /^\s*_{8,}\s*$/.test(lines[i - 1])) ? i - 1 : i; break; }
+  }
+  const head = start > 0 ? lines.slice(0, start).join('\n').trim() : '';
+  if (!head) return { text: s.trim(), quoted: '' };
+  return { text: head, quoted: lines.slice(start).join('\n').trim() };
+}
