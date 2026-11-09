@@ -418,9 +418,10 @@ test.describe('SS4 — broadcasts console', () => {
     await expect(contacts.locator('.n')).toHaveText('12');
     await expect(contacts).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: /Preview/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Send update' })).toBeVisible();
+    // bold redesign: the send button says how many it goes to; the fill-ins are chips
+    await expect(page.locator('#sendUpdate')).toHaveText('Send to 12 people');
     await expect(page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button')).toHaveCount(4);
-    await expect(page.locator('#insvar')).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Fill in for each person' }).getByRole('button')).toHaveText(['+ First name', '+ Business name']);
     expect(errors).toEqual([]);
   });
 
@@ -437,14 +438,14 @@ test.describe('SS4 — broadcasts console', () => {
     await page.locator('#subj').fill('Autumn hours');
     await page.locator('#bodytx').fill('Hi {{first_name}}, we close early on Sundays now.');
     const created = page.waitForRequest((r) => r.method() === 'POST' && /\/presence\/broadcasts$/.test(new URL(r.url()).pathname));
-    await page.getByRole('button', { name: 'Send update' }).click();
+    await page.locator('#sendUpdate').click();   // "Send to 12 people" — the same road as before
     await created;
     await expect(page.locator('#stage')).toContainText('Preview & send');
     await expect(page.locator('#send')).toBeFocused();           // the next press is the real one
     expect(sends).toHaveLength(0);                                // …and it has NOT happened
   });
 
-  test('the formatting bar writes the markdown the email renderer understands, and Insert variable lands at the caret', async ({ page }) => {
+  test('the formatting bar writes the markdown the email renderer understands, and a fill-in chip lands at the caret', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/broadcasts.html');
     const body = page.locator('#bodytx');
@@ -457,9 +458,9 @@ test.describe('SS4 — broadcasts console', () => {
     await expect(body).toHaveValue('**open late***italic text*');
     await body.fill('Hi ');
     await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(3, 3); });
-    await page.locator('#insvar').selectOption('{{first_name}}');
+    await page.getByRole('button', { name: '+ First name' }).click();
     await expect(body).toHaveValue('Hi {{first_name}}');
-    await expect(page.locator('#insvar')).toHaveValue('');          // the menu resets, ready for the next one
+    await expect(body).toBeFocused();                               // the caret stays in the message, ready for more
     await body.fill('first\nsecond');
     await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });
     await page.getByRole('button', { name: 'Bulleted list' }).click();
