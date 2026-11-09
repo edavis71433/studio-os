@@ -28,12 +28,12 @@
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     /* Chart ramp — ONE ordered categorical ramp, indexed by sort order (SLDS
        color discipline §12.5). Stage colors follow the approved mockup: the
-       purple ladder for open stages, --good for won (= pipeline.html's
+       violet ladder for open stages (look refresh E: the new violet), --good for won (= pipeline.html's
        .stage.won), --warn for the "other" slice. */
-    --c1:#5b3fa0;--c2:#8b6fd0;--c3:#b49ae8;--c4:var(--good);--c5:var(--warn);
+    --c1:#6d3fd4;--c2:#9673e6;--c3:#c4b0fa;--c4:var(--good);--c5:var(--warn);
   }
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c1:#a98ff0;--c2:#8b6fd0;--c3:#6a53a8}}
-  :root[data-theme="dark"]{--c1:#a98ff0;--c2:#8b6fd0;--c3:#6a53a8}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c1:#b79cf5;--c2:#9071e3;--c3:#6a4dc4}}
+  :root[data-theme="dark"]{--c1:#b79cf5;--c2:#9071e3;--c3:#6a4dc4}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s5,20px) var(--dds-s7,32px) 90px}
@@ -222,6 +222,15 @@
   @media (max-width:1000px){.grid2{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:760px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:560px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.stats{grid-template-columns:minmax(0,1fr)}.stat{border-left:none}.stat+.stat{border-top:1px solid var(--line)}.seg{overflow-x:auto}}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026): this page's touch-ups. The
+     tokens and the shared anatomy come from shell.css. ══ */
+  /* the numbers: each its own card, as on Home */
+  .stats{gap:var(--dds-s3,12px);border:0;background:transparent;box-shadow:none;overflow:visible}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
+  .stat:first-child{border-left:1px solid var(--line)}
+  .stat .ico{border-radius:12px}
+  .btn{border-radius:999px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>

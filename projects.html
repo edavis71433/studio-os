@@ -236,6 +236,14 @@ html.dds-embed #detailWrap{padding-top:0}
   dialog input,dialog textarea,dialog select{font-size:16px}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  /* ══ Look refresh E ("Fresh & bold", Nov 2026): this page's touch-ups. The
+     tokens and the shared anatomy come from shell.css. ══ */
+  .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  .card{box-shadow:var(--shadow);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .card:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
+  @media (prefers-reduced-motion:reduce){.card:hover{transform:none}}
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>

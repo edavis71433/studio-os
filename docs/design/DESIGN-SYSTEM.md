@@ -2,24 +2,29 @@
 
 Everything a page is allowed to use. The tokens live once in `shell.css` (`:root`, theme-independent) and every shelled page pulls from them with the literal as the `var()` fallback. Mockups Eric approved: [the canvas](https://claude.ai/artifact/BkaE4KvwNxCXXgrNXTke7a) (Tokens · Sweep · Motion · Today boards). Benchmark item 11 in [BENCHMARK-2026-10.md](BENCHMARK-2026-10.md).
 
-## Color (settled in the October refresh, listed for completeness)
+**Look refresh E, "Fresh & bold" (Nov 2026).** Eric picked Direction E of five in the Figma file "Studio OS — look refresh directions" (https://www.figma.com/design/HSP7ScFSz2mg1xGzHRrEZi, section "Direction E"): a lavender canvas, white cards that float on a soft shadow, bigger corners, pill buttons in a violet gradient, a floating sidebar, gradient avatars and a gradient greeting on Home. The values below are E's; the names did not change.
+
+## Color
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--dds-p` / `--dds-p-soft` / `--dds-p-deep` | #5b3fa0 / #f1edfa / #2a1b4a | #b79ceb / #272136 / #cdb6f2 | the plum: the one filled button, the active nav row, links; the soft wash; the deep plum for marks |
-| `--dds-ink` / `--dds-soft` / `--dds-faint` | #15141a / #5c5a66 / #6f6d7a | #ededf0 / #a6a4b0 / #8e8c99 | three inks: body, secondary, labels |
-| `--dds-line` / `--dds-line-strong` | #e6e6ec / #d2d2db | #2a2932 / #3a3944 | two hairlines |
-| `--dds-bg` / `--dds-card` | #f7f7f9 / #fff | #141318 / #1c1b22 | canvas and card |
-| `--dds-good` / `--dds-warn` / `--dds-bad` / `--dds-info` (+ `-soft`) | #15713d / #975208 / #c43c3c / #2a6fb5 | #8bbf9f / #d3ac6e / #e08b83 / #8ab8e8 | four meanings, each with a wash |
-| `--dds-shadow` / `--dds-shadow-pop` | | | the one card shadow; the popover shadow |
+| `--dds-p` / `--dds-p-soft` / `--dds-p-deep` | #6d3fd4 / #f0ebfd / #3d2185 | #b79cf5 / #2c2347 / #d7c8fb | the violet: the active nav row, links, chips; the soft wash; the deep violet for marks |
+| `--dds-ink` / `--dds-soft` / `--dds-faint` | #171522 / #55526a / #69667d | #edeaf7 / #b3aecb / #9792b0 | three inks: body, secondary, labels |
+| `--dds-line` / `--dds-line-strong` | #e7e6ef / #d6d4e2 | #2d2944 / #403a5e | two hairlines |
+| `--dds-bg` / `--dds-card` / `--dds-up` | #f3f3f8 / #fff / #f7f6fb | #131120 / #1d1a2e / #262239 | canvas, card, and a raised surface inside a card (a composer, a deal in a column) |
+| `--dds-good` / `--dds-warn` / `--dds-bad` / `--dds-info` (+ `-soft`) | #11744a / #94530a / #bf3535 / #245fa0 | #7fd3a5 / #e3b06b / #f09a92 / #8ab8e8 | four meanings, each with a wash |
+| `--dds-shadow` / `--dds-shadow-pop` | | | the one card shadow (soft, two layers); the popover shadow |
+| `--dds-grad-btn` + `--dds-on-p` | #6d3fd4 → #7a4bdd, white label | #c4b0fa → #dcb4f0, #171320 label | the one filled button |
+| `--dds-grad-brand` | #6d3fd4 → #a63f86 | same | the brand mark, avatars, badges |
+| `--dds-grad` | #4a2c8c → #6436c4 → #7d3fb8 | #3c2378 → #56309f → #6f3aa6 | the greeting on Home |
 
-Pinned by tests (axe 4.5:1, admin-health, shell A7): do not change a color. Four blocks keep them honest: `:root`, `prefers-color-scheme: dark`, `[data-theme="light"]`, `[data-theme="dark"]`.
+Every text pair is AA (4.5:1) on bg, card and up in both themes, and white or #171320 text is AA on every gradient stop. Pinned by tests (axe 4.5:1, admin-health, shell A7, agency's dark tokens): change a color only with those pins, and re-check the pairs. Four blocks keep them honest: `:root`, `prefers-color-scheme: dark`, `[data-theme="light"]`, `[data-theme="dark"]`; every new token goes in all four.
 
 ## Type — six sizes
 
 | | Size | Face / weight |
 |---|---|---|
-| Page title | 28px | Fraunces 500 (`--dds-serif`), the only serif on a page |
+| Page title | 30px (24 on a phone) | Fraunces 600 (`--dds-serif`), the only serif on a page; Home's greeting is 36px |
 | Section heading | 14px | Inter 600 |
 | Body | 13.5px | Inter 400 — what most text is |
 | Secondary | 12.5px | Inter 400, `--dds-soft` — the line under a name |
@@ -48,11 +53,11 @@ Under 761px the scale shrinks one step: s4 → 12, s5 → 16, s7 → 16. Values 
 
 | Token | px | Use |
 |---|---|---|
-| `--dds-r-sm` | 6 | inputs, small icon tiles |
-| `--dds-r` | 8 | buttons, menus, rows |
-| `--dds-r-lg` | 10 | cards, lists |
-| `--dds-r-xl` | 14 | dialogs, toasts, the ⌘K box |
-| `999px` | pill | chips and toggles |
+| `--dds-r-sm` | 8 | inputs, small icon tiles, the brand mark |
+| `--dds-r` | 12 | menus, rows, nav items |
+| `--dds-r-lg` | 16 | cards, lists, the sidebar |
+| `--dds-r-xl` | 20 | dialogs, toasts, the ⌘K box, the greeting |
+| `999px` | pill | buttons, chips, toggles, search boxes |
 
 ## Motion — three speeds, one curve
 
@@ -71,6 +76,6 @@ The shell's `ICON` map in `shell.js`: 17px, 1.75px stroke, round caps and joins,
 
 ## The three rules
 
-1. **One filled button per view.** The rest are outlined or plain.
+1. **One filled button per view.** It wears `--dds-grad-btn` as a pill; the rest are outlined or plain pills.
 2. **Sentence case everywhere.** No SHOUTING labels, no Title Case Buttons.
-3. **The sidebar from 761px** (`html.dds-side`). Below that, the top bar, the bottom bar and the drawer sheet.
+3. **The sidebar from 761px** (`html.dds-side`), floating as a card `--dds-side-gap` (12px) from the edges. Below that, the top bar, the bottom bar (an icon over each word) and the drawer sheet.

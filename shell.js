@@ -530,7 +530,8 @@
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
-    dot: '<circle cx="12" cy="12" r="3"/>'
+    dot: '<circle cx="12" cy="12" r="3"/>',
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
@@ -660,10 +661,11 @@
     var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : { href: '/inbox.html', label: 'Inbox' };
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
+    // Look refresh E: an icon over each word (the words stay the names)
     bar.innerHTML =
-      '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + esc(home.label) + '</a>' +
-      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</a>' : '') +
-      '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">Menu</button>';
+      '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>' +
+      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '') +
+      '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">' + icon('menu') + '<span class="mlbl">Menu</span></button>';
     document.body.appendChild(bar);
     var mb = document.getElementById('dds-mbar-menu');
     if (mb) mb.addEventListener('click', function (e) {
@@ -1496,7 +1498,9 @@
     // Visual refresh: the left sidebar (shell.css ≥761px). The website builder
     // keeps the top bar — it has its own left rail — and embedded frames have
     // no chrome at all.
-    if (location.pathname.indexOf('/presence') !== 0 && !document.documentElement.classList.contains('dds-embed')) document.documentElement.classList.add('dds-side');
+    // Look refresh E: dds-app marks the same pages for shell.css's shared page anatomy
+    // (the builder pre-stamps dds-side for the frame but keeps its own controls)
+    if (location.pathname.indexOf('/presence') !== 0 && !document.documentElement.classList.contains('dds-embed')) document.documentElement.classList.add('dds-side', 'dds-app');
     // A11y (central): give EVERY shelled page a skip link + a main landmark
     // without editing each one. The page's primary container is #main on most
     // pages; fall back to .wrap or a real <main>. role=main is the ARIA landmark
