@@ -81,6 +81,11 @@ ok('prod: every change is inside ONE do block, so a failed check changes nothing
   prodBlock.length > 1000 && ['cron.schedule(', 'cron.unschedule(', 'vault.create_secret(', 'vault.update_secret(', 'delete from', 'cron.alter_job('].every((s) =>
     (code.prod.split(s).length - 1) === (prodBlock.split(s).length - 1) && prodBlock.includes(s)));
 ok('prod: the checks come before the first change', prodBlock.indexOf('does not carry a real secret') < prodBlock.indexOf('cron.schedule(') && prodBlock.indexOf('belongs to another database user') < prodBlock.indexOf('vault.create_secret('));
+// Nov 9 2026: the staging pack was pasted into production's editor and pointed
+// production's tick at staging. Each pack now refuses the other project first.
+const WATCHDOG_ENTRIES = /select 1 from vault\.secrets\s+where name in \('watchdog_health_url', 'watchdog_resend_key', 'watchdog_target_secret'\)\) then\s+raise exception/;
+ok('prod: stops first thing in the staging project (only staging has the watchdog\'s Vault entries)',
+  new RegExp(/if exists \(/.source + WATCHDOG_ENTRIES.source + / 'this is the STAGING project/.source).test(prodBlock) && prodBlock.indexOf('this is the STAGING project') < prodBlock.indexOf('belongs to another database user'));
 ok('prod: old run history holding a secret is deleted, nothing else', /delete from cron\.job_run_details where position\(live in command\) > 0;/.test(prodBlock) && /if length\(old_nightly\) >= 16 then\s+delete from cron\.job_run_details where position\(old_nightly in command\) > 0;/.test(prodBlock) && (prodBlock.match(/delete from/g) || []).length === 2);
 
 // ═══ 4. staging: the address bug, and nothing switched on by surprise ═══
@@ -90,6 +95,8 @@ ok('staging: every address is staging\'s', urlsIn(code.staging).every((u) => u.s
 ok('staging: switched off when converted, a re-run leaves the switch as it was',
   /perform cron\.alter_job\(job_id := jid,\s+active := case when was_on_vault_body then coalesce\(was_active, false\) else false end\);/.test(code.staging)
   && /was_on_vault_body := exists/.test(code.staging) && code.staging.indexOf('was_active :=') < code.staging.indexOf("cron.schedule('presence-cycle'"));
+ok('staging: stops first thing outside staging',
+  new RegExp(/if not exists \(/.source + WATCHDOG_ENTRIES.source + / 'this is not the STAGING project/.source).test(code.staging) && code.staging.indexOf('this is not the STAGING project') < code.staging.indexOf('has no presence_scheduler_secret'));
 ok('staging: stops if its Vault entry is missing', /if not exists \(select 1 from vault\.secrets where name = 'presence_scheduler_secret'\) then\s+raise exception/.test(code.staging));
 ok('staging: leaves the watchdog to watchdog-cron.sql', !/presence[-_]watchdog/.test(code.staging) && !/vault\.(create|update)_secret/.test(code.staging) && !/delete from/.test(code.staging));
 
