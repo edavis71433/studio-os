@@ -1141,7 +1141,7 @@
   function closeHelp() { if (help) help.classList.remove('open'); setExpanded('dds-help', false); }
   function helpSuggest() {
     var body = help.querySelector('#dds-help-body');
-    var qs = ['Change my hours', 'Publish my changes', 'Set up booking', 'Send a broadcast', 'Connect a service'];
+    var qs = ['Change my hours', 'Publish my changes', 'Set up booking', 'Send an update', 'Connect a service'];
     body.innerHTML = '<div class="muted" style="font-size:12px;margin-bottom:2px">Popular questions</div>' +
       qs.map(function (q) { return '<button type="button" class="dds-help-chip" style="' + HELP_CHIP + '">' + esc(q) + '</button>'; }).join('');
     Array.prototype.forEach.call(body.querySelectorAll('.dds-help-chip'), function (b) {

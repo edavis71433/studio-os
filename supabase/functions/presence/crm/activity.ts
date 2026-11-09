@@ -75,7 +75,7 @@ export function mapConversationItem(m: any): ActivityItem | null {
     case 'booking':
       return { id, kind: 'booking', type: 'call', title: str(m.subject) || 'The client booked a call', body, at, meta: 'Booking', href: null };
     case 'broadcast':
-      return { id, kind: 'broadcast', type: 'email', title: `You sent a broadcast${m.subject ? ` — ${str(m.subject)}` : ''}`, body, at, meta: 'Broadcast', href: null };
+      return { id, kind: 'broadcast', type: 'email', title: `You sent an update${m.subject ? ` — ${str(m.subject)}` : ''}`, body, at, meta: 'Update', href: null };   // item 92: an update, as the Inbox's Send an update calls it
     case 'activity': {
       const ak = str(m.activity_kind);
       if (SENT_STAMPS.includes(ak)) return null;   // the deal ledger covers these

@@ -473,7 +473,7 @@ test.describe('SS4 — broadcasts console', () => {
     await expect(body).toHaveValue('[our menu](https://)');
   });
 
-  test('no history yet → the calm empty state inside the Recent broadcasts card', async ({ page }) => {
+  test('no history yet → the calm empty state inside the Recent updates card', async ({ page }) => {
     await installApp(page, { api: { ...API, '/broadcasts': { data: { broadcasts: [] } } } });
     await page.goto('/broadcasts.html');
     await expect(page.locator('#bcMeta')).toContainText('0 broadcasts');

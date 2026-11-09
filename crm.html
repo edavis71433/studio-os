@@ -1321,7 +1321,7 @@ function convItem(m){
   if(m.kind==='support_reply')return{id,kind:'support_reply',type:'message',title:mine?'You replied':'The client replied',body,at,meta:'Support',href:null};
   if(m.kind==='enquiry')return{id,kind:'enquiry',type:'message',title:'The client reached out from your website',body,at,meta:'Website enquiry',href:null};
   if(m.kind==='booking')return{id,kind:'booking',type:'call',title:m.subject||'The client booked a call',body,at,meta:'Booking',href:null};
-  if(m.kind==='broadcast')return{id,kind:'broadcast',type:'email',title:'You sent a broadcast'+(m.subject?' — '+m.subject:''),body,at,meta:'Broadcast',href:null};
+  if(m.kind==='broadcast')return{id,kind:'broadcast',type:'email',title:'You sent an update'+(m.subject?' — '+m.subject:''),body,at,meta:'Update',href:null};
   if(m.kind==='activity'){
     const map={call:['call','You logged a call','Logged call'],email:['email','You logged an email','Logged email'],meeting:['call','You logged a meeting','Meeting'],note:['note','You added a note','Note'],proposal_sent:['system','Proposal sent','Deal'],contract_sent:['system','Agreement sent','Deal'],invoice_sent:['system','Invoice sent','Deal']};
     const t=map[m.activity_kind]||['note','You logged an activity','Activity'];

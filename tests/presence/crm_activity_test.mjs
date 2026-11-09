@@ -146,7 +146,7 @@ const DEAL = 'dddddddd-4444-4444-8444-dddddddddddd';
   const tk = mapDoneTask({ id: 'th', title: pg, status: 'done', completed_at: NOW }, DEAL);
   ok('filter-grammar chars in a task title survive', tk.title === `To-do completed — ${pg}`);
   const bc = mapConversationItem({ id: 'bh', kind: 'broadcast', from: 'studio', subject: evil, created_at: NOW });
-  ok('hostile broadcast subject unmangled', bc.title === `You sent a broadcast — ${evil}`);
+  ok('hostile broadcast subject unmangled', bc.title === `You sent an update — ${evil}`);
   const uh = buildUpcoming({ tasks: [{ id: 'uh', title: evil, due_date: null, status: 'open' }] }, NOW);
   ok('hostile to-do title survives the upcoming band', uh[0].title === evil);
 }

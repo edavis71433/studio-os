@@ -60,7 +60,7 @@ ok('searchReadiness: broken links flagged', /point somewhere broken/.test(search
   ok('portfolio: surfaces who has new inquiries', insights.find((i) => i.key === 'growing')?.number === 2);
   ok('portfolio: surfaces who needs attention', insights.find((i) => i.key === 'attention')?.number === 2);
   ok('portfolio: surfaces who has gone quiet (>30d)', insights.find((i) => i.key === 'quiet')?.number === 1);
-  ok('portfolio: headline frames the whole portfolio', /Across 3 clients/.test(headline));
+  ok('portfolio: headline frames the whole portfolio', /Across 3 customers/.test(headline));
   const calm = portfolioInsights([{ name: 'X', leads_waiting: 0, attention: 0, last_published_at: daysAgo(2) }], NOW);
   // sales review item 11: the clients' lens says they are quiet, never that nothing needs the studio (Home's list is the one count)
   ok('portfolio: all-quiet → reassuring headline, no invented work', calm.insights.length === 0 && /quiet and current/.test(calm.headline) && !/nothing needs you/.test(calm.headline));
