@@ -424,4 +424,55 @@ test.describe('+ Create', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     for (const chip of await dlg(page).locator('.cr-chip').all()) expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   });
+
+  // a page that already knows the deal (the Customers preview) passes it along
+  test('a page that knows the deal starts the form on it: from the first read, or that one deal read by id', async ({ page }) => {
+    await installApp(page, { api: { ...FIXTURES, [`/sales/deals/${D9}`]: { data: {
+      deal: { id: D9, title: 'Zed — retainer', stage: 'qualified', contact_id: 'c9', expected_value_cents: 0 },
+      contact: { id: 'c9', name: 'Zed Far', email: 'zed@example.com', company: 'Far & Wide' } } } } });
+    await salesServer(page);
+    await page.goto('/agency.html');
+    const open = (kind: string, id: string) => page.evaluate(([k, d]) => (window as unknown as { ddsOpenCreate: (...a: unknown[]) => boolean }).ddsOpenCreate(k, null, false, { deal_id: d }), [kind, id]);
+    await expect(page.locator(isPhone(page) ? '#dds-mbar-create' : '#dds-create')).toBeVisible();   // the shell knows who's here
+    expect(await open('call', D1)).toBe(true);
+    await expect(dlg(page).locator('#dds-cr-title')).toHaveText('Log a call');
+    await expect(dlg(page).locator('#cr-picked')).toContainText('Jane Doe');
+    await expect(dlg(page).locator('#cr-whobox')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(dlg(page)).toBeHidden();
+    expect(await open('invoice', D9)).toBe(true);                                           // past the first read: asked for by id
+    await expect(dlg(page).locator('#dds-cr-title')).toHaveText('Send an invoice');
+    await expect(dlg(page).locator('#cr-picked')).toContainText('Zed Far');
+  });
+
+  test('an open invoice for a different amount: it says so, and offers to send a second one beside it', async ({ page }) => {
+    await installApp(page, { api: FIXTURES });
+    const calls = await salesServer(page, { invoice: (body, n) => n === 1
+      ? { status: 409, json: { error: 'amount_mismatch', message: 'There’s an open $2,500 invoice on this deal.' } }
+      : { status: 201, json: { data: { id: 'inv-3' }, url: 'https://pay.example/inv-3', emailed: true, reused: false, amount_cents: body.amount_cents } } });
+    await page.goto('/agency.html');
+    await openForm(page, 'Send an invoice');
+    await option(page, 'Jane Doe').click();
+    await dlg(page).locator('#cr-amt').fill('500');
+    await dlg(page).locator('.cr-go').click();
+    const err = dlg(page).locator('.cr-err');
+    await expect(err).toContainText('There’s an open $2,500 invoice on this deal.');
+    await err.getByRole('button', { name: 'Send a second invoice' }).click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Invoice sent — emailed to Jane Doe');
+    const sent = calls.filter((c) => c.path.endsWith('/invoice')).map((c) => c.body || {});
+    expect(sent.map((b) => b.force)).toEqual([undefined, true]);                           // only the yes sends one beside it
+    expect(sent.map((b) => b.amount_cents)).toEqual([50000, 50000]);
+  });
+
+  test('Pipeline catches up after a create, quietly', async ({ page }) => {
+    await installApp(page, { api: FIXTURES });
+    const calls = await salesServer(page);
+    await page.goto('/pipeline.html');
+    await expect(page.getByRole('button', { name: /Blue Finch — site/ }).first()).toBeVisible();
+    const reads = () => calls.filter((c) => c.method === 'GET' && c.path === '/sales/deals').length;
+    const before = reads();
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'deal' } })));   // what create.js sends after a save
+    await expect.poll(reads).toBeGreaterThan(before);
+    await expect(page.getByRole('button', { name: /Blue Finch — site/ }).first()).toBeVisible();
+  });
 });

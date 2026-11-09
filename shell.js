@@ -562,10 +562,12 @@
     return createP;
   }
   // viaKey: opened from the keyboard, so the menu's first job takes focus (a tap leaves no ring)
-  function openCreate(kind, from, viaKey) {
+  // preset: { deal_id } starts the form on that deal (a page that already knows
+  // it, like the Customers preview)
+  function openCreate(kind, from, viaKey, preset) {
     if (!canCreate()) return false;
     closeAllLayers(); closePalette();
-    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey); }, function () {
+    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null); }, function () {
       if (window.ddsToast) window.ddsToast('Create didn’t load — check your connection and try again.', 'err');
     });
     return true;

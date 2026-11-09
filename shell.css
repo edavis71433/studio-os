@@ -809,6 +809,8 @@ html.dds-cr-on body{overflow:hidden}
 .dds-cr .cr-preview b{font-weight:600;font-size:14.5px;line-height:1.35}
 .dds-cr .cr-paybtn{display:inline-block;padding:8px 18px;border-radius:999px;background:var(--dds-grad-btn);color:var(--dds-on-p);font-weight:600;font-size:13.5px}
 .dds-cr .cr-err{margin:0 20px 10px;padding:10px 12px;border-radius:var(--dds-r,12px);background:var(--dds-bad-soft);color:var(--dds-bad);font-size:13.5px;font-weight:500}
+.dds-cr .cr-err .cr-second{display:block;margin-top:8px;font:inherit;font-weight:600;color:var(--dds-bad);background:var(--dds-card);border:1px solid currentColor;border-radius:999px;padding:7px 14px;cursor:pointer}
+@media (pointer:coarse){.dds-cr .cr-err .cr-second{min-height:44px}}
 .dds-cr .cr-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--dds-line);background:var(--dds-card)}
 .dds-cr .cr-note{flex:1 1 160px;min-width:0;font-size:12.5px;color:var(--dds-soft);line-height:1.35}
 .dds-cr .cr-cancel,.dds-cr .cr-go{min-height:44px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600}

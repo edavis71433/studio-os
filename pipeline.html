@@ -1664,6 +1664,9 @@ document.addEventListener('click',(e)=>{if(e.target&&e.target.closest&&e.target.
 // the skeleton + error surfaces are for hard loads only (the leads.html
 // contract). NOTE: load must always be WRAPPED when passed as a handler —
 // a click event in the first slot would become its soft flag.
+// + Create (any page, including this one) made a deal, logged a call, sent an
+// invoice or added a to-do: the board catches up quietly
+window.addEventListener('dds:created',(e)=>{const k=e&&e.detail&&e.detail.kind;if(k==='proposal')return;Promise.resolve().then(()=>load(true)).catch(()=>{});});
 async function load(soft){
   const gen=++REQ_SEQ;   // request-generation guard: only the NEWEST read may paint
   renderSummary(gen);    // refresh the numbers whenever the pipeline reloads (add/move/convert)

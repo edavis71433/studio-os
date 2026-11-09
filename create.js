@@ -279,7 +279,7 @@
     proposal: ['Send a proposal', 'Pick the deal; its proposal opens ready to fill'],
   };
   var WHO_LABEL = { call: 'Who did you talk to?', invoice: 'Who is it for?', todo: 'Which deal is it for?', proposal: 'Which deal?' };
-  function openForm(kind) {
+  function openForm(kind, preset) {
     if (!TITLES[kind]) kind = 'call';
     mode = kind;
     S = { kind: kind, pick: null, q: '', active: -1, outcome: 'talked', due: kind === 'invoice' ? '14' : kind === 'todo' ? 'tomorrow' : '', nextDue: 'tomorrow', busy: false, someoneNew: false };
@@ -312,6 +312,25 @@
       load().then(function () { paintWho(); }, function (why) { paintWho(why === 'plan' ? 'Deals are part of your plan’s business tools — an upgrade adds them.' : 'We couldn’t load your people and deals just now. Close this and try again.'); });
     }
     note();
+    if (preset && preset.deal_id && WHO_LABEL[kind]) presetPick(String(preset.deal_id));
+  }
+  // a page that already knows the deal (the Customers preview) starts the form on
+  // it: from the first read, else that one deal by id (it may be past the first 200)
+  function presetPick(id) {
+    var mine = S;
+    load().then(function () {
+      var hit = DATA && DATA.cands.filter(function (c) { return c.kind === 'deal' && c.deal_id === id; })[0];
+      if (hit) return hit;
+      return api('/sales/deals/' + encodeURIComponent(id)).then(function (r) {
+        var d = r.ok && r.body && r.body.data && r.body.data.deal; if (!d || !d.id) return null;
+        var p = r.body.data.contact;
+        return crCandidates([d], p && p.id ? [p] : [])[0] || null;
+      });
+    }).then(function (c) {
+      if (!c || S !== mine || !dlg || !dlg.open || S.pick) return;   // closed, reopened or already picked meanwhile
+      if (S.kind === 'proposal' && !c.open) return;
+      SHOWN = [c]; choose(0);
+    }, function () { /* the search still works */ });
   }
   function chips(name, label, opts, on) {
     return '<div class="cr-chips" role="group" aria-label="' + esc(label) + '" data-chips="' + name + '">' +
@@ -501,6 +520,13 @@
   function fail(msg) {
     var e = dlg && dlg.querySelector('.cr-err'); if (!e) { toast(msg, 'err'); return; }
     e.textContent = msg; e.hidden = false;
+    // an open invoice for a different amount: say so, and offer a second one beside it
+    if (S && S.offerSecond) {
+      S.offerSecond = false;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'cr-second'; b.textContent = 'Send a second invoice';
+      b.addEventListener('click', function () { submit(true); });
+      e.appendChild(document.createTextNode(' ')); e.appendChild(b);
+    }
     S.busy = false; var go = dlg.querySelector('.cr-go'); if (go) go.disabled = false;
   }
 
@@ -541,8 +567,9 @@
     toast(text, kind || 'ok', href ? { label: 'Open', onClick: function () { location.assign(href); } } : null);
     try { window.dispatchEvent(new CustomEvent('dds:created', { detail: detail })); } catch (_) { /* */ }
   }
-  function submit() {
+  function submit(force) {
     if (!S || S.busy) return;
+    S.force = force === true;   // only "Send a second invoice" sends one beside an open one
     var f = dlg.querySelector('form'); var err = dlg.querySelector('.cr-err'); if (err) err.hidden = true;
     var go = dlg.querySelector('.cr-go');
     var val = function (id) { var el = f.querySelector('#' + id); return el ? String(el.value || '').trim() : ''; };
@@ -593,7 +620,12 @@
       p = ensureDeal(c).then(function (id) {
         var b = { purpose: 'service', amount_cents: amt, due_date: crDue(S.due) };
         if (what) b.title = what;
+        if (S.force) b.force = true;
         return api('/sales/deals/' + encodeURIComponent(id) + '/invoice', { method: 'POST', body: b }).then(function (r) {
+          if (r.status === 409 && !S.force && r.body && r.body.error === 'amount_mismatch') {
+            S.offerSecond = true;
+            return Promise.reject(msg(r, 'There’s already an open invoice for a different amount on this deal.'));
+          }
           if (!r.ok) return Promise.reject(msg(r, r.status === 409 ? 'There’s already an open invoice for a different amount on this deal — open the deal to send or void it.' : 'That invoice didn’t send — please try again.'));
           var b2 = r.body || {}, url = b2.url || '', href = '/crm.html?deal=' + encodeURIComponent(id) + '&tab=billing';
           if (b2.warning === 'link_failed' || !url) return Promise.reject(b2.message || 'The invoice saved, but its payment link didn’t generate — press Send invoice again to finish it.');
@@ -618,12 +650,12 @@
   }
 
   window.ddsCreate = {
-    open: function (kind, from, viaKey) {
+    open: function (kind, from, viaKey, preset) {
       KEYS = !!viaKey;
       opener = from || document.activeElement || null;
       if (opener && opener.setAttribute) opener.setAttribute('aria-expanded', 'true');
       if (kind && LINKS[kind]) { location.assign(LINKS[kind]); return; }
-      if (kind) openForm(kind); else openMenu();
+      if (kind) openForm(kind, preset); else openMenu();
     },
     close: close,
     isOpen: function () { return !!(dlg && dlg.open); },
