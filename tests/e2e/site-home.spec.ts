@@ -996,6 +996,42 @@ test.describe('one preview screen', () => {
     await expect(page.locator('#stage')).toBeHidden();
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
   });
+  // item 100: Preview used to grow an Edit / up / down / Hide bar on hover, with a move engine of
+  // its own, and a click on a section left Preview to edit it. It is a visitor's view now.
+  test('it is a visitor’s view: no toolbar, nothing marked editable, a click stays in Preview (item 100)', async ({ page }) => {
+    await mount(page, '/presence.html#preview', OWN);
+    await expect(page.locator('#stage')).toBeVisible();
+    const frame = page.frameLocator('#previewFrame');
+    const sec = frame.locator('#main > section').first();
+    await expect(sec).toBeVisible();   // the draft draws into the frame after the screen opens
+    await sec.hover();
+    await page.waitForTimeout(300);
+    await expect(frame.locator('#dds-ee-bar')).toHaveCount(0);
+    await expect(frame.locator('[data-dds-ee], .dds-ee-on')).toHaveCount(0);
+    expect(await sec.getAttribute('tabindex')).toBeNull();
+    await sec.click({ position: { x: 4, y: 4 } });   // a plain spot, never a link
+    await page.waitForTimeout(300);
+    await expect(page.locator('#stage')).toBeVisible();
+  });
+  // Item 100 too: the loading line could finish loading after the page was written, and the
+  // browser then dropped the page. A draft that came back quickly sat on "Loading your draft…"
+  // for good, in about half the runs on tablets and phones. A frame left on an older write is
+  // given the newest again.
+  test('a frame left on an older write is given the newest again (item 100)', async ({ page }) => {
+    await mount(page, '/presence.html#preview', OWN);
+    const frame = page.frameLocator('#previewFrame');
+    await expect(frame.locator('#main > section').first()).toBeVisible();
+    const newest = (await page.evaluate('PV_WRITES')) as number;
+    // as the browser left it: the frame on the loading line, the write before the page
+    await page.evaluate((n) => new Promise<void>((done) => {
+      const f = document.getElementById('previewFrame') as HTMLIFrameElement;
+      f.addEventListener('load', () => done(), { once: true });
+      f.srcdoc = `<div>Loading your draft…</div><!--dds-proof ${n - 1}-->`;
+    }), newest);
+    await expect(frame.locator('#main > section').first()).toBeVisible();
+    await expect(frame.getByText('Loading your draft…')).toHaveCount(0);
+    expect(await page.evaluate('PV_WRITES')).toBe(newest);   // the same page again, not a new read
+  });
   test('it lists every page of the site, the owner’s own included, and has no template chooser', async ({ page }) => {
     await mount(page, '/presence.html#preview', OWN);
     await expect(page.locator('#stage')).toBeVisible();
