@@ -547,7 +547,9 @@ test.describe('Settings — deal stage names', () => {
     await page.getByRole('button', { name: 'Save stage names' }).click();
     await expect.poll(() => sent).toEqual({ names: { lead: 'Enquiry', qualified: '', proposal: 'Quote sent', contract: '' } });
     await expect(page.locator('#snMsg')).toContainText('The Pipeline, records and reports use these names.');
-    await expect(page.locator('[data-stage-label="lead"]')).toHaveText('Enquiry');
-    await expect(page.locator('[data-stage-label="proposal"]')).toHaveText('Quote sent');
+    // the stalled-deal labels (item 69 added the percents card, which names the stages too)
+    await expect(page.locator('label:has(#st-lead) [data-stage-label="lead"]')).toHaveText('Enquiry');
+    await expect(page.locator('label:has(#st-proposal) [data-stage-label="proposal"]')).toHaveText('Quote sent');
+    await expect(page.locator('#stageChances [data-stage-label="lead"]')).toHaveText('Enquiry');
   });
 });
