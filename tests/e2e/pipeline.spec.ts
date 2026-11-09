@@ -189,7 +189,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
     await expect(page.locator('#list .card')).toHaveCount(2);
   });
 
-  test('mobile/tablet: the page body never scrolls horizontally — wide views scroll in their own containers', async ({ page, isMobile }) => {
+  test('mobile/tablet: the page body never scrolls horizontally — wide views scroll in their own containers', { tag: '@layout' }, async ({ page, isMobile }) => {
     test.skip(!isMobile, 'touch-viewport pin');
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
@@ -588,7 +588,7 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
   // not hide, it `menu.remove()`s — so on iOS the option was DESTROYED between
   // pointerdown and click and the tap landed on the card underneath (which
   // opens the deal). See tests/e2e/helpers/ios-focus.ts.
-  test('touch: tapping a Move option actually moves the deal', async ({ page }, testInfo) => {
+  test('touch: tapping a Move option actually moves the deal', { tag: '@touch' }, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
     await pinBoard(page);
     await installApp(page, { api: API });

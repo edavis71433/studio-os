@@ -530,6 +530,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
           import('../lib/email_brand.ts'),
         ]);
         const brand = await loadEmailBrand(String(inv.site_id)).catch(() => undefined);
+        // The payer is the deal's own contact, so siteId lands their answer in the Inbox,
+        // like the invoice email's (item 72: it used to reach the platform's mailbox,
+        // whichever site sent it).
         receipted = await sendEmail(payerEmail, `Payment received — thank you`,
           `<p>Your payment went through securely.</p>` +
           `<table style="margin:8px 0;border-collapse:collapse">` +
@@ -538,7 +541,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
           `</table>` +
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} Your studio has been notified, and everything updates automatically on their side.</p>` +
           `<p style="color:#666;font-size:.9rem">Keep this email for your records.</p>`,
-          brand, { critical: true });
+          brand, { critical: true, siteId: String(inv.site_id) });
       } else {
         console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
       }

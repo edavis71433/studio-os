@@ -5,6 +5,8 @@
 // A wrong skip reads as a green check with nothing tested, so every case that
 // must run the suite is pinned here. It lives outside the browser suite because
 // a broken gate must not be what decides whether its own test runs.
+// It also runs the `browser` job's verdict step, the device step's choice of tests
+// and the summary script, each with made-up inputs.
 
 const ROOT = new URL('../../', import.meta.url);
 const WORKFLOW = Deno.readTextFileSync(new URL('.github/workflows/e2e.yml', ROOT));
@@ -12,8 +14,14 @@ const WORKFLOW = Deno.readTextFileSync(new URL('.github/workflows/e2e.yml', ROOT
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p: !!p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? `  (${note})` : ''}`); };
 
-const SCOPE = WORKFLOW.match(/id: scope\n[\s\S]*?run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
-const STEPS = WORKFLOW.slice(WORKFLOW.indexOf('    steps:')).split(/^ {6}- /m).slice(1);
+// A step's script: the block under `run: |` in the step that carries `marker`.
+const script = (marker) => WORKFLOW.match(new RegExp(`${marker}\\n[\\s\\S]*?run: \\|\\n((?: {10}.*\\n|\\n)+)`))?.[1].replace(/^ {10}/gm, '');
+const SCOPE = script('id: scope');
+// Each job's lines, by name, and a job's steps.
+const JOBS = Object.fromEntries([...WORKFLOW.slice(WORKFLOW.indexOf('\njobs:\n')).matchAll(/^ {2}([\w-]+):\n((?:(?: {4}.*)?\n)*)/gm)].map((m) => [m[1], m[2]]));
+const stepsOf = (job) => (job || '').slice((job || '').indexOf('    steps:')).split(/^ {6}- /m).slice(1);
+const STEPS = stepsOf(JOBS.scope);
+const DEVICE_STEPS = stepsOf(JOBS.devices);
 
 const text = new TextDecoder();
 async function sh(cwd, cmd, ...args) {
@@ -77,13 +85,115 @@ const edit = (...paths) => async () => { for (const p of paths) await write(p, '
 // ── Static: the shape a required check depends on ────────────────────────────
 ok('no path filter, so a pull request always gets a `browser` result', !/^\s*paths(-ignore)?:/m.test(WORKFLOW));
 ok('no branch filter on pull requests', /^ {2}pull_request:\n {2}workflow_dispatch:/m.test(WORKFLOW));
-ok('the job is called browser, the name the required check will use', /^jobs:\n {2}browser:\n/m.test(WORKFLOW) && !/^ {4}name:/m.test(WORKFLOW));
-ok('the job has no if: of its own, which could skip it before it reports', !/^ {4}if:/m.test(WORKFLOW));
+ok('three jobs: the decision, the devices, and the check to require', Object.keys(JOBS).join() === 'scope,devices,browser', Object.keys(JOBS).join());
+// GitHub names a job's check after its `name:`, or its key when there is none.
+ok('the check to require is called browser', !!JOBS.browser && !/^ {4}name:/m.test(JOBS.browser));
+// A job that is skipped reports as a pass, so the check to require must run whatever happened before it.
+ok('browser always runs, so it always reports', /^ {4}if: always\(\)$/m.test(JOBS.browser));
+ok('browser reads how the decision and the devices ended', /^ {4}needs: \[scope, devices\]$/m.test(JOBS.browser));
+ok('no device is called browser', /^ {4}name: browser on \$\{\{ matrix\.project \}\}$/m.test(JOBS.devices));
+// GitHub matches a required check by name alone, so a job called browser anywhere else could answer for this one.
+for (const { name } of Deno.readDirSync(new URL('.github/workflows/', ROOT))) {
+  if (name === 'e2e.yml' || !name.endsWith('.yml')) continue;
+  const other = Deno.readTextFileSync(new URL(`.github/workflows/${name}`, ROOT));
+  ok(`${name} has no job called browser`, !/^ {2}browser:$/m.test(other) && !/^ {4}name: browser\s*$/m.test(other));
+}
+ok('the decision has no if: of its own, which could skip it', !/^ {4}if:/m.test(JOBS.scope));
+ok('the decision hands its answer on', /^ {4}outputs:\n {6}run: \$\{\{ steps\.scope\.outputs\.run \}\}$/m.test(JOBS.scope));
 ok('the checkout reaches the first parent', /actions\/checkout@\S+\n {8}with:\n {10}fetch-depth: 2\n/.test(STEPS[0]));
-ok('the decision comes straight after the checkout', STEPS[1].includes('id: scope'));
-const gated = STEPS.slice(2);
-ok('every later step waits on the decision', gated.length === 5 && gated.every((s) => s.includes("steps.scope.outputs.run == 'true'")));
-ok('the decision step cannot be set to pass on its own failure', !STEPS[1].includes('continue-on-error'));
+ok('the decision comes straight after the checkout, and is the last step', STEPS.length === 2 && STEPS[1].includes('id: scope'));
+ok('the devices run only on the decision\'s yes', /^ {4}needs: scope$/m.test(JOBS.devices) && /^ {4}if: needs\.scope\.outputs\.run == 'true'$/m.test(JOBS.devices));
+ok('nothing can pass on its own failure', !WORKFLOW.includes('continue-on-error'));
+// The two steps that report on a failed run have to run after one; nothing else may be skipped.
+const reporting = DEVICE_STEPS.filter((st) => /^ {8}if:/m.test(st));
+ok('every device step runs, apart from the two that report', reporting.length === 2 && reporting.every((st) => st.includes('if: ${{ !cancelled() }}') && /e2e-summary\.mjs|upload-artifact/.test(st)));
+
+// ── The devices ──────────────────────────────────────────────────────────────
+const CONFIG = Deno.readTextFileSync(new URL('playwright.config.ts', ROOT));
+const projects = [...CONFIG.matchAll(/\{ name: '([\w-]+)'/g)].map((m) => m[1]);
+const matrix = JOBS.devices?.match(/^ {8}project: \[([^\]]*)\]$/m)?.[1].split(',').map((x) => x.trim()) || [];
+ok('each device in playwright.config.ts gets a machine, and only those', projects.length === 3 && matrix.join() === projects.join(), matrix.join());
+ok('one device failing doesn\'t cancel the others', /^ {6}fail-fast: false$/m.test(JOBS.devices));
+const lock = JSON.parse(Deno.readTextFileSync(new URL('package-lock.json', ROOT)));
+const pw = lock.packages?.['node_modules/@playwright/test']?.version;
+const image = JOBS.devices?.match(/^ {6}image: (\S+)$/m)?.[1] || '';
+ok('the devices run in Playwright\'s own image, at the version package-lock.json installs', !!pw && image === `mcr.microsoft.com/playwright:v${pw}-noble`, `${image} for ${pw}`);
+ok('Playwright\'s two packages are on the same version', lock.packages?.['node_modules/playwright-core']?.version === pw);
+
+// The device step's real script, with a stand-in npx that prints what it was asked to run.
+const RUN_DEVICE = script('name: Run the browser suite on this device\\n {8}env:\\n[\\s\\S]*?EVENT: .*');
+const bin = await Deno.makeTempDir({ prefix: 'e2e-device-bin-' });
+await Deno.writeTextFile(`${bin}/npx`, '#!/bin/sh\necho "$@"\n');
+await Deno.chmod(`${bin}/npx`, 0o755);
+await Deno.writeTextFile(`${bin}/step.sh`, RUN_DEVICE || 'exit 9');
+async function device(PROJECT, EVENT) {
+  const { code, stdout } = await new Deno.Command('bash', {
+    args: ['-e', `${bin}/step.sh`], stdout: 'piped', stderr: 'null', clearEnv: true,
+    env: { PATH: `${bin}:${Deno.env.get('PATH')}`, PROJECT, EVENT },
+  }).output();
+  return { code, ran: new TextDecoder().decode(stdout).trim() };
+}
+const tabletPr = await device('tablet', 'pull_request');
+ok('on a pull request the tablet runs the touch and layout tests', tabletPr.code === 0 && tabletPr.ran === 'playwright test --project=tablet --grep @touch|@layout', tabletPr.ran);
+for (const [p, e] of [['tablet', 'push'], ['tablet', 'workflow_dispatch'], ['desktop-chromium', 'pull_request'], ['mobile', 'pull_request'], ['mobile', 'push']]) {
+  const r = await device(p, e);
+  ok(`${p} on ${e} runs everything`, r.code === 0 && r.ran === `playwright test --project=${p}`, r.ran);
+}
+// A tag nobody carries would leave the tablet with nothing to run, and an empty run passes.
+const specs = [...Deno.readDirSync(new URL('tests/e2e/', ROOT))].filter((e) => e.name.endsWith('.spec.ts'))
+  .map((e) => Deno.readTextFileSync(new URL(`tests/e2e/${e.name}`, ROOT))).join('\n');
+for (const tag of ['@touch', '@layout']) ok(`tests carry ${tag}`, specs.split(`{ tag: '${tag}' }`).length - 1 >= 3);
+
+// ── The verdict: browser passes only on every device passing, or nothing to test ─
+const VERDICT = script('id: verdict');
+await Deno.writeTextFile(`${bin}/verdict.sh`, VERDICT || 'exit 9');
+async function verdict(SCOPE, RUN, DEVICES) {
+  const { code, stdout } = await new Deno.Command('bash', {
+    args: ['-e', `${bin}/verdict.sh`], stdout: 'piped', stderr: 'null', clearEnv: true,
+    env: { PATH: Deno.env.get('PATH'), SCOPE, RUN, DEVICES },
+  }).output();
+  return { code, log: new TextDecoder().decode(stdout) };
+}
+const allPassed = await verdict('success', 'true', 'success');
+ok('every device passed: browser passes', allPassed.code === 0);
+const skippedSuite = await verdict('success', 'false', 'skipped');
+ok('nothing to test: browser passes, and says it was a skip', skippedSuite.code === 0 && skippedSuite.log.includes('skipped, not passed'));
+for (const [s, r, d, why] of [
+  ['success', 'true', 'failure', 'a device failed'],
+  ['success', 'true', 'cancelled', 'a device was cancelled'],
+  ['success', 'true', 'skipped', 'the devices were skipped though the decision said run'],
+  ['failure', '', 'skipped', 'the decision failed'],
+  ['cancelled', '', 'skipped', 'the decision was cancelled'],
+  ['success', '', 'skipped', 'the decision gave no answer'],
+]) {
+  const v = await verdict(s, r, d);
+  ok(`${why}: browser fails`, v.code === 1 && v.log.includes('::error title=Browser check::'));
+}
+
+// ── The summary names each flaky and failed test ─────────────────────────────
+const fixture = {
+  stats: { expected: 1203, flaky: 1, unexpected: 1, skipped: 30 },
+  suites: [{ title: 'site-home.spec.ts', file: 'site-home.spec.ts', specs: [], suites: [{ title: 'Pages', file: 'site-home.spec.ts', specs: [
+    { title: 'Add a link', file: 'site-home.spec.ts', line: 721, tests: [{ status: 'flaky' }] },
+    { title: 'Remove a page', file: 'site-home.spec.ts', line: 760, tests: [{ status: 'unexpected' }] },
+    { title: 'Rename a page', file: 'site-home.spec.ts', line: 790, tests: [{ status: 'expected' }] },
+  ] }] }],
+};
+await Deno.writeTextFile(`${bin}/results.json`, JSON.stringify(fixture));
+async function summary(file) {
+  const { code, stdout } = await new Deno.Command(Deno.execPath(), {
+    args: ['run', '--allow-read', new URL('scripts/e2e-summary.mjs', ROOT).pathname, file, 'tablet'], stdout: 'piped', stderr: 'piped',
+  }).output();
+  return { code, text: new TextDecoder().decode(stdout) };
+}
+const sum = await summary(`${bin}/results.json`);
+ok('the summary counts the run', sum.code === 0 && sum.text.includes('1,203 passed, 1 flaky, 1 failed, 30 skipped.'), sum.text.split('\n')[2]);
+ok('the summary names the flaky test with its place', sum.text.includes('- `site-home.spec.ts:721` Pages › Add a link'));
+ok('the summary names the failed test', /\*\*Failed:\*\*\n\n- `site-home\.spec\.ts:760` Pages › Remove a page/.test(sum.text));
+ok('a passing test is not named', !sum.text.includes('Rename a page'));
+const none = await summary(`${bin}/missing.json`);
+ok('no results file: the summary says the run stopped, and the step still exits 0', none.code === 0 && none.text.includes('No results'));
+await Deno.remove(bin, { recursive: true });
 
 // ── Pull requests: nothing the suite can reach may skip it ───────────────────
 const MUST_RUN = [

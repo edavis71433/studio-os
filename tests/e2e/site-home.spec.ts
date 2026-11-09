@@ -327,7 +327,7 @@ const touchChecks = () => {
     await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks)).map((w) => w.body.blocks.length).at(-1)).toBe(3);
   });
 };
-test.describe('editing by touch: Safari on a phone and a tablet', () => {
+test.describe('editing by touch: Safari on a phone and a tablet', { tag: '@touch' }, () => {
   test.beforeEach(({}, testInfo) => { test.skip(!testInfo.project.use.hasTouch, 'touch devices only'); });
   touchChecks();
 });

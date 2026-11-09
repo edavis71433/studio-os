@@ -24,6 +24,9 @@ name: CI (Deno pure suite + typecheck)
 # at deploy. `_shared` has no index.ts: the functions that import it bring it in.
 # tests/workflows/ci_scope_test.mjs holds all this in place.
 #
+# deploy.yml runs this same workflow as its pre-deploy gate (`workflow_call`), so a
+# deploy is checked exactly as a pull request is.
+#
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
 # "test" (this job) as a required status check.
 
@@ -32,6 +35,7 @@ on:
     branches: [main, staging]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   test:
@@ -46,9 +50,20 @@ jobs:
         run: deno check supabase/functions/*/index.ts
       - name: Pure test sweep (+ golden render)
         run: bash scripts/ci-pure-tests.sh
+      # Only the deploy gate checked this before Nov 8 2026, so a clash showed up at deploy time.
+      - name: Migrations (fenced files intact; numbers unique)
+        run: |
+          for n in 0003 0004 0005; do
+            ls supabase/migrations/${n}_*.sql >/dev/null 2>&1 || { echo "fenced migration $n missing — history integrity broken"; exit 1; }
+          done
+          dupes=$(ls supabase/migrations/[0-9]*.sql | sed -E 's#.*/([0-9]+)_.*#\1#' | sort | uniq -d)
+          if [ -n "$dupes" ]; then echo "duplicate migration numbers: $dupes"; exit 1; fi
+          echo "migrations verified: fenced 0003-0005 present, numbers unique."
       - name: Schema dump workflow (real steps, stub CLI, no secrets)
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/schema_dump_test.mjs
       - name: E2E workflow's decision step (real step, real git, no network)
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/e2e_scope_test.mjs
       - name: This workflow's own shape (nothing can skip or soften this check)
         run: deno run --allow-read tests/workflows/ci_scope_test.mjs
+      - name: Deploy and rollback workflows (the browser gate, every function, the smoke tests)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/deploy_gate_test.mjs
