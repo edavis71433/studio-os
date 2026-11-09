@@ -67,11 +67,11 @@ const RECORD_API = {
 };
 
 test.describe('item 41 — three buttons on the record', () => {
-  test('Send invoice, Message and Log activity in front; Open project under More', async ({ page }) => {
+  test('Log a call, Message and Send invoice in front (in the header since the bold redesign); Open project under More', async ({ page }) => {
     await installApp(page, { api: RECORD_API });
     await page.goto(`/crm.html?client=${CLIENT}`);
     const bar = page.locator('#actbar');
-    await expect(bar.locator(':scope > .abtn')).toHaveText(['Send invoice', 'Message', 'Log activity']);
+    await expect(bar.locator(':scope > .abtn')).toHaveText(['Log a call', 'Message', 'Send invoice']);
     await expect(page.locator('#act-menu #act-project')).toHaveCount(1);
   });
 });

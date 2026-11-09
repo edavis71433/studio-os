@@ -336,6 +336,27 @@
   .hl{border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
   .hl:first-child{border-left:1px solid var(--line)}
   .hl .ico{border-radius:12px}
+
+  /* ══ Bold redesign — the record (Nov 2026): the verbs sit in the header, five
+     facts in one strip, and the path's one button names the next stage ══ */
+  .rec-head{align-items:center;flex-wrap:wrap;gap:12px 16px}
+  .rec-head .rec-who{min-width:0;flex:1 1 300px}
+  .rec-head .obj-ic{width:56px;height:56px;min-width:56px;border-radius:50%;font-size:19px;font-weight:700;color:#fff;background:var(--dds-grad-brand,var(--p))}
+  .rec-head .actbar{margin:0;flex:0 1 auto;justify-content:flex-end;align-items:center}
+  .rec-head .abtn{border-radius:999px;padding:9px 16px;font-weight:600}
+  .rec-head .abtn.primary{background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border-color:transparent;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  #hlpanel .hl-panel{margin-top:var(--dds-s4,16px);grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--card);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
+  #hlpanel .hl-panel{border:1px solid var(--line);overflow:hidden}
+  #hlpanel .hl{display:block;border:0;border-radius:0;box-shadow:none;border-right:1px solid var(--line);padding:14px 18px}
+  #hlpanel .hl:last-child{border-right:0}
+  #hlpanel .hl .ico{display:none}
+  #hlpanel .hl-k{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  #hlpanel .hl-v{font-size:20px;margin-top:4px}
+  #hlpanel .hl-s{font-size:12px;color:var(--soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media (max-width:760px){#hlpanel .hl-panel{grid-template-columns:1fr 1fr}#hlpanel .hl{border-right:0;border-bottom:1px solid var(--line);padding:12px 14px}#hlpanel .hl:nth-child(odd){border-right:1px solid var(--line)}#hlpanel .hl:last-child:nth-child(odd){grid-column:1/-1;border-right:0}#hlpanel .hl:last-child,#hlpanel .hl:nth-last-child(2):nth-child(odd){border-bottom:0}}
+  @media (max-width:760px){.rec-head .actbar{flex:1 1 100%;justify-content:flex-start}}
+  .path button.pstep.done::before{content:"✓ ";font-weight:700}
+  #markComplete{border-radius:999px;padding:9px 18px;font-weight:600;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border:0;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -507,7 +528,7 @@ async function loadRecord(){
   if(!r.ok){ trouble(); return; }
   REC=r.body.data||{};
   // sales review item 38: the studio's own stage names, read at studio level (they live on the studio's site)
-  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
+  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const chs=s.ok&&s.body&&s.body.data&&s.body.data.chances;if(chs&&typeof chs==='object'){STAGE_CHANCE=chs;try{renderHighlights();}catch(_){}}const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
   // Canonical addressing: a converted customer is addressed by their SITE so the
   // scope (x-dds-scope-site) is right for the profile + notes + activity. If we
   // arrived by ?deal=/?contact= but the canonical key is the customer site and it
@@ -552,13 +573,13 @@ function renderShell(){
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
       <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
-      <div style="min-width:0">
+      <div class="rec-who">
         <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
         <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
       </div>
+      <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     </div>
     <div id="hlpanel"></div>
-    <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
@@ -655,7 +676,7 @@ function renderActions(){
     if(draft&&stage!=='won'&&stage!=='lost')btns.push({id:'act-proposal',label:'Send proposal',on:()=>openBilling('proposal:'+draft.id)});
     const draftCon=d&&(DEAL.contracts||[]).find(k=>k.status==='draft');
     if(draftCon&&stage!=='won'&&stage!=='lost')btns.push({id:'act-agreement',label:'Send agreement',on:()=>openBilling('contract:'+draftCon.id)});
-    btns.push({id:'act-log',label:'Log activity',on:()=>focusComposer('logcall')});
+    btns.push({id:'act-log',label:'Log a call',on:()=>focusComposer('logcall')});
     btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});
   }
   btns.push({id:'act-message',label:'Message',on:()=>focusComposer('message')});
@@ -669,7 +690,8 @@ function renderActions(){
   const render=(b)=>b.href
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
     :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
-  const FRONT=[both?'act-send-both':'act-invoice','act-message','act-log'];
+  // bold redesign (Nov 2026): the verbs sit in the header, read left to right — Log a call, Message, then the money one
+  const FRONT=['act-log','act-message',both?'act-send-both':'act-invoice'];
   const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
   const rest=btns.filter(b=>!FRONT.includes(b.id));
   host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
@@ -723,6 +745,7 @@ async function loadPanels(){
 
 // ── highlights panel: up to 6 label-over-value tiles, data-only ─────────────
 let HL_EDIT=false;   // an OPEN next-step inline editor owns the panel — async re-renders skip it
+let STAGE_CHANCE={};   // item 69's per-stage chances (Settings), for the deal fact
 function renderHighlights(){
   const host=$('hlpanel'); if(!host)return;
   if(HL_EDIT)return;   // don't destroy the open editor + typed text; the render after save/cancel catches up
@@ -737,7 +760,7 @@ function renderHighlights(){
   const owed=DEAL&&DEAL.deal?openInv.reduce((a,b)=>a+(b.amount_cents||0),0):(hl.owed_cents||0);
   // the four states, one formula (item 2): the tile's sub-line names them
   const mb=moneyBuckets(inv,recTodayYmd());
-  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.title&&d.title!==((REC.header||{}).name||'')?d.title:'')});
+  const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.stage?stageLabel(d.stage)+((STAGE_CHANCE[d.stage]!=null&&d.stage!=='won'&&d.stage!=='lost')?' · '+STAGE_CHANCE[d.stage]+'% chance':''):(d.title&&d.title!==((REC.header||{}).name||'')?d.title:''))});   // bold redesign: where it is and its chance (the title is the path's and the Deal tab's)
   if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
     tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
   const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
@@ -747,10 +770,12 @@ function renderHighlights(){
   // own "do next" (a won deal says "open their project", never a blank dash)
   const suggested=(d.id&&!ns&&d.stage)?guideNow(d.stage).action:'';
   if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:(ns&&d.next_step_at)?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
+  // bold redesign: the fifth fact — when you last spoke (the deal's last contact)
+  if(d.id)tiles.push({k:'Last talked',v:d.last_contacted_at?esc(when(d.last_contacted_at)):'—',ico:'phone',tone:'',s:d.last_contacted_at?'':'Nothing logged yet'});
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
   if(!d.id&&p)tiles.push({k:'Website',v:esc(siteWord(p)),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
-  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,4).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
+  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,5).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
   const eb=host.querySelector('[data-hledit]');
   if(eb)eb.addEventListener('click',()=>{
     const tile=eb.closest('.hl'); const cur=(DEAL&&DEAL.deal&&DEAL.deal.next_step)||'';
@@ -819,7 +844,7 @@ function renderPath(){
   if(stage==='won')side='';   // the lifecycle bar already shows Won — no second badge
   else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
   else if(stage==='contract'&&signed)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Convert to customer →</a>`;
-  else if(fwdOk)side=`<button class="primary" id="markComplete">Mark stage complete</button>`;
+  else if(fwdOk)side=`<button class="primary" id="markComplete">Move to ${esc(stageLabel(fwd))} →</button>`;   // bold redesign: names the next stage (was "Mark stage complete")
   else side=`<span class="muted" style="font-size:13px">Get the agreement signed to convert</span>`;
   host.innerHTML=`<div class="pathcard">
     <div class="pathrow">

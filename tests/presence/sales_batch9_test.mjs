@@ -39,7 +39,7 @@ ok('a run of notice rows says its kind once, above the run', /if\(it\.tag!==last
 ok('each notice row still says where it opens, to a screen reader', /aria-label="\$\{esc\(\(it\.read\?'Read — ':''\)\+it\.label\+' — '\+it\.tag\+', opens in its own page'\)\}"/.test(inbox));
 
 // ── 41 ──
-ok('the record keeps three buttons in front', /const FRONT=\[both\?'act-send-both':'act-invoice','act-message','act-log'\];/.test(read('crm.html')));
+ok('the record keeps three buttons in front', /const FRONT=\['act-log','act-message',both\?'act-send-both':'act-invoice'\];/.test(read('crm.html')));
 
 // ── 42 ──
 const cust = read('customers.html');

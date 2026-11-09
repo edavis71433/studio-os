@@ -51,7 +51,7 @@ ok('PATH: STAGE_LABEL is byte-identical to pipeline.html', stageLabelMap(crm) !=
 const guidanceMap = (src) => (src.match(/const PIPELINE_GUIDANCE=\{[\s\S]*?\n\};/) || [''])[0];
 ok('PATH: PIPELINE_GUIDANCE is byte-identical to pipeline.html', guidanceMap(crm) !== '' && guidanceMap(crm) === guidanceMap(pipeline));
 ok('PATH: guidance renders BOTH tip and action (the pipeline.html:694 bug, fixed here)', /esc\(g\.tip\)/.test(crm) && /esc\(g\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
-ok('PATH: Mark stage complete advances via the stage route', /Mark stage complete/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
+ok('PATH: the forward button (Move to <next stage> →, was "Mark stage complete") advances via the stage route', /id="markComplete">Move to \$\{esc\(stageLabel\(fwd\)\)\} →/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
 ok('PATH: won is convert-only — the button becomes a pipeline link', /Convert to customer →/.test(crm) && /signed/.test(crm));
 
 // ═══ Embed mode on the panel pages (still supported for other hosts) ═══
@@ -93,7 +93,7 @@ ok('MESSAGES: inbox conversations open the record Messages tab', /tab=messages/.
 // pipeline drawer show ONE "Send proposal & agreement" (POST /sales/deals/:id/
 // send); the per-document sends + Request deposit sit under More.
 ok('SEND: crm.html decides the pair in one place (sendBothDocs: draft proposal, not superseded + draft agreement, open deal)', /function sendBothDocs\(\)/.test(crm) && /if\(d\.stage==='won'\|\|d\.stage==='lost'\|\|d\.converted_client_id\)return null/.test(crm));
-ok('SEND: crm.html action bar headlines "Send proposal & agreement" as the ONE filled button when both exist', /id:'act-send-both',label:'Send proposal & agreement',primary:true/.test(crm) && /primary:!both&&!pathHasAction\(d\),on:\(\)=>openBilling\('invoice'\)/.test(crm) && /const FRONT=\[both\?'act-send-both':'act-invoice'/.test(crm));
+ok('SEND: crm.html action bar headlines "Send proposal & agreement" as the ONE filled button when both exist', /id:'act-send-both',label:'Send proposal & agreement',primary:true/.test(crm) && /primary:!both&&!pathHasAction\(d\),on:\(\)=>openBilling\('invoice'\)/.test(crm) && /const FRONT=\['act-log','act-message',both\?'act-send-both':'act-invoice'\]/.test(crm));   // bold redesign: in front, last of the three
 ok('SEND: crm.html Billing shows the one button + More (proposal only · agreement only · deposit), and the rows lose their own Send', /id="sendBothBtn" data-send-both="1"/.test(crm) && /id="sendMoreMenu" hidden/.test(crm) && /Send the proposal only/.test(crm) && /Send the agreement only/.test(crm) && /p\.status==='draft'&&!closed&&!both/.test(crm) && /k\.status==='draft'&&!both/.test(crm));
 ok('SEND: crm.html posts the combined route with the pair it showed', /billingSend\('\/sales\/deals\/'\+d\.id\+'\/send','Proposal and agreement sent',\{proposal_id:sb\.getAttribute\('data-prop'\),contract_id:sb\.getAttribute\('data-con'\)\}\)/.test(crm));
 ok('SEND: pipeline.html mirrors it — SEND_BOTH hides the row sends and renders the band + More', /const SEND_BOTH=!!\(draftProp&&draftCon\)/.test(pipeline) && /SEND_BOTH\?'':`<button class="\$\{fillIf\(BILL_PRIMARY==='prop:'\+p\.id\)\}" data-send-proposal=/.test(pipeline) && /\(SEND_BOTH\?'':`<button class="\$\{fillIf\(BILL_PRIMARY==='con:'\+k\.id\)\}" data-send-contract=/.test(pipeline) && /id="sendBothBtn" data-prop=/.test(pipeline) && /id="sendMoreMenu" hidden/.test(pipeline));
