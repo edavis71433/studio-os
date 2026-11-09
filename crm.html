@@ -554,7 +554,7 @@ function renderShell(){
       <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
       <div style="min-width:0">
         <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
-        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span class="sep">·</span> <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
+        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
       </div>
     </div>
     <div id="hlpanel"></div>

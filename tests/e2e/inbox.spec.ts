@@ -80,7 +80,7 @@ test.describe('Inbox — split-view console', () => {
     await expect(msgRow.locator('.unread-dot')).toHaveCount(0);
     await expect(msgRow).toHaveAttribute('aria-selected', 'true');
     // other rows keep their dots — nothing was bulk-cleared (count, not
-    // visibility: <760px the open pane covers the list)
+    // visibility: under 1024px the open pane covers the list)
     await expect(page.locator('#rows [role=option]').filter({ hasText: 'Logo tweak' }).locator('.unread-dot')).toHaveCount(1);
   });
 
@@ -220,8 +220,9 @@ test.describe('Inbox — split-view console', () => {
     expect((await readReq).postDataJSON()).toEqual({ status: 'read' });
   });
 
-  test('split view collapses and reopens (edge toggle, SLDS labels)', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'the edge toggle is a ≥760px affordance; <760px stacks');
+  test('split view collapses and reopens (edge toggle, SLDS labels)', async ({ page }) => {
+    // sales list item 43: an upright iPad stacks too, so the split view starts at 1024px
+    test.skip((page.viewportSize()?.width ?? 0) < 1024, 'the edge toggle is a split-view affordance; under 1024px the panes stack');
     await installApp(page, { api: API });
     await page.goto('/inbox.html');
     const edge = page.locator('#edgeBtn');
@@ -234,8 +235,8 @@ test.describe('Inbox — split-view console', () => {
     await expect(page.locator('.lpane')).toBeVisible();
   });
 
-  test('mobile: panes stack — picking a row pushes the pane in, back returns (D5)', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'mobile', 'stacked panes are the <760px behaviour');
+  test('phones and an upright tablet: panes stack — picking a row pushes the pane in, back returns (D5)', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) >= 1024, 'stacked panes are the under-1024px behaviour (phones and an upright iPad, sales list item 43)');
     await installApp(page, { api: API });
     await page.goto('/inbox.html');
     await expect(page.locator('#rpane')).toBeHidden();   // list first
@@ -343,7 +344,7 @@ test.describe('Inbox — split-view console', () => {
     } });
     await page.goto('/inbox.html');
     await expect(page.locator('#rows')).toContainText('all caught up');
-    // ≥760px the pane shows the calm all-clear; mobile shows the list only
+    // in the split view (≥1024px) the pane shows the calm all-clear; stacked shows the list only
   });
 });
 
@@ -737,8 +738,8 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
-  test('the reading pane blames the LENS, not the view, when a lens emptied the list', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'the reading pane is a ≥760px surface; <760px stacks to the list');
+  test('the reading pane blames the LENS, not the view, when a lens emptied the list', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) < 1024, 'the empty reading pane is a split-view surface; under 1024px the panes stack to the list');
     await installApp(page, { api: LENS_API });
     await page.goto('/inbox.html');
     await page.locator('#fClient').selectOption('c-1');
@@ -864,7 +865,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     expect(await rowTexts(page)).toEqual(['Marlow’s Kitchen']);
     // open the row, come back, then narrow to a DIFFERENT client: the previous
     // selection must not survive as a ghost that pushes the pane back in over
-    // a list it is no longer part of (<760px there is no split view to fall
+    // a list it is no longer part of (under 1024px there is no split view to fall
     // back on — a stranded pane hides the whole Inbox).
     await page.locator('#rows [role=option]').first().click();
     await expect(page.locator('#rpane')).toBeVisible();
