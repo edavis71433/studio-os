@@ -29,6 +29,16 @@ env:
   # in deploy.yml, rollback.yml and schema-dump.yml.
   SUPABASE_CLI_VERSION: "2.122.0"
 
+# One at a time (Nov 9 2026). Two dispatches used to run side by side, and the older one
+# could land last: sessions agreed an order by message three times, and two once ran on the
+# same commit. A production deploy or rollback now waits for the one before it. GitHub keeps
+# one waiting run per group, so a newer dispatch replaces a waiting one; every run ships the
+# commit main was at when it was dispatched, so the newer carries the older's code. A run
+# cancelled while it waited was replaced: don't rerun it.
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && 'production' || 'staging' }}
+  cancel-in-progress: false
+
 jobs:
   # The pre-deploy gate is ci.yml itself: the same typecheck of every function, the
   # same test sweep and the same Deno as every pull request, so the two can't drift.
