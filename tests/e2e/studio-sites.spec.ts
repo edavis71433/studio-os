@@ -87,6 +87,19 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(errors).toEqual([]);
   });
 
+  // Nov 9 2026: like Squarespace's account dashboard, the list of sites is where a new one
+  // starts. Every site belongs to a client, so "+ New site" opens Home's Add a customer,
+  // which says it emails them a sign-in link before anything is sent.
+  test('+ New site, at the top of the page, opens Add a customer', async ({ page }) => {
+    await openSites(page);
+    const btn = page.getByRole('link', { name: '+ New site' });
+    await expect(btn).toBeVisible();
+    await expect(btn).toHaveAttribute('href', '/agency.html#add');
+    await btn.click();
+    await expect(page).toHaveURL(/\/agency\.html/);             // Home opens the dialog, then tidies #add from the address
+    await expect(page.locator('#custDlg')).toBeVisible();
+  });
+
   test('a card: address, status, plan and renewal, domain renewal, who can edit, and the three doors into that client', async ({ page }) => {
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
