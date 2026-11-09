@@ -17,7 +17,7 @@ production run identical code with different values for the rows below.
 | `RESEND_KEY` | all outbound email | yes | 90 days | Rotated 2026-07-02 (old key dead) |
 | `ANTHROPIC_KEY` | all 21 AI call sites | yes | 90 days | |
 | `PSI_KEY` | PageSpeed Insights | yes | 180 days | Also fallback for `PLACES_KEY` |
-| `SCHEDULER_SECRET` | gates `run_scheduled_jobs` / `gsc_ingest` | yes | 180 days | Also embedded in the pg_cron job body — rotate both together |
+| `SCHEDULER_SECRET` | gates `run_scheduled_jobs` / `gsc_ingest` | yes | 180 days | The pg_cron jobs read a copy from Vault (`presence_scheduler_secret`) when they run. After a rotation, update that entry on the same project, and for production also staging's `watchdog_target_secret` |
 | `STATE_SIGNING_SECRET` | OAuth state HMAC | recommended | 180 days | Falls back to `SCHEDULER_SECRET` if unset |
 | `STRIPE_SECRET` | checkout links, subscriptions | yes | on incident | Use the TEST key on staging, always |
 | `SITE_URL` | Stripe success/cancel URLs | yes | n/a | Staging: the Netlify preview/staging URL |
@@ -61,5 +61,3 @@ production run identical code with different values for the rows below.
   staging must set `SUPABASE_URL` explicitly and CORS for the staging origin
   requires a one-line code change (violates §2.8 — scheduled for step 2, the
   pipeline/config pass).
-- `02-schedule-cron.sql` embeds `SCHEDULER_SECRET` in the cron job body;
-  rotating that secret requires re-running the cron SQL.

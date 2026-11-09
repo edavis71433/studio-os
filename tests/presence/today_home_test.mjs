@@ -101,7 +101,7 @@ function customerRows(list){
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
-function initials(n){return String(n||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}
+function initials(n){return String(n||'').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}
 
 // ── mirrors (verbatim) of the pure helpers in client.html ──
 // Oct 2026 benchmark (item 2): unpaidInvoices runs on the one money formula —
@@ -617,6 +617,7 @@ const DEALS=[
   ok('initials: first letters of the first two words, "?" when blank',
     initials('Larkspur Kitchen')==='LK' && initials('Fennel Street Designs')==='FS' && initials('cher')==='C' && initials('')==='?');
   // final pass, batch C: an emoji stays whole and "ß" stays one letter (it upper-cases to "SS")
+  ok('initials: a bracket or dash is never a letter ("Eric (test)" → ET, item 71)', initials('Eric (test)')==='ET' && initials('(Acme) Jordan')==='AJ' && initials('- dash')==='D', initials('Eric (test)'));
   ok('initials: an emoji or "ß" stays whole', initials('😀 Bakery')==='😀B' && initials('ßen Ölberg')==='ßÖ', initials('😀 Bakery')+' '+initials('ßen Ölberg'));
   ok('money: whole dollars, or dollars and cents — never rounded away', money(195000)==='$1,950' && money(123450)==='$1,234.50' && money(0)==='$0', money(123450));
 }

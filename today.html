@@ -381,7 +381,7 @@ function customerRows(list){
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
-function initials(n){return String(n||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}   // batch C: an emoji or "ß" stays whole
+function initials(n){return String(n||'').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
 
 // ── inline stroke icons for the band + stat tiles (crm.html's set) ──────────
 const SVG={

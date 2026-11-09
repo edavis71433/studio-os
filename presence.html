@@ -81,6 +81,7 @@ a{color:var(--plum);text-decoration:none}
 .subline a:hover{text-decoration:underline}
 .subline .whisper{color:var(--ink-2);transition:color var(--dur) var(--ease)}
 .subline .whisper.ok{color:var(--sage)}
+.subline .whisper.bad,h5.rune .whisper.bad,#dcWhisper.bad{color:var(--clay,#b42318)}
 .actions{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
 .findwrap{position:relative;width:170px}
 .findwrap input{width:100%;height:32px;font:inherit;font-size:13px;padding:0 10px;border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet);color:var(--ink)}
@@ -1954,6 +1955,7 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
+const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
 let DRAFT_SEED = false;    // readChanges: the state was just loaded whole, so take the version with it
 let REVIEWED = null;       // the version Publish's review read, which /publish names
 // named: the version this write names, when it isn't the one the page holds (/publish
@@ -1975,7 +1977,10 @@ async function apiSend(method, route, body, undoRec, named) {
   // M9 optimistic locking: echo the draft version (M3 hash) on writes so a stale
   // edit is refused, never silently overwriting a newer one. One place → every
   // save is protected consistently, no duplicated logic.
-  const mut = method !== "GET";
+  // Item 82: a live section draw is a read that goes by POST; counted as a write, it made an
+  // overlapping changes read (the publish review's too) throw itself away and repeat, and
+  // cleared the "last edit by someone else" line.
+  const mut = method !== "GET" && !READS_BY_POST.test(route);
   const version = named !== undefined ? named : S.draftHash;
   const r = await fetch(FN + route, {
     method,
@@ -2133,7 +2138,11 @@ function go(view, early) {
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
   if (view === "search") { loadSearch(); hbLoadBoardExtras(); }
-  if (view === "design") { if (stays) dcCaptureScroll(); refreshDesignPreview(); }   // CP-2.5: the live proof warms on entry; a section's Edit from the canvas keeps its place
+  // CP-2.5: the live proof warms on entry. Item 85: already on a drawn canvas (a section's
+  // Edit, its cog, a double-click on a picture) nothing has changed, so nothing is drawn
+  // again; that full redraw 350 ms later also left sections below a new one resolving one
+  // index off. A canvas never drawn yet (a link that opens straight on it) still is.
+  if (view === "design" && (!stays || !DC_DRAWN)) refreshDesignPreview();
   contextHint(view);   // PT-2C: teach in context, once
   // CP-2.6: the URL mirrors the tab — shareable, palette-routable, back-button-safe
   try { history.replaceState(null, "", "#" + view); } catch (_) {}
@@ -2361,7 +2370,8 @@ function debounceFlush(prefix) {
     return Promise.resolve().then(fn).catch(() => {});
   }));
 }
-const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):/.test(k));
+// Item 78: the hours and the closed note wait 0.6s before saving too, so they count.
+const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):|^(hours|closednote)$/.test(k));
 // An inline editor (a menu item, a question, a testimonial, an update) saves each
 // field as you leave it. Done just closes it, once anything pending has landed.
 function editorAutosave(ed, read, patch, close) {
@@ -2372,18 +2382,21 @@ function editorAutosave(ed, read, patch, close) {
     if (sig === saved) return true;
     whisper("topWhisper", "saving");
     try { await patch(body); saved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); return true; }
-    catch (err) { whisper("topWhisper", ""); toast(nice(err), true); return false; }
+    catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); return false; }
   };
   ed.addEventListener("change", (e) => { if (e.target.matches("[data-k]")) { clearTimeout(t); t = setTimeout(flush, 250); } });
   ed.querySelector('[data-act="save"]').addEventListener("click", async () => { if (await flush()) close(); });
 }
+// Item 81: "failed" stays until the next save ("Everything saved" after a failure was untrue),
+// and "unsaved" says a field holds words its save is still waiting on.
 function whisper(id, state) {
   if (id === "topWhisper") whisper("dcWhisper", state);   // Edit mode shows the same one status
   const w = $(id); if (!w) return;
   w.classList.toggle("ok", state === "saved");
+  w.classList.toggle("bad", state === "failed");
   w.classList.toggle("idle", !state);   // the resting line can step aside when the bar is short of room
   const idle = id === "topWhisper" || id === "dcWhisper" ? "Everything saved" : "";
-  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved just now" : state || idle;
+  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved just now" : state === "failed" ? "Not saved, try again" : state === "unsaved" ? "Unsaved changes" : state || idle;
   if (state === "saved") setTimeout(() => { if (w.textContent === "Saved just now") { w.textContent = idle; w.classList.remove("ok"); w.classList.add("idle"); } }, 2600);
 }
 document.querySelectorAll("[data-sing]").forEach((inp) => {
@@ -2397,7 +2410,7 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
         S[sing] = { ...(S[sing] || {}), [field]: inp.value };   // the next undo step needs what's saved now
         whisper(wid, "saved"); whisper("topWhisper", "saved");
         scheduleChangesRefresh();
-      } catch (err) { whisper(wid, ""); toast(nice(err), true); }
+      } catch (err) { whisper(wid, ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
     }, 700);
   });
 });
@@ -2430,7 +2443,7 @@ function renderHours() {
       debounce("hours", async () => {
         UNDO_BEFORE = HOURS_BEFORE; HOURS_BEFORE = null;
         try { await api("PUT", "/location", { hours: S.location.hours }); whisper("save-hours", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
-        catch (err) { whisper("save-hours", ""); toast(nice(err), true); }
+        catch (err) { whisper("save-hours", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
       }, 600);
     };
     cb.addEventListener("change", () => { open.disabled = close.disabled = cb.checked; save(); });
@@ -2462,8 +2475,13 @@ $("closedSwitch").addEventListener("change", async () => {
   UNDO_BEFORE = { temporarily_closed: !now };
   S.location = { ...(S.location || {}), temporarily_closed: now };
   $("f-closednote").hidden = !now;
-  try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
-  catch (err) { toast(nice(err), true); }
+  whisper("save-hours", "saving"); whisper("topWhisper", "saving");
+  try { await api("PUT", "/location", { temporarily_closed: now }); whisper("save-hours", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
+  catch (err) {
+    // item 81: the switch goes back to what's saved, so it never shows a closure that didn't happen
+    $("closedSwitch").checked = !now; S.location = { ...(S.location || {}), temporarily_closed: !now }; $("f-closednote").hidden = now;
+    whisper("save-hours", ""); whisper("topWhisper", "failed"); toast(nice(err), true);
+  }
 });
 // Item 61: the published site's visit counter, and the privacy page that describes it,
 // follow this one switch. Absent means on, as every site has counted until now.
@@ -2489,7 +2507,7 @@ $("visitSwitch").addEventListener("change", async () => {
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
     try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
+    catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   }, 700);
 });
 
@@ -3831,7 +3849,7 @@ function renderBookings(wrap, appts) {
     if (sig === bkSaved) return;
     whisper("topWhisper", "saving");
     try { await api("PUT", "/bookings/settings", payload); BK.settings = { ...BK.settings, ...payload }; bkSaved = sig; whisper("topWhisper", "saved"); }
-    catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+    catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   }, 500);
   [c1, c2].forEach((c) => c.addEventListener("change", bkSave));
 
@@ -5304,6 +5322,9 @@ window.addEventListener("message", (e) => {
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
   if (e.data && e.data.presenceRetry && $("stage").classList.contains("on")) loadPreview();   // the proof's own Try again (experience review #13)
 });
+// Item 85: Hide or a move from the canvas also drew the page into the Preview screen,
+// hidden behind Edit mode: two full renders for one Hide. Opening Preview draws it anyway.
+function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")) loadPreview(); }
 async function loadPreview() {
   const frame = $("previewFrame");
   frame.srcdoc = `<div style="font-family:Georgia,serif;font-style:italic;color:#8a8172;padding:48px;text-align:center">Loading your ${PV.publishId ? "saved version" : PV.ver === "live" ? "live site" : "draft"}…</div>`;
@@ -5415,14 +5436,11 @@ function eeMoveBlock(bi, dir) {                  // reuse the block-card reorder
   // keep resolving until the save's reload re-stamps them.
   dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, bi, ni));
   if ($("blocksCard")) renderBlocksCard();
-  saveBlocks().then(() => loadPreview());        // persist, then redraw the proof
+  saveBlocks().then(previewIfOpen);              // persist, then redraw the proof if it's on screen (item 85)
 }
 function eeHideKey(key) {                        // reuse the sections-visibility machinery
   if (!key) return;
-  const hidden = new Set((S.settings && S.settings.sections_hidden) || []);
-  const order = (S.settings && S.settings.sections_order) || [];
-  hidden.add(key);
-  Promise.resolve(saveSections(order, [...hidden])).then(() => loadPreview());
+  Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => [...new Set([...sectionsHiddenNow(), key])])).then(previewIfOpen);
 }
 // Which editor a clicked section belongs to — G13: read the SERVER STAMPS.
 // A block section carries data-dds-src (its TRUE stored-list index, render
@@ -5623,6 +5641,10 @@ async function loadRitual(toSchedule) {
     // What was just typed, and any save still waiting in line, goes in first: otherwise the
     // review leaves it out, and Publish names a version that save is about to move.
     await dcSavePendingEdits();
+    // Item 78: so are an hours change and the closed note still in their 0.6s wait, and any
+    // settings write in line; without them the review left the hours out, or Publish named
+    // a version they were about to move and was refused as someone else's change.
+    await Promise.all([debounceFlush("hours"), debounceFlush("closednote"), SETTINGS_WRITES]);
     await DRAFT_LINE;
     let c, answered;
     do { answered = WRITES_ANSWERED; c = (await api("GET", "/changes")).data; } while (answered !== WRITES_ANSWERED);
@@ -6641,9 +6663,27 @@ async function refreshAll() {
   fillSingles(); await loadToday();
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
-  mountAnnouncementCard();
-  mountDesignCard();
+  // Item 80: these cards mount once. On a reload (Load the latest, a restore, an accepted
+  // draft) the ones already on screen are drawn again from what just loaded, in place,
+  // so a restored announcement or section order shows; never while someone types in one.
+  remountInPlace("annCard", mountAnnouncementCard);
+  remountSectionsCard();
+  remountInPlace("designCard", mountDesignCard);
   mountSearchCard();
+}
+// Draw a once-mounted card again from what's loaded, where it was (a placeholder holds its
+// spot while a mount that reads first is out); absent, mount it fresh. If the new one
+// can't be drawn, the old one goes back.
+function remountInPlace(id, mount, force) {   // force: an Undo redraws it even under the caret
+  const old = $(id);
+  if (!force && old && old.contains(document.activeElement)) return;
+  const mark = old ? document.createComment(id) : null;
+  if (old) old.replaceWith(mark);
+  return Promise.resolve(mount()).catch(() => {}).then(() => {
+    if (!mark || !mark.parentNode) return;
+    const nu = $(id);
+    mark.replaceWith(nu && nu !== old ? nu : old);
+  });
 }
 // ── Phase SD: Search & visibility — human questions, our plumbing ──
 // ── Per-page search/share builders, for each page's settings panel on the Pages tab
@@ -6895,7 +6935,7 @@ async function saveSeoSetup() {
     whisper("save-identity", "saved"); whisper("topWhisper", "saved");
     toast("Saved — publish to apply"); scheduleChangesRefresh();
     closeSeoSetup(); renderSearchPreview();
-  } catch (err) { whisper("save-identity", ""); whisper("topWhisper", ""); toast(nice(err), true); }
+  } catch (err) { whisper("save-identity", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
   btn.disabled = false; btn.textContent = "Save";
 }
 // ── what's left: the tasks, each a door ──
@@ -7617,12 +7657,16 @@ async function mountDesignCard(fresh = true) {
 // scripts, no <style> breakout, no third-party url()) at save AND at render, and it
 // applies to this owner's own published site, versioned with the snapshot. Saves
 // through the SAME /dev/customization path as Design Studio (one machinery).
+// Item 85: asked once per page. An owner without the capability has no card to find, so
+// every redraw of the Styles cards used to ask the server again.
+let DEV_CSS_ALLOWED = null;
 async function mountDevCssCard() {
-  const host = $("designHost") || $("view-business"); if (!host || $("devCssCard")) return;
+  const host = $("designHost") || $("view-business"); if (!host || $("devCssCard") || DEV_CSS_ALLOWED === false) return;
   let data;
   try { data = (await api("GET", "/dev/customization")).data; }
   catch (_) { return; }
-  if (!data || !data.can_edit_css) return;   // owners see the palette, not the advanced editor
+  DEV_CSS_ALLOWED = !!(data && data.can_edit_css);
+  if (!DEV_CSS_ALLOWED) return;   // owners see the palette, not the advanced editor
 
   const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px";
   const sum = el("summary", null, "Custom CSS (advanced)");
@@ -7824,9 +7868,9 @@ function renderLinkedChip(blk, idx, card) {
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; renderBlocksCard(); });
-  rm.addEventListener("click", () => { BLOCKS_WORK.splice(idx, 1); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -8462,13 +8506,13 @@ async function undoStep(rec, dir) {
     }
     whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
     return true;
-  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); return false; }
+  } catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); return false; }
 }
 async function undoSync(rec, vals, r) {
   if (rec.route === "/identity") { S.identity = { ...(S.identity || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/location") { S.location = { ...(S.location || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/bookings/settings") { BK.settings = { ...BK.settings, ...vals }; if ($("view-bookings").classList.contains("on")) loadBookings(); }
-  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
+  else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
   else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
@@ -8478,8 +8522,10 @@ async function undoSync(rec, vals, r) {
     if ($("blocksCard")) renderBlocksCard();
     renderPagesBar();
     if ($("formsCard")) formsLoad();
-    const sc = $("sectionsCard"); if (sc) { sc.remove(); mountSectionsCard(); }
-    const dc = $("designCard"); if (dc) { dc.remove(); mountDesignCard(); }
+    // item 85: in place (they used to drop to the bottom of the Styles panel), and the colors
+    // and fonts card from the tokens it holds: a settings step doesn't change them
+    remountSectionsCard();
+    remountInPlace("designCard", () => mountDesignCard(false), true);
     fillSingles();
     if ($("ann-text")) { $("ann-text").value = S.settings.announcement_text || ""; $("ann-url").value = S.settings.announcement_url || ""; $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10); }
   }
@@ -8620,7 +8666,7 @@ async function putBlocks() {
     whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview(); stageStale();
     return true;   // review fix 8: callers may announce "Saved" only on a real resolve
   } catch (err) {
-    whisper("topWhisper", "");
+    whisper("topWhisper", "failed");
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
     if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
@@ -8661,6 +8707,7 @@ function mountBlocksCard() {
   card.addEventListener("input", (e) => {
     const t = e.target;
     if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName) || (t.tagName === "INPUT" && !/^(text|search|url|email|tel|number)$/.test(t.type))) return;
+    whisper("topWhisper", "unsaved");   // item 81: the words save when the field is left
     const b = BLOCK_SOLO != null && BLOCKS_WORK ? BLOCKS_WORK[BLOCK_SOLO] : null;
     if (!b || !LIVE_TYPE_OK.has(b.type)) return;
     LIVE_PROBE = true; LIVE_TYPING = t;
@@ -9002,9 +9049,9 @@ function renderBlocksCard() {
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; const o = BLOCKS_WORK; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; const o = BLOCKS_WORK; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; BLOCKS_WORK.splice(idx, 1); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); sub.appendChild(head);
@@ -9964,10 +10011,10 @@ async function saveForms() {
   FORMS_SAVING = true;
   try {
     // Built from the saved list below, so section edits reach it first.
-    if (!(await dcSavePendingEdits(true))) { whisper("topWhisper", ""); return; }
+    if (!(await dcSavePendingEdits(true))) { whisper("topWhisper", "failed"); return; }
     await settingsTurn(putForms);
     whisper("topWhisper", "saved"); scheduleChangesRefresh(); refreshDesignPreview();
-  } catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+  } catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   finally { FORMS_SAVING = false; }
 }
 async function putForms() {
@@ -10204,27 +10251,52 @@ function dcCoreKeys(main) {
 // place in the saved order, so the move lands next to the neighbour that can be seen.
 let DC_FOCUS_CORE = null;   // the section just moved: the redraw brings it into view, and the left list's button keeps focus
 function dcMoveCore(key, dir, fromTree) {
-  const doc = dcFrameDoc(), shown = dcCoreKeys(doc && doc.getElementById("main"));
-  const i = shown.indexOf(key), j = i + dir;
-  if (i < 0 || j < 0 || j >= shown.length) return;
-  const order = homeOrderNow().filter((k) => k !== key);
-  const at = order.indexOf(shown[j]);
-  order.splice(dir < 0 ? at : at + 1, 0, key);
+  const doc = dcFrameDoc(), onShow = new Set(dcCoreKeys(doc && doc.getElementById("main")));
+  // Item 79: worked out when the move's turn comes, from the order the last move left (the
+  // canvas catches up after), so two quick presses make two moves; worked out at the press,
+  // the second repeated the first. Which sections are on show doesn't change with a move.
+  const moved = () => {
+    const shown = homeOrderNow().filter((k) => onShow.has(k));
+    const i = shown.indexOf(key), j = i + dir;
+    if (i < 0 || j < 0 || j >= shown.length) return null;
+    const order = homeOrderNow().filter((k) => k !== key);
+    const at = order.indexOf(shown[j]);
+    order.splice(dir < 0 ? at : at + 1, 0, key);
+    return order;
+  };
+  if (!moved()) return;
   DC_FOCUS_CORE = { key, dir, tree: !!fromTree };
-  saveSections(order, (S.settings && S.settings.sections_hidden) || []);
+  saveSections(moved, sectionsHiddenNow);
 }
+const sectionsHiddenNow = () => (S.settings && S.settings.sections_hidden) || [];
 function remountSectionsCard() {   // in place, so the card keeps its spot among the others
   const old = $("sectionsCard"); if (!old) return;
   const parent = old.parentNode, next = old.nextSibling;
   old.remove(); mountSectionsCard();
   const nu = $("sectionsCard"); if (nu && parent && nu.parentNode === parent) parent.insertBefore(nu, next);
 }
+// The order and the hidden list may be functions, read when the write's turn comes (item 79).
 async function saveSections(order, hidden) {
   try {
-    await settingsPut({ sections_order: order, sections_hidden: hidden });
+    const r = await settingsPut(() => {
+      const o = typeof order === "function" ? order() : order;
+      return o ? { sections_order: o, sections_hidden: typeof hidden === "function" ? hidden() : hidden } : null;
+    });
+    if (!r) { DC_FOCUS_CORE = null; return; }   // the move had nowhere left to go
     remountSectionsCard();
     toast("Home page updated — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview();
   } catch (err) { DC_FOCUS_CORE = null; toast(nice(err), true); }
+}
+// The Styles list's order, and one swap in it, as they stand when a write's turn comes (item 79).
+function cardOrderNow(heroPinned) {
+  const o = homeOrderNow();
+  return heroPinned ? ["hero", ...o.filter((k) => k !== "hero")] : o;
+}
+function swapInCard(key, dir, heroPinned) {
+  const o = cardOrderNow(heroPinned), i = o.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= o.length || (heroPinned && (key === "hero" || o[j] === "hero"))) return null;
+  [o[i], o[j]] = [o[j], o[i]];
+  return o;
 }
 function mountSectionsCard() {
   const host = $("designHost") || $("view-business"); if (!host || $("sectionsCard")) return;
@@ -10239,15 +10311,15 @@ function mountSectionsCard() {
     const def = HOME_SECTION_DEFS.find(([k]) => k === key); if (!def) return;
     const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line,#eee)";
     const cb = el("input"); cb.type = "checkbox"; cb.checked = !hidden.has(key); cb.id = "sec-" + key;
-    cb.addEventListener("change", () => { const h = new Set(hidden); cb.checked ? h.delete(key) : h.add(key); saveSections(order, [...h]); });
+    cb.addEventListener("change", () => saveSections(() => cardOrderNow(heroPinned), () => { const h = new Set(sectionsHiddenNow()); cb.checked ? h.delete(key) : h.add(key); return [...h]; }));
     const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
     const still = heroPinned && key === "hero";
     const up = el("button", null, "↑"); up.type = "button"; up.disabled = still || idx <= (heroPinned ? 1 : 0); up.title = "Move up";
     const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = still || idx === order.length - 1; dn.title = "Move down";
     if (still) up.title = dn.title = "This template keeps the welcome section at the top";
     [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
-    up.addEventListener("click", () => { if (up.disabled) return; const o = [...order]; [o[idx - 1], o[idx]] = [o[idx], o[idx - 1]]; saveSections(o, [...hidden]); });
-    dn.addEventListener("click", () => { if (dn.disabled) return; const o = [...order]; [o[idx + 1], o[idx]] = [o[idx], o[idx + 1]]; saveSections(o, [...hidden]); });
+    up.addEventListener("click", () => { if (!up.disabled) saveSections(() => swapInCard(key, -1, heroPinned), sectionsHiddenNow); });
+    dn.addEventListener("click", () => { if (!dn.disabled) saveSections(() => swapInCard(key, 1, heroPinned), sectionsHiddenNow); });
     rowEl.append(cb, lb, up, dn);
     card.appendChild(rowEl);
   });
@@ -11306,13 +11378,23 @@ function pdEnd(e) { pdFinish(true); }
 function pdCancel(e) { pdFinish(false); }
 // The "+" popover: the SAME grouped, searchable add-list as the tray, but every
 // pick inserts at THIS gap index (not append). One list builder, two entry points.
-let INSERT_MENU = null;
-function closeInsertMenu() { if (INSERT_MENU) { INSERT_MENU.remove(); INSERT_MENU = null; document.removeEventListener("keydown", insertMenuKey, true); } }
+let INSERT_MENU = null, INSERT_MENU_OFF = [];   // what closing the menu takes back
+function closeInsertMenu() {
+  if (INSERT_MENU) { INSERT_MENU.remove(); INSERT_MENU = null; document.removeEventListener("keydown", insertMenuKey, true); }
+  INSERT_MENU_OFF.splice(0).forEach((fn) => { try { fn(); } catch (_) {} });
+}
 function insertMenuKey(e) { if (e.key === "Escape") { e.stopPropagation(); closeInsertMenu(); } }
 function openInsertMenu(atIndex, anchor, rectOverride) {
   closeInsertMenu();
   const menu = el("div", "blk-insertmenu"); INSERT_MENU = menu;
-  menu.appendChild(el("div", "tray-h", "Add a section here"));
+  // Item 82: a phone has no Escape and no hover, and a tap on the canvas never reaches this
+  // page's listeners, so the menu has its own close button and a tap on the canvas closes it.
+  const head = el("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+  head.appendChild(el("div", "tray-h", "Add a section here"));
+  const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.title = "Close";
+  x.style.cssText = "font:inherit;font-size:20px;line-height:1;min-width:44px;min-height:44px;margin:-8px -8px 0 0;border:0;background:transparent;color:var(--ink-2,#666);cursor:pointer;border-radius:10px";
+  x.addEventListener("click", closeInsertMenu);
+  head.appendChild(x); menu.appendChild(head);
   // If a section was copied/cut, offer to paste it right here (before the palette).
   const clip = dcClipGet();
   if (clip) {
@@ -11362,8 +11444,15 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + "px";
   document.addEventListener("keydown", insertMenuKey, true);
   setTimeout(() => { try { search.focus(); } catch (_) {} }, 20);
-  const off = (e) => { if (INSERT_MENU && !INSERT_MENU.contains(e.target) && e.target !== anchor) { closeInsertMenu(); document.removeEventListener("mousedown", off, true); } };
-  setTimeout(() => document.addEventListener("mousedown", off, true), 0);
+  const off = (e) => { if (INSERT_MENU && !INSERT_MENU.contains(e.target) && e.target !== anchor) closeInsertMenu(); };
+  const fdoc = dcFrameDoc();
+  const offCanvas = () => { if (INSERT_MENU) closeInsertMenu(); };
+  setTimeout(() => {
+    if (INSERT_MENU !== menu) return;   // already closed
+    document.addEventListener("mousedown", off, true);
+    if (fdoc) fdoc.addEventListener("pointerdown", offCanvas, true);
+    INSERT_MENU_OFF.push(() => document.removeEventListener("mousedown", off, true), () => { if (fdoc) fdoc.removeEventListener("pointerdown", offCanvas, true); });
+  }, 0);
 }
 
 // ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
@@ -11388,6 +11477,7 @@ function dpHoldRepaint() {
   if (IPE || IDE || IDE_SAVING) { DP_REPAINT_HELD = true; return true; }
   return IPE_SAVE_T != null || IPE_SAVE_PENDING;
 }
+let DC_DRAWN = false;
 function refreshDesignPreview() {
   const frame = $("designPreview"); if (!frame) return;
   // Drawing a canvas nobody can see is a full page render per save. Opening Edit mode
@@ -11396,6 +11486,7 @@ function refreshDesignPreview() {
   // Slice D: a past version is on the canvas (Timewarp) — leave it there until
   // "Back to today"; the draft repaint happens on the mode change back to Edit.
   if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
+  DC_DRAWN = true;   // item 85: asked for at least once on this page
   clearTimeout(designPreviewTimer);
   designPreviewTimer = setTimeout(async () => {
     // Re-check at fire time AND after the fetch — a Timewarp render may have
@@ -11491,6 +11582,19 @@ function dcShiftIndex(i, at, delta) {
 // already has once it exists (the stamp domain is the list AT LAST RELOAD, so
 // it must survive later length changes), else 0..n-1 for the PRE-splice length
 // `n` callers pass. dcInjectCanvas resets the map when a fresh render lands.
+// Item 79: a move or removal from a panel shifts the canvas's stamps the way the toolbar's
+// does (dcMove, dcDelete), so a hover, Edit, Hide or Delete on the canvas before the redraw
+// acts on the section it shows, not the neighbour now at that index.
+function panelSwap(idx, to) {
+  const o = BLOCKS_WORK;
+  [o[to], o[idx]] = [o[idx], o[to]];
+  if (DDS_SIDMAP) Object.keys(DDS_SIDMAP).forEach((sid) => { DDS_SIDMAP[sid] = dcPermuteIndex(DDS_SIDMAP[sid], idx, to); });
+  dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, idx, to));
+}
+function panelRemove(idx) {
+  dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, idx, -1));   // before the splice, like dcDelete
+  BLOCKS_WORK.splice(idx, 1);
+}
 function dcComposeSrcMap(n, fn) {
   const prev = DDS_SRCMAP, next = {};
   const keys = prev ? Object.keys(prev) : Array.from({ length: n }, (_, v) => v);
@@ -12468,7 +12572,11 @@ function dcInjectCanvas(doc, main) {
   }
   let bar = doc.getElementById("dds-dc-bar");
   if (!bar) { bar = doc.createElement("div"); bar.id = "dds-dc-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
-  let current = null, hideT = null;
+  // Item 82: what the bar points at and its hide timer live on the document. A live redraw
+  // runs this again on the same document while older sections keep their first listeners;
+  // with a copy per run, leaving a redrawn section for an older one hid the bar under the
+  // pointer. The bar's own two listeners go on once.
+  const ds = doc.__dcBarState || (doc.__dcBarState = { current: null, hideT: null });
   // The toolbar sits on the section's top edge, OUTSIDE its text. Placed inside
   // the padding it wrapped to two rows on a narrow canvas (an iPad's 250px
   // frame) and covered the heading — nothing under it could be double-clicked
@@ -12486,8 +12594,8 @@ function dcInjectCanvas(doc, main) {
     else y = Math.max(top + 6, sy + 2);
     bar.style.top = y + "px";
   };
-  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (current) { current.classList.remove("dc-hot"); current = null; } };
-  const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(hideBar, 170); };
+  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
+  const scheduleHide = () => { clearTimeout(ds.hideT); ds.hideT = setTimeout(hideBar, 170); };
   // List item 31: a finger has no hover. A tap selects a section and its toolbar
   // stays until another tap selects something else or lands off every section; a
   // second tap on the selected section's words edits them in place, as a
@@ -12496,8 +12604,11 @@ function dcInjectCanvas(doc, main) {
   // The time of the last touch lives on the document, since every redraw of the
   // canvas runs this again and older sections keep their first listeners.
   const byTouch = () => Date.now() - (doc.__dcTouchAt || 0) < 900;
-  bar.addEventListener("mouseenter", () => clearTimeout(hideT));
-  bar.addEventListener("mouseleave", scheduleHide);
+  if (!bar.__dcWired) {
+    bar.__dcWired = true;
+    bar.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
+    bar.addEventListener("mouseleave", scheduleHide);
+  }
   const mkBtn = (label, aria, fn, opts) => {
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + ((opts && opts.cls) ? " " + opts.cls : "");
     b.textContent = label; b.setAttribute("aria-label", aria); b.title = aria;
@@ -12506,9 +12617,9 @@ function dcInjectCanvas(doc, main) {
   };
   const showBar = (el2) => {
     if (IPE) return;   // G13 slice 2: the hover toolbar sleeps while a text session is active
-    clearTimeout(hideT);
-    if (current && current !== el2) current.classList.remove("dc-hot");
-    current = el2; el2.classList.add("dc-hot");
+    clearTimeout(ds.hideT);
+    if (ds.current && ds.current !== el2) ds.current.classList.remove("dc-hot");
+    ds.current = el2; el2.classList.add("dc-hot");
     const c = eeClassify(el2); bar.textContent = "";
     if (c.kind === "block") {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
@@ -12566,13 +12677,23 @@ function dcInjectCanvas(doc, main) {
   if (IPE_LIVE_MSG) { ipeAnnounce(doc, IPE_LIVE_MSG); IPE_LIVE_MSG = null; }
   if (!doc.body.hasAttribute("data-dc-touch")) {
     doc.body.setAttribute("data-dc-touch", "1");
-    doc.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") doc.__dcTouchAt = Date.now(); }, true);
-    // a tap off every section puts the toolbar away
-    doc.addEventListener("click", (e) => {
-      if (!byTouch() || !doc.__dcSel) return;
+    doc.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      doc.__dcTouchAt = Date.now();
+      doc.__dcTapFrom = { x: e.clientX, y: e.clientY, at: Date.now() };
+    }, true);
+    // A tap off every section puts the toolbar away. It's read from the finger lifting, not
+    // from a click: Safari sends no click for a tap on something that takes none (a footer,
+    // the page's background), so on an iPhone the toolbar stayed up. A finger that moved or
+    // stayed down is a scroll or a hold, not a tap.
+    doc.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      const from = doc.__dcTapFrom; doc.__dcTapFrom = null;
+      if (!from || Math.abs(e.clientX - from.x) > 10 || Math.abs(e.clientY - from.y) > 10 || Date.now() - from.at > 600) return;
+      if (!doc.__dcSel) return;
       if (e.target.closest && e.target.closest("main > section, main > nav.block-toc, #dds-dc-bar, #dds-ipe-bar, .dc-ins, .dc-colh, .dc-emptyzone")) return;
       hideBar();
-    });
+    }, true);
   }
   const targets = main.querySelectorAll(":scope > section, :scope > nav.block-toc");
   Array.prototype.forEach.call(targets, (el2) => {
@@ -13005,7 +13126,7 @@ function mountAnnouncementCard() {
     if (sig === annSaved) return;
     whisper("topWhisper", "saving");
     try { await settingsPut(body); annSaved = sig; whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
-    catch (err) { whisper("topWhisper", ""); toast(nice(err), true); }
+    catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   };
   ["ann-text", "ann-url", "ann-until"].forEach((id) => $(id).addEventListener("change", annSave));
 }
