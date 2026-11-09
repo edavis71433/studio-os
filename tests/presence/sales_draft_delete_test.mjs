@@ -29,6 +29,7 @@ const mig117 = read('supabase/migrations/0117_deal_event_delete_kinds.sql');
 // allowed kinds" check below must run against the latest migration, or adding a
 // kind correctly would fail this suite; 0117's own properties are still pinned.
 const mig118 = read('supabase/migrations/0118_deal_event_invoice_voided.sql');
+const mig144 = read('supabase/migrations/0144_email_opens.sql');   // item 69: the newest kind list (doc_opened)
 const pipeline = read('pipeline.html');
 
 const results = [];
@@ -68,9 +69,11 @@ const C_SIGNED = '88888888-8888-4888-8888-888888888888';
   ok('0117 is idempotent (drop if exists, then add)', /drop constraint if exists presence_deal_events_kind_check/.test(mig117));
   ok('0117 documents its rollback', /rollback:/.test(mig117));
   // and the code writes ONLY kinds the CURRENT constraint allows
-  const latest = kinds(mig118);
+  const k118 = kinds(mig118), latest = kinds(mig144);
   ok('0118 carries the whole 0117 superset forward (the chain never narrows)',
-    latest.length > 0 && now.every((k) => latest.includes(k)), now.filter((k) => !latest.includes(k)).join(','));
+    k118.length > 0 && now.every((k) => k118.includes(k)), now.filter((k) => !k118.includes(k)).join(','));
+  ok('0144 carries the whole 0118 superset forward (the chain never narrows)',
+    latest.length > 0 && k118.every((k) => latest.includes(k)), k118.filter((k) => !latest.includes(k)).join(','));
   for (const k of sales.match(/dealEvent\([^,]+, [^,]+, '([a-z_]+)'/g) || []) {
     const kind = k.match(/'([a-z_]+)'$/)[1];
     ok(`sales.ts writes deal-event kind '${kind}' — allowed by the check`, latest.includes(kind));

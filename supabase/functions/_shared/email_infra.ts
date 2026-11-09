@@ -27,6 +27,12 @@ export async function unsubscribeToken(email: string): Promise<string> {
   return await hmacB64url(`unsub:${email.trim().toLowerCase()}`);
 }
 
+/** Token for an update's open counter (presence lib/email_engagement.ts): ties the
+ *  1×1 image in one emailed update to that send's row, with no address in the link. */
+export async function openToken(sendId: string): Promise<string> {
+  return await hmacB64url(`open:${sendId.trim().toLowerCase()}`);
+}
+
 /** The absolute one-click unsubscribe URL for a recipient: the List-Unsubscribe header's
  *  target, which mail clients POST to (RFC 8058). Not for a link a person clicks. */
 export async function unsubscribeUrl(email: string): Promise<string> {

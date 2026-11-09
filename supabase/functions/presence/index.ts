@@ -315,6 +315,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const { handleInboundEmail } = await import('./routes/inbound_email.ts');
     return handleInboundEmail(req);
   }
+  // Sales review item 69: the open counter in an emailed update (a 1×1 image the
+  // person's email app fetches). Public by design: the signature in the path is
+  // the key, and it only ever stamps that one send's first open (a HEAD stamps nothing).
+  const openPx = route.match(/^\/email\/open\/([0-9a-f-]{36})\.([A-Za-z0-9_-]{32})\.gif$/i);
+  if (openPx && (method === 'GET' || method === 'HEAD')) {
+    const { handleEmailOpen, PIXEL_HEADERS } = await import('./lib/email_engagement.ts');
+    return method === 'HEAD' ? new Response(null, { status: 200, headers: PIXEL_HEADERS }) : await handleEmailOpen(openPx[1], openPx[2]);
+  }
   // Sales review item 46: the private calendar link Google Calendar (or Apple,
   // Outlook) reads on its own schedule — no session; the 160-bit token in the
   // path is the key, and turning the link off or making a new one retires it.

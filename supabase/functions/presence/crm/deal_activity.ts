@@ -65,6 +65,13 @@ const SYS_LABEL: Record<string, string> = {
   proposal_decided: 'Proposal decision', contract_sent: 'Agreement sent', contract_signed: 'Agreement signed',
   invoice_sent: 'Invoice sent', invoice_paid: 'Invoice paid', converted: 'Converted to a customer',
 };
+// Item 69: the client opened a document's page (routes/sales.ts firstOpen) — "They
+// opened your proposal". pipeline.html mirrors these by hand, like SYS_LABEL.
+const OPENED_WHAT: Record<string, string> = { proposal: 'proposal', agreement: 'agreement', invoice: 'invoice', deposit: 'deposit request' };
+/** "They opened your proposal". Pure. */
+export function openedLine(what: unknown): string {
+  return 'They opened your ' + (OPENED_WHAT[String(what || '')] || 'document');
+}
 const STAGE_LABEL: Record<string, string> = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
 
 function usd(cents: unknown): string {
@@ -83,6 +90,7 @@ export function describeSystemEvent(row: any): string {
   if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer;
   if (k === 'invoice_sent' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit requested' : 'Invoice sent') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
   if (k === 'invoice_paid' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit paid' : 'Invoice paid') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
+  if (k === 'doc_opened') return openedLine(d.what);
   return SYS_LABEL[k] || String(k || '').replace(/_/g, ' ');
 }
 

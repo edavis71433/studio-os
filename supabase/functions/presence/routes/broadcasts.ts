@@ -28,6 +28,7 @@ import {
   isAudienceKey, isListKey, loadPickedLists, type AudienceKey,
 } from '../lib/broadcast.ts';
 import { normalizeLists, normalizePeople, newId, MAX_LISTS } from '../lib/saved_views.ts';
+import { loadEngagement } from '../lib/email_engagement.ts';
 import { updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -152,12 +153,14 @@ export async function handleBroadcastGet(site: SiteRow, id: string, cors: Record
   const tokens = { firstName: 'there', businessName: brand.name };
   const preview_html = brandEmailShell(buildEmailHtml(b.body, tokens), brand);
   const preview_subject = renderSubject(b.subject, tokens);
+  // Item 69: who opened a sent update (null before APPLY-0144, or when the read fails).
+  const engagement = b.status === 'sent' ? await loadEngagement(site.id, id) : null;
   return json({ data: {
     broadcast: b,
     audience_label: await audienceLabelFor(site.id, String(b.audience || '')),
     recipient_count: sendable.recipients.length,
     suppressed_count: sendable.suppressed,
-    preview_subject, preview_html,
+    preview_subject, preview_html, engagement,
   } }, 200, cors);
 }
 

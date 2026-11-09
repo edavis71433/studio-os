@@ -110,6 +110,9 @@
   .bcdetail .kv{font-size:13.5px;color:var(--soft)}
   .bcdetail .kv b{color:var(--ink)}
   .bcdetail .preview iframe{height:320px}
+  .bcdetail .opens{font-size:13.5px;color:var(--soft);margin-top:var(--dds-s2,8px);overflow-wrap:anywhere}
+  .bcdetail .opens b{color:var(--ink)}
+  .bcdetail .opens-why{font-size:12.5px;color:var(--soft);margin-top:2px}
   .failnote{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;margin-top:var(--dds-s2,8px)}
   .bc .st{font-size:12px;font-weight:500;border-radius:999px;padding:2px var(--dds-s2,8px);text-transform:capitalize}
   .st.draft{color:var(--warn);background:var(--warn-soft)}
@@ -361,6 +364,15 @@ async function loadDetail(id){
   DETAILS[id]=r.body.data;paintDetail(box,id);
 }
 function paintDetail(box,id){const d=DETAILS[id];box.innerHTML=detailHtml(d);const f=box.querySelector('iframe');if(f)f.srcdoc=(d&&d.preview_html)||'';}
+// Item 69: "Opened by 3 of 10", and who. Shown once someone has opened it (an
+// update sent before the counter existed simply shows nothing).
+function opensHtml(e){
+  if(!e||!e.opened)return '';
+  const who=(e.opened_by||[]).filter(Boolean);
+  const more=e.opened-who.length;
+  return `<p class="opens" data-opens><b>Opened by ${e.opened} of ${e.sent}</b>${who.length?': '+esc(who.join(', '))+(more>0?` and ${more} more`:''):''}</p>
+    <p class="opens-why">A rough count: some email apps open every message by themselves, and others block the counter.</p>`;
+}
 function detailHtml(d){
   const b=(d&&d.broadcast)||{};
   let counts='';
@@ -369,7 +381,7 @@ function detailHtml(d){
   else counts=`${d.recipient_count||0} ${d.recipient_count===1?'person':'people'} would get this today${d.suppressed_count?' · '+d.suppressed_count+' unsubscribed and left out':''}`;
   // The API doesn't expose per-address failures — the honest line is the count.
   const failed=(b.status==='sent'&&b.failed_count)?`<p class="failnote">${b.failed_count} address${b.failed_count===1?'':'es'} couldn’t be reached — everyone else got it.</p>`:'';
-  return `<div class="kv"><b>${esc(d.audience_label||'')}</b> · ${esc(counts)}</div>${failed}
+  return `<div class="kv"><b>${esc(d.audience_label||'')}</b> · ${esc(counts)}</div>${failed}${opensHtml(b.status==='sent'?d.engagement:null)}
     <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||b.subject||'')}</b></div><iframe title="${b.status==='sent'?'Email as delivered':'Email preview'}" sandbox=""></iframe></div>`;
 }
 // ── "Drafts live again" (the L fix): a saved draft reopens INTO THE COMPOSER

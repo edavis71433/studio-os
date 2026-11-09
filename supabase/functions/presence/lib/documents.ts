@@ -29,7 +29,7 @@ export type DocKind = 'proposal' | 'contract' | 'invoice';
 //    sign/accept token — a doc link only ever RENDERS, it never mutates). Mirrors
 //    the house HMAC idiom used by routes/sales.ts signSalesToken. Pure: caller
 //    passes the secret and the current epoch seconds, so there is no clock here. ─
-export interface DocTokenPayload { t: 'doc'; k: DocKind; id: string; site_id: string; exp: number }
+export interface DocTokenPayload { t: 'doc'; k: DocKind; id: string; site_id: string; exp: number; e?: 1 }   // e: 1 = the copy linked from an email (item 69)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
