@@ -102,7 +102,7 @@ test.describe('item 23 — one Home for a studio', () => {
     const reads = readsOf(page);
     await page.goto('/today.html');
     await expect(page).toHaveURL(/\/agency\.html$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Customers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // Home is headed Home since the sales side's final pass
     for (const p of TODAY_ONLY) expect(reads, p).not.toContain(p);
   });
   test('a studio here for the first time goes Home as soon as its context is in, not after the slow reads (item 86)', async ({ page }) => {
