@@ -244,6 +244,105 @@ html.dds-embed #detailWrap{padding-top:0}
   .card{box-shadow:var(--shadow);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .card:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
   @media (prefers-reduced-motion:reduce){.card:hover{transform:none}}
+
+  /* ══ Bold redesign — Projects (Nov 2026): a board by stage (Kickoff, Design &
+     build, Review, Launch, then Done), each card the project at a glance — who
+     it's for, how far along, whose move it is, when it's due. Chips with counts
+     over it; List (the sortable table) and Calendar beside it. ══ */
+  .lhead{background:none;border:0;box-shadow:none;padding:0;margin-bottom:var(--dds-s3,12px)}
+  .lrow1{gap:10px;flex-wrap:wrap}
+  .lrow1 .sp{flex:1 1 0}
+  .lhead h1{flex:0 1 auto}
+  .lhead .lmeta{margin:2px 0 0;font-size:13px;color:var(--soft)}
+  #newProject{border-radius:999px;font-weight:600;padding:9px 18px;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .trow{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 var(--dds-s4,16px)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 360px;min-width:0}
+  .chips .chip{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .chips .chip .n{font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+  .chips .chip:hover{border-color:color-mix(in srgb,var(--p) 45%,var(--line));color:var(--ink)}
+  .chips .chip[aria-pressed="true"]{background:var(--p-soft);border-color:transparent;color:var(--p);font-weight:600}
+  .chips .chip[aria-pressed="true"] .n{color:var(--p)}
+  .trow .search{flex:0 1 280px;min-width:200px}
+  @media (min-width:761px){.trow .search{font-size:14px;padding:7px 14px}}
+  /* the board: the columns side by side, as many to a row as fit (a narrower
+     screen wraps them in order, never scrolls them out of sight) */
+  .pboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:12px;align-items:start}
+  .pcol{background:color-mix(in srgb,var(--ink) 3.5%,transparent);border-radius:var(--dds-r-lg,16px);padding:10px;min-width:0}
+  .pcol-h{display:flex;align-items:baseline;gap:6px;font-family:var(--sans);font-size:13.5px;font-weight:650;letter-spacing:0;margin:2px 4px 10px;color:var(--ink)}
+  .pcol-h .n{font-size:12px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+  .pcol-b{display:flex;flex-direction:column;gap:10px}
+  .pcol-empty{border:1.5px dashed color-mix(in srgb,var(--ink) 14%,transparent);border-radius:var(--dds-r,12px);padding:14px 10px;text-align:center;font-size:12.5px;color:var(--faint);margin:0}
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .card.pc{display:block;margin:0;padding:12px 14px 12px;border-radius:var(--dds-r-lg,14px);background:var(--card);border:1px solid var(--line);cursor:pointer;min-width:0}
+  .card.pc:hover{border-color:color-mix(in srgb,var(--p) 40%,var(--line))}
+  /* on hold: a dashed edge and grey accents (fading the card would fail its text's contrast) */
+  .card.pc.hold{border-style:dashed}
+  .card.pc.hold .pc-av,.card.pc.hold .prog.pc-bar>i{background:var(--faint)}
+  .card.pc.hold .pc-pct{color:var(--soft)}
+  .pc-h{display:flex;align-items:flex-start;gap:10px;min-width:0}
+  .pc-av{flex:0 0 auto;width:30px;height:30px;margin-top:1px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em;color:#fff;background:var(--dds-grad-brand,var(--p))}
+  .pc-t{display:flex;flex-direction:column;min-width:0;flex:1}
+  .pc-n{font-weight:650;font-size:14px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+  .pc-c{font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pc-p{display:flex;align-items:center;gap:10px;margin:12px 0 0}
+  .prog.pc-bar{flex:1;height:6px}
+  .prog.pc-bar>i{background:var(--dds-grad-btn,var(--p));border-radius:999px}
+  .pc-pct{flex:0 0 auto;font-size:12.5px;font-weight:700;color:var(--p);font-variant-numeric:tabular-nums}
+  .pc-chips{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:10px}
+  .pc-chip{max-width:100%;font-size:12px;font-weight:600;line-height:1.35;border-radius:10px;padding:4px 9px;background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--soft)}
+  .pc-chip>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+  .pc-chip.wait{background:var(--warn-soft);color:var(--warn)}
+  .pc-chip.soon,.pc-chip.done{background:var(--good-soft);color:var(--good)}
+  .pc-d{font-size:12px;color:var(--faint);margin:8px 0 0}
+  .pc-d.late{color:var(--bad);font-weight:600}
+  /* the calendar: a month on one card */
+  .cal{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow);padding:12px 14px 10px}
+  .cal-h{display:flex;align-items:center;gap:4px;margin:0 0 8px}
+  .cal-h h2{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0 4px;min-width:0}
+  .cal-h .sp{flex:1}
+  .cal-h .lbtn{font-size:20px;line-height:1;min-width:36px;min-height:36px}
+  table.cal-t{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:12.5px}
+  .cal-t thead th{font-size:11.5px;font-weight:600;color:var(--faint);padding:4px 6px 6px;border-bottom:0}
+  .cal-t tbody tr{cursor:default}
+  .cal-t tbody tr:hover{background:none}
+  .cal-t tbody td{height:96px;vertical-align:top;padding:4px;border-top:1px solid var(--line);border-bottom:0}
+  .cal-t tbody td+td{border-left:1px solid var(--line)}
+  .cal-t td.cal-out{background:color-mix(in srgb,var(--ink) 2.5%,transparent)}
+  .cal-d{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 4px;border-radius:999px;font-weight:600;color:var(--soft);font-variant-numeric:tabular-nums}
+  .cal-today .cal-d{background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff)}
+  .cal-ev{display:block;width:100%;margin-top:4px;text-align:left;font:inherit;font-size:12px;font-weight:600;border:0;border-radius:6px;padding:3px 7px;background:var(--p-soft);color:var(--p);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-ev:hover{background:color-mix(in srgb,var(--p) 18%,transparent)}
+  .cal-ev.late{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
+  .cal-ev.done{background:var(--good-soft);color:var(--good)}
+  .cal-ag{display:none;list-style:none;padding:0;margin:0}
+  .cal-note{font-size:12.5px;color:var(--faint);margin:10px 2px 0}
+  @media (pointer:coarse){.chips .chip,.cal-ev{min-height:44px}.cal-h .lbtn{min-width:44px;min-height:44px}}
+  @media (max-width:1100px){.lrow1 .seg{order:3;flex:1 1 100%}.lrow1 .seg button{flex:1}}
+  /* below a laptop's width a month grid can't hold the names, so the month is a list */
+  @media (max-width:960px){
+    table.cal-t{display:none}
+    .cal-ag{display:block}
+    .cal-ag li{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-top:1px solid var(--line)}
+    .cal-ag li:first-child{border-top:0}
+    .cal-agd{font-size:12.5px;font-weight:600;color:var(--soft)}
+    .cal-agc{font-weight:500;color:var(--soft)}
+    .cal-ag .cal-ev{font-size:14px;padding:8px 10px;white-space:normal}
+    .cal-none{font-size:13.5px;color:var(--soft)}
+  }
+  /* a phone: the board's columns stack (empty ones step aside), the month is a list */
+  @media (max-width:760px){
+    .lhead .obj-ic{width:10px;height:10px;min-width:10px;border-radius:50%;background:var(--dds-grad-brand,var(--p));font-size:0;color:transparent;box-shadow:none}
+    .lhead h1{font-family:var(--serif);font-weight:600;font-size:26px;letter-spacing:-.015em}
+    .lhead .lmeta{display:none}
+    .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex-basis:100%}
+    .chips::-webkit-scrollbar{display:none}
+    .trow .search{flex:1 1 100%}
+    .pboard{display:flex;flex-direction:column;align-items:stretch;gap:18px}
+    .pcol{background:none;padding:0}
+    .pcol.empty{display:none}
+    .pcol-h{margin:0 2px 8px;font-size:14px}
+    .card.pc{padding:14px 16px}
+  }
 </style>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/shell.js" defer></script>
@@ -251,10 +350,14 @@ html.dds-embed #detailWrap{padding-top:0}
 <body>
 <div class="wrap" id="listWrap">
   <header id="lhead"></header>
-  <div class="bar" id="filters" role="group" aria-label="Filter by status"></div>
-  <!-- C2: the search input is STATIC page skeleton — renderRoster only rebuilds
-       #lhead + #list, so the input node (and caret) is never disturbed -->
-  <div class="bar"><input class="search" id="q" type="search" aria-label="Search projects" placeholder="Search project or customer…"><button class="btn" id="newProject" hidden>+ New project</button></div>
+  <!-- Bold redesign (Nov 2026): the chips (with their counts) and the search share
+       one row; + New project sits in the header beside Board · List · Calendar.
+       C2: the search input is STATIC page skeleton — renderRoster only rebuilds
+       #lhead, the chips and #list, so the input node (and caret) is never disturbed -->
+  <div class="trow">
+    <div class="chips" id="filters" role="group" aria-label="Show"></div>
+    <input class="search" id="q" type="search" aria-label="Search projects" placeholder="Search project or customer…">
+  </div>
   <!-- Cross-client client messages now live in the Inbox (grouped by client). This
        page is the projects list view + the project record page; a customer's own
        general messages live INSIDE their record page (loadClientGeneral). -->
@@ -320,7 +423,7 @@ async function resolveScopedClient(){
 const P_NEXT={active:['on_hold','complete','archived'],on_hold:['active','complete','archived'],complete:['active','archived'],archived:['active']};
 const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked','done'],blocked:['todo','in_progress'],done:['todo','in_progress']};
 const STATUSES=['active','on_hold','complete','archived'];
-let TOKEN="",FILTER="",STUDIO=true;
+let TOKEN="",STUDIO=true,NEW_OK=false;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 // Server errors that read like a sentence still show; raw technical junk doesn't.
@@ -348,14 +451,70 @@ let ITEMS=[],LOADED_AT=0,Q="";
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
+let CUSTPERSON={};         // client_id → the person there ("Waiting on Ivy"), from the same read
 let CUSTTRIED=false;
 const updatedLabel=()=>{if(!LOADED_AT)return 'Couldn’t load just now';const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
-// Table ⇄ Cards display choice, persisted; small screens default to Cards
-// (customers.html's list-view mobile pattern, kept in sync by hand).
+// Board · List · Calendar, persisted. Bold redesign (Nov 2026): the board is the
+// default at every size (on a phone its columns stack); the old Cards choice opens
+// the board, and List is the sortable table it always was.
 const DISPLAY_KEY='dds-display:projects';
-let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
-  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='board'||v==='cal')return v;if(v==='cards')return 'board';}catch(_){/* storage may be denied */}
+  return 'board';})();
+
+// ── Bold redesign — Projects: the board's stages, and what each card says ────
+// Where a project stands and whose move it is come from the server, with the
+// progress (GET /projects/progress: stage · next · waiting · overdue — see
+// lib/service_delivery.ts boardFacts). The page never guesses a stage: a project
+// the server can't place sits under "No stage yet".
+const STAGES=[['kickoff','Kickoff'],['design','Design & build'],['review','Review'],['launch','Launch']];
+const STAGE_LABEL=Object.fromEntries(STAGES);
+const isRunning=(p)=>String(p.status||'active')==='active';
+const isDoneish=(p)=>{const st=String(p.status||'active');return st==='complete'||st==='archived';};
+// the board's columns need the server's stages; until it sends them (an older
+// server, or the per-project report fallback) the running work shares one column
+const STAGED=()=>Object.values(REPORTS).some(r=>r&&Object.prototype.hasOwnProperty.call(r,'stage'));
+function stageOf(p){
+  if(isDoneish(p))return 'done';
+  const r=REPORTS[p.id];
+  return (r&&STAGE_LABEL[r.stage])?r.stage:'none';
+}
+const dayOf=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?m[0]:'';};
+const daysTo=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));if(!m)return null;const t=new Date();return Math.round((new Date(+m[1],+m[2]-1,+m[3])-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000);};
+const shortDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+const weekday=(s)=>{const n=daysTo(s);if(n===0)return 'today';if(n===1)return 'tomorrow';const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{weekday:'short'}):'';};
+// late: past its target date, or a step past its own
+const isLate=(p)=>{if(!isRunning(p))return false;const d=daysTo(p.target_date);const r=REPORTS[p.id];return (d!=null&&d<0)||!!(r&&Number(r.overdue)>0);};
+// launching soon: its target date within the coming week (and not already late)
+const isSoon=(p)=>{if(!isRunning(p)||isLate(p))return false;const d=daysTo(p.target_date);return d!=null&&d>=0&&d<=7;};
+// waiting on them (the product's one name for it): an approval out with the client, or the next step is theirs
+const isWaiting=(p)=>{if(!isRunning(p))return false;const r=REPORTS[p.id];return !!(r&&(r.waiting||Number(r.pending_approvals)>0));};
+// who at the customer it's waiting on — their first name, else the business
+function whoOf(p){
+  if(!STUDIO)return 'you';
+  const person=String(CUSTPERSON[p.client_id]||'').trim().split(/\s+/)[0];
+  if(person)return person;
+  const c=customerName(p);
+  return (c&&c!=='—'&&c!=='Internal')?c:'them';
+}
+const initials=(s)=>String(s||'').split(/\s+/).filter(w=>/^[A-Za-z0-9]/.test(w)&&!/^(co\.?|inc\.?|llc|ltd\.?|the|and)$/i.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'•';
+
+// the chips over the board — each with its count; an empty one is noise (All and
+// the pressed one always show). Not tabs: they filter in place (role=group + aria-pressed).
+const VIEWS=[['all','All'],['waiting','Waiting on them'],['late','Late'],['soon','Launching soon'],['hold','On hold'],['done','Done'],['archived','Archived']];
+let VIEW='all';
+const viewLabel=(v)=>v==='waiting'&&!STUDIO?'Waiting on you':((VIEWS.find(x=>x[0]===v)||VIEWS[0])[1]);
+function inView(v,p){
+  const st=String(p.status||'active');
+  if(v==='all')return st!=='archived';
+  if(v==='archived')return st==='archived';
+  if(v==='done')return st==='complete';
+  if(v==='hold')return st==='on_hold';
+  if(v==='waiting')return isWaiting(p);
+  if(v==='late')return isLate(p);
+  if(v==='soon')return isSoon(p);
+  return true;
+}
 function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}renderRoster();}
 
 // sortable columns — Progress/Open approvals sort on the lazily-fetched report
@@ -366,6 +525,7 @@ const COLS=[
   ['customer','Customer',(p)=>customerName(p).toLowerCase()],
   ['status','Status',(p)=>String(p.status||'active')],
   ['progress','Progress',(p)=>{const r=REPORTS[p.id];return r&&r.progress?Number(r.progress.pct||0):null;}],
+  ['stage','Stage',(p)=>{const s=stageOf(p);return s==='done'?STAGES.length:(s==='none'?null:STAGES.findIndex(x=>x[0]===s));}],
   ['target_date','Target',(p)=>p.target_date?String(p.target_date):null],
   ['approvals','Open approvals',(p)=>{const r=REPORTS[p.id];return r?Number(r.pending_approvals||0):null;}],
 ];
@@ -388,30 +548,55 @@ document.addEventListener('click',(e)=>{
 function renderFilters(){
   // SS6 (C5): an honest role=group with aria-pressed — these chips filter, they
   // don't own tab panels (the E2 downgrade SS5's pipeline rows also took).
-  const opts=[['','All'],...STATUSES.map(s=>[s,s[0].toUpperCase()+s.slice(1).replace('_',' ')])];
-  $('filters').innerHTML=opts.map(([v,l])=>`<button aria-pressed="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-status="${v}">${esc(l)}</button>`).join('');
-  $('filters').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.status;renderFilters();load();});
+  // Bold redesign: they filter what the page already holds (one read of every
+  // project), so a press is instant and the counts are true for each one.
+  const out=[];
+  for(const [v] of VIEWS){
+    const n=ITEMS.filter(p=>inView(v,p)).length;
+    const on=VIEW===v;
+    if(!n&&!on&&v!=='all')continue;
+    out.push(`<button type="button" class="chip${on?' on':''}" data-view="${v}" aria-pressed="${on?'true':'false'}">${esc(viewLabel(v))} <span class="n">${n}</span></button>`);
+  }
+  $('filters').innerHTML=out.join('');
+  $('filters').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
+    VIEW=b.dataset.view;renderRoster();
+    const nb=$('filters').querySelector('[data-view="'+VIEW+'"]');if(nb)nb.focus();
+    ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();});
+  });
 }
 
 // ── the shared list-view header (.lhead anatomy: 📁 icon · H1 · refresh · meta) ──
 // counts what the roster SHOWS (the C2 search included), never raw ITEMS
-function headerHtml(list){
-  const n=list.length;
-  const active=list.filter(p=>p.status==='active').length;
+// Bold redesign: the line under the title is the studio at a glance — what's
+// running, what's waiting on them, what launches this week, what's late —
+// whatever the chips show (they carry their own counts).
+function metaText(list){
+  const run=ITEMS.filter(isRunning);
+  const waiting=run.filter(isWaiting).length,soon=run.filter(isSoon).length,late=run.filter(isLate).length,hold=ITEMS.filter(p=>p.status==='on_hold').length;
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  const mid=FILTER?` · ${esc(statusLabel(FILTER))}`:` · ${active} active`;
-  const who=SCOPED_CLIENT?`For ${esc(SCOPED_CLIENT.name||'this client')} · `:'';
+  const parts=[];
+  if(SCOPED_CLIENT)parts.push('For '+(SCOPED_CLIENT.name||'this client'));
+  parts.push(run.length?`${run.length} running`:'Nothing running');
+  if(waiting)parts.push(`${waiting} waiting on ${STUDIO?'them':'you'}`);
+  if(soon)parts.push(`${soon} launching this week`);
+  if(late)parts.push(`${late} late`);
+  if(hold)parts.push(`${hold} on hold`);
+  if(VIEW!=='all'||Q.trim())parts.push(`showing ${list.length} project${list.length===1?'':'s'}`);
+  parts.push(updatedLabel());
+  if(DISPLAY==='table')parts.push(`Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`);
+  return parts.join(' · ');
+}
+function headerHtml(list){
   return `<div class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">📁</span>
       <h1 id="pagehead" tabindex="-1">Projects</h1>
-      <div class="seg" role="group" aria-label="Display as">
-        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
-        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
-      </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      <span class="sp"></span>
+      <div class="seg" role="group" aria-label="Display as"><button type="button" id="dispBoard" aria-pressed="${DISPLAY==='board'}">Board</button><button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'}">List</button><button type="button" id="dispCal" aria-pressed="${DISPLAY==='cal'}">Calendar</button></div>
+      ${NEW_OK?'<button class="btn" id="newProject" type="button">+ New project</button>':''}
     </div>
-    <div class="lmeta">${who}${n} project${n===1?'':'s'}${mid} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${esc(metaText(list))}</div>
   </div>`;
 }
 
@@ -456,6 +641,7 @@ function tableHtml(list){
       <td>${cust==='Internal'?'<span class="mutcell">Internal</span>':(cust==='—'?'<span class="mutcell">—</span>':esc(cust))}</td>
       <td><span class="pill ${esc(st)}">${esc(statusLabel(st))}</span></td>
       <td>${progressCell(p)}</td>
+      <td>${(()=>{const sg=stageOf(p);return sg==='done'?'<span class="mutcell">Done</span>':(STAGE_LABEL[sg]?esc(STAGE_LABEL[sg]):'<span class="mutcell">—</span>');})()}</td>
       <td class="num">${p.target_date?esc(niceDay(p.target_date)):'<span class="mutcell">—</span>'}</td>
       <td class="num">${approvalsCell(p)}</td>
     </tr>`;
@@ -463,36 +649,106 @@ function tableHtml(list){
   return `<div class="tscroll"><table aria-label="Projects"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
-function cardsHtml(list){
-  return list.map(p=>{
-    const r=REPORTS[p.id];
-    const cust=customerName(p);
-    const prog=(r&&r.progress&&r.progress.total>0)?`<div class="cprog"><div class="prog"><i style="width:${Number(r.progress.pct||0)}%"></i></div><span class="pnum mut" style="font-size:11.5px">${Number(r.progress.done||0)}/${Number(r.progress.total||0)} tasks</span></div>`:'';
-    return `<div class="card" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Open ${esc(p.name||'Untitled project')}"><div style="min-width:0"><div class="t">${esc(p.name||'Untitled project')}</div><div class="m">${cust!=='—'&&cust!=='Internal'?esc(cust)+' · ':''}${p.target_date?('Target '+esc(niceDay(p.target_date))):'No target date'}${p.client_visible===false?' · internal':''}</div>${prog}</div><span class="pill ${esc(p.status)}">${esc(statusLabel(p.status))}</span></div>`;
-  }).join('');
+// ── Bold redesign — the board: one column per stage, then Done. Each card is the
+// project at a glance: who it's for, how far along, whose move it is, when it's due.
+function cardHtml(p){
+  const r=REPORTS[p.id]||null;
+  const name=p.name||'Untitled project';
+  const cust=customerName(p);
+  const forWho=cust==='Internal'?'Your studio':(cust==='—'?'':cust);
+  const pct=(r&&r.progress&&Number(r.progress.total)>0)?Math.max(0,Math.min(100,Number(r.progress.pct||0))):null;
+  const st=String(p.status||'active');
+  const chips=[];
+  // (the words sit in an inner span: it clamps to two lines, the outer one pads)
+  const chip=(cls,html)=>`<span class="pc-chip${cls?' '+cls:''}"><span>${html}</span></span>`;
+  if(st==='complete')chips.push(chip('done','✓ Done'));
+  else if(st==='archived')chips.push(chip('','Archived'));
+  else if(st==='on_hold')chips.push(chip('hold','On hold'));
+  else if(r){
+    const w=r.waiting||(Number(r.pending_approvals)>0?{kind:'approval',title:''}:null);
+    if(w)chips.push(chip('wait',`${STUDIO?'Waiting on '+esc(whoOf(p)):'Your turn'}${w.title?' · '+esc(w.title):(w.kind==='approval'?' · an approval':'')}`));
+    if(isSoon(p))chips.push(chip('soon',`${stageOf(p)==='launch'?'Launching':'Due'} ${esc(weekday(p.target_date))}`));
+    else if(r.next&&!r.next.theirs&&STUDIO)chips.push(chip('mine',`Your move${r.next.title?' · '+esc(r.next.title):''}`));
+  }
+  let when='';
+  if(st==='active'||st==='on_hold'){
+    const dl=daysTo(p.target_date);
+    if(dl!=null&&dl<0&&st==='active')when=`<p class="pc-d late">Due ${esc(shortDay(p.target_date))} · ${-dl} day${dl===-1?'':'s'} late</p>`;
+    else if(r&&Number(r.overdue)>0&&st==='active')when=`<p class="pc-d late">${Number(r.overdue)} step${Number(r.overdue)===1?'':'s'} overdue${p.target_date?' · due '+esc(shortDay(p.target_date)):''}</p>`;
+    else when=`<p class="pc-d">${p.target_date?'Due '+esc(shortDay(p.target_date)):'No date yet'}</p>`;
+  }
+  return `<div class="card pc${st==='on_hold'?' hold':''}" data-id="${esc(p.id)}" tabindex="0" role="button">
+    <div class="pc-h"><span class="pc-av" aria-hidden="true">${esc(initials(forWho&&forWho!=='Your studio'?forWho:name))}</span><span class="pc-t"><span class="pc-n">${esc(name)}</span>${forWho?`<span class="pc-c">${esc(forWho)}</span>`:''}</span></div>
+    ${pct!=null?`<div class="pc-p"><div class="prog pc-bar" aria-hidden="true"><i style="width:${pct}%"></i></div><b class="pc-pct">${pct}%</b></div>`:''}
+    ${chips.length?`<div class="pc-chips">${chips.join('')}</div>`:''}
+    ${when}
+  </div>`;
+}
+function boardHtml(list){
+  if(VIEW==='done'||VIEW==='archived')return `<div class="pgrid">${list.map(cardHtml).join('')}</div>`;
+  const staged=STAGED();
+  const cols=[];
+  const none=list.filter(p=>stageOf(p)==='none');
+  if(none.length||!staged)cols.push({k:'none',l:staged?'No stage yet':'In progress',items:none});
+  if(staged)STAGES.forEach(([k,l])=>cols.push({k,l,items:list.filter(p=>stageOf(p)===k)}));
+  if(VIEW==='all')cols.push({k:'done',l:'Done',items:list.filter(p=>stageOf(p)==='done')});
+  return `<div class="pboard">${cols.map(c=>`<section class="pcol${c.items.length?'':' empty'}" aria-labelledby="pcol-${c.k}">
+    <h2 class="pcol-h" id="pcol-${c.k}">${esc(c.l)} <span class="n">${c.items.length}</span></h2>
+    ${c.items.length?`<div class="pcol-b">${c.items.map(cardHtml).join('')}</div>`:`<p class="pcol-empty">Nothing in ${esc(c.l.toLowerCase())}</p>`}
+  </section>`).join('')}</div>`;
+}
+
+// ── Bold redesign — the calendar: each project on its target date, a month at a
+// time (a tablet or a phone gets the month as a list). Due dates only, never invented ones.
+let CAL=null;   // {y,m} — the month on show
+function calHtml(list){
+  const now=new Date(); if(!CAL)CAL={y:now.getFullYear(),m:now.getMonth()};
+  const pad=(n)=>('0'+n).slice(-2);
+  const key=(d)=>CAL.y+'-'+pad(CAL.m+1)+'-'+pad(d);
+  const first=new Date(CAL.y,CAL.m,1),days=new Date(CAL.y,CAL.m+1,0).getDate(),lead=first.getDay();
+  const title=first.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const month=CAL.y+'-'+pad(CAL.m+1);
+  const dated=list.filter(p=>dayOf(p.target_date).slice(0,7)===month).sort((a,b)=>dayOf(a.target_date)<dayOf(b.target_date)?-1:1);
+  const byDay={}; dated.forEach(p=>{(byDay[dayOf(p.target_date)]=byDay[dayOf(p.target_date)]||[]).push(p);});
+  const tone=(p)=>isDoneish(p)?' done':(isLate(p)?' late':'');
+  const today=todayYmd();
+  const cells=[];
+  for(let i=0;i<lead;i++)cells.push('<td class="cal-out"></td>');
+  for(let d=1;d<=days;d++){const k=key(d);cells.push(`<td${k===today?' class="cal-today"':''}><span class="cal-d"${k===today?' aria-label="Today, '+d+'"':''}>${d}</span>${(byDay[k]||[]).map(p=>`<button type="button" class="cal-ev${tone(p)}" data-open="${esc(p.id)}" title="${esc((p.name||'Untitled project')+' — '+(customerName(p)==='—'?'':customerName(p)))}">${esc(p.name||'Untitled project')}</button>`).join('')}</td>`);}
+  while(cells.length%7)cells.push('<td class="cal-out"></td>');
+  const weeks=[];for(let i=0;i<cells.length;i+=7)weeks.push('<tr>'+cells.slice(i,i+7).join('')+'</tr>');
+  const agenda=dated.length?dated.map(p=>`<li><span class="cal-agd">${esc(new Date(+dayOf(p.target_date).slice(0,4),+dayOf(p.target_date).slice(5,7)-1,+dayOf(p.target_date).slice(8,10)).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}))}</span><button type="button" class="cal-ev${tone(p)}" data-open="${esc(p.id)}">${esc(p.name||'Untitled project')}${customerName(p)!=='—'?`<span class="cal-agc"> · ${esc(customerName(p))}</span>`:''}</button></li>`).join(''):`<li class="cal-none">Nothing due in ${esc(first.toLocaleDateString('en-US',{month:'long'}))}.</li>`;
+  const undated=list.filter(p=>isRunning(p)&&!p.target_date).length;
+  return `<div class="cal">
+    <div class="cal-h"><button type="button" class="lbtn" id="calPrev" aria-label="Previous month">‹</button><h2 id="calTitle">${esc(title)}</h2><button type="button" class="lbtn" id="calNext" aria-label="Next month">›</button><span class="sp"></span>${(CAL.y!==now.getFullYear()||CAL.m!==now.getMonth())?'<button type="button" class="chip" id="calNow">This month</button>':''}</div>
+    <table class="cal-t" aria-labelledby="calTitle"><thead><tr>${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<th scope="col">${d}</th>`).join('')}</tr></thead><tbody>${weeks.join('')}</tbody></table>
+    <ol class="cal-ag" aria-labelledby="calTitle">${agenda}</ol>
+    <p class="cal-note">Each project sits on its target date.${undated?` ${undated} running project${undated===1?' has':'s have'} no date yet — open ${undated===1?'it':'one'} to set it.`:''}</p>
+  </div>`;
 }
 
 // C2: the search filters what the roster shows — project name + the enriched
 // customer-name column (so "salon" finds Beta Salon's project).
 function visRows(){
   const q=Q.trim().toLowerCase();
-  return sortedRows().filter(p=>!q||((p.name||'')+' '+customerName(p)).toLowerCase().includes(q));
+  return sortedRows().filter(p=>inView(VIEW,p)&&(!q||((p.name||'')+' '+customerName(p)).toLowerCase().includes(q)));
 }
 function renderRoster(){
   const list=visRows();
   $('lhead').innerHTML=headerHtml(list);
+  renderFilters();
   if(!list.length){
     if(Q.trim())$('list').innerHTML='<p class="mut">No projects match “'+esc(Q)+'”.</p>';
     // Scoped into a client, this list reads site_id = <the client's site> — and
     // projects are created on the AGENCY site (service_bridge ensureProjectForDeal
     // takes agencySiteId). So it is not "no projects yet", it is "projects don't
     // live here", and "New project" would be a trap. Say the true thing instead.
-    else if(SCOPED_CLIENT&&!Q.trim()&&window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects for '+(SCOPED_CLIENT.name||'this client')+' yet',body:FILTER?'No '+statusLabel(FILTER)+' projects for them right now — try “All”.':'A project starts when their deal is won — convert the deal in the pipeline and it lands here.'});
-    else if(!Q.trim()&&!FILTER&&window.ddsStudioLevel&&window.ddsStudioLevel($('list'),{noun:'Projects',lower:'projects'})){/* painted */}
-    else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:FILTER?'Nothing in this view':'No projects yet',body:STUDIO?(FILTER?'No '+statusLabel(FILTER)+' projects right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&!FILTER)?'New project':'',onAction:(STUDIO&&!FILTER)?openNew:null});
+    else if(SCOPED_CLIENT&&!Q.trim()&&window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:VIEW!=='all'?'Nothing in this view':'No projects for '+(SCOPED_CLIENT.name||'this client')+' yet',body:VIEW!=='all'?'Nothing '+viewLabel(VIEW).toLowerCase()+' for them right now — try “All”.':'A project starts when their deal is won — convert the deal in the pipeline and it lands here.'});
+    else if(!Q.trim()&&VIEW==='all'&&window.ddsStudioLevel&&window.ddsStudioLevel($('list'),{noun:'Projects',lower:'projects'})){/* painted */}
+    else if(window.ddsEmpty) window.ddsEmpty($('list'),{icon:'📁',title:VIEW!=='all'?'Nothing in this view':'No projects yet',body:STUDIO?(VIEW!=='all'?'Nothing '+viewLabel(VIEW).toLowerCase()+' right now — try “All”.':'Create a project to start managing a customer’s work — tasks, files, and approvals live here.'):'Your projects will appear here.',actionLabel:(STUDIO&&VIEW==='all')?'New project':'',onAction:(STUDIO&&VIEW==='all')?openNew:null});
     else $('list').innerHTML='<p class="mut">No projects yet.</p>';
   }else{
-    $('list').innerHTML=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
+    $('list').innerHTML=DISPLAY==='table'?tableHtml(list):(DISPLAY==='cal'?calHtml(list):boardHtml(list));
   }
   wireRoster();
 }
@@ -506,6 +762,8 @@ function renderRosterKeepFocus(){
   if(ae&&ae!==document.body&&$('listWrap')&&$('listWrap').contains(ae)){
     if(ae.id)sel='#'+ae.id;
     else if(ae.dataset&&ae.dataset.sort)sel='[data-sort="'+ae.dataset.sort+'"]';
+    else if(ae.dataset&&ae.dataset.view)sel='[data-view="'+ae.dataset.view+'"]';
+    else if(ae.dataset&&ae.dataset.open&&!ae.closest('[data-id]'))sel='[data-open="'+ae.dataset.open+'"]';
     else{const row=ae.closest('[data-id]');if(row)sel='[data-id="'+row.dataset.id+'"]'+(ae.classList.contains('rowlink')?' .rowlink':'');}
   }
   renderRoster();
@@ -515,8 +773,13 @@ function renderRosterKeepFocus(){
 function wireRoster(){
   // refresh (soft: a failed refresh toasts and keeps the list) + focus-return
   const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
-  const dt=$('dispTable'); if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
-  const dc=$('dispCards'); if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
+  [['dispBoard','board'],['dispTable','table'],['dispCal','cal']].forEach(([id,v])=>{const b=$(id);if(b)b.addEventListener('click',()=>{if(DISPLAY!==v){setDisplay(v);const nb=$(id);if(nb)nb.focus();}});});
+  const np=$('newProject'); if(np)np.addEventListener('click',openNew);
+  // the calendar's month: ‹ › step it, "This month" comes home (focus stays on the arrow pressed)
+  const step=(n,id)=>{const d=new Date(CAL.y,CAL.m+n,1);CAL={y:d.getFullYear(),m:d.getMonth()};renderRoster();const nb=$(id)||$('calTitle');if(nb)nb.focus();};
+  const cp=$('calPrev'); if(cp)cp.addEventListener('click',()=>step(-1,'calPrev'));
+  const cn=$('calNext'); if(cn)cn.addEventListener('click',()=>step(1,'calNext'));
+  const cw=$('calNow'); if(cw)cw.addEventListener('click',()=>{CAL=null;renderRoster();const t=$('calTitle');if(t){t.tabIndex=-1;t.focus();}});
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
   $('list').querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',(e)=>{
     e.stopPropagation();
@@ -540,15 +803,23 @@ async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
     if(scope()&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
-    const res=await api('/projects'+(FILTER?('?status='+FILTER):''));
+    // Bold redesign: one read of every project (the chips filter in place, with
+    // true counts) — the server's page cap, not its default 25
+    const res=await api('/projects?limit=100');
     // Scoped into a client, POST /projects would file the project on the CLIENT's
     // site — projects live on the agency site (service_bridge ensureProjectForDeal
     // takes agencySiteId), so it would land where nothing else can see it. Hide
     // the action rather than offer a button that does the wrong thing quietly.
-    STUDIO=res.is_studio_view!==false; $('newProject').hidden=!STUDIO||!!scope();
+    STUDIO=res.is_studio_view!==false; NEW_OK=STUDIO&&!scope();
     ITEMS=res.data||[];
     if(SCOPED_CLIENT)ITEMS=ITEMS.filter(p=>String(p.client_id||'')===SCOPED_CLIENT.client_id);   // this client's work only
     LOADED_AT=Date.now();
+    // the board places a card by its stage, so it waits for the facts — briefly:
+    // past ~1.2s it draws with what it has and the late answer fills it in
+    if(soft)for(const k of Object.keys(REPORTS))delete REPORTS[k];   // a refresh re-reads where each project stands
+    let settled=false;
+    const enrich=Promise.all([ensureCustomers(),ensureReports()]).then((v)=>{settled=true;return v;});
+    await Promise.race([enrich,new Promise((r)=>setTimeout(r,1200))]);
     renderRoster();
     // one project for this client and nothing else asked for → open it straight away
     if(SCOPED_CLIENT&&!soft&&!OPENED_ONCE&&ITEMS.length===1){
@@ -556,11 +827,10 @@ async function load(soft){
       const qp=new URLSearchParams(location.search);
       if(!qp.get('project')&&!qp.get('support'))openProject(ITEMS[0].id);
     }
-    // enrichment (existing routes only): customer names once + per-project report
-    // summaries for Progress / Open approvals — cells fill in as they arrive.
-    // These re-renders are async: keep the user's keyboard focus where it was.
-    ensureCustomers().then((changed)=>{if(changed)renderRosterKeepFocus();});
-    ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();});
+    // enrichment (existing routes only): customer names once + the one progress read
+    // (progress, approvals, and the board's stage/next/waiting) — when it outran the
+    // wait above, it fills in as it arrives. Keep the user's keyboard focus where it was.
+    if(!settled)enrich.then(([c,r])=>{if(c||r)renderRosterKeepFocus();});
   }catch(e){
     if(soft)throw e;
     if(!$('lhead').innerHTML.trim())$('lhead').innerHTML=headerHtml([]);   // the page keeps its name even when the list could not load
@@ -575,8 +845,8 @@ async function ensureCustomers(){
   CUSTTRIED=true;
   try{
     const r=await api('/studio/customers');
-    const map={}; (r.data||[]).forEach(c=>{if(c.client_id&&c.name)map[c.client_id]=c.name;});
-    CUSTMAP=map; return true;
+    const map={},person={}; (r.data||[]).forEach(c=>{if(c.client_id&&c.name)map[c.client_id]=c.name;if(c.client_id&&c.person_name)person[c.client_id]=String(c.person_name);});
+    CUSTMAP=map; CUSTPERSON=person; return true;
   }catch(_){return false;}
 }
 // the Progress + Open approvals columns, for the rows the roster actually SHOWS (search
@@ -610,7 +880,6 @@ async function loadCustomerOptions(){
   }catch(_){/* picker is optional — a manual internal project still works */}
 }
 function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value='';if($('np-customer'))$('np-customer').value='';if($('np-template'))$('np-template').value=''; $('newDlg').showModal(); loadCustomerOptions(); setTimeout(()=>$('np-name').focus(),20); }
-$('newProject').onclick=openNew;
 $('np-cancel').onclick=()=>$('newDlg').close();
 $('newForm').onsubmit=async(e)=>{
   e.preventDefault();
@@ -712,7 +981,14 @@ function addedMsg(r){
 // record are two panels of the ONE page; only one is visible at a time.
 function showDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(l)l.hidden=true; if(d)d.hidden=false; window.scrollTo(0,0); }
 function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=true; if(l)l.hidden=false; }
-function closeProjectDetail(){ PROJ_SEQ++; hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():'')); const c=document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus(); }
+function closeProjectDetail(){
+  const was=new URLSearchParams(location.search).get('project');
+  PROJ_SEQ++; hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():''));
+  const c=(was&&document.querySelector('#list [data-id="'+was+'"]'))||document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus();
+  // bold redesign: the project just closed may have moved on (a ticked step, an
+  // approval asked) — re-read where it stands so its card tells the truth
+  if(was&&REPORTS[was]){delete REPORTS[was];ensureReports().then((changed)=>{if(changed)renderRosterKeepFocus();}).catch(()=>{});}
+}
 
 // PROJ_SEQ (SS6): ONE monotonic token threaded through openProject and every
 // record-section loader. Opening a different record (or closing back to the
@@ -757,7 +1033,7 @@ async function openProject(id){
     const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
     if(seq!==PROJ_SEQ)return;   // a newer record (or the roster) took over mid-flight
     const p=data.project; STUDIO=data.is_studio_view!==false;
-    const rp=rep&&rep.data&&rep.data.summary; if(rp)REPORTS[id]=rp;
+    const rp=rep&&rep.data&&rep.data.summary; if(rp)REPORTS[id]=Object.assign({},REPORTS[id]||{},rp);   // keep the board's stage/next/waiting beside the report's counts
     if(STUDIO)await ensureCustomers();   // the Customer highlight tile (cached after the first record)
     if(seq!==PROJ_SEQ)return;
     const cust=customerName(p);
@@ -1102,7 +1378,7 @@ async function openStudioSupportFull(rid){
     const {data}=await sb.auth.getSession();
     TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){ $('list').innerHTML='<p class="mut">Please <a href="/studio.html">sign in</a> to see your projects.</p>'; return; }
-    renderFilters(); await load();
+    await load();
     const params=new URLSearchParams(location.search);
     const deep=params.get('project'); if(deep) openProject(deep);
     const sup=params.get('support'); if(sup) openStudioSupportFull(sup);

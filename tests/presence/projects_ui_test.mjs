@@ -27,7 +27,7 @@ ok('wires: approvals decide + messages thread', /\/approvals\/'\+.*\/decide','PO
 ok('a11y/ux: no prompt()/alert()/confirm() — uses dialogs + ddsToast', !/\bprompt\(/.test(h) && !/\balert\(/.test(h) && !/\bconfirm\(/.test(h) && /ddsToast/.test(h));
 ok('ux: valid next-stage buttons mirror the bounded ladders (no illegal jumps in UI)', /P_NEXT=\{active:\['on_hold','complete','archived'\]/.test(h) && /T_NEXT=\{todo:\['in_progress','blocked','done'\]/.test(h));
 ok('ux: shared/internal + client-action tags reflect visibility', /tag client/.test(h) && /needs the client/.test(h));
-ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /\$\('newProject'\)\.hidden=!STUDIO/.test(h));
+ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /NEW_OK=STUDIO&&!scope\(\)/.test(h) && /\$\{NEW_OK\?'<button class="btn" id="newProject"/.test(h));
 ok('slice 9: record body is the two-column related-list layout (main + rail)', /class="dgrid/.test(h) && /class="dside"/.test(h) && /class="dmain"/.test(h) && /#detailWrap\{max-width/.test(h));
 ok('FIX B: a customer’s general (project-less) messages surface inside their view', /loadClientGeneral/.test(h) && /\/client-messages/.test(h) && /id="genList"/.test(h));
 ok('nav: Projects is a primary outcome, gated to the relationship area', /single\('projects', 'Projects', '\/projects\.html'\)/.test(nav) && /if \(f\.hasRelationship\) single\('projects'/.test(nav));
@@ -35,7 +35,7 @@ ok('nav: Projects is a primary outcome, gated to the relationship area', /single
 // ── slice 9: the Lightning roster + record anatomy ──────────────────────────
 ok('slice 9: shared .lhead list-view header — 📁 object icon, #pagehead H1, refresh, meta', /class="lhead"/.test(h) && /class="obj-ic"/.test(h) && /id="pagehead" tabindex="-1"/.test(h) && /id="refreshBtn"/.test(h) && /updatedLabel\(\)/.test(h));
 ok('slice 9: sortable roster table in its own scroll container (aria-sort + th buttons)', /class="tscroll"/.test(h) && /aria-sort=/.test(h) && /data-sort=/.test(h) && /table aria-label="Projects"/.test(h));
-ok('slice 9: Table ⇄ Cards display toggle persisted (customers.html mobile pattern)', /dds-display:projects/.test(h) && /id="dispTable"/.test(h) && /id="dispCards"/.test(h));
+ok('bold redesign: Board · List · Calendar, persisted (the old Cards choice opens the board)', /dds-display:projects/.test(h) && /id="dispBoard"/.test(h) && /id="dispTable"/.test(h) && /id="dispCal"/.test(h) && /if\(v==='cards'\)return 'board'/.test(h));
 ok('slice 9: roster enrichment uses EXISTING routes only (per-project /report + /studio/customers), no fake numbers', /ensureReports/.test(h) && /ensureCustomers/.test(h) && /\/studio\/customers/.test(h) && /if\(!\(r&&r\.progress\)\)return '<span class="mutcell">—<\/span>'/.test(h));
 ok('slice 9: record page breadcrumb (Projects › name)', /class="crumbs" aria-label="Breadcrumb"/.test(h) && /aria-current="page"/.test(h));
 ok('slice 9: highlights panel tiles (Customer · Target · Progress · Waiting · Files)', /class="hl-panel"/.test(h) && /Waiting on them/.test(h) && /class="hl-k"/.test(h));

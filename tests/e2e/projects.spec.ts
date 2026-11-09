@@ -144,12 +144,16 @@ test.describe('Projects list view', () => {
     // header: 📁 object icon + H1 focus target + refresh + meta
     await expect(page.locator('.lhead .obj-ic')).toHaveText('📁');
     await expect(page.locator('#pagehead')).toHaveText('Projects');
-    await expect(page.locator('.lmeta')).toContainText('3 projects');
-    await expect(page.locator('.lmeta')).toContainText('2 active');
+    // bold redesign: the line under the title is the studio at a glance (p1's
+    // two open approvals put it with a client; its Aug 1 target has passed)
+    await expect(page.locator('.lmeta')).toContainText('2 running');
+    await expect(page.locator('.lmeta')).toContainText('1 waiting on them');
+    await expect(page.locator('.lmeta')).toContainText('1 late');
     await expect(page.locator('.lmeta')).toContainText('Updated just now');
-    // the status filter chips survive (SS6: an honest role=group, All pressed)
-    await expect(page.locator('#filters [aria-pressed="true"]')).toHaveText('All');
-    await expect(page.locator('#filters .chip')).toHaveCount(5);
+    // the chips (SS6: an honest role=group, All pressed) carry their counts, and
+    // an empty one steps aside
+    await expect(page.locator('#filters [aria-pressed="true"]')).toHaveText('All 3');
+    await expect(page.locator('#filters .chip')).toHaveText(['All 3', 'Waiting on them 1', 'Late 1', 'Done 1']);
     // + New project survives for the studio view
     await expect(page.locator('#newProject')).toBeVisible();
     // table: default Project-ascending sort with aria-sort
@@ -212,20 +216,22 @@ test.describe('Projects list view', () => {
     expect(await ids()).toEqual(['p1', 'p2', 'p3']);
   });
 
-  test('the status filter chips re-query the server and select honestly', async ({ page }) => {
+  test('the chips filter in place, with true counts — one read of every project, no re-query', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });
-    // the chips filter SERVER-side (?status=) — installApp ignores query strings,
-    // so layer a query-aware route on top (registered later → matched first)
-    await page.route('**/functions/v1/presence/projects?status=complete*', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: LIST.data.filter((p) => p.status === 'complete'), is_studio_view: true }) }));
+    const listReads: string[] = [];
+    page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.endsWith('/presence/projects')) listReads.push(u.search); });
     await page.goto('/projects.html');
     await expect(page.locator('tbody tr')).toHaveCount(3);
-    await page.locator('#filters [data-status="complete"]').click();
-    await expect(page.locator('#filters [data-status="complete"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#filters [data-view="done"]').click();
+    await expect(page.locator('#filters [data-view="done"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#filters [data-view="done"]')).toBeFocused();
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr').first()).toContainText('Beta brand refresh');
-    await expect(page.locator('.lmeta')).toContainText('1 project · complete');
+    await expect(page.locator('.lmeta')).toContainText('showing 1 project');
+    await page.locator('#filters [data-view="all"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(3);
+    expect(listReads).toEqual(['?limit=100']);   // the server's page cap, read once
   });
 
   // ── SS6: C2 roster search · honest filter group · PROJ_SEQ · visible-rows fan-out ──
@@ -261,7 +267,7 @@ test.describe('Projects list view', () => {
     await page.goto('/projects.html');
     await expect(page.locator('#filters')).toHaveAttribute('role', 'group');
     await expect(page.locator('#filters [role=tab]')).toHaveCount(0);
-    await expect(page.locator('#filters [data-status=""]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#filters [data-view="all"]')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('PROJ_SEQ — a stale section load can never paint into a newer record', async ({ page }) => {
@@ -369,6 +375,7 @@ test.describe('Projects list view', () => {
   });
 
   test('cards open the record on click; the table row activates from the keyboard via its name button', async ({ page }) => {
+    // the old Cards choice opens the board (bold redesign) — its cards open the record the same way
     await page.addInitScript(() => { try { localStorage.setItem('dds-display:projects', 'cards'); } catch { /* denied */ } });
     await installApp(page, { api: API });
     await page.goto('/projects.html');
@@ -389,13 +396,12 @@ test.describe('Projects list view', () => {
     await expect(page.locator('tbody tr[tabindex]')).toHaveCount(0);
   });
 
-  test('mobile defaults to the Cards display (the customers.html pattern); toggle persists', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'mobile', 'phone-width default under test');
+  test('the board is the default at every size (a phone stacks it); the choice persists', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/projects.html');
     await expect(page.locator('#list .card')).toHaveCount(3);
     await expect(page.locator('.tscroll')).toHaveCount(0);
-    await expect(page.locator('#dispCards')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#dispBoard')).toHaveAttribute('aria-pressed', 'true');
     // switching to Table sticks across a reload
     await page.locator('#dispTable').click();
     await expect(page.locator('tbody tr')).toHaveCount(3);
