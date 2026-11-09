@@ -33,6 +33,8 @@
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  /* + New site (Nov 9 2026): on a phone the row can't hold it beside the title, which then shrank under the switch; it takes a row of its own */
+  @media (max-width:640px){#newSiteBtn{flex-basis:100%;justify-content:center;margin-left:0}}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer;min-height:36px}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
@@ -300,6 +302,7 @@ function headHtml(shown){
         <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
       </div>
       <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      <a class="btn" id="newSiteBtn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center;margin-left:auto">+ New site</a>
     </div>
     <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>
     <nav class="tabs" aria-label="Sites and domains"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a></nav>

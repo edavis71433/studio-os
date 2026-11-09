@@ -216,8 +216,18 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasAgency && studioLevel && !f.hasRelationship) single('studio', 'Studio', '/agency.html');
 
   // ── utilities (the foot of the sidebar; the account menu on the top bar) ──
-  // The agency's OWN website: one door, out of the primary bar.
-  if (f.hasWebsite && studioLevel) sections.push({ ...websiteSection('Your website'), utility: true });
+  // The agency's OWN website: one door, out of the primary bar, once it's live. A studio
+  // whose own site lives elsewhere (Squarespace, say) found an empty, never-published
+  // placeholder behind "Your website" and took it for a client's site (Nov 9 2026). Until
+  // the studio publishes a site here, it is one search entry, and its clients' sites are
+  // on Sites; the builder's own pages stay in search either way.
+  if (f.hasWebsite && studioLevel) {
+    if (c.siteLive) sections.push({ ...websiteSection('Your website'), utility: true });
+    else sections.push({ key: 'website', label: 'Your website', utility: true, items: [
+      hid('content', 'Your studio’s own site', '/presence.html', 'Build your studio’s own website on Studio OS, if you want it here. Your clients’ sites are on Sites.'),
+      ...websiteSubItems(),
+    ] });
+  }
 
   // Connections — integrations. A card on Settings owns them; ⌘K keeps the entry.
   if (f.hasConnected) sections.push({ key: 'connections', label: 'Connections', items: [hid('connections', 'Connections', '/connections.html', 'The services connected to your business — Google, Yelp, booking, email.')], utility: true });

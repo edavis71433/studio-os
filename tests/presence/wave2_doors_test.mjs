@@ -30,6 +30,11 @@ const owner = buildNav({ role: 'business_owner', edition: 'presence', capabiliti
 const visible = (nav) => flatten(nav).filter((i) => !i.hidden);
 // builder list item 43 (Nov 2026): Sites joins, right after Home
 ok('the studio menu lists ten places, Analytics back among them and Sites after Home', visible(studio).length === 10 && visible(studio).map((i) => i.label).join('·') === 'Home·Sites·Inbox·Customers·Pipeline·Projects·Files·Analytics·Your website·Settings');
+// Nov 9 2026: a studio whose own site lives elsewhere found an empty placeholder behind
+// "Your website" and took it for a client's site. Until it publishes one here, no menu item.
+const unpublished = buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, siteLive: false });
+ok('a studio with no published site of its own has nine places, no "Your website"', visible(unpublished).length === 9 && !visible(unpublished).some((i) => i.label === 'Your website'));
+ok('…search still finds its own site, and Sites lists its clients’ sites', hits(unpublished, 'own site')[0]?.href === '/presence.html' && visible(unpublished).some((i) => i.href === '/sites.html'));
 ok('inside a client the menu is still the client’s six', visible(scoped).length === 6);
 ok('the plain owner’s menu is unchanged (nine)', visible(owner).length === 9);
 ok('⌘K "billing" (studio) → Pipeline’s Outstanding first, never Customers', hits(studio, 'billing')[0]?.href === '/pipeline.html#outstanding' && !hits(studio, 'billing').some((h) => h.href === '/customers.html'));
