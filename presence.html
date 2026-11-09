@@ -1319,7 +1319,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
             <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
             <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
-          </select><div class="hint">Sets the words your site uses, like Services or Menu. Applies when you next publish.</div></div>
+          </select><div class="hint" id="industryHint">Sets the words your site uses, like Services or Menu. Applies when you next publish.</div></div>
           <h5 class="rune">Contact</h5>
           <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
           <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
@@ -2519,8 +2519,8 @@ function categoriesInOrder() {
   const declared = (S.settings && S.settings.category_order) || [];
   const seen = new Set(declared);
   const encounter = [];
-  for (const o of S.offerings) { const c = o.category || "Menu"; if (!seen.has(c)) { seen.add(c); encounter.push(c); } }
-  return [...declared.filter((c) => S.offerings.some((o) => (o.category || "Menu") === c)), ...encounter];
+  for (const o of S.offerings) { const c = o.category || VOCAB.label; if (!seen.has(c)) { seen.add(c); encounter.push(c); } }
+  return [...declared.filter((c) => S.offerings.some((o) => (o.category || VOCAB.label) === c)), ...encounter];
 }
 function renderOfferings() {
   const wrap = $("offeringsWrap"); wrap.innerHTML = "";
@@ -2528,16 +2528,17 @@ function renderOfferings() {
   const wash = changedIds();
   if (!S.offerings.length) {
     const e = el("div", "estate");
-    e.innerHTML = `<div class="eq">Burrata &amp; Peaches …… $16</div><div class="eh">Your menu is waiting for its first line. Add a dish and it reads just like this.</div>`;
-    const a = el("div", "ea"); const b = el("button", "pillbtn inked", "Add the first dish");
-    b.addEventListener("click", () => addDishLine(wrap, "Mains"));
+    // Item 93: in the business's own words. A plumber saw burrata, dishes and "Mains".
+    e.innerHTML = `<div class="eq">${VOCAB.example}</div><div class="eh">${esc(VOCAB.empty)}</div>`;
+    const a = el("div", "ea"); const b = el("button", "pillbtn inked", `Add the first ${VOCAB.one}`);
+    b.addEventListener("click", () => addDishLine(wrap, VOCAB.firstCat));
     a.appendChild(b); e.appendChild(a); wrap.appendChild(e);
   }
   cats.forEach((cat, ci) => {
     const head = el("div", "menuhead");
     head.appendChild(el("h6", null, cat));
-    const n = S.offerings.filter((o) => (o.category || "Menu") === cat).length;
-    head.appendChild(el("span", "mv", `${n} dish${n === 1 ? "" : "es"}`));
+    const n = S.offerings.filter((o) => (o.category || VOCAB.label) === cat).length;
+    head.appendChild(el("span", "mv", `${n} ${n === 1 ? VOCAB.one : VOCAB.many}`));
     const ctl = el("div", "ctl");
     const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier`);
     const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later`);
@@ -2546,8 +2547,8 @@ function renderOfferings() {
     dn.addEventListener("click", () => moveCategory(cat, +1));
     ctl.append(up, dn); head.appendChild(ctl);
     wrap.appendChild(head);
-    S.offerings.filter((o) => (o.category || "Menu") === cat).forEach((o) => wrap.appendChild(dishLine(o, wash)));
-    const add = el("button", "addline", `＋ Add a dish to ${cat}`);
+    S.offerings.filter((o) => (o.category || VOCAB.label) === cat).forEach((o) => wrap.appendChild(dishLine(o, wash)));
+    const add = el("button", "addline", `＋ Add a ${VOCAB.one} to ${cat}`);
     add.addEventListener("click", () => addDishLine(add, cat));
     wrap.appendChild(add);
   });
@@ -2581,8 +2582,8 @@ function dishEditor(o) {
   const ed = el("div", "editor");
   ed.innerHTML = `
     <div class="erow">
-      <div class="field"><label>Dish</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
-      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" value="${esc(o.price_text || "")}" maxlength="40" placeholder="$18 · MP"></div>
+      <div class="field"><label>${vocabCap(VOCAB.one)}</label><input type="text" data-k="name" value="${esc(o.name)}" maxlength="120"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" value="${esc(o.price_text || "")}" maxlength="40" placeholder="${esc(VOCAB.pricePh)}"></div>
     </div>
     <div class="field"><label>Description</label><textarea data-k="description" maxlength="500" style="min-height:52px">${esc(o.description || "")}</textarea></div>
     <div class="erow">
@@ -2617,19 +2618,19 @@ function addDishLine(afterNode, cat) {
   const ed = el("div", "editor adding");
   ed.innerHTML = `
     <div class="erow">
-      <div class="field"><label>Dish</label><input type="text" data-k="name" maxlength="120"></div>
-      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" maxlength="40" placeholder="$18 · MP"></div>
+      <div class="field"><label>${vocabCap(VOCAB.one)}</label><input type="text" data-k="name" maxlength="120"></div>
+      <div class="field" style="max-width:130px"><label>Price</label><input type="text" data-k="price_text" aria-label="Price" maxlength="40" placeholder="${esc(VOCAB.pricePh)}"></div>
     </div>
-    ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" aria-label="Section" maxlength="60" placeholder="Desserts, Drinks, Specials…"></div>` : ""}
+    ${cat === "" ? `<div class="field"><label>Section</label><input type="text" data-k="category" aria-label="Section" maxlength="60" placeholder="${esc(VOCAB.catHint)}"></div>` : ""}
     <div class="eacts"><button class="pillbtn inked" data-act="add">${VOCAB.addBtn}</button><button class="quietact" data-act="cancel">Never mind</button></div>`;
   ed.querySelector('[data-act="cancel"]').addEventListener("click", () => ed.remove());
   ed.querySelector('[data-act="add"]').addEventListener("click", async () => {
     const name = ed.querySelector('[data-k="name"]').value.trim();
     const price = ed.querySelector('[data-k="price_text"]').value.trim();
     const category = cat || (ed.querySelector('[data-k="category"]')?.value.trim() || "");
-    if (!name || !category) { toast("A dish needs a name and a section.", true); return; }
+    if (!name || !category) { toast(`A ${VOCAB.one} needs a name and a section.`, true); return; }
     try { const r = await api("POST", "/offerings", { name, category, price_text: price });
-      S.offerings.push(r.data); renderOfferings(); toast("On the draft menu"); scheduleChangesRefresh(); }
+      S.offerings.push(r.data); renderOfferings(); toast(VOCAB.added); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   });
   afterNode.parentNode ? afterNode.parentNode.insertBefore(ed, afterNode.nextSibling) : afterNode.appendChild(ed);
@@ -5227,7 +5228,7 @@ function renderRecent() {
   const sch = el("a", null, "Schedule it for later"); sch.href = "#schedule"; sch.addEventListener("click", (e) => { e.preventDefault(); openRitual({ schedule: true }); }); qt.appendChild(sch); qt.appendChild(el("span", null, " — pick a time and it goes live on its own."));
   q.appendChild(qt); list.appendChild(q);
 }
-const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "files", site: "your site" }[s] || s);
+const sectionWord = (s) => ({ offerings: VOCAB.label.toLowerCase(), faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "files", site: "your site" }[s] || s);
 function renderPublishButton() {
   const c = S.changes;
   const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
@@ -6678,6 +6679,7 @@ function fillSingles() {
   [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
     .forEach(([id, k]) => { $(id).value = i[k] || ""; });
   if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
+  industryHint();
   if ($("f-gsv")) $("f-gsv").value = (S.settings && S.settings.google_site_verification) || "";
   if ($("f-bsv")) $("f-bsv").value = (S.settings && S.settings.bing_site_verification) || "";
   renderVisitSwitch();
@@ -7352,11 +7354,11 @@ async function mountSearchCard() {
 // then the industry. Also fixes the preview page-word: it pointed at /menu/,
 // a page that doesn't exist on business-classic sites.
 const OFFER_WORDS = {
-  food:      { label: "Menu",     path: "/menu/",     sub: "Click any line to change it. Anything you take off stays saved here.", addLine: "＋ Start a new section of the menu", putBack: "Put it back on the menu", takeOff: "Take it off the menu", offTag: "off the menu", addBtn: "Add to the menu" },
-  retail:    { label: "Products", path: "/products/", sub: "Click any product to change it. Anything you hide stays saved here.", addLine: "＋ Start a new product group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this product" },
-  fitness:   { label: "Classes",  path: "/classes/",  sub: "Click any class to change it. Anything you hide stays saved here.", addLine: "＋ Start a new class group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this class" },
-  community: { label: "Programs", path: "/programs/", sub: "Click any program to change it. Anything you hide stays saved here.", addLine: "＋ Start a new program group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this program" },
-  generic:   { label: "Services", path: "/services/", sub: "Click any service to change it. Anything you hide stays saved here.", addLine: "＋ Start a new service category", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this service" },
+  food:      { label: "Menu",     path: "/menu/",     sub: "Click any line to change it. Anything you take off stays saved here.", addLine: "＋ Start a new section of the menu", putBack: "Put it back on the menu", takeOff: "Take it off the menu", offTag: "off the menu", addBtn: "Add to the menu", one: "dish", many: "dishes", firstCat: "Mains", example: "Burrata &amp; Peaches …… $16", empty: "Your menu is waiting for its first line. Add a dish and it reads just like this.", pricePh: "$18 · MP", catHint: "Desserts, Drinks, Specials…", added: "On the draft menu" },
+  retail:    { label: "Products", path: "/products/", sub: "Click any product to change it. Anything you hide stays saved here.", addLine: "＋ Start a new product group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this product", one: "product", many: "products", firstCat: "Products", example: "Linen apron …… $38", empty: "Your products are waiting for the first one. Add one and it reads just like this.", pricePh: "$38", catHint: "New arrivals, Gifts, Sale…", added: "Added to your draft" },
+  fitness:   { label: "Classes",  path: "/classes/",  sub: "Click any class to change it. Anything you hide stays saved here.", addLine: "＋ Start a new class group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this class", one: "class", many: "classes", firstCat: "Classes", example: "Morning flow …… $20", empty: "Your classes are waiting for the first one. Add one and it reads just like this.", pricePh: "$20 a class", catHint: "Yoga, Strength, Kids…", added: "Added to your draft" },
+  community: { label: "Programs", path: "/programs/", sub: "Click any program to change it. Anything you hide stays saved here.", addLine: "＋ Start a new program group", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this program", one: "program", many: "programs", firstCat: "Programs", example: "After-school tutoring …… Free", empty: "Your programs are waiting for the first one. Add one and it reads just like this.", pricePh: "Free", catHint: "Youth, Families, Seniors…", added: "Added to your draft" },
+  generic:   { label: "Services", path: "/services/", sub: "Click any service to change it. Anything you hide stays saved here.", addLine: "＋ Start a new service category", putBack: "Put it back on your site", takeOff: "Hide it from your site", offTag: "hidden", addBtn: "Add this service", one: "service", many: "services", firstCat: "Services", example: "Leak repair …… from $95", empty: "Your services are waiting for the first one. Add one and it reads just like this.", pricePh: "From $95", catHint: "Repairs, Installations, Maintenance…", added: "Added to your draft" },
 };
 let VOCAB = OFFER_WORDS.food;   // matches the pre-load default markup
 function vocabWords() {
@@ -7369,6 +7371,7 @@ function vocabWords() {
   if (["nonprofit", "church"].includes(k)) return OFFER_WORDS.community;
   return OFFER_WORDS.generic;
 }
+const vocabCap = (w) => String(w || "").charAt(0).toUpperCase() + String(w || "").slice(1);
 function applyVocab() {
   VOCAB = vocabWords();
   document.querySelectorAll('.navitem[data-view="offerings"]').forEach((n) => { n.textContent = VOCAB.label; });   // main tab + sections sheet stay in sync
@@ -13193,12 +13196,21 @@ function dcTreeSelect(el2, row) {
   });
 });
 // ── Phase O: industry selector — drives the template's vocabulary + schema ──
+// Item 93: a site starts as "General / other", whose words are plain (Services). While it
+// is, the hint asks for the closest kind, since that choice sets the words and the looks.
+function industryHint() {
+  const h = $("industryHint"), sel = $("f-industry"); if (!h || !sel) return;
+  h.textContent = sel.value === "generic"
+    ? "Which is closest? It sets the words your site and this editor use, like Menu, Services or Classes."
+    : "Sets the words your site uses, like Services or Menu. Applies when you next publish.";
+}
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry"), was = vocabWords();
+  industryHint();
   try {
     await settingsPut({ industry_key: sel.value });
     toast("Saved — your site uses the right words when you next publish");
-    applyVocab(); renderPagesBar();
+    applyVocab(); renderPagesBar(); renderOfferings();   // item 93: the editor's own words follow at once
     await pgFollowOffering(was);
     scheduleChangesRefresh();
   } catch (err) { toast(nice(err), true); }
