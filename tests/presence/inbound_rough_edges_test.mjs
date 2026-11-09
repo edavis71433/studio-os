@@ -148,6 +148,26 @@ ok('the alert falls back to actorName before "A client"', /whoRow\?\.name \|\| w
 ok('the Inbox names a contact before showing their email', /client: c\.client \|\| owners\.nameOf\[String\(r\.id\)\] \|\| owners\.emailOf\[String\(r\.id\)\] \|\| ''/.test(workspace));
 ok('Home names a contact before showing their email', /if \(owners\.nameOf\[r\.id\]\) r\.requester_name = owners\.nameOf\[r\.id\];/.test(agency) && /String\(s\.requester_name \|\| s\.requester_email \|\| ''\)\.trim\(\) \|\| 'A customer'/.test(needs));
 
+// ═══ badge letters: now that a contact is named ("Eric (test)"), a bracket must not become a letter ═══
+{
+  const today = await read('../../today.html');
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const inboxFn = /const initialsOf=\(name\)=>([^\n]+);/.exec(inbox);
+  const crmFn = /const initials=(String\(nm\)[^\n]+?\|\|'\?');/.exec(crm);
+  const todayFn = /function initials\(n\)\{([^\n]+?)\}   \/\//.exec(today);
+  ok('the three badge-letter rules are found (Inbox, record, Home)', !!inboxFn && !!crmFn && !!todayFn);
+  const fns = {
+    inbox: new Function('esc', `return (name)=>${inboxFn ? inboxFn[1] : "''"};`)(esc),
+    record: new Function(`return (nm)=>${crmFn ? crmFn[1] : "''"};`)(),
+    home: new Function(`return function(n){${todayFn ? todayFn[1] : "return ''"}};`)(),
+  };
+  const cases = [['Eric (test)', 'ET'], ['Jordan Ellis', 'JE'], ['(Acme) Jordan', 'AJ'], ['🌸 Flowers', '🌸F'], ['ßeta Studio', 'ßS'], ['- dash', 'D'], ['', '?'], ['Larkspur', 'L']];
+  for (const [where, fn] of Object.entries(fns)) {
+    const got = cases.map(([n]) => fn(n));
+    ok(`${where}: a word's first letter, digit or emoji (never a bracket); emoji and ß stay whole`, cases.every(([, want], i) => got[i] === want), JSON.stringify(got));
+  }
+}
+
 // ═══ behaviour: the healer names a contact; the alert says who ═══
 const realFetch = globalThis.fetch;
 const jr = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
