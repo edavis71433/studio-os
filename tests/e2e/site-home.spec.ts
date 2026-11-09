@@ -1350,3 +1350,41 @@ test.describe('the welcome list', () => {
     await expect(page.locator('#ssTodo')).toBeHidden();
   });
 });
+
+test.describe('the offerings editor speaks the business’s own words (item 93)', () => {
+  // A plumber on the Services tab saw "Burrata & Peaches …… $16", "Add the first dish" filed
+  // under "Mains", "3 dishes", a "Dish" field and "On the draft menu".
+  test('a plumber sees services, never dishes', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#offerings', { '/settings': { data: { industry_key: 'plumber' } }, '/offerings': { data: [] } });
+    const view = page.locator('#view-offerings');
+    await expect(view.locator('h1.doc')).toHaveText('Services');
+    await expect(view.locator('.estate')).toContainText('Leak repair');
+    await expect(view.locator('.estate')).toContainText('Your services are waiting for the first one.');
+    await view.getByRole('button', { name: 'Add the first service' }).click();
+    const ed = view.locator('.editor.adding');
+    await expect(ed.locator('label').first()).toHaveText('Service');
+    await expect(ed.locator('[data-k="price_text"]')).toHaveAttribute('placeholder', 'From $95');
+    await ed.locator('[data-k="name"]').fill('Drain cleaning');
+    await ed.getByRole('button', { name: 'Add this service' }).click();
+    await expect.poll(() => writes.filter((w) => w.path === '/offerings' && w.method === 'POST').map((w) => w.body)).toEqual([{ name: 'Drain cleaning', category: 'Services', price_text: '' }]);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Added to your draft' }).first()).toBeVisible();
+    await expect(view.locator('.menuhead .mv').first()).toHaveText('1 service');
+    await expect(view).not.toContainText(/dish|Burrata|Mains/);
+  });
+  test('a restaurant keeps its menu words', async ({ page }) => {
+    await mount(page, '/presence.html#offerings', { '/settings': { data: { industry_key: 'restaurant' } }, '/offerings': { data: [] } });
+    const view = page.locator('#view-offerings');
+    await expect(view.locator('.estate')).toContainText('Burrata & Peaches');
+    await view.getByRole('button', { name: 'Add the first dish' }).click();
+    await expect(view.locator('.editor.adding label').first()).toHaveText('Dish');
+  });
+  test('a site still on General / other is asked which kind is closest, and the words follow the answer', async ({ page }) => {
+    await mount(page, '/presence.html#business', { '/settings': { data: { industry_key: 'generic' } } });
+    const hint = page.locator('#industryHint');
+    await expect(hint).toContainText('Which is closest?');
+    await page.locator('#f-industry').selectOption('fitness');
+    await expect(hint).not.toContainText('Which is closest?');
+    await expect(page.locator('#view-offerings h1.doc')).toHaveText('Classes');
+    await expect(page.locator('#view-offerings .menuhead .mv').first()).toHaveText('1 class');
+  });
+});

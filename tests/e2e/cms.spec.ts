@@ -226,7 +226,7 @@ test.describe('CMS workspace', () => {
     const list = page.locator('#recentList');
     await expect(list.locator('.hb-row:not(.quiet)')).toHaveCount(2);
     await expect(list.locator('.hb-row').nth(0).locator('b')).toHaveText('“Download menu (PDF)” joins Mains.');
-    await expect(list.locator('.hb-row').nth(0).locator('.t span')).toHaveText('Menu · ready to publish');   // the diff section's word
+    await expect(list.locator('.hb-row').nth(0).locator('.t span')).toHaveText('Services · ready to publish');   // the diff section's word: the site's own (item 93), as its page is /services/
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Preview' })).toBeVisible();
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Edit' })).toBeVisible();
     await expect(list.locator('.hb-row.quiet')).toContainText('Nothing goes live until you press Publish');
@@ -607,7 +607,7 @@ test.describe('Publish ritual — the owner\'s voice and the studio\'s voice', (
     await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes.');
     await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as customers will experience them. Your live site stays as it is until the moment you decide.');
     // the change lines keep their section wording
-    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');   // sentence case since the experience review (#27)
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Services');   // sentence case since the experience review (#27); the site's own word since item 93
     const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
     await expect(publish).toBeVisible();
     await publish.click();
@@ -624,7 +624,7 @@ test.describe('Publish ritual — the owner\'s voice and the studio\'s voice', (
     await expect(rit.locator('#ritTitle')).toHaveText('Here’s what changes on Marlow’s Kitchen’s site');
     await expect(rit.locator('#ritSub')).toHaveText('2 changes, read exactly as their customers will experience them. Their live site stays as it is until you decide.');
     // section wording unchanged; button unchanged
-    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Menu');   // sentence case since the experience review (#27)
+    await expect(rit.locator('.jrow .jsec').first()).toHaveText('Services');   // sentence case since the experience review (#27); the site's own word since item 93
     const publish = rit.getByRole('button', { name: 'Publish these 2 changes' });
     await expect(publish).toBeVisible();
     await publish.click();
