@@ -56,7 +56,7 @@ test.describe('batch B — the badge without building the list on every page', (
     const seen = watch(page);
     await installApp(page, { api: { ...HOME_API, '/portal/context': ctx(7, true), '/agency/needs-you': needs() } });
     await page.goto('/agency.html');
-    await expect(page.locator('#needs .qhead')).toHaveText('Needs you · 2');
+    await expect(page.locator('#needs #qt-needs')).toHaveText('Needs you 2');   // item 70: the list's first tab
     await expect(page.locator('#dds-bell .dot')).toHaveText('2');
     await page.waitForTimeout(1600);
     expect(seen.filter((s) => s.includes('only=total'))).toHaveLength(0);

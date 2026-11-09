@@ -51,7 +51,7 @@ test.describe('item 11 — one number, one list, at studio level', () => {
     const stale = { data: { ...STUDIO_CTX.data, attention_count: 7, attention_stale: true } };
     await installApp(page, { api: { ...HOME_API, '/portal/context': stale } });
     await page.goto('/agency.html');
-    await expect(page.locator('#needs .qhead')).toHaveText('Needs you · 3');
+    await expect(page.locator('#needs #qt-needs')).toHaveText('Needs you 3');   // item 70: the list's first tab
     await expect(page.locator('#dds-bell .dot')).toHaveText('3');
     await page.locator('#dds-bell').click();
     const pop = page.locator('.dds-bell-pop');

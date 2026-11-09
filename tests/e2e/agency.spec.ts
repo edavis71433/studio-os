@@ -377,18 +377,20 @@ test.describe('Agency portfolio', () => {
     await page.waitForURL(/crm\.html\?client=a2/);
   });
 
-  test('Needs you: one list, each row "Name — what" · when · ONE verb; the button carries the client scope', async ({ page }) => {
+  test('Needs you: one list, each row the name, its kind, what · when, and ONE verb; the button carries the client scope', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
     const n = page.locator('#needs');
-    await expect(n.locator('.qhead')).toHaveText('Needs you · 1');
+    await expect(n.locator('#qt-needs')).toHaveText('Needs you 1');   // item 70: the list's first tab
     const row = n.locator('.need .row').first();
     await expect(row.locator('.t b')).toHaveText('Marlow’s Kitchen');
-    await expect(row.locator('.t')).toContainText('Marlow’s Kitchen — SSL certificate is missing');
-    await expect(row.locator('.when')).toHaveText('Found by the health check');
+    await expect(row.locator('.kchip')).toHaveText('Website');
+    await expect(row.locator('.t .what')).toHaveText('SSL certificate is missing · Found by the health check');
     await expect(row.locator('a.rowact')).toHaveText('Fix');
     await expect(row.locator('a.rowact')).toHaveAttribute('href', '/presence.html?client=a1#domain');
-    await expect(row.locator('a, button')).toHaveCount(1);   // exactly one verb
+    // exactly one verb: a broken site has no Done (fixing it clears it), and
+    // Snooze waits for APPLY-0146 (this server says nothing of snooze_ready)
+    await expect(row.locator('a, button')).toHaveCount(1);
     // nothing of the old queue dump
     await expect(n).not.toContainText('High priority');
     await expect(n).not.toContainText('Growth');
@@ -408,10 +410,13 @@ test.describe('Agency portfolio', () => {
     await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou(rows) } });
     await page.goto('/agency.html');
     const n = page.locator('#needs');
-    await expect(n.locator('.qhead')).toHaveText('Needs you · 8');
+    await expect(n.locator('#qt-needs')).toHaveText('Needs you 8');
     await expect(n.locator('.need .row a.rowact')).toHaveText(['Resend', 'Resend', 'Reply', 'Reply', 'Open deal', 'Fix', 'Apply', 'Review']);
-    await expect(n.locator('.need .row').first()).toContainText('Marlow’s Kitchen — invoice $1,600 is overdue by 3 days');
-    await expect(n.locator('.need .row').nth(4)).toContainText('Jordan Ellis — next step “Book the kickoff call” is 74 days late');
+    await expect(n.locator('.need .row .kchip')).toHaveText(['Money', 'Money', 'Enquiry', 'Support', 'Deal', 'Website', 'Plan', 'Website']);
+    await expect(n.locator('.need .row a.rowact.primary')).toHaveCount(1);                 // item 70: the first row's verb is the filled one
+    await expect(n.locator('.need .row').first().locator('a.rowact')).toHaveClass(/primary/);
+    await expect(n.locator('.need .row').first().locator('.what')).toHaveText('Invoice $1,600 is overdue by 3 days · Sent Oct 14 · no payment yet');
+    await expect(n.locator('.need .row').nth(4).locator('.what')).toHaveText('Next step “Book the kickoff call” is 74 days late · On the deal Larkspur Kitchen · due Aug 8');
     await expect(n.locator('#needsMore')).toHaveCount(0);
     // the roster's Status/Next read from the same list — first row per client
     await pinDisplay(page, 'table');
@@ -427,7 +432,7 @@ test.describe('Agency portfolio', () => {
     await installApp(page, { api: { ...agencyApi, '/agency/needs-you': needsYou(rows) } });
     await page.goto('/agency.html');
     const n = page.locator('#needs');
-    await expect(n.locator('.qhead')).toHaveText('Needs you · 11');
+    await expect(n.locator('#qt-needs')).toHaveText('Needs you 11');
     await expect(n.locator('.need .row')).toHaveCount(8);
     await expect(n.locator('#needsMore')).toHaveText('+ 3 more');
     await n.locator('#needsMore').click();
@@ -992,24 +997,44 @@ test.describe('Agency home — look refresh E', () => {
     { id: 'won-before', title: 'Marlow’s Kitchen — menu', stage: 'won', expected_value_cents: 300000, converted_client_id: 'c1', converted_at: lastMonth(), updated_at: lastMonth() },
   ];
 
-  test('the greeting names the studio and role, how many need you, what kinds (replies together) and the first one', async ({ page }) => {
+  test('the greeting names the studio and role, how many need you and how many are money; each kind narrows the list; Go through them', async ({ page }) => {
     await installApp(page, { api: { ...homeApi, '/agency/needs-you': needsYou(NEEDS_ROWS) } });
     await page.goto('/agency.html');
     await expect(page.locator('#top .hero .brand')).toHaveText('Bright Studio');
-    await expect(page.locator('#heroSub')).toContainText('3 need you');
+    await expect(page.locator('#heroSub')).toHaveText('3 things need you. 1 is money.');
     // an enquiry row can hold several enquiries, so replies count as conversations
-    await expect(page.locator('#heroChips .hchip')).toHaveText(['1 unpaid invoice', '2 to reply to']);
-    await expect(page.locator('#heroChips .hchip').first()).toHaveAttribute('href', '#needs');
+    const chips = page.locator('#heroChips .hchip');
+    await expect(chips).toHaveText(['1 unpaid invoice', '2 to reply to']);
+    // item 70: a kind is a filter on the list below, not a jump to it (a phone's
+    // greeting leaves the kinds out: the list is right under it)
+    if ((page.viewportSize()?.width || 0) >= 761) {
+      await chips.nth(1).click();
+      await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#needs .need .row')).toHaveCount(2);
+      await expect(page.locator('#needs .qfilter')).toContainText('Only to reply to');
+      await page.locator('#qfilterOff').click();
+      await expect(page.locator('#needs .need .row')).toHaveCount(3);
+      await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'false');
+    } else await expect(chips.first()).toBeHidden();
+    // and "Go through them" opens the list one at a time, the first thing first
     const go = page.locator('#heroChips .hgo');
-    await expect(go).toHaveText('Resend — Marlow’s Kitchen →');
-    await expect(go).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
+    await expect(go).toHaveText('Go through them →');
+    await go.click();
+    const f = page.locator('#focusDlg');
+    await expect(f.locator('#fcount')).toHaveText('Needs you · 1 of 3');
+    await expect(f.locator('.fwhat')).toHaveText('Invoice $1,200 is overdue by 4 days.');
+    await expect(f.locator('.fgo')).toHaveText('Resend');
+    await expect(f.locator('.fgo')).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
+    await page.keyboard.press('Escape');
+    await expect(f).toBeHidden();
+    await expect(go).toBeFocused();
     await expect(page.locator('h1')).toHaveCount(1);   // the greeting is not a heading; Home's one h1 stays
   });
 
   test('nothing needs you: one quiet chip, no button', async ({ page }) => {
     await installApp(page, { api: { ...homeApi, '/agency/needs-you': needsYou([]) } });
     await page.goto('/agency.html');
-    await expect(page.locator('#heroSub')).toContainText('nothing needs you');
+    await expect(page.locator('#heroSub')).toHaveText('Nothing needs you right now.');
     await expect(page.locator('#heroChips .hchip')).toHaveText(['All caught up']);
     await expect(page.locator('#heroChips .hgo')).toHaveCount(0);
   });

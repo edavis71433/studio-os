@@ -8,7 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
-import { needsYouPayload, dealNoticeIds, staleDealNotices } from './needs_you.ts';
+import { needsYouPayload, dealNoticeIds, staleDealNotices, snoozeUntil, SNOOZE_KEY_RE, SNOOZE_MAX_DAYS } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
 import { buildPortalFeed } from '../routes/workspace.ts';
@@ -232,6 +232,31 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const d = await computeStudioNeeds(member, principal, jwt, now, { fresh: q.get('fresh') === '1' });
     if (q.get('only') === 'total') return json({ data: { total: Number(d.total) || 0, partial: !!d.partial } }, 200, cors);
     return json({ data: d }, 200, cors);
+  }
+
+  // ── Snooze (bold redesign, sales item 70): a row leaves Home's list, the bell
+  //    and the roster's Next for 1–30 days, studio-wide; Wake brings it back
+  //    now. Anyone who can see the list can do either (like the Inbox's Close).
+  //    Before APPLY-0146 there is no table: the list says snooze_ready:false and
+  //    the page hides the buttons; a write here answers 503, plainly. ──
+  if ((route === '/agency/needs-you/snooze' || route === '/agency/needs-you/wake') && method === 'POST') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const b = await body();
+    const key = String(b?.key ?? '');
+    if (!SNOOZE_KEY_RE.test(key)) return json({ error: 'bad_request', message: 'That item can’t be snoozed.' }, 400, cors);
+    const wake = route.endsWith('/wake');
+    const until = wake ? null : snoozeUntil(now, b?.days);
+    if (!wake && !until) return json({ error: 'bad_request', message: `Snooze for 1 to ${SNOOZE_MAX_DAYS} days.` }, 400, cors);
+    const r = wake
+      ? await svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&row_key=eq.${encodeURIComponent(key)}`, { method: 'DELETE' })
+      : await svc('presence_needs_snoozes?on_conflict=agency_id,row_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ agency_id: member.agency_id, row_key: key, until, created_by: principal.email || principal.userId || null }) });
+    if (!r.ok) {
+      const missing = r.status === 404 || /presence_needs_snoozes/.test(String(r.text || ''));
+      return json({ error: missing ? 'unavailable' : 'write_failed', message: missing ? 'Snooze isn’t switched on yet — it needs one database step.' : 'That didn’t save — please try again.' }, missing ? 503 : 502, cors);
+    }
+    forgetAgencyReads(member.agency_id); needsTotals.delete(member.agency_id);   // the next read (and the bell) recounts
+    return json({ data: { key, until } }, 200, cors);
   }
 
   // ── client management ──
@@ -627,7 +652,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     const none = Promise.resolve({ ok: true, json: [] as unknown[] });
     const swallow = () => ({ ok: false, json: null as unknown });
     const todayStart = now.slice(0, 10) + 'T00:00:00Z';
-    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ] = await Promise.all([
+    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ, snQ] = await Promise.all([
       own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
       // client_id + requester (sales review B2): name a project-less request; the
       // narrow select is the fallback for a database without 0115's column
@@ -639,6 +664,8 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       ids.length ? svc(`presence_publishes?${IN}&select=site_id,status,created_at,error_text&order=created_at.desc&limit=1000`).catch(swallow) : none,
       ids.length ? svc(`presence_connections?${IN}&status=in.(expired,error,revoked)&select=site_id,provider_key,status&limit=500`).catch(swallow) : none,
       own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
+      // item 70: what's snoozed (APPLY-0146); before the table exists the read fails and nothing is held back
+      svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&until=gt.${encodeURIComponent(now)}&select=row_key,until&limit=500`).catch(swallow),
     ]);
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
     // Sales review B2: a request with no stamp and no project names its customer
@@ -687,6 +714,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
       publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
       own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [], deals: ownDeals } : undefined,
+      snoozed: Object.fromEntries(rowsOf<{ row_key: string; until: string }>(snQ).map((x) => [String(x.row_key), String(x.until)])),
     });
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
@@ -694,7 +722,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     // batch B: the bell's Updates tab — the same feed rows /portal/feed would
     // have sent, so opening the bell is one call, not two feeds
     const update_notices = ownFeed ? (ownFeed.notices || []).filter((n: { tier?: string }) => n && n.tier === 'update') : [];
-    return { ...payload, partial, own_site: !!own, update_notices };
+    return { ...payload, partial, own_site: !!own, update_notices, snooze_ready: !!snQ.ok };
 }
 
 async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | null> {
