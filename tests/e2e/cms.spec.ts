@@ -518,6 +518,9 @@ test.describe('CMS workspace', () => {
       await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Services — Marlow’s Kitchen');   // the vocabulary word
       await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Settings for About' }).click();
+      // the panel puts the cursor in its first field 30 ms after opening; typing before then
+      // lands there (about 3 in 24 on a tablet)
+      await expect(page.locator('#pageSettings').locator('input, select').first()).toBeFocused();
       const about = page.locator('#srp-about');
       await expect(about.locator('.srp-title')).toHaveText('About — Marlow’s Kitchen');
       await expect(about.locator('.srp-url')).toHaveText('marlows.example › about');
