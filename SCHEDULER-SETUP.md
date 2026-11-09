@@ -44,9 +44,13 @@ Supabase → Edge Functions → clever-api → Secrets:
   review button.
 
 ### Step 4 — Schedule the cron
-Supabase → SQL Editor → open `02-schedule-cron.sql`, replace the two placeholders
-(`<YOUR_PROJECT_REF>` = qksstlqzbhesadrrofgn, and `<YOUR_SCHEDULER_SECRET>` = the secret
-from Step 3), then run it.
+Supabase → Integrations → Vault → Add new secret: name `presence_scheduler_secret`, value
+= the secret from Step 3 (the presence jobs read the same entry, so it may already be
+there). Then SQL Editor → open `02-schedule-cron.sql`, replace `<YOUR_PROJECT_REF>`
+(= qksstlqzbhesadrrofgn), and run it. The job reads the secret from Vault each time it
+runs; never paste the secret itself into the job. On production the job
+(`nightly-data-sync`) has been switched off since Nov 8 2026, and running the file
+switches it back on: read the note at the top of the file first.
 
 ### Step 5 — Test it once now
 At the bottom of `02-schedule-cron.sql` there's a one-line `net.http_post` you can run

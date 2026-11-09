@@ -8,7 +8,7 @@
 | Signal | Source | Meaning |
 |---|---|---|
 | Watchdog email "[Studio OS ops] Production health check is failing" | staging pg_cron (`supabase/ops/watchdog-cron.sql`) → Resend, at most every 6 hours | prod `/system/health` unreachable, refused (403: staging's `watchdog_target_secret` no longer matches prod's SCHEDULER_SECRET), or `ok:false` (DB down, cron dead >45min, ≥10 failed runs/24h, a stuck run). The email's "Why:" line says which, including the newest failed run's `last_error`; staging's `watchdog_state.last_reason` holds the latest. |
-| Failure email "N/M scheduled runs failed" | the tick itself | per-site cycle failures — auto-retried hourly, read the ledger before acting |
+| Failure email "N/M scheduled runs failed" | the tick itself | per-site cycle failures — the next 15-minute tick runs the site again; read the ledger before acting |
 | A customer emails | support@ | check §2 triage first, then their site |
 
 ## 1. First 5 minutes — triage
@@ -31,7 +31,7 @@ Stripe Dashboard → Webhooks → the endpoint → recent deliveries. Non-200s: 
 The tick's `last_error` names the step (e.g. `retention.evidence_runs failed`). Dashboard → Logs → Postgres shows the database's own error for it. Jul to Nov 2026 it was "permission denied for function prune_evidence_runs": a function revoked from PUBLIC without a grant to `service_role` (fixed by 0141; `tests/presence/rpc_grants_test.mjs` now catches the next one).
 
 **Cron dead (`cron_stale:true`)**
-`select jobname, schedule, active from cron.job;` — if jobs are gone, re-run `supabase/ops/schedule-presence-cron.sql` (secret comes from Vault). One manual tick to catch up:
+`select jobname, schedule, active from cron.job;` — if jobs are gone, re-run `supabase/ops/schedule-presence-cron.sql` (the jobs read Vault `presence_scheduler_secret` when they run). One manual tick to catch up:
 `POST .../presence/system/run` body `{"secret":"<SCHEDULER_SECRET>","task":"cycle"}`.
 
 **Database down / Supabase incident**
@@ -41,7 +41,7 @@ https://status.supabase.com. Nothing to do but wait — published sites stay up;
 GitHub → Actions → `rollback.yml` → run with the last known-good ref (functions are stateless; rollback is a redeploy). Locally: `git log --oneline` to pick the ref.
 
 **Secret leaked / suspected compromise**
-Rotate in Supabase → Edge Functions → Secrets (and its consumer: pg_cron Vault entry for SCHEDULER_SECRET, Stripe dashboard for webhook secret, Resend for API key). Service-role key rotation: Supabase Dashboard → Settings → API. Then redeploy nothing — functions read env at invocation.
+Rotate in Supabase → Edge Functions → Secrets (and its consumers: for SCHEDULER_SECRET the Vault entry `presence_scheduler_secret` on the same project, plus staging's `watchdog_target_secret` when it is production's; Stripe dashboard for webhook secret, Resend for API key). Service-role key rotation: Supabase Dashboard → Settings → API. Then redeploy nothing — functions read env at invocation.
 
 **Runaway email (wrong sends going out)**
 Fastest kill: delete `RESEND_KEY` from the presence AND clever-api function secrets — every send becomes a logged no-op instantly. Restore when fixed. (Marketing sends also die per-recipient via `suppressed_emails`.)
