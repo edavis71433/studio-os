@@ -163,6 +163,10 @@
   .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14.5px}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
+  /* item 66: "Showing 100 of 240 · Show more" under the People list */
+  .more-line{margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);text-align:center;font-size:13px;color:var(--faint)}
+  .more-line .morebtn{background:none;border:0;color:var(--p);font:inherit;font-weight:600;cursor:pointer;padding:var(--dds-s2,8px) var(--dds-s3,12px);min-height:44px}
+  .more-line .morebtn:disabled{color:var(--faint);cursor:default}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
@@ -541,6 +545,8 @@ function sortedRows(){
 const lmetaText=(list)=>{
   if(TAB==='people'){
     if(!PEOPLE||PEOPLE_FAILED)return '';
+    // item 66: while some people are not loaded, say how many of how many
+    if(pHasMore())return PTOTAL!=null?`${PEOPLE.length} of ${PTOTAL} people`:`${PEOPLE.length} people so far`;
     const not=PEOPLE.filter(p=>!p.client_id).length;
     return `${PEOPLE.length} ${PEOPLE.length===1?'person':'people'}${not?` · ${not} not ${not===1?'a customer':'customers'} yet`:''}`;
   }
@@ -642,27 +648,75 @@ function listHtml(list){
 // person to their customer's record when they belong to one (client_id, 0130).
 let TAB=(new URLSearchParams(location.search).get('tab')==='people')?'people':'customers';
 let PEOPLE=null, PEOPLE_FAILED=false;
+// item 66: people come 100 at a time (the server's page; limit=200 silently got
+// 100), with the count of all of them. PSRCH holds the server's matches for a
+// search typed while some people are not loaded, so a search finds everyone.
+const PPAGE=100;
+let PTOTAL=null,PNEXT=0,PFULL=false,PBUSY=false,PSRCH=null,PSRCH_SEQ=0,PSRCH_ERR='';
+const pHasMore=()=>PTOTAL!=null?PNEXT<PTOTAL:PFULL;
+const pSrchNow=()=>{const q=Q.trim();return(PSRCH&&q&&PSRCH.q===q)?PSRCH:null;};
+const pRead=(off,q)=>{const p=new URLSearchParams({limit:String(PPAGE),offset:String(off),total:'1'});if(q)p.set('q',q);return api('/sales/contacts?'+p.toString());};
+const pTotalOf=(r)=>(r&&r.ok&&r.body&&typeof r.body.total==='number')?r.body.total:null;
 async function loadPeople(){
-  const r=await api('/sales/contacts?limit=200');
+  let r;try{r=await pRead(0,'');}catch(_){r={ok:false,body:{}};}
   PEOPLE_FAILED=!r.ok; PEOPLE=r.ok&&Array.isArray(r.body.data)?r.body.data:[];
-  if(TAB==='people')render();
+  PTOTAL=pTotalOf(r); PNEXT=PEOPLE.length; PFULL=PEOPLE.length>=PPAGE; PSRCH=null; PSRCH_ERR='';
+  if(TAB==='people'){render();if(Q.trim())pSearchServer();}
+}
+function pMoreHtml(){
+  const s=pSrchNow();
+  if(Q.trim()&&!s)return'';
+  const shown=s?s.rows.length:PEOPLE.length,total=s?s.total:PTOTAL,more=s?s.more:pHasMore();
+  if(!more)return'';
+  return `<div class="more-line"><span id="pMoreCount">Showing ${shown}${total!=null?' of '+total:''}${s?' matches':''}</span> · <button type="button" class="morebtn" id="pMoreBtn" aria-describedby="pMoreCount"${PBUSY?' disabled':''}>${PBUSY?'Loading…':'Show more'}</button></div>`;
+}
+function repaintPeople(){const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}const pc=$('pchips');if(pc){pc.innerHTML=peopleChipsHtml();wirePChips();}const lm=$('lmeta');if(lm)lm.textContent=lmetaText([]);}
+async function showMorePeople(){
+  if(PBUSY)return;
+  const s=pSrchNow();
+  PBUSY=true;repaintPeople();
+  let r;try{r=await pRead(s?s.rows.length:PNEXT,s?s.q:'');}catch(_){r={ok:false,body:{}};}
+  PBUSY=false;
+  if(!r.ok){repaintPeople();toast('We couldn’t load more people just now.');return;}
+  const page=(r.body&&r.body.data)||[],tot=pTotalOf(r);
+  if(s){if(PSRCH!==s){repaintPeople();return;}const have=new Set(s.rows.map(c=>String(c.id)));s.rows=s.rows.concat(page.filter(c=>!have.has(String(c.id))));s.total=tot;s.more=tot!=null?s.rows.length<tot:page.length>=PPAGE;}
+  else{const have=new Set(PEOPLE.map(c=>String(c.id)));PEOPLE=PEOPLE.concat(page.filter(c=>!have.has(String(c.id))));PNEXT+=page.length;PTOTAL=tot;PFULL=page.length>=PPAGE;}
+  repaintPeople();
+  const nb=$('pMoreBtn');if(nb)nb.focus();else{const rows=document.querySelectorAll('tr[data-person]');if(rows.length)rows[rows.length-1].focus();}
+}
+async function pSearchServer(){
+  const q=Q.trim();
+  if(!q||!pHasMore()){PSRCH=null;return;}
+  if(PSRCH&&PSRCH.q===q)return;
+  const seq=++PSRCH_SEQ;
+  let r;try{r=await pRead(0,q);}catch(_){r={ok:false,body:{}};}
+  if(seq!==PSRCH_SEQ||Q.trim()!==q||TAB!=='people')return;
+  if(!r.ok){PSRCH=null;PSRCH_ERR=q;repaintPeople();return;}
+  PSRCH_ERR='';
+  const rows=(r.body&&r.body.data)||[],tot=pTotalOf(r);
+  PSRCH={q,rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PPAGE};
+  repaintPeople();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
+  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PTOTAL!=null?PTOTAL:PEOPLE.length}</span>`:''}</button></div>`;
 }
 let PFILTER='all';
 function peopleChipsHtml(){
   if(!PEOPLE||PEOPLE_FAILED||!PEOPLE.length)return '';
   const yes=PEOPLE.filter(p=>p.client_id).length;
-  const ch=[['all','All',PEOPLE.length],['customers','Customers',yes],['not','Not yet',PEOPLE.length-yes]];
-  return `<div class="trow"><div class="chips" role="group" aria-label="Show">${ch.map(([v,l,n])=>(!n&&v!=='all'&&PFILTER!==v)?'':`<button type="button" class="chip" data-pchip="${v}" aria-pressed="${PFILTER===v?'true':'false'}">${l} <span class="n">${n}</span></button>`).join('')}</div></div>`;
+  // item 66: while some people are not loaded, only All carries a number (the total);
+  // a count of the loaded ones would read as everyone
+  const part=pHasMore();
+  const ch=[['all','All',part?PTOTAL:PEOPLE.length],['customers','Customers',part?null:yes],['not','Not yet',part?null:PEOPLE.length-yes]];
+  return `<div class="trow"><div class="chips" role="group" aria-label="Show">${ch.map(([v,l,n])=>(n===0&&v!=='all'&&PFILTER!==v)?'':`<button type="button" class="chip" data-pchip="${v}" aria-pressed="${PFILTER===v?'true':'false'}">${l}${n!=null?` <span class="n">${n}</span>`:''}</button>`).join('')}</div></div>`;
 }
 function peopleHtml(){
   if(PEOPLE===null)return'<div class="spin" role="status" aria-label="Loading people"></div>';
   if(PEOPLE_FAILED)return'<p class="muted" style="padding:20px 0">We couldn’t load your people just now. <a href="/contacts.html">Open Contacts</a></p>';
   const q=Q.trim().toLowerCase();
-  const list=PEOPLE.filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
-  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?'No one matches “'+esc(Q)+'”.':PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`;
+  const s=pSrchNow();   // item 66: past the loaded pages, the server's matches answer the search
+  const list=(s?s.rows:PEOPLE).filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
+  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(pHasMore()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`+pMoreHtml();
   const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
   const trs=list.map(c=>{
     const cust=c.client_id?byClient[String(c.client_id)]:null;
@@ -670,10 +724,12 @@ function peopleHtml(){
     const nm=c.name||c.email||'Someone';
     return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
   }).join('');
-  return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+  return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`+pMoreHtml();
 }
+function wirePChips(){document.querySelectorAll('[data-pchip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-pchip');PFILTER=v;render();const nb=document.querySelector('[data-pchip="'+v+'"]');if(nb)nb.focus();}));}
 function wirePeople(){
-  const byId={}; for(const p of (PEOPLE||[]))byId[String(p.id)]=p;
+  const byId={}; for(const p of (PEOPLE||[]).concat((PSRCH&&PSRCH.rows)||[]))byId[String(p.id)]=p;
+  const mb=$('pMoreBtn');if(mb)mb.addEventListener('click',showMorePeople);   // item 66
   document.querySelectorAll('tr[data-person]').forEach(tr=>{
     const open=()=>openPreview(byId[tr.getAttribute('data-person')],tr,'person');
     tr.addEventListener('click',(e)=>{if(e.target.closest('a,button,input'))return;open();});
@@ -694,8 +750,8 @@ function render(){
     hp+=`<div class="bar"><input class="search" id="search" aria-label="Search people" placeholder="Find a person, business or email" value="${esc(Q)}"></div>`;
     hp+=`<div id="pchips">${peopleChipsHtml()}</div><div id="listZone">${peopleHtml()}</div>`;
     $('main').innerHTML=hp;
-    const s=$('search'); if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}}));
-    document.querySelectorAll('[data-pchip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-pchip');PFILTER=v;render();const nb=document.querySelector('[data-pchip="'+v+'"]');if(nb)nb.focus();}));
+    const s=$('search'); if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}pSearchServer();}));
+    wirePChips();
     wireTabs(); wirePeople(); if(PEOPLE===null)loadPeople();
     return;
   }

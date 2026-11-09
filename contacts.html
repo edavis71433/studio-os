@@ -136,6 +136,10 @@
   .center{text-align:center;padding:56px var(--dds-s5,20px)}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
+  /* item 66: "Showing 100 of 240 · Show more" under the list */
+  .more-line{margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);text-align:center;font-size:13px;color:var(--faint)}
+  .more-line .morebtn{background:none;border:0;color:var(--p);font:inherit;font-weight:600;cursor:pointer;padding:var(--dds-s2,8px) var(--dds-s3,12px);min-height:44px}
+  .more-line .morebtn:disabled{color:var(--faint);cursor:default}
   /* Centering, mobile-safe (SS6 review; kept in sync with customers.html).
      NOT margin:auto — mobile browsers resolve the top-layer dialog's
      containing block against the DOCUMENT height, so vertical auto-margins
@@ -323,6 +327,17 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",ALL=[],Q="",LOADED_AT=0;
+// item 66: the roster comes 100 at a time (the server's page). TOTAL is how many it
+// holds (null when the count failed: then "Show more" stays while a page comes back
+// full); NEXT_OFF is where the next page starts. SRCH holds the server's matches for
+// a search typed while some people are not loaded yet, so a search finds everyone.
+const PAGE=100;
+let TOTAL=null,NEXT_OFF=0,LAST_FULL=false,MORE_BUSY=false,SRCH=null,SRCH_SEQ=0,SRCH_ERR='';
+const hasMore=()=>TOTAL!=null?NEXT_OFF<TOTAL:LAST_FULL;
+const srchNow=()=>{const q=Q.trim();return(SRCH&&q&&SRCH.q===q)?SRCH:null;};
+// every row this page knows: the loaded pages plus any search matches beyond them
+const knownRows=()=>{const s=SRCH&&SRCH.rows||[];if(!s.length)return ALL;const have=new Set(ALL.map(c=>String(c.id)));return ALL.concat(s.filter(c=>!have.has(String(c.id))));};
+const findRow=(id)=>knownRows().find(x=>x.id===id);
 // SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
@@ -405,7 +420,7 @@ function bulkHtml(){
 }
 async function bulkSend(){
   const k=KIT();if(!k)return;
-  const people=ALL.filter(c=>PICKED.has(String(c.id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
+  const people=knownRows().filter(c=>PICKED.has(String(c.id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
   if(!people.length){toast('None of the people you picked has an email address.');return;}
   const b=$('bulkSend');if(b)b.disabled=true;
   if(!(await k.sendTo(people)))if(b)b.disabled=false;
@@ -424,14 +439,17 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 
 function sortedRows(){
   const q=Q.trim().toLowerCase();
-  const list=ALL.filter(viewMatch).filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q));
+  const s=srchNow();   // item 66: past the loaded pages, the server's matches answer the search
+  const list=(s?s.rows:ALL).filter(viewMatch).filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q));
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
 }
 const lmetaText=(count)=>{
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  return `${count} contact${count===1?'':'s'} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
+  // item 66: never "100 contacts" when the roster holds more
+  const part=!Q.trim()&&VIEWNAME==='all'&&TOTAL!=null&&TOTAL>count, n=part?TOTAL:count;
+  return `${part?count+' of ':''}${n} contact${n===1?'':'s'} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
 };
 function headerHtml(count){
   return `<h1 class="sr-only">Contacts</h1><div class="lhead">
@@ -513,8 +531,49 @@ function listHtml(rows){
   // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
   if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
   if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
-  if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?'No contacts match “'+esc(Q)+'”.':'Nothing in this view — try “All contacts”.'}</p>`;
-  return DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows);
+  if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&hasMore()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
+  return (DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows))+moreHtml();
+}
+// item 66: "Showing 100 of 240 · Show more" whenever the server holds more than shown
+function moreHtml(){
+  const s=srchNow();
+  if(Q.trim()&&!s)return'';   // a search over a fully loaded roster needs no more
+  const shown=s?s.rows.length:ALL.length,total=s?s.total:TOTAL,more=s?s.more:hasMore();
+  if(!more)return'';
+  return `<div class="more-line"><span id="moreCount">Showing ${shown}${total!=null?' of '+total:''}${s?' matches':''}</span> · <button type="button" class="morebtn" id="moreBtn" aria-describedby="moreCount"${MORE_BUSY?' disabled':''}>${MORE_BUSY?'Loading…':'Show more'}</button></div>`;
+}
+// one page of people (100), with the count of all of them
+async function readPage(off,q){
+  const p=new URLSearchParams({limit:String(PAGE),offset:String(off),total:'1'});
+  if(q)p.set('q',q);else p.set('dupes','1');
+  return api('/sales/contacts?'+p.toString());
+}
+async function showMore(){
+  if(MORE_BUSY)return;
+  const s=srchNow();
+  MORE_BUSY=true;renderListZone();
+  let r;try{r=await readPage(s?s.rows.length:NEXT_OFF,s?s.q:'');}catch(_){r={ok:false};}
+  MORE_BUSY=false;
+  if(!r.ok){renderListZone();toast('We couldn’t load more contacts just now.');return;}
+  const page=(r.body&&r.body.data)||[],tot=(r.body&&typeof r.body.total==='number')?r.body.total:null;
+  if(s){if(SRCH!==s){renderListZone();return;}const have=new Set(s.rows.map(c=>String(c.id)));s.rows=s.rows.concat(page.filter(c=>!have.has(String(c.id))));s.total=tot;s.more=tot!=null?s.rows.length<tot:page.length>=PAGE;}
+  else{const have=new Set(ALL.map(c=>String(c.id)));ALL=ALL.concat(page.filter(c=>!have.has(String(c.id))));NEXT_OFF+=page.length;TOTAL=tot;LAST_FULL=page.length>=PAGE;}
+  renderListZone();
+  const nb=$('moreBtn');if(nb)nb.focus();else{const z=$('listZone');const last=z&&z.querySelectorAll('[data-open]');if(last&&last.length)last[last.length-1].focus();}
+}
+// a search typed while some people are not loaded asks the server (debounced by the input)
+async function searchServer(){
+  const q=Q.trim();
+  if(!q||!hasMore()){SRCH=null;return;}
+  if(SRCH&&SRCH.q===q)return;
+  const seq=++SRCH_SEQ;
+  let r;try{r=await readPage(0,q);}catch(_){r={ok:false};}
+  if(seq!==SRCH_SEQ||Q.trim()!==q)return;
+  if(!r.ok){SRCH=null;SRCH_ERR=q;renderListZone();return;}
+  SRCH_ERR='';
+  const rows=(r.body&&r.body.data)||[],tot=(r.body&&typeof r.body.total==='number')?r.body.total:null;
+  SRCH={q,rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PAGE};
+  renderListZone();
 }
 function render(){
   const rows=sortedRows();
@@ -538,7 +597,7 @@ function renderListZone(){
   const z=$('listZone');if(z){z.innerHTML=listHtml(rows);wireList();}
 }
 function wire(){
-  const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderListZone();}));
+  const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderListZone();searchServer();}));
   const nb=$('new');if(nb)nb.addEventListener('click',openNew);
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   // view dropdown (fixed views, D3): listbox popup — opening focuses the first
@@ -577,6 +636,7 @@ function wire(){
 }
 // handlers whose targets live INSIDE #listZone — re-wired on every list re-render
 function wireList(){
+  const mb=$('moreBtn');if(mb)mb.addEventListener('click',showMore);   // item 66
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>)
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');
@@ -829,7 +889,7 @@ function openImport(){
 
 // Start a pipeline deal straight from a contact — no re-typing.
 async function newDeal(cid){
-  const c=ALL.find(x=>x.id===cid);if(!c)return;
+  const c=findRow(cid);if(!c)return;
   const title=(c.name||c.company||c.email||'New')+' — project';
   try{
     const d=await api('/sales/deals','POST',{title,contact_id:cid});
@@ -883,7 +943,7 @@ function readFailNote(r){
 }
 async function openEdit(id){
   EDIT_ID=id;
-  const row=ALL.find(x=>x.id===id)||{};
+  const row=findRow(id)||{};
   $('edit-h').textContent='Edit '+(row.name||row.email||row.phone||'contact');
   $('edit-fields').hidden=true;$('edit-load').hidden=false;
   $('edit-load').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
@@ -944,7 +1004,7 @@ $('editForm').onsubmit=async(e)=>{
 // ?confirm=1, removes them, and it removes ONLY the contact row (a soft delete):
 // the deals, agreements, invoices and projects stay exactly where they are.
 async function askDelete(id){
-  const row=ALL.find(x=>x.id===id)||{};
+  const row=findRow(id)||{};
   const who=row.name||row.email||row.phone||'this contact';
   let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id),'DELETE');}catch(_){r={ok:false,status:0,body:{}};}
   if(r.ok&&r.body&&r.body.data&&r.body.data.already){toast(who+' was already removed.');await load();return;}
@@ -1011,13 +1071,21 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 let REQ_SEQ=0;
 async function load(){
   const seq=++REQ_SEQ;
-  const r=await api('/sales/contacts?limit=500&dupes=1');
+  // item 66: 100 a page (the server's cap; limit=500 silently got 100) with the
+  // count of all; a reload after an edit re-reads as many pages as were showing
+  const pages=Math.max(1,Math.ceil(NEXT_OFF/PAGE));
+  const rs=await Promise.all(Array.from({length:pages},(_,i)=>readPage(i*PAGE,'')));
+  const r=rs.find(x=>!x.ok)||rs[rs.length-1];
   if(seq!==REQ_SEQ)return;
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
   if(!r.ok){trouble();return;}
-  ALL=(r.body&&r.body.data)||[];LOADED_AT=Date.now();
+  {const seen=new Set();ALL=[];for(const x of rs)for(const c of ((x.body&&x.body.data)||[]))if(!seen.has(String(c.id))){seen.add(String(c.id));ALL.push(c);}}
+  const last=rs[rs.length-1].body||{};
+  NEXT_OFF=rs.reduce((n,x)=>n+((x.body&&x.body.data)||[]).length,0);TOTAL=typeof last.total==='number'?last.total:null;LAST_FULL=((last.data)||[]).length>=PAGE;
+  SRCH=null;SRCH_ERR='';LOADED_AT=Date.now();
   { const live=new Set(ALL.map(c=>String(c.id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
   render();loadSavedViews();
+  if(Q.trim())searchServer();   // item 66: a search still in the box looks past the loaded pages again
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

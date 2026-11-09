@@ -43,7 +43,8 @@ ok('inbox.html: Make customer posts /sales/customers with the enquiry id', /api\
 ok('inbox.html: the deal is optional', /\$\('conv-deal'\)\.checked/.test(inbox));
 // the person → customer link on both rosters
 ok('contacts.html: a linked person links to the customer record', /crm\.html\?client_id=\$\{esc\(c\.client_id\)\}/.test(contacts));
-ok('customers.html: People tab reads /sales/contacts', /api\('\/sales\/contacts\?limit=200'\)/.test(customers) && /id="tabPeople"/.test(customers));
+// item 66: 100 a page (the server's cap) with the total, from offset 0
+ok('customers.html: People tab reads /sales/contacts', /api\('\/sales\/contacts\?'\+p\.toString\(\)\)/.test(customers) && /const PPAGE=100;/.test(customers) && /r=await pRead\(0,''\)/.test(customers) && /id="tabPeople"/.test(customers));
 
 console.log(`\n${pass}/${pass + fail} passed`);
 if (fail) { console.log('FAILURES'); failed.forEach((f) => console.log(' -', f)); Deno.exit(1); }

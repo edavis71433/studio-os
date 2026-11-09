@@ -11,7 +11,7 @@
 // It understands the filters the presence function uses: eq / neq / is /
 // in.(…) / like / ilike / gte / lte / gt / lt, not.<op>, or=(…) with quoted
 // values, and a jsonb path column (detail->>key); select is ignored (whole rows
-// come back); order (first key) and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
+// come back); order (every key, in turn), offset and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
 // partial unique index) answer 409 like the database. PATCH and DELETE apply
 // to every matching row. A user JWT (anything but the service key) sees only
@@ -83,8 +83,9 @@ export function installFakePostgrest(opts = {}) {
     const rows = (db.tables[table] ||= []);
     if (method === 'GET' || method === 'HEAD') {
       let out = filterRows(rows, params);
-      const order = (u.searchParams.get('order') || '').split(',')[0];
-      if (order) { const [col, dir] = order.split('.'); out = [...out].sort((a, b) => (String(a[col] ?? '') < String(b[col] ?? '') ? -1 : String(a[col] ?? '') > String(b[col] ?? '') ? 1 : 0) * (dir === 'desc' ? -1 : 1)); }
+      const keys = (u.searchParams.get('order') || '').split(',').filter(Boolean).map((k) => k.split('.'));
+      if (keys.length) out = [...out].sort((a, b) => { for (const [col, dir] of keys) { const x = String(a[col] ?? ''), y = String(b[col] ?? ''); if (x !== y) return (x < y ? -1 : 1) * (dir === 'desc' ? -1 : 1); } return 0; });
+      const off = Math.max(0, Number(u.searchParams.get('offset') || 0)); if (off) out = out.slice(off);
       const lim = Number(u.searchParams.get('limit') || 0); if (lim) out = out.slice(0, lim);
       return method === 'HEAD' ? new Response(null, { status: 200, headers: { 'content-range': `*/${out.length}` } }) : reply(out.map((r) => ({ ...r })));
     }

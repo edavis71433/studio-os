@@ -240,12 +240,16 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // Phase 2: client_id (migration 0130) rides the select — the roster links a
     // person to their customer. A database without the column 400s the widened
     // select; retry the narrow one so the roster never goes dark pre-apply.
-    const mkPath = (cols: string) => {
-      let p = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
-      if (q) p += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
-      if (ids.length) p += `&id=in.(${ids.join(',')})`;
-      return p;
-    };
+    // item 66: the filters past the site pin, shared by the page read and its count
+    let more = withDeleted ? '' : '&deleted_at=is.null';
+    if (q) more += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+    if (ids.length) more += `&id=in.(${ids.join(',')})`;
+    // item 66: id breaks ties in the order, so offset pages never repeat or skip a person
+    const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc,id.desc&limit=${limit}&offset=${offset}`;
+    // item 66: total=1 asks how many match in all (one HEAD count beside the page
+    // read, so every page costs the same two reads at any roster size). The pages
+    // that list people ask for it to say "Showing 100 of N"; nobody else pays.
+    const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
     let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
@@ -256,7 +260,10 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // against one new arrival. Opt-in so no other caller pays for the scan.
     const hints = u.searchParams.get('dupes') === '1' ? duplicateHints(list) : null;
     if (hints) for (const c of list) { const h = hints[String(c.id)]; if (h) c.possible_duplicate_of = h; }
-    return json({ data: list, limit, offset }, 200, cors);
+    const total = await totalP;
+    // total: the count when asked for (null when the count failed: the page then
+    // offers "Show more" while a page comes back full, and never claims a number)
+    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }

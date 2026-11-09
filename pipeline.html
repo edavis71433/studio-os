@@ -1819,6 +1819,8 @@ async function load(soft){
     const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays(),board?ensureContactNames():null]);   // the board's stale threshold and its cards' people ride the same wave (best-effort; neither ever rejects)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];DEALS_LOADED=true;
+    // item 66: a deal whose contact sits outside the newest 100 gets its name too
+    if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
     // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
     {const live=new Set(DEALS.map(d=>String(d.id)));for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id);}
     LOADED_AT=Date.now();
@@ -1846,20 +1848,37 @@ function ensureContactNames(){
   if(CONTACT_LOADING)return CONTACT_LOADING;
   // limit=100 = the server's MAX_PAGE (clampLimit silently caps anything higher
   // right back to 100 — the old limit=500 claimed a capacity the server refuses).
-  // HONEST RESIDUAL: a studio with >100 contacts gets only the 100 most recently
-  // updated — older contacts' deals read "—" in the Table and match by title only
-  // in search. Lifting that needs paged fetches or a server-side join, not a
-  // bigger number here.
+  // item 66: this first read covers most studios in one go; any loaded deal whose
+  // contact is older than the newest 100 is then looked up by id (fillMissingNames),
+  // 100 ids a read, so every deal on the page says whose it is.
   // include_deleted=1: this join only ever LABELS deals that already exist. A
   // contact removed from the roster must not turn their own historical deals
   // into "—" (and unfindable by the person's name in search) — the deal is
   // still real, and it still belongs to whoever it belonged to. Same site
   // scope; the roster read is unchanged and still hides them.
   CONTACT_LOADING=api('/sales/contacts?limit=100&include_deleted=1')
-    .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;for(const c of (r.data||[])){CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}})
+    .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;NAMES_ASKED=new Set();for(const c of (r.data||[]))nameOf(c);})
+    .then(()=>fillMissingNames())
     .catch(()=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
     .finally(()=>{CONTACT_LOADING=null;});
   return CONTACT_LOADING;
+}
+function nameOf(c){if(!c||!c.id||!CONTACT_NAME)return;CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}
+// item 66: names for the loaded deals' contacts the first read didn't cover, asked
+// for by id (?ids=, up to 100 a read, removed contacts included: this only labels
+// deals that exist). Resolves true when it learned a name, so the caller repaints.
+let NAMES_ASKED=new Set();
+async function fillMissingNames(){
+  if(!CONTACT_NAME||CONTACT_FAILED||!DEALS_LOADED)return false;
+  const miss=[...new Set(DEALS.map(d=>d.contact_id).filter(Boolean).map(String))].filter(id=>!(id in CONTACT_NAME)&&!NAMES_ASKED.has(id));
+  if(!miss.length)return false;
+  miss.forEach(id=>NAMES_ASKED.add(id));
+  const chunks=[];for(let i=0;i<miss.length;i+=100)chunks.push(miss.slice(i,i+100));
+  const names=CONTACT_NAME;
+  let found;try{found=await Promise.all(chunks.map(c=>api('/sales/contacts?limit=100&include_deleted=1&ids='+c.map(encodeURIComponent).join(','))));}catch(_){miss.forEach(id=>NAMES_ASKED.delete(id));return false;}   // the next render asks again
+  if(names!==CONTACT_NAME)return false;   // the cache was reset meanwhile (a contact was edited)
+  let any=false;for(const r of found)for(const c of ((r&&r.data)||[])){nameOf(c);any=true;}
+  return any;
 }
 // ── the .lhead search: ONE client-side filter across every display. Matches the
 // deal title plus the contact's name/email/company (the same cached
