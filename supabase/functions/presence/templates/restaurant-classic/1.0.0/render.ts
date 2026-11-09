@@ -120,7 +120,7 @@ main{display:block}
 section.block{padding:calc(44px * var(--spacing-scale,1)) 0}
 section.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .menu-cat{margin-bottom:34px}
-.menu-cat h3{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:var(--font-body,system-ui,sans-serif);font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.menu-cat h2{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:.95rem;font-family:var(--font-body,system-ui,sans-serif);font-weight:700;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
 ul.items{list-style:none}
 .item{display:flex;gap:16px;justify-content:space-between;align-items:baseline;padding:10px 0}
 .item .nm{font-weight:600}
@@ -170,7 +170,7 @@ const CRITICAL = `:root{--ink:#241d1a;--soft:#6b5f58;--cream:#faf6ef;--accent:#8
 
 // tiny static "open now" script — reads a JSON data island; runs in the browser
 // (renderer itself never touches a clock). <1KB.
-const OPEN_NOW_JS = `(function(){var el=document.getElementById('open-now');var d=document.getElementById('hours-data');if(!el||!d)return;try{var cfg=JSON.parse(d.textContent);var now=new Date(new Date().toLocaleString('en-US',{timeZone:cfg.tz}));var ds=['sun','mon','tue','wed','thu','fri','sat'];var key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');var day=(cfg.ex&&cfg.ex[key])?cfg.ex[key]:cfg.days[ds[now.getDay()]];var mins=now.getHours()*60+now.getMinutes();var open=false;if(day&&!day.closed)for(var i=0;i<day.iv.length;i++){var a=day.iv[i][0],b=day.iv[i][1];if(b<=a)b+=1440;if(mins>=a&&mins<b)open=true;if(b>1440&&mins+1440>=a&&mins+1440<b)open=true}var tr=document.querySelector('table.hours tr[data-day="'+ds[now.getDay()]+'"]');if(tr)tr.setAttribute('data-today','');el.textContent=open?'Open now':'Closed now';el.className='open-now '+(open?'yes':'no')}catch(e){el.textContent=''}})();`;
+const OPEN_NOW_JS = `(function(){var el=document.getElementById('open-now');var d=document.getElementById('hours-data');if(!el||!d)return;try{var cfg=JSON.parse(d.textContent);if(!cfg.days||!Object.keys(cfg.days).length)return;var now=new Date(new Date().toLocaleString('en-US',{timeZone:cfg.tz}));var ds=['sun','mon','tue','wed','thu','fri','sat'];var key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');var day=(cfg.ex&&cfg.ex[key])?cfg.ex[key]:cfg.days[ds[now.getDay()]];var mins=now.getHours()*60+now.getMinutes();var open=false;if(day&&!day.closed)for(var i=0;i<day.iv.length;i++){var a=day.iv[i][0],b=day.iv[i][1];if(b<=a)b+=1440;if(mins>=a&&mins<b)open=true;if(b>1440&&mins+1440>=a&&mins+1440<b)open=true}var tr=document.querySelector('table.hours tr[data-day="'+ds[now.getDay()]+'"]');if(tr)tr.setAttribute('data-today','');el.textContent=open?'Open now':'Closed now';el.className='open-now '+(open?'yes':'no')}catch(e){el.textContent=''}})();`;
 
 // ═════════ partials ═════════
 
@@ -301,9 +301,9 @@ ${o.body}
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
-<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
+${o.body.includes('id="open-now"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
-</body>
+` : ''}</body>
 </html>`;
 }
 
@@ -384,7 +384,7 @@ ${strip}`,
 function menuBody(c: SnapshotContent): string {
   const cats = orderedCats(c);
   return `<section class="block wrap"><h1>Menu</h1>
-${cats.map((cat) => `<div class="menu-cat"><h3>${esc(cat)}</h3><ul class="items">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
+${cats.map((cat) => `<div class="menu-cat"><h2>${esc(cat)}</h2><ul class="items">${bySort(c.offerings).filter((o) => o.category === cat).map((o) => `
   <li class="item"${prE('offering', o.id)}><div><div class="nm">${esc(o.name)}</div>${o.description ? `<div class="ds">${esc(o.description)}</div>` : ''}${o.media ? img(o.media, '(max-width:560px) 100vw, 400px') : ''}</div><div class="dots" aria-hidden="true"></div>${o.price_text ? `<div class="pr">${esc(o.price_text)}</div>` : ''}</li>`).join('')}
 </ul></div>`).join('')}
 ${cats.length === 0 ? '<p>Our menu is being updated — check back soon.</p>' : ''}</section>`;
@@ -570,13 +570,14 @@ export const render: RenderFn = (snapshot: Snapshot, manifest: TemplateManifest,
 
   // favicon: deterministic SVG from the first letter
   const letter = (i.business_name || 'P').trim()[0]?.toUpperCase() || 'P';
-  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#8c3b2e"/><text x="32" y="44" font-family="Georgia,serif" font-size="36" fill="#faf6ef" text-anchor="middle">${esc(letter)}</text></svg>`;
+  files['favicon.svg'] = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#8c3b2e" data-accent="fill"/><text x="32" y="44" font-family="Georgia,serif" font-size="36" fill="#faf6ef" text-anchor="middle">${esc(letter)}</text></svg>`;
 
   // sitemap (lastmod = snapshot time — the only clock the renderer may read)
-  const lastmod = snapshot.created_at.slice(0, 10);
+  // item 99: no page records when it last changed, so only a post (its own date) carries one
+  const lastmod = '';
   const KEY_PATHS: Array<[string, string]> = [['offerings', '/menu/'], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
   const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
-  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u.loc)}</loc><lastmod>${u.lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(site.baseUrl + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO
   {

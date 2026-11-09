@@ -112,6 +112,7 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');set
 
 // ── state ──
 let STATE={files:[],template:{},cust:{theme_tokens:{},custom_css:'',custom_html:'',allowed_tokens:[]},active:'theme/tokens.json'};
+const FIXED_COLOR_TEMPLATES=new Set(['slate']);   // templates whose own colours win over these tokens (presence.html has the same list)
 const TOKEN_META={accent:{label:'Accent',type:'color'},accent_soft:{label:'Accent soft',type:'color'},ink:{label:'Text',type:'color'},bg:{label:'Background',type:'color'},radius:{label:'Corner radius',type:'text',ph:'8px'},font_scale:{label:'Type scale',type:'text',ph:'1.0'}};
 
 function iconFor(kind){return kind==='theme'?'◆':kind==='css'?'{}':kind==='html'?'<>':kind==='template'?'⌘':'▤';}
@@ -153,8 +154,12 @@ function themeEditor(){
       toks+=`<div class="tok"><label>${esc(m.label)}</label><input type="text" data-tok="${esc(key)}" aria-label="${esc(m.label)}" value="${esc(val)}" placeholder="${esc(m.ph||'')}"></div>`;
     }
   }
+  // Item 99: Slate keeps its own dark colours over these (html:root in its CSS), as the
+  // Styles panel already says; a colour set here saved without changing anything.
+  const fixed=FIXED_COLOR_TEMPLATES.has(STATE.template.slug||'')
+    ?`<p class="hint" id="fixedColors" style="margin-bottom:14px">Slate keeps its own dark colors, so the color tokens here don’t change your site. Fonts, text size, corners and spacing still do.</p>`:'';
   return `<label class="fld" style="margin-bottom:12px">Theme tokens</label>
-    <p class="hint" style="margin-bottom:14px">Only these values can be set, and only in valid forms — a safety guarantee, not a limitation. Everything else lives in the template.</p>
+    <p class="hint" style="margin-bottom:14px">Only these values can be set, and only in valid forms — a safety guarantee, not a limitation. Everything else lives in the template.</p>${fixed}
     <div class="tokens">${toks}</div>${previewBlock()}${approvalBlock()}`;
 }
 function cssEditor(){

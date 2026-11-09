@@ -67,7 +67,10 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
   ok('contact form: honeypot + thanks page is noindexed', f['contact/index.html'].includes('name="_hp"') && f['thanks/index.html'].includes('name="robots" content="noindex"'));
   // Content pages carry ZERO client JS. The sole first-party inline scripts are the
   // on-site search (/search/) + the updates tag-filter — same-origin, zero external origins.
-  ok('editorial keeps ZERO client JavaScript (except first-party search + tag-filter)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(v)));
+  // item 99: the Open now line, its hours data and its first-party script, rides on the home page only
+  const noOpenNow = (h) => String(h).replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>\n<script>\(function\(\)\{var el=document\.getElementById\('open-now'\)[\s\S]*?<\/script>/, '');
+  ok('editorial keeps ZERO client JavaScript (except first-party search, tag filter and Open now)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(noOpenNow(v))));
+  ok('editorial: the Open now script is on the home page only', Object.entries(f).filter(([k, v]) => k.endsWith('.html') && String(v).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
   ok('provenance markers preserved (data-pr on the hero identity)', home.includes('data-pr="identity.business_name"'));
 }
 

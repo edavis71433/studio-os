@@ -64,7 +64,10 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   // Content pages stay pure-static. The ONLY first-party inline scripts are the
   // on-site search (Phase SEARCH: /search/) + the updates tag-filter (progressive
   // enhancement) — both same-origin, zero external origins. Everything else is JS-free.
-  ok('zero JavaScript emitted, except the first-party search + tag-filter', pages.filter(([k]) => k !== 'search/index.html' && k !== 'updates/index.html').every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(h)));
+  // item 99: the Open now line, its hours data and its first-party script, rides on the home page only
+  const noOpenNow = (h) => String(h).replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>\n<script>\(function\(\)\{var el=document\.getElementById\('open-now'\)[\s\S]*?<\/script>/, '');
+  ok('zero JavaScript emitted, except the first-party search, tag filter and Open now', pages.filter(([k]) => k !== 'search/index.html' && k !== 'updates/index.html').every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(h))));
+  ok('the Open now script is on the home page only', pages.filter(([, h]) => String(h).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
 }
 
 // ═══ 5. the Phase-V essentials carry over ═══
