@@ -2,7 +2,10 @@
 --  APPLY PACK - scheduled jobs read their secret from Vault  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE in Supabase -> SQL Editor, the PRODUCTION project
---  (qksstlqzbhesadrrofgn). No deploy needed before or after. Safe to re-run.
+--  (qksstlqzbhesadrrofgn; the top bar says davis-digital-studio). In the
+--  staging project it stops and changes nothing. No deploy needed before or
+--  after. Safe to re-run: a re-run also repairs a job that the staging pack
+--  pointed at staging's address (Nov 9 2026, before that check existed).
 --  Nothing in this file, and nothing it prints, contains a secret value.
 --
 --  What it does, as one step (if any check fails, nothing changes):
@@ -50,6 +53,11 @@ declare
   jid bigint;
   j record;
 begin
+  -- Wrong-project check: only staging holds the watchdog's Vault entries.
+  if exists (select 1 from vault.secrets
+              where name in ('watchdog_health_url', 'watchdog_resend_key', 'watchdog_target_secret')) then
+    raise exception 'this is the STAGING project (it has the watchdog''s Vault entries); open production (qksstlqzbhesadrrofgn, davis-digital-studio); nothing changed';
+  end if;
   if exists (select 1 from cron.job
               where jobname in ('presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync', 'nightly-data-sync',
                                 'dds_product_intelligence', 'presence_ops_cycle', 'presence_ops_retry', 'presence_ops_coach')
