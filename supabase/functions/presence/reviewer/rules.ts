@@ -118,8 +118,16 @@ const snip = (s: string, n = 90) => s.length > n ? s.slice(0, n - 1) + '…' : s
 
 export function deterministicFindings(facts: FactSheet, scope: { kind: 'site' | 'section' | 'entity'; section?: string; targetId?: string }): Finding[] {
   const out: Finding[] = [];
+  // A one-item review checks the section that item lives in, the way the whole-site review
+  // does, and keeps only what is about that item (its neighbours are still read, so a
+  // duplicate of another item is found).
+  const entitySection = scope.kind !== 'entity' || !scope.targetId ? null
+    : facts.faqs_full.some((f) => f.id === scope.targetId) ? 'faqs'
+    : facts.offerings.some((o) => o.id === scope.targetId) ? 'offerings'
+    : facts.posts_full.some((p) => p.id === scope.targetId) ? 'updates'
+    : null;
   const wantSection = (name: string) =>
-    scope.kind === 'site' || (scope.kind === 'section' && scope.section === name);
+    scope.kind === 'site' || (scope.kind === 'section' && scope.section === name) || entitySection === name;
   const wantEntity = (id: string) => scope.kind !== 'entity' || scope.targetId === id;
 
   // identity prose
@@ -146,18 +154,20 @@ export function deterministicFindings(facts: FactSheet, scope: { kind: 'site' | 
 
   // faqs
   if (wantSection('faqs')) {
-    if (!facts.faqs_full.length) {
+    if (!facts.faqs_full.length && scope.kind !== 'entity') {
       out.push(makeFinding('customer_questions', 'suggestion', 0.9, { kind: 'site' },
         'No customer questions are answered yet.', 'Customers with unanswered questions ask a competitor’s site.',
         'the site answers before customers have to call', 'Answer the one question customers ask most.', []));
     }
     const seen = new Map<string, string>();
-    for (const f of facts.faqs_full.filter((f) => f.visible && wantEntity(f.id))) {
+    for (const f of facts.faqs_full.filter((f) => f.visible)) {
       const key = f.question.trim().toLowerCase();
-      if (seen.has(key)) out.push(makeFinding('duplicate_content', 'suggestion', 1, { kind: 'faq', id: f.id },
+      const mine = wantEntity(f.id);
+      seen.set(key, seen.get(key) ?? f.id);
+      if (!mine) continue;
+      if (seen.get(key) !== f.id) out.push(makeFinding('duplicate_content', 'suggestion', 1, { kind: 'faq', id: f.id },
         'Two answered questions are nearly identical.', 'Duplicates read as clutter and split the answer’s strength.',
         'one strong answer instead of two weak ones', 'Merge or remove the duplicate.', [snip(f.question)]));
-      seen.set(key, f.id);
       if (f.answer && flesch(f.answer) < 45) out.push(makeFinding('readability', 'note', 0.8, { kind: 'faq', id: f.id },
         'This answer reads harder than it needs to.', 'Answers get skimmed; hard ones get skipped.',
         'the answer lands on first read', 'Simplify the sentences.', [snip(f.answer)]));
@@ -168,13 +178,15 @@ export function deterministicFindings(facts: FactSheet, scope: { kind: 'site' | 
   if (wantSection('offerings')) {
     const names = new Map<string, number>();
     for (const o of facts.offerings.filter((o) => o.visible)) names.set(o.name, (names.get(o.name) || 0) + 1);
-    for (const [name, n] of names) if (n > 1) out.push(makeFinding('duplicate_content', 'suggestion', 1, { kind: 'site' },
+    const own = facts.offerings.find((o) => o.visible && o.id === scope.targetId)?.name;
+    for (const [name, n] of names) if (n > 1 && (scope.kind !== 'entity' || name === own)) out.push(makeFinding('duplicate_content', 'suggestion', 1, { kind: 'site' },
       `“${name}” appears ${n} times on the menu.`, 'Repeated items confuse customers and readers alike.',
       'a cleaner menu that reads deliberately', 'Remove or rename the duplicate.', [name]));
-    const undescribed = facts.offerings.filter((o) => o.visible && !o.description && wantEntity(o.id));
-    if (undescribed.length >= 3) out.push(makeFinding('missing_information', 'note', 0.85, { kind: 'site' },
+    const undescribed = facts.offerings.filter((o) => o.visible && !o.description);
+    const named = undescribed.filter((o) => wantEntity(o.id));
+    if (undescribed.length >= 3 && named.length) out.push(makeFinding('missing_information', 'note', 0.85, { kind: 'site' },
       `${undescribed.length} menu items have no description.`, 'A line of description sells better than a name alone.',
-      'items sell themselves on the page', 'Add a short line to the items that matter most.', undescribed.slice(0, 3).map((o) => o.name)));
+      'items sell themselves on the page', 'Add a short line to the items that matter most.', named.slice(0, 3).map((o) => o.name)));
   }
 
   // posts: heading hierarchy in markdown
