@@ -2,7 +2,9 @@
 --  APPLY PACK - scheduled jobs read their secret from Vault  (owner-apply, staging)
 -- ===========================================================================
 --  Run this ONCE in Supabase -> SQL Editor, the STAGING project
---  (wjlpursnwbmlcdwbeowv). No deploy needed before or after. Safe to re-run.
+--  (wjlpursnwbmlcdwbeowv; the top bar says studio-os-staging). In production
+--  it stops and changes nothing. No deploy needed before or after. Safe to
+--  re-run.
 --  Nothing in this file, and nothing it prints, contains a secret value.
 --
 --  What it fixes:
@@ -31,6 +33,11 @@ declare
   was_active boolean;
   jid bigint;
 begin
+  -- Wrong-project check: only staging holds the watchdog's Vault entries.
+  if not exists (select 1 from vault.secrets
+                  where name in ('watchdog_health_url', 'watchdog_resend_key', 'watchdog_target_secret')) then
+    raise exception 'this is not the STAGING project (it has none of the watchdog''s Vault entries); open staging (wjlpursnwbmlcdwbeowv, studio-os-staging); nothing changed';
+  end if;
   if not exists (select 1 from vault.secrets where name = 'presence_scheduler_secret') then
     raise exception 'staging Vault has no presence_scheduler_secret; nothing changed';
   end if;
