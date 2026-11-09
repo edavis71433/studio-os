@@ -2,10 +2,12 @@
 //   deno run --allow-read --allow-env --allow-net tests/presence/dns_zone_test.mjs
 // Part A unit-tests every pure piece: SigV4 against the OFFICIAL AWS example
 // vector, wire conversions, guardrail classes, SPF merge-not-append, the scan
-// name list, import filter, the rrset change planner. Part B drives the zone
-// routes + applyPlan behaviorally with a globalThis.fetch fake covering the
-// Route 53 XML API, DoH, and PostgREST (the inbound_email_test idiom). NO
-// live AWS calls, ever — a request that escapes the fake FAILS the run.
+// name list, import filter, the rrset change planner. Part B drives the
+// dormant switch, the DS pre-flight and applyPlan behaviorally with a
+// globalThis.fetch fake covering the Route 53 XML API, DoH, and PostgREST (the
+// inbound_email_test idiom). NO live AWS calls, ever — a request that escapes
+// the fake FAILS the run. (The /foundations/zone routes this drove were removed
+// in Nov 2026: no page ever called them.)
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
@@ -19,7 +21,6 @@ Deno.env.delete('AWS_SECRET_ACCESS_KEY');
 const r53 = await import('../../supabase/functions/presence/lib/route53.ts');
 const M = await import('../../supabase/functions/presence/platform/managed_dns.ts');
 const { dnsFor, guidedDns } = await import('../../supabase/functions/presence/platform/contract.ts');
-const Z = await import('../../supabase/functions/presence/routes/zone.ts');
 const { applyPlan } = await import('../../supabase/functions/presence/routes/foundations.ts');
 
 // ═══════════════ PART A · pure ═══════════════
@@ -300,18 +301,7 @@ globalThis.fetch = (input, _init) => {
 ok('dormant: contract selects guided when secrets absent', dnsFor() === guidedDns && dnsFor().capabilities.write === 'guided');
 ok('dormant: route53Configured() false', r53.route53Configured() === false);
 ok('dormant: client op refuses without a network call', await r53.listReusableDelegationSets().then((r) => !r.ok && r.error === 'aws_not_configured'));
-{
-  const g = await Z.handleZoneGet(SITE, CORS);
-  const gj = await g.json();
-  ok('dormant: GET /foundations/zone → honest 503', g.status === 503 && gj.error === 'not_configured' && /isn’t switched on yet/.test(gj.message));
-  const c = await Z.handleZoneCreate(new Request('http://x/', { method: 'POST', body: '{}' }), SITE, PRINCIPAL, CORS);
-  ok('dormant: POST /foundations/zone → honest 503', c.status === 503);
-  const d = await Z.handleZoneDelete(new Request('http://x/', { method: 'DELETE', body: '{"confirm":true}' }), SITE, PRINCIPAL, CORS);
-  ok('dormant: DELETE /foundations/zone → honest 503', d.status === 503);
-  const rr = await Z.handleZoneRecords(new Request('http://x/', { method: 'POST', body: '{}' }), 'POST', SITE, PRINCIPAL, CORS);
-  ok('dormant: record CRUD → honest 503', rr.status === 503);
-  ok('dormant: ZERO AWS calls were made', world.aws.calls.length === 0);
-}
+ok('dormant: ZERO AWS calls were made', world.aws.calls.length === 0);
 
 // ── switch the secrets on (call-time reads pick this up immediately) ──
 Deno.env.set('AWS_ACCESS_KEY_ID', 'AKIDTEST');
@@ -322,86 +312,19 @@ ok('live: contract selects the automatic adapter once secrets exist', dnsFor().s
 // ── B2: DS pre-flight ──
 world.doh.set('acme.com|43', [{ data: '12345 13 2 ABCDEF' }]);
 ok('DS check: present', await M.checkDs('acme.com') === 'present');
-{
-  const c = await Z.handleZoneCreate(new Request('http://x/', { method: 'POST', body: '{}' }), SITE, PRINCIPAL, CORS);
-  const cj = await c.json();
-  ok('create: DNSSEC DS present → 409 with registrar guidance, zone NOT created', c.status === 409 && cj.error === 'dnssec_active' && /Turn DNSSEC off/.test(cj.message) && world.aws.zones.size === 0);
-}
 world.dohFail.add('acme.com|43');
 world.doh.delete('acme.com|43');
 ok('DS check: failed probe → unknown (never claims safe)', await M.checkDs('acme.com') === 'unknown');
-{
-  const c = await Z.handleZoneCreate(new Request('http://x/', { method: 'POST', body: '{}' }), SITE, PRINCIPAL, CORS);
-  ok('create: failed DS probe → refuses (502), nothing done', c.status === 502 && (await c.json()).error === 'dnssec_unverified');
-}
 world.dohFail.delete('acme.com|43');
 ok('DS check: absent', await M.checkDs('acme.com') === 'absent');
 
-// ── B3: zone creation — scan, import, site records, write-through ──
-world.doh.set('acme.com|15', [{ data: '10 mail.oldhost.com.' }]);
-world.doh.set('acme.com|16', [{ data: '"v=spf1 include:oldhost.com ~all"' }]);
-world.doh.set('acme.com|1', [{ data: '9.9.9.9' }]);
-world.doh.set('www.acme.com|5', [{ data: 'oldweb.example.net.' }]);
-world.db.monitorToken = 'dds-veriftoken123';
-{
-  const c = await Z.handleZoneCreate(new Request('http://x/', { method: 'POST', body: '{}' }), SITE, PRINCIPAL, CORS);
-  const cj = await c.json();
-  ok('create: 201 with the delegation-set nameservers', c.status === 201 && JSON.stringify(cj.data.nameservers) === JSON.stringify(AWS_NS));
-  ok('create: delegation set created exactly once, fixed caller ref', world.aws.delegationSets.length === 1 && world.aws.delegationSets[0].ref === r53.DELEGATION_SET_CALLER_REF);
-  ok('create: MX + SPF imported; old apex A replaced (reported)', cj.data.imported.some((r) => r.type === 'MX') && cj.data.imported.some((r) => /v=spf1/.test(r.value)) && cj.data.replaced_by_site_records.some((r) => r.value === '9.9.9.9'));
-  ok('create: site records placed (apex A + www CNAME + verify TXT)', cj.data.placed.length === 3 && cj.data.placed.some((r) => r.value === '75.2.60.5') && cj.data.placed.some((r) => r.name === '_dds-verify.acme.com'));
-  const z = [...world.aws.zones.values()][0];
-  ok('create: the zone actually contains imported MX + placed A', z.rrsets.some((s) => s.type === 'MX' && s.values[0] === '10 mail.oldhost.com.') && z.rrsets.some((s) => s.type === 'A' && s.values.includes('75.2.60.5')));
-  ok('create: pre-migration snapshot taken', world.db.snapshots.length >= 1 && world.db.snapshots[0].domain === 'acme.com');
-  ok('create: desired-zone doc written through with sources', (() => { const d = world.db.dnsZones.get(SITE.id); return d && d.records.some((r) => r.source === 'import') && d.records.some((r) => r.source === 'platform'); })());
-  ok('create: zone history appended', world.db.history.length >= 1);
-  const c2 = await Z.handleZoneCreate(new Request('http://x/', { method: 'POST', body: '{}' }), SITE, PRINCIPAL, CORS);
-  const cj2 = await c2.json();
-  ok('create: idempotent — existing zone reused, not duplicated', c2.status === 201 && cj2.data.created === false && world.aws.zones.size === 1);
-}
-
-// ── B4: GET status — NS propagation + state machine ──
-world.doh.set('acme.com|2', [{ data: 'ns1.godaddy.com.' }]);
-{
-  const g = await Z.handleZoneGet(SITE, CORS);
-  const gj = await g.json();
-  ok('status: ns_pending while the registrar still points elsewhere', g.status === 200 && gj.data.zone.status === 'ns_pending' && gj.data.zone.ns.propagated === false);
-  ok('status: platform section carries delegation set + glue map', gj.data.platform.available && gj.data.platform.delegation_set_id === 'N1DELEGATION' && gj.data.platform.glue.length === 4 && gj.data.platform.glue[0].host === 'ns1.davisdigitalstudio.com');
-  ok('status: records carry managed flags + protection classes', gj.data.zone.records.some((r) => r.managed && r.protected === 'mx'));
-}
-world.doh.set('acme.com|2', [{ data: 'ns-101.awsdns-01.org.' }]);
-{
-  const g = await Z.handleZoneGet(SITE, CORS);
-  const gj = await g.json();
-  ok('status: NS detected → live (no hosting attached, so no ssl leg)', gj.data.zone.status === 'live' && gj.data.zone.ns.propagated === true);
-}
-
-// ── B5: record CRUD guardrails ──
-{
-  const post = (bodyObj) => Z.handleZoneRecords(new Request('http://x/', { method: 'POST', body: JSON.stringify(bodyObj) }), 'POST', SITE, PRINCIPAL, CORS);
-  const noConfirm = await post({ record: { type: 'MX', name: 'acme.com', value: 'smtp.google.com', priority: 1 } });
-  ok('CRUD: protected class without confirm → 409 confirm_required', noConfirm.status === 409 && (await noConfirm.json()).error === 'confirm_required');
-  const confirmed = await post({ record: { type: 'MX', name: 'acme.com', value: 'smtp.google.com', priority: 1 }, confirm: true });
-  ok('CRUD: protected class WITH confirm → applied', confirmed.status === 200);
-  const unprotected = await post({ record: { type: 'TXT', name: 'note.acme.com', value: 'hello' } });
-  ok('CRUD: unprotected record needs no confirm', unprotected.status === 200);
-  const invalid = await post({ record: { type: 'A', name: 'acme.com', value: 'not-an-ip' }, confirm: true });
-  ok('CRUD: invalid record → 400 validation, nothing changed', invalid.status === 400);
-  const spf = await post({ record: { type: 'TXT', name: 'acme.com', value: 'v=spf1 include:_spf.google.com ~all' }, confirm: true });
-  const spfJ = await spf.json();
-  const z = [...world.aws.zones.values()][0];
-  const spfValues = z.rrsets.filter((s) => s.type === 'TXT' && s.name === 'acme.com.').flatMap((s) => s.values).filter((v) => v.includes('v=spf1'));
-  ok('CRUD: SPF MERGED — one v=spf1 in the zone carrying both includes', spfJ.data.spf_merged === true && spfValues.length === 1 && spfValues[0].includes('include:oldhost.com') && spfValues[0].includes('include:_spf.google.com'));
-  const del = (bodyObj) => Z.handleZoneRecords(new Request('http://x/', { method: 'DELETE', body: JSON.stringify(bodyObj) }), 'DELETE', SITE, PRINCIPAL, CORS);
-  const delImported = await del({ record: { type: 'MX', name: 'acme.com', value: 'mail.oldhost.com', priority: 10 } });
-  ok('CRUD: deleting a SCAN-IMPORTED record without confirm → refused', delImported.status === 409);
-  const delMissing = await del({ record: { type: 'TXT', name: 'ghost.acme.com', value: 'nope' }, confirm: true });
-  ok('CRUD: deleting an absent record → honest 404', delMissing.status === 404);
-  const delOk = await del({ record: { type: 'TXT', name: 'note.acme.com', value: 'hello' } });
-  ok('CRUD: unprotected delete lands', delOk.status === 200 && !z.rrsets.some((s) => s.name === 'note.acme.com.'));
-}
-
-// ── B6: applyPlan wiring — approved DNS plans APPLY through the adapter ──
+// ── B3: applyPlan wiring — approved DNS plans APPLY through the adapter ──
+// A hosted zone already exists for the domain (made in Route 53 itself): the
+// fake serves it, and the plan's records land in it.
+world.aws.zones.set('Z1ZONE', { id: 'Z1ZONE', name: 'acme.com', rrsets: [
+  { name: 'acme.com.', type: 'NS', ttl: 172800, values: AWS_NS.map((n) => n + '.') },
+  { name: 'acme.com.', type: 'SOA', ttl: 900, values: [`${AWS_NS[0]}. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400`] },
+] });
 {
   const PLAN_ID = '44444444-4444-4444-8444-444444444444';
   world.db.plans.set(PLAN_ID, {
@@ -426,31 +349,11 @@ world.doh.set('acme.com|2', [{ data: 'ns-101.awsdns-01.org.' }]);
   ok('applyPlan: write-through into the desired doc (drift machinery fed)', (() => { const d = world.db.dnsZones.get(SITE.id); return d && d.records.some((x) => x.name === '_dmarc.acme.com'); })());
 }
 
-// ── B7: detach ──
-{
-  const noConfirm = await Z.handleZoneDelete(new Request('http://x/', { method: 'DELETE', body: '{}' }), SITE, PRINCIPAL, CORS);
-  ok('detach: without confirm → 400 with the point-NS-away warning', noConfirm.status === 400 && /confirm/.test((await noConfirm.json()).error));
-  const snapshotsBefore = world.db.snapshots.length;
-  const d = await Z.handleZoneDelete(new Request('http://x/', { method: 'DELETE', body: '{"confirm":true}' }), SITE, PRINCIPAL, CORS);
-  const dj = await d.json();
-  ok('detach: confirmed → zone emptied + deleted, snapshot kept', d.status === 200 && dj.data.deleted === true && world.aws.zones.size === 0 && world.db.snapshots.length === snapshotsBefore + 1);
-  const after = await Z.handleZoneDelete(new Request('http://x/', { method: 'DELETE', body: '{"confirm":true}' }), SITE, PRINCIPAL, CORS);
-  ok('detach: repeat → honest 404 (already guided mode)', after.status === 404);
-}
-
 ok('behavioral: NO request ever escaped the fake (no live AWS)', world.escaped.length === 0, world.escaped.join(', '));
 
-// ── B8: registration pins (index.ts + the untouched guided surface) ──
+// ── B4: registration pins (index.ts keeps the foundations surface) ──
 {
   const idx = await Deno.readTextFile(new URL('../../supabase/functions/presence/index.ts', import.meta.url));
-  ok('pin: GET /foundations/zone registered', /route === '\/foundations\/zone' && method === 'GET'.*handleZoneGet/.test(idx.replace(/\n/g, ' ')) || idx.includes("if (route === '/foundations/zone' && method === 'GET') return handleZoneGet(site, cors);"));
-  ok('pin: POST /foundations/zone registered', idx.includes("if (route === '/foundations/zone' && method === 'POST') return handleZoneCreate(req, site, principal, cors);"));
-  ok('pin: DELETE /foundations/zone registered', idx.includes("if (route === '/foundations/zone' && method === 'DELETE') return handleZoneDelete(req, site, principal, cors);"));
-  ok('pin: /foundations/zone/records registered for POST/PUT/DELETE', idx.includes("route === '/foundations/zone/records'") && idx.includes('handleZoneRecords(req, method, site, principal, cors)'));
-  // the shipped guided surface stays EXACTLY as it was
-  ok('pin: guided /foundations/dns GET untouched', idx.includes("if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(db, site, cors);"));
-  ok('pin: guided /foundations/dns PUT untouched', idx.includes("if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);"));
-  ok('pin: /foundations/dns/rollback untouched', idx.includes("if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);"));
   ok('pin: /foundations GET untouched', idx.includes("if (route === '/foundations' && method === 'GET') return handleFoundationsGet(site, cors);"));
   ok('pin: /foundations/prepare untouched', idx.includes("if (route === '/foundations/prepare' && method === 'POST') return handleFoundationsPrepare(req, site, principal, cors);"));
 }

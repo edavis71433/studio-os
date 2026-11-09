@@ -22,7 +22,7 @@ const files = {
   prod: 'docs/presence/APPLY-cron-vault-prod.sql',
   staging: 'docs/presence/APPLY-cron-vault-staging.sql',
   ops: 'supabase/ops/schedule-presence-cron.sql',
-  legacy: '02-schedule-cron.sql',
+  legacy: 'supabase/ops/clever-api-legacy/02-schedule-cron.sql',
 };
 const sql = Object.fromEntries(Object.entries(files).map(([k, p]) => [k, read(p)]));
 const code = Object.fromEntries(Object.entries(sql).map(([k, s]) => [k, s.replace(/--[^\n]*/g, '')]));

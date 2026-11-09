@@ -391,7 +391,7 @@ for (const [label, header] of [['no header', undefined], ['the empty header the 
   {
     reset();
     const r = await call('jwt-owner-a', 'GET', '/commerce/first-run', opts());
-    ok(`un-scoped (${label}): an owner's checklist is theirs, under their JWT`, r.status === 200 && r.body?.data?.done === 3 && contentCalls().every((c) => c.role === 'user' && c.token === 'jwt-owner-a'), r.text.slice(0, 160));
+    ok(`un-scoped (${label}): an owner's welcome state is theirs, one read under their JWT`, r.status === 200 && r.body?.data?.dismissed === false && contentCalls().length === 1 && contentCalls().every((c) => c.table === 'presence_first_run' && c.role === 'user' && c.token === 'jwt-owner-a'), r.text.slice(0, 160));
     const d = await call('jwt-owner-a', 'POST', '/commerce/first-run/dismiss', opts());
     ok(`un-scoped (${label}): an owner can still dismiss their welcome`, d.status === 200 && T.presence_first_run.find((f) => f.site_id === SITE_A).dismissed === true && T.presence_first_run.find((f) => f.site_id === SITE_STUDIO).dismissed === false);
     ok(`un-scoped (${label}): nothing recorded`, audit().length === 0);

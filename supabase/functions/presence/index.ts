@@ -1,16 +1,21 @@
-// ── Presence edge function — independent bounded context (M3) ────────────────
+// ── Presence edge function — the app's whole API ─────────────────────────────
 // Reuses _shared for CORS, the json helper, and auth/principal resolution.
 // This function does NOT duplicate any middleware already in _shared.
 //
-// Boundary order, every request:
+// Boundary order, every request (route_ below):
 //   1. CORS / OPTIONS
-//   2. resolvePrincipal (shared) — authenticated staff or client, else 401
-//   3. resolve the caller's site via RLS (gives site_id + client_id)
-//   4. entitlement gate at the boundary (outside RLS): full / readonly / denied
-//   5. method+path router — GET /site, GET /identity, PUT /identity — else 404
-//
-// Scope is exactly those three routes. No generic router, no table routing,
-// no publishing/preview/templates/media/CRUD beyond identity.
+//   2. /system/* — the scheduler, gated by its own secret, before any sign-in
+//   3. resolvePrincipal (shared); /agency/* resolves its member and leaves here
+//   4. routes that carry their own authority: /commerce, public pages and posts
+//      (a signed token, or the site a visitor's form, booking, review or visit
+//      names), signed webhooks, and the operators' marketplace and enterprise
+//   5. signed in as staff or a client, else 401; staff admin, the agency
+//      portfolio and help need no site and answer next
+//   6. the caller's site: their own via RLS, a studio's scope re-checked (never
+//      falling back to another site), or an invited member's seat
+//   7. entitlement (full / readonly / denied), the reviewer boundary, the member
+//      write gate (lib/site_roles.ts), then the Monitor and edition feature gates
+//   8. exact method + path routes, else 404
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsFor } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
@@ -39,10 +44,10 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin, handleDomain } from './routes/admin.ts';
-import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handleWebsiteTimeline } from './routes/timeline.ts';
 import { handleAttentionCenter } from './routes/attention.ts';
@@ -74,15 +79,13 @@ import { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWrit
 import { handleEditorImprove } from './routes/editor.ts';
 import { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } from './routes/review.ts';
 import { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } from './routes/brand.ts';
-import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney, handleCoachMemory } from './routes/coach.ts';
-import { handleAnalyticsHome, handleAnalyticsWebsite, handleAnalyticsCustomers, handleAnalyticsSearch, handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
+import { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney } from './routes/coach.ts';
+import { handleAnalyticsHome, handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
 import { handleCollect } from './routes/collect.ts';
 import { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } from './routes/knowledge.ts';
-import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect, handleMonitorReadiness } from './routes/monitor.ts';
+import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect } from './routes/monitor.ts';
 import { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } from './routes/foundations.ts';
-import { handleZoneGet, handleZoneCreate, handleZoneDelete, handleZoneRecords } from './routes/zone.ts';
-import { handleExport, handleLaunch, handleDnsGet, handleDnsPut, handleDnsRollback, handleEmailHealth } from './routes/services.ts';
-import { handleImportInventory } from './routes/monitor.ts';
+import { handleExport, handleLaunch } from './routes/services.ts';
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
@@ -90,7 +93,7 @@ import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 import { handleSystem } from './routes/system.ts';
 import { handleVisibility, handleVisibilityCheck } from './routes/visibility.ts';
 import { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } from './routes/connections.ts';
-import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceAudit, handleMarketplaceFeatures } from './routes/marketplace.ts';
+import { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } from './routes/marketplace.ts';
 import { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } from './routes/enterprise.ts';
 
 // path after the function name: /functions/v1/presence/site -> "/site"
@@ -258,7 +261,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/marketplace' || route.startsWith('/marketplace/')) {
     if (route !== '/marketplace/features') {   // /features is the customer view, handled later with a site
       if (route === '/marketplace' && method === 'GET') return handleMarketplaceList(principal, cors);
-      if (route === '/marketplace/audit' && method === 'GET') return handleMarketplaceAudit(principal, cors);
       const mo = route.match(/^\/marketplace\/operations\/([0-9a-f-]{36})\/(decide|execute|rollback)$/);
       if (mo && method === 'POST') {
         if (mo[2] === 'decide') return handleMarketplaceDecide(req, mo[1], principal, cors);
@@ -586,10 +588,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── Phase DAM: the Studio Asset Library (lens + lifecycle over presence_media) ──
   if (route === '/assets' && method === 'GET') return handleAssetsList(req, site, cors);
   if (route === '/assets/collections' && method === 'GET') return handleAssetsCollections(site, cors);
-  if (route === '/assets/tags' && method === 'GET') return handleAssetsTags(site, cors);
   if (route === '/assets/health' && method === 'GET') return handleAssetsHealth(site, cors);
-  if (route === '/assets/duplicates' && method === 'GET') return handleAssetsDuplicates(site, cors);
-  if (route === '/assets/usage' && method === 'GET') return handleAssetsUsage(site, cors);
   if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
   if (route === '/assets/match' && method === 'GET') return handleAssetsMatch(req, site, cors);   // item 115: already in Files?
   if (route === '/assets/folders/move' && method === 'POST') return handleAssetsFolderMove(req, site, principal, cors);   // item 56
@@ -1067,23 +1066,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && !m[2] && method === 'GET') return handleBrandReportGet(db, site, m[1], cors);
     if (m && m[2] === '/dismiss' && method === 'POST') return handleBrandReportDismiss(req, site, m[1], cors);
   }
-  // ── M14: Presence Platform Services — ownership, launch, DNS documents, email posture ──
+  // ── M14: Presence Platform Services — ownership (the export) and the launch checklist ──
   if (route === '/export' && method === 'GET') return handleExport(site, principal, cors);
   if (route === '/launch' && method === 'GET') return handleLaunch(site, cors);
-  // ── D1: the managed DNS zone lifecycle (one-stop shop). DORMANT + fail-closed
-  //    until the AWS secrets exist (honest 503) — additive next to the guided
-  //    /foundations/dns document editor, which stays exactly as shipped.
-  if (route === '/foundations/zone' && method === 'GET') return handleZoneGet(site, cors);
-  if (route === '/foundations/zone' && method === 'POST') return handleZoneCreate(req, site, principal, cors);
-  if (route === '/foundations/zone' && method === 'DELETE') return handleZoneDelete(req, site, principal, cors);
-  if (route === '/foundations/zone/records' && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
-    return handleZoneRecords(req, method, site, principal, cors);
-  }
-  if (route === '/foundations/dns' && method === 'GET') return handleDnsGet(db, site, cors);
-  if (route === '/foundations/dns' && method === 'PUT') return handleDnsPut(req, site, principal, cors);
-  if (route === '/foundations/dns/rollback' && method === 'POST') return handleDnsRollback(req, site, principal, cors);
-  if (route === '/foundations/email' && method === 'GET') return handleEmailHealth(site, cors);
-  if (route === '/monitor/import-inventory' && method === 'GET') return handleImportInventory(site, cors);
   // ── M12: Platform Services — the technical foundation, in plain words; changes only as approved plans ──
   // Self-serve custom domain (the caller's OWN site) — reuses the complete domain
   // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
@@ -1104,7 +1089,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/monitor/connection' && method === 'DELETE') return handleMonitorDisconnect(site, principal, cors);
   if (route === '/monitor/connect' && method === 'POST') return handleMonitorConnect(req, site, principal, cors);
   if (route === '/monitor/verify' && method === 'POST') return handleMonitorVerify(site, principal, cors);
-  if (route === '/monitor/readiness' && method === 'GET') return handleMonitorReadiness(site, cors);
   // ── M10: Business Knowledge Import (knowledge in, evidence out) ──
   if (route === '/knowledge/import' && method === 'POST') return handleKnowledgeImport(req, site, principal, cors);
   if (route === '/knowledge/docs' && method === 'GET') return handleKnowledgeList(db, site, cors);
@@ -1154,9 +1138,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
   if (route === '/analytics' && method === 'GET') return handleAnalyticsHome(req, site, cors);
-  if (route === '/analytics/website' && method === 'GET') return handleAnalyticsWebsite(req, site, cors);
-  if (route === '/analytics/customers' && method === 'GET') return handleAnalyticsCustomers(req, site, cors);
-  if (route === '/analytics/search' && method === 'GET') return handleAnalyticsSearch(req, site, cors);
   // Slice 8: the Business dashboard summary (analytics.html's two-band board)
   if (route === '/analytics/dashboard' && method === 'GET') return handleAnalyticsDashboard(req, site, cors);
 
@@ -1164,7 +1145,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/coach/run' && method === 'POST') return handleCoachRun(site, cors);
   if (route === '/coach/health' && method === 'GET') return handleCoachHealth(site, cors);       // PT-6 Business Health Coach
   if (route === '/coach/journey' && method === 'GET') return handleCoachJourney(site, cors);     // PT-7 Customer Timeline
-  if (route === '/coach/memory' && method === 'GET') return handleCoachMemory(site, cors);       // PT-9 AI Business Memory
   if (route === '/coach/opportunities' && method === 'GET') return handleCoachList(db, site, cors);
   {
     const m = route.match(/^\/coach\/opportunities\/([0-9a-f-]{36})\/decide$/);
@@ -1185,7 +1165,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/media' && method === 'GET') return handleMediaList(site, cors);
   if (route === '/location' && (method === 'GET' || method === 'PUT')) { const r = await handleLocation(req, db, site, principal, cors); if (r) return r; }
-  if (route === '/voice' && (method === 'GET' || method === 'PUT')) { const r = await handleVoice(req, db, site, principal, cors); if (r) return r; }
   if (route === '/settings' && (method === 'GET' || method === 'PUT')) { const r = await handleSettings(req, db, site, principal, cors); if (r) return r; }
   // ── Wave-1 G7: page operations on the settings.pages model (duplicate = a
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──

@@ -32,7 +32,8 @@
 -- and the next 15-minute tick runs a failed site again anyway.
 -- Staging runs presence-cycle only (switched off since Nov 2026), plus the
 -- watchdog (watchdog-cron.sql). clever-api's legacy nightly job is
--- 02-schedule-cron.sql (nightly-data-sync, switched off on production).
+-- clever-api-legacy/02-schedule-cron.sql (nightly-data-sync, switched off on
+-- production).
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;

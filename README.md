@@ -1,8 +1,8 @@
 # Studio OS
 
-A production business-operations platform for a web design studio — CRM, project delivery, client portal, proposals, invoicing, and AI-assisted workflows — running live at [davisdigitalstudio.com](https://davisdigitalstudio.com).
+A website builder and back office for small businesses and the web studios that serve them — the site itself, the customers and deals around it, the projects, the money and the client portal — running live for [Davis Digital Studio](https://davisdigitalstudio.com).
 
-Built and operated solo by [Eric Davis](https://github.com/edavis71433). This is not a tutorial project or a course exercise: it is the real system that runs Davis Digital Studio day to day, currently being converted from a single-tenant application into a multi-tenant SaaS product.
+Built and operated solo by [Eric Davis](https://github.com/edavis71433). This is not a tutorial project or a course exercise: it is the real system Davis Digital Studio runs on, and the product it offers to other studios and businesses.
 
 ---
 
@@ -10,12 +10,14 @@ Built and operated solo by [Eric Davis](https://github.com/edavis71433). This is
 
 | Area | Capability |
 |---|---|
-| **CRM & pipeline** | Contacts, companies, deal stages, attention queue, revenue-at-risk and churn-risk signals |
-| **Project delivery** | Project roster and record pages, milestones, approval center, client-facing status |
-| **Client portal** | Separate authenticated surface for clients — documents of record, approvals, messaging |
-| **Money** | Proposals, contracts, Stripe subscriptions with trials, usage-based overage, dunning, proration |
-| **AI** | Drafted replies, project help, SEO/site critique — all routed through a single AI gateway |
-| **Ops** | Structured request logging, audit trail, health checks, backup/restore tooling, data export |
+| **Website builder** | Eight templates, a section editor on a live canvas, pages and menus, versions and checkpoints, preview links with comments, scheduled publishing, custom domains |
+| **On the live site** | Contact forms, bookings, reviews, and a first-party visit counter — no third-party tracking |
+| **Customers & pipeline** | Contacts, customer records, deals and stages, to-dos, saved views, reports |
+| **Money** | Proposals, agreements with e-signature, invoices, deposits and payment schedules, retainers (Stripe); the platform's own plans and trials |
+| **Projects & client portal** | Projects, tasks, milestones, deliverables and approvals; a separate signed-in portal where clients see progress, message, upload and pay |
+| **Studios** | A studio works inside its clients' sites through a checked scope, with roles for its team and for the client's own people |
+| **AI** | Drafting and rewriting copy, a site reviewer, a brand guardian, a growth coach, image generation — metered against the plan's AI allowance |
+| **Ops** | A 15-minute scheduled tick (publishing, reminders, reconciliation, retention), an error ledger, health checks, rollback and schema-dump workflows |
 
 ## Architecture
 
@@ -28,54 +30,57 @@ Browser (static HTML/CSS/JS, no framework)
 Netlify CDN  ──  build-public.sh publishes an allowlisted dist/, never the repo root
         │
         ▼
-Supabase Edge Function  (Deno / TypeScript, ~165 routes)
+Supabase Edge Function "presence"  (Deno / TypeScript, one router)
         │
-        ├── request pipeline: identity → tenant → authorization → revocation
-        │                     → rate limit → handler → audit hook
+        ├── request boundary: sign-in → whose site (own · a studio's checked scope ·
+        │   an invited seat) → entitlement → role limits → edition features → route
         │
         ▼
-Postgres (~103 tables, row-level security)  +  Storage  +  Auth
+Postgres (row-level security)  +  Storage  +  Auth  +  pg_cron
         │
-        └── Stripe · Resend · Anthropic API
+        └── Stripe · Resend · Netlify · Google · Anthropic API
 ```
 
 **Design decisions worth calling out:**
 
-- **True multi-tenancy on a shared schema.** `tenant_id` on every tenant-owned table, enforced by RLS, with a `TenancyProvider` abstraction so all tenant resolution goes through one contract.
-- **Entitlements, not plan names.** Every limit and feature check reads an entitlements record. Plans are data, not branching logic.
-- **Single AI gateway.** No route calls the Anthropic API directly. One door means one place for model routing, prompt-injection protection, usage metering, and a spend circuit breaker.
-- **Append-only billing ledger.** Modules emit usage and charge events; billing consumes the ledger rather than reaching into module tables.
-- **Forward-only migrations.** 116 numbered SQL migrations in the repo, each with a written rollback note. No dashboard-only schema changes.
-- **Money is integer cents. Timestamps are UTC.** Database identifiers are `snake_case`; the mapping to `camelCase` happens only at the API edge.
+- **Every request answers for one site.** The router resolves the caller's site once — their own under row-level security, or a client's when a studio's scope is re-checked against its membership — and every route works inside it. A refused scope never falls back to another site.
+- **Entitlements, not plan names.** What a site may do comes from its entitlement and edition; plans are data, not branching logic.
+- **Roles are a table, not scattered checks.** Every write a team member can reach is listed once (`lib/site_roles.ts`) with the capability it needs; an unlisted write is refused.
+- **Approval before change.** DNS, email-setup and connected-service changes are prepared as plans that someone approves before anything moves.
+- **Forward-only migrations.** Numbered SQL files, never edited once applied; production gets each one from a re-runnable apply pack (`supabase/migrations/README.md`).
+- **Money is integer cents. Timestamps are UTC.**
 
 ## Tech stack
 
-**Backend** Supabase (Postgres, Auth, Storage, Edge Functions) · Deno · TypeScript
-**Frontend** Vanilla HTML/CSS/JavaScript — 84 pages, no framework, no build step for the app itself
+**Backend** Supabase (Postgres, Auth, Storage, Edge Functions, pg_cron) · Deno · TypeScript
+**Frontend** Vanilla HTML/CSS/JavaScript — no framework, no build step for the app itself
 **Infrastructure** Netlify · GitHub Actions
-**Integrations** Stripe · Resend · Anthropic API
+**Integrations** Stripe · Resend · Netlify · Google (Search Console, Analytics) · Anthropic API
 
 ## Testing & CI
 
-- **19 Playwright end-to-end specs** covering the real browser flows, including mobile viewports
+As of November 2026:
+
+- **63 Playwright specs** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
+- **324 Deno suites** for the server and the pages' logic, plus a typecheck of the whole function
 - **Accessibility assertions** via `@axe-core/playwright` on key pages
-- **Tenant isolation test suite** that must pass before any tenancy change ships
-- **Five GitHub Actions workflows**: `ci`, `e2e`, `deploy`, `rollback`, `schema-dump`
+- **Five GitHub Actions workflows**: `ci`, `e2e`, `deploy` (by hand, after the checks), `rollback`, `schema-dump`
 
 ```bash
-npm install
+npm ci
 npm run serve        # static server on :4173
 npm run test:e2e     # Playwright suite
+DENO=deno bash scripts/ci-pure-tests.sh   # the Deno suites, as CI runs them
 ```
 
 ## Repository layout
 
 ```
-*.html, *.css, *.js       the application surfaces (admin, portal, marketing site)
-supabase/functions/       edge functions — clever-api is the main one
-supabase/migrations/      116 forward-only numbered migrations
-tests/                    e2e, isolation, smoke, presence
-docs/adr/                 architecture decision records
+*.html, *.css, *.js       the app's pages, the marketing site and the free tools
+supabase/functions/       edge functions — presence is the app's whole API
+supabase/migrations/      forward-only numbered migrations
+supabase/ops/             hand-run SQL for the scheduled jobs
+tests/                    e2e (Playwright), presence (Deno), workflows, isolation, smoke
 docs/legal/               published policies (privacy, DPA, AUP, retention, …)
 docs/runbooks/            operational runbooks
 scripts/build-public.sh   allowlist build — decides what reaches the CDN
@@ -83,7 +88,7 @@ scripts/build-public.sh   allowlist build — decides what reaches the CDN
 
 ## Project status
 
-Live in production as a single-tenant system. The multi-tenant SaaS conversion is in progress, sequenced so production keeps working at every step — environments and migration tooling, then the request pipeline, tenancy, entitlements, AI gateway, billing, files, ops, onboarding, and identity, in that dependency order.
+Live in production. New work lands through pull requests, and the server ships only when the deploy workflow is run by hand.
 
 ## A note on what's public
 

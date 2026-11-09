@@ -99,7 +99,6 @@ await rest(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying
   ok("singleton: GET /settings 200", (await call("GET", "/settings", jwt)).status === 200);
   ok("singleton: PUT /settings 200", (await call("PUT", "/settings", jwt, { category_order: ["Mains", "Starters"] })).status === 200);
   ok("singleton: GET /location 200", (await call("GET", "/location", jwt)).status === 200);
-  ok("singleton: GET /voice 200", (await call("GET", "/voice", jwt)).status === 200);
 }
 // ═══ 7. media list with usage flags ═══
 {

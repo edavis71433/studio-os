@@ -1,6 +1,6 @@
 // ── Phase AN-3: Search Performance — plain-English composition (pure) ─────────
 //   deno run --allow-read --allow-env tests/presence/search_perf_test.mjs
-import { searchInsights, searchNotice, searchHealth, searchMilestones, agencySearchState } from '../../supabase/functions/presence/analytics/search_perf.ts';
+import { searchInsights, searchNotice, searchHealth, agencySearchState } from '../../supabase/functions/presence/analytics/search_perf.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -40,16 +40,6 @@ ok('searchNotice: no prior → no fabricated comparison', searchNotice(g({ impre
 ok('searchHealth: halving impressions → falling', searchHealth(g({ impressions: 40, priorImpressions: 120 })).impressionsFalling === true);
 ok('searchHealth: zero impressions → noVisibility', searchHealth(g({ impressions: 0, priorImpressions: null })).noVisibility === true);
 ok('searchHealth: steady → neither', (() => { const h = searchHealth(g({ impressions: 110, priorImpressions: 100 })); return !h.impressionsFalling && !h.noVisibility; })());
-
-// ── genuine milestones (no fakes) ──
-{
-  const m = searchMilestones(1200, 130, '2026-05-01T00:00:00Z', '2026-06-01T00:00:00Z');
-  ok('milestones: first impression achieved with real date', m.find((x) => x.key === 'first_impression').achieved && /🎉/.test(m.find((x) => x.key === 'first_impression').note));
-  ok('milestones: first click achieved', m.find((x) => x.key === 'first_search_click').achieved);
-  ok('milestones: 1,000 impressions milestone reached', m.find((x) => x.key === 'impressions_1k').achieved);
-  const none = searchMilestones(0, 0, null, null);
-  ok('milestones: nothing achieved → anticipatory, not faked', none.every((x) => !x.achieved) && /will show here/.test(none.find((x) => x.key === 'first_search_click').note));
-}
 
 // ── agency state classification ──
 ok('agencyState: no data → not_connected', agencySearchState(g({ hasData: false })) === 'not_connected');

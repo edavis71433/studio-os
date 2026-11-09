@@ -25,15 +25,15 @@ const allowed = (ed, route, method) => {
 const MAP = [
   ['/publish', 'POST', 'website'], ['/identity', 'PUT', 'website'], ['/assets', 'GET', 'website'],
   ['/preview', 'GET', 'website'], ['/site/template', 'PUT', 'website'], ['/schedule', 'POST', 'website'],
-  ['/foundations/dns', 'PUT', 'website'], ['/media/upload-url', 'POST', 'website'],
+  ['/foundations/domain', 'POST', 'website'], ['/media/upload-url', 'POST', 'website'],
   ['/dev/files', 'GET', 'developer'],
   ['/crm/profile', 'GET', 'relationship'], ['/crm/notes', 'POST', 'relationship'],
   ['/moments', 'GET', 'business_moments'],
   ['/coach/health', 'GET', 'ai'],
   ['/connections', 'GET', 'connected'],
-  ['/analytics', 'GET', 'reports'], ['/analytics/website', 'GET', 'reports'],
+  ['/analytics', 'GET', 'reports'], ['/analytics/dashboard', 'GET', 'reports'],
   // baseline / shell — MUST be null (reachable by every edition)
-  ['/site', 'GET', null], ['/identity', 'GET', null], ['/voice', 'GET', null],
+  ['/site', 'GET', null], ['/identity', 'GET', null], ['/location', 'GET', null],
   ['/forms/inbox', 'GET', null], ['/schedule', 'GET', null], ['/approve/send', 'POST', null],
   ['/portal/feed', 'GET', null], ['/portal/context', 'GET', null], ['/notes', 'GET', null],
   ['/changes', 'GET', null], ['/export', 'GET', null], ['/settings', 'GET', null],

@@ -1,13 +1,12 @@
 // ── /marketplace/* (L5.5) — the pack management surface ─────────────────────
-// OPERATOR: review packs, prepare/approve/execute/rollback install operations,
-// audit history — every state change is an Approved Plan (lib/approved_plan.ts).
+// OPERATOR: review packs and prepare/approve/execute/rollback install operations;
+// every state change is an Approved Plan (lib/approved_plan.ts).
 // CUSTOMER: sees FEATURES, never packages.
 //   GET  /marketplace                       — operator: packs + states + updates
 //   POST /marketplace/:key/prepare          — operator: propose an operation {op}
 //   POST /marketplace/operations/:id/decide — operator: {approve|abandon}
 //   POST /marketplace/operations/:id/execute— operator: run an APPROVED operation
 //   POST /marketplace/operations/:id/rollback— operator: prepare the inverse op
-//   GET  /marketplace/audit                 — operator: the operation ledger
 //   GET  /marketplace/features              — customer: installed features, plain
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -16,7 +15,7 @@ import { registeredPacks, resolvePack, resolveIndustryKey } from '../industry/re
 import { planMarketplaceOperation, customerFeatures, updateAvailable, MARKETPLACE_OPS } from '../industry/marketplace_ops.ts';
 import type { MarketplaceOp } from '../industry/marketplace_ops.ts';
 import {
-  listInstalls, getInstall, saveOperation, listOperations, getOperation, decideOperation,
+  listInstalls, getInstall, saveOperation, getOperation, decideOperation,
   claimOperation, releaseOperationClaim, markOperationOutcome, applyOperation, GLOBAL_SCOPE,
 } from '../industry/marketplace_store.ts';
 
@@ -106,11 +105,6 @@ export async function handleMarketplaceRollback(id: string, principal: Principal
   const plan = planMarketplaceOperation(inverse, pack, installedPacks);
   const row = await saveOperation(plan);
   return json({ data: { rollback_operation: row, note: 'Prepared the undo as a new operation for you to approve — even undoing is reviewed first.' } }, 200, cors);
-}
-
-export async function handleMarketplaceAudit(principal: Principal, cors: Record<string, string>) {
-  if (!staffOnly(principal)) return json({ error: 'forbidden', message: 'Operator-only.' }, 403, cors);
-  return json({ data: await listOperations() }, 200, cors);
 }
 
 /** CUSTOMER: the features their pack provides — never packages, never versions. */

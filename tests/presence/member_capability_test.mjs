@@ -37,8 +37,6 @@ const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
 const { handleSalesContact, handleSalesContactFields, handleSalesDeal, handleSalesProposalDelete, handleSalesContractDelete, handleSalesTemplateDelete, handleSalesInvoiceVoid, handleSalesRetainerCancel } = await import(`${P}/routes/sales.ts`);
 const { handleDeliverable } = await import(`${P}/routes/project_delivery.ts`);
 const { handleDomain } = await import(`${P}/routes/admin.ts`);
-const { handleDnsPut, handleDnsRollback } = await import(`${P}/routes/services.ts`);
-const { handleZoneCreate, handleZoneDelete, handleZoneRecords } = await import(`${P}/routes/zone.ts`);
 const { handleFoundationsPrepare } = await import(`${P}/routes/foundations.ts`);
 const { handlePreviewSettings } = await import(`${P}/routes/preview_env.ts`);
 const { handlePutTemplate } = await import(`${P}/routes/site.ts`);
@@ -141,10 +139,8 @@ const DECIDED = {
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
   ],
   configure: [
-    'DELETE /foundations/domain', 'DELETE /foundations/zone', 'DELETE /foundations/zone/records',
-    'POST /foundations/dns/rollback', 'POST /foundations/domain', 'POST /foundations/prepare',
-    'POST /foundations/zone', 'POST /foundations/zone/records', 'POST /preview/settings', 'POST /site/offline',
-    'POST /site/online', 'PUT /bookings/settings', 'PUT /foundations/dns', 'PUT /foundations/zone/records',
+    'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
+    'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'PUT /bookings/settings',
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
   ],
@@ -221,14 +217,14 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   const has = (need, ...names) => names.every((n) => DECIDED[need].includes(n));
   ok('decided: withdrawing an invoice and cancelling a retainer count as delete', has('delete', 'POST /sales/invoices/:id/void', 'POST /sales/deals/:id/retainer/cancel'));
   ok('decided: taking the site offline and back is configure, not publish', has('configure', 'POST /site/offline', 'POST /site/online'));
-  ok('decided: domain, DNS and zone deletes are configure, so a developer keeps them', has('configure', 'DELETE /foundations/domain', 'DELETE /foundations/zone', 'DELETE /foundations/zone/records'));
+  ok('decided: removing the domain is configure, so a developer keeps it', has('configure', 'DELETE /foundations/domain'));
   ok('decided: the everyday lists stay edit', has('edit', 'PUT /sales/services', 'PUT /service/faq', 'PUT /service/saved-replies', 'POST /bookings/types', 'PATCH /bookings/types/:id', 'POST /redirects'));
   ok('decided: archiving a file is not deleting it', has('edit', 'POST /assets/bulk') && has('approve', 'POST /assets/:id/status'));
   ok('decided: stopping a recurring invoice is delete, like cancelling a retainer; staff can still start, change, pause and skip one', has('delete', 'POST /sales/recurring/:id/stop') && has('edit', 'POST /sales/deals/:id/recurring', 'PATCH /sales/recurring/:id', 'POST /sales/recurring/:id/pause', 'POST /sales/recurring/:id/skip'));
   ok('decided: removing a draft estimate is delete; sending one and turning it into a draft proposal or invoice is edit', has('delete', 'DELETE /sales/estimates/:id') && has('edit', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice'));
   ok('decided: staff can still send what they can\'t withdraw', has('edit', 'POST /sales/deals/:id/invoice', 'POST /sales/invoices/:id/send') && has('publish', 'POST /broadcasts/:id/send'));
 
-  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/voice'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
+  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
   ok('list: the content routes answer from contentWriteNeeds, and only there', CONTENT.every(([m, r]) => contentWriteNeeds(r, m) !== null && memberWriteNeeds(r, m) === null));
   ok('list: nothing here is on the content path', ALL.every(({ name }) => contentWriteNeeds(pathOf(name), methodOf(name)) === null));
   ok('list: a read is not its business', memberWriteNeeds('/media', 'GET') === null && memberWriteNeeds('/export', 'GET') === null);
@@ -297,13 +293,6 @@ const CHANGED = [
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
-  { name: 'PUT /foundations/dns', body: { records: [{ type: 'TXT', name: '@', value: 'v', ttl: 300 }] }, run: (r, p) => handleDnsPut(r, A, p, cors) },
-  { name: 'POST /foundations/dns/rollback', fx: { rows: { presence_dns_zone_history: { saved_at: '2026-01-01T00:00:00Z', records: [] } } }, body: { history_id: ROW }, run: (r, p) => handleDnsRollback(r, A, p, cors) },
-  { name: 'POST /foundations/zone', body: { domain: 'alpha.example' }, run: (r, p) => handleZoneCreate(r, A, p, cors) },
-  { name: 'DELETE /foundations/zone', body: { confirm: true }, run: (r, p) => handleZoneDelete(r, A, p, cors) },
-  { name: 'POST /foundations/zone/records', body: { type: 'TXT', name: '@', value: 'v', ttl: 300 }, run: (r, p) => handleZoneRecords(r, 'POST', A, p, cors) },
-  { name: 'PUT /foundations/zone/records', body: { type: 'TXT', name: '@', value: 'v', ttl: 300 }, run: (r, p) => handleZoneRecords(r, 'PUT', A, p, cors) },
-  { name: 'DELETE /foundations/zone/records', body: { type: 'TXT', name: '@', value: 'v' }, run: (r, p) => handleZoneRecords(r, 'DELETE', A, p, cors) },
   { name: 'POST /foundations/prepare', body: { goal: 'email_auth' }, run: (r, p) => handleFoundationsPrepare(r, A, p, cors) },
   { name: 'POST /preview/settings', body: {}, run: (r, p) => handlePreviewSettings(r, A, p, cors) },
   { name: 'PUT /bookings/settings', body: { enabled: true }, run: (r, p) => handleBookingSettingsPut(r, A, p, cors) },
@@ -418,7 +407,7 @@ const WRITE_HANDLERS = [
   'handleConnectionRefresh', 'handleContentLibraryDelete', 'handleContentLibrarySave', 'handleContentLibraryUpdate',
   'handleCrmNoteAdd', 'handleCrmNoteDelete', 'handleCrmNotePin', 'handleDealTaskCreate', 'handleDealTaskUpdate',
   'handleDeliverable', 'handleDeliverableUploadUrl', 'handleDeliverablesCreate', 'handleDevCustomizationPut',
-  'handleDnsPut', 'handleDnsRollback', 'handleDomain', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
+  'handleDomain', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
   'handleFormStatus', 'handleFoundationsDecide', 'handleFoundationsPrepare', 'handleKnowledgeDelete',
   'handleKnowledgeImport', 'handleLaunchCancel', 'handleLaunchCreate', 'handleLaunchDecide', 'handleLaunchPromote',
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',
@@ -446,9 +435,9 @@ const WRITE_HANDLERS = [
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',
-  'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleVoice', 'handleWriteDecide',
+  'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleWriteDecide',
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
-  'handleWriterGenerate', 'handleWriterRewrite', 'handleZoneCreate', 'handleZoneDelete', 'handleZoneRecords',
+  'handleWriterGenerate', 'handleWriterRewrite',
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');

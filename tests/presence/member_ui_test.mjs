@@ -74,13 +74,6 @@ const CONTROLS = [
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
-  'DELETE /foundations/zone': /\/foundations\/zone/,
-  'DELETE /foundations/zone/records': /\/foundations\/zone/,
-  'POST /foundations/zone': /\/foundations\/zone/,
-  'POST /foundations/zone/records': /\/foundations\/zone/,
-  'PUT /foundations/zone/records': /\/foundations\/zone/,
-  'PUT /foundations/dns': /\/foundations\/dns/,
-  'POST /foundations/dns/rollback': /\/foundations\/dns/,
 };
 const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name)).map((f) => f.name);
 const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
@@ -105,7 +98,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 39, String(routes.length));   // item 47: removing a draft estimate, stopping a recurring invoice
+  ok('the decided delete and configure lists were read', routes.length === 32, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));

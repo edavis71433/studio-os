@@ -1,25 +1,22 @@
 // ── M14 Presence Platform Services suite ─────────────────────────────────────
-// Pure tiers: desired-zone validation + drift detection + one-click repair,
-// transfer plans (both directions — leaving as guided as arriving), email
-// provider presets (records validate; DKIM never invented), import inventory
-// extraction, and the Launch Assistant's honest derivation. Integration
-// (staging): the export carries EVERYTHING the customer owns (the ownership
-// guarantee, verified field by field), DNS editor round-trip with history +
-// rollback, drift → repair plan under the approval law, email posture in
-// sentences, launch checklist live, import inventory changes NOTHING.
+// Pure tiers: drift detection + one-click repair, transfer plans (both
+// directions — leaving as guided as arriving), email provider presets (records
+// validate; DKIM never invented), and the Launch Assistant's honest derivation.
+// Integration (staging): the export carries EVERYTHING the customer owns (the
+// ownership guarantee, verified field by field), launch checklist live, and the
+// transfer and email plans under the approval law.
 //
 //   deno run --allow-read --allow-net --allow-env tests/presence/services_test.mjs
-import { validateZone, diffZones, planDnsRepair } from '../../supabase/functions/presence/platform/zone.ts';
+import { diffZones, planDnsRepair } from '../../supabase/functions/presence/platform/zone.ts';
 import { planTransferIn, planTransferOut } from '../../supabase/functions/presence/platform/transfer.ts';
 import { EMAIL_PROVIDERS, planEmailSetup } from '../../supabase/functions/presence/platform/email_providers.ts';
-import { buildImportInventory } from '../../supabase/functions/presence/platform/importer.ts';
 import { buildLaunchChecklist } from '../../supabase/functions/presence/platform/launch.ts';
 import { validateRecord } from '../../supabase/functions/presence/platform/dns.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 
-// ═══ 1. the desired zone — validation, drift, repair ═══
+// ═══ 1. the desired zone — drift, repair ═══
 {
   const good = [
     { type: 'A', name: 'marlows.example', value: '75.2.60.5' },
@@ -27,9 +24,6 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
     { type: 'MX', name: 'marlows.example', value: 'smtp.google.com', priority: 1 },
     { type: 'TXT', name: 'marlows.example', value: 'v=spf1 include:_spf.google.com ~all' },
   ];
-  ok('zone: a good zone validates', validateZone(good).ok);
-  const v = validateZone([...good, { type: 'A', name: 'marlows.example', value: 'not-an-ip' }, good[0]]);
-  ok('zone: bad records and duplicates named by index', !v.ok && v.problems.length === 2 && /IPv4/.test(v.problems[0].problem) && /Duplicate/.test(v.problems[1].problem));
 
   const observed = [good[0], { type: 'TXT', name: 'marlows.example', value: 'some-verification-we-dont-manage' }];
   const drift = diffZones(good, observed);
@@ -67,21 +61,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('email: the platform is NOT an email service — stated in the plan itself', /not an email service/i.test(other.summary));
 }
 
-// ═══ 4. import inventory — review before anything moves ═══
-{
-  const pages = [
-    { path: '/', html: '<title>Marlow’s</title><meta name="description" content="Seasonal plates."><h1>Marlow’s Kitchen</h1><nav><a href="/menu">Menu</a></nav><p>' + 'We cook honest food. '.repeat(30) + '</p><img src="/img/patio.jpg"><img src="https://cdn.example/hero.webp">' },
-    { path: '/menu/', html: '<title>Menu</title><h1>The Menu</h1><h2>Mains</h2><p>Rye gnocchi and half chicken, plates that change with the market garden.</p><img src="/img/gnocchi.png">' },
-  ];
-  const inv = buildImportInventory(pages, 'https://marlows.example/');
-  ok('inventory: per-page title/description/headings/text/word-count extracted', inv.pages[0].title === 'Marlow’s' && inv.pages[0].headings.includes('Marlow’s Kitchen') && inv.pages[0].word_count > 100 && inv.pages[1].headings.length === 2);
-  ok('inventory: nav/footer/script noise excluded from text', !inv.pages[0].text_preview.includes('Menu'));
-  ok('inventory: media preserved as absolute URLs, deduped across the site', inv.media.length === 3 && inv.media.every((u) => u.startsWith('http')));
-  ok('inventory: pages classified + fitted for the mapping', inv.pages[1].kind === 'menu' && inv.pages[1].fit === 'clean');
-  ok('inventory: totals honest; deterministic', inv.totals.pages === 2 && JSON.stringify(inv) === JSON.stringify(buildImportInventory(pages, 'https://marlows.example/')));
-}
-
-// ═══ 5. the Launch Assistant — honest derivation ═══
+// ═══ 4. the Launch Assistant — honest derivation ═══
 {
   const base = { edition: 'presence', domain: 'marlows.example', apex_resolves: true, https_ok: true, published: true, monitor_verified: false, sitemap_present: true, gbp_connected: true, analytics_connected: true, email_has_mx: true, email_authenticated: true, accessibility_criticals: 0, review_done: true };
   const launched = buildLaunchChecklist(base);
@@ -95,15 +75,15 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('launch: accessibility criticals block the reviewed step with a count', buildLaunchChecklist({ ...base, accessibility_criticals: 2 }).items.find((i) => i.step === 'Accessibility reviewed').how.includes('2 critical'));
 }
 
-// ═══ 6. ownership, structurally ═══
+// ═══ 5. ownership, structurally ═══
 {
-  const src = ['exporter.ts', 'importer.ts', 'zone.ts', 'transfer.ts', 'email_providers.ts', 'launch.ts']
+  const src = ['exporter.ts', 'zone.ts', 'transfer.ts', 'email_providers.ts', 'launch.ts']
     .map((f) => Deno.readTextFileSync(new URL(`../../supabase/functions/presence/platform/${f}`, import.meta.url))).join('\n');
   ok('structure: no module here writes the world — no POST/PUT/PATCH/DELETE, no deploy calls', !/method:\s*['"](POST|PUT|PATCH|DELETE)/i.test(src) && !/netlify|deploy/i.test(src));
   ok('structure: the export declares the ownership note in its own contract', /Nothing here requires Studio OS/i.test(src));
 }
 
-// ═══ 7. integration (staging) ═══
+// ═══ 6. integration (staging) ═══
 const SB = Deno.env.get('SB'), SR = Deno.env.get('SR_KEY'), ANON = Deno.env.get('ANON');
 if (SB && SR && ANON) {
   const H = { apikey: SR, Authorization: `Bearer ${SR}`, 'Content-Type': 'application/json' };
@@ -138,41 +118,14 @@ if (SB && SR && ANON) {
     const launch = await call('GET', '/launch');
     ok('integration: the launch checklist derives from live state', launch.status === 200 && Array.isArray(launch.json?.data?.items) && typeof launch.json.data.sentence === 'string' && launch.json.data.total > 0, launch.json?.data?.sentence);
 
-    // the DNS document: save → history → drift → repair plan → rollback
-    const put = await call('PUT', '/foundations/dns', { records: [{ type: 'A', name: 'example.com', value: '75.2.60.5' }], note: 'm14 test' });
-    ok('integration: the desired zone saves as a DOCUMENT (reality untouched)', put.status === 200 && /Reality follows through an approved plan/i.test(put.json?.data?.note || ''));
-    const bad = await call('PUT', '/foundations/dns', { records: [{ type: 'A', name: 'example.com', value: 'nonsense' }] });
-    ok('integration: invalid records are refused with the problem named', bad.status === 400 && (bad.json?.details || []).length === 1);
-    const dns = await call('GET', '/foundations/dns');
-    ok('integration: desired vs observed with drift in a sentence', dns.status === 200 && (dns.json?.data?.desired || []).length === 1 && typeof dns.json?.data?.drift?.sentence === 'string' && (dns.json?.data?.history || []).length >= 1);
-    const repair = await call('POST', '/foundations/prepare', { goal: 'dns_repair' });
-    ok('integration: drift → one-click repair PLAN (approval law, not action)', repair.status === 200 && repair.json?.data?.kind === 'dns_repair' && repair.json?.data?.status === 'proposed');
-    const hist = dns.json?.data?.history?.[0];
-    const rb = await call('POST', '/foundations/dns/rollback', { history_id: hist.id });
-    ok('integration: rollback restores a saved version', rb.status === 200 && rb.json?.data?.restored === 1);
-
     // transfers + email setup as plans
     const tout = await call('POST', '/foundations/prepare', { goal: 'transfer_out' });
     ok('integration: transfer OUT is a first-class supported plan', tout.status === 200 && tout.json?.data?.kind === 'domain_transfer_out');
     const email = await call('POST', '/foundations/prepare', { goal: 'email_setup', provider: 'google_workspace' });
     ok('integration: provider-preset email setup prepared with validated records', email.status === 200 && email.json?.data?.kind === 'email_setup' && (email.json?.data?.steps || []).some((s) => (s.records || []).length));
-    const emailHealth = await call('GET', '/foundations/email');
-    ok('integration: deliverability posture in plain words', emailHealth.status === 200 && typeof emailHealth.json?.data?.sentence === 'string' && Array.isArray(emailHealth.json?.data?.checks));
-
-    // migration import inventory — review-only, provably
-    const before = JSON.stringify((await call('GET', '/identity')).json?.data);
-    await fetch(`${SB}/rest/v1/presence_sites?id=eq.${siteId}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ edition: 'monitor' }) });
-    const inv = await call('GET', '/monitor/import-inventory');
-    ok('integration: the import inventory reads the real external site', inv.status === 200 && inv.json?.data?.totals?.pages >= 1 && /Nothing has been imported/i.test(inv.json?.data?.note || ''));
-    await fetch(`${SB}/rest/v1/presence_sites?id=eq.${siteId}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ edition: 'presence' }) });
-    const after = JSON.stringify((await call('GET', '/identity')).json?.data);
-    ok('integration: THE INVENTORY CHANGED NOTHING — content byte-identical', before === after);
   } finally {
     await fetch(`${SB}/rest/v1/presence_monitor_connections?site_id=eq.${siteId}`, { method: 'DELETE', headers: H });
-    await fetch(`${SB}/rest/v1/presence_infra_plans?site_id=eq.${siteId}&kind=in.(dns_repair,domain_transfer_out,email_setup)`, { method: 'DELETE', headers: H });
-    await fetch(`${SB}/rest/v1/presence_dns_zones?site_id=eq.${siteId}`, { method: 'DELETE', headers: H });
-    await fetch(`${SB}/rest/v1/presence_dns_zone_history?site_id=eq.${siteId}`, { method: 'DELETE', headers: H });
-    await fetch(`${SB}/rest/v1/presence_sites?id=eq.${siteId}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ edition: 'presence' }) });
+    await fetch(`${SB}/rest/v1/presence_infra_plans?site_id=eq.${siteId}&kind=in.(domain_transfer_out,email_setup)`, { method: 'DELETE', headers: H });
   }
 } else {
   console.log('      (SB/SR_KEY/ANON not set — staging integration tier skipped)');

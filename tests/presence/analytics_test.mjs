@@ -1,6 +1,6 @@
 // ── Phase AN-1: Analytics — plain-English composition (pure) + AN-9 no-AI guard ──
 //   deno run --allow-read --allow-env tests/presence/analytics_test.mjs
-import { windowCounts, trendPhrase, inquiriesInsight, publishingInsight, notMeasured, searchReadinessInsight, portfolioInsights } from '../../supabase/functions/presence/analytics/compose.ts';
+import { windowCounts, trendPhrase, inquiriesInsight, publishingInsight, notMeasured, portfolioInsights } from '../../supabase/functions/presence/analytics/compose.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -43,11 +43,6 @@ ok('publishing: long-stale flags attention', publishingInsight([daysAgo(90)], da
   ok('notMeasured: connected → nothing to disclaim', notMeasured(true, true).length === 0);
   ok('notMeasured: traffic card points to Connections (actionable)', both.find((c) => c.key === 'traffic').href === '/connections.html');
 }
-
-// ── search readiness (real booleans, not fake impressions) ──
-ok('searchReadiness: all set → confident, good tone', searchReadinessInsight({ verified: true, titleSet: true, descriptionSet: true, sitemap: true, brokenLinks: 0 }).tone === 'good');
-ok('searchReadiness: missing pieces named plainly', /missing a search title, a search description/.test(searchReadinessInsight({ verified: true, titleSet: false, descriptionSet: false, sitemap: true, brokenLinks: 0 }).sentence));
-ok('searchReadiness: broken links flagged', /point somewhere broken/.test(searchReadinessInsight({ verified: true, titleSet: true, descriptionSet: true, sitemap: true, brokenLinks: 2 }).sentence));
 
 // ── agency portfolio (composes buildPortfolio rows) ──
 {

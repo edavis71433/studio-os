@@ -72,7 +72,7 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
 /** The capability this write needs, or null when it isn't a write on the content
  *  data path. Pure. `settingsFields` is the body's keys, for PUT /settings only. */
 export function contentWriteNeeds(route: string, method: string, settingsFields: string[] = []): SiteCapability | null {
-  if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/voice' || route === '/brand/profile')) return 'edit';
+  if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/brand/profile')) return 'edit';
   if (method === 'POST' && route === '/pages/duplicate') return 'edit';
   if (method === 'PUT' && route === '/settings') return settingsFields.every((f) => SETTINGS_CONTENT_FIELDS.has(f)) ? 'edit' : 'configure';
   const m = route.match(/^\/(?:offerings|testimonials|faqs|posts)(\/[0-9a-f-]{36})?$/);
@@ -113,10 +113,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
-    '(POST|DELETE) /foundations/(domain|zone)',
-    '(POST|PUT|DELETE) /foundations/zone/records',
-    'PUT /foundations/dns',
-    'POST /foundations/(dns/rollback|prepare)',
+    '(POST|DELETE) /foundations/domain',
+    'POST /foundations/prepare',
     'POST /preview/settings',
     'POST /site/(offline|online)',
     'PUT /bookings/settings',

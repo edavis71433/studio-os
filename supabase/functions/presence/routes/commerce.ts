@@ -11,7 +11,7 @@
 //   GET  /commerce/checkout-status  (public)  did the webhook provision yet?
 //   GET  /commerce/subscription     (authed)  the caller's plan/status/renewal
 //   POST /commerce/portal           (authed)  Stripe billing portal (manage/cancel/change)
-//   GET  /commerce/first-run        (authed)  the welcome checklist (derived)
+//   GET  /commerce/first-run        (authed)  has the owner hidden their welcome list?
 //   POST /commerce/first-run/dismiss(authed)  dismiss the welcome
 //   GET  /commerce/example-data     (authed)  are the trial's example rows still here? (benchmark 12)
 //   POST /commerce/example-data/remove (authed) delete exactly those rows
@@ -281,42 +281,14 @@ async function handlePortal(jwt: string, cors: Record<string, string>) {
   }
 }
 
-// ── AUTHED: the welcome checklist (derived) ─────────────────────────────────
+// ── AUTHED: has the owner hidden their welcome list? ────────────────────────
+// The builder draws the list's steps itself (presence.html, renderTodoLine) and
+// reads only `dismissed` here, so this is one read of the owner's own row.
 async function handleFirstRun(jwt: string, cors: Record<string, string>) {
   const site = await resolveSite(jwt);
   if (!site) return json({ error: 'no_site', message: 'No workspace is set up for this account yet.' }, 404, cors);
-  const monitor = site.edition === 'monitor';
-  const [idn, brand, fr, conn] = await Promise.all([
-    asUser(jwt, `presence_identity?site_id=eq.${site.id}&select=business_name,phone,email,description&limit=1`),
-    asUser(jwt, `presence_brand_profile?site_id=eq.${site.id}&select=personality,mission,elevator_pitch&limit=1`),
-    asUser(jwt, `presence_first_run?site_id=eq.${site.id}&select=dismissed,welcomed_at&limit=1`),
-    monitor ? asUser(jwt, `presence_monitor_connections?site_id=eq.${site.id}&select=status&limit=1`) : Promise.resolve({ json: [] as any[] }),
-  ]);
-  const id = idn.json?.[0] || {};
-  const br = brand.json?.[0] || {};
-  const firstRun = fr.json?.[0] || {};
-  const connStatus = (conn.json?.[0]?.status) || '';
-
-  const detailsDone = !!(id.phone || id.email || (id.description && String(id.description).length > 10));
-  const brandDone = !!(br.personality || br.mission || br.elevator_pitch);
-  const domainDone = monitor ? connStatus === 'verified' : !!site.custom_domain;
-  const liveDone = monitor ? connStatus === 'verified' : !!site.last_published_at;
-
-  const steps = [
-    { key: 'details', title: 'Add your business details', done: detailsDone, hint: 'Your name, what you do, how to reach you.' },
-    { key: 'brand', title: 'Set how your business sounds', done: brandDone, hint: 'A few words in your voice — guidance, never a score.' },
-    monitor
-      ? { key: 'connect', title: 'Verify you own your website', done: domainDone, hint: 'A one-time ownership check — nothing on your site changes.' }
-      : { key: 'domain', title: 'Connect your domain', done: domainDone, hint: 'Point your web address here, or launch on a free subdomain first.' },
-    monitor
-      ? { key: 'observe', title: 'See your first read', done: liveDone, hint: 'Once verified, the first observations arrive.' }
-      : { key: 'publish', title: 'Publish your website', done: liveDone, hint: 'One calm ritual — preview, then publish.' },
-  ];
-  const done = steps.filter((s) => s.done).length;
-  return json({ data: {
-    edition: site.edition, dismissed: firstRun.dismissed === true, welcomed_at: firstRun.welcomed_at || null,
-    steps, done, total: steps.length, complete: done === steps.length,
-  } }, 200, cors);
+  const fr = await asUser(jwt, `presence_first_run?site_id=eq.${site.id}&select=dismissed&limit=1`);
+  return json({ data: { dismissed: fr.json?.[0]?.dismissed === true } }, 200, cors);
 }
 
 // ── AUTHED: the commercial capacity notice (the calm "outgrown your plan" card) ──

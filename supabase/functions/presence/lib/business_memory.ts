@@ -87,10 +87,3 @@ function daysBetween(aIso: string, bIso: string): number {
   if (!isFinite(a) || !isFinite(b)) return 9999;
   return Math.abs(Math.floor((b - a) / 86400_000));
 }
-
-/** A one-line memory summary the concierge can open with. Pure. */
-export function memorySentence(m: BusinessMemory): string {
-  const stageWord = m.stage === 'setting_up' ? 'just getting set up'
-    : m.stage === 'newly_live' ? 'newly live' : m.stage === 'quiet' ? 'been quiet lately' : 'established';
-  return `I know ${m.industry} — ${stageWord}, and I keep the tone ${m.tone}.`;
-}

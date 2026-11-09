@@ -5,7 +5,7 @@
 //   deno run --allow-read --allow-env tests/presence/dam_test.mjs
 import {
   assetApprovalPolicy, assetAvailable, nextAssetStatus, detectDuplicates, dupKey,
-  usageMap, canDelete, assetHealth, collectionsOf, tagsOf, searchAssets, isClientUpload,
+  usageMap, canDelete, assetHealth, collectionsOf, searchAssets, isClientUpload,
   displayName, clientsByMedia,
 } from '../../supabase/functions/presence/lib/dam.ts';
 
@@ -68,7 +68,6 @@ const A = (id, o = {}) => ({ id, storage_path: `p/${id}.webp`, alt_text: o.alt ?
 {
   const assets = [A('1', { collection: 'Team', tags: ['people', 'office'] }), A('2', { collection: 'Team', tags: ['People'] }), A('3', { collection: 'Food', tags: ['dish'] })];
   ok('collections rolled up with counts', collectionsOf(assets).find((c) => c.name === 'Team').count === 2);
-  ok('tags normalized (case-insensitive) + counted', tagsOf(assets).find((t) => t.tag === 'people').count === 2);
 }
 
 // ═══ DAM-1/2/6: library search (on-demand, ranked) ═══

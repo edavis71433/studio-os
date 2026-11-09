@@ -6,7 +6,7 @@
 import { coachRead } from '../../supabase/functions/presence/lib/health_coach.ts';
 import { buildTimeline } from '../../supabase/functions/presence/lib/customer_timeline.ts';
 import { summarizeHealthCenter } from '../../supabase/functions/presence/lib/health_center.ts';
-import { buildBusinessMemory, memorySentence } from '../../supabase/functions/presence/lib/business_memory.ts';
+import { buildBusinessMemory } from '../../supabase/functions/presence/lib/business_memory.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -62,7 +62,6 @@ const NOW = '2026-07-08T12:00:00Z';
   const nl = buildBusinessMemory({ industry: 'salon', siteStatus: 'live', lastPublishedAt: NOW, live: true, offeringsCount: 5 }, NOW);
   ok('memory: just-published reads as newly_live', nl.stage === 'newly_live');
   ok('memory: unknown industry → graceful seasonality + prettified label', buildBusinessMemory({ industry: 'artisan_forge', live: true, lastPublishedAt: NOW, offeringsCount: 1 }, NOW).industry === 'Artisan Forge');
-  ok('memory sentence is one plain line, no score', /^I know /.test(memorySentence(est)) && !/\d+\s*(\/|%|score)/.test(memorySentence(est)));
 }
 
 const passed = results.filter((r) => r.p).length;

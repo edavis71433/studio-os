@@ -14,7 +14,7 @@ Two tables and one pure brain:
 - **`presence_pack_operations`** — the Approved-Plan ledger: every install/enable/disable/update/remove, proposed → approved → atomically-claimed → executed → audited.
 - **`industry/marketplace_ops.ts`** (pure) — dependency resolution, install assessment, operation planning (as `ApprovedPlanBase`), states, customer features.
 - **`industry/marketplace_store.ts`** — the I/O, which *reuses* `lib/approved_plan.ts` (`decidePlan`, `claimApprovedPlan`, `releaseApprovedPlanClaim`) — the same spine as connected writes and infra plans.
-- **`routes/marketplace.ts`** — the operator surface (prepare/decide/execute/rollback/audit) and the customer features view.
+- **`routes/marketplace.ts`** — the operator surface (prepare/decide/execute/rollback) and the customer features view.
 
 The Marketplace works identically for **first-party, partner, third-party, private agency, and enterprise** packs — a pack is a pack; only `author`/`license`/`scope` differ.
 
@@ -29,7 +29,7 @@ prepare (assess → Approved Plan)  →  decide (approve/abandon)  →  execute 
 - **Decide** — `POST /marketplace/operations/:id/decide {approve|abandon}` (the shared `decidePlan`).
 - **Execute** — `POST …/execute` enforces approval, **atomically claims** the operation (never twice), applies it to the install state, and **verifies** by reading the state back.
 - **Rollback** — `POST …/rollback` prepares the **inverse** operation as a new reviewed plan (even undo is approved).
-- **Audit** — `GET /marketplace/audit` is the operation ledger; every step is recorded.
+- **Audit** — every step is a row in `presence_pack_operations`, the ledger. (The `GET /marketplace/audit` route that listed it was removed in Nov 2026: nothing called it.)
 
 Every operation is auditable, approval-gated, and reversible-or-explained — inherited from the spine, not reinvented.
 

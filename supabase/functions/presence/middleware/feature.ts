@@ -27,7 +27,7 @@ import { editionFromPlan, editionFromSite, editionIncludes, type EditionKey, typ
  *  null for baseline/shell routes that every edition may reach. Pure. Keep this
  *  in lockstep with lib/navigation.ts (the test matrix enforces agreement).
  *
- *  Reads of shared business facts (GET /identity, /voice, /location) are baseline
+ *  Reads of shared business facts (GET /identity, /location) are baseline
  *  so the shell can render a name/address; EDITING them is website content. */
 export function featureForRoute(route: string, method: string): EditionFeature | null {
   const seg = route.split('/').filter(Boolean);
@@ -45,12 +45,12 @@ export function featureForRoute(route: string, method: string): EditionFeature |
       return 'website';
     case 'site':
       return seg.length > 1 ? 'website' : null;          // /site GET = bootstrap (baseline); /site/template(s) = website
-    case 'identity': case 'location': case 'voice':
+    case 'identity': case 'location':
       return isWrite ? 'website' : null;                 // read = baseline; edit = website content
     case 'schedule':
       return isWrite ? 'website' : null;                 // scheduling a publish = website; listing lives in Inbox (baseline)
     case 'foundations':
-      return (seg[1] === 'dns' || seg[1] === 'domain') ? 'website' : null;  // custom domain + DNS = website hosting; other foundations are platform baseline
+      return seg[1] === 'domain' ? 'website' : null;     // a custom domain = website hosting; other foundations are platform baseline
     case 'dev':
       return 'developer';                                // Developer Mode — its own atom (CMS has it; Monitor/Business OS do not)
 
@@ -85,7 +85,7 @@ export function featureForRoute(route: string, method: string): EditionFeature |
     // ── Baseline / cross-cutting — the app shell, always allowed ──────────────
     // inbox (forms/inbox, approve/send), notes, changes, health, restore-to-draft,
     // portal (context/feed/members/shares), concierge, knowledge, monitor,
-    // launch, foundations(non-dns), export, settings, marketplace/features.
+    // launch, foundations (not domain), export, settings, marketplace/features.
     default:
       return null;
   }

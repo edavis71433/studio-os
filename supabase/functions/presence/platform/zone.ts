@@ -1,28 +1,11 @@
 // ── Desired-state DNS + drift + repair (M14) — PURE ─────────────────────────
-// The manual DNS editor edits a DOCUMENT (the desired zone), never the world.
-// Observed reality comes from read-only zone snapshots (M12). Drift is the
-// difference; repair is a PLAN carrying the exact records — the approval law
-// and the write-capability honesty (guided until a DNS adapter ships) are
-// unchanged. Rollback restores a saved version of the document.
-import { validateRecord, explainRecord } from './dns.ts';
+// The desired zone is a DOCUMENT, never the world. Observed reality comes from
+// read-only zone snapshots (M12). Drift is the difference; repair is a PLAN
+// carrying the exact records — the approval law and the write-capability
+// honesty (guided until a DNS adapter ships) are unchanged.
+import { explainRecord } from './dns.ts';
 import type { DnsRecord } from './dns.ts';
 import type { InfraPlan } from './plans.ts';
-
-export interface ZoneValidation { ok: boolean; problems: Array<{ index: number; problem: string }> }
-
-/** Validate a whole desired zone. Every record must pass; duplicates collapse. */
-export function validateZone(records: DnsRecord[]): ZoneValidation {
-  const problems: Array<{ index: number; problem: string }> = [];
-  const seen = new Set<string>();
-  records.forEach((r, index) => {
-    const v = validateRecord(r);
-    if (!v.ok) problems.push({ index, problem: v.problem || 'Invalid record.' });
-    const key = normKey(r);
-    if (seen.has(key)) problems.push({ index, problem: 'Duplicate of an earlier record.' });
-    seen.add(key);
-  });
-  return { ok: problems.length === 0, problems };
-}
 
 const normHost = (s: string) => (s || '').toLowerCase().replace(/\.$/, '');
 const normVal = (r: DnsRecord) => r.type === 'CNAME' || r.type === 'MX' || r.type === 'NS'

@@ -37,7 +37,7 @@ While monitoring, Studio OS deterministically answers *"what would migration tak
 - **Accessibility first:** the worst observed issues, deduped, in order — what deserves fixing before or at migration.
 - **Content after:** what the studio would improve post-migration, derived from evidence, as sentences.
 
-Customers get sentences only (`GET /monitor/readiness` — no state word, no score, per Law 13); operators get the full working detail (`GET /admin/sites/:id/migration-readiness`, including the `ready | mostly_ready | needs_prep` shorthand). The latest assessment is quietly kept on the connection row.
+Operators get the full working detail (`GET /admin/sites/:id/migration-readiness`, including the `ready | mostly_ready | needs_prep` shorthand). The latest assessment is quietly kept on the connection row. (A customer-facing `GET /monitor/readiness`, sentences only, was removed in Nov 2026: no page ever called it.)
 
 ## Boundaries (enforced, not promised)
 

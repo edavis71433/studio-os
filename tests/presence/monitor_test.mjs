@@ -210,12 +210,6 @@ if (SB && SR && ANON) {
     ok('integration: no FALSE hosted-site claims about the external site', !items.some((i) => ['website.not_live', 'website.hosting_missing', 'trust.hours_not_public'].includes(i.type)));
 
     // 6b. Migration Readiness — quietly determined while monitoring
-    const ready = await call(jwtC, 'GET', '/monitor/readiness');
-    ok('integration: readiness answers in sentences — summary, page plans, first fixes', ready.status === 200 &&
-      Array.isArray(ready.json?.data?.summary) && ready.json.data.summary.length >= 2 &&
-      Array.isArray(ready.json?.data?.pages) && ready.json.data.pages.every((p) => p.path && p.plan), ready.json?.data?.summary?.[0]);
-    ok('integration: no internal state word or score reaches the customer',
-      !JSON.stringify(ready.json?.data || {}).match(/needs_prep|mostly_ready|"state"|"score"/));
     const adminReady = await call(jwtS, 'GET', `/admin/sites/${siteId}/migration-readiness`);
     ok('integration: the operator sees the full working detail', adminReady.status === 200 &&
       adminReady.json?.data?.state && adminReady.json?.data?.seo && Array.isArray(adminReady.json?.data?.pages), `state=${adminReady.json?.data?.state}`);

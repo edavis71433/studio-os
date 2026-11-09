@@ -200,7 +200,7 @@ async function runIntegration({ SB_URL, SERVICE, ANON }) {
       iok('GET /commerce/subscription (authed) returns their plan', subR.status === 200 && sub?.data?.plan === 'presence_monitor');
       const frGet = await fetch(`${FN}/commerce/first-run`, { headers: jH });
       const fr = await frGet.json();
-      iok('GET /commerce/first-run returns a derived checklist', frGet.status === 200 && Array.isArray(fr?.data?.steps) && fr.data.steps.length === 4);
+      iok('GET /commerce/first-run says whether the welcome is hidden', frGet.status === 200 && fr?.data?.dismissed === false);
     }
 
     // billing-sync: an upgrade to Presence via a subscription event flips edition + plan

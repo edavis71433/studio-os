@@ -12,7 +12,6 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import { verifyConnection, fetchExternalSite } from '../monitor/external.ts';
 import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
 import { assessMigrationReadiness } from '../monitor/readiness.ts';
-import { buildImportInventory } from '../platform/importer.ts';
 import type { ReadinessReport } from '../monitor/readiness.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -96,7 +95,7 @@ export async function handleMonitorVerify(site: SiteRow, principal: Principal, c
 }
 
 /** Compute + quietly store the Migration Readiness assessment. Shared by the
- *  client route (sentences) and the admin route (full detail). Read-only
+ *  admin route (full detail) and the studio's bulk readiness action. Read-only
  *  toward the customer's website; deterministic given pages + evidence. */
 export async function computeReadiness(site: SiteRow): Promise<ReadinessReport | null> {
   const connQ = await svc(`presence_monitor_connections?site_id=eq.${site.id}&status=eq.verified&select=url&limit=1`);
@@ -115,33 +114,6 @@ export async function computeReadiness(site: SiteRow): Promise<ReadinessReport |
     method: 'PATCH', body: JSON.stringify({ readiness: report, readiness_at: new Date().toISOString() }),
   });
   return report;
-}
-
-export async function handleMonitorReadiness(site: SiteRow, cors: Record<string, string>) {
-  if (site.edition !== 'monitor') return json({ error: 'not_monitor', message: 'This website already lives here.' }, 400, cors);
-  const r = await computeReadiness(site);
-  if (!r) return json({ error: 'not_ready', message: 'Connect and verify your website first — then this can take a proper look.' }, 409, cors);
-  // customers get sentences and plans — never the state word, never counts-as-scores
-  return json({ data: {
-    summary: r.summary,
-    pages: r.pages.map((p) => ({ path: p.path, plan: p.plan })),
-    first_fixes: r.accessibility_first.map((a) => a.what),
-    after_the_move: r.content_after,
-  } }, 200, cors);
-}
-
-/** M14: the migration import inventory — what's on the external site, page by
- *  page (text, images, meta), reviewable BEFORE anything moves. Read-only;
- *  content arrives only through the existing CMS flows after plan approval. */
-export async function handleImportInventory(site: SiteRow, cors: Record<string, string>) {
-  if (site.edition !== 'monitor') return json({ error: 'not_monitor', message: 'The import inventory reads an external website.' }, 400, cors);
-  const connQ = await svc(`presence_monitor_connections?site_id=eq.${site.id}&status=eq.verified&select=url&limit=1`);
-  const conn = connQ.json?.[0];
-  if (!conn?.url) return json({ error: 'not_ready', message: 'Connect and verify the website first.' }, 409, cors);
-  const ext = await (async () => { try { return await fetchExternalSite(conn.url); } catch { return null; } })();
-  if (!ext?.pages.length) return json({ error: 'fetch_failed', message: 'The website didn’t answer — try again shortly.' }, 502, cors);
-  const inventory = buildImportInventory(ext.pages, conn.url);
-  return json({ data: { ...inventory, note: 'Nothing has been imported. This is the review — content moves only through the migration plan you approve, and every page arrives as a draft first.' } }, 200, cors);
 }
 
 export async function handleMonitorDisconnect(site: SiteRow, principal: Principal, cors: Record<string, string>) {
