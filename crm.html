@@ -536,7 +536,7 @@ function renderShell(){
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
   // visual refresh: an initials avatar instead of an emoji object tile
-  const initials=String(nm).split(/\s+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole
+  const initials=String(nm).split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
   $('main').innerHTML=`
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
