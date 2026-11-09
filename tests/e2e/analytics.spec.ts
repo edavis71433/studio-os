@@ -128,7 +128,7 @@ test.describe('Analytics (Business dashboard)', () => {
   // The segmented control is plain buttons (no popup, no focusout guard), so an
   // iOS tap — which blurs without focusing anything — has nothing to break.
   // Pinned with the iOS focus semantics anyway: see tests/e2e/helpers/ios-focus.ts.
-  test('touch: tapping a period segment actually switches the period', async ({ page }, testInfo) => {
+  test('touch: tapping a period segment actually switches the period', { tag: '@touch' }, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'desktop-chromium', 'touch-only behaviour');
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await installIosFocusSemantics(page);

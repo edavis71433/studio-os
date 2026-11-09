@@ -31,9 +31,13 @@ jobs:
   rollback:
     runs-on: ubuntu-latest
     steps:
+      # The typed inputs arrive as data, never pasted into a script.
       - name: Confirmation gate (production only)
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          if [ "${{ github.event.inputs.environment }}" = "production" ] && [ "${{ github.event.inputs.confirm }}" != "rollback-production" ]; then
+          if [ "$ENVIRONMENT" = "production" ] && [ "$CONFIRM" != "rollback-production" ]; then
             echo "Production rollback requires the confirmation phrase 'rollback-production'. Aborting."; exit 1
           fi
 
@@ -43,26 +47,59 @@ jobs:
 
       - name: Resolve target project
         id: target
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+          if [ "$ENVIRONMENT" = "production" ]; then
             echo "ref=${{ secrets.SUPABASE_PROJECT_REF_PROD }}" >> "$GITHUB_OUTPUT"
           else
             echo "ref=${{ secrets.SUPABASE_PROJECT_REF_STAGING }}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Every function deploy.yml deploys. Until Nov 8 2026 this put back three of the
+      # eight and left the Free Tools at the version being rolled back from.
+      # tests/workflows/deploy_gate_test.mjs fails when a function is missing here.
+      # A function that didn't exist yet at that ref is left as it is now, and said so.
       - name: Redeploy functions at the target ref (stateless rollback)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.target.outputs.ref }}
+          REF: ${{ github.event.inputs.ref }}
         run: |
-          for fn in clever-api stripe-webhook presence; do
-            echo "== redeploying $fn @ ${{ github.event.inputs.ref }} =="
-            npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy "$fn" --no-verify-jwt --project-ref ${{ steps.target.outputs.ref }}
+          for fn in clever-api stripe-webhook presence tool-report unlock-report send-lead-alert site-review ai-visibility; do
+            if [ ! -f "supabase/functions/$fn/index.ts" ]; then
+              echo "::warning title=Not rolled back::$fn didn't exist at $REF, so it stays at the version deployed now."
+              continue
+            fi
+            echo "== redeploying $fn @ $REF =="
+            npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy "$fn" --no-verify-jwt --project-ref "$PROJECT_REF"
           done
 
       - name: Smoke test the rolled-back deployment
+        env:
+          PROJECT_REF: ${{ steps.target.outputs.ref }}
         run: |
-          base="https://${{ steps.target.outputs.ref }}.supabase.co/functions/v1"
+          base="https://$PROJECT_REF.supabase.co/functions/v1"
           sleep 5
           curl -s --fail -X POST "$base/clever-api" -H "Content-Type: application/json" -d '{"type":"version"}' | grep -q '"build"' || { echo "clever-api smoke FAILED"; exit 1; }
           curl -s --fail "$base/presence/commerce/plans" | grep -q -i 'plan' || { echo "presence smoke FAILED"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/presence/connections")
+          [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
           echo "Rollback smoke passed. Note: database migrations were NOT rolled back (manual by design)."
+
+      # The same checks deploy.yml makes after a deploy: each Free Tools function answers,
+      # and refuses what it should.
+      - name: Smoke test — Free Tools functions answer and gate
+        env:
+          PROJECT_REF: ${{ steps.target.outputs.ref }}
+        run: |
+          base="https://$PROJECT_REF.supabase.co/functions/v1"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/tool-report?id=00000000-0000-4000-8000-000000000000")
+          [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
+          [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/site-review" -H "Content-Type: application/json" -d '{"url":"example.com"}')
+          [ "$code" = "403" ] || { echo "site-review expected 403 without a Turnstile token, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/ai-visibility" -H "Content-Type: application/json" -d '{"business_name":"Smoke Test","city":"Burbank"}')
+          [ "$code" = "403" ] || { echo "ai-visibility expected 403 without a Turnstile token, got $code"; exit 1; }
+          echo "Free Tools smoke passed (tool-report 404, send-lead-alert 401, site-review and ai-visibility 403 without Turnstile)."

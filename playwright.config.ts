@@ -21,8 +21,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,      // a stray test.only fails the CI gate
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
+  // On CI the JSON results feed scripts/e2e-summary.mjs, which names each flaky and
+  // failed test on the run's summary page; a retried pass is otherwise only in the log.
   reporter: process.env.CI
-    ? [['github'], ['html', { open: 'never' }], ['list']]
+    ? [['github'], ['html', { open: 'never' }], ['list'], ['json', { outputFile: 'test-results/results.json' }]]
     : [['html', { open: 'never' }], ['list']],
   timeout: 30_000,
   expect: { timeout: 7_000, toHaveScreenshot: { maxDiffPixelRatio: 0.02 } },

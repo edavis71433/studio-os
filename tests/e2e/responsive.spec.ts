@@ -21,7 +21,7 @@ const pinTables = (page: Page) => page.addInitScript(() => {
   } catch { /* storage denied */ }
 });
 
-test.describe('Responsive layout', () => {
+test.describe('Responsive layout', { tag: '@layout' }, () => {
   // ── every page whose .wrap adopted a width tier ────────────────────────────
   // A page that gained width must not have gained a sideways body scroll with
   // it. Eric is on his phone constantly; a horizontal body scroll there is the
