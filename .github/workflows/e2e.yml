@@ -6,12 +6,21 @@ name: E2E (Playwright)
 #
 # There is no `paths:` filter, on purpose. A required check that a path filter
 # skips never reports, so the pull request sits on "Expected" forever. Instead
-# the `browser` job always starts and its first step decides whether the suite
-# needs to run. When it doesn't, `browser` still reports green in a few seconds.
+# the `scope` job always starts and decides whether the suite needs to run, and
+# the `browser` job always reports. When the suite doesn't need to run, `browser`
+# still reports green in under a minute.
+#
+# The three devices run at the same time, one machine each (`devices`), inside
+# Playwright's own image, which has the browsers and their system libraries in it.
+# Until Nov 8 2026 one machine ran all three on two workers and installed the
+# browsers every time: a run took 44 to 60 minutes against a 60-minute cap, and on
+# Nov 6 the browser install alone took 40 minutes on a slow package mirror.
 #
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
-# "browser" as a required status check. Leave "Require branches to be up to date"
-# off, or every merge sends each open pull request back through the full suite.
+# "browser" as a required status check: the last job below, not a device. Leave
+# "Require branches to be up to date" off, or every merge sends each open pull
+# request back through the full suite. deploy.yml waits for this same check on the
+# commit it deploys.
 
 on:
   push:
@@ -20,11 +29,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  browser:
+  scope:
     runs-on: ubuntu-latest
-    # About 3,500 tests on two workers took 27 to 41 minutes across Oct and Nov
-    # 2026. A run that hits this cap is cancelled with no test summary at all.
-    timeout-minutes: 60
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
     steps:
       # Depth 2 gives the next step something to compare with: a pull request is
       # checked out as GitHub's trial merge, whose first parent is the base branch.
@@ -38,8 +47,9 @@ jobs:
       # by importing a file or reading one; tests/workflows/e2e_scope_test.mjs fails when
       # one does, and the fix is a line like the first in this `case`.
       #
-      # This is a step, not a separate job the suite `needs`. If a separate job failed,
-      # the suite would be skipped, and GitHub counts a skipped job as a pass.
+      # If this job fails, the devices are skipped, and GitHub counts a skipped job as
+      # a pass. That's why the check to require is `browser` below, which always runs
+      # and reads how this job ended.
       - name: Decide whether the browser suite needs to run
         id: scope
         env:
@@ -94,28 +104,102 @@ jobs:
             printf '%s\n' "${changed:-(nothing to compare)}" | head -n 50
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # One machine per device, all three at once.
+  devices:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    name: browser on ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    # A device takes about a third of what all three took together. A run that hits
+    # this cap is cancelled with no test summary at all.
+    timeout-minutes: 45
+    # Playwright's image for the exact version in package-lock.json: the browsers and
+    # their system libraries are already in it, so nothing is downloaded or installed
+    # per run. Move it with Playwright; tests/workflows/e2e_scope_test.mjs checks that
+    # the two agree.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
+    strategy:
+      # A failure on one device doesn't stop the other two, so each run names all of its own.
+      fail-fast: false
+      matrix:
+        project: [desktop-chromium, tablet, mobile]
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        if: steps.scope.outputs.run == 'true'
         with:
           node-version: "20"
+          cache: npm
       # npm ci installs exactly what package-lock.json says. Plain `npm install`
       # took whatever npm called latest that minute, so Playwright's 1.65.0 release
       # broke every install for an hour on Nov 5 2026 (it reached npm in pieces).
       # To move Playwright: change @playwright/test and playwright-core together in
-      # package.json, run `npm install`, commit the lockfile, let this check prove it.
+      # package.json, run `npm install`, commit the lockfile, change the image above
+      # to the same version, and let this check prove it.
       - name: Install dependencies
-        if: steps.scope.outputs.run == 'true'
         run: npm ci --no-audit --no-fund
-      - name: Install Playwright browsers
-        if: steps.scope.outputs.run == 'true'
-        run: npx playwright install --with-deps chromium webkit
-      - name: Run browser E2E
-        if: steps.scope.outputs.run == 'true'
-        run: npm run test:e2e
+      # On a pull request the tablet runs only what a tablet adds, the tests tagged
+      # @touch and @layout. Every other test already ran on the desktop and the phone,
+      # and the iPad's touch quirks made most of the flaky failures. Pushes to main and
+      # manual runs test the tablet in full, and deploy.yml waits for main's run.
+      - name: Run the browser suite on this device
+        env:
+          PROJECT: ${{ matrix.project }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$PROJECT" = tablet ] && [ "$EVENT" = pull_request ]; then
+            npx playwright test --project=tablet --grep "@touch|@layout"
+          else
+            npx playwright test --project="$PROJECT"
+          fi
+      # A test that fails and then passes on its retry leaves the run green, so its
+      # name would sit in a log nobody opens. This puts it on the run's summary page.
+      - name: Name the flaky and failed tests
+        if: ${{ !cancelled() }}
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: node scripts/e2e-summary.mjs test-results/results.json "$PROJECT" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload report
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           retention-days: 14
+
+  # The check to require, and the one deploy.yml waits for. It always runs, so it
+  # always reports, and it reads how the other jobs ended instead of trusting a skip:
+  # it passes only when every device passed, or when the decision found nothing the
+  # suite can reach.
+  browser:
+    needs: [scope, devices]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every device passed, or nothing needed testing
+        id: verdict
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          RUN: ${{ needs.scope.outputs.run }}
+          DEVICES: ${{ needs.devices.result }}
+        run: |
+          if [ "$SCOPE" != success ]; then
+            echo "::error title=Browser check::The decision didn't finish (it ended $SCOPE), so nothing was tested."
+            exit 1
+          fi
+          if [ "$RUN" = false ]; then
+            echo "No changed file can affect the browser suite, so it didn't run. This green means skipped, not passed."
+            exit 0
+          fi
+          if [ "$RUN" != true ]; then
+            echo "::error title=Browser check::The decision gave no answer, so nothing was tested."
+            exit 1
+          fi
+          if [ "$DEVICES" != success ]; then
+            echo "::error title=Browser check::At least one device didn't pass (the devices ended $DEVICES). Each device's run names its failures."
+            exit 1
+          fi
+          echo "The desktop, the tablet and the phone all passed."

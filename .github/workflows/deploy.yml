@@ -3,7 +3,9 @@ name: Deploy Edge Functions
 # Staging: every push to the `staging` branch deploys both functions to the
 # staging Supabase project.
 # Production: manual only. Actions tab -> Run workflow -> type
-# `deploy-production` into the confirmation box. Deploys from `main`.
+# `deploy-production` into the confirmation box. Deploys from `main`, and only a
+# commit that passed the same checks as every pull request (ci.yml, run again here)
+# and the browser check (e2e.yml's `browser`, which this waits for).
 #
 # Config-only variance: identical commands, different project ref per
 # environment (Build Brief section 2.8).
@@ -28,42 +30,65 @@ env:
   SUPABASE_CLI_VERSION: "2.122.0"
 
 jobs:
-  # Pre-deploy quality gate (Ops audit HIGH-3): run the deterministic pure test
-  # suites — including the 14 machine-enforced platform invariants — before any
-  # deploy. The four integration-only suites (admin/pipeline/room/service) need
-  # live staging credentials and are skipped here; every other suite runs its
-  # pure tier with no env and must pass. A red gate blocks the deploy.
+  # The pre-deploy gate is ci.yml itself: the same typecheck of every function, the
+  # same test sweep and the same Deno as every pull request, so the two can't drift.
+  # Until Nov 8 2026 this was a second copy with its own test loop (which hid which
+  # check failed), a typecheck that left out two functions, and whichever Deno 2 was
+  # newest that day. A red gate blocks the deploy.
   test:
+    uses: ./.github/workflows/ci.yml
+
+  # Production only: wait for the browser check (e2e.yml's `browser` job) on the exact
+  # commit being deployed, and stop unless it passed. On Nov 8 2026 production was
+  # deployed four times from commits whose browser check was cancelled or still
+  # running. A green that skipped the suite, because nothing it can reach changed, counts.
+  # Not named `browser`: GitHub matches a required check by name alone.
+  browser-gate:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # The browser check takes about 20 minutes; this leaves room for one that starts late.
+    timeout-minutes: 90
+    permissions:
+      checks: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: v2.x
-      - name: Run pure test suites + platform invariants
+      - name: Wait for the browser check on this commit
+        id: browser-gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          fail=0
-          for f in tests/presence/*_test.mjs; do
-            b=$(basename "$f")
-            case "$b" in
-              admin_test.mjs|pipeline_test.mjs|room_test.mjs|service_test.mjs)
-                echo "skip (integration-only, needs live env): $b"; continue;;
+          poll="${POLL_SECONDS:-30}"
+          start_by=$(( $(date +%s) + ${START_MINUTES:-15} * 60 ))
+          give_up=$(( $(date +%s) + ${WAIT_MINUTES:-80} * 60 ))
+          while :; do
+            # The newest `browser` check from GitHub Actions on this commit, as "status conclusion"; empty when there is none yet.
+            state=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=browser&filter=latest&per_page=20" \
+              --jq '[.check_runs[] | select(.name == "browser" and .app.slug == "github-actions")] | sort_by(.started_at) | last | select(. != null) | "\(.status) \(.conclusion // "")"') || state=unreadable
+            case "$state" in
+              "completed success")
+                echo "The browser check passed on this commit."
+                exit 0 ;;
+              completed*)
+                echo "::error title=Browser check::The browser check on this commit ended ${state#completed }, so nothing was deployed. Fix it or re-run it, then run the deploy again."
+                exit 1 ;;
+              "")
+                if [ "$(date +%s)" -ge "$start_by" ]; then
+                  echo "::error title=Browser check::No browser check started on this commit, so nothing was deployed. Production goes out only from a commit that passed it."
+                  exit 1
+                fi
+                echo "The browser check hasn't started on this commit yet." ;;
+              unreadable)
+                echo "Couldn't read the checks just now; trying again." ;;
+              *)
+                echo "The browser check is ${state% *}; waiting for it." ;;
             esac
-            echo "== $b =="
-            deno run --allow-read --allow-env "$f" || { echo "FAILED: $b"; fail=1; }
+            if [ "$(date +%s)" -ge "$give_up" ]; then
+              echo "::error title=Browser check::The browser check hadn't passed after ${WAIT_MINUTES:-80} minutes, so nothing was deployed. Run the deploy again once it has."
+              exit 1
+            fi
+            sleep "$poll"
           done
-          if [ "$fail" -ne 0 ]; then echo "Pre-deploy test gate FAILED"; exit 1; fi
-          echo "Pre-deploy test gate passed."
-      - name: Type-check (deno check)
-        run: deno check supabase/functions/presence/index.ts supabase/functions/tool-report/index.ts supabase/functions/unlock-report/index.ts supabase/functions/send-lead-alert/index.ts supabase/functions/site-review/index.ts supabase/functions/ai-visibility/index.ts
-      - name: Verify migrations (fenced files intact; numbers unique)
-        run: |
-          for n in 0003 0004 0005; do
-            ls supabase/migrations/${n}_*.sql >/dev/null 2>&1 || { echo "fenced migration $n missing — history integrity broken"; exit 1; }
-          done
-          dupes=$(ls supabase/migrations/[0-9]*.sql | sed -E 's#.*/([0-9]+)_.*#\1#' | sort | uniq -d)
-          if [ -n "$dupes" ]; then echo "duplicate migration numbers: $dupes"; exit 1; fi
-          echo "migrations verified: fenced 0003-0005 present, numbers unique."
 
   deploy-staging:
     if: github.event_name == 'push'
@@ -155,15 +180,19 @@ jobs:
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
-    needs: test
+    needs: [test, browser-gate]
     runs-on: ubuntu-latest
     steps:
+      # The typed phrase and the branch arrive as data, never pasted into the script.
       - name: Confirmation gate
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.event.inputs.confirm }}" != "deploy-production" ]; then
+          if [ "$CONFIRM" != "deploy-production" ]; then
             echo "Confirmation phrase not provided. Aborting."; exit 1
           fi
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+          if [ "$REF" != "refs/heads/main" ]; then
             echo "Production deploys only from main. Aborting."; exit 1
           fi
 

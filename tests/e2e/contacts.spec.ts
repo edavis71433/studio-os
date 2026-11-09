@@ -306,7 +306,7 @@ test.describe('Contacts — the possible-duplicate hint', () => {
 // scrolling to reach a last-column action). The viewport is pinned explicitly so
 // this holds in every project, not only the mobile one. No display is pinned in
 // localStorage here — the default is exactly what's being tested.
-test.describe('Contacts — reachable at 390px', () => {
+test.describe('Contacts — reachable at 390px', { tag: '@touch' }, () => {
   // hasTouch as well as the viewport: the desktop project has no touch context,
   // and these actions have to be TAPPABLE, not merely clickable.
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });

@@ -732,7 +732,7 @@ test.describe('Project record — client-upload origin (A10)', () => {
 // top-layer dialog + the mobile layout-viewport widening (courting the wide
 // roster table) put the Create button beyond the visible viewport, so taps
 // never reached it. Pinned with the table view behind the dialog on purpose.
-test.describe('Projects — the New-project dialog on phones (SS6 pin)', () => {
+test.describe('Projects — the New-project dialog on phones (SS6 pin)', { tag: '@layout' }, () => {
   test('create submits over the pinned roster table: POST /projects lands and the new record opens', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });
