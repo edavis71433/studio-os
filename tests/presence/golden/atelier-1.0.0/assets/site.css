@@ -14,7 +14,7 @@ h3{font-size:1.25rem}
 .annbar a{color:#f6f2ea;text-decoration:underline}
 .notice{background:var(--wash);color:#6a5533;text-align:center;padding:10px 16px;font-size:.92rem;border-bottom:1px solid var(--line)}
 header.site{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
 .nav.centered{flex-direction:column;gap:10px;justify-content:center;text-align:center}
 .brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;letter-spacing:.02em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:36px;width:auto;vertical-align:middle;margin-right:12px}
@@ -22,7 +22,7 @@ nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;border-bottom:1px solid transparent}
 nav.primary a:hover{color:var(--accent-ink)}
 nav.primary a[aria-current="page"]{color:var(--ink);border-bottom:1px solid var(--accent)}
-.hero{padding:calc(96px * var(--spacing-scale,1)) 0 calc(64px * var(--spacing-scale,1));text-align:center}
+.hero{padding-top:calc(96px * var(--spacing-scale,1));padding-bottom:calc(64px * var(--spacing-scale,1));text-align:center}
 .hero .kicker{display:inline-block;color:var(--accent-ink);font-weight:600;font-size:.74rem;letter-spacing:.28em;text-transform:uppercase}
 .hero .kicker::after{content:"";display:block;width:36px;margin:14px auto 0;border-top:1px solid var(--accent)}
 .hero h1{margin:18px auto 16px;max-width:17ch;text-wrap:balance}
@@ -53,7 +53,7 @@ nav.primary a[aria-current="page"]{color:var(--ink);border-bottom:1px solid var(
 .open-now.yes{color:#2e6b45}
 .open-now.no{color:#9b3a26}
 .strip a:hover{text-decoration:underline}
-.block{padding:calc(64px * var(--spacing-scale,1)) 0}
+.block{padding-top:calc(64px * var(--spacing-scale,1));padding-bottom:calc(64px * var(--spacing-scale,1))}
 .block>.wrap>h1::after,.block>.wrap>h2::after,.block.wrap>h1::after,.block.wrap>h2::after{content:"";display:block;width:44px;border-top:1px solid var(--accent);margin-top:16px}
 .block.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 48px;margin-top:10px}
@@ -120,8 +120,8 @@ footer.site h2::after{content:"";display:block;width:36px;border-top:1px solid v
 .annbar,.skip{display:none}
 header.site{position:static}
 }
-@media (max-width:640px){.hero{padding:64px 0 44px}
-.block{padding:48px 0}
+@media (max-width:640px){.hero{padding-top:64px;padding-bottom:44px}
+.block{padding-top:48px;padding-bottom:48px}
 .svc-grid{gap:0}
 }
 /* the section styles its pages use: BLOCK_CSS in lib/site_blocks.ts, less the rest */

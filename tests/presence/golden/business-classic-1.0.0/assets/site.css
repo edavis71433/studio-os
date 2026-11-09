@@ -21,14 +21,14 @@ h3{font-size:1.1rem}
 .annbar a{color:#fff;text-decoration:underline}
 .notice{background:#fdf3e4;color:#6b4c12;text-align:center;padding:10px 16px;font-size:.95rem}
 header.site{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}
 .brand{font-family:var(--font-display,inherit);font-weight:800;font-size:1.15rem;letter-spacing:-.01em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:34px;width:auto;vertical-align:middle;margin-right:10px;border-radius:6px}
 nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.95rem;border-radius:8px}
 nav.primary a:hover{color:var(--ink);background:var(--wash)}
 nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--wash)}
-.hero{padding:calc(72px * var(--spacing-scale,1)) 0 calc(48px * var(--spacing-scale,1))}
+.hero{padding-top:calc(72px * var(--spacing-scale,1));padding-bottom:calc(48px * var(--spacing-scale,1))}
 .hero .kicker{color:var(--accent-dark);font-weight:700;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase}
 .hero h1{margin:10px 0 12px;max-width:20ch;text-wrap:balance}
 .tagline{font-size:1.2rem;color:var(--soft);max-width:52ch}
@@ -45,7 +45,7 @@ nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--was
 .open-now{font-weight:700}
 .open-now.yes{color:#8fd0a5}
 .open-now.no{color:#f0b9ad}
-.block{padding:calc(52px * var(--spacing-scale,1)) 0}
+.block{padding-top:calc(52px * var(--spacing-scale,1));padding-bottom:calc(52px * var(--spacing-scale,1))}
 .block.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:8px}
 .svc{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:20px 22px}
@@ -54,6 +54,7 @@ nav.primary a[aria-current="page"]{color:var(--accent-dark);background:var(--was
 .svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
 .svc .pr{color:var(--accent-dark);font-weight:700;margin-top:10px}
 .svc img{width:100%;height:auto;border-radius:10px;margin-top:12px}
+.block--bg-accent .svc,.block--bg-dark .svc{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 .cat-h{margin-top:34px;padding-bottom:8px;border-bottom:2px solid var(--wash)}
 h2.cat-h{margin-bottom:0;font-size:1.1rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
@@ -94,8 +95,8 @@ footer.site h2{font-size:1.1rem}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}
 }
-@media (max-width:640px){.hero{padding:52px 0 36px}
-.block{padding:40px 0}
+@media (max-width:640px){.hero{padding-top:52px;padding-bottom:36px}
+.block{padding-top:40px;padding-bottom:40px}
 }
 /* the section styles its pages use: BLOCK_CSS in lib/site_blocks.ts, less the rest */
 

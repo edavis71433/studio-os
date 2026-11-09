@@ -90,7 +90,7 @@ h1{font-size:clamp(2.7rem,7vw,4.8rem)}h2{font-size:clamp(1.6rem,3.4vw,2.3rem);ma
 .annbar a{color:#f6f2ea;text-decoration:underline}
 .notice{background:var(--wash);color:#6a5533;text-align:center;padding:10px 16px;font-size:.92rem;border-bottom:1px solid var(--line)}
 header.site{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
 .nav.centered{flex-direction:column;gap:10px;justify-content:center;text-align:center}
 .brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;letter-spacing:.02em;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
 .brandlogo{height:36px;width:auto;vertical-align:middle;margin-right:12px}
@@ -98,7 +98,7 @@ nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:var(--soft);font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;border-bottom:1px solid transparent}
 nav.primary a:hover{color:var(--accent-ink)}
 nav.primary a[aria-current="page"]{color:var(--ink);border-bottom:1px solid var(--accent)}
-.hero{padding:calc(96px * var(--spacing-scale,1)) 0 calc(64px * var(--spacing-scale,1));text-align:center}
+.hero{padding-top:calc(96px * var(--spacing-scale,1));padding-bottom:calc(64px * var(--spacing-scale,1));text-align:center}
 .hero .kicker{display:inline-block;color:var(--accent-ink);font-weight:600;font-size:.74rem;letter-spacing:.28em;text-transform:uppercase}
 .hero .kicker::after{content:"";display:block;width:36px;margin:14px auto 0;border-top:1px solid var(--accent)}
 .hero h1{margin:18px auto 16px;max-width:17ch;text-wrap:balance}
@@ -123,7 +123,7 @@ nav.primary a[aria-current="page"]{color:var(--ink);border-bottom:1px solid var(
 .strip a{color:var(--accent-ink);text-decoration:none}
 .open-now{font-weight:700}.open-now.yes{color:#2e6b45}.open-now.no{color:#9b3a26}
 .strip a:hover{text-decoration:underline}
-.block{padding:calc(64px * var(--spacing-scale,1)) 0}
+.block{padding-top:calc(64px * var(--spacing-scale,1));padding-bottom:calc(64px * var(--spacing-scale,1))}
 .block>.wrap>h1::after,.block>.wrap>h2::after,.block.wrap>h1::after,.block.wrap>h2::after{content:"";display:block;width:44px;border-top:1px solid var(--accent);margin-top:16px}
 .block.alt{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 48px;margin-top:10px}
@@ -183,7 +183,7 @@ footer.site h2::after{content:"";display:block;width:36px;border-top:1px solid v
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}}
 @media print{body{background:#fff;color:#000}.annbar,.skip{display:none}header.site{position:static}}
-@media (max-width:640px){.hero{padding:64px 0 44px}.block{padding:48px 0}.svc-grid{gap:0}}
+@media (max-width:640px){.hero{padding-top:64px;padding-bottom:44px}.block{padding-top:48px;padding-bottom:48px}.svc-grid{gap:0}}
 ${BLOCK_CSS}
 ${SEARCH_CSS}
 /* Item 67: the shared section and search styles colour some text with --accent, which here is
@@ -192,7 +192,7 @@ ${SEARCH_CSS}
 .search-hit .sh-kind,.post-tags li,.block-spotlight .sp-eyebrow,.block-linklist ul.linklist a,.block-progress .pgb-pct{color:var(--accent-dark)}
 .tagchip.on,ol.process li::before,.bk-done-ic{background:var(--accent-dark);border-color:var(--accent-dark)}`;
 
-const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding:96px 0 64px;text-align:center}`;
+const CRITICAL = `:root{--ink:#1c1b18;--soft:#5b564c;--paper:var(--bg,#fbfaf7);--accent:#9a7b4f;--accent-ink:#7a5f3a;--accent-dark:#7a5f3a;--line:#e5e0d5}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body,"Avenir Next","Helvetica Neue",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif);background:var(--paper);color:var(--ink);line-height:1.7;font-size:16.5px}h1{font-size:clamp(2.7rem,7vw,4.8rem);line-height:1.08;font-family:var(--font-display,Georgia,serif);font-weight:500}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:var(--paper);padding:10px 18px;z-index:99}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{border-bottom:1px solid var(--line)}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}.brand{font-family:var(--font-display,Georgia,serif);font-weight:500;font-size:1.45rem;color:var(--ink);text-decoration:none}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#5b564c;font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase}.hero{padding-top:96px;padding-bottom:64px;text-align:center}`;
 
 // ═════════ partials ═════════
 
