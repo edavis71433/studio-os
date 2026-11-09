@@ -28,7 +28,7 @@ const base = () => ({
 {
   ok('daysBetween counts whole days from y-m-d text', daysBetween('2026-10-21', '2026-10-24') === 3 && daysBetween('2026-10-24', '2026-10-21') === -3 && daysBetween(null, '2026-10-21') === null);
   ok('shortDate prints "Nov 3"', shortDate('2026-11-03') === 'Nov 3' && shortDate('2026-11-03T10:00:00Z') === 'Nov 3' && shortDate('') === '');
-  ok('ago: today · yesterday · N days ago · a date beyond two weeks', ago('2026-10-21T01:00:00Z', '2026-10-21') === 'today' && ago('2026-10-20', '2026-10-21') === 'yesterday' && ago('2026-10-19', '2026-10-21') === '2 days ago' && ago('2026-08-08', '2026-10-21') === 'Aug 8');
+  ok('ago: today · yesterday · N days ago, then weeks, months and "over a year" (item 96: it was a bare date)', ago('2026-10-21T01:00:00Z', '2026-10-21') === 'today' && ago('2026-10-20', '2026-10-21') === 'yesterday' && ago('2026-10-19', '2026-10-21') === '2 days ago' && ago('2026-08-08', '2026-10-21') === '2 months ago' && ago('2026-10-01', '2026-10-21') === '2 weeks ago' && ago('2025-09-01', '2026-10-21') === 'over a year ago');
 }
 
 // ═══ 2. a customer moment NEVER appears; website evidence NEVER appears ═══
@@ -136,7 +136,7 @@ const base = () => ({
   // sales review item 11: the route is a thin call; the gather lives in computeStudioNeeds (shared with the bell)
   ok('the needs-you gather is fixed-cost (no per-site loop)', (() => { const body = routes.slice(routes.indexOf('async function runStudioNeeds'), routes.indexOf('async function ownSiteOf')); return body.length > 200 && !/for\s*\(.*await svc/.test(body) && /Promise\.all/.test(body); })());
   ok('agency.html reads /agency/needs-you, never /agency/queues; no Starter kits card; roster chips are All · Needs you · Outstanding · Archived',
-    /api\('\/agency\/needs-you'\)/.test(page) && !/agency\/queues/.test(page) && !/kitCardHtml|id="kitList"/.test(page) && /\[\['all','All'\],\['needs','Needs you'\],\['owed','Outstanding'\],\['archived','Archived'\]\]/.test(page));
+    /api\('\/agency\/needs-you'(\+\(fresh\?'\?fresh=1':''\))?\)/.test(page) && !/agency\/queues/.test(page) && !/kitCardHtml|id="kitList"/.test(page) && /\[\['all','All'\],\['needs','Needs you'\],\['owed','Outstanding'\],\['archived','Archived'\]\]/.test(page));
   ok('agency.html: the roster columns are Name · Status · Next · Outstanding', /\['name','Name'/.test(page) && /\['status','Status'/.test(page) && /\['next','Next'/.test(page) && /\['owed','Outstanding'/.test(page) && !/\['edition','Edition'|\['attention','Waiting'|\['leads','Leads'|\['domain','Domain'/.test(page) && !/search issue\$\{/.test(page));
 }
 

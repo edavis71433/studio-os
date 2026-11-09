@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Studio — Studio OS</title>
+<title>Home — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <!-- The studio home is never scoped: a stray ?client= (the nav carries the drill-in
      scope onto every link) is dropped here, BEFORE the deferred shell reads the URL,
@@ -137,6 +137,7 @@
   .linkbtn{font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer}
   .linkbtn:hover{text-decoration:underline}
   .need .pnote{font-size:12px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
+  .need .qold{font-size:12.5px;color:var(--soft);margin:0 0 var(--dds-s2,8px)}   /* item 96: the over-a-month line and its Clear */
   /* status words on the roster: Live · Not live yet · Needs you · Archived */
   .pill.needs,.pill.live,.pill.quiet{text-transform:none}   /* sentence case: "Needs you", not "Needs You" */
   .pill.needs{background:var(--warn-soft);color:var(--warn)} .pill.live{background:var(--good-soft);color:var(--good)} .pill.quiet{background:var(--bg);color:var(--soft)}
@@ -198,7 +199,6 @@
   .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn:hover{filter:brightness(1.05)}
-  #healthLine{font-size:12.5px;color:var(--soft)} #healthLine a{color:var(--p);text-decoration:none;font-weight:500} #healthLine .warnw{color:var(--warn)}
   /* ── the Add-a-customer dialog — customers.html's custDlg, ported wholesale and kept in sync by hand ── */
   dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
@@ -347,7 +347,7 @@ let REQ_SEQ=0;   // request-generation guard: a slow response that resolves afte
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function apiSend(method,path,payload,site){const h=H();if(site)h['x-dds-scope-site']=site;const r=await fetch(FN+path,{method,headers:h,body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}   // site: act inside that client's account, as the shell's ?client= does
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
@@ -719,8 +719,7 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to you
 // — NEVER the empty roster ("No clients yet" was the old lie). Try-again re-runs
 // the FULL boot path (me + load + mounts): a load()-only retry after a failed
 // /agency/me left a recovered portfolio wearing ME=null placeholders with the
-// Needs you never mounted. boot is idempotent here — mountHealthDoor
-// guards its own node and mountNeeds is NSEQ-guarded.
+// Needs you never mounted. boot is idempotent here — mountNeeds is NSEQ-guarded.
 function trouble(){
   $('main').innerHTML=`<div class="center"><h2>We couldn’t load your portfolio just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="primary">Try again</button></div>`;
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
@@ -777,10 +776,13 @@ async function load(soft){
   render();
 }
 
-// ── the top row: who you are, + Add a customer, platform health (staff) ──
+// ── the top row: who you are, + Add a customer. Item 96: platform health moved to
+//    the account menu (staff only), and the role reads as words, not its code ──
+const ROLE_WORDS={owner:'Owner',admin:'Admin',account_manager:'Account manager',content_strategist:'Content strategist',designer:'Designer',developer:'Developer',support:'Support',readonly:'View only'};
+const roleWords=(r)=>ROLE_WORDS[r]||(r?String(r).replace(/_/g,' ').replace(/^\w/,(c)=>c.toUpperCase()):'Member');
 function renderTop(){
   const t=$('top');if(!t)return;
-  t.innerHTML=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><div class="acts"><span id="healthLine"></span><span class="rolebadge">● ${esc((ME&&ME.role)||'member')}</span><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
+  t.innerHTML=`<div class="top"><div class="brand">${esc((ME&&ME.agency)||'Your agency')}<small>Studio</small></div><div class="acts"><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>`;
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
 }
 
@@ -1033,11 +1035,10 @@ async function boot(){
     renderTop();
     openFromHash();   // ⌘K → /agency.html#add (or #kits)
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
-    // final pass (Nov 8, batch B): the studio strip and the staff doorway read
-    // alongside the roster and Needs you too — they use neither, and Home's last
-    // answer waited on Needs you for them (live: 1.45 s before they even started)
+    // final pass (Nov 8, batch B): the studio strip reads alongside the roster and
+    // Needs you too — it uses neither, and Home's last answer waited on Needs you
+    // for it (live: 1.45 s before it even started)
     const studio=mountStudio();   // one home: the studio's own money, this week and key deals (was today.html's)
-    mountHealthDoor();   // staff-only doorway to the platform Health Center
     await load();
     await needs;
     await studio;
@@ -1046,21 +1047,6 @@ async function boot(){
 }
 boot();
 
-// ── Platform health doorway (staff only). admin-health.html existed with no way
-//    in from any page; the Studio surface is its natural parent. We probe the
-//    staff-only route once — a non-staff agency member simply never sees the link.
-async function mountHealthDoor(){
-  try{
-    const r=await api('/admin/health-center');
-    if(!r.ok)return;
-    const host=$('healthLine');if(!host)return;
-    // the door is a status line in the top row (it used to be a text link under the
-    // kits, below the fold): the count of areas needing a look, or "all good"
-    const areas=(r.body&&r.body.data&&Array.isArray(r.body.data.areas))?r.body.data.areas:[];
-    const n=areas.filter(a=>a&&a.state==='attention').length;
-    host.innerHTML='<a id="healthDoor" href="/admin-health.html">'+(n?'<span class="warnw">Platform: '+n+' area'+(n===1?'':'s')+' need'+(n===1?'s':'')+' a look</span>':'Platform: all clear')+' →</a>';
-  }catch(_){/* the door is a nicety, never a blocker */}
-}
 
 // ── the Ask box (from today.html): the answer, then the sources it drew on ──
 function paintAnswer(box,d,fallback){
@@ -1109,15 +1095,43 @@ function paintNeeds(){
     return;
   }
   const total=Number(NEEDS.total||rows.length);
-  host.innerHTML=`<h2 class="qhead">Needs you · ${total}</h2><div class="rcard need" id="needsList">${shown.map(needRowHtml).join('')}${
+  const old=Number((NEEDS.old&&NEEDS.old.count)||0);   // item 96: waited over a month, and can be cleared from here
+  const oldLine=old?`<p class="qold" id="needsOld">${old} of these ${old===1?'has':'have'} waited over a month. <button type="button" class="linkbtn" id="needsClearOld">Clear ${old===1?'it':'them'}</button></p>`:'';
+  host.innerHTML=`<h2 class="qhead">Needs you · ${total}</h2><div class="rcard need" id="needsList">${oldLine}${shown.map(needRowHtml).join('')}${
     left>0?`<p class="qmore"><button type="button" class="linkbtn" id="needsMore">+ ${left} more</button></p>`:''}${partial}</div>`;
-  const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('.row:nth-child('+(rows.length+1)+') a');if(a)a.focus();}});
+  const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(rows.length+1)+') a');if(a)a.focus();}});
+  const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
+}
+// Item 96: enquiries and support requests that have waited over a month leave the
+// list in one go, after an in-place "are you sure". An enquiry is marked read and a
+// support request closed, the same as the Inbox's own buttons, so each stays in the
+// Inbox and can be picked up again there. A client's enquiry is changed inside that
+// client's account.
+async function clearOld(btn){
+  const items=(NEEDS&&NEEDS.old&&Array.isArray(NEEDS.old.items))?NEEDS.old.items:[];
+  const n=items.length,k=window.ddsListKit;
+  if(!n||!k||!k.confirmIn)return;
+  if(!(await k.confirmIn(btn,{text:`Clear ${n} item${n===1?'':'s'} older than a month? Enquiries are marked read and support requests closed. They stay in the Inbox.`,yes:'Yes, clear them'})))return;
+  btn.disabled=true;
+  let ok=0,fail=0;
+  for(const it of items){
+    let good=true;
+    for(const id of (Array.isArray(it.ids)?it.ids:[])){
+      let r;try{r=it.kind==='support'
+        ?await apiSend('PATCH','/support/'+encodeURIComponent(id),{status:'closed'})
+        :await apiSend('POST','/forms/inbox/'+encodeURIComponent(id),{status:'read'},it.site_id||'');}catch(_){r={ok:false};}
+      if(!r.ok)good=false;
+    }
+    if(good)ok++;else fail++;
+  }
+  toast(fail?`Cleared ${ok} of ${n}. The rest didn’t change; try again.`:`Cleared ${ok}. They’re still in the Inbox.`,!!fail);
+  mountNeeds(true);
 }
 function applyNext(){NEXT={bySite:(NEEDS&&NEEDS.next_by_site)||{},byClient:(NEEDS&&NEEDS.next_by_client)||{}};}
-async function mountNeeds(){
+async function mountNeeds(fresh){
   const host=$('needs');if(!host)return;
   const gen=++NSEQ;
-  let r;try{r=await api('/agency/needs-you');}catch(_){r={ok:false,status:0,body:{}};}
+  let r;try{r=await api('/agency/needs-you'+(fresh?'?fresh=1':''));}catch(_){r={ok:false,status:0,body:{}};}   // fresh: just after a change here, never a shared run
   if(gen!==NSEQ)return;   // a newer read started — drop this one
   if(!r.ok||!r.body.data||typeof r.body.data!=='object'){
     host.hidden=false;
@@ -1127,7 +1141,7 @@ async function mountNeeds(){
     return;
   }
   const d=r.body.data;
-  NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{}};
+  NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{},old:(d.old&&typeof d.old==='object')?d.old:null};   // old: item 96's over-a-month count and what Clear changes
   NEEDS_EXPANDED=false;
   // final pass (Nov 8, batch B): the bell's badge is this list's total — hand it over, so the shell doesn't build the list again
   try{if(window.ddsBellSet)window.ddsBellSet(NEEDS.total);}catch(_){}

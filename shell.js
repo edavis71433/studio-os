@@ -617,16 +617,17 @@
   function mountContextBar(scope) {
     var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
     if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
-    // Oct 2026 nav cut: the card carries WHO (initials + name) and the two ways
-    // out — Switch client · Exit to studio. Their record, Today and website are
-    // the client's own menu items now (Record · Overview · Website), not links here.
+    // Oct 2026 nav cut: the card carries WHO (initials + name) and the way out.
+    // Their record, Today and website are the client's own menu items now
+    // (Record · Overview · Website), not links here. Item 96: "Switch client" and
+    // "Exit to studio" both opened Home, so it is one "Back to studio" until a
+    // real client switcher exists.
     var initials = String(scope.name).split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || 'C';
     var bar = el('<div id="dds-ctxbar" role="region" aria-label="Client context">' +
       '<span class="lbl">Viewing client</span>' +
       '<span class="who"><span class="av" aria-hidden="true">' + esc(initials) + '</span><strong>' + esc(scope.name) + '</strong></span>' +
       '<span class="acts">' +
-        '<a href="/agency.html" class="exit" data-noscope="1">Switch client</a>' +
-        '<a href="/agency.html" class="exit" data-noscope="1">Exit to studio</a>' +
+        '<a href="/agency.html" class="exit" data-noscope="1">Back to studio</a>' +
       '</span></div>');
     // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
     // lay it out as a card ABOVE the client's menu; on phones shell.css keeps it
@@ -1179,9 +1180,15 @@
     setExpanded('dds-profile', true);
     var email = (sb && sb.__email) || 'Signed in';
     var role = (CTX && CTX.site_role) || '';
-    var edition = (CTX && CTX.edition) || '';
+    // Item 96: the role and the plan in words, not their codes ("business owner · presence")
+    var ROLE_WORDS = { business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client', developer: 'Developer' };
+    var roleWord = ROLE_WORDS[role] || (role ? role.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) : '');
+    var plan = (CTX && CTX.edition_name && role !== 'client_reviewer') ? CTX.edition_name + ' plan' : '';
     var rows = '';
     if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>';
+    // Item 96: the platform's health door, for staff only. It sat on the studio's
+    // Home as "Platform: 3 areas need a look", staff wording on the owner's page.
+    if (CTX && CTX.is_operator) rows += '<a class="row" href="/admin-health.html" id="dds-health-row">Platform health<span class="sub" id="dds-health-sub"></span></a>';
     // Architecture v1.0: utility destinations (Connections, Settings, Help) live here.
     // Multi-item groups get a quiet header so a long menu stays scannable.
     UTILS.forEach(function (sec) {
@@ -1201,8 +1208,14 @@
     if (tourAvailable()) rows += '<a class="row" href="#" id="dds-tour-again">Show me around</a>';
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
-    prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([role.replace(/_/g, ' '), edition].filter(Boolean).join(' · ')) + '</div></div>' + rows;
+    prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([roleWord, plan].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
+    if (document.getElementById('dds-health-row')) api('/admin/health-center').then(function (r) {
+      var sub = document.getElementById('dds-health-sub'); if (!sub || !r.ok) return;
+      var areas = (r.body && r.body.data && Array.isArray(r.body.data.areas)) ? r.body.data.areas : [];
+      var n = areas.filter(function (a) { return a && a.state === 'attention'; }).length;
+      sub.textContent = n ? n + (n === 1 ? ' area needs' : ' areas need') + ' a look' : 'All clear';
+    });
     var nt = document.getElementById('dds-notif-toggle');
     if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
     var th = document.getElementById('dds-theme-toggle');

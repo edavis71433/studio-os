@@ -36,6 +36,10 @@ export interface NeedsRow {
   when: string;                // "Sent Oct 14 · no payment yet"
   verb: string;                // Resend · Open record · Reply · Open deal · Fix · Apply · Review
   href: string;
+  /** item 96: when the wait began, for the "older than a month" count */
+  at?: string | null;
+  /** item 96: how "Clear" puts it away: an enquiry is marked read, a support request closed */
+  clear?: { kind: 'enquiry' | 'support'; site_id: string | null; ids: string[] };
 }
 
 export interface NeedsInput {
@@ -106,15 +110,21 @@ export function shortDate(s: unknown): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(y)!;
   return `${MONTHS[+m[2] - 1]} ${+m[3]}`;
 }
-/** "today" · "yesterday" · "3 days ago" · "Aug 8" (beyond two weeks) */
+/** "today" · "yesterday" · "3 days ago" · "3 weeks ago" · "2 months ago" · "over a year ago".
+ *  Item 96: beyond two weeks it said only the date ("Aug 8"), so an enquiry from
+ *  August sat in Needs you looking as fresh as last week's. */
 export function ago(s: unknown, todayYmd: string): string {
   const d = daysBetween(s, todayYmd);
   if (d === null) return '';
   if (d <= 0) return 'today';
   if (d === 1) return 'yesterday';
   if (d <= 14) return `${d} days ago`;
-  return shortDate(s);
+  if (d < 60) return `${Math.floor(d / 7)} weeks ago`;
+  if (d < 365) return `${Math.floor(d / 30)} months ago`;
+  return 'over a year ago';
 }
+/** item 96: a waiting enquiry or support request this many days old can be cleared from Home */
+export const OLD_DAYS = 30;
 export const money = (cents: unknown) => '$' + Math.round((Number(cents) || 0) / 100).toLocaleString('en-US');
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const PROVIDER_LABEL: Record<string, string> = { google_search_console: 'Google Search Console', gsc: 'Google Search Console', ga4: 'Google Analytics', google_analytics: 'Google Analytics', google_business: 'Google Business Profile', gbp: 'Google Business Profile', stripe: 'Stripe', mailchimp: 'Mailchimp' };
@@ -173,7 +183,8 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     const kind = String(e.form_kind || '').trim();
     push({ key: `enquiry:${e.id}`, kind: 'enquiry', site_id: e.site_id, client_id: null, name: nameOf(e.site_id, null),
       what: `new enquiry from ${who}`, when: [ago(e.created_at, today), kind ? `${kind} form` : ''].filter(Boolean).join(' · ').replace(/^\w/, (c) => c.toUpperCase()),
-      verb: 'Reply', href: `/inbox.html${sc(e.site_id)}#enquiries?sel=lead:${encodeURIComponent(e.id)}` });
+      verb: 'Reply', href: `/inbox.html${sc(e.site_id)}#enquiries?sel=lead:${encodeURIComponent(e.id)}`,
+      at: e.created_at || null, clear: { kind: 'enquiry', site_id: e.site_id, ids: [String(e.id)] } });
   }
 
   // ── b2. the studio's OWN new enquiries — one row per person, as the Inbox
@@ -196,7 +207,8 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       push({ key: `enquiry:own:${newest.id}`, kind: 'enquiry', site_id: null, client_id: null, name: who,
         what: g.length > 1 ? `${g.length} new ${noun === 'enquiry' ? 'enquiries' : noun + 's'} through your website` : `new ${noun} through your website`,
         when: ago(g[g.length - 1].created_at, today).replace(/^\w/, (c) => c.toUpperCase()),
-        verb: 'Reply', href: `/inbox.html#enquiries?sel=lead:${encodeURIComponent(String(newest.id))}` });
+        verb: 'Reply', href: `/inbox.html#enquiries?sel=lead:${encodeURIComponent(String(newest.id))}`,
+        at: g[g.length - 1].created_at || null, clear: { kind: 'enquiry', site_id: null, ids: g.map((x) => String(x.id)) } });
     }
   }
 
@@ -218,7 +230,8 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       push({ key: `support:${s.id}`, kind: 'support', site_id: cust.site_id, client_id: cust.client_id, name: nameOf(cust.site_id, cust.client_id, String(s.requester_name || s.requester_email || '').trim() || 'A customer'),
         what: subject ? `support request: ${subject}` : 'has an open support request',
         when: `Opened ${ago(s.created_at || s.updated_at, today) || 'recently'}`,
-        verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}` });
+        verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}`,
+        at: s.updated_at || s.created_at || null, clear: { kind: 'support', site_id: null, ids: [String(s.id)] } });   // old = no word on it for a month
     }
   }
 
@@ -442,8 +455,13 @@ export function emptyLine(i: NeedsInput): string {
 export function needsYouPayload(i: NeedsInput, cap = NEEDS_YOU_CAP) {
   const all = buildNeedsYou(i);
   const { rows, more, rest } = capNeedsYou(all, cap);
+  // item 96: the waiting enquiries and support requests more than a month old, across
+  // the whole list (rows and rest carry only the first 48), for Home's "Clear" offer
+  const today = ymdOf(i.nowIso) || '';
+  const old = all.filter((r) => r.clear && r.at && (daysBetween(r.at, today) ?? 0) > OLD_DAYS);
   return {
     rows, more, rest, total: all.length,
+    old: { count: old.length, items: old.map((r) => r.clear!) },
     empty_line: all.length ? '' : emptyLine(i),
     next_by_site: nextBySite(all),
     next_by_client: nextByClient(all),

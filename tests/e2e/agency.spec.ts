@@ -701,19 +701,13 @@ test.describe('Agency home — one home, one roster', () => {
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
   });
 
-  test('the Health Center door is a status line in the top row (staff only)', async ({ page }) => {
+  test('the Health Center door left the top row for the account menu (item 96)', async ({ page }) => {
     await installApp(page, { api: { ...homeApi, '/admin/health-center': { data: { overall: 'attention', areas: [
       { key: 'domains', label: 'Domains', state: 'attention', detail: '1 expiring.' }, { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running.' }, { key: 'billing', label: 'Billing', state: 'attention', detail: '1 with trouble.' },
     ] } } } });
     await page.goto('/agency.html');
-    const door = page.locator('#top #healthDoor');
-    await expect(door).toContainText('Platform: 2 areas need a look');
-    await expect(door).toHaveAttribute('href', '/admin-health.html');
-    // a non-staff member never sees it
-    await installApp(page, { api: homeApi });
-    await page.route('**/functions/v1/presence/admin/health-center', (route) => route.fulfill(boom(403)));
-    await page.goto('/agency.html');
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
+    await expect(page.locator('#top')).not.toContainText('Platform');   // staff wording on the owner's page; home-words.spec.ts checks the menu
     await expect(page.locator('#healthDoor')).toHaveCount(0);
   });
 });
@@ -954,15 +948,16 @@ test.describe('Agency roster — housekeeping', () => {
 
 // ── Wave 2 doors (Oct 2026 studio audit change 11 + bug 10) ───────────────────
 test.describe('Agency home — the Health Center door and the kits anchor', () => {
-  test('all areas fine → "Platform: all clear →", still a link to the Health Center', async ({ page }) => {
-    await installApp(page, { api: { ...homeApi, '/admin/health-center': { data: { overall: 'ok', areas: [
-      { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running.' }, { key: 'ai', label: 'AI', state: 'off', detail: 'Not configured.' },
-    ] } } } });
+  test('all areas fine → the account menu’s "Platform health" says "All clear", still a link to the Health Center (item 96)', async ({ page }) => {
+    await installApp(page, { api: { ...homeApi, '/portal/context': { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', is_agency: true, is_operator: true, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], landing: '/agency.html', nav: [] } },
+      '/admin/health-center': { data: { overall: 'ok', areas: [
+        { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running.' }, { key: 'ai', label: 'AI', state: 'off', detail: 'Not configured.' },
+      ] } } } });
     await page.goto('/agency.html');
-    const door = page.locator('#top #healthDoor');
-    await expect(door).toContainText('Platform: all clear');
-    await expect(door).toHaveAttribute('href', '/admin-health.html');
-    await expect(page.locator('#healthLine .warnw')).toHaveCount(0);
+    await page.locator('#dds-profile').click();
+    const row = page.locator('.dds-pop #dds-health-row');
+    await expect(row).toContainText('All clear');
+    await expect(row).toHaveAttribute('href', '/admin-health.html');
   });
 
   test('⌘K "Starter kits" lands on #kits: the kits card left the home, so Add a customer opens (where "Start from a kit" lives)', async ({ page }) => {

@@ -779,16 +779,20 @@ function renderList(){
   const vis=visibleRows();
   const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
+  // item 96: each row says its age; the line says how many waiting ones are over a month old
+  const oldOf=(i)=>!!i.when&&(Date.now()-Date.parse(i.when))>30*86400000;
   if(VIEW==='enquiries'){
     // C7: "N enquiries · M new" — what the queue SHOWS (chip, kind and search
     // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
-    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
+    const oldN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new'&&oldOf(i)).length;
+    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
     paintEnqCounts();
   }else{
     // "N waiting for a reply", not "need you": Home's Needs-you list is the one
     // count of everything that needs the studio; this counts conversations (item 11)
-    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply · Sorted by newest`;
+    const oldN=convs.filter(i=>(i.unread||i.needs)&&oldOf(i)).length;
+    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest`;
   }
   // partial-failure honesty: one of the two reads failed (loadData renders the
   // surviving half) — say so instead of presenting a quietly complete inbox

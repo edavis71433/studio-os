@@ -199,12 +199,12 @@ test.describe('App shell', () => {
       `/projects.html?client=${CLIENT}`, `/inbox.html?client=${CLIENT}`, `/files.html?client=${CLIENT}`,
     ]);
     await expect(page.locator('.dds-nav .sec.active > a[data-href="/today.html"]')).toHaveAttribute('aria-current', 'page');
-    // the card: who, and the two ways out
+    // the card: who, and the way out
     const card = page.locator('#dds-ctxbar');
     await expect(card).toBeVisible();
     await expect(card.locator('.av')).toHaveText('JP');
     await expect(card).toContainText('Joe’s Plumbing');
-    await expect(card.locator('a')).toHaveText(['Switch client', 'Exit to studio']);
+    await expect(card.locator('a')).toHaveText(['Back to studio']);   // item 96: the two both opened Home
     if (testInfo.project.name !== 'mobile') {
       // ABOVE the client's menu in the sidebar
       const cardBox = (await card.boundingBox())!;
@@ -428,10 +428,9 @@ test.describe('Context bar (slice 7)', () => {
     await expect(bar).toBeVisible();
     await expect(bar).toContainText('Joe’s Plumbing');
     // Oct 2026 nav cut: the record, their Today and their website are the client's own menu items
-    // (Record · Overview · Website) — the card keeps WHO and the two ways out
-    await expect(bar.locator('a')).toHaveText(['Switch client', 'Exit to studio']);
-    await expect(bar.locator('a', { hasText: 'Exit to studio' })).toHaveAttribute('href', '/agency.html');
-    await expect(bar.locator('a', { hasText: 'Switch client' })).toHaveAttribute('href', '/agency.html');   // the studio home lists every client
+    // (Record · Overview · Website) — the card keeps WHO and the way out
+    await expect(bar.locator('a')).toHaveText(['Back to studio']);   // item 96: Switch client and Exit to studio both opened Home
+    await expect(bar.locator('a', { hasText: 'Back to studio' })).toHaveAttribute('href', '/agency.html');   // the studio home lists every client
     // nothing hides under the chrome: on the sidebar layouts (≥761px) the body
     // is pushed RIGHT past the column the bar sits in; on the top-bar layouts
     // it is pushed DOWN past BOTH bars
