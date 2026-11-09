@@ -89,8 +89,22 @@ const SCOPE_SITE = { kind: 'site' };
   const entity = deterministicFindings(MESSY, { kind: 'entity', targetId: 'p1' });
   ok('scope: entity review narrows to the one item', entity.every((x) => !x.location.id || x.location.id === 'p1'));
   // p1 skips a heading level and closes on "Click here", which the whole-site review finds
-  known('scope: entity review still finds that item’s own problems', entity.some((x) => x.location.kind === 'post' && x.location.id === 'p1'),
-    'an entity scope reads no section at all (wantSection is false for it), so it never finds anything (reviewer/rules.ts deterministicFindings)');
+  ok('scope: entity review still finds that item’s own problems', entity.some((x) => x.location.kind === 'post' && x.location.id === 'p1'));
+  // a question or a menu item is checked against its neighbours, as the whole-site review does
+  resetFindingSeq();
+  const dupe = deterministicFindings(MESSY, { kind: 'entity', targetId: 'f2' });
+  ok('scope: one question’s review finds it repeats another', dupe.some((x) => x.category === 'duplicate_content' && x.location.id === 'f2') && dupe.every((x) => !x.location.id || x.location.id === 'f2'), dupe.map((x) => x.category).join(','));
+  resetFindingSeq();
+  const first = deterministicFindings(MESSY, { kind: 'entity', targetId: 'f1' });
+  ok('scope: and the first of the two is not the repeat, as on the whole-site review', !first.some((x) => x.category === 'duplicate_content'));
+  resetFindingSeq();
+  const item = deterministicFindings(MESSY, { kind: 'entity', targetId: 'o3' });
+  ok('scope: one menu item’s review finds the missing descriptions, naming that item', item.some((x) => x.category === 'missing_information' && x.supporting_evidence.join() === 'Soup') && !item.some((x) => x.category === 'duplicate_content'), item.map((x) => x.category).join(','));
+  resetFindingSeq();
+  const twin = deterministicFindings(MESSY, { kind: 'entity', targetId: 'o1' });
+  ok('scope: a menu item sharing its name with another is found', twin.some((x) => x.category === 'duplicate_content' && x.supporting_evidence.includes('Special')));
+  resetFindingSeq();
+  ok('scope: an unknown item finds nothing', deterministicFindings(MESSY, { kind: 'entity', targetId: 'nope' }).length === 0);
 }
 
 // ═══ 5. the sanitizer — the model does not get to lie ═══

@@ -159,8 +159,15 @@ function draftPage(list, slug, version, man) {
   asked = [];
   const r = await draftSectionHtml(SITE, manifest, [SAMPLE_BLOCKS.title, { type: 'linked', ref: LIB }], 1, NOW);
   ok('a linked saved section reads its library item by id', asked.some((u) => u.includes('presence_content_library?site_id=eq.' + SITE) && u.includes(`id=in.(${LIB})`)));
-  known('a linked saved section draws with its photos, as the page does', r.html.includes('data-dds-key="block_gallery"') && photoPaths(r.html).length > 0,
-    'the photo read takes ids from the list before links resolve, so a linked gallery draws nothing and leaves the canvas until the save redraws (lib/serializer.ts draftSectionHtml)');
+  ok('a linked saved section draws with its photos, as the page does', r.html.includes('data-dds-key="block_gallery"') && photoPaths(r.html).length > 0);
+}
+{
+  // a saved reviews wall placed as a link reads the reviews too: the list itself names none
+  const WALL = 'cccccccc-0000-4000-8000-000000000002';
+  rows.presence_content_library.push({ id: WALL, payload: { type: 'reviews_wall', title: 'What people say', max: 6 } });
+  asked = [];
+  const r = await draftSectionHtml(SITE, manifest, [SAMPLE_BLOCKS.title, { type: 'linked', ref: WALL }], 1, NOW);
+  ok('a linked reviews wall reads the approved reviews and shows them', asked.some((u) => u.includes('presence_reviews') && u.includes('status=eq.approved')) && r.html.includes('On time and tidy.'));
 }
 
 const failed = results.filter((r) => !r.p);

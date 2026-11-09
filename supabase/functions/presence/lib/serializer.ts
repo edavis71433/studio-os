@@ -375,18 +375,21 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
 const UUID_G = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 export async function draftSectionHtml(siteId: string, manifest: TemplateManifest, rawBlocks: unknown[], index: number, now: string): Promise<{ html: string; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
-  const text = JSON.stringify(rawBlocks);
-  const ids = [...new Set((text.match(UUID_G) || []).map((x) => x.toLowerCase()))].slice(0, 200);
+  // A linked saved section keeps its photos (and a reviews wall) in its library item, not
+  // in the list, so resolve the links first and look up what the resolved sections show.
+  // No links: no library read and no extra wait.
   const refIds = linkedRefIds(rawBlocks);
-  const [media, libRows, reviewsArr] = await Promise.all([
+  const libRows = refIds.length ? await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : [];
+  const lib = new Map<string, unknown>((libRows as Array<{ id: string; payload: unknown }>).map((r) => [r.id, r.payload]));
+  const text = JSON.stringify(refIds.length ? resolveLinkedBlocksTracked(rawBlocks, (id) => lib.get(id) ?? null).blocks : rawBlocks);
+  const ids = [...new Set((text.match(UUID_G) || []).map((x) => x.toLowerCase()))].slice(0, 200);
+  const [media, reviewsArr] = await Promise.all([
     ids.length ? q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&id=in.(${ids.join(',')})&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`) : Promise.resolve([]),
-    refIds.length ? q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : Promise.resolve([]),
     text.includes('"reviews_wall"') ? q(`presence_reviews?site_id=eq.${siteId}&status=eq.approved&order=approved_at.desc,created_at.desc&select=reviewer_name,rating,body,owner_reply,status,approved_at,created_at&limit=500`) : Promise.resolve([]),
   ]);
   const mediaById = new Map<string, MediaRow>((media as MediaRow[]).map((m) => [m.id, m]));
   const used = new Set<string>();
   const ref = (id: string | null | undefined): MediaRef | null => { const m = id ? mediaById.get(id) : undefined; if (m) used.add(m.id); return toRef(m, manifest); };
-  const lib = new Map<string, unknown>((libRows as Array<{ id: string; payload: unknown }>).map((r) => [r.id, r.payload]));
   const approved = reviewsArr as any[];
   const extras = approved.length ? { reviewsWall: { items: shapeReviewsForDisplay(approved, 24), aggregate: aggregateApproved(approved) } } : undefined;
   const composed = composeBlocks(rawBlocks, (id) => lib.get(id) ?? null, ref, extras);

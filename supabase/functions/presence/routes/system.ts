@@ -37,6 +37,7 @@ function envPresent(name: string): boolean {
   if (name === 'SERVICE_ROLE_KEY') return !!(Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
   if (name === 'SUPABASE_URL') return !!(Deno.env.get('SUPABASE_URL') || Deno.env.get('SB_URL'));
   if (name === 'SUPABASE_ANON_KEY') return !!(Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY'));
+  if (name === 'PSI_KEY') return !!(Deno.env.get('PSI_KEY') || Deno.env.get('PSI_API_KEY'));
   return !!Deno.env.get(name);
 }
 
@@ -60,12 +61,21 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'AGENCY_SITE_ID', required: false, enables: 'the OPS_ALERT_EMAIL fallback for operator notifications, on the platform’s OWN agency site only — a site whose presence_identity.email AND owner-client email are both blank falls back to OPS_ALERT_EMAIL when, and only when, its site id matches this value (without it: that last-resort rung does not exist and the notification is skipped with a warn, which is the safe default — sending another tenant’s client activity to the platform operator would be a privacy breach)' },
     { name: 'RESEND_WEBHOOK_SECRET', required: false, enables: 'the Resend bounce/complaint webhook (/email/events) — bounces auto-suppress (without it: the endpoint 404s)' },
     { name: 'NURTURE_DRIP', required: false, enables: 'the day-7 free-review follow-up email (owner-approved outbound; set to 1 to activate)' },
+    { name: 'RESEND_INBOUND_SECRET', required: false, enables: 'checking that an email reply coming in really is from Resend (without it: the reply webhook 404s and replies never reach the Inbox)' },
+    { name: 'RESEND_INBOUND_DOMAIN', required: false, enables: 'the reply address domain, so a customer’s reply to a sent email lands in the Inbox (without it: replies go to the sender’s own mailbox)' },
+    { name: 'PLATFORM_REPLY_TO', required: false, enables: 'the reply-to address on the platform’s own mail (defaults to the studio’s address)' },
   ],
   hosting: [
     { name: 'NETLIFY_AUTH_TOKEN', required: false, enables: 'publishing customer sites (without it: publish fails with a clear config error — nothing goes live)' },
   ],
+  domains: [
+    { name: 'AWS_ACCESS_KEY_ID', required: false, enables: 'managed domains: DNS we run on Amazon Route 53 (lib/route53.ts), paired with AWS_SECRET_ACCESS_KEY (without both: those routes answer 503)' },
+    { name: 'AWS_SECRET_ACCESS_KEY', required: false, enables: 'the Route 53 key’s secret half, for managed domains' },
+  ],
   approvals: [
     { name: 'APPROVAL_SECRET', required: false, enables: 'one-tap client approval links (falls back to SCHEDULER_SECRET; without either: /approve/send returns 503)' },
+    { name: 'PREVIEW_LINK_SECRET', required: false, enables: 'signing shared draft links (falls back to APPROVAL_SECRET, then STATE_SIGNING_SECRET, then SCHEDULER_SECRET)' },
+    { name: 'STATE_SIGNING_SECRET', required: false, enables: 'an older signing secret, kept only as a fallback for draft links and the sales pages’ signed links' },
   ],
   operator: [
     { name: 'OPERATOR_SECRET', required: false, enables: 'the programmatic operator caller (x-operator-secret header) for marketplace/enterprise management (without it: those surfaces are operable only by an interactive staff login)' },
@@ -74,13 +84,28 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
     { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
     { name: 'REPLICATE_API_TOKEN', required: false, enables: 'the photo editor’s “Cut out the subject” (Replicate; without it the button doesn’t show)' },
+    { name: 'CONCIERGE_POLISH', required: false, enables: 'AI polish of the concierge’s answers (set to on; off by default)' },
+    { name: 'HELP_POLISH', required: false, enables: 'AI polish of the help answers (set to on; off by default)' },
+  ],
+  photos: [
+    { name: 'PEXELS_API_KEY', required: false, enables: 'the stock photo search (Pexels; without it the search is off)' },
+  ],
+  push: [
+    { name: 'VAPID_PUBLIC_KEY', required: false, enables: 'device notifications (Web Push), paired with VAPID_PRIVATE_KEY (without both: push is cleanly off)' },
+    { name: 'VAPID_PRIVATE_KEY', required: false, enables: 'the private half of the device notifications key' },
+    { name: 'VAPID_SUBJECT', required: false, enables: 'the contact sent with device notifications (defaults to the support address)' },
+  ],
+  free_tools: [
+    { name: 'TURNSTILE_SECRET', required: false, enables: 'the free tools’ bot check (Cloudflare Turnstile; without it every free scan is refused as unverified)' },
+    { name: 'TOOLS_HASH_SALT', required: false, enables: 'salting the free tools’ visitor counters (falls back to the service key)' },
+    { name: 'PSI_KEY', required: false, enables: 'Google PageSpeed Insights for the free site review (PSI_API_KEY accepted too; without it the review has no PageSpeed scores)' },
   ],
   // These are the names connected/auth.ts ACTUALLY reads (credsSource): a
   // provider's own CONNECTED_<PROVIDER_KEY>_CLIENT_ID/_SECRET pair, else, for a
   // Google product, the studio's Google app GOOGLE_CLIENT_ID/_SECRET (since Nov 8
   // 2026; before that GOOGLE_* lit nothing here). The OAuth state is SEALED with
-  // CONNECTION_ENC_KEY (auth.ts signState); STATE_SIGNING_SECRET is read by
-  // nothing. connected_platform below asks auth.ts itself, so the two can't
+  // CONNECTION_ENC_KEY (auth.ts signState); auth.ts doesn't read
+  // STATE_SIGNING_SECRET. connected_platform below asks auth.ts itself, so the two can't
   // disagree again.
   connected: [
     { name: 'CONNECTION_ENC_KEY', required: false, enables: 'encrypting connected tokens at rest AND sealing the OAuth state (FAIL-CLOSED: without it, token storage is refused, not faked)' },
@@ -91,6 +116,8 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
   ],
   site: [
     { name: 'SITE_URL', required: false, enables: 'absolute links in emails (defaults to the production host)' },
+    { name: 'APP_URL', required: false, enables: 'the app’s own address: the Google return page, font files and links back to the app (defaults to app.davisdigitalstudio.com)' },
+    { name: 'VISITS_SALT', required: false, enables: 'salting the visit counter’s visitor fingerprints (falls back to APPROVAL_SECRET)' },
   ],
 };
 
