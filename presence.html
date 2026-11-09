@@ -7294,7 +7294,10 @@ const OFFER_WORDS = {
 };
 let VOCAB = OFFER_WORDS.food;   // matches the pre-load default markup
 function vocabWords() {
-  const tpl = (S.site && S.site.template) || "";
+  // template_slug is the template itself; `template` is "<slug> <version>", sent since item 63.
+  // Before that the page looked only for `template` and a restaurant site with no business
+  // type read "Services" (found Nov 8 while building item 46).
+  const tpl = (S.site && (S.site.template_slug || S.site.template)) || "";
   if (tpl.indexOf("restaurant-classic") === 0) return OFFER_WORDS.food;
   const k = (S.settings && S.settings.industry_key) || "generic";
   if (["restaurant", "coffee_shop", "cafe", "bar", "food_truck"].includes(k)) return OFFER_WORDS.food;
