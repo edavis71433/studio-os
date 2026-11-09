@@ -284,6 +284,31 @@ const touchChecks = () => {
     await expect(bar).not.toHaveClass(/\bon\b/);
     await expect(frame.locator('.dc-hot')).toHaveCount(0);
   });
+  // Safari sends no click for a tap on something that takes none, like the footer: only the
+  // finger going down and up. The toolbar stayed up on an iPhone, and in the Linux browsers
+  // GitHub runs the checks in.
+  const fingerOn = (frame: any, sel: string, dy = 0) => frame.locator(sel).evaluate((el: Element, move: number) => {
+    const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const at = (type: string, py: number) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true, clientX: x, clientY: py }));
+    at('pointerdown', y); at('pointerup', y + move);
+  }, dy);
+  test('a tap that brings no click still puts the toolbar away', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').tap();
+    await expect(bar).toHaveClass(/\bon\b/);
+    await fingerOn(frame, '#ft');
+    await expect(bar).not.toHaveClass(/\bon\b/);
+  });
+  test('a finger that scrolls off the sections leaves the toolbar up', async ({ page }) => {
+    const { frame } = await touchCanvas(page);
+    const bar = frame.locator('#dds-dc-bar');
+    await frame.locator('section#a').tap();
+    await expect(bar).toHaveClass(/\bon\b/);
+    await fingerOn(frame, '#ft', 80);
+    await page.waitForTimeout(300);
+    await expect(bar).toHaveClass(/\bon\b/);
+  });
   test('a second tap on the selected section’s words edits them in place', async ({ page }) => {
     const { frame } = await touchCanvas(page);
     const h = frame.locator('section#a h2[data-dds-field="title"]');
@@ -386,6 +411,31 @@ test.describe('Business details holds only the business', () => {
     await sw.click();
     await expect(sw).not.toBeChecked();
     await expect(page.locator('#visitHint')).toContainText('Your site counts nothing');
+  });
+  // Item 78: an hours change waits 0.6s before it saves; Publish in that window used to read
+  // the changes first, so the review left the hours out.
+  test('Publish right after changing the hours saves them before it reads the changes', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    const order: string[] = [];
+    page.on('request', (r) => {
+      const p = new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+      if (p === '/location' && r.method() === 'PUT') order.push('hours');
+      if (p === '/changes') order.push('changes');
+    });
+    const first = page.locator('#hoursGrid input[type=checkbox]').first();
+    await expect(first).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    order.length = 0;                                   // only what happens from the click on
+    await first.click();
+    await page.evaluate(() => (window as any).openRitual());
+    await expect.poll(() => order.includes('changes')).toBe(true);
+    expect(order[0]).toBe('hours');
+  });
+  test('closing the tab during an hours change is warned about', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await page.locator('#hoursGrid input[type=checkbox]').first().click();
+    const warned = await page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+    expect(warned).toBe(true);
   });
   test('a watched website has no visit counter switch', async ({ page }) => {
     await mount(page, '/presence.html#business', { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } } });
@@ -831,6 +881,18 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     await expect.poll(() => log.slice(log.indexOf('save answered')).includes('page drawn')).toBe(true);   // the save's own redraw still follows
   });
 
+  // Item 82: the draw is a read sent by POST; counted as a write, it made an overlapping
+  // changes read throw itself away and repeat, and cleared the "last edit by" line.
+  test('a live draw isn’t counted as a save', async ({ page }) => {
+    const { frame } = await setup(page);
+    await page.evaluate(() => (window as any).eeEditBlock(0));
+    const before = await page.evaluate('WRITES_ANSWERED');
+    await page.evaluate("S.lastChange = { actor_kind: 'operator', created_at: new Date().toISOString() }");
+    await page.locator('#blocksCard input').first().fill('A fresh heading');   // still in the field: no save yet
+    await expect(frame.locator('#main > section[data-dds-src="0"] h2')).toHaveText('A fresh heading');
+    expect(await page.evaluate('WRITES_ANSWERED')).toBe(before);
+    expect(await page.evaluate('S.lastChange && S.lastChange.actor_kind')).toBe('operator');
+  });
   test('typing shows on the canvas as you type, and the save still waits for the field to be left', async ({ page }) => {
     const { frame, writes } = await setup(page);
     await page.evaluate(() => (window as any).eeEditBlock(0));
@@ -1196,6 +1258,172 @@ test.describe('Undo takes back a menu-category move', () => {
   });
 });
 
+test.describe('a save that fails says so', () => {
+  // Item 81: a failed Business-details save left "Saving…" in the top bar for good, other
+  // failures said "Everything saved", and the closed switch stayed flipped after a failure.
+  const failing = (page: Page, path: string) => page.route(`**/functions/v1/presence${path}`, (route: Route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }) })
+    : route.fallback());
+  test('a business detail that fails to save says “Not saved, try again”', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await failing(page, '/identity');
+    await page.locator('#f-phone').fill('555-0199');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveClass(/\bbad\b/);
+  });
+  test('the closed switch goes back to what’s saved when its save fails', async ({ page }) => {
+    await mount(page, '/presence.html#business');
+    await failing(page, '/location');
+    const sw = page.locator('#closedSwitch');
+    await expect(sw).not.toBeChecked();
+    await sw.click();
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(sw).not.toBeChecked();
+    await expect(page.locator('#f-closednote')).toBeHidden();
+  });
+  test('a section field still being typed in says “Unsaved changes”, and the save says it saved', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a').hover();
+    await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    const field = page.locator('#blocksCard input[type=text]').first();
+    await field.click();
+    await field.pressSequentially(' more');
+    await expect(page.locator('#topWhisper')).toHaveText('Unsaved changes');
+    await field.blur();
+    await expect(page.locator('#topWhisper')).toHaveText(/Saved just now|Everything saved/);
+  });
+});
+
+test.describe('Load the latest shows what was loaded', () => {
+  // Item 80: the announcement bar and the Styles cards mount once and returned early on a
+  // reload, so a restored or newer announcement and section order stayed hidden until a refresh.
+  const LOADED = { blocks: BLOCKS, section_meta: META, pages: [], announcement_text: 'Open late Fridays', sections_order: ['hero', 'faqs', 'about', 'offerings', 'testimonials'] };
+  const serveLoaded = (page: Page) => page.route('**/functions/v1/presence/settings', (route: Route) => route.request().method() === 'GET'
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: LOADED }) })
+    : route.fallback());
+  test('the announcement and the home page’s section order show the loaded values, in their places', async ({ page }) => {
+    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th');
+    await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'About', 'What you offer', 'Testimonials', 'Questions']);
+    const placeBefore = await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!));
+    await serveLoaded(page);
+    await page.evaluate(() => (window as any).loadLatest());
+    await expect(page.locator('#ann-text')).toHaveValue('Open late Fridays');
+    await expect.poll(() => page.locator('#sectionsCard > div > label').allTextContents()).toEqual(['Welcome', 'Questions', 'About', 'What you offer', 'Testimonials']);
+    expect(await page.evaluate(() => [...document.getElementById('annCard')!.parentNode!.children].indexOf(document.getElementById('annCard')!))).toBe(placeBefore);
+  });
+  test('words being typed in the announcement aren’t replaced by a reload', async ({ page }) => {
+    await mount(page, '/presence.html#updates', { '/settings': { data: { announcement_text: 'Closed July 4th' } } });
+    await page.locator('#ann-text').fill('Closed July 4th and 5th');
+    await serveLoaded(page);
+    await page.evaluate(() => (window as any).loadLatest());
+    await expect(page.locator('#ann-text')).toHaveValue('Closed July 4th and 5th');
+    await expect(page.locator('#ann-text')).toBeFocused();
+  });
+});
+
+test.describe('no drawing nobody asked for (item 85)', () => {
+  const drawsAfter = async (page: Page, act: () => Promise<unknown>) => {
+    await page.waitForLoadState('networkidle');
+    const seen: string[] = [];
+    const on = (r: any) => { const u = new URL(r.url()); if (/\/functions\/v1\/presence\/preview$/.test(u.pathname)) seen.push(u.search); };
+    page.on('request', on);
+    await act();
+    await page.waitForTimeout(900);                                   // past the 350 ms the old redraw waited
+    page.off('request', on);
+    return seen;
+  };
+  test('Edit on a section opens its panel without drawing the whole page again', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const draws = await drawsAfter(page, async () => {
+      await frame.locator('#a').hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    });
+    expect(draws).toEqual([]);
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+  });
+  test('Hide from the canvas draws the canvas once, and not the hidden Preview', async ({ page }) => {
+    test.skip(isPhone(page), 'a phone selects by tap, with no hover');
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const previewBefore = await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc);
+    const draws = await drawsAfter(page, async () => {
+      await frame.locator('#a').hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Hide this section"]').click();
+    });
+    expect(draws.length).toBeLessThanOrEqual(1);                        // the canvas's own redraw, no second one
+    expect(await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc)).toBe(previewBefore);
+  });
+  test('Undo of a section move keeps the Styles cards where they were, without reading the colors again', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    const place = () => page.evaluate(() => { const c = document.getElementById('sectionsCard')!; return [...c.parentNode!.children].indexOf(c); });
+    const before = await place();
+    const down = page.locator('#sectionsCard > div').filter({ hasText: 'About' }).locator('button').last();
+    await down.click();
+    await page.waitForLoadState('networkidle');
+    const reads: string[] = [];
+    page.on('request', (r) => { if (/\/dev\/customization$/.test(new URL(r.url()).pathname) && r.method() === 'GET') reads.push(r.url()); });
+    await page.locator('#btnUndo').click();
+    await page.waitForLoadState('networkidle');
+    expect(await place()).toBe(before);
+    expect(reads).toEqual([]);
+  });
+});
+
+test.describe('the Add section menu can always be closed', () => {
+  // Item 82: on a phone there is no Escape and no hover, and a tap on the canvas never
+  // reached the page's own listener, so the menu stayed open over the canvas.
+  test('it has a close button, and a tap on the canvas closes it', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    const frame = page.frameLocator('#designPreview');
+    await frame.locator('#a h2').waitFor();
+    const open = () => page.evaluate(() => (window as any).openInsertMenu(0, null, { left: 20, top: 200, bottom: 220, right: 300 }));
+    const menu = page.locator('.blk-insertmenu');
+    await open();
+    await expect(menu).toBeVisible();
+    await menu.getByRole('button', { name: 'Close' }).click();
+    await expect(menu).toHaveCount(0);
+    await open();
+    await expect(menu).toBeVisible();
+    await page.waitForTimeout(50);                                     // its outside-tap listeners go on after the opening tap
+    await frame.locator('#b h2').dispatchEvent('pointerdown');
+    await expect(menu).toHaveCount(0);
+  });
+});
+
+test.describe('the section panel’s arrows keep the canvas pointing at the right section', () => {
+  // Item 79: the panel's own up, down and Remove changed the list without shifting the
+  // canvas's stamps, so until the redraw a canvas Edit opened the neighbour now at that index.
+  test('after the panel moves a section down, Edit on the canvas opens the section it shows', async ({ page }) => {
+    test.skip(isPhone(page), 'on a phone the section panel covers the canvas');
+    await mount(page, '/presence.html#design');
+    await page.route('**/functions/v1/presence/settings', async (route: Route) => {
+      if (route.request().method() === 'PUT') await new Promise((r) => setTimeout(r, 2500));   // the canvas keeps the old order meanwhile
+      return route.fallback();
+    });
+    const frame = page.frameLocator('#designPreview');
+    const editOn = async (id: string) => {
+      await frame.locator('#b' === id ? '#a' : '#b').hover();
+      await frame.locator(id).hover();
+      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    };
+    await editOn('#a');
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+    await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
+    await page.locator('#blkSub-0 button', { hasText: '↓' }).click();
+    expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');
+    await editOn('#a');                                   // the canvas still draws the title first
+    expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
+  });
+});
+
 test.describe('move the welcome section among the others', () => {
   const page_ = (movable: boolean) => '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="main">'
     + '<section class="hero" data-dds-core="hero"' + (movable ? ' data-dds-movable' : '') + '><h1 data-pr="identity.business_name">Marlow’s Kitchen</h1></section>'
@@ -1257,6 +1485,32 @@ test.describe('move the welcome section among the others', () => {
     await row.locator('button[aria-label="Move down"]').click();
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
+  });
+
+  // Item 79: each move is worked out when its save's turn comes, from the order the last one
+  // left; worked out at the press, the second press wrote the first move again.
+  // both presses land while the first save is still out
+  const slowSaves = (page: Page) => page.route('**/functions/v1/presence/settings', async (route: Route) => {
+    if (route.request().method() === 'PUT') await new Promise((r) => setTimeout(r, 500));
+    return route.fallback();
+  });
+  test('two quick presses on a built-in section’s arrow make two moves', async ({ page }) => {
+    const { writes, frame } = await canvas(page, true);
+    await slowSaves(page);
+    await frame.locator('section[data-dds-core="hero"]').hover();
+    const down = barButton(frame, 'Move this section down');
+    await down.click();
+    await down.click();
+    await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs'], ['about', 'offerings', 'hero', 'testimonials', 'faqs']]);
+  });
+  test('two quick presses on the Styles list’s arrow make two moves too', async ({ page }) => {
+    const { writes } = await canvas(page, true);
+    await slowSaves(page);
+    await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    const down = page.locator('#sectionsCard > div').filter({ hasText: 'About' }).locator('button').last();
+    await down.click();
+    await down.click();
+    await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs'], ['hero', 'offerings', 'testimonials', 'about', 'faqs']]);
   });
 });
 

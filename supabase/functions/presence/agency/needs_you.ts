@@ -55,8 +55,8 @@ export interface NeedsInput {
   enquiries?: Array<{ id: string; site_id: string; name?: string | null; email?: string | null; form_kind?: string | null; created_at?: string | null }>;
   /** open / in-progress support requests on the studio's own site */
   // client_id: the write-time stamp (or one healed from the requester's sign-in);
-  // requester_email: who wrote, when no customer could be named
-  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; client_id?: string | null; requester_email?: string | null; created_at?: string | null; updated_at?: string | null }>;
+  // requester_name / requester_email: who wrote, when no customer could be named (the contact's name first)
+  support?: Array<{ id: string; subject?: string | null; project_id?: string | null; client_id?: string | null; requester_email?: string | null; requester_name?: string | null; created_at?: string | null; updated_at?: string | null }>;
   /** the studio's active service links: project → customer */
   serviceLinks?: Array<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>;
   /** the studio's own deals (open stages) with their next step */
@@ -215,7 +215,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       const cust = stamped || custByProject.get(String(s.project_id || '')) || { client_id: null, site_id: null };
       if (cust.site_id && archivedSites.has(cust.site_id)) continue;
       const subject = String(s.subject || '').trim();
-      push({ key: `support:${s.id}`, kind: 'support', site_id: cust.site_id, client_id: cust.client_id, name: nameOf(cust.site_id, cust.client_id, String(s.requester_email || '').trim() || 'A customer'),
+      push({ key: `support:${s.id}`, kind: 'support', site_id: cust.site_id, client_id: cust.client_id, name: nameOf(cust.site_id, cust.client_id, String(s.requester_name || s.requester_email || '').trim() || 'A customer'),
         what: subject ? `support request: ${subject}` : 'has an open support request',
         when: `Opened ${ago(s.created_at || s.updated_at, today) || 'recently'}`,
         verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}` });

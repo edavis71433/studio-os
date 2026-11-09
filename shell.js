@@ -173,6 +173,57 @@
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   };
 
+  // ── An emailed reply's quoted earlier email (item 71, Nov 2026). A client who
+  //    answers by email sends back the whole thread under their words ("On Sun,
+  //    Nov 8 … wrote:" and every line after it starting with ">"), nested deeper
+  //    with each reply. ddsQuote.split finds that TRAILING quote and nothing else:
+  //    a client who answers INSIDE the quote (their lines between the ">" lines)
+  //    keeps the whole message as it is, and a message that is only a quote is
+  //    never folded to nothing. ddsQuote.html shows the reply and puts the rest
+  //    behind "Show earlier email" — folded, never cut.
+  /* quote-fold:start — pure; tests/presence/inbound_rough_edges_test.mjs runs this exact text */
+  function ddsSplitQuote(text) {
+    var s = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+    var lines = s.split('\n');
+    var ATTR = /\b(wrote|writes|escribió|a écrit|schrieb|scrisse|escreveu)\s*:\s*$/i;
+    var quoted = function (l) { return /^\s*>/.test(l); };
+    var blank = function (l) { return !/\S/.test(l); };
+    var restQuoted = function (from) {
+      var any = false;
+      for (var k = from; k < lines.length; k++) { if (blank(lines[k])) continue; if (!quoted(lines[k])) return false; any = true; }
+      return any;
+    };
+    var start = -1;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i], next = lines[i + 1] || '';
+      if (quoted(l)) { if (restQuoted(i)) { start = i; break; } continue; }
+      // Gmail / Apple Mail: "On <date>, <name> <address> wrote:" — Gmail wraps it, so "wrote:" may sit alone on the next line
+      if (ATTR.test(l) && restQuoted(i + 1)) { start = i; break; }
+      if (/^\s*On\s\S/i.test(l) && ATTR.test(next) && !quoted(next) && restQuoted(i + 2)) { start = i; break; }
+      // Outlook: "-----Original Message-----", or a From: line (under a rule of underscores) followed by Sent:/Date:
+      if (/^\s*-{2,}\s*Original Message\s*-{2,}\s*$/i.test(l)) { start = i; break; }
+      if (/^\s*From:\s*\S/i.test(l) && /^\s*(Sent|Date):\s*\S/i.test(next)) { start = (i > 0 && /^\s*_{8,}\s*$/.test(lines[i - 1])) ? i - 1 : i; break; }
+    }
+    var head = start > 0 ? lines.slice(0, start).join('\n').trim() : '';
+    if (!head) return { text: s.trim(), quoted: '' };
+    return { text: head, quoted: lines.slice(start).join('\n').trim() };
+  }
+  /* quote-fold:end */
+  window.ddsQuote = {
+    split: ddsSplitQuote,
+    html: function (text, esc) {
+      var raw = String(text == null ? '' : text);
+      var p = ddsSplitQuote(raw);
+      if (!p.quoted) return esc(raw);
+      if (!document.getElementById('dds-quoted-css')) {
+        var st = document.createElement('style'); st.id = 'dds-quoted-css';
+        st.textContent = '.dds-quoted{display:block;margin-top:8px;white-space:normal}.dds-quoted>summary{cursor:pointer;font-size:12px;color:var(--faint,#6b6478);min-height:24px;line-height:24px}.dds-quoted-body{white-space:pre-wrap;font-size:12.5px;color:var(--faint,#6b6478);border-left:2px solid var(--line,#e2dff0);padding-left:8px;margin-top:4px}';
+        document.head.appendChild(st);
+      }
+      return esc(p.text) + '<details class="dds-quoted"><summary>Show earlier email</summary><div class="dds-quoted-body">' + esc(p.quoted) + '</div></details>';
+    },
+  };
+
   // ── The list tools Customers, Contacts and Pipeline share (sales review items
   //    31, 32 and 39, Nov 2026): saved views, a column picker, "send an update to
   //    the people you picked" and the CSV import (the contacts importer, shared).
