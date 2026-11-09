@@ -2,6 +2,7 @@
 
 **For:** Eric, to pick a direction before the open builder items (34, 35, 36 and 118 to 125) get built. Nothing in the editor changes until you pick.
 **Figma:** [Website builder, bold directions](https://www.figma.com/design/HSP7ScFSz2mg1xGzHRrEZi?node-id=64-2), a new page in the same file as the sales pages. Three sections, A, B and C, each with a desktop frame and a phone frame. A also has a dark frame.
+**Eric's pick, Nov 9:** A, the floating studio. The editor gets built in it; B's Pages panel and C's text toolbar and bare plus come along inside it. The four cards not drawn in the first pass (Styles, Add section, Photos, Publish) are drawn in A on the same Figma page.
 **No client data.** Every drawing shows a made-up bakery, Marlow's Kitchen, which is the name the browser tests already use. The screenshots of today's editor came from the test harness with made-up content, not from a real site.
 
 ## What I walked
@@ -56,7 +57,7 @@ Change a colour: today two (Styles, scroll past the logo card). A, B and C: one 
 
 ## Which I'd pick, and why
 
-**A, the floating studio.**
+**A, the floating studio.** Eric picked it on Nov 9.
 
 - It is the Fresh & bold look itself: the floating white card, the pill toolbar, the plum Publish, the same Button, Chip and icon parts the sales pages use. The Sites page opens into an editor that looks like the same product.
 - It keeps the one rule today's editor gets right, the site is the only big colour, and goes further: the page runs edge to edge and the chrome sits on top of it instead of boxing it in.
