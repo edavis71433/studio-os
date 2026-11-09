@@ -342,6 +342,14 @@ html.dds-embed .dds-waffle{display:none!important}
 .dds-toast.err{background:#9a4242}
 .dds-toast .ico{flex:0 0 auto;font-weight:700}
 @media (prefers-reduced-motion:reduce){.dds-toast{transition:none}}
+/* Sales list item 43: beside the sidebar, the tip and the toast centre on the
+   content, not the window. On an upright iPad (820px) the tip slid under the
+   sidebar and lost its first words. */
+@media (min-width:761px){
+  html.dds-side .dds-hint,html.dds-side .dds-toast{left:calc(50% + (var(--dds-side-w) + var(--dds-side-gap) * 2) / 2)}
+  html.dds-side .dds-hint{max-width:min(560px,calc(100vw - var(--dds-side-w) - var(--dds-side-gap) * 2 - 32px))}
+  html.dds-side .dds-toast{max-width:min(460px,calc(100vw - var(--dds-side-w) - var(--dds-side-gap) * 2 - 32px))}
+}
 
 /* Legacy alias tokens — a few components referenced --dds-accent; keep them
    pointing at the real palette so dark mode never falls back to light values. */
@@ -415,6 +423,29 @@ html.dds-embed .dds-waffle{display:none!important}
 @media (max-width:760.98px){
   .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-waffle){ min-height:44px; }
   .dds-ic{ width:44px; height:44px; }
+}
+/* 4b) The same floor on any touch screen (sales list item 43, Nov 2026). An iPad
+      is wider than a phone, so block 4 never reached it: walked in real iPad
+      Safari, the sidebar rows and search were 36px, the bell 34px, view
+      switches and stage chips 23–27px, row buttons ~30px, the Inbox filters
+      21px. (pointer:coarse) is a finger-first device at any width; it also
+      lifts the record's 32px action buttons, tabs and filters on phones. */
+@media (pointer:coarse){
+  .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-waffle){ min-height:44px; }
+  .dds-ic,html.dds-side.dds-app .dds-ic,html.dds-side.dds-app #dds-waffle{ width:44px; height:44px; }
+  html.dds-side .dds-nav .sec > .it,html.dds-side .dds-nav .sec .menu a,html.dds-side #dds-search{ min-height:44px; }
+  html.dds-app .lbtn,html.dds-app .rowact,html.dds-app .abtn,html.dds-app .seg button,html.dds-app .fchips button,
+  html.dds-app .filters button,html.dds-app .managerow button,html.dds-app .cardmenu button,html.dds-app .tdone,
+  html.dds-app .thb,html.dds-app #viewBtn,html.dds-app input.search,html.dds-app .ti-head,html.dds-app .composer-row button,
+  html.dds-app .dds-hint button,html.dds-app .trow a,html.dds-app .rrows a,html.dds-app .crow button,html.dds-app [role="tab"]{ min-height:44px; }
+  /* links that sit in a header or a sentence: tall enough to hit, same look */
+  html.dds-app .hchip,html.dds-app .hgo,html.dds-app .nall,html.dds-app a.back,html.dds-app .link-btn,
+  html.dds-app .ti-link,html.dds-app .rec-sub a,html.dds-app .dkv a{ display:inline-flex; align-items:center; min-height:44px; }
+  /* Safari draws a native drop-down at its own height whatever min-height says
+     (batch C found it on phones), so on touch screens the app draws its own */
+  html.dds-app select:not([multiple]){ min-height:44px; -webkit-appearance:none; appearance:none; padding-right:30px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 11px center; background-size:10px 6px; }
 }
 
 /* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css

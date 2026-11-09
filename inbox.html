@@ -35,8 +35,8 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none !important}}
 
-  /* ── the console: split view ≥760px (list pane · edge toggle · reading pane) ── */
-  .console{display:flex;align-items:stretch;height:calc(100vh - var(--dds-shell-h,54px));overflow:hidden}
+  /* ── the console: split view ≥1024px (list pane · edge toggle · reading pane) ── */
+  .console{display:flex;align-items:stretch;height:calc(100vh - var(--dds-shell-h,54px));height:calc(100dvh - var(--dds-shell-h,54px));overflow:hidden}   /* dvh: the screen Safari shows — 100vh ran under an iPad's toolbar and hid Send */
   .lpane{width:24rem;max-width:80vw;flex:0 0 auto;display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--line)}
   .console.collapsed .lpane{display:none}
   .edge{flex:0 0 auto;width:16px;border:none;border-right:1px solid var(--line);background:var(--card);color:var(--faint);cursor:pointer;padding:0;font-size:9px;border-radius:0}
@@ -231,7 +231,7 @@
     .edge{display:none}
     .rpane{display:none}
     .console.pane-open .lpane{display:none}
-    .console.pane-open .rpane{display:flex;height:calc(100vh - var(--dds-shell-h,54px) - 72px)}
+    .console.pane-open .rpane{display:flex;height:calc(100vh - var(--dds-shell-h,54px) - 72px);height:calc(100dvh - var(--dds-shell-h,54px) - 72px - env(safe-area-inset-bottom,0px))}   /* dvh: the screen Safari actually shows (100vh assumes its toolbars are hidden, which pushed the reply buttons under the bar) */
     .pback{display:inline-flex}
   }
 
@@ -308,6 +308,36 @@
     .lpane{width:100%}
     .console.pane-open .rpane{border-radius:var(--dds-r-lg,16px)}
   }
+  /* ── Sales list item 43 (walked in real iPad and iPhone Safari, Nov 2026) ──
+     An iPad held upright (760–1023px) has the sidebar, so the split view left
+     the reading pane ~180px wide: the name ran over three lines, Resolve and
+     Close sat on top of the chips, and Send hung off the edge. Stack there
+     too — list first, a picked conversation pushes in with ← Inbox — at full
+     height, since there is no phone bar beside the sidebar. */
+  @media (min-width:760px) and (max-width:1023px){
+    .console{display:block;height:auto;min-height:calc(100vh - 24px);overflow:visible}
+    .lpane{width:100%;max-width:none;border-right:none}
+    #rows{overflow:visible}
+    .edge{display:none}
+    .rpane{display:none}
+    .console.pane-open .lpane{display:none}
+    .console.pane-open .rpane{display:flex;height:calc(100vh - 24px);height:calc(100dvh - 24px)}
+    .pback{display:inline-flex}
+  }
+  /* Narrower than a wide laptop, the pane header and the reply row wrap rather
+     than squeeze: the triage buttons drop under the name, and the "they get an
+     email" line takes its own row above the buttons (on a 402px iPhone it was
+     one word per line and pushed Send off the screen). */
+  @media (max-width:1279px){
+    .phead{flex-wrap:wrap;row-gap:var(--dds-s2,8px)}
+    .phead>div:not(.pacts){flex:1 1 160px}
+    .crow{flex-wrap:wrap;row-gap:var(--dds-s2,8px)}
+    .crow>.muted{flex:1 0 100%}
+    .crow>button.primary{margin-left:auto}   /* Send keeps the right-hand end even on a row of its own */
+  }
+  /* The list column is 21rem up to 1100px, where the 24px view title spilled
+     into "Send an update". That link is also under ⋯, so it steps aside there. */
+  @media (min-width:1024px) and (max-width:1100px){a.lsend{display:none}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -902,16 +932,17 @@ function openItem(id){
   if(it.thread_key)api('/threads/read','POST',{thread_key:it.thread_key}).catch(()=>{});
   renderList();
   renderPane();
-  const c=$('console');if(c)c.classList.add('pane-open');   // <760px: push the pane in
+  const c=$('console');if(c)c.classList.add('pane-open');   // stacked (<1024px): push the pane in
   focusPane();
 }
 // a11y: opening a conversation must MOVE focus — on mobile the list is hidden and
-// focus would drop to <body> with nothing announced. Mobile (<760px) → the back
-// button; desktop → the pane heading (tabindex=-1: focusable, not in tab order).
-// The pane head renders synchronously, so this runs before the body loads.
+// focus would drop to <body> with nothing announced. Stacked (<1024px: phones and
+// an upright iPad) → the back button; split view → the pane heading (tabindex=-1:
+// focusable, not in tab order). The pane head renders synchronously, so this runs
+// before the body loads.
 function focusPane(){
   const back=$('paneBack');
-  if(window.matchMedia('(max-width:759px)').matches&&back){back.focus();return;}
+  if(window.matchMedia('(max-width:1023px)').matches&&back){back.focus();return;}
   const h=document.querySelector('#rpane .pname');
   if(h){h.setAttribute('tabindex','-1');h.focus();}
 }
