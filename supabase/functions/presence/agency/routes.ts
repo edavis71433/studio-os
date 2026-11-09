@@ -19,6 +19,8 @@ import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo } from './kit_io.ts';
 import { handleAgencySites } from './sites.ts';
+import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
+import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
@@ -180,6 +182,24 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     // email + member_id: the Team section needs to know which row is YOURS (no
     // controls on yourself). The server guard below is the law; this is the hint.
     return json({ data: { agency: member.agency_name, role: member.role, plan: member.plan, branding: member.branding, email: member.email, member_id: member.member_id } }, 200, cors);
+  }
+
+  // ── item 54: the menu areas this studio hides (Settings › Your menu). Kept once per
+  //    studio on its own site; every member sees the same menu. Nothing is deleted: a
+  //    hidden area keeps its page, its buttons elsewhere and its ⌘K entry. ──
+  if (route === '/agency/nav' && (method === 'GET' || method === 'PUT')) {
+    if (!can(member.role, method === 'GET' ? 'read' : 'manage_clients')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Your menu is kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    if (method === 'PUT') {
+      let b: { hidden?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+      if (!Array.isArray(b.hidden)) return json({ error: 'bad_request', message: 'Say which areas to hide, as a list.' }, 400, cors);
+      const hidden = normalizeHidden(b.hidden);
+      if (!(await writeReservedJson(own.id, RESERVED_NAMES.navHidden, { hidden }, member.email))) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
+    }
+    const hidden = normalizeHidden(await readReservedJson(own.id, RESERVED_NAMES.navHidden));
+    return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
   }
 
   // ── the Sites and Domains pages, Pin and Duplicate (builder list items 43, 45, 52) ──

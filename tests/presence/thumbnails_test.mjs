@@ -31,7 +31,7 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
 
 // every sample still draws through the real renderer
 {
-  const pages = allPages().sections;
+  const pages = (await allPages()).sections;
   const missing = offered.filter((t) => !pages[t] || !drew(t, pages[t]));
   ok('every sample draws a section', missing.length === 0, missing.join(', '));
 }

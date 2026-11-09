@@ -31,10 +31,36 @@ export interface NavContext {
   editionKey?: EditionKey;      // Phase D: the FEATURE edition; when absent, all features (today's behavior)
   isManagedClient?: boolean;    // the caller is an agency's CLIENT signed into their OWN (bridged) site — client experience, not operator tools
   scoped?: boolean;             // Phase 1 overhaul: an agency operator drilled INTO a client (x-dds-scope-site set) — the client's Website is primary there
+  hiddenSections?: string[];    // builder list item 54: menu areas the studio hid (studio level only); their items become ⌘K-only, nothing is deleted
   siteLive?: boolean;           // Oct 2026 nav cut: the site has been published (presence_sites.status 'live' / last_published_at) — "Get started" is listed only until then
 }
 
 const has = (c: NavContext, cap: SiteCapability) => c.capabilities.includes(cap);
+
+/** Item 54: the studio-level areas a studio may take out of its menu, with the
+ *  words Settings shows for each. Home and Settings stay; a hidden area keeps
+ *  its page, its buttons elsewhere and its ⌘K entry. */
+export const HIDEABLE_SECTIONS: ReadonlyArray<{ key: string; label: string; what: string }> = [
+  { key: 'sites', label: 'Sites', what: 'Every client’s website as a card, and their domains.' },
+  { key: 'inbox', label: 'Inbox', what: 'Messages, approvals, notices and new enquiries.' },
+  { key: 'customers', label: 'Customers', what: 'Your customers and the people at each.' },
+  { key: 'pipeline', label: 'Pipeline', what: 'Deals by stage, proposals and agreements.' },
+  { key: 'projects', label: 'Projects', what: 'The work you do for each client.' },
+  { key: 'files', label: 'Files', what: 'Photos, brand files and documents.' },
+];
+export const hideableKey = (k: unknown): k is string => HIDEABLE_SECTIONS.some((h) => h.key === k);
+/** The stored list, cleaned: known keys only, each once. */
+export function normalizeHidden(raw: unknown): string[] {
+  const list = raw && typeof raw === 'object' && Array.isArray((raw as { hidden?: unknown }).hidden) ? (raw as { hidden: unknown[] }).hidden : Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const k of list) if (hideableKey(k) && !out.includes(k)) out.push(k);
+  return out;
+}
+/** A section the studio hid keeps every item, ⌘K-only, so the shell draws nothing for it. */
+function applyHidden(sections: NavSection[], hidden: string[] | undefined): NavSection[] {
+  if (!hidden || !hidden.length) return sections;
+  return sections.map((s) => hidden.includes(s.key) && !s.utility ? { ...s, items: s.items.map((i) => ({ ...i, hidden: true })) } : s);
+}
 const canDraft = (c: NavContext) => c.edition !== 'monitor' && has(c, 'edit');       // Monitor never drafts
 const canPublish = (c: NavContext) => c.edition !== 'monitor' && has(c, 'publish');
 
@@ -253,7 +279,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // Help — the ? icon in every menu's foot; the page stays a ⌘K entry.
   sections.push({ key: 'help', label: 'Help', items: [hid('help', 'Help', '/help.html')], utility: true });
 
-  return sections.filter((s) => s.items.length > 0);
+  return applyHidden(sections.filter((s) => s.items.length > 0), studioLevel ? c.hiddenSections : undefined);
 }
 
 /** The caller's landing surface, by role + edition. A CMS-Only account lands on

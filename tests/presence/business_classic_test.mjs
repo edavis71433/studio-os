@@ -32,7 +32,7 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
 
 // ═══ 2. plumber: Services vocabulary + Plumber schema (the fix, rendered) ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   ok('plumber: /services/ page exists, no /menu/', 'services/index.html' in f && !('menu/index.html' in f));
   const home = f['index.html'];
   ok('plumber: @type Plumber on the home page', home.includes('"@type":"Plumber"'));
@@ -43,15 +43,15 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
 
 // ═══ 3. other industries flip correctly from the SAME render ═══
 {
-  ok('salon → HairSalon', render('salon')['index.html'].includes('"@type":"HairSalon"'));
-  ok('retail → Store + Products page', (() => { const f = render('retail'); return f['index.html'].includes('"@type":"Store"') && 'products/index.html' in f; })());
-  ok('restaurant on business-classic → Restaurant + Menu vocabulary', (() => { const f = render('restaurant'); return f['index.html'].includes('"@type":"Restaurant"') && 'menu/index.html' in f && f['menu/index.html'].includes('MenuItem'); })());
-  ok('unknown/generic → LocalBusiness (safe)', render('generic')['index.html'].includes('"@type":"LocalBusiness"'));
+  ok('salon → HairSalon', (await render('salon'))['index.html'].includes('"@type":"HairSalon"'));
+  ok('retail → Store + Products page', await (async () => { const f = await render('retail'); return f['index.html'].includes('"@type":"Store"') && 'products/index.html' in f; })());
+  ok('restaurant on business-classic → Restaurant + Menu vocabulary', await (async () => { const f = await render('restaurant'); return f['index.html'].includes('"@type":"Restaurant"') && 'menu/index.html' in f && f['menu/index.html'].includes('MenuItem'); })());
+  ok('unknown/generic → LocalBusiness (safe)', (await render('generic'))['index.html'].includes('"@type":"LocalBusiness"'));
 }
 
 // ═══ 4. production contract: files, a11y, SEO plumbing ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   const expected = ['index.html', 'services/index.html', 'about/index.html', 'faq/index.html', 'contact/index.html', 'thanks/index.html', 'updates/index.html', '404.html', 'favicon.svg', 'sitemap.xml', 'robots.txt'];
   ok('full production file set', expected.every((k) => k in f), expected.filter((k) => !(k in f)).join(','));
   // full pages only — redirect stubs are intentionally-minimal meta-refresh files
@@ -74,33 +74,33 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
 
 // ═══ 5. the Phase-V essentials carry over ═══
 {
-  const f = render('plumber', { announcement: { text: 'Closed July 4th', expires_at: null }, });
+  const f = await render('plumber', { announcement: { text: 'Closed July 4th', expires_at: null }, });
   ok('announcement bar renders site-wide', f['index.html'].includes('class="annbar"') && f['about/index.html'].includes('Closed July 4th'));
-  const contact = render('plumber')['contact/index.html'];
+  const contact = (await render('plumber'))['contact/index.html'];
   ok('form: honeypot + hidden kind/source + posts to the endpoint', contact.includes('name="_hp"') && contact.includes('name="form_kind"') && contact.includes(SITE.formEndpoint));
-  ok('thanks page: noindex + calm copy', render('plumber')['thanks/index.html'].includes('name="robots" content="noindex"'));
+  ok('thanks page: noindex + calm copy', (await render('plumber'))['thanks/index.html'].includes('name="robots" content="noindex"'));
 }
 
 // ═══ 5b. Phase Q: the generated legal foundation ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   ok('privacy + accessibility pages generated', 'privacy/index.html' in f && 'accessibility/index.html' in f);
   const pv = f['privacy/index.html'];
   ok('privacy: facts-true (title + contact-form coverage + effective date)', pv.includes('Privacy policy') && pv.includes('contact form') && pv.includes('Effective '));
   // item 61: every published page carries the first-party visit counter, so the page says so
   ok('privacy: no cookies, and the visit counter described as it is', pv.includes('no cookies') && pv.includes('counts its own visits') && pv.includes('without any outside analytics') && pv.includes('Do Not Track') === false && pv.includes('asks websites not to track you') && !pv.includes('no analytics or tracking'));
-  const off = render('plumber', { visit_counter: false })['privacy/index.html'];
+  const off = (await render('plumber', { visit_counter: false }))['privacy/index.html'];
   ok('privacy: with the counter switched off, the page says the site counts nothing', off.includes('does not count or track visits') && !off.includes('counts its own visits'));
   ok('accessibility: promises the template actually keeps', f['accessibility/index.html'].includes('keyboard') && f['accessibility/index.html'].includes('written description'));
   ok('every page footer links Privacy · Accessibility', f['index.html'].includes('href="/privacy/"') && f['about/index.html'].includes('href="/accessibility/"'));
   ok('sitemap includes the legal pages', f['sitemap.xml'].includes('/privacy/') && f['sitemap.xml'].includes('/accessibility/'));
-  const noForm = renderSnapshot(snapFor('plumber'), { baseUrl: 'https://example.com' });
+  const noForm = await renderSnapshot(snapFor('plumber'), { baseUrl: 'https://example.com' });
   ok('no form endpoint → privacy honestly says nothing is collected', noForm['privacy/index.html'].includes('no forms and collects nothing'));
 }
 
 // ═══ 5b+. item 62: a message that didn't send says why, and goes back with the words kept ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   const ns = f['not-sent/index.html'];
   ok('not-sent: the page exists, noindex, out of the sitemap, disallowed for robots', !!ns && ns.includes('name="robots" content="noindex"') && !f['sitemap.xml'].includes('/not-sent/') && f['robots.txt'].includes('Disallow: /not-sent/'));
   ok('not-sent: says it didn’t send, with a line per reason and a general one', ns.includes('Your message didn’t send.') && NOT_SENT_REASONS.every((r) => ns.includes(`id="ns-${r}"`)) && ns.includes('ns-general'));
@@ -110,47 +110,47 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   const route = await Deno.readTextFile(new URL('supabase/functions/presence/routes/commercial.ts', ROOT));
   ok('route: every failed browser submission goes to the page; the contact page is only the old-site fallback and the gone-form case', (route.match(/await notSent\(/g) || []).length === 4 && (route.match(/redirectTo\('\/contact\/'\)/g) || []).length === 2);
   const slugs = listTemplates().map((t) => t.slug);
-  const each = slugs.map((slug) => { const sn = snapFor('plumber'); sn.template_slug = slug; const g = renderSnapshot(sn, SITE); const h = String(g['not-sent/index.html'] || ''); return [slug, h.includes('Your message didn’t send.') && h.includes('content="noindex"') && (h.match(/<h1[\s>]/g) || []).length === 1 && h.includes('aria-current="page"')]; });
+  const each = await Promise.all(slugs.map(async (slug) => { const sn = snapFor('plumber'); sn.template_slug = slug; const g = await renderSnapshot(sn, SITE); const h = String(g['not-sent/index.html'] || ''); return [slug, h.includes('Your message didn’t send.') && h.includes('content="noindex"') && (h.match(/<h1[\s>]/g) || []).length === 1 && h.includes('aria-current="page"')]; }));
   ok('not-sent: all eight templates draw it, noindex, one heading, Contact marked in the menu', slugs.length === 8 && each.every(([, good]) => good), each.filter(([, g]) => !g).map(([s]) => s).join(','));
 }
 
 // ═══ 5b++. item 67: the social share image uses the chosen cover photo ═══
 {
   const cover = { variants: { w400: '/img/cv-400.webp', w800: '/img/cv-800.webp', w1600: '/img/cv-1600.webp' }, alt: 'The dining room', width: 1600, height: 1067 };
-  const home = render('plumber', { cover, og_image: null })['index.html'];
+  const home = (await render('plumber', { cover, og_image: null }))['index.html'];
   ok('share image: the chosen cover photo when no share image is set', /property="og:image" content="[^"]*\/img\/cv-1600\.webp"/.test(home));
-  const own = render('plumber', { cover, og_image: { variants: { w1600: '/img/og-1600.webp' }, alt: '' } })['index.html'];
+  const own = (await render('plumber', { cover, og_image: { variants: { w1600: '/img/og-1600.webp' }, alt: '' } }))['index.html'];
   ok('share image: a share image the owner set still wins', /property="og:image" content="[^"]*\/img\/og-1600\.webp"/.test(own));
 }
 
 // ═══ 5c. Phase Z: search-engine verification — a field, not a technical task ═══
 {
-  const f = render('plumber', { verification: { google: 'GTOKEN123', bing: 'BTOKEN456' } });
+  const f = await render('plumber', { verification: { google: 'GTOKEN123', bing: 'BTOKEN456' } });
   ok('verification meta tags render on every page when set', f['index.html'].includes('name="google-site-verification" content="GTOKEN123"') && f['about/index.html'].includes('name="msvalidate.01" content="BTOKEN456"'));
-  ok('no tokens → no verification meta (clean default)', !render('plumber')['index.html'].includes('google-site-verification'));
+  ok('no tokens → no verification meta (clean default)', !(await render('plumber'))['index.html'].includes('google-site-verification'));
 }
 
 // ═══ 5d. Phase CP-2: the Design Studio renders ═══
 {
-  const css = render('plumber')[Object.keys(render('plumber')).find((k) => k.startsWith('assets/'))];
+  const css = (await render('plumber'))[Object.keys(await render('plumber')).find((k) => k.startsWith('assets/'))];
   ok('CSS adopts the studio tokens (type/scale/density/radius/bg vars with safe fallbacks)',
     css.includes('var(--font-body,') && css.includes('var(--font-display,') && css.includes('var(--font-scale,1)') && css.includes('var(--spacing-scale,1)') && css.includes('var(--radius,') && css.includes('var(--bg,'));
-  const hidden = render('plumber', { sections: { hidden: ['testimonials', 'faqs'], order: [] } })['index.html'];
+  const hidden = (await render('plumber', { sections: { hidden: ['testimonials', 'faqs'], order: [] } }))['index.html'];
   ok('sections hide (testimonials+faqs off the home page, kept elsewhere)', !hidden.includes('What customers say') && !hidden.includes('Good to know') && hidden.includes('About us'));
-  const reordered = render('plumber', { sections: { hidden: [], order: ['faqs', 'about'] } })['index.html'];
+  const reordered = (await render('plumber', { sections: { hidden: [], order: ['faqs', 'about'] } }))['index.html'];
   ok('sections reorder (faqs before about)', reordered.indexOf('Good to know') < reordered.indexOf('About us'));
-  const noSet = render('plumber')['index.html'];
+  const noSet = (await render('plumber'))['index.html'];
   ok('no settings → all four sections in default order', noSet.indexOf('About us') < noSet.indexOf('What customers say'));
   // The welcome section moves like the others, and its address strip moves with it.
   const at = (h, needle) => h.indexOf(needle);
   ok('the welcome section is stamped movable for the builder', noSet.includes('data-dds-core="hero" data-dds-movable'));
   ok('no settings → the welcome section comes first', at(noSet, 'data-dds-core="hero"') < at(noSet, 'About us'));
-  const heroDown = render('plumber', { sections: { hidden: [], order: ['about', 'hero', 'offerings', 'testimonials', 'faqs'] } })['index.html'];
+  const heroDown = (await render('plumber', { sections: { hidden: [], order: ['about', 'hero', 'offerings', 'testimonials', 'faqs'] } }))['index.html'];
   ok('a saved order can put the welcome section below About', at(heroDown, 'About us') < at(heroDown, 'data-dds-core="hero"'));
   const stripAt = at(heroDown, 'class="strip"');
   ok('the address strip follows the welcome section wherever it goes', stripAt > at(heroDown, 'data-dds-core="hero"') && stripAt < at(heroDown, 'data-dds-core="offerings"'));
   ok('an order saved before the welcome section could move leaves it first', at(reordered, 'data-dds-core="hero"') < at(reordered, 'Good to know'));
-  const heroOff = render('plumber', { sections: { hidden: ['hero'], order: ['about', 'hero'] } })['index.html'];
+  const heroOff = (await render('plumber', { sections: { hidden: ['hero'], order: ['about', 'hero'] } }))['index.html'];
   ok('with the welcome section removed, the strip keeps its place at the top', !heroOff.includes('data-dds-core="hero"') && at(heroOff, 'class="strip"') < at(heroOff, 'About us'));
   ok('the welcome section appears once', (heroDown.match(/data-dds-core="hero"/g) || []).length === 1 && (heroDown.match(/class="strip"/g) || []).length === 1);
   // DS-6 split hero consumes DS-5 focal — the first cropping presentation
@@ -159,28 +159,28 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   if (heroOffering) heroOffering.media.focal = { x: 100, y: 0 };
   base.template_slug = 'business-classic'; base.template_version = '1.0.0';
   base.content.settings = { ...(base.content.settings || {}), industry: 'plumber', hero_layout: 'split' };
-  const split = renderSnapshot(base, SITE)['index.html'];
+  const split = (await renderSnapshot(base, SITE))['index.html'];
   ok('split hero renders with object-fit cropping + the focal point', split.includes('hero-split') && split.includes('object-position:100% 0%'));
-  const centeredNav = render('plumber', { nav_style: 'centered' })['index.html'];
+  const centeredNav = (await render('plumber', { nav_style: 'centered' }))['index.html'];
   ok('centered header style applies via class', centeredNav.includes('wrap nav centered'));
-  const noFooter = render('plumber', { footer: { hours: false, social: false } })['index.html'];
+  const noFooter = (await render('plumber', { footer: { hours: false, social: false } }))['index.html'];
   ok('footer toggles hide hours + social', !noFooter.includes('<caption>Hours</caption>'));
 }
 
 // ═══ 5e. Phase SD: search visibility as human questions ═══
 {
-  const f = render('plumber', { pages_noindex: ['faq', 'contact'] });
+  const f = await render('plumber', { pages_noindex: ['faq', 'contact'] });
   ok('hidden pages get noindex + leave the sitemap (but still exist)', f['faq/index.html'].includes('content="noindex"') && f['contact/index.html'].includes('content="noindex"') && !f['sitemap.xml'].includes('/faq/') && !f['sitemap.xml'].includes('/contact/') && f['sitemap.xml'].includes('/services/'));
-  ok('default: nothing customer-facing is noindexed (only /thanks/)', !render('plumber')['faq/index.html'].includes('content="noindex"'));
-  const ov = render('plumber', { page_seo: { about: { title: 'Meet the crew', description: 'Two generations of pipes.' } } });
+  ok('default: nothing customer-facing is noindexed (only /thanks/)', !(await render('plumber'))['faq/index.html'].includes('content="noindex"'));
+  const ov = await render('plumber', { page_seo: { about: { title: 'Meet the crew', description: 'Two generations of pipes.' } } });
   ok('per-page search wording overrides title + description', ov['about/index.html'].includes('<title>Meet the crew</title>') && ov['about/index.html'].includes('content="Two generations of pipes."'));
-  ok('blank overrides keep the good defaults', render('plumber')['about/index.html'].includes('<title>About — '));
+  ok('blank overrides keep the good defaults', (await render('plumber'))['about/index.html'].includes('<title>About — '));
   const base = JSON.parse(JSON.stringify(fixture));
   base.template_slug = 'business-classic'; base.template_version = '1.0.0';
   base.content.settings = { ...(base.content.settings || {}), industry: 'plumber' };
   if (base.content.posts[0]) {
     base.content.posts[0].noindex = true;
-    const pf = renderSnapshot(base, SITE);
+    const pf = await renderSnapshot(base, SITE);
     const slug = base.content.posts[0].slug;
     ok('a post can be hidden from Google (noindex + out of the sitemap, still published)', pf[`updates/${slug}/index.html`].includes('content="noindex"') && !pf['sitemap.xml'].includes(`/updates/${slug}/`) && (`updates/${slug}/index.html` in pf));
   }
@@ -188,7 +188,7 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
 
 // ═══ 6. determinism ═══
 {
-  const a = render('plumber'), b = render('plumber');
+  const a = await render('plumber'), b = await render('plumber');
   ok('same snapshot → same bytes', JSON.stringify(Object.keys(a).sort()) === JSON.stringify(Object.keys(b).sort()) && a['index.html'] === b['index.html'] && a['sitemap.xml'] === b['sitemap.xml']);
 }
 

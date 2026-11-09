@@ -18,7 +18,7 @@ const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 // The exact publish-time injection: render a real snapshot, then merge over the
 // template's own `_headers` the way routes/publish.ts does.
 const fixture = JSON.parse(read('supabase/functions/presence/templates/restaurant-classic/1.0.0/fixture.json'));
-const fileMap = renderSnapshot(fixture, { baseUrl: 'https://example-tenant.example' });
+const fileMap = await renderSnapshot(fixture, { baseUrl: 'https://example-tenant.example' });
 const templateHeaders = String(fileMap['_headers'] ?? '');
 const merged = mergeSecurityHeaders(typeof templateHeaders === 'string' ? templateHeaders : undefined);
 

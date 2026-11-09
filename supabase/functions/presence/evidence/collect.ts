@@ -95,7 +95,7 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
   let fileMapFrom: ObservationInput['fileMapFrom'] = 'none';
   const contentToRender = live ?? snapshot.content;
   try {
-    const fm = t.render(
+    const fm = await t.render(
       { content: structuredClone(contentToRender), content_contract_version: snapshot.content_contract_version, template_slug: site.template_slug, template_version: site.template_version, created_at: now },
       t.manifest,
       { baseUrl: 'https://observe.invalid' },

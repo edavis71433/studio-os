@@ -14,6 +14,7 @@
 //   DELETE /crm/notes/:id          — soft-delete
 import { loadCustomerNames } from '../lib/customer_names.ts';
 import { loadStageLabels, renameMovedTo } from '../lib/stage_names.ts';
+import { callerToday } from '../lib/sales_lifecycle.ts';
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -397,7 +398,9 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
       tasks.map((t) => mapDoneTask(t, dealId)),
       siteEvents,
     ]);
-    const upcoming = buildUpcoming({ tasks, deal, invoices }, now);
+    // item 65: the band's "overdue" is judged on the record page's local day (?today=),
+    // the UTC day without it; buildUpcoming reads only the day part of what it is given
+    const upcoming = buildUpcoming({ tasks, deal, invoices }, callerToday(new URL(req.url).searchParams.get('today'), now));
     return json({ data: {
       upcoming, items,
       project_id: conv.projectId || null, deal_id: dealId || null,

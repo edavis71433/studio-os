@@ -194,6 +194,55 @@ test.describe('Settings page', () => {
     expect(seen.filter(([p, scope]) => p === '/identity' && scope !== CLIENT)).toEqual([]);   // the profile read IS the client's
   });
 
+  // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
+  test('item 54 — Your menu: a switch per area, saved as you flip it; a failed save flips back; never inside a client or for an owner', async ({ page }) => {
+    const CHOICES = [
+      { key: 'sites', label: 'Sites', what: 'Every client’s website as a card, and their domains.' }, { key: 'inbox', label: 'Inbox', what: 'Messages.' },
+      { key: 'customers', label: 'Customers', what: 'Your customers.' }, { key: 'pipeline', label: 'Pipeline', what: 'Deals.' },
+      { key: 'projects', label: 'Projects', what: 'Work.' }, { key: 'files', label: 'Files', what: 'Photos.' },
+    ];
+    const puts: unknown[] = [];
+    let fail = false;
+    await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX } });
+    await page.route(/\/functions\/v1\/presence\/agency\/nav$/, (route) => {
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON(); puts.push(body);
+        if (fail) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save.' }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { hidden: body.hidden, choices: CHOICES } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { hidden: ['files'], choices: CHOICES } }) });
+    });
+    await page.goto('/settings.html');
+    await expect(page.locator('[data-card="menu"]')).toHaveAttribute('href', '#menu');
+    await page.locator('[data-card="menu"]').click();
+    const sec = page.locator('#menu');
+    await expect(sec).toBeVisible();
+    await expect(sec.locator('[role="switch"]')).toHaveCount(6);
+    await expect(sec.locator('#sw-menu-files')).toHaveAttribute('aria-checked', 'false');      // hidden reads as off
+    await expect(sec.locator('#sw-menu-sites')).toHaveAttribute('aria-checked', 'true');
+    await expect(sec).toContainText('Home and Settings always stay');
+    await sec.locator('#sw-menu-pipeline').click();
+    await expect(sec.locator('#sw-menu-pipeline')).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('.dds-toast').last()).toContainText('Hidden. The menu changes the next time a page opens.');
+    expect(puts).toEqual([{ hidden: ['files', 'pipeline'] }]);
+    await sec.locator('#sw-menu-files').click();                                                   // back on
+    expect(puts[1]).toEqual({ hidden: ['pipeline'] });
+    await expect(sec.locator('#sw-menu-files')).toHaveAttribute('aria-checked', 'true');
+    fail = true;
+    await sec.locator('#sw-menu-sites').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('That didn’t save.');
+    await expect(sec.locator('#sw-menu-sites')).toHaveAttribute('aria-checked', 'true');       // flipped back
+    // inside a client there is no such card; a plain owner has none either
+    await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('#cards .setcard').first()).toBeVisible();
+    await expect(page.locator('[data-card="menu"]')).toHaveCount(0);
+    await installApp(page, { api: API });
+    await page.goto('/settings.html');
+    await expect(page.locator('#cards .setcard').first()).toBeVisible();
+    await expect(page.locator('[data-card="menu"]')).toHaveCount(0);
+  });
+
   test('cards a plan or role does not include are left out; the billing card is owner-only', async ({ page }) => {
     const ctx = { data: {
       site_role: 'business_owner', edition: 'presence', edition_key: 'cms_only', edition_name: 'CMS', edition_features: ['website', 'forms'],

@@ -19,7 +19,7 @@ for (const slug of TEMPLATES) {
   const fx = JSON.parse(Deno.readTextFileSync(new URL(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`, ROOT)));
   fx.template_slug = slug; fx.template_version = '1.0.0';
   fx.dev_customization = { theme_tokens: TOKENS, custom_css: '', custom_html: '' };
-  const out = renderSnapshot(fx, SITE);
+  const out = await renderSnapshot(fx, SITE);
   const css = Object.entries(out).filter(([k]) => k.startsWith('assets/') && k.endsWith('.css')).map(([, v]) => String(v)).join('\n');
   const home = String(out['index.html']);
   ok(`[${slug}] the chosen tokens are on the page`, home.includes('id="presence-dev"') && home.includes('--font-display:') && home.includes('--accent:#23635a'));
@@ -32,7 +32,7 @@ for (const slug of TEMPLATES) {
 }
 {
   const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/restaurant-classic/1.0.0/fixture.json', ROOT)));
-  const css = Object.entries(renderSnapshot(fx, SITE)).filter(([k]) => k.startsWith('assets/') && k.endsWith('.css')).map(([, v]) => String(v)).join('\n');
+  const css = Object.entries(await renderSnapshot(fx, SITE)).filter(([k]) => k.startsWith('assets/') && k.endsWith('.css')).map(([, v]) => String(v)).join('\n');
   ok('[restaurant-classic] the menu’s category headings follow the body font', /\.menu-cat h2\{[^}]*font-family:var\(--font-body/.test(css));
 }
 

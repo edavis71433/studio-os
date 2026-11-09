@@ -53,7 +53,7 @@ export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
  *  Protection without a teardown is not a guard, it is a TRAP: the row becomes
  *  permanent, both dismiss surfaces refuse it forever, and everything derived
  *  from an active notice (agency/portfolio.ts's `billing_issue` flag, the
- *  attention badge in lib/attention_center.ts) stays lit for work that is long
+ *  studio bell) stays lit for work that is long
  *  since done. So every kind below names the code that takes it down:
  *
  *    deal_followup + invremind:  ← the money lands — stripe-webhook's paid echo
@@ -179,8 +179,8 @@ export interface BellInput {
  *  so any surface that counts new enquiries alongside active notices reports the
  *  same lead twice unless it subtracts the ones already spoken for. This is the
  *  ONE place the rule lives: it used to be inlined in the bell count and the
- *  portal feed only, so /attention rendered an aged lead as two cards while the
- *  bell counted it once. Every counter of new enquiries must route through this. */
+ *  portal feed only, so the old /attention read rendered an aged lead as two
+ *  cards while the bell counted it once. Every counter of new enquiries must route through this. */
 export function freshEnquiries(newEnquiries: number, notices: Array<{ kind?: unknown }>): number {
   const spokenFor = (notices || []).filter((n) => n && n.kind === 'lead_followup').length;
   return Math.max(0, (newEnquiries || 0) - spokenFor);

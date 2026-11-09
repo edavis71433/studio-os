@@ -58,7 +58,7 @@ test.describe('Pipeline table view', () => {
     // the contact name arrives from the cached /sales/contacts join
     await expect(page.locator('#table tbody tr').first()).toContainText('Sam Rivera');
     // overdue next step is highlighted; stage renders as the chip
-    await expect(page.locator('#table .over').first()).toContainText('Due: Follow up call');
+    await expect(page.locator('#table .over').first()).toContainText('Overdue: Follow up call');   // item 65: its day has passed
     await expect(page.locator('#table .stage').first()).toContainText('Proposal sent');
     // sorting flips: Deal column, ascending → Acme first; descending → Beta first
     await page.locator('[data-tsort="title"]').click();
@@ -2236,7 +2236,7 @@ test.describe('deal page — one filled button per view', () => {
     await expect(filledIn(page, '#detailInner')).toHaveCount(1);   // still the header's Send invoice
     await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'wonInvoice');
     await page.locator('#detailInner .tabs [data-dtab="activity"]').click();
-    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);   // Activity's one is Log it
+    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);   // Activity's one is Log call
     await expect(filledIn(page, '#detailInner')).toHaveCount(1);
   });
 });

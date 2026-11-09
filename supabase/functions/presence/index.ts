@@ -54,12 +54,8 @@ const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
-const { handleAttentionCenter } = lazyRoutes(() => import('./routes/attention.ts'));
 const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
-const { handleUpcoming } = lazyRoutes(() => import('./routes/upcoming.ts'));
-const { handleApprovalCenter } = lazyRoutes(() => import('./routes/approvals_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
-const { handleSnapshotHistory } = lazyRoutes(() => import('./routes/history_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
@@ -650,12 +646,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
-  if (route === '/attention' && method === 'GET') return handleAttentionCenter(site, cors);
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
-  if (route === '/upcoming' && method === 'GET') return handleUpcoming(site, cors);
-  if (route === '/approval-center' && method === 'GET') return handleApprovalCenter(site, cors);
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
-  if (route === '/snapshot-history' && method === 'GET') return handleSnapshotHistory(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
     const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);

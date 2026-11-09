@@ -35,7 +35,7 @@ import {
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
-  currentProposal, flowSignGate, stageAfterSignature,
+  currentProposal, flowSignGate, stageAfterSignature, callerToday,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -240,12 +240,16 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // Phase 2: client_id (migration 0130) rides the select — the roster links a
     // person to their customer. A database without the column 400s the widened
     // select; retry the narrow one so the roster never goes dark pre-apply.
-    const mkPath = (cols: string) => {
-      let p = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
-      if (q) p += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
-      if (ids.length) p += `&id=in.(${ids.join(',')})`;
-      return p;
-    };
+    // item 66: the filters past the site pin, shared by the page read and its count
+    let more = withDeleted ? '' : '&deleted_at=is.null';
+    if (q) more += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+    if (ids.length) more += `&id=in.(${ids.join(',')})`;
+    // item 66: id breaks ties in the order, so offset pages never repeat or skip a person
+    const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc,id.desc&limit=${limit}&offset=${offset}`;
+    // item 66: total=1 asks how many match in all (one HEAD count beside the page
+    // read, so every page costs the same two reads at any roster size). The pages
+    // that list people ask for it to say "Showing 100 of N"; nobody else pays.
+    const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
     let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
@@ -256,7 +260,10 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // against one new arrival. Opt-in so no other caller pays for the scan.
     const hints = u.searchParams.get('dupes') === '1' ? duplicateHints(list) : null;
     if (hints) for (const c of list) { const h = hints[String(c.id)]; if (h) c.possible_duplicate_of = h; }
-    return json({ data: list, limit, offset }, 200, cors);
+    const total = await totalP;
+    // total: the count when asked for (null when the count failed: the page then
+    // offers "Show more" while a page comes back full, and never claims a number)
+    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -600,7 +607,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   ]);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
   const deals = rows(r);
-  const today = nowIso().slice(0, 10);
+  // item 65: overdue against the page's local day (?today=), the UTC day without it
+  const today = callerToday(new URL(req.url).searchParams.get('today'), nowIso());
   // Oct 2026 (item 2): the SAME formula as /sales/receivables' total — outstanding
   // is what still WAITS on a client (upcoming + overdue); a processing payment is
   // on its way and gets its own number, so the Outstanding tile and the money band
@@ -622,14 +630,15 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
-export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  try { return json({ data: await loadReceivables(site) }, 200, cors); }
+export async function handleSalesReceivables(req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  // item 65: the page sends its local day as ?today= (older pages and the reports: UTC)
+  try { return json({ data: await loadReceivables(site, callerToday(new URL(req.url).searchParams.get('today'), nowIso())) }, 200, cors); }
   catch { return json({ error: 'read_failed', message: 'Who owes you couldn’t load just now.' }, 502, cors); }   // batch D: never "all paid up" on a failed read
 }
 /** The receivables payload itself — shared with the agency home's "Needs you"
  *  (agency/routes.ts), so the money rows there, the roster's Outstanding column
  *  and Pipeline's Outstanding tile are the same rows under the same formula. */
-export async function loadReceivables(site: SiteRow) {
+export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // stripe_url rides along so the list rows can offer the SAME per-invoice
   // actions the deal drawer has (Send vs Resend label, Copy link) — chasing
   // payment is this list's whole point, and voiding a mistake shouldn't
@@ -660,8 +669,9 @@ export async function loadReceivables(site: SiteRow) {
     dealCustomer[String(d.id)] = { client_id: d.converted_client_id ? String(d.converted_client_id) : null, site_id: d.converted_site_id ? String(d.converted_site_id) : null };
   }
   const customerOf = (dealId: unknown) => dealCustomer[String(dealId || '')] || { client_id: null, site_id: null };
-  const today = nowIso().slice(0, 10);
-  // `state` is the one formula (lib/money_state.ts) against the server's UTC day;
+  const today = todayYmd || nowIso().slice(0, 10);
+  // `state` is the one formula (lib/money_state.ts) against the caller's day: the
+  // page's local day when it sent ?today= (item 65), else the server's UTC day.
   // `overdue` stays for older page builds. Today re-runs the same mirrored formula
   // against the studio's local day, so its chips and the record's agree.
   const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));

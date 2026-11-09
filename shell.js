@@ -691,14 +691,94 @@
       '<span class="lbl">Viewing client</span>' +
       '<span class="who"><span class="av" aria-hidden="true">' + esc(initials) + '</span><strong>' + esc(scope.name) + '</strong></span>' +
       '<span class="acts">' +
+        // item 44 (Nov 9 2026): jump to another site from inside one, like Wix's All Sites switcher
+        '<button type="button" class="switch" id="dds-site-switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="dds-sites-pop">Switch site</button>' +
         '<a href="/agency.html" class="exit" data-noscope="1">Back to studio</a>' +
       '</span></div>');
+    bar.querySelector('#dds-site-switch').addEventListener('click', function (e) { e.stopPropagation(); toggleSiteSwitch(); });
     // Visual refresh: the bar lives INSIDE the shell so the desktop sidebar can
     // lay it out as a card ABOVE the client's menu; on phones shell.css keeps it
     // fixed under the top bar (a fixed child escapes the column's flow).
     root.appendChild(bar);
     document.documentElement.classList.add('dds-has-ctxbar');
   }
+
+  // ── item 44 (Nov 9 2026): the site switcher. "Switch site" on the client card
+  // opens a small panel with a search box and every site the studio looks after
+  // (the same rows the Sites page shows, GET /agency/sites at studio level, read
+  // once per page and kept). A pick opens that site's own home, as the Sites page
+  // does; "All sites" opens the Sites page. Escape or a click outside closes it. ──
+  var SWITCH_ROWS = null, SWITCH_LOADING = null;
+  function siteRows() {
+    if (SWITCH_ROWS) return Promise.resolve(SWITCH_ROWS);
+    if (SWITCH_LOADING) return SWITCH_LOADING;
+    SWITCH_LOADING = fetch(FN + '/agency/sites', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': '' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) { if (!b || !Array.isArray(b.data)) return null; SWITCH_ROWS = b.data; return SWITCH_ROWS; })   // a failed read is said, never "no sites"; the next open tries again
+      .catch(function () { return null; })
+      .then(function (rows) { SWITCH_LOADING = null; return rows; });
+    return SWITCH_LOADING;
+  }
+  function siteSwitchPop() { return document.getElementById('dds-sites-pop'); }
+  function closeSiteSwitch(refocus) {
+    var pop = siteSwitchPop(); if (pop) pop.remove();
+    var b = document.getElementById('dds-site-switch'); if (b) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
+  }
+  function toggleSiteSwitch() {
+    if (siteSwitchPop()) { closeSiteSwitch(true); return; }
+    var btn = document.getElementById('dds-site-switch'); if (!btn) return;
+    [].forEach.call(document.querySelectorAll('.dds-pop.open'), function (o) { o.classList.remove('open'); });   // one panel at a time
+    var pop = el('<div class="dds-pop dds-sites-pop open" id="dds-sites-pop" role="dialog" aria-label="Switch site">' +
+      '<input type="search" class="q" id="dds-sites-q" placeholder="Find a site…" aria-label="Find a site" autocomplete="off">' +
+      '<div class="list" id="dds-sites-list" role="list"><div class="muted">Loading your sites…</div></div>' +
+      '<a class="row all" href="/sites.html" data-noscope="1">All sites →</a></div>');
+    document.body.appendChild(pop);
+    btn.setAttribute('aria-expanded', 'true');
+    placeSiteSwitch(btn, pop);
+    var q = pop.querySelector('#dds-sites-q'); q.focus();
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeSiteSwitch(true); return; }
+      // arrows move between the box and the rows
+      var rows = [].slice.call(pop.querySelectorAll('.list a.row'));
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0] || q).focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? rows[i - 1] : q).focus(); }
+    });
+    q.addEventListener('input', function () { paintSiteRows(pop, q.value); });
+    siteRows().then(function (rows) {
+      if (!siteSwitchPop()) return;
+      if (rows === null) { pop.querySelector('#dds-sites-list').innerHTML = '<div class="muted">Couldn’t load your sites just now.</div>'; return; }
+      paintSiteRows(pop, q.value);
+    });
+  }
+  function placeSiteSwitch(btn, pop) {
+    var r = btn.getBoundingClientRect();
+    pop.style.right = 'auto'; pop.style.bottom = 'auto';   // the sidebar layout pins panels to the bottom; this one hangs from its button
+    var left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left));
+    var below = r.bottom + 6 + pop.offsetHeight <= window.innerHeight - 8;
+    pop.style.left = left + 'px';
+    pop.style.top = (below ? r.bottom + 6 : Math.max(8, r.top - 6 - pop.offsetHeight)) + 'px';
+  }
+  function paintSiteRows(pop, query) {
+    var list = pop.querySelector('#dds-sites-list'); if (!list) return;
+    var q = String(query || '').trim().toLowerCase();
+    var here = scopeId();
+    var host = function (u) { return String(u || '').replace(/^https?:\/\//, '').replace(/\/.*$/, ''); };
+    var rows = (SWITCH_ROWS || []).filter(function (x) {
+      if (!q) return true;
+      return [x.name, x.domain, host(x.address), (x.tags || []).join(' ')].some(function (v) { return String(v || '').toLowerCase().indexOf(q) >= 0; });
+    });
+    if (!rows.length) { list.innerHTML = '<div class="muted">' + (SWITCH_ROWS && SWITCH_ROWS.length ? 'No site matches that.' : 'No client sites yet.') + '</div>'; return; }
+    list.innerHTML = rows.map(function (x) {
+      var now = x.site_id === here;
+      var ini = String(x.name || '?').trim().charAt(0).toUpperCase();
+      return '<a class="row site' + (now ? ' now' : '') + '" role="listitem" href="/today.html?client=' + encodeURIComponent(x.site_id) + '" data-noscope="1"' + (now ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + (now ? ' · here now' : '') + '</span></span></a>';
+    }).join('');
+  }
+  document.addEventListener('click', function () { if (siteSwitchPop()) closeSiteSwitch(false); });
+  window.addEventListener('resize', function () { var b = document.getElementById('dds-site-switch'), p = siteSwitchPop(); if (b && p) placeSiteSwitch(b, p); });
 
   // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
   //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
@@ -1272,7 +1352,9 @@
     var roleWord = ROLE_WORDS[role] || (role ? role.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) : '');
     var plan = (CTX && CTX.edition_name && role !== 'client_reviewer') ? CTX.edition_name + ' plan' : '';
     var rows = '';
-    if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>';
+    if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>' +
+      // item 44: the Sites page in one click, from anywhere
+      '<a class="row" href="/sites.html" id="dds-all-sites">All sites<span class="sub">Every website you look after</span></a>';
     // Item 96: the platform's health door, for staff only. It sat on the studio's
     // Home as "Platform: 3 areas need a look", staff wording on the owner's page.
     if (CTX && CTX.is_operator) rows += '<a class="row" href="/admin-health.html" id="dds-health-row">Platform health<span class="sub" id="dds-health-sub"></span></a>';

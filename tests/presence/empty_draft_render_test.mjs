@@ -22,12 +22,12 @@ for (const slug of TEMPLATES) {
   empty.content.offerings = []; empty.content.testimonials = []; empty.content.faqs = []; empty.content.posts = []; empty.content.redirects = [];
   if (empty.content.settings) { empty.content.settings.blocks = []; delete empty.content.settings.pages; }
   let out = null, threw = null;
-  try { out = renderSnapshot(empty, { baseUrl: 'https://x.test' }); } catch (e) { threw = e && e.message; }
+  try { out = await renderSnapshot(empty, { baseUrl: 'https://x.test' }); } catch (e) { threw = e && e.message; }
   ok(`[${slug}] an empty draft (no location/content) renders without throwing`, !threw && out && typeof out['index.html'] === 'string' && out['index.html'].length > 0);
   if (threw) console.log('    threw: ' + threw);
   // just a business name (still no location) — the common first-save state
   const named = structuredClone(empty); named.content.identity.business_name = 'My Shop';
-  let t2 = null; try { renderSnapshot(named, { baseUrl: 'https://x.test' }); } catch (e) { t2 = e && e.message; }
+  let t2 = null; try { await renderSnapshot(named, { baseUrl: 'https://x.test' }); } catch (e) { t2 = e && e.message; }
   ok(`[${slug}] a named site with no location yet also renders`, !t2);
 }
 

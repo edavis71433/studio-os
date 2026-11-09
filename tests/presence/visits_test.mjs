@@ -94,9 +94,9 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
   const fx = JSON.parse(await Deno.readTextFile(new URL('../../supabase/functions/presence/templates/business-classic/1.0.0/fixture.json', import.meta.url)));
   fx.template_slug = 'business-classic'; fx.template_version = '1.0.0';
   const SITE = { baseUrl: 'https://example.com', siteId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa' };
-  const on = renderSnapshot(fx, SITE);
+  const on = await renderSnapshot(fx, SITE);
   const offSnap = structuredClone(fx); offSnap.content.settings = { ...(offSnap.content.settings || {}), visit_counter: false };
-  const off = renderSnapshot(offSnap, SITE);
+  const off = await renderSnapshot(offSnap, SITE);
   ok('switch: on (absent) → the counter is on every page', on['index.html'].includes('id="presence-analytics"') && on['privacy/index.html'].includes('id="presence-analytics"'));
   const offPages = Object.entries(off).filter(([k]) => k.endsWith('.html'));
   ok('switch: off → no page carries the counter', offPages.length > 0 && offPages.every(([, v]) => !String(v).includes('presence-analytics')));

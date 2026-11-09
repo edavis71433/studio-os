@@ -309,6 +309,7 @@ html.dds-embed #detailWrap{padding-top:0}
   #table td .dn{font-weight:600}
   #table td.num{font-variant-numeric:tabular-nums}
   #table td .over{color:var(--bad);font-weight:600}
+  #table td .due-today{color:var(--warn);font-weight:600}
   .tmeta{font-size:12px;color:var(--faint);margin:0 0 var(--dds-s2,8px)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* Kanban board — columns = open stages, cards = deals, tap/drag to move */
@@ -372,6 +373,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .btn.sm{padding:var(--dds-s1,4px) 10px;font-size:12.5px}
   .bc-stale{display:inline-block;font-size:12px;font-weight:500;color:var(--warn,#775d31);background:rgba(154,107,18,.12);border-radius:999px;padding:1px var(--dds-s2,8px);margin-top:6px}
   .bc-due{color:var(--warn);font-weight:600;font-size:12px;margin-top:var(--dds-s1,4px)}
+  .bc-due.late{color:var(--bad)}
   .bc-actions{margin-top:var(--dds-s2,8px);position:relative}
   /* popup contract: the Move trigger + every menu option meet the 44px touch floor */
   .bc-move{font:inherit;font-size:12px;font-weight:600;color:var(--p);background:transparent;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s3,12px);min-height:44px;cursor:pointer}
@@ -484,6 +486,21 @@ html.dds-embed #detailWrap{padding-top:0}
   .stats .st{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
   .stats .st:first-child{border-left:1px solid var(--line)}
   .stats .v{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  /* phones: the four numbers keep their one short row (item 58) at the phone size, as in the
+     design's phone frame; 24px only fits a tile on a computer or a 2-by-2 phone. Each card is a
+     subgrid of the row, so a label that wraps ("Won this month") can't push its number below
+     the others, and the number spans its card, so fitTiles can see one that's too long. Open's
+     line says just what's expected: the header already counts the open deals. */
+  @media (min-width:361px) and (max-width:600px){
+    .stats{gap:6px;grid-template-rows:auto auto auto}
+    .stats .st{display:grid;grid-row:span 3;grid-template-rows:subgrid;grid-template-columns:minmax(0,1fr);row-gap:2px;align-content:start;padding:8px 7px}
+    .stats .st-main{display:contents}
+    .stats .st.st-exp{display:none}   /* still rides under Open on a phone (item 69) */
+    .stats .k{font-size:11px;line-height:1.3}
+    .stats .v{font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis}
+    .stats .s{font-size:11px}
+    .stats .has-exp .across,.stats .has-exp .exp-sep{display:none}
+  }
   .stats .ico{border-radius:12px}
   .card{box-shadow:var(--shadow);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .card:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
@@ -606,7 +623,14 @@ function moneyBuckets(list,todayYmd,pending){
 }
 // "overdue" is judged on the STUDIO's local day — the operator's calendar, the
 // same one crm.html and today.html use — never on the browser's UTC date slice.
-function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// item 65: EVERY "today" on this page is this one (a moment in ms → its local day).
+function localYmd(ms){const d=ms==null?new Date():new Date(ms);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// item 65: a dated step or to-do against the local day: 'overdue' only once its
+// day has passed, 'today' for the whole of its own day, else ''.
+function dueState(ymd,today){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));if(!m)return'';const t=today||localYmd();return m[0]<t?'overdue':m[0]===t?'today':'';}
+// a picked day (YYYY-MM-DD) sent as local noon, so the server never files it under
+// a neighbouring day (a bare date is read as noon UTC, which is tomorrow east of +12)
+function dayAtNoon(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));return m?new Date(+m[1],+m[2]-1,+m[3],12).toISOString():undefined;}
 const invState=(v)=>moneyState(v,localYmd());
 // upcoming / overdue = still waiting on the client; paid, processing and void are not
 const invWaits=(v)=>{const st=invState(v);return st==='upcoming'||st==='overdue';};
@@ -627,11 +651,11 @@ const STAGES=['lead','qualified','proposal','contract','won','lost'];
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
 // The badge reads as an OUTCOME where one exists: a converted deal is "Won ✓"
-// (calm green), a lost one is a muted "Lost" — active stages keep their labels.
+// (calm green), a lost one is a muted "Not a fit" — active stages keep their labels.
 const stageBadge=(s,signed)=>{
   // A signed agreement reads as its own positive state — never the stale "Agreement out".
   if(s==='contract'&&signed)return `<span class="stage won">Agreement signed ✓</span>`;
-  return `<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
+  return `<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Not a fit':esc(stageLabel(s))}</span>`;
 };
 // Per-stage "Path" guidance — the calm one-line tip + suggested next action, so
 // a non-technical owner always knows what to do next. Mirrors the source of
@@ -746,12 +770,15 @@ const evtDateTime=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';return evtD
 const evtDate=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';const o={month:'short',day:'numeric'};if(t.getFullYear()!==new Date().getFullYear())o.year='numeric';return t.toLocaleDateString('en-US',o);};
 // Calm relative date ("today" / "3 days ago") — mirrors the server's humanWhen so
 // "Last contacted …" reads the same everywhere.
-function ago(iso){const then=Date.parse(iso),now=Date.now();if(!isFinite(then))return'';const days=Math.floor((now-then)/86400000);if(days<=0)return'today';if(days===1)return'yesterday';if(days<7)return days+' days ago';if(days<14)return'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
+// item 65: "today" / "yesterday" are local calendar days, not 24-hour spans
+function ago(iso){const then=Date.parse(iso);if(!isFinite(then))return'';const days=Math.round((Date.parse(localYmd()+'T00:00:00Z')-Date.parse(localYmd(then)+'T00:00:00Z'))/86400000);if(days<=0)return'today';if(days===1)return'yesterday';if(days<7)return days+' days ago';if(days<14)return'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
 // The activity quick-log kinds (calm, plain — icon + label).
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
 const SI={phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',pipeline:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',hourglass:'<path d="M6 2h12M6 22h12"/><path d="M7 2c0 6 5 6 5 10s-5 4-5 10M17 2c0 6-5 6-5 10s5 4 5 10"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
 const svgi=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const ACTKINDS=[['call',svgi('phone')+' Call'],['email',svgi('mail')+' Email'],['meeting',svgi('users')+' Meeting'],['note',svgi('pencil')+' Note']];
+// one word per action (bold redesign): the log button names what it logs, "Log call" as in + Create
+const logLabel=(k)=>k==='email'?'Log email':k==='meeting'?'Log meeting':k==='note'?'Add note':'Log call';
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
 let DEALS_LOADED=false;
 // item 69: "How did they find you?" — the server's list (lib/found_via.ts), mirrored
@@ -1637,7 +1664,7 @@ function renderFilters(){
 async function renderSummary(gen){
   const host=$('summary'); if(!host) return;
   let s;
-  try{ const r=await api('/sales/summary'); s=r&&r.data; }
+  try{ const r=await api('/sales/summary?today='+localYmd()); s=r&&r.data; }   // item 65: the Outstanding tile's overdue on the local day
   catch(_){ if(gen===undefined||gen===REQ_SEQ)host.innerHTML=''; return; }   // never let the summary sink the page
   if(gen!==undefined&&gen!==REQ_SEQ)return;           // a newer roster read started — this strip is stale
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
@@ -1654,8 +1681,8 @@ async function renderSummary(gen){
   // item 69: Expected = each open deal's value times its stage's chance (Settings › The chance each stage closes).
   // Its own tile on a computer or tablet; on a phone the four tiles keep their one row (item 58), so it rides under Open.
   const ex=(s.expected&&open.count)?s.expected:null;
-  const expSub=ex?`<span class="exp-sub"> · ${money(ex.value_cents)||'$0'} expected</span>`:'';
-  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal')+expSub,'open',''):tile('Open','$0','no open deals yet','open','');
+  const expSub=ex?`<span class="exp-sub"><span class="exp-sep"> · </span>${money(ex.value_cents)||'$0'} expected</span>`:'';
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','no open deals yet','open','');
   const expT=ex?tile('Expected',money(ex.value_cents)||'$0','at each stage’s chance','rate','info','','st-exp'):'';
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
@@ -1694,8 +1721,9 @@ async function loadDealTasks(id,opts){
   const openNow=items.filter(t=>t.status!=='done').length;
   const prompt=(opts.justTicked&&openNow===0)?whatsNextHtml():'';
   if(!items.length){host.innerHTML='<span class="mut">No to-dos yet.</span>'+prompt;wireWhatsNext(host,id);return;}
-  const today=new Date().toISOString().slice(0,10);
-  host.innerHTML=prompt+items.map(t=>{const done=t.status==='done';const overdue=!done&&t.due_date&&t.due_date<=today;return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut" style="${overdue?'color:var(--warn,#775d31);font-weight:600':''}">· ${overdue?'due ':''}${esc(t.due_date)}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
+  const today=localYmd();
+  // item 65: due today says so (amber) all day; red "overdue" only once the day has passed
+  host.innerHTML=prompt+items.map(t=>{const done=t.status==='done';const ds=done?'':dueState(t.due_date,today);return `<div class="row2" style="align-items:center;gap:8px"><input type="checkbox" data-tk="${t.id}"${done?' checked':''} aria-label="Mark done"><span style="flex:1;${done?'text-decoration:line-through;color:var(--soft,#888)':''}">${esc(t.title)}${t.due_date?` <span class="mut tk-due${ds?' '+ds:''}" style="${ds==='overdue'?'color:var(--bad,#a3423a);font-weight:600':ds==='today'?'color:var(--warn,#775d31);font-weight:600':''}">· ${ds==='today'?'due today':(ds==='overdue'?'overdue · ':'')+esc(niceDay(t.due_date))}</span>`:''}</span><button class="btn ghost sm" data-tkdel="${t.id}" aria-label="Remove to-do">✕</button></div>`;}).join('');
   host.querySelectorAll('[data-tk]').forEach(c=>c.onchange=async()=>{try{await api('/sales/deal-tasks/'+c.getAttribute('data-tk'),'PATCH',{status:c.checked?'done':'open'});loadDealTasks(id,{justTicked:c.checked});}catch(e){toast(nice(e),true);}});
   host.querySelectorAll('[data-tkdel]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deal-tasks/'+b.getAttribute('data-tkdel'),'PATCH',{delete:true});loadDealTasks(id);}catch(e){toast(nice(e),true);}});
   wireWhatsNext(host,id);
@@ -1741,7 +1769,7 @@ function wireInvoiceActions(root,refresh){
 async function openReceivables(){
   showDetail();
   $('detailInner').innerHTML='<div class="dbody"><div class="dds-skeleton" style="height:16px;width:50%"></div></div>';
-  let d=null;try{const r=await api('/sales/receivables');d=r&&r.data;}catch(e){/* */}
+  let d=null;try{const r=await api('/sales/receivables?today='+localYmd());d=r&&r.data;}catch(e){/* */}   // item 65: overdue on the local day
   if(!d){$('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="rcBack">← Back to pipeline</button></div><div class="dbody mut">Couldn’t load receivables just now.</div>';const b=$('rcBack');if(b)b.onclick=closeDealDetail;return;}
   const items=d.items||[];
   // Every row here is an OPEN invoice (the endpoint filters), and each wears its
@@ -1808,6 +1836,8 @@ async function load(soft){
     const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays(),board?ensureContactNames():null]);   // the board's stale threshold and its cards' people ride the same wave (best-effort; neither ever rejects)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];DEALS_LOADED=true;
+    // item 66: a deal whose contact sits outside the newest 100 gets its name too
+    if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
     // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
     {const live=new Set(DEALS.map(d=>String(d.id)));for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id);}
     LOADED_AT=Date.now();
@@ -1835,20 +1865,37 @@ function ensureContactNames(){
   if(CONTACT_LOADING)return CONTACT_LOADING;
   // limit=100 = the server's MAX_PAGE (clampLimit silently caps anything higher
   // right back to 100 — the old limit=500 claimed a capacity the server refuses).
-  // HONEST RESIDUAL: a studio with >100 contacts gets only the 100 most recently
-  // updated — older contacts' deals read "—" in the Table and match by title only
-  // in search. Lifting that needs paged fetches or a server-side join, not a
-  // bigger number here.
+  // item 66: this first read covers most studios in one go; any loaded deal whose
+  // contact is older than the newest 100 is then looked up by id (fillMissingNames),
+  // 100 ids a read, so every deal on the page says whose it is.
   // include_deleted=1: this join only ever LABELS deals that already exist. A
   // contact removed from the roster must not turn their own historical deals
   // into "—" (and unfindable by the person's name in search) — the deal is
   // still real, and it still belongs to whoever it belonged to. Same site
   // scope; the roster read is unchanged and still hides them.
   CONTACT_LOADING=api('/sales/contacts?limit=100&include_deleted=1')
-    .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;for(const c of (r.data||[])){CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}})
+    .then(r=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=false;NAMES_ASKED=new Set();for(const c of (r.data||[]))nameOf(c);})
+    .then(()=>fillMissingNames())
     .catch(()=>{CONTACT_NAME={};CONTACT_TEXT={};CONTACT_FAILED=true;})   // plan-gated or offline → cells read “—” for THIS render; a failure is never cached — the next render retries
     .finally(()=>{CONTACT_LOADING=null;});
   return CONTACT_LOADING;
+}
+function nameOf(c){if(!c||!c.id||!CONTACT_NAME)return;CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}
+// item 66: names for the loaded deals' contacts the first read didn't cover, asked
+// for by id (?ids=, up to 100 a read, removed contacts included: this only labels
+// deals that exist). Resolves true when it learned a name, so the caller repaints.
+let NAMES_ASKED=new Set();
+async function fillMissingNames(){
+  if(!CONTACT_NAME||CONTACT_FAILED||!DEALS_LOADED)return false;
+  const miss=[...new Set(DEALS.map(d=>d.contact_id).filter(Boolean).map(String))].filter(id=>!(id in CONTACT_NAME)&&!NAMES_ASKED.has(id));
+  if(!miss.length)return false;
+  miss.forEach(id=>NAMES_ASKED.add(id));
+  const chunks=[];for(let i=0;i<miss.length;i+=100)chunks.push(miss.slice(i,i+100));
+  const names=CONTACT_NAME;
+  let found;try{found=await Promise.all(chunks.map(c=>api('/sales/contacts?limit=100&include_deleted=1&ids='+c.map(encodeURIComponent).join(','))));}catch(_){miss.forEach(id=>NAMES_ASKED.delete(id));return false;}   // the next render asks again
+  if(names!==CONTACT_NAME)return false;   // the cache was reset meanwhile (a contact was edited)
+  let any=false;for(const r of found)for(const c of ((r&&r.data)||[])){nameOf(c);any=true;}
+  return any;
 }
 // ── the .lhead search: ONE client-side filter across every display. Matches the
 // deal title plus the contact's name/email/company (the same cached
@@ -1973,13 +2020,14 @@ function renderList(){
   const host=$('list');
   // Deals with a DUE next step float to the top (overdue first) — the pipeline
   // answers "what do I do today", not just "what exists".
-  const today=new Date().toISOString().slice(0,10);
+  const today=localYmd();   // item 65: the local day, never the UTC slice
   // A won or lost deal sinks below the open ones, and its next step is never
   // "Due" (sales review B4: a Won deal read "Due: Sign Contract" in red).
   const list=[...visibleDeals()].sort((a,b)=>{const ac=isClosed(a)?1:0,bc=isClosed(b)?1:0;if(ac!==bc)return ac-bc;const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
   host.innerHTML=list.map(d=>{
     const step=shownStep(d);
-    const ns=step?`<div class="m">${(!isClosed(d)&&d.next_step_at&&d.next_step_at<=today)?`<span style="color:var(--warn,#775d31);font-weight:600">Due: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(niceDay(d.next_step_at)):''}`}</div>`:'';
+    const ds=isClosed(d)?'':dueState(d.next_step_at,today);
+    const ns=step?`<div class="m">${ds==='overdue'?`<span class="step-due overdue" style="color:var(--bad,#a3423a);font-weight:600">Overdue: ${esc(step)} · ${esc(niceDay(d.next_step_at))}</span>`:ds==='today'?`<span class="step-due today" style="color:var(--warn,#775d31);font-weight:600">Due today: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(niceDay(d.next_step_at)):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
     const cv=needsConvert(d)?`<div class="m conv">Not a customer yet — open to make them one</div>`:'';
     return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
@@ -2145,7 +2193,7 @@ function importDeals(){
       const title=o.title||o.company||who;if(!title)return null;
       const sw=String(o.stage||'').toLowerCase();let stage='lead';for(const [re,k2] of STAGE_WORDS){if(re.test(sw)){stage=k2;break;}}
       const v=amountCents(o.value);
-      const d=/^\d{4}-\d{2}-\d{2}$/.test(o.close||'')?o.close:(Number.isFinite(Date.parse(o.close||''))?new Date(Date.parse(o.close)).toISOString().slice(0,10):'');
+      const d=/^\d{4}-\d{2}-\d{2}$/.test(o.close||'')?o.close:(Number.isFinite(Date.parse(o.close||''))?localYmd(Date.parse(o.close)):'');   // item 65: "3/1/2026" parses as local midnight; its UTC slice was Feb 28 east of UTC
       return{title,stage,value_cents:Number.isFinite(v)?v:0,email:String(o.email||'').toLowerCase(),name:who,company:o.company||'',close:d};
     },
     label:(it)=>it.title,
@@ -2184,7 +2232,7 @@ function renderTable(){
     const firstLook=!CONTACT_NAME;
     ensureContactNames().then(()=>{if((firstLook||!CONTACT_FAILED)&&VIEW==='table'&&!host.hidden)renderTable();});
   }
-  const today=new Date().toISOString().slice(0,10);
+  const today=localYmd();   // item 65
   const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];
   const list=[...visibleDeals()].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});
   if(KIT())KIT().style();
@@ -2196,9 +2244,10 @@ function renderTable(){
   const trs=list.map(d=>{
     const cn=CONTACT_NAME?((d.contact_id&&CONTACT_NAME[d.contact_id])||'—'):'…';
     const step=shownStep(d);
-    const overdue=step&&!isClosed(d)&&d.next_step_at&&d.next_step_at<=today;
+    const ds=(step&&!isClosed(d))?dueState(d.next_step_at,today):'';
     const ns=step
-      ?(overdue?`<span class="over">Due: ${esc(step)} · ${esc(niceDay(d.next_step_at))}</span>`
+      ?(ds==='overdue'?`<span class="over">Overdue: ${esc(step)} · ${esc(niceDay(d.next_step_at))}</span>`
+        :ds==='today'?`<span class="due-today">Due today: ${esc(step)}</span>`
                :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(niceDay(d.next_step_at))}</span>`:''}`)
       :'—';
     const CELL={title:()=>`<td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>`,contact:()=>`<td>${esc(cn)}</td>`,
@@ -2253,7 +2302,8 @@ const loadStaleDays=()=>(STALE_Q=STALE_Q||api('/settings').then(r=>{const v=r&&r
 function boardCard(d,today){
   const val=money(d.expected_value_cents);
   const lc=d.last_contacted_at?`Last contacted ${esc(ago(d.last_contacted_at))}`:'';
-  const due=(d.next_step&&d.next_step_at&&d.next_step_at<=today)?`<div class="bc-due">Due: ${esc(d.next_step)}</div>`:'';
+  const ds=d.next_step?dueState(d.next_step_at,today):'';   // item 65: amber all of its day, red once it has passed
+  const due=ds==='overdue'?`<div class="bc-due late">Overdue: ${esc(d.next_step)}</div>`:ds==='today'?`<div class="bc-due">Due today: ${esc(d.next_step)}</div>`:'';
   // Stalled: no movement — no logged contact, no edit — for the stage's N days
   // (Settings → "stale after", default 14; benchmark 2026-10 item 13). Mirrors
   // lib/sales_lifecycle.ts dealStaleAfter.
@@ -2288,7 +2338,7 @@ function outcomeColsHtml(){
 }
 function renderBoard(){
   const host=$('board');
-  const today=new Date().toISOString().slice(0,10);
+  const today=localYmd();   // item 65
   // Open deals only — won/lost are outcomes (mirrors the summary), shown in List.
   // boardVisible() = visibleDeals() (the .lhead search narrows the board too)
   // minus outcomes — the SAME set renderMeta counts, by construction.
@@ -2384,8 +2434,7 @@ function dpPaint(){
   const nextBtn=(d.stage==='won'||d.stage==='lost'||d.converted_client_id)?''
     :nxt==='won'?`<button type="button" class="dp-next" data-dp="win" data-k="next">Mark it won → <small>on the deal, where it becomes a customer</small></button>`
     :(nxt&&boardCanMove(d.stage,nxt))?`<button type="button" class="dp-next" data-dp="next" data-to="${nxt}" data-k="next">Move to ${esc(stageLabel(nxt))} →</button>`:'';
-  const today=new Date().toISOString().slice(0,10);
-  const late=d.next_step&&d.next_step_at&&d.next_step_at<today;
+  const late=!!(d.next_step&&dueState(d.next_step_at)==='overdue');   // item 65: the local day
   const step=d.next_step?`<p class="dp-step${late?' late':''}"><span>Next step</span>${esc(d.next_step)}${d.next_step_at?' · '+esc(late?'overdue':dpDay(d.next_step_at)):''}</p>`:'';
   const act=DP.act,items=(act&&Array.isArray(act.items))?act.items.filter(i=>i&&i.title).slice(0,3):[];
   const latest=act===undefined?'<div class="dp-wait" role="status" aria-label="Loading"><div class="dp-skel"></div><div class="dp-skel" style="width:70%"></div></div>'
@@ -2793,7 +2842,7 @@ async function openDeal(id){
       +' It’s part of your service: you bill them for your work the usual way — they never subscribe to anything or pay for software.';
     // Activity: the quick-log (call/email/meeting/dated note) + the ONE merged
     // timeline (manual activities interleaved with system events, newest first).
-    const todayStr=new Date().toISOString().slice(0,10);
+    const todayStr=localYmd();   // item 65: after 5pm in Los Angeles the UTC slice was tomorrow, and today couldn't be picked
     const tlItems=data.timeline||[];
     const tlHtml=tlItems.length?tlItems.map(it=>{
       // item 69: an open shows its time too — "Nov 8, 3:12 PM" tells you whether to call
@@ -2940,7 +2989,7 @@ async function openDeal(id){
           <div class="qlog">
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
             <textarea id="qlBody" rows="2" placeholder="What happened? (optional for a call, email, or meeting)"></textarea>
-            <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">Log it</button></div>
+            <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">${logLabel('call')}</button></div>
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
@@ -3084,11 +3133,11 @@ async function openDeal(id){
     }
     const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';if($('dt-preset'))$('dt-preset').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
     // Activity quick-log: pick a kind, jot what happened (optional except a note),
-    // optionally date it, "Log it". A logged activity feeds the merged timeline +
+    // optionally date it, "Log call" (the button names the kind). A logged activity feeds the merged timeline +
     // "last contacted", so the drawer + card refresh after saving.
     let qlKind='call';
-    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
-    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:($('qlDate')&&$('qlDate').value)||undefined});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
+    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;const sv=$('qlSave');if(sv)sv.textContent=logLabel(qlKind);qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
+    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value)});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,
     // and — critically — tells the operator honestly whether it was EMAILED or

@@ -77,8 +77,8 @@ function loadsFromElsewhere(files, base) {
 }
 
 // ═══ 1. determinism: identical input → byte-identical output, twice ═══
-const a = renderSnapshot(fixture, SITE);
-const b = renderSnapshot(fixture, SITE);
+const a = await renderSnapshot(fixture, SITE);
+const b = await renderSnapshot(fixture, SITE);
 {
   const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
   let same = ka.length === kb.length && ka.every((k, ix) => k === kb[ix]);
@@ -88,7 +88,7 @@ const b = renderSnapshot(fixture, SITE);
 { // input mutation must change output (drift detection sanity)
   const mut = structuredClone(fixture);
   mut.content.identity.tagline = 'CHANGED';
-  const c = renderSnapshot(mut, SITE);
+  const c = await renderSnapshot(mut, SITE);
   ok('determinism: changed input → changed output', c['index.html'] !== a['index.html']);
 }
 
@@ -107,7 +107,7 @@ hostile.content.posts.push({
   body_md: `# raw h1 demoted\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[click](javascript:alert(1)) and [ok](https://safe.example)\n\n[data](data:text/html,<script>alert(1)</script>)\n\n> quote with <b>html</b>\n\n- item <script>x</script>\n\n**bold** and *em* survive`,
 });
 hostile.content.redirects.push({ from_path: '/x', to_path: '/y' });
-const h = renderSnapshot(hostile, SITE);
+const h = await renderSnapshot(hostile, SITE);
 {
   const htmlFiles = Object.entries(h).filter(([k]) => k.endsWith('.html'));
   let bad = [];
@@ -192,10 +192,10 @@ const h = renderSnapshot(hostile, SITE);
   ok('perf: maxed fixture is cap-legal', vr.ok, vr.blockers.map((x) => x.field).slice(0, 3).join(','));
 
   const N = 5; const times = [];
-  for (let i = 0; i < N; i++) { const t0 = performance.now(); renderSnapshot(maxed, SITE); times.push(performance.now() - t0); }
+  for (let i = 0; i < N; i++) { const t0 = performance.now(); await renderSnapshot(maxed, SITE); times.push(performance.now() - t0); }
   times.sort((x, y) => x - y);
   const p50 = times[Math.floor(N / 2)];
-  const out = renderSnapshot(maxed, SITE);
+  const out = await renderSnapshot(maxed, SITE);
   const nFiles = Object.keys(out).length;
   const totalKB = Math.round(Object.values(out).reduce((s, v) => s + String(v).length, 0) / 1024);
   const homeKB = Math.round(String(out['index.html']).length / 1024);
@@ -277,9 +277,9 @@ const [homeStored, pageStored] = storedSections();
 for (const slug of TEMPLATES) {
   const own = sampleOf(slug);
   ok(`sample [${slug}]: its fixture names its own template`, own.template_slug === slug && own.template_version === '1.0.0', `${own.template_slug}@${own.template_version}`);
-  const plain = renderSnapshot(own, SITE);
+  const plain = await renderSnapshot(own, SITE);
   const fx = fullFixture(slug);
-  const r1 = renderSnapshot(fx, SITE), r2 = renderSnapshot(fullFixture(slug), SITE);
+  const r1 = await renderSnapshot(fx, SITE), r2 = await renderSnapshot(fullFixture(slug), SITE);
 
   // determinism: render twice → byte-identical
   {
@@ -382,7 +382,7 @@ for (const slug of TEMPLATES) {
     const content = hostilify(own.content, 'content', keepContent);
     const { blocks, blocks_src, pages, nav } = full.content.settings;
     const hSnap = { ...full, content: { ...content, settings: { ...content.settings, blocks, blocks_src, pages, nav } } };
-    const hr = renderSnapshot(hSnap, SITE);
+    const hr = await renderSnapshot(hSnap, SITE);
     let bad = [], sawEscaped = false;
     for (const [k, v] of Object.entries(hr)) {
       if (!k.endsWith('.html')) continue;
