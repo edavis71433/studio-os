@@ -56,6 +56,17 @@ eq('not a fit by reason: an offered reason matches whatever the case; no reason 
 eq('more than eight reasons fold the rest into one row', R.wonAndLost(Array.from({ length: 12 }, (_, i) => ({ stage: 'lost', lost_reason: 'Reason ' + i, updated_at: NOW })), NOW).lost_by_reason.slice(-1)[0], { label: 'Other reasons', count: 5, value_cents: 0 });
 eq('an unknown source reads as words', [R.sourceLabel('trade_show'), R.sourceLabel(''), R.sourceLabel('import')], ['Trade show', 'Not recorded', 'Imported']);
 eq('no closed deals → no win rate', R.wonAndLost([], NOW).win_rate_pct, null);
+// Bold redesign (Analytics): days to close — the median of the six most recent wins, and the six before
+{
+  const day = 86400000, t0 = Date.parse(NOW);
+  const win = (closedDaysAgo, tookDays, extra = {}) => ({ id: 'w' + closedDaysAgo, stage: 'won', converted_client_id: 'c', converted_at: new Date(t0 - closedDaysAgo * day).toISOString(), created_at: new Date(t0 - (closedDaysAgo + tookDays) * day).toISOString(), ...extra });
+  const wins = [win(1, 10), win(2, 20), win(3, 30), win(4, 40), win(5, 50), win(6, 60), win(30, 5), win(40, 15), win(50, 99, { created_at: null })];
+  const dc = R.wonAndLost(wins, NOW).days_to_close;
+  eq('days to close: the median of the six latest wins (35), the six before (10), a deal with no start left out', dc, { median_days: 35, count: 6, prior_median_days: 10 });
+  eq('days to close: an odd count takes the middle one', R.wonAndLost([win(1, 4), win(2, 9), win(3, 30)], NOW).days_to_close, { median_days: 9, count: 3, prior_median_days: null });
+  eq('days to close: no wins → nothing to say', R.wonAndLost([], NOW).days_to_close, { median_days: null, count: 0, prior_median_days: null });
+  eq('days to close: the close date comes from the move into Won when there is one', R.wonAndLost([win(1, 10, { id: 'x1' })], NOW, 365, { x1: new Date(t0 - 6 * day).toISOString() }).days_to_close.median_days, 5);
+}
 
 // ── 4. enquiries by page ──
 const enq = R.enquiriesBySource([

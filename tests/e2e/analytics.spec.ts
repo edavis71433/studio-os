@@ -663,7 +663,8 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // the same title row as the business dashboard, one h1, an "All clients" chip
     await expect(dashHead(page)).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('.subline .chip')).toHaveText('All customers');
+    // bold redesign: the studio's own numbers lead; the customers' chip and headline head their band
+    await expect(page.locator('.bandsub .chip')).toHaveText('All customers');
     await expect(page.getByText(/^As of /)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
     await expect(page.getByText('Across 3 customers, here’s what stands out.')).toBeVisible();
