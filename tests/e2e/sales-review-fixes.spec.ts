@@ -97,6 +97,12 @@ test.describe('B13 — the deal page\'s activity buttons read as words', () => {
     await page.locator('#qlKinds').getByRole('button', { name: 'Email' }).click();
     await expect(page.locator('#qlKinds').getByRole('button', { name: 'Email' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#qlKinds').getByRole('button', { name: 'Call' })).toHaveAttribute('aria-pressed', 'false');
+    // bold redesign, one word per action: the button names what it logs ("Log call" as in + Create, never "Log it")
+    await expect(page.locator('#qlSave')).toHaveText('Log email');
+    await page.locator('#qlKinds').getByRole('button', { name: 'Note' }).click();
+    await expect(page.locator('#qlSave')).toHaveText('Add note');
+    await page.locator('#qlKinds').getByRole('button', { name: 'Call' }).click();
+    await expect(page.locator('#qlSave')).toHaveText('Log call');
   });
 });
 

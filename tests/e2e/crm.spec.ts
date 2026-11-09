@@ -809,6 +809,55 @@ test.describe('Relationship view', () => {
     await expect(cb).toBeEnabled();
     await expect(page.locator('.dds-toast')).toContainText('update that to-do');
   });
+
+  // ── bold redesign leftovers (Nov 2026): one word per action, and + Create refreshes the record ──
+  test('one word per action: Log a call · To-do tabs, a log button that names what it logs, To-dos in the filter', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': RECORD, '/crm/activity': activityFx() } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await expect(page.locator('.composer-tabs [role=tab]')).toHaveText(['Message', 'Log a call', 'To-do', 'Note']);
+    await page.locator('.composer-tabs').getByRole('tab', { name: 'Log a call' }).click();
+    const go = page.locator('#logGo');
+    await expect(go).toHaveText('Log call');                                   // as in + Create, never "Log it"
+    for (const [chip, label] of [['Email', 'Log email'], ['Meeting', 'Log meeting'], ['Note', 'Add note'], ['Call', 'Log call']]) {
+      await page.locator('.kindchips').getByRole('button', { name: chip }).click();
+      await expect(go).toHaveText(label);
+    }
+    await expect(page.locator('#fchips [data-f="task"]')).toHaveText('To-dos');
+  });
+
+  test('+ Create from the header: what it made shows on the record at once', async ({ page }) => {
+    let made = false;
+    const n = { deal: 0, act: 0 };
+    await installApp(page, { api: { '/crm/record': RECORD, '/crm/activity': activityFx() } });
+    await page.route(/\/functions\/v1\/presence\/crm\/activity(\?|$)/, (route) => {
+      n.act++;
+      const items = made ? [{ id: 'deal:act:c1', kind: 'deal_activity', type: 'call', title: 'You called Marlow — talked pricing', body: null, at: new Date().toISOString(), meta: 'Call', href: null }] : [];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(activityFx({ items })) });
+    });
+    page.on('request', (r) => { if (r.method() === 'GET' && new URL(r.url()).pathname.endsWith(`/sales/deals/${DEAL}`)) n.deal++; });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await expect(page.getByRole('heading', { name: 'Marlow’s Kitchen' })).toBeVisible();
+    await expect.poll(() => n.act).toBeGreaterThan(0);
+    await expect.poll(() => n.deal).toBeGreaterThan(0);
+    const d0 = n.deal;
+    made = true;
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'call' } })));   // what create.js sends after a save
+    await expect(page.getByText('You called Marlow — talked pricing')).toBeVisible();
+    await expect.poll(() => n.deal).toBeGreaterThan(d0);                       // the facts and the money are read again too
+  });
+
+  test('+ Create never redraws a half-filled invoice form under you', async ({ page }) => {
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    await page.goto(`/crm.html?client=${CLIENT}`);
+    await page.locator('#act-invoice').click();
+    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#bf-amt').fill('1600');
+    const reread = page.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname.endsWith(`/sales/deals/${DEAL}`));
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'todo' } })));
+    await reread;
+    await page.waitForTimeout(200);   // the repaint after the read
+    await expect(page.locator('#bf-amt')).toHaveValue('1600');
+  });
 });
 
 // ── The record page's own Edit / Delete for a contact ────────────────────────

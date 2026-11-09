@@ -106,7 +106,7 @@ eq('only the next step and a dated one are now; the rest wait', tasks.map((t) =>
 eq('each step carries its place, so Home can move the next one up', tasks.map((t) => t.order), [9, 1, 2, 3]);
 ok('the route reads each step\'s place', /select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order(&order=[a-z_.,]+)?&limit=300/.test(read('supabase/functions/presence/routes/sales.ts')));
 const home = read('agency.html');
-ok('Home shows what\'s next, counts it, and moves the next step up on Done', /const now=items\.filter\(t=>!t\.later\);/.test(home) && /My tasks · \$\{MYT_ALL\?total:now\.length\}/.test(home) && /x\.later&&x\.parent_id===t\.parent_id/.test(home));
+ok('Home shows what\'s next, counts it, and moves the next step up on Done', /const now=items\.filter\(t=>!t\.later\);/.test(home) && /My to-dos · \$\{MYT_ALL\?total:now\.length\}/.test(home) && /x\.later&&x\.parent_id===t\.parent_id/.test(home));
 
 // ── items 54–56 ──
 ok('Inbox: the badge reads the name alone', /who:l\.name\|\|l\.email\|\|'Someone'/.test(read('inbox.html')) && !/initialsOf\(it\.name\)/.test(read('inbox.html')));

@@ -275,7 +275,7 @@
     call: ['Log a call', 'From anywhere — no need to open their record first'],
     deal: ['New deal', 'It starts as a new lead on your board'],
     invoice: ['Send an invoice', 'They get an email with a Pay button — card or bank'],
-    todo: ['Add a to-do', 'It shows in My tasks on Home'],
+    todo: ['Add a to-do', 'It shows in My to-dos on Home'],
     proposal: ['Send a proposal', 'Pick the deal; its proposal opens ready to fill'],
   };
   var WHO_LABEL = { call: 'Who did you talk to?', invoice: 'Who is it for?', todo: 'Which deal is it for?', proposal: 'Which deal?' };
@@ -512,7 +512,7 @@
     var t = '';
     if (S.kind === 'call') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + ', then saves the call on it' : 'Saved on this deal') : 'Pick who you talked to';
     else if (S.kind === 'invoice') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + '; the invoice is saved on it' : 'Saved on this deal, under Billing') : 'Pick who it’s for';
-    else if (S.kind === 'todo') t = c ? 'Shows in My tasks on Home' : 'Pick the deal it’s for';
+    else if (S.kind === 'todo') t = c ? 'Shows in My to-dos on Home' : 'Pick the deal it’s for';
     else if (S.kind === 'proposal') t = c ? 'Opens the deal with a new proposal' : 'Pick an open deal';
     else if (S.kind === 'deal') t = 'Starts as a new lead';
     n.textContent = t;

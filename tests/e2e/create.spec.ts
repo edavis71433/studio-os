@@ -313,6 +313,7 @@ test.describe('+ Create', () => {
     const calls = await salesServer(page);
     await page.goto('/agency.html');
     await openForm(page, 'Add a to-do');
+    await expect(dlg(page)).toContainText('My to-dos on Home');   // one word: to-do everywhere
     await dlg(page).locator('#cr-what').fill('Price the add-ons');
     await expect(dlg(page).locator('[data-chips=due] .cr-chip.on')).toHaveText('Tomorrow');
     await dlg(page).locator('[data-chips=due] .cr-chip', { hasText: 'Next week' }).click();

@@ -107,7 +107,7 @@ test.describe('Home — the list first (item 70)', () => {
       }
     }
     // the tabs carry their counts; My tasks moved in from the studio strip
-    await expect(page.locator('#needs [role=tab]')).toHaveText(['Needs you 6', 'My tasks 3', 'Waiting on them 3']);
+    await expect(page.locator('#needs [role=tab]')).toHaveText(['Needs you 6', 'My to-dos 3', 'Waiting on them 3']);
     await expect(studio.locator('#my-tasks')).toHaveCount(0);
     // each row: name, kind, what · when, the verb (the first one filled)
     await expect(needs.locator('.row .kchip')).toHaveText(['Money', 'Enquiry', 'Support', 'Deal', 'Notice', 'Website']);

@@ -2236,7 +2236,7 @@ test.describe('deal page — one filled button per view', () => {
     await expect(filledIn(page, '#detailInner')).toHaveCount(1);   // still the header's Send invoice
     await expect(filledIn(page, '#detailInner').first()).toHaveAttribute('id', 'wonInvoice');
     await page.locator('#detailInner .tabs [data-dtab="activity"]').click();
-    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);   // Activity's one is Log it
+    await expect(page.locator('#wonInvoice')).toHaveClass(/ghost/);   // Activity's one is Log call
     await expect(filledIn(page, '#detailInner')).toHaveCount(1);
   });
 });

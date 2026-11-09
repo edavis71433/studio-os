@@ -180,7 +180,7 @@
   .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) 10px;line-height:18px}
   .answer .lowc{margin-top:var(--dds-s2,8px);font-size:12.5px;color:var(--soft);white-space:normal}
   .rrows .late{color:var(--bad)} .rrows a .rn.due{color:var(--warn)}
-  /* My tasks (sales review item 29): a row is the link plus its own Done */
+  /* My to-dos (sales review item 29): a row is the link plus its own Done */
   .trow{display:flex;align-items:center;gap:var(--dds-s2,8px);padding:6px 0;border-top:1px solid var(--line)}
   .trow:first-child{border-top:0}
   .trow a{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500}
@@ -341,7 +341,7 @@
 
   /* ══ The bold redesign of Home (sales list item 70, Nov 2026) ══════════════
      The greeting and a Today card side by side; then one list with tabs (Needs
-     you · My tasks · Waiting on them · Snoozed), each row with its own verb and
+     you · My to-dos · Waiting on them · Snoozed), each row with its own verb and
      Snooze and Done; "Go through them" shows the list one at a time. */
   #top.has-today{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--dds-s4,16px);align-items:stretch;margin-bottom:var(--dds-s5,20px)}
   #top.has-today .top.hero{margin-bottom:0}
@@ -405,7 +405,7 @@
     .hero .acts{margin-top:10px}
     .hero .acts .btn{width:auto;min-height:44px;background:rgba(255,255,255,.16);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.28)}
     .qtabs{display:flex;width:100%;box-sizing:border-box}
-    .qtabs [role=tab]{flex:1 0 auto;padding:7px 10px;font-size:12.5px}
+    .qtabs [role=tab]{flex:1 0 auto;padding:7px 6px;font-size:12.5px}   /* the tabs grow into any spare room; tight padding keeps "My to-dos" and its neighbours on a 375px phone */
     .need .t .what{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
     .qcard{padding:8px 14px 10px;border-radius:var(--dds-r-lg,16px)}
     .need .ra .qlink{display:none}           /* on a phone, Snooze and Done live in "Go through them" */
@@ -1072,7 +1072,7 @@ function paintToday(){
   (AR_ITEMS||[]).forEach(v=>{if(!openInvoice(v)||!v.due_date)return;const d=daysBetween(today,v.due_date);if(d==null||d<0||d>7)return;rows.push({d:d+0.5,w:d===0?'Today':'In '+d+(d===1?' day':' days'),late:false,txt:'Invoice '+money(v.amount_cents)+' due · '+invoiceWho(v),href:invoiceHref(v)});});
   rows.sort((a,b)=>a.d-b.d);
   if(!rows.length){el.innerHTML='<p class="tq">Nothing is due today.</p>';return;}
-  el.innerHTML=rows.slice(0,5).map(r=>`<a href="${esc(r.href)}" data-noscope="1"><span class="tw${r.late?' late':''}">${esc(r.w)}</span><span class="tt">${esc(r.txt)}</span></a>`).join('')+(rows.length>5?`<p class="tq">+ ${rows.length-5} more under My tasks</p>`:'');
+  el.innerHTML=rows.slice(0,5).map(r=>`<a href="${esc(r.href)}" data-noscope="1"><span class="tw${r.late?' late':''}">${esc(r.w)}</span><span class="tt">${esc(r.txt)}</span></a>`).join('')+(rows.length>5?`<p class="tq">+ ${rows.length-5} more under My to-dos</p>`:'');
 }
 
 // ── the studio strip (one home, Oct 2026 studio audit change 3): the money tiles,
@@ -1173,7 +1173,7 @@ function pipelineStripHtml(s,deals){
   }
   return h+'</div></div>';
 }
-// ── My tasks (sales review item 29, Nov 2026): every open deal next step and
+// ── My to-dos (sales review item 29, Nov 2026): every open deal next step and
 //    to-do and the studio's own project tasks, from GET /sales/my-tasks (the rule
 //    is lib/my_tasks.ts), each with its due date and a Done that uses the route
 //    that owns it. An older server without the route keeps This week. ──
@@ -1197,7 +1197,7 @@ function myTasksHtml(){
   const now=items.filter(t=>!t.later);
   const shown=MYT_ALL?items:now.slice(0,MYT_SHOW);
   const hiddenHere=items.length-shown.length,beyond=Math.max(0,total-items.length);
-  let h=`<div class="rcard" id="my-tasks"><p class="rh" tabindex="-1">My tasks · ${MYT_ALL?total:now.length}</p>`;
+  let h=`<div class="rcard" id="my-tasks"><p class="rh" tabindex="-1">My to-dos · ${MYT_ALL?total:now.length}</p>`;
   h+=shown.length?`<div class="trows">${shown.map(myTaskRow).join('')}</div>`:'<p class="quiet">Nothing left on your list.</p>';
   if(hiddenHere>0)h+=`<p class="quiet"><button type="button" class="linkbtn" id="myTasksMore">Show all ${items.length}</button></p>`;
   else if(beyond>0)h+=`<p class="quiet">${beyond} more on your deals and projects.</p>`;
@@ -1206,7 +1206,7 @@ function myTasksHtml(){
 }
 function paintMyTasks(){
   if(!$('my-tasks')||!MYTASKS)return;
-  paintNeeds();paintToday();   // item 70: My tasks is a tab of the list
+  paintNeeds();paintToday();   // item 70: My to-dos is a tab of the list
 }
 function wireMyTasks(){
   const card=$('my-tasks');if(!card)return;
@@ -1236,7 +1236,7 @@ async function mountStudio(){
   if(gen!==SSEQ)return;
   MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
   DEALS=Array.isArray(deals)?deals:null;STUDIO_DONE=true;
-  paintNeeds();paintToday();   // item 70: My tasks and Waiting on them are tabs of the list now
+  paintNeeds();paintToday();   // item 70: My to-dos and Waiting on them are tabs of the list now
   const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
   if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
   let h='';
@@ -1399,7 +1399,7 @@ async function boot(){
 }
 boot();
 // + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
-// call, sent an invoice or added a to-do: the numbers, My tasks and Needs you
+// call, sent an invoice or added a to-do: the numbers, My to-dos and Needs you
 // catch up without a reload
 window.addEventListener('dds:created',()=>{if(!ME)return;mountStudio();mountNeeds(true);});
 
@@ -1507,7 +1507,7 @@ function snoozedPanelHtml(){
 }
 function queueTabs(){
   const t=[{k:'needs',label:'Needs you',n:NEEDS?Number(NEEDS.total||0):null}];
-  if(MYTASKS)t.push({k:'tasks',label:'My tasks',n:MYT_ALL?MYTASKS.total:MYTASKS.items.filter(x=>!x.later).length});   // what's next; everything once Show all is on (item 53)
+  if(MYTASKS)t.push({k:'tasks',label:'My to-dos',n:MYT_ALL?MYTASKS.total:MYTASKS.items.filter(x=>!x.later).length});   // what's next; everything once Show all is on (item 53)
   const w=waitingRows();if(w)t.push({k:'wait',label:'Waiting on them',n:w.length});
   const z=(NEEDS&&NEEDS.snoozed)||[];if(z.length||QTAB==='snoozed')t.push({k:'snoozed',label:'Snoozed',n:z.length});
   return t;
