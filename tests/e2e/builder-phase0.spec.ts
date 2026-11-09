@@ -166,7 +166,7 @@ test.describe('one tip at a time', () => {
     await installApp(page, { api: API });
     await page.goto('/presence.html#search');
     const tip = page.locator('.dds-hint.dds-live');
-    await expect(tip).toContainText('Search settings');
+    await expect(tip).toContainText('How people find you on Google');   // item 95: the tip says what is on the tab
     await page.evaluate(() => (window as any).go('media'));
     await expect(tip).toHaveCount(0);
     await page.waitForTimeout(700);        // past the tip's own delay
