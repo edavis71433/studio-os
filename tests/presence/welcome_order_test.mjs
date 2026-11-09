@@ -1,7 +1,6 @@
 // ── The welcome section moves like the other home sections, on every template ──
 //   deno run --allow-read --allow-env tests/presence/welcome_order_test.mjs
-// Each template's own fixture, rendered as that template (one fixture names another
-// template, so the slug is set here), with the home page's saved section order varied.
+// Each template's own fixture, with the home page's saved section order varied.
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
 
 const results = [];
@@ -14,7 +13,6 @@ for (const slug of TEMPLATES) {
   const fx = JSON.parse(Deno.readTextFileSync(new URL(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`, ROOT)));
   const home = (sections) => {
     const s = structuredClone(fx);
-    s.template_slug = slug; s.template_version = '1.0.0';
     s.content.settings = { ...(s.content.settings || {}), ...(sections ? { sections } : {}) };
     return String(renderSnapshot(s, SITE)['index.html']);
   };

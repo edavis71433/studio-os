@@ -14,11 +14,7 @@ const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : '
 const { renderSnapshot, tintFavicon, FIXED_COLOR_TEMPLATES } = await import('../../supabase/functions/presence/lib/render.ts');
 const SITE = { baseUrl: 'https://example.test', brand: { credit: 'Site by Davis Digital Studio' } };
 const SLUGS = ['atelier', 'aurora', 'business-classic', 'editorial', 'harbor', 'meadow', 'restaurant-classic', 'slate'];
-const fixture = (slug) => {
-  const fx = JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
-  fx.template_slug = slug;   // two samples name Restaurant Classic (item 103 fixes that); draw each with its own
-  return fx;
-};
+const fixture = (slug) => JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
 const drawn = Object.fromEntries(SLUGS.map((s) => [s, renderSnapshot(fixture(s), SITE)]));
 const html = (files) => Object.entries(files).filter(([k]) => k.endsWith('.html'));
 

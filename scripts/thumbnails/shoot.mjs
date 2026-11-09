@@ -3,9 +3,12 @@
 // Serves what render.ts wrote and saves small JPEGs the builder shows:
 //   thumbs/templates/<slug>.jpg  — the top of each template's sample home page, 640×440
 //   thumbs/sections/<type>.jpg   — each section type on its own, 440×248
-// Re-run both steps after a template or section changes how it draws, and commit.
+// and, once every picture is taken, tests/presence/golden/pictures.json: each picture's
+// digest beside the digest of the page it shows. thumbnails_test.mjs fails when a page no
+// longer draws what its picture shows. Re-run both steps then, and commit.
 import { createServer } from 'node:http';
-import { readFile, mkdir, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -64,4 +67,12 @@ for (const type of sections) {
 }
 await browser.close();
 server.close();
+
+// The record: what each picture shows (render.ts's digest of its page) and the picture itself.
+const sources = JSON.parse(await readFile(join(src, 'sources.json'), 'utf8'));
+const record = {};
+for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...sections.map((t) => `sections/${t}.jpg`)].sort()) {
+  record[name] = { page: sources[name], picture: createHash('sha256').update(await readFile(join(ROOT, 'thumbs', name))).digest('hex') };
+}
+await writeFile(join(ROOT, 'tests/presence/golden/pictures.json'), JSON.stringify(record, null, 1) + '\n');
 console.log(`shot ${templates.length} templates and ${sections.length} sections`);

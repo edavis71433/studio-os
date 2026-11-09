@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>Vermilion &amp; Vine — Updates</title>
+<link>https://vermilionandvine.example/updates/</link>
+<description>Latest updates from Vermilion &amp; Vine</description>
+<item>
+<title>Winter menu is live</title>
+<link>https://vermilionandvine.example/updates/winter-menu-2026/</link>
+<guid>https://vermilionandvine.example/updates/winter-menu-2026/</guid>
+<pubDate>Mon, 12 Jan 2026 18:00:00 GMT</pubDate>
+<description>Six new plates, two returning favorites, and a mulled thing for the patio.</description>
+</item>
+</channel>
+</rss>

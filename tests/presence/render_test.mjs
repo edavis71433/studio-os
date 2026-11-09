@@ -3,13 +3,23 @@
 // hostile/XSS fixtures, accessibility structure, manifest validation, and
 // performance measurement. Pure local run: no network, no env.
 //
-//   deno run --allow-read [--allow-write] tests/presence/render_test.mjs [--update-golden]
+//   deno run --allow-read --allow-env [--allow-write] tests/presence/render_test.mjs [--update-golden]
 //
-// --update-golden regenerates tests/presence/golden/restaurant-classic-1.0.0.json
-// (path -> sha256). Committing that file IS the approval of a renderer change.
+// Restaurant Classic's own sample runs the deep checks (1 to 6). Then every template draws
+// its own sample and its full sample (full_fixture.mjs: every section the builder offers, a
+// page of the owner's own, a dropdown menu) through the structure checks, the hostile pass
+// and its golden (7).
+//
+// --update-golden rewrites, for every template, tests/presence/golden/<slug>-1.0.0.json (each
+// drawn file's sha256: the exact check) and tests/presence/golden/<slug>-1.0.0/ (the same
+// files with a line break between tags, to read in a pull request). Committing both IS the
+// approval of a renderer change.
 import { renderSnapshot, getTemplate } from '../../supabase/functions/presence/lib/render.ts';
 import { validateSnapshot } from '../../supabase/functions/presence/lib/manifest_validate.ts';
 import { renderMarkdown } from '../../supabase/functions/presence/lib/markdown.ts';
+import { BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { vocabFor } from '../../supabase/functions/presence/lib/industry_vocab.ts';
+import { TEMPLATES, fixture as sampleOf, fullFixture, storedSections, PAGE } from './full_fixture.mjs';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -23,6 +33,48 @@ async function sha(s) {
 
 const fixture = JSON.parse(read('supabase/functions/presence/templates/restaurant-classic/1.0.0/fixture.json'));
 const SITE = { baseUrl: 'https://vermilionandvine.example', brand: { credit: 'Site by Davis Digital Studio' } };
+
+// The structure every real page keeps (a redirect stub isn't one): one h1, the skip link,
+// the main landmark, a labelled menu, the language, room for a phone's notch, alt text on
+// every picture (empty only on one marked decorative), and a menu that links to the page
+// marks the link as the page you're on.
+function structureProblems(files) {
+  const bad = [];
+  for (const [k, v] of Object.entries(files)) {
+    if (!k.endsWith('.html')) continue;
+    const s = String(v);
+    if (s.includes('http-equiv="refresh"')) continue;
+    const h1s = (s.match(/<h1[\s>]/g) || []).length;
+    if (h1s !== 1) bad.push(`${k}: h1 count ${h1s}`);
+    if (!s.includes('class="skip"')) bad.push(`${k}: no skip link`);
+    if (!/<main id="main">/.test(s)) bad.push(`${k}: no main landmark`);
+    const menu = s.match(/<nav class="primary" aria-label="Main">([\s\S]*?)<\/nav>/);
+    if (!menu) bad.push(`${k}: no labeled nav`);
+    if (!/<html lang="en">/.test(s)) bad.push(`${k}: no lang`);
+    if (!/viewport-fit=cover/.test(s)) bad.push(`${k}: viewport-fit missing`);
+    for (const m of s.matchAll(/<img\b[^>]*>/g)) {
+      const alt = m[0].match(/alt="([^"]*)"/);
+      if (!alt || (!alt[1].trim() && !m[0].includes('role="presentation"'))) bad.push(`${k}: img missing alt`);
+    }
+    const here = k === 'index.html' ? '/' : `/${k.replace(/index\.html$/, '')}`;
+    if (menu && menu[1].includes(`href="${here}"`) && !new RegExp(`href="${here.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*aria-current="page"`).test(menu[1])) bad.push(`${k}: the menu links here without marking it current`);
+  }
+  return bad;
+}
+// Nothing loads from another site: an outside address is only ever a link a visitor follows.
+function loadsFromElsewhere(files, base) {
+  const leaks = [];
+  for (const [k, v] of Object.entries(files)) {
+    const s = String(v);
+    for (const [tag] of s.matchAll(/<[a-z][a-z0-9]*\b[^>]*>/gi)) {
+      for (const m of tag.matchAll(/\s(?:src|srcset|poster)="([^"]*)"/gi)) if (/(?:^|,\s*)(?:https?:)?\/\//i.test(m[1]) && !m[1].startsWith(base)) leaks.push(`${k}: ${m[1].slice(0, 60)}`);
+      if (/^<link\b/i.test(tag)) for (const m of tag.matchAll(/\shref="((?:https?:)?\/\/[^"]+)"/gi)) if (!m[1].startsWith(base)) leaks.push(`${k}: ${m[1].slice(0, 60)}`);
+    }
+    if (/url\(\s*['"]?(?:https?:)?\/\/|@import/i.test(s)) leaks.push(`${k}: a stylesheet reaches out`);
+    if (/fonts\.googleapis|fonts\.gstatic|cdn\./i.test(s)) leaks.push(`${k}: CDN reference`);
+  }
+  return leaks;
+}
 
 // ═══ 1. determinism: identical input → byte-identical output, twice ═══
 const a = renderSnapshot(fixture, SITE);
@@ -40,27 +92,7 @@ const b = renderSnapshot(fixture, SITE);
   ok('determinism: changed input → changed output', c['index.html'] !== a['index.html']);
 }
 
-// ═══ 2. golden files ═══
-const goldenPath = new URL('tests/presence/golden/restaurant-classic-1.0.0.json', ROOT);
-const digest = {};
-for (const k of Object.keys(a).sort()) digest[k] = await sha(String(a[k]));
-if (UPDATE) {
-  await Deno.mkdir(new URL('tests/presence/golden/', ROOT), { recursive: true });
-  await Deno.writeTextFile(goldenPath, JSON.stringify(digest, null, 1) + '\n');
-  console.log(`golden updated: ${Object.keys(digest).length} files`);
-} else {
-  let golden = null;
-  try { golden = JSON.parse(await Deno.readTextFile(goldenPath)); } catch { /* absent */ }
-  if (!golden) ok('golden: baseline exists', false, 'run with --update-golden once');
-  else {
-    const gk = Object.keys(golden).sort(), dk = Object.keys(digest).sort();
-    const sameSet = gk.length === dk.length && gk.every((k, i) => k === dk[i]);
-    const drift = sameSet ? gk.filter((k) => golden[k] !== digest[k]) : ['<file set changed>'];
-    ok('golden: output matches committed baseline', sameSet && drift.length === 0, drift.slice(0, 3).join(', '));
-  }
-}
-
-// ═══ 3. hostile / XSS fixtures ═══
+// ═══ 2. hostile / XSS fixtures ═══
 const hostile = structuredClone(fixture);
 hostile.content.identity.business_name = `<script>alert(1)</script> Bistro`;
 hostile.content.identity.tagline = `" onmouseover="alert(1)" data-x="`;
@@ -109,31 +141,7 @@ const h = renderSnapshot(hostile, SITE);
   ok('markdown: escape-first (no raw html ever)', md.includes('&lt;script&gt;') && md.includes('<strong>b</strong>'));
 }
 
-// ═══ 4. accessibility structure (every page) ═══
-{
-  const pages = Object.entries(a).filter(([k]) => k.endsWith('.html'));
-  let bad = [];
-  for (const [k, v] of pages) {
-    const s = String(v);
-    const h1s = (s.match(/<h1[\s>]/g) || []).length;
-    if (h1s !== 1) bad.push(`${k}: h1 count ${h1s}`);
-    if (!s.includes('class="skip"')) bad.push(`${k}: no skip link`);
-    if (!/<main id="main">/.test(s)) bad.push(`${k}: no main landmark`);
-    if (!/<nav class="primary" aria-label="Main">/.test(s)) bad.push(`${k}: no labeled nav`);
-    if (!/<html lang="en">/.test(s)) bad.push(`${k}: no lang`);
-    if (!/aria-current="page"/.test(s) && !k.startsWith('404') && !k.startsWith('updates/') && !k.startsWith('privacy/') && !k.startsWith('accessibility/') && !k.startsWith('search/')) bad.push(`${k}: no aria-current`);   // footer utility pages aren't nav destinations
-    // every <img has non-empty alt
-    for (const m of s.matchAll(/<img\b[^>]*>/g)) {
-      const alt = m[0].match(/alt="([^"]*)"/);
-      if (!alt || !alt[1].trim()) bad.push(`${k}: img missing alt`);
-    }
-    if (!/viewport-fit=cover/.test(s)) bad.push(`${k}: viewport-fit missing`);
-  }
-  ok('a11y: single h1, skip link, landmarks, lang, aria-current, alt on every img', bad.length === 0, bad.slice(0, 4).join(' | '));
-  ok('a11y: reduced-motion + focus-visible in stylesheet', String(a[Object.keys(a).find((k) => k.startsWith('assets/'))]).includes('prefers-reduced-motion') && String(a[Object.keys(a).find((k) => k.startsWith('assets/'))]).includes(':focus-visible'));
-}
-
-// ═══ 5. SEO / AEO output ═══
+// ═══ 3. SEO / AEO output ═══
 {
   const home = String(a['index.html']);
   ok('seo: canonical + og + twitter + description on home', home.includes('rel="canonical"') && home.includes('property="og:title"') && home.includes('name="twitter:card"') && home.includes('name="description"'));
@@ -146,27 +154,11 @@ const h = renderSnapshot(hostile, SITE);
   ok('redirects: 301 map emitted', String(a['_redirects']).includes('/menu.html  /menu/  301'));
   ok('assets: immutable cache headers emitted', String(a['_headers']).includes('immutable'));
   ok('404 page + svg favicon emitted', '404.html' in a && 'favicon.svg' in a);
-}
-
-// ═══ 6. purity: no external origins in output ═══
-{
-  let leaks = [];
-  for (const [k, v] of Object.entries(a)) {
-    const s = String(v);
-    for (const m of s.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)) {
-      const u = m[1];
-      if (u.startsWith(SITE.baseUrl)) continue;
-      // allowed external references: user-entered links (booking/social/maps/mailto handled elsewhere)
-      if (/^https:\/\/(resy\.example|instagram\.com|www\.google\.com\/maps|safe\.example)/.test(u)) continue;
-      if (k === 'sitemap.xml' || k === 'robots.txt') continue;
-      leaks.push(`${k}: ${u.slice(0, 60)}`);
-    }
-    if (/fonts\.googleapis|fonts\.gstatic|cdn\./i.test(s)) leaks.push(`${k}: CDN reference`);
-  }
+  const leaks = loadsFromElsewhere(a, SITE.baseUrl);
   ok('purity: zero external ASSET origins (fonts/cdn) — only user links leave the site', leaks.length === 0, leaks.slice(0, 3).join(' | '));
 }
 
-// ═══ 7. manifest validation (pass/fail drafts) ═══
+// ═══ 4. manifest validation (pass/fail drafts) ═══
 {
   const t = getTemplate('restaurant-classic', '1.0.0');
   const good = validateSnapshot(fixture, t.manifest);
@@ -187,7 +179,7 @@ const h = renderSnapshot(hostile, SITE);
   ok('validate: entity caps enforced', !validateSnapshot(capSnap, t.manifest).ok);
 }
 
-// ═══ 8. performance (measured, budgets from M3.75) ═══
+// ═══ 5. performance (measured, budgets from M3.75) ═══
 {
   // maxed fixture: fill to manifest caps
   const t = getTemplate('restaurant-classic', '1.0.0');
@@ -214,13 +206,14 @@ const h = renderSnapshot(hostile, SITE);
   ok('perf: inline JS < 10KB budget', String(out['index.html']).match(/<script>([\s\S]*?)<\/script>/)[1].length < 10240);
 }
 
-// ═══ 9. golden + hostile across the OTHER registered templates (Phase 1 M1) ═══
-// restaurant-classic is covered in full above. Every template@version must hold
-// two universal guarantees: byte-identical golden output, and hostile content
-// escaped (never executable markup). This extends the SAME golden + hostile
-// mechanism to business-classic and editorial — no second harness, no second
-// renderer. Adding a template = add it to this list + commit its golden baseline.
-const OTHER_TEMPLATES = ['business-classic', 'editorial', 'aurora', 'slate', 'meadow', 'atelier', 'harbor'];
+// ═══ 6. reduced motion + focus in Restaurant Classic's stylesheet ═══
+{
+  const css = String(a[Object.keys(a).find((k) => k.startsWith('assets/'))]);
+  ok('a11y: reduced-motion + focus-visible in stylesheet', css.includes('prefers-reduced-motion') && css.includes(':focus-visible'));
+}
+
+// ═══ 7. every template: its own sample, its full sample, the hostile pass, its golden ═══
+// Adding a template = registering it (lib/render.ts) + committing its golden.
 const HOSTILE_PAYLOADS = [
   '<script>alert(1)</script>',
   '" onmouseover="alert(1)" x="',
@@ -234,21 +227,55 @@ let _hp = 0;
 // BEFORE anything renders/publishes (slugs build file paths + internal links),
 // so a hostile slug is unreachable in production — keep them valid here, exactly
 // as prod does, to test the real threat (hostile DISPLAY content) not a fiction.
-const STRUCTURAL_KEYS = new Set(['slug']);
+// The sections' kinds, ids and switches are the serializer's to refuse in the same way.
+const CONTENT_KEYS = new Set(['slug']);
+const SECTION_KEYS = new Set(['type', 'id', 'style', 'size', 'side', 'aspect', 'kind', 'network']);
+const keepContent = (key) => CONTENT_KEYS.has(key);
+const keepSection = (key) => SECTION_KEYS.has(key) || /_ids?$/.test(key || '');
 // deep-replace every non-structural STRING leaf with a rotating hostile payload;
 // structure (keys, arrays, numbers) is preserved so the template still renders.
-// The snapshot envelope (template_slug/version/contract) is untouched.
-const hostilify = (v, key) => {
-  if (typeof v === 'string') return STRUCTURAL_KEYS.has(key) ? v : HOSTILE_PAYLOADS[(_hp++) % HOSTILE_PAYLOADS.length];
-  if (Array.isArray(v)) return v.map((x) => hostilify(x, key));
-  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) o[k] = hostilify(v[k], k); return o; }
+const hostilify = (v, key, keep) => {
+  if (typeof v === 'string') return keep(key) ? v : HOSTILE_PAYLOADS[(_hp++) % HOSTILE_PAYLOADS.length];
+  if (Array.isArray(v)) return v.map((x) => hostilify(x, key, keep));
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) o[k] = hostilify(v[k], k, keep); return o; }
   return v;
 };
-for (const slug of OTHER_TEMPLATES) {
-  const fx = JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
+
+// The golden's reading copy: a line break between tags and after each rule. The stylesheet's
+// name carries its hash, and the section styles are the same in every template (reviewed in
+// lib/site_blocks.ts's own diff), so the copy calls the stylesheet assets/site.css and leaves
+// the section styles out. The digests still cover every byte of every file.
+const GOLDEN = new URL('tests/presence/golden/', ROOT);
+const copyName = (path) => path.replace(/^assets\/site-[0-9a-f]+\.css$/, 'assets/site.css');
+const readable = (body) => String(body)
+  .replace(BLOCK_CSS, '/* the section styles: BLOCK_CSS in lib/site_blocks.ts */')
+  .replace(/\/assets\/site-[0-9a-f]+\.css/g, '/assets/site.css')
+  .replace(/></g, '>\n<')
+  .replace(/\}(?!\n|$)/g, '}\n');
+const readTree = (dir, pre = '') => {
+  const out = {};
+  for (const e of Deno.readDirSync(dir)) {
+    if (e.isDirectory) Object.assign(out, readTree(new URL(`${e.name}/`, dir), `${pre}${e.name}/`));
+    else out[pre + e.name] = Deno.readTextFileSync(new URL(e.name, dir));
+  }
+  return out;
+};
+const firstDiff = (was, now) => {
+  const x = was.split('\n'), y = now.split('\n');
+  let i = 0; while (i < x.length && x[i] === y[i]) i++;
+  return `line ${i + 1} was «${(x[i] ?? '').slice(0, 80)}» now «${(y[i] ?? '').slice(0, 80)}»`;
+};
+const sidTypes = (html) => [...String(html || '').matchAll(/ data-dds-sid="([^"]+)"/g)].map((m) => m[1].split(/[#:]/)[0]);
+
+const [homeStored, pageStored] = storedSections();
+for (const slug of TEMPLATES) {
+  const own = sampleOf(slug);
+  ok(`sample [${slug}]: its fixture names its own template`, own.template_slug === slug && own.template_version === '1.0.0', `${own.template_slug}@${own.template_version}`);
+  const plain = renderSnapshot(own, SITE);
+  const fx = fullFixture(slug);
+  const r1 = renderSnapshot(fx, SITE), r2 = renderSnapshot(fullFixture(slug), SITE);
 
   // determinism: render twice → byte-identical
-  const r1 = renderSnapshot(fx, SITE), r2 = renderSnapshot(fx, SITE);
   {
     const k1 = Object.keys(r1).sort(), k2 = Object.keys(r2).sort();
     let same = k1.length === k2.length && k1.every((k, i) => k === k2[i]);
@@ -256,32 +283,99 @@ for (const slug of OTHER_TEMPLATES) {
     ok(`determinism [${slug}]: render twice → identical`, same, `${k1.length} files`);
   }
 
-  // golden baseline (path → sha256), same approval mechanism as restaurant
-  const gPath = new URL(`tests/presence/golden/${slug}-1.0.0.json`, ROOT);
-  const dg = {};
-  for (const k of Object.keys(r1).sort()) dg[k] = await sha(String(r1[k]));
-  if (UPDATE) {
-    await Deno.writeTextFile(gPath, JSON.stringify(dg, null, 1) + '\n');
-    console.log(`golden updated [${slug}]: ${Object.keys(dg).length} files`);
-  } else {
-    let g = null;
-    try { g = JSON.parse(await Deno.readTextFile(gPath)); } catch { /* absent */ }
-    if (!g) ok(`golden [${slug}]: baseline exists`, false, 'run with --update-golden once');
-    else {
-      const gk = Object.keys(g).sort(), dk = Object.keys(dg).sort();
-      const sameSet = gk.length === dk.length && gk.every((k, i) => k === dk[i]);
-      const drift = sameSet ? gk.filter((k) => g[k] !== dg[k]) : ['<file set changed>'];
-      ok(`golden [${slug}]: output matches committed baseline`, sameSet && drift.length === 0, drift.slice(0, 3).join(', '));
+  // structure: both samples, every page
+  {
+    const badOwn = structureProblems(plain), badFull = structureProblems(r1);
+    ok(`structure [${slug}]: its own sample — one h1, skip link, landmarks, lang, menu marks the page, alt on every img`, badOwn.length === 0, badOwn.slice(0, 4).join(' | '));
+    ok(`structure [${slug}]: the full sample — the same on every page`, badFull.length === 0, badFull.slice(0, 4).join(' | '));
+    const css = String(r1[Object.keys(r1).find((k) => k.startsWith('assets/'))]);
+    ok(`structure [${slug}]: reduced-motion + focus-visible in the stylesheet`, css.includes('prefers-reduced-motion') && css.includes(':focus-visible'));
+    const vr = validateSnapshot(fx, getTemplate(slug, '1.0.0').manifest);
+    ok(`structure [${slug}]: the full sample is a draft the template accepts`, vr.ok && vr.blockers.length === 0, vr.blockers.map((x) => x.field).slice(0, 3).join(','));
+  }
+
+  // the full sample's own parts: every section, the owner's page, the dropdown, the stamps
+  {
+    const home = String(r1['index.html']), page = String(r1[`${PAGE.slug}/index.html`] || '');
+    const want = (list) => list.map((x) => x.type).join(',');
+    ok(`sections [${slug}]: the home page draws each of its sections, in order`, sidTypes(home).join(',') === want(homeStored), sidTypes(home).join(','));
+    ok(`sections [${slug}]: the owner's page draws each of the rest, in order`, sidTypes(page).join(',') === want(pageStored), sidTypes(page).join(','));
+    const stamped = (s) => { const n = (re) => (s.match(re) || []).length; const sid = n(/ data-dds-sid="/g); return sid > 0 && n(/ data-dds-key="block_/g) === sid && n(/ data-dds-src="\d+"/g) === sid; };
+    ok(`sections [${slug}]: every section carries the canvas's stamps (sid, key, stored index)`, stamped(home) && stamped(page));
+    ok(`page [${slug}]: the owner's page has its own file, its title as the h1, and the site's header and footer`,
+      page.includes(`<h1>${PAGE.title}</h1>`) && page.includes('<header class="site"') && page.includes('<footer class="site"'));
+    const pages = Object.entries(r1).filter(([k, v]) => k.endsWith('.html') && !String(v).includes('http-equiv="refresh"'));
+    const dropdown = new RegExp(`<li class="has-sub"><a href="/about/"[^>]*aria-haspopup="true">[^<]*<span class="sub-caret"[^>]*>[^<]*</span></a><ul class="subnav">(?:(?!</ul>)[\\s\\S])*href="/${PAGE.slug}/"`);
+    const noDrop = pages.filter(([, v]) => !dropdown.test(String(v))).map(([k]) => k);
+    ok(`menu [${slug}]: every page's menu has the dropdown under About, opening onto the owner's page`, noDrop.length === 0, noDrop.slice(0, 3).join(', '));
+    const css = String(r1[Object.keys(r1).find((k) => k.startsWith('assets/'))]);
+    ok(`menu [${slug}]: the stylesheet carries the dropdown's styles`, css.includes('ul.subnav'));
+  }
+
+  // what search engines and other sites read
+  {
+    const home = String(r1['index.html']), page = String(r1[`${PAGE.slug}/index.html`] || '');
+    const v = vocabFor(fx.content.settings?.industry);
+    const kind = slug === 'restaurant-classic' ? 'Restaurant' : v.schemaType;
+    ok(`seo [${slug}]: canonical + og + twitter + description on the home page and the owner's page`,
+      [home, page].every((s) => s.includes('rel="canonical"') && s.includes('property="og:title"') && s.includes('name="twitter:card"') && s.includes('name="description"')));
+    ok(`seo [${slug}]: the business JSON-LD names its kind (${kind})`, home.includes(`"@type":"${kind}"`));
+    ok(`aeo [${slug}]: FAQPage JSON-LD on the questions page`, String(r1['faq/index.html']).includes('"@type":"FAQPage"'));
+    const offerings = slug === 'restaurant-classic' ? '/menu/' : v.offeringPath;
+    const want = ['/', offerings, '/about/', '/faq/', '/contact/', '/updates/', ...fx.content.posts.map((p) => `/updates/${p.slug}/`), `/${PAGE.slug}/`];
+    const missing = want.filter((p) => !String(r1['sitemap.xml']).includes(`<loc>${SITE.baseUrl}${p}</loc>`));
+    ok(`seo [${slug}]: the sitemap lists every page, the owner's too, and robots points at it`, missing.length === 0 && String(r1['robots.txt']).includes('sitemap.xml'), missing.join(', '));
+    ok(`seo [${slug}]: a 404 page and an svg favicon`, '404.html' in r1 && 'favicon.svg' in r1);
+    const leaks = loadsFromElsewhere(r1, SITE.baseUrl);
+    ok(`purity [${slug}]: nothing loads from another site; only links lead out`, leaks.length === 0, leaks.slice(0, 3).join(' | '));
+  }
+
+  // golden: every file the full sample draws, plus the home page as its own sample draws it
+  // (the template's own menu, no sections) under _plain/
+  {
+    const drawn = { ...r1, '_plain/index.html': plain['index.html'] };
+    const digest = {};
+    for (const k of Object.keys(drawn).sort()) digest[k] = await sha(String(drawn[k]));
+    const copy = Object.fromEntries(Object.entries(drawn).map(([k, v]) => [copyName(k), readable(v)]));
+    const gPath = new URL(`${slug}-1.0.0.json`, GOLDEN), cDir = new URL(`${slug}-1.0.0/`, GOLDEN);
+    if (UPDATE) {
+      await Deno.mkdir(GOLDEN, { recursive: true });
+      await Deno.writeTextFile(gPath, JSON.stringify(digest, null, 1) + '\n');
+      await Deno.remove(cDir, { recursive: true }).catch(() => {});
+      for (const [k, v] of Object.entries(copy)) {
+        const f = new URL(k, cDir);
+        await Deno.mkdir(new URL('./', f), { recursive: true });
+        await Deno.writeTextFile(f, v);
+      }
+      console.log(`golden updated [${slug}]: ${Object.keys(digest).length} files`);
+    } else {
+      let g = null, stored = null;
+      try { g = JSON.parse(await Deno.readTextFile(gPath)); } catch { /* absent */ }
+      try { stored = readTree(cDir); } catch { /* absent */ }
+      if (!g || !stored) ok(`golden [${slug}]: baseline exists`, false, 'run with --update-golden once');
+      else {
+        const gone = Object.keys(g).filter((k) => !(k in digest)), added = Object.keys(digest).filter((k) => !(k in g));
+        const drift = Object.keys(digest).filter((k) => k in g && g[k] !== digest[k]);
+        ok(`golden [${slug}]: every file matches its committed digest`, !gone.length && !added.length && !drift.length,
+          [...added.map((k) => `new ${k}`), ...gone.map((k) => `gone ${k}`), ...drift].slice(0, 4).join(', '));
+        const missing = Object.keys(copy).filter((k) => !(k in stored)), extra = Object.keys(stored).filter((k) => !(k in copy));
+        const changed = Object.keys(copy).filter((k) => k in stored && stored[k] !== copy[k]);
+        ok(`golden [${slug}]: the reading copy matches, file for file`, !missing.length && !extra.length && !changed.length,
+          [...missing.map((k) => `new ${k}`), ...extra.map((k) => `gone ${k}`), ...changed.map((k) => `${k} ${firstDiff(stored[k], copy[k])}`)].slice(0, 3).join(' | '));
+      }
     }
   }
 
-  // hostile: every content string is a hostile payload; no LIVE dangerous markup
+  // hostile: every content string is a hostile payload, and the owner's words in the
+  // sections and the menu go through the serializer's step first; no LIVE dangerous markup
   // may survive (escaped forms like &lt;script&gt; are fine and expected).
-  const hSnap = structuredClone(fx);
-  _hp = 0;
-  hSnap.content = hostilify(fx.content, 'content');
-  const hr = renderSnapshot(hSnap, SITE);
   {
+    _hp = 0;
+    const full = fullFixture(slug, (x) => hostilify(x, undefined, keepSection));
+    const content = hostilify(own.content, 'content', keepContent);
+    const { blocks, blocks_src, pages, nav } = full.content.settings;
+    const hSnap = { ...full, content: { ...content, settings: { ...content.settings, blocks, blocks_src, pages, nav } } };
+    const hr = renderSnapshot(hSnap, SITE);
     let bad = [], sawEscaped = false;
     for (const [k, v] of Object.entries(hr)) {
       if (!k.endsWith('.html')) continue;
@@ -296,6 +390,8 @@ for (const slug of OTHER_TEMPLATES) {
     }
     ok(`hostile [${slug}]: no script/handler/js-url/iframe survives in any page`, bad.length === 0, bad.slice(0, 3).join(' | '));
     ok(`hostile [${slug}]: hostile markup present but escaped (proves escaping ran)`, sawEscaped, 'expected &lt;script&gt; in output');
+    const drew = sidTypes(hr['index.html']).length + sidTypes(hr[`${PAGE.slug}/index.html`]).length;
+    ok(`hostile [${slug}]: most sections still draw with hostile words in them`, drew >= 0.75 * (homeStored.length + pageStored.length), `${drew} of ${homeStored.length + pageStored.length}`);
   }
 }
 
