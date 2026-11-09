@@ -10,9 +10,10 @@
 import { svc } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
 import { serializeDraft, variantPath } from './serializer.ts';
+import type { MediaManifestEntry } from './serializer.ts';
 import { writeChangeEvent } from './provenance.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from './render_types.ts';
-import type { SnapshotContent } from './render_types.ts';
+import type { Snapshot, SnapshotContent } from './render_types.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { SiteRow } from './site.ts';
 
@@ -45,6 +46,7 @@ export async function applySnapshotToDraft(
   snapshot: { content: unknown; media_manifest?: MediaManifestRow[]; content_contract_version: number; template_slug: string; template_version: string; dev_customization?: { theme_tokens?: Record<string, string>; custom_css?: string; custom_html?: string } | null },
   principal: Principal,
   summary: string,
+  current?: { snapshot: Snapshot; mediaManifest: MediaManifestEntry[] } | null,   // the draft as the caller already read it
 ): Promise<ApplyResult> {
   // the gate refuses unusable content no matter who calls — REPLACE semantics
   // applied from a degenerate snapshot would blank the draft
@@ -54,10 +56,13 @@ export async function applySnapshotToDraft(
 
   // 1. safety snapshot — the current draft is set aside, never lost
   try {
-    const { getTemplate } = await import('./render.ts');
-    const t = getTemplate(site.template_slug, site.template_version);
-    if (t) {
-      const cur = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+    let cur = current || null;
+    if (!cur) {
+      const { getTemplate } = await import('./render.ts');
+      const t = getTemplate(site.template_slug, site.template_version);
+      if (t) cur = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+    }
+    if (cur) {
       await svc('presence_snapshots', {
         method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({

@@ -10,6 +10,7 @@
 // Nothing here can publish. The ritual still stands between all of it and the world.
 import { svc } from '../lib/db.ts';
 import { serializeDraft } from '../lib/serializer.ts';
+import type { MediaManifestEntry } from '../lib/serializer.ts';
 import { getTemplate } from '../lib/render.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
 import { buildFactSheet } from './facts.ts';
@@ -22,7 +23,7 @@ import type { ModelFn } from './model.ts';
 import type { FactSheet } from './facts.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
-import type { SnapshotContent } from '../lib/render_types.ts';
+import type { Snapshot, SnapshotContent } from '../lib/render_types.ts';
 
 /* ── task prompts per kind (what fields the model may fill) ── */
 const TASKS: Record<WriterKind, { summary: string; fields: string; optionCount: number }> = {
@@ -213,7 +214,7 @@ export function composeMerged(current: SnapshotContent, payload: WriterPayload, 
 
 export interface AcceptResult { ok: boolean; applied_summary: string; error?: string }
 
-export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: number, edits: WriterPayload | null, principal: Principal): Promise<AcceptResult> {
+export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: number, edits: WriterPayload | null, principal: Principal, current?: { snapshot: Snapshot; mediaManifest: MediaManifestEntry[] } | null): Promise<AcceptResult> {
   const q = await svc(`presence_ai_drafts?id=eq.${draftId}&site_id=eq.${site.id}&status=eq.proposed&select=id,kind,options,prompt_summary&limit=1`);
   const row = q.json?.[0];
   if (!row) return { ok: false, applied_summary: '', error: 'not_found' };
@@ -225,7 +226,9 @@ export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: n
   if (CONTRACT_KINDS.includes(row.kind) || EDIT_CONTRACT.includes(row.kind)) {
     const t = getTemplate(site.template_slug, site.template_version);
     if (!t) return { ok: false, applied_summary: '', error: 'template_missing' };
-    const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+    // the draft as it is now: the starting point, and the safety copy applySnapshotToDraft sets aside
+    const cur = current || await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
+    const { snapshot, mediaManifest } = cur;
     const merged = composeMerged(snapshot.content, opt.payload, edits);
     const parts: string[] = [];
     if (opt.payload.identity || edits?.identity) parts.push('business copy');
@@ -239,7 +242,7 @@ export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: n
     const applied = await applySnapshotToDraft(
       site,
       { content: merged, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: site.template_slug, template_version: site.template_version },
-      principal, summary,
+      principal, summary, cur,
     );
     if (!applied.ok) return { ok: false, applied_summary: '', error: applied.error || 'apply_failed' };
   } else {

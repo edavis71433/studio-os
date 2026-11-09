@@ -150,24 +150,66 @@ function resolvePageSeoShare(rawPageSeo: unknown, ref: (id: string | null | unde
   })) as PageSeoMap;
 }
 
-export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
+// The ONE list of what a draft is read from: each table, and its read for one site. They
+// all go at once; the library rows its linked sections name are read after them.
+const DRAFT_READS: Record<string, (siteId: string) => string> = {
+  presence_identity: (s) => `presence_identity?site_id=eq.${s}&limit=1`,
+  presence_locations: (s) => `presence_locations?site_id=eq.${s}&order=created_at.asc`,
+  presence_offerings: (s) => `presence_offerings?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`,
+  presence_testimonials: (s) => `presence_testimonials?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`,
+  presence_faqs: (s) => `presence_faqs?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`,
+  presence_posts: (s) => `presence_posts?site_id=eq.${s}&deleted_at=is.null&status=eq.published&order=published_at.desc`,
+  presence_media: (s) => `presence_media?site_id=eq.${s}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`,
+  presence_redirects: (s) => `presence_redirects?site_id=eq.${s}&order=from_path.asc&select=from_path,to_path`,
+  presence_settings: (s) => `presence_settings?site_id=eq.${s}&limit=1`,
+  presence_dev_customizations: (s) => `presence_dev_customizations?site_id=eq.${s}&select=theme_tokens,custom_css,custom_html&limit=1`,
+  // Phase RV: approved reviews ONLY — baked into the reviews_wall block so the render
+  // is pure and the schema.org is honest. Deploy-order-tolerant: pre-0101 this table
+  // is absent → q() returns [] → no reviews_wall renders (nothing fabricated).
+  presence_reviews: (s) => `presence_reviews?site_id=eq.${s}&status=eq.approved&order=approved_at.desc,created_at.desc&select=reviewer_name,rating,body,owner_reply,status,approved_at,created_at&limit=500`,
+};
+
+/** Every table a draft is built from. */
+export const DRAFT_TABLES: readonly string[] = [...Object.keys(DRAFT_READS), 'presence_content_library'];
+/** A draft's rows, by table (DRAFT_TABLES). */
+export type DraftRows = Record<string, any[]>;
+
+// Multi-page: owner-created pages carry their own block arrays. Collect linked
+// refs across the home page AND every custom page so one library query resolves
+// them all (a linked section can appear on any page).
+function linkedIdsIn(settings: any): string[] {
+  const all: unknown[] = Array.isArray(settings.blocks) ? settings.blocks.slice() : [];
+  for (const p of Array.isArray(settings.pages) ? settings.pages : []) if (Array.isArray(p?.blocks)) all.push(...p.blocks);
+  return linkedRefIds(all);
+}
+
+/** Read a site's draft rows. Given `prev`, an earlier read, and `only`, read just the
+ *  tables in `only` again and keep the rest of `prev`. The library rows follow the
+ *  sections that link to them, so they're read again with the settings, or when the
+ *  library itself was written. */
+export async function readDraftRows(siteId: string, prev?: DraftRows, only?: ReadonlySet<string>): Promise<DraftRows> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
-  const [identArr, locArr, offerings, testimonials, faqs, posts, media, redirects, settingsArr, devArr, reviewsArr] = await Promise.all([
-    q(`presence_identity?site_id=eq.${siteId}&limit=1`),
-    q(`presence_locations?site_id=eq.${siteId}&order=created_at.asc`),
-    q(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
-    q(`presence_testimonials?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
-    q(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`),
-    q(`presence_posts?site_id=eq.${siteId}&deleted_at=is.null&status=eq.published&order=published_at.desc`),
-    q(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`),
-    q(`presence_redirects?site_id=eq.${siteId}&order=from_path.asc&select=from_path,to_path`),
-    q(`presence_settings?site_id=eq.${siteId}&limit=1`),
-    q(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`),
-    // Phase RV: approved reviews ONLY — baked into the reviews_wall block so the render
-    // is pure and the schema.org is honest. Deploy-order-tolerant: pre-0101 this table
-    // is absent → q() returns [] → no reviews_wall renders (nothing fabricated).
-    q(`presence_reviews?site_id=eq.${siteId}&status=eq.approved&order=approved_at.desc,created_at.desc&select=reviewer_name,rating,body,owner_reply,status,approved_at,created_at&limit=500`),
-  ]);
+  const again = (table: string) => !prev || !only || only.has(table);
+  const tables = Object.keys(DRAFT_READS).filter(again);
+  const read = await Promise.all(tables.map((t) => q(DRAFT_READS[t](siteId))));
+  const rows: DraftRows = { ...prev };
+  tables.forEach((t, i) => { rows[t] = read[i]; });
+  if (again('presence_settings') || again('presence_content_library')) {
+    // CL-LINK: no links → no query, byte-identical to before.
+    const refIds = linkedIdsIn(rows.presence_settings[0] || {});
+    rows.presence_content_library = refIds.length ? await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : [];
+  }
+  return rows;
+}
+
+export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
+  return buildSnapshot(await readDraftRows(siteId), manifest, opts);
+}
+
+/** Build the snapshot from a draft's rows (readDraftRows). Pure. */
+export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[] } {
+  const { presence_identity: identArr, presence_locations: locArr, presence_offerings: offerings, presence_testimonials: testimonials, presence_faqs: faqs, presence_posts: posts,
+    presence_media: media, presence_redirects: redirects, presence_settings: settingsArr, presence_dev_customizations: devArr, presence_reviews: reviewsArr } = rows;
   // Phase RV: resolve the approved reviews → display items + HONEST aggregate (only
   // approved rows, real counts). Passed to resolveBlockMedia as extras so the reviews_wall
   // block can render + carry its schema without the pure engine reading the DB.
@@ -189,22 +231,13 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   const settings = settingsArr[0] || {};
 
   // CL-LINK: resolve any "linked" sections to the CURRENT content of their library
-  // item (single source, update-once). The impure read lives HERE; the pure engine
-  // (validateBlocks → resolveBlockMedia) is unchanged, so a copy-inserted block and
-  // a linked one render identically. No links → no query, byte-identical to before.
+  // item (single source, update-once). The impure read lives in readDraftRows; the pure
+  // engine (validateBlocks → resolveBlockMedia) is unchanged, so a copy-inserted block
+  // and a linked one render identically.
   const rawBlocks: unknown[] = Array.isArray(settings.blocks) ? settings.blocks : [];
-  // Multi-page: owner-created pages carry their own block arrays. Collect linked
-  // refs across the home page AND every custom page so one library query resolves
-  // them all (a linked section can appear on any page).
   const rawPages: any[] = Array.isArray(settings.pages) ? settings.pages : [];
-  const allRawForLinks: unknown[] = rawBlocks.slice();
-  for (const p of rawPages) if (Array.isArray(p?.blocks)) allRawForLinks.push(...p.blocks);
-  const refIds = linkedRefIds(allRawForLinks);
   const libMap = new Map<string, unknown>();
-  if (refIds.length) {
-    const libRows = await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`);
-    for (const r of libRows as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
-  }
+  for (const r of (rows.presence_content_library || []) as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
   // G13: home + every custom page run the SAME exported composeBlocks (above)
   // over this request's library lookup / media ref / approved reviews.
   const compose = (raw: unknown[]) => composeBlocks(raw, (id) => libMap.get(id) ?? null, ref, reviewsWall ? { reviewsWall } : undefined);

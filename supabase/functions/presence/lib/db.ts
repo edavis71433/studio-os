@@ -14,7 +14,32 @@ const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') ||
 
 export const REST = `${SB_URL}/rest/v1`;
 
+// ── Which tables this isolate has written (Nov 2026) ─────────────────────────
+// svc and asUser carry all of this function's PostgREST traffic, so a count per
+// table, bumped by each write through them, tells a request which tables it wrote:
+// take a mark before the write and compare after. lib/optimistic_lock.ts uses it to
+// read again only the part of the draft a write moved. A request running alongside
+// in this isolate can only add tables: a read more, and the same answer a read of
+// the whole draft would give.
+const WRITES = new Map<string, number>();
+function noteWrite(path: string, init: RequestInit) {
+  const method = (init.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return;
+  const table = path.split('?')[0];
+  WRITES.set(table, (WRITES.get(table) || 0) + 1);
+}
+export type WriteMark = ReadonlyMap<string, number>;
+/** The write counts as they are now. */
+export function writeMark(): WriteMark { return new Map(WRITES); }
+/** The tables (or `rpc/<name>` database functions) written since `mark`. */
+export function writtenSince(mark: WriteMark): Set<string> {
+  const out = new Set<string>();
+  for (const [table, n] of WRITES) if (n !== (mark.get(table) || 0)) out.add(table);
+  return out;
+}
+
 export async function svc(path: string, init: RequestInit = {}) {
+  noteWrite(path, init);
   const r = await fetch(`${REST}/${path}`, {
     ...init,
     headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
@@ -61,6 +86,7 @@ export async function svcAll(path: string, orderCol: string, pageSize = 1000, ma
 }
 
 export async function asUser(jwt: string, path: string, init: RequestInit = {}) {
+  noteWrite(path, init);
   const r = await fetch(`${REST}/${path}`, {
     ...init,
     headers: { apikey: SB_ANON, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', ...(init.headers || {}) },

@@ -17,6 +17,7 @@ import { computeDraftHash } from '../lib/draft_hash.ts';
 import { deriveHealth } from '../lib/health.ts';
 import { ensureAndListNotes, resolveNote } from '../lib/notes.ts';
 import { applySnapshotToDraft } from '../lib/draft_writer.ts';
+import { draftAsFound } from '../lib/optimistic_lock.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from '../lib/render_types.ts';
 import { buildContentTree } from '../lib/content_tree.ts';
@@ -240,7 +241,7 @@ export async function handleRestoreToDraft(req: Request, site: SiteRow, principa
   if (!snapshotContentUsable(snap.content)) return json({ error: 'not_restorable', message: 'That version predates the current site format and can’t be restored.' }, 410, cors);
 
   const when = new Date(rec.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const res = await applySnapshotToDraft(site, snap, principal, `Brought the version from ${when} into the draft`);
+  const res = await applySnapshotToDraft(site, snap, principal, `Brought the version from ${when} into the draft`, await draftAsFound(req));
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged except where noted, and nothing was lost.', }, 502, cors);
 
   const dropped = res.applied?.dropped_media ?? 0;

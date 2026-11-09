@@ -10,8 +10,10 @@
 // before. `If-Match: *` is the HTTP "any current version" wildcard → proceed.
 
 import { json } from '../../_shared/http.ts';
-import { draftHashForSite } from './draft_hash.ts';
-import { svc } from './db.ts';
+import { readDraft, draftTablesMoved } from './draft_hash.ts';
+import type { DraftRead } from './draft_hash.ts';
+import { svc, writeMark, writtenSince } from './db.ts';
+import type { WriteMark } from './db.ts';
 import type { SiteRow } from './site.ts';
 
 /** Read + normalize the `If-Match` precondition. Strips a weak-validator `W/`
@@ -89,6 +91,13 @@ export async function guardStaleDraft(req: Request, site: SiteRow, cors: Record<
 // Nothing for a write that named no version, failed, or doesn't move the draft. The draft
 // can still move between the write and the hash after it, as it can between the guard's
 // check and the write; both are this function's own few milliseconds.
+//
+// The draft is read in full once per request, before the write. The read after it takes
+// the tables this isolate wrote in between (lib/db.ts) and reads only those again: a
+// section save reads the settings row, not the whole draft. Another instance's write to
+// a part this one didn't touch, in those milliseconds, isn't read: the version named is
+// what this write left on what the caller had, so the caller's next checked write is
+// refused rather than let through over a change they never loaded.
 
 /** The routes whose writes move the draft version. The same list as the page's
  *  DRAFT_WRITE (presence.html), which sends these one at a time; optimistic_lock_test
@@ -103,38 +112,59 @@ export function movesDraft(method: string, route: string): boolean {
 /** The answer header naming the version a write left. */
 export const DRAFT_VERSION_HEADER = 'X-Draft-Version';
 
-// One hash of the draft as the request found it, shared by the guard and the answer.
-const BEFORE = new WeakMap<Request, { site: SiteRow; hash: Promise<string | null> }>();
+/** How a request reads the draft: all of it, or, given an earlier read and the tables
+ *  written since, only what moved (lib/draft_hash.ts readDraft). */
+export type DraftReader = (site: SiteRow, prev?: DraftRead | null, written?: Iterable<string>) => Promise<DraftRead | null>;
 
-/** The draft's version before this request wrote, hashed once per request. */
-export function draftVersionBefore(req: Request, site: SiteRow, hashFor: (s: SiteRow) => Promise<string | null> = draftHashForSite): Promise<string | null> {
+// One read of the draft as the request found it, shared by the guard, the answer and a
+// restore's safety copy, with the write counts it was taken at.
+const BEFORE = new WeakMap<Request, { site: SiteRow; mark: WriteMark; read: Promise<DraftRead | null> }>();
+
+function foundBy(req: Request, site: SiteRow, read: DraftReader) {
   let b = BEFORE.get(req);
-  if (!b) { b = { site, hash: hashFor(site) }; BEFORE.set(req, b); }
-  return b.hash;
+  if (!b) { b = { site, mark: writeMark(), read: read(site) }; BEFORE.set(req, b); }
+  return b;
+}
+
+/** The draft's version before this request wrote, read once per request. */
+export function draftVersionBefore(req: Request, site: SiteRow, read: DraftReader = readDraft): Promise<string | null> {
+  return foundBy(req, site, read).read.then((d) => d?.hash ?? null);
+}
+
+/** The draft as this request found it, while nothing has written it since: a restore's
+ *  safety copy and a proposal's starting point need no read of their own. Null when the
+ *  request didn't read it, or it has moved. */
+export async function draftAsFound(req: Request): Promise<DraftRead | null> {
+  const b = BEFORE.get(req);
+  if (!b) return null;
+  try {
+    const found = await b.read;
+    return found && draftTablesMoved(writtenSince(b.mark))?.size === 0 ? found : null;
+  } catch { return null; }
 }
 
 /** Before a write that moves the draft and names a version: look at the draft first.
- *  A route the guard covers reuses this hash; on any other, an error here only means
+ *  A route the guard covers reuses this read; on any other, an error here only means
  *  the answer won't name a version. */
-export async function noteDraftBefore(req: Request, route: string, site: SiteRow, hashFor?: (s: SiteRow) => Promise<string | null>): Promise<void> {
+export async function noteDraftBefore(req: Request, route: string, site: SiteRow, read?: DraftReader): Promise<void> {
   if (!movesDraft(req.method, route)) return;
   const named = readIfMatch(req);
   if (named === null || named === '' || named === '*') return;
-  try { await draftVersionBefore(req, site, hashFor); } catch { /* the write goes ahead, unnamed */ }
+  try { await draftVersionBefore(req, site, read); } catch { /* the write goes ahead, unnamed */ }
 }
 
 /** Name the version a successful write left (see above). Returns the response as it
  *  was when there is nothing to name. */
-export async function withDraftVersion(req: Request, resp: Response, hashFor: (s: SiteRow) => Promise<string | null> = draftHashForSite): Promise<Response> {
+export async function withDraftVersion(req: Request, resp: Response, read: DraftReader = readDraft): Promise<Response> {
   const b = BEFORE.get(req);
   if (!b || !resp.ok) return resp;
   const named = readIfMatch(req);
   if (named === null || named === '' || named === '*') return resp;
   let version: string | null = null;
   try {
-    const before = await b.hash;
-    if (before === null) return resp;
-    version = before === named ? await hashFor(b.site) : named;
+    const found = await b.read;
+    if (!found) return resp;
+    version = found.hash === named ? (await read(b.site, found, writtenSince(b.mark)))?.hash ?? null : named;
   } catch { return resp; }
   if (!version) return resp;
   const headers = new Headers(resp.headers);
