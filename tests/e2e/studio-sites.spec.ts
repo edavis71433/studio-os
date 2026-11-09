@@ -42,13 +42,13 @@ const json = (body: unknown, status = 200) => ({ status, contentType: 'applicati
 
 /** The app plus the Sites routes. The harness matches by prefix, so the routes under
  *  /agency/sites/:id/… get their own handlers (registered after it, so they win). */
-async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], opts: { body?: Record<string, unknown>; thumbDelay?: number; needs?: Record<string, unknown> } = {}) {
+async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], opts: { body?: Record<string, unknown>; thumbDelay?: number; needs?: Record<string, unknown>; needsRows?: unknown[] } = {}) {
   const thumbs: string[] = []; let inFlight = 0, maxInFlight = 0;
   const writes: Array<{ method: string; path: string; body: any }> = [];
   await installApp(page, { api: {
     '/portal/context': studioContext,
     '/agency/sites': sitesBody(rows, opts.body),
-    '/agency/needs-you': { data: { rows: [], more: 0, rest: [], total: 0, empty_line: '', partial: false, own_site: true, next_by_site: opts.needs || {}, next_by_client: {} } },
+    '/agency/needs-you': { data: { rows: opts.needsRows || [], more: 0, rest: [], total: (opts.needsRows || []).length, empty_line: '', partial: false, own_site: true, next_by_site: opts.needs || {}, next_by_client: {} } },
   } });
   await page.route(/\/functions\/v1\/presence\/agency\/sites\/[^/]+\/thumb/, async (route: Route) => {
     const id = route.request().url().split('/agency/sites/')[1].split('/')[0];
@@ -279,6 +279,62 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.getByRole('link', { name: '+ Add a customer' })).toHaveAttribute('href', '/agency.html#add');
   });
 
+  // ── the command center (Nov 9 2026): the band, Needs you up top, and the filters ──
+  const NEEDS_ROW = { key: 'broken:1', kind: 'broken', site_id: 's1', client_id: 'c1', name: 'Bistro Nine', what: 'bistro.example expires in 12 days', when: '', verb: 'Fix', href: '/presence.html?client=s1#domain' };
+  const NEXT = { s1: { what: 'bistro.example expires in 12 days', verb: 'Fix', href: '/presence.html?client=s1#domain', kind: 'broken' } };
+
+  test('the band counts what the server already knows across every site, and a number filters the cards', async ({ page }) => {
+    await openSites(page, [BISTRO, GARAGE, CAFE], { needs: NEXT, needsRows: [NEEDS_ROW] });
+    const band = page.locator('.sband');
+    await expect(band).toContainText('3 sites you look after');
+    await expect(band).toContainText('1 live · 1 needs you · all answering');
+    await expect(band.locator('[data-filter="live"] .v')).toHaveText('1');
+    await expect(band.locator('[data-filter="needs"] .v')).toHaveText('1');
+    await expect(band.locator('[data-filter="changes"] .v')).toHaveText('0');       // Cafe's changes don't count: it was never published
+    await expect(band.locator('[data-filter="domains"] .v')).toHaveText('1');       // bistro.example, within 30 days
+    await expect(band.locator('[data-filter="domains"] .n')).toContainText('bistro.example in');
+    await band.locator('[data-filter="live"]').click();
+    await expect(band.locator('[data-filter="live"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.scard:visible')).toHaveCount(1);
+    await expect(page.locator('.scard:visible .sname')).toHaveText('Bistro Nine');
+    await expect(page.locator('#fpills [data-filter="live"]')).toHaveAttribute('aria-pressed', 'true');
+    await band.locator('[data-filter="live"]').click();   // the same number again clears it
+    await expect(page.locator('.scard:visible')).toHaveCount(3);
+  });
+
+  test('Needs you up top is Home’s own list for these sites, each with its verb; the pills filter, and nothing under one says so', async ({ page }) => {
+    await openSites(page, [BISTRO, GARAGE, CAFE], { needs: NEXT, needsRows: [NEEDS_ROW, { ...NEEDS_ROW, key: 'other', site_id: 'zzz', name: 'Someone else' }] });
+    const strip = page.locator('.nstrip');
+    await expect(strip.locator('.task')).toHaveCount(1);     // only rows that belong to a site on this page
+    await expect(strip.locator('.task .tn')).toHaveText('Bistro Nine');
+    await expect(strip.locator('.task .tw')).toHaveText('bistro.example expires in 12 days');
+    await expect(strip.locator('.task a')).toHaveText('Fix');
+    await expect(strip.locator('.task a')).toHaveAttribute('href', '/presence.html?client=s1#domain');
+    await expect(page.locator('.nhead a')).toHaveAttribute('href', '/agency.html');
+    await page.locator('#fpills [data-filter="notlive"]').click();
+    await expect(page.locator('.scard:visible .sname')).toHaveText('Cafe Eleven');
+    await expect(page.locator('.scard:visible .launch')).toContainText('Not published yet');
+    await page.locator('#search').fill('garage');
+    await expect(page.locator('#noMatch')).toBeVisible();
+    await expect(page.locator('#noMatch')).toContainText('No sites under “Not published” match that.');
+    await page.locator('#noMatch [data-filter="all"]').click();
+    await expect(page.locator('.scard:visible .sname')).toHaveText('Garage Ten');
+    await expect(page.locator('#fpills [data-filter="all"]')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('like Squarespace’s dashboard, the name and the picture open the site’s own home; the status sits on the picture', async ({ page }) => {
+    await openSites(page);
+    const card = page.locator('.scard[data-site="s1"]');
+    await expect(card.locator('.sname a')).toHaveAttribute('href', '/today.html?client=s1');
+    await expect(card.locator('.thumb a.tlink')).toHaveAttribute('href', '/today.html?client=s1');
+    await expect(card.locator('.thumb .pill')).toHaveText('Live');
+    const w = await card.locator('.thumb .pill').evaluate((n) => n.getBoundingClientRect().width);
+    expect(w).toBeLessThan(120);   // a chip, not a bar across the picture
+    await expect(card.locator('.sst').nth(0)).toContainText('Plan');
+    await expect(card.locator('.sst').nth(1)).toContainText('Domain renews Nov 20');
+    await expect(page.locator('.scard[data-site="s3"] .sst').nth(1)).toContainText('None connected');
+  });
+
   test('phone width: one column, nothing wider than the screen', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openSites(page);
@@ -287,6 +343,9 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(overflow).toBeLessThanOrEqual(0);
     const xs = await page.locator('.scard').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
     expect(new Set(xs).size).toBe(1);
+    await expect(page.locator('.sband .kpi')).toHaveCount(4);   // two by two on a phone
+    const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(new Set(ks).size).toBe(2);
   });
 });
 

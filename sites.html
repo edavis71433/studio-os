@@ -46,8 +46,37 @@
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 var(--dds-s3,12px)}
 
-  /* ── the cards: a live picture of each site, then the facts and three doors ── */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--dds-s4,16px)}
+  /* ── Command center (Nov 9 2026, Eric's pick of three Figma directions): the band
+     across every site, what needs you next, filter pills, then each site as a card ── */
+  .sband{position:relative;display:grid;grid-template-columns:minmax(220px,1.15fr) repeat(4,minmax(0,1fr));gap:var(--dds-s3,12px);align-items:stretch;background:var(--dds-grad,linear-gradient(135deg,#4a2c8c,#6436c4 55%,#7d3fb8));color:#fff;border-radius:var(--dds-r-xl,20px);padding:20px 22px;margin-bottom:var(--dds-s4,16px);box-shadow:0 22px 44px -24px rgba(74,44,140,.7);overflow:hidden}
+  .sband .lead{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;padding-right:var(--dds-s2,8px)}
+  .sband .eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+  .sband .hi{font-family:var(--serif);font-weight:600;font-size:24px;line-height:1.12;letter-spacing:-.015em;color:#fff}
+  .sband .hsub{font-size:13px;color:rgba(255,255,255,.85)}
+  .kpi{font:inherit;text-align:left;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.12);border:1px solid transparent;border-radius:var(--dds-r-lg,14px);padding:12px 14px;color:#fff;cursor:pointer;min-width:0;min-height:44px;transition:background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .kpi:hover{background:rgba(255,255,255,.2)} .kpi[aria-pressed="true"]{background:#fff;color:#3d2185;border-color:#fff}
+  .kpi .l{font-size:12px;font-weight:500;opacity:.85} .kpi .v{font-size:26px;font-weight:700;line-height:1.1;letter-spacing:-.02em} .kpi .n{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi.ok .v::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#7fd3a5;margin-left:8px;vertical-align:middle}
+  .sband :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  @media (max-width:900px){.sband{grid-template-columns:1fr 1fr}.sband .lead{grid-column:1/-1}.sband .hi{font-size:21px}}
+  .nhead{display:flex;align-items:center;gap:var(--dds-s2,8px);margin:0 0 10px}
+  .nhead h2{font-family:var(--sans);font-weight:600;font-size:15.5px;margin:0}
+  .nhead .count{font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 8px}
+  .nhead a{margin-left:auto;font-size:13px;font-weight:500;color:var(--p);text-decoration:none} .nhead a:hover{text-decoration:underline}
+  .nstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--dds-s3,12px);margin-bottom:var(--dds-s5,20px)}
+  .task{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);padding:10px 12px 10px 14px;box-shadow:var(--shadow);min-width:0}
+  .task .av{width:34px;height:34px;font-size:13px;flex:0 0 auto;background:var(--dds-grad-brand,var(--p));color:#fff}
+  .task .tx{flex:1;min-width:0} .task .tn{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .task .tw{font-size:12.5px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task .sbtn{flex:0 0 auto}
+  .frow{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
+  .fpill{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:6px 12px;cursor:pointer;min-height:36px}
+  .fpill:hover{border-color:var(--p);color:var(--p)} .fpill[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--dds-on-p,#fff)}
+  .fpill .c{opacity:.75;font-weight:500;margin-left:3px}
+  .frow .search{flex:1 1 220px;min-width:0;margin:0;padding:8px 14px;font-size:14px;border-radius:999px}
+  @media (max-width:767px){.fpill{min-height:44px}.frow .search{flex-basis:100%;order:-1}}
+
+  /* ── the cards: a live picture of each site with its status on it, then the facts in small boxes, who edits, and three doors ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--dds-s4,16px)}
   .scard{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);overflow:hidden;min-width:0;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .scard:hover{border-color:var(--p)}
   .thumb{position:relative;aspect-ratio:16/10;overflow:hidden;background:var(--p-soft);border-bottom:1px solid var(--line)}
@@ -57,7 +86,21 @@
   .tfall{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--dds-s1,4px);padding:var(--dds-s4,16px);text-align:center;color:var(--p);font-weight:600;font-size:14px;overflow-wrap:anywhere}
   .tfall small{display:block;font-weight:500;font-size:12px;color:var(--soft)}
   .tfall .ini{width:44px;height:44px;border-radius:var(--dds-r,8px);background:var(--card);color:var(--p);display:grid;place-items:center;font-size:18px;font-weight:700;box-shadow:var(--shadow)}
-  .tpin{position:absolute;z-index:1;top:var(--dds-s2,8px);left:var(--dds-s2,8px);font-size:11.5px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:2px var(--dds-s2,8px);box-shadow:var(--shadow)}
+  .tpin{position:absolute;z-index:1;top:var(--dds-s2,8px);right:var(--dds-s2,8px);font-size:11.5px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:2px var(--dds-s2,8px);box-shadow:var(--shadow)}
+  .thumb .pill{position:absolute;z-index:1;top:var(--dds-s2,8px);left:var(--dds-s2,8px);background:var(--card);box-shadow:var(--shadow);font-weight:600}
+  .thumb .pill.live{background:var(--good-soft)} .thumb .pill.needs,.thumb .pill.warn{background:var(--warn-soft)} .thumb .pill.bad{background:#f7e3e3}
+  .thumb a.tlink{position:absolute;inset:0;z-index:2}
+  .sstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dds-s2,8px);margin-top:2px}
+  .sst{background:var(--bg);border-radius:var(--dds-r,10px);padding:8px 10px;min-width:0}
+  .sst .l{display:block;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
+  .sst .sline{font-size:12.5px;line-height:1.35}
+  .sfoot{display:flex;align-items:center;gap:var(--dds-s2,8px);margin-top:auto;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
+  .sfoot .avs{flex:0 0 auto} .sfoot .when{font-size:12px;color:var(--soft);flex:1;min-width:0;line-height:1.35}
+  .sfoot .sacts{margin-top:0;padding-top:0;flex-wrap:nowrap}
+  .sfoot .sacts .sbtn{padding:6px 10px;font-size:12px}
+  @media (max-width:420px){.sfoot{flex-wrap:wrap}.sfoot .sacts{width:100%}}
+  .launch{background:var(--p-soft);border-radius:var(--dds-r,10px);padding:10px 12px;font-size:12.5px;color:var(--p-deep)}
+  .launch b{display:block;font-weight:600;color:var(--p-deep)}
   .sbody{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:6px;flex:1}
   .shead{display:flex;align-items:flex-start;gap:var(--dds-s2,8px)}
   .sname{font-size:15.5px;font-weight:600;line-height:1.3;flex:1;min-width:0;overflow-wrap:anywhere}
@@ -72,7 +115,7 @@
   .sline b{font-weight:600;color:var(--ink)}
   .sline.warn{color:var(--warn)} .sline.bad{color:var(--bad)}
   .sline a{color:inherit}
-  .sacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:var(--dds-s2,8px)}
+  .sacts{display:flex;gap:6px;flex-wrap:wrap}
   .sbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
   .sbtn:hover{border-color:var(--p);color:var(--p)}
   .sbtn.main{background:var(--p);border-color:var(--p);color:#fff}
@@ -167,8 +210,11 @@
 <script>
 // ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
 // Every client's website, the way Squarespace's dashboard and Wix's Sites table
-// show them: a card with a live picture of the home page, its address, status,
-// plan and renewal, who can edit, and Website · Analytics · Settings; or a table
+// show them. Nov 9 2026, the command center: a band across every site (live,
+// needs you, changes waiting, domains), what needs you next from Home's own list,
+// filter pills, then each site as a card with a live picture of the home page and
+// its status on it, the plan and domain, who can edit, and Website · Analytics ·
+// Settings. The name and the picture open the site's own home (Overview); or a table
 // (Name · Team · Plan · Published · Last updated · Tags). Pinned sites come
 // first, then the ones you opened last. Everything comes from GET /agency/sites
 // (agency/sites.ts); Needs you is Home's own list, laid over the status words.
@@ -196,7 +242,8 @@ const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 const scoped=(path,id)=>path+'?client='+encodeURIComponent(id);
 
 let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
-let NEXT={};   // Home's Needs you, by site (/agency/needs-you next_by_site)
+let NEXT={},NEEDS_ROWS=[];   // Home's Needs you: by site (next_by_site) and its rows (for the strip up top)
+let FILTER='all';            // all · needs · live · notlive · elsewhere · changes · domains
 const DISPLAY_KEY='dds-display:sites';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}return'cards';})();
 let SORT=null;   // null = the server's order (pinned, then last opened); else {key,dir}
@@ -231,21 +278,29 @@ function domainLine(s){
 }
 
 // ── the cards: built once per load ──
+// Like Squarespace's dashboard: the name and the picture open the site's own home
+// (its Overview, today.html?client=), where its website sits; the doors go straight in.
+const homeOf=(s)=>scoped('/today.html',s.site_id);
 function cardHtml(s,i){
   const st=statusOf(s);
   const addr=s.address?`<a href="${esc(s.address)}" target="_blank" rel="noopener" aria-label="${esc(hostOf(s.address))} (opens the live site)">${esc(hostOf(s.address))}</a>`:'<span>No address yet</span>';
   const fall=s.thumb?`<div class="ini">${esc(initial(s.name))}</div>`:`<div class="ini">${esc(initial(s.name))}</div>${esc(s.domain||s.name||'')}<small>Lives on their own host</small>`;
+  const dom=domainLine(s);
+  const when=s.updated_at?'Edited '+day(s.updated_at):s.published_at?'Published '+day(s.published_at):'';
   return `<article class="scard" data-site="${esc(s.site_id)}" style="order:${i}" aria-label="${esc(s.name||'(unnamed)')}">
-    <div class="thumb" data-thumb="${esc(s.site_id)}" aria-hidden="true"><div class="tfall">${fall}</div>${s.pinned?'<span class="tpin">Pinned</span>':''}</div>
+    <div class="thumb" data-thumb="${esc(s.site_id)}"><div class="tfall" aria-hidden="true">${fall}</div>${META.can_open?`<a class="tlink" href="${esc(homeOf(s))}" aria-label="Open ${esc(s.name||'this site')}"></a>`:''}<span class="pill ${st.cls}" data-pill="${esc(s.site_id)}"${st.why?` title="${esc(st.why)}"`:''}>${esc(st.w)}</span>${s.pinned?'<span class="tpin">Pinned</span>':''}</div>
     <div class="sbody">
-      <div class="shead"><h2 class="sname">${META.can_open?`<a href="${esc(scoped('/presence.html',s.site_id))}">${esc(s.name||'(unnamed)')}</a>`:esc(s.name||'(unnamed)')}</h2>${menuBtnHtml(s)}</div>
-      <div class="saddr">${addr}<span class="pill ${st.cls}" data-pill="${esc(s.site_id)}"${st.why?` title="${esc(st.why)}"`:''}>${esc(st.w)}</span></div>
+      <div class="shead"><h2 class="sname">${META.can_open?`<a href="${esc(homeOf(s))}">${esc(s.name||'(unnamed)')}</a>`:esc(s.name||'(unnamed)')}</h2>${menuBtnHtml(s)}</div>
+      <div class="saddr">${addr}</div>
       <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
-      <div class="sline">${planLine(s.plan)}</div>
-      ${domainLine(s)}
-      <div class="sline" title="${esc((s.team||[]).map(whoLabel).join('\n'))}">Can edit: ${esc(teamWords(s.team))}</div>
+      ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
       ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
+      <div class="sstats">
+        <div class="sst"><span class="l">Plan</span><div class="sline">${planLine(s.plan)}</div></div>
+        <div class="sst"><span class="l">Domain</span>${dom||`<div class="sline">${s.domain?esc(s.domain):'None connected'}</div>`}</div>
+      </div>
+      <div class="sfoot">${avatars(s.team)}<span class="when" title="${esc((s.team||[]).map(whoLabel).join('\n'))}">Can edit: ${esc(teamWords(s.team))}${when?' · '+esc(when):''}</span></div>
       <div class="sacts">${doorsHtml(s)}</div>
     </div>
   </article>`;
@@ -283,8 +338,19 @@ function tableHtml(list){
   return `<div class="tscroll"><table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
-// ── search: name, address, tags and who can edit ──
-const matches=(s)=>{const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
+// ── the filters (the band's numbers and the pills share them) and the search ──
+const domainDays=(s)=>s.domain&&s.domain_expires_at?Math.round((new Date(s.domain_expires_at)-Date.now())/86400000):null;
+const FILTERS={
+  all:{label:'All',test:()=>true},
+  needs:{label:'Needs you',test:(s)=>!!NEXT[s.site_id]},
+  live:{label:'Live',test:(s)=>s.state==='live'},
+  notlive:{label:'Not published',test:(s)=>s.state==='not_live'},
+  elsewhere:{label:'Hosted elsewhere',test:(s)=>s.state==='elsewhere'},
+  changes:{label:'Changes waiting',test:(s)=>!!s.unpublished_changes&&s.state!=='not_live'},
+  domains:{label:'Domain renews soon',test:(s)=>{const d=domainDays(s);return d!=null&&d<=30;}},
+};
+const countOf=(k)=>SITES.filter(FILTERS[k].test).length;
+const matches=(s)=>{if(!FILTERS[FILTER].test(s))return false;const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
 // the server's order (pinned in pin order, then last opened, then name), or a column's
 function ordered(){
   const list=SITES.slice();
@@ -308,6 +374,38 @@ function headHtml(shown){
     <nav class="tabs" aria-label="Sites and domains"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a></nav>
   </header>`;
 }
+// the band: the facts the server already knows, across every site; each number filters the cards
+function bandHtml(){
+  const n=SITES.length,live=countOf('live'),needs=countOf('needs'),changes=countOf('changes'),doms=countOf('domains');
+  const soon=SITES.filter(FILTERS.domains.test).map(s=>({s,d:domainDays(s)})).sort((a,b)=>a.d-b.d)[0];
+  const down=SITES.filter(s=>s.state==='down'||s.state==='offline').length;
+  const sub=[`${live} live`,needs?`${needs} need${needs===1?'s':''} you`:'nothing needs you',down?`${down} not answering`:(live?'all answering':'')].filter(Boolean).join(' · ');
+  const kpi=(k,label,value,note,cls)=>`<button type="button" class="kpi${cls?' '+cls:''}" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}"><span class="l">${esc(label)}</span><span class="v">${esc(value)}</span><span class="n">${esc(note)}</span></button>`;
+  return `<section class="sband" aria-label="Across your sites">
+    <div class="lead"><span class="eyebrow">Across your sites</span><h2 class="hi">${n} site${n===1?'':'s'} you look after</h2><span class="hsub">${esc(sub)}</span></div>
+    ${kpi('live','Live',String(live),`of ${n} site${n===1?'':'s'}`,live&&!down?'ok':'')}
+    ${kpi('needs','Needs you',String(needs),needs?'from Home’s own list':'nothing waiting')}
+    ${kpi('changes','Changes waiting',String(changes),changes?'to be published':'everything published')}
+    ${kpi('domains','Domains to renew',String(doms),soon?`${esc(soon.s.domain)} in ${soon.d} day${soon.d===1?'':'s'}`:'none within 30 days')}
+  </section>`;
+}
+// what needs you next, from Home's own list: the first three rows that belong to a site here
+function needsHtml(){
+  const rows=NEEDS_ROWS.filter(r=>r.site_id&&SITES.some(s=>s.site_id===r.site_id));
+  if(!rows.length)return '';
+  return `<div class="nhead"><h2>Needs you</h2><span class="count">${rows.length}</span><a href="/agency.html">See all on Home →</a></div>
+  <div class="nstrip">${rows.slice(0,3).map(r=>`<div class="task"><span class="av" aria-hidden="true">${esc(initial(r.name))}</span><div class="tx"><div class="tn">${esc(r.name)}</div><div class="tw" title="${esc(r.what)}">${esc(r.what)}</div></div><a class="sbtn main" href="${esc(/^\//.test(String(r.href||''))?r.href:'/agency.html')}">${esc(r.verb||'Open')}</a></div>`).join('')}</div>`;
+}
+function pillsHtml(){
+  const keys=['all','needs','live','notlive','elsewhere'].filter(k=>k==='all'||countOf(k)||FILTER===k);
+  if(!keys.includes(FILTER))keys.push(FILTER);
+  return keys.map(k=>`<button type="button" class="fpill" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}">${esc(FILTERS[k].label)}<span class="c">· ${countOf(k)}</span></button>`).join('');
+}
+function paintFilters(){
+  document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',b.getAttribute('data-filter')===FILTER?'true':'false'));
+  const fp=$('fpills');if(fp)fp.innerHTML=pillsHtml();
+}
+function setFilter(k){if(!FILTERS[k])return;FILTER=FILTER===k&&k!=='all'?'all':k;MENU_OPEN=null;paintFilters();applyView();}
 function lmetaText(shown){
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
   const sorted=SORT?`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`:'Pinned first, then the ones you opened last';
@@ -319,11 +417,15 @@ function lmetaText(shown){
 function render(){
   const shown=SITES.filter(matches).length;
   let h=headHtml(shown);
-  h+=`<label class="sr-only" for="search">Search sites</label><input class="search" id="search" type="search" placeholder="Search by name, address, tag or person…" value="${esc(Q)}">`;
+  const searchHtml=`<label class="sr-only" for="search">Search sites</label><input class="search" id="search" type="search" placeholder="Search by name, address, tag or person…" value="${esc(Q)}">`;
+  if(!SITES.length)h+=searchHtml;
   if(META.partial)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
   if(!SITES.length){
     h+=`<div class="center"><p class="muted">No client sites yet.</p><p style="margin-top:14px"><a class="btn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center">+ Add a customer</a></p></div>`;
   }else{
+    h+=bandHtml();
+    h+=`<div id="needsHost">${needsHtml()}</div>`;
+    h+=`<div class="frow"><div id="fpills" style="display:contents">${pillsHtml()}</div>${searchHtml}</div>`;
     h+=`<div class="grid" id="grid"${DISPLAY==='cards'?'':' hidden'}>${SITES.map(cardHtml).join('')}</div>`;
     h+=`<div id="tableHost"${DISPLAY==='table'?'':' hidden'}></div>`;
     h+=`<div class="center" id="noMatch" hidden><p class="muted">No sites match that.</p></div>`;
@@ -341,13 +443,14 @@ function applyView(){
   }
   const th=$('tableHost');
   if(th&&DISPLAY==='table'){th.innerHTML=tableHtml(shown);wireTable();}
-  const nm=$('noMatch');if(nm)nm.hidden=!(SITES.length&&!shown.length);
+  const nm=$('noMatch');if(nm){nm.hidden=!(SITES.length&&!shown.length);nm.innerHTML=FILTER==='all'?'<p class="muted">No sites match that.</p>':`<p class="muted">No sites under “${esc(FILTERS[FILTER].label)}”${Q.trim()?' match that':''}.</p><p style="margin-top:10px"><button type="button" class="fpill" data-filter="all">Show all sites</button></p>`;}
   if(th)th.hidden=DISPLAY!=='table'||!shown.length;
   const lm=$('lmeta');if(lm)lm.innerHTML=lmetaText(shown.length);
   paintMenu();
 }
 function wireFrame(){
   const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;MENU_OPEN=null;applyView();});
+  $('main').addEventListener('click',(e)=>{const f=e.target.closest('[data-filter]');if(f){setFilter(f.getAttribute('data-filter'));}});
   const dc=$('dispCards'),dt=$('dispTable');
   const setD=(v)=>{if(DISPLAY===v)return;DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}
     $('dispCards').setAttribute('aria-pressed',v==='cards'?'true':'false');$('dispTable').setAttribute('aria-pressed',v==='table'?'true':'false');
@@ -520,13 +623,16 @@ async function mountNeeds(){
   const gen=++NSEQ;
   let r;try{r=await api('/agency/needs-you');}catch(_){return;}
   if(gen!==NSEQ||!r.ok||!r.body||!r.body.data)return;   // best-effort: without it the cards keep the website's own state
-  NEXT=r.body.data.next_by_site||{};
+  NEXT=r.body.data.next_by_site||{};NEEDS_ROWS=Array.isArray(r.body.data.rows)?r.body.data.rows:[];
+  const nh=$('needsHost');if(nh)nh.innerHTML=needsHtml();
+  const band=document.querySelector('.sband');if(band)band.outerHTML=bandHtml();
+  paintFilters();
   for(const s of SITES){
     const st=statusOf(s);
     document.querySelectorAll('[data-pill="'+CSS.escape(s.site_id)+'"]').forEach(p=>{p.className='pill '+st.cls;p.textContent=st.w;if(st.why)p.title=st.why;else p.removeAttribute('title');});
     document.querySelectorAll('[data-why="'+CSS.escape(s.site_id)+'"]').forEach(l=>{l.hidden=!st.why;l.innerHTML=st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:'';});
   }
-  if(DISPLAY==='table')applyView();
+  applyView();
 }
 
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Sites lists the websites a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your website →</a></p></div>`;}
