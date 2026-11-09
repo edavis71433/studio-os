@@ -1398,6 +1398,10 @@ async function boot(){
   }catch(_){trouble();}
 }
 boot();
+// + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
+// call, sent an invoice or added a to-do: the numbers, My tasks and Needs you
+// catch up without a reload
+window.addEventListener('dds:created',()=>{if(!ME)return;mountStudio();mountNeeds(true);});
 
 
 // ── the Ask box (from today.html): the answer, then the sources it drew on ──

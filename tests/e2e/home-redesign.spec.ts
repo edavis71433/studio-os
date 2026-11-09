@@ -276,3 +276,18 @@ test.describe('Home — the list first (item 70)', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });
+
+test.describe('Home — after + Create (item 70)', () => {
+  test('a call, a deal, an invoice or a to-do made with + Create brings Home up to date without a reload', async ({ page }) => {
+    const reads: string[] = [];
+    page.on('request', (r) => { const p = new URL(r.url()).pathname; if (r.method() === 'GET' && /\/(sales\/my-tasks|agency\/needs-you)$/.test(p)) reads.push(p.replace(/^.*\/presence/, '')); });
+    await installApp(page, { api: HOME });
+    await page.goto('/agency.html');
+    await expect.poll(() => reads.filter((p) => p === '/sales/my-tasks').length).toBeGreaterThan(0);
+    await expect.poll(() => reads.filter((p) => p === '/agency/needs-you').length).toBeGreaterThan(0);
+    const tasks0 = reads.filter((p) => p === '/sales/my-tasks').length, needs0 = reads.filter((p) => p === '/agency/needs-you').length;
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'todo' } })));   // what create.js sends after a save
+    await expect.poll(() => reads.filter((p) => p === '/sales/my-tasks').length).toBeGreaterThan(tasks0);
+    await expect.poll(() => reads.filter((p) => p === '/agency/needs-you').length).toBeGreaterThan(needs0);
+  });
+});
