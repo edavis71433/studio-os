@@ -204,14 +204,14 @@ test.describe('CMS workspace', () => {
     await expect(rows).toHaveCount(7);   // six template pages + the owner's own page
     await expect(rows.nth(0).locator('b')).toHaveText('Home');
     await expect(rows.nth(0).locator('.hb-chip')).toHaveText('1 change waiting');   // the business change
-    await expect(rows.nth(1).locator('b')).toHaveText('Services');   // the generic industry's vocabulary (VOCAB)
+    await expect(rows.nth(1).locator('b')).toHaveText('Menu');   // the template's word: the sample is Restaurant Classic with no business type
     await expect(rows.nth(1).locator('.hb-chip')).toHaveText('1 change waiting');   // the offerings change
     await expect(rows.nth(3).locator('b')).toHaveText('FAQ');   // what the site's menu says
     await expect(rows.nth(3).locator('.hb-chip')).toHaveText('Published');
     await expect(rows.nth(6).locator('b')).toHaveText('Private events');
     await expect(rows.nth(6).locator('.t span')).toHaveText('2 sections');
-    // Edit on Services → the offerings editor; Edit on the owner's page → the Design builder on that page
-    await rows.nth(1).getByRole('button', { name: 'Edit Services' }).click();
+    // Edit on Menu → the offerings editor; Edit on the owner's page → the Design builder on that page
+    await rows.nth(1).getByRole('button', { name: 'Edit Menu' }).click();
     await expect(page.locator('#view-offerings')).toBeVisible();
     await page.evaluate(() => (window as any).go('pages'));
     await expect(page.locator('#view-pages')).toBeVisible();
@@ -226,7 +226,7 @@ test.describe('CMS workspace', () => {
     const list = page.locator('#recentList');
     await expect(list.locator('.hb-row:not(.quiet)')).toHaveCount(2);
     await expect(list.locator('.hb-row').nth(0).locator('b')).toHaveText('“Download menu (PDF)” joins Mains.');
-    await expect(list.locator('.hb-row').nth(0).locator('.t span')).toHaveText('Services · ready to publish');   // the diff section's word: the site's own (item 93), as its page is /services/
+    await expect(list.locator('.hb-row').nth(0).locator('.t span')).toHaveText('Menu · ready to publish');   // the diff section's word: the site's own (item 93), as its page is /menu/
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Preview' })).toBeVisible();
     await expect(list.locator('.hb-row').nth(0).getByRole('button', { name: 'Edit' })).toBeVisible();
     await expect(list.locator('.hb-row.quiet')).toContainText('Nothing goes live until you press Publish');
@@ -234,7 +234,7 @@ test.describe('CMS workspace', () => {
     // Preview opens the proofing desk on the page the change touches
     await list.locator('.hb-row').nth(0).getByRole('button', { name: 'Preview' }).click();
     await expect(page.locator('#stage')).toHaveClass(/on/);
-    await expect(page.locator('#pageWords button.on')).toHaveAttribute('data-page', '/services/');   // VOCAB's path for the offerings page
+    await expect(page.locator('#pageWords button.on')).toHaveAttribute('data-page', '/menu/');   // VOCAB's path for the offerings page: Restaurant Classic's
   });
 
   test('Pages: an up-to-date site hides the waiting list', async ({ page }) => {
@@ -514,8 +514,8 @@ test.describe('CMS workspace', () => {
       await expect(page.locator('#srp-contact .srp-title')).toHaveText('Contact & Hours — Marlow’s Kitchen');
       await expect(page.locator('#srp-contact .srp-desc')).toHaveText('Address, phone, and hours for Marlow’s Kitchen.');
       await page.keyboard.press('Escape');
-      await page.getByRole('button', { name: 'Settings for Services' }).click();
-      await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Services — Marlow’s Kitchen');   // the vocabulary word
+      await page.getByRole('button', { name: 'Settings for Menu' }).click();
+      await expect(page.locator('#srp-offerings .srp-title')).toHaveText('Menu — Marlow’s Kitchen');   // the vocabulary word: Restaurant Classic's
       await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Settings for About' }).click();
       // the panel puts the cursor in its first field 30 ms after opening; typing before then
