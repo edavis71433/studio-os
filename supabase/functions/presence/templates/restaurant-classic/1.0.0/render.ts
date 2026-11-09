@@ -129,6 +129,11 @@ ul.items{list-style:none}
 .dots{flex:1;border-bottom:1px dotted var(--line);transform:translateY(-4px);min-width:24px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:22px}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 4px);padding:22px}
+.svc .nm{font-weight:600;font-size:1.05rem}
+.svc .ds{color:var(--soft);font-size:.95rem;margin-top:6px}
+.block--bg-accent .svc,.block--bg-dark .svc{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 blockquote.t{font-size:1.05rem}
 blockquote.t footer{margin-top:10px;color:var(--soft);font-size:.9rem;font-style:normal}
 .faq dt{font-weight:600;margin-top:18px}

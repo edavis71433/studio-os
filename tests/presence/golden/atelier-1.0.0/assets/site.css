@@ -124,7 +124,7 @@ header.site{position:static}
 .block{padding:48px 0}
 .svc-grid{gap:0}
 }
-/* the section styles: BLOCK_CSS in lib/site_blocks.ts */
+/* the section styles its pages use: BLOCK_CSS in lib/site_blocks.ts, less the rest */
 
 .sitesearch{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#e2e4e1);border-radius:999px;padding:5px 12px;background:var(--card,#fff);max-width:200px}
 .sitesearch .ss-ic{color:var(--soft,#5b6572);display:inline-flex}

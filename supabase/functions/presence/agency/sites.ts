@@ -32,7 +32,7 @@ import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
-import { getTemplate, renderSnapshot, latestTemplateVersion } from '../lib/render.ts';
+import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import type { MediaManifestEntry } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
@@ -367,7 +367,7 @@ export async function renderThumb(site: SiteRow): Promise<{ html: string; versio
   }
   const key = previewCacheKey(site.id, 'draft', await computeDraftHash(snapshot));
   const hit = previewCache.get(key);
-  const fileMap = hit ? hit.fileMap : renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' });
+  const fileMap = hit ? hit.fileMap : renderForBuilder(snapshot);
   if (!hit) previewCache.set(key, { fileMap, mediaManifest, blockers, warnings });
   let html = fileMap['index.html'] as string | undefined;
   if (typeof html !== 'string') return null;
