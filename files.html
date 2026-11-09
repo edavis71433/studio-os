@@ -13,7 +13,7 @@
      as customers.html / crm.html / inbox.html. */
   :root{
     --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
-    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);--on-p:var(--dds-on-p,#fff);
     --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--danger:var(--dds-bad,#9a4242);
     --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
@@ -56,7 +56,7 @@
   .search svg{position:absolute;left:11px;top:11px;width:16px;height:16px;color:var(--faint)}
   .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--dds-r,8px);padding:10px var(--dds-s4,16px);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:var(--dds-s2,8px)}
   .btn:hover{border-color:var(--p)}
-  .btn.primary{background:var(--p);color:#fff;border-color:var(--p)}
+  .btn.primary{background:var(--p);color:var(--on-p);border-color:var(--p)}
   .btn.primary:hover{filter:brightness(1.06)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
@@ -64,7 +64,7 @@
         .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / leads.html ── */
   .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:var(--on-p);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
   .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1 1 auto;min-width:max-content}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
@@ -158,7 +158,7 @@
   .check{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:var(--dds-r,8px);background:rgba(255,255,255,.9);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--p);z-index:2}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .check{background:rgba(31,26,43,.86)}}
   :root[data-theme="dark"] .check{background:rgba(31,26,43,.86)}
-  .tile.sel .check{background:var(--p);border-color:var(--p);color:#fff}
+  .tile.sel .check{background:var(--p);border-color:var(--p);color:var(--on-p)}
   .check svg{width:15px;height:15px}
   .bulkbar{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);align-items:center;background:var(--p-soft);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:10px var(--dds-s4,16px);margin-bottom:var(--dds-s4,16px)}
   .bulkbar .cnt{font-weight:700;color:var(--p);font-size:14px}
@@ -429,7 +429,7 @@ function askConfirm(title, body, okLabel){
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
       b.style.cssText=primary
-        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
+        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer'
         :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b; };
     const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
@@ -523,7 +523,7 @@ function askFolder(title,body,opts){
     inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px';box.appendChild(inp);
     const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px';
     const mk=(label,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b;};
     if(opts&&opts.canClear){const out=mk('Take out of folders',false);out.style.marginRight='auto';out.addEventListener('click',()=>finish({clear:true}));row.appendChild(out);}
     const cancel=mk('Cancel',false),ok=mk('Move',true);
@@ -549,7 +549,7 @@ function askPrompt(title, body, okLabel, placeholder, value){
     inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b; };
     const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
     row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
@@ -1469,7 +1469,7 @@ function askRepeats(list){
     box.appendChild(ul);
     const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px';
     const mk=(label,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
       return b;};
     let done=false;const finish=(v)=>{if(done)return;done=true;try{dlg.close();}catch(e){}dlg.remove();resolve(v);};
     const keep=mk('Upload anyway',false);keep.addEventListener('click',()=>finish('keep'));row.appendChild(keep);
