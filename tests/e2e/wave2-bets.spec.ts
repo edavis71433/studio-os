@@ -207,7 +207,7 @@ test.describe('Wave 2 bets', () => {
     await pane.locator('#msgBody').type(' Thanks!');
     await expect(pane.locator('.ai-note')).toHaveCount(0);       // the note leaves on the first edit
     await expect(pane.getByRole('button', { name: 'Send' })).toBeVisible();   // Send is still the operator's click
-    // the enquiry and support composers carry the same button. Under 760px the
+    // the enquiry and support composers carry the same button. Under 1024px the
     // panes stack and the open conversation hides the list (inbox.html's D5:
     // picking a row pushes the pane in), so a phone steps back to the list
     // first — the same move an operator makes; on wider screens there is no
