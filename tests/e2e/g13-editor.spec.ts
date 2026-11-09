@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 
 // ── G13 slice 2 — the in-place canvas TEXT editor (docs/design/G13-INPLACE-
 // EDITING.md §2–3) ────────────────────────────────────────────────────────────
@@ -730,7 +730,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('Undo after deleting a page brings it back with the words typed just before', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Worth keeping');
     await pill(page, 'About').locator('.pp-menu').click();
@@ -899,7 +899,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('Undo of a page delete while another page\'s save is out keeps that edit', async ({ page }) => {
     const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Delete page');
     const undo = page.locator('.toast').getByRole('button', { name: 'Undo' });
@@ -1104,7 +1104,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('a session opened while its page is being deleted writes nothing onto Home', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await openAbout(page, frame);
     const { sent, release } = await holdPuts(page);
     await pageMenu(page, 'About', 'Delete page');
@@ -1321,7 +1321,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('a page deleted while Hide is out keeps the hide', async ({ page }) => {
     const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     const { sent, release } = await hideOut(page, frame);
     await pageMenu(page, 'Contact', 'Delete page');
     await page.waitForTimeout(300);
@@ -1333,7 +1333,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('Undo of a page delete while Hide is out keeps the hide', async ({ page }) => {
     const { frame } = await mountPages(page, '', [...PAGED.pages, CONTACT]);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Delete page');
     const undo = page.locator('.toast').getByRole('button', { name: 'Undo' });
@@ -2109,7 +2109,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('Undo of Delete puts the page back where it was, as it was, and leaves other pages\' words alone', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', [CONTACT, ...PAGED.pages]);
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Delete page');
     await expect(pill(page, 'Contact')).toHaveCount(0);
@@ -2136,14 +2136,13 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('Undo of ＋ Page with nothing on it takes the page away without asking, and moves off it', async ({ page }) => {
     const { puts } = await mountPages(page);
-    const asked: string[] = [];
-    page.on('dialog', (d) => { asked.push(d.message()); return d.accept(); });
+    await answerAsks(page);
     await addGallery(page);
     await undo(page);
     await expect(pill(page, 'Gallery')).toHaveCount(0);
     await expect(onPill(page)).toHaveText('Home');
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
-    expect(asked).toEqual([]);
+    expect(await askedSoFar(page)).toEqual([]);
     await redo(page);
     await expect(pill(page, 'Gallery')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'gallery']);
@@ -2156,8 +2155,7 @@ test.describe('G13 in-place canvas text editor', () => {
       checkpoints.push((route.request().postDataJSON() as { name: string }).name);
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
     });
-    let answer = false; const asked: string[] = [];
-    page.on('dialog', (d) => { asked.push(d.message()); return answer ? d.accept() : d.dismiss(); });
+    await answerAsks(page, false);
     await addGallery(page);
     await page.evaluate(() => (0, eval)('BLOCKS_WORK = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; saveBlocks()'));
     await expect.poll(() => pageIn(lastPut(puts), 'gallery')?.blocks.length).toBe(1);
@@ -2165,20 +2163,20 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect(onPill(page)).toHaveText('Home');
     const count = puts.length;
     await undo(page);
-    await expect.poll(() => asked.length).toBe(1);
-    expect(asked[0]).toContain('Gallery');
+    await expect.poll(async () => (await askedSoFar(page)).length).toBe(1);
+    expect((await askedSoFar(page))[0]).toContain('Gallery');
     await page.waitForTimeout(300);
     expect(puts.length).toBe(count);                               // no: nothing was written
     await expect(pill(page, 'Gallery')).toBeVisible();
-    answer = true;
+    await setAsksAnswer(page, true);
     await undo(page);                                              // and the step is still there to take
     await expect(pill(page, 'Gallery')).toHaveCount(0);
-    expect(asked.length).toBe(2);
+    expect((await askedSoFar(page)).length).toBe(2);
     expect(checkpoints).toEqual(['Before removing “Gallery”']);
     await redo(page);
     await expect(pill(page, 'Gallery')).toBeVisible();
     expect(pageIn(lastPut(puts), 'gallery')?.blocks[0].subtitle).toBe('Written on the new page');
-    expect(asked.length).toBe(2);
+    expect((await askedSoFar(page)).length).toBe(2);
   });
 
   test('Undo of a step leaves a page made since by Duplicate on the list', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
 // one bar and one to-do line, and the menu lives in the sidebar, grouped by job.
@@ -806,7 +806,7 @@ test.describe('Pages: every page and the menu in one place', () => {
     await page.keyboard.press('ArrowDown');
     await expect.poll(() => navWrite(writes)?.nav?.[1]?.children?.map((k: any) => k.label)).toEqual(['Booking', 'Say hello']);
     // Reset to automatic asks, then clears it
-    page.once('dialog', (d) => d.accept());
+    await answerAsks(page);
     await page.locator('#btnNavAuto').click();
     await expect.poll(() => writes.at(-1)?.body?.nav).toEqual([]);
     await expect(page.locator('#btnNavAuto')).toBeHidden();
@@ -828,7 +828,7 @@ test.describe('Pages: every page and the menu in one place', () => {
   test('deleting a page takes it off a custom menu, its dropdown staying; Undo puts both back', async ({ page }) => {
     const nav = [{ label: 'Home', href: '/' }, { label: 'Gallery', href: '/gallery/', children: [{ label: 'About', href: '/about/' }] }];
     const writes = await mount(page, '/presence.html#pages', withPages({ nav }));
-    page.on('dialog', (d) => d.accept());
+    await answerAsks(page);
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Settings for Gallery' }).click();
     await page.locator('#pageSettings').getByRole('button', { name: 'Delete page' }).click();
@@ -1896,7 +1896,7 @@ test.describe('the welcome list', () => {
     await expect(page.locator('#siteStatusCard a')).toHaveText('marlows.example');
     await expect(page.locator('#siteStatusCard a')).toHaveAttribute('href', 'https://marlows.example');
     await expect(page.locator('#setupCard [data-step="publish"]')).toHaveClass(/\bdone\b/);
-    page.once('dialog', (d) => d.accept());
+    await answerAsks(page);
     await page.locator('#siteStatusBtn').click();
     await expect.poll(() => writes.some((w) => w.method === 'POST' && w.path === '/site/offline')).toBe(true);
   });

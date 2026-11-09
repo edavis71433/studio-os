@@ -264,3 +264,27 @@ export async function sentBodies(page: Page): Promise<Array<{ url: string; metho
   const raw = await page.evaluate(() => (window as unknown as { __E2E_BODIES?: SentBody[] }).__E2E_BODIES || []);
   return raw.map((b) => ({ url: b.url, method: b.method, type: b.type, body: Buffer.from(b.bytes) }));
 }
+
+// List item 33: the builder asks its questions in its own dialog now, not the browser's confirm().
+// answerAsks answers each one as it opens by clicking its real button, the way page.on('dialog')
+// accepted or dismissed the browser's box, and keeps the words asked (askedSoFar). It covers the
+// page already open and any it navigates to; setAsksAnswer changes the answer midway.
+export async function answerAsks(page: Page, answer = true): Promise<void> {
+  const install = (yes: boolean) => {
+    const w = window as unknown as { __askAnswer: boolean; __asked: string[]; __askWatch?: boolean };
+    w.__askAnswer = yes; w.__asked = w.__asked || [];
+    if (w.__askWatch) return;
+    w.__askWatch = true;
+    new MutationObserver(() => {
+      const d = document.querySelector('dialog.ask-yes[open]:not([data-e2e-answered])');
+      if (!d) return;
+      d.setAttribute('data-e2e-answered', '');
+      w.__asked.push((d.querySelector('.ask-msg')?.textContent || '').trim());
+      (d.querySelector(w.__askAnswer ? '.ask-ok' : '.ask-cancel') as HTMLElement).click();
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+  };
+  await page.addInitScript(install, answer);
+  await page.evaluate(install, answer).catch(() => { /* nothing open yet */ });
+}
+export const setAsksAnswer = (page: Page, yes: boolean) => page.evaluate((y) => { (window as unknown as { __askAnswer: boolean }).__askAnswer = y; }, yes);
+export const askedSoFar = (page: Page) => page.evaluate(() => (window as unknown as { __asked?: string[] }).__asked || []);

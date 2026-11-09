@@ -1788,6 +1788,29 @@ function askText(title, opts) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
+// A styled yes/no question in place of the browser's confirm() (item 33). The browser's box
+// can't be styled, reads like a system warning, and on a phone shows the site's address over
+// the question. Resolves true for the main button, false for Cancel or Escape. A question about
+// removing or replacing something (danger) starts on Cancel, so Enter never takes the risky path.
+let ASK_YES_N = 0;
+function askYes(message, opts) {
+  opts = opts || {};
+  return new Promise((resolve) => {
+    const dlg = el("dialog", "ask-yes"); dlg.style.cssText = "border:none;border-radius:14px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)";
+    const form = el("form"); form.style.cssText = "padding:20px";
+    const msg = el("div", "ask-msg", message); msg.id = "askYesMsg" + (++ASK_YES_N); msg.style.cssText = "white-space:pre-line;font-size:15px;line-height:1.5"; form.appendChild(msg);
+    dlg.setAttribute("aria-labelledby", msg.id);
+    const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px";
+    const cancel = el("button", "ask-cancel", opts.cancel || "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
+    const ok = el("button", "ask-ok", opts.ok || "OK"); ok.type = "submit"; ok.style.cssText = opts.danger ? "font:inherit;font-size:13px;font-weight:600;border:1px solid #b42318;background:#b42318;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer" : "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
+    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
+    let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
+    cancel.addEventListener("click", () => finish(false));
+    form.addEventListener("submit", (e) => { e.preventDefault(); finish(true); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(false); });
+    dlg.showModal(); (opts.danger ? cancel : ok).focus();
+  });
+}
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Phase SEARCH: client-side tag parse — mirrors lib/search_index.ts normalizeTags
 // (lowercase · charset-limited · de-duped · ≤12 tags · ≤30 chars). The server
@@ -3201,7 +3224,7 @@ function renderFoundations(f, plans, launch, dom) {
   domCard.appendChild(el("div", "dol", "your domain"));
   const dstat = (dom && dom.custom_domain) ? dom : null;
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
-  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!confirm("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.")) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
+  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!(await askYes("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.", { ok: "Remove domain", danger: true }))) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
 
   if (dstat && dstat.health === "ok") {
     const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
@@ -3901,7 +3924,7 @@ function bkServiceRow(t) {
   const del = el("button", null, "Remove"); del.dataset.needs = "delete"; del.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
   edit.addEventListener("click", () => row.replaceWith(bkServiceForm(t)));
   del.addEventListener("click", async () => {
-    if (!confirm("Remove “" + t.name + "”? Existing appointments keep their details.")) return;
+    if (!(await askYes("Remove “" + t.name + "”? Existing appointments keep their details.", { ok: "Remove", danger: true }))) return;
     try { await api("DELETE", "/bookings/types/" + t.id); toast("Service removed"); loadBookings(); }
     catch (err) { toast(nice(err), true); }
   });
@@ -3957,7 +3980,7 @@ function bkApptRow(a) {
     acts.appendChild(conf);
   }
   const canc = el("button", null, "Cancel"); canc.style.cssText = BK_BTN + ";color:var(--clay,#b42318)";
-  canc.addEventListener("click", async () => { if (!confirm("Cancel this booking? The customer will be emailed.")) return; canc.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/cancel", {}); toast("Canceled — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); canc.disabled = false; } });
+  canc.addEventListener("click", async () => { if (!(await askYes("Cancel this booking? The customer will be emailed.", { ok: "Cancel booking", cancel: "Keep it", danger: true }))) return; canc.disabled = true; try { await api("POST", "/bookings/appointments/" + a.id + "/cancel", {}); toast("Canceled — the customer was emailed"); loadBookings(); } catch (err) { toast(nice(err), true); canc.disabled = false; } });
   acts.appendChild(canc);
   row.append(info, badge, acts); return row;
 }
@@ -5120,7 +5143,7 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
   const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
   const addLink = $("btnPagesAddLink"); if (addLink) addLink.addEventListener("click", () => pgOpenLink(null));
-  const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", async () => { if (confirm("Remove your custom menu and let the site build it automatically from your pages?")) { await dcSaveNav(null); renderPagesBar(); } });
+  const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", async () => { if (await askYes("Remove your custom menu and let the site build it automatically from your pages?", { ok: "Use the automatic menu", danger: true })) { await dcSaveNav(null); renderPagesBar(); } });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
   const frame = $("siteFrame");
   if (frame) frame.addEventListener("load", () => {
@@ -6008,7 +6031,7 @@ function togglePageInfoMenu() {
     if (!PI_OPEN || PI_OPEN.menu !== m) return;
     if (!live || !live.published) { offBtn.hidden = true; return; }
     offBtn.hidden = false; offBtn.disabled = false;
-    if (live.offline_since) { offBtn.textContent = "Bring my site back online"; offBtn.classList.remove("danger"); offAction = siteBringOnline; }
+    if (live.offline_since) { offBtn.textContent = "Bring back online"; offBtn.classList.remove("danger"); offAction = siteBringOnline; }
     else { offBtn.textContent = "Take site offline…"; offBtn.classList.add("danger"); offAction = siteTakeOffline; }
   };
   if (S.previewStatus) setOffState(S.previewStatus.live);
@@ -6254,7 +6277,7 @@ async function renderLaunches() {
     if (l.status === "draft") mk("Approve", () => act(`/launches/${l.id}/decide`, "Approved", { decision: "approve" }), true);
     if (l.status === "draft" || l.status === "approved") mk("Update from draft", () => act(`/launches/${l.id}/recapture`, "Refreshed from your current draft"));
     if (l.status === "approved") {
-      mk("Launch now", () => { if (confirm("Launch “" + l.name + "”? This replaces your live site with the staged version.")) act(`/launches/${l.id}/promote`, "Launching — this usually takes under a minute"); }, true);
+      mk("Launch now", async () => { if (await askYes("Launch “" + l.name + "”? This replaces your live site with the staged version.", { ok: "Launch" })) act(`/launches/${l.id}/promote`, "Launching — this usually takes under a minute"); }, true);
       mk("Schedule", () => {
         // W7: a friendly native date+time picker instead of hand-typed ISO text.
         if (row.querySelector(".sched-inline")) { const ex = row.querySelector(".sched-inline input"); if (ex) ex.focus(); return; }
@@ -6271,7 +6294,7 @@ async function renderLaunches() {
         wrap.appendChild(inp); wrap.appendChild(ok); wrap.appendChild(no); row.appendChild(wrap); inp.focus();
       });
     }
-    if (l.status === "published") mk("Roll back", () => { if (confirm("Roll back “" + l.name + "” to the previous version?")) act(`/launches/${l.id}/rollback`, "Rolling back…"); });
+    if (l.status === "published") mk("Roll back", async () => { if (await askYes("Roll back “" + l.name + "” to the previous version?", { ok: "Roll back" })) act(`/launches/${l.id}/rollback`, "Rolling back…"); });
     if (l.status === "draft" || l.status === "approved" || l.status === "scheduled") mk("Cancel", () => act(`/launches/${l.id}/cancel`, "Canceled"));
     row.appendChild(acts);
     card.appendChild(row);
@@ -6316,10 +6339,10 @@ async function renderPreviewPanel() {
     mk("Preview in editor", () => openPreview("preview"));
     mk(st.preview.has_password ? "Change / remove password" : "Password-protect", async () => { const pw = await askText(st.preview.has_password ? "Change preview password" : "Set a preview password", { password: true, ok: "Update", hint: st.preview.has_password ? "Leave blank to remove the password." : "Anyone with the link will need this to view the preview." }); if (pw !== null) act("/preview/settings", "Preview access updated", { password: pw }); });
     acts.lastChild.dataset.needs = "configure";
-    mk("Reset link", () => { if (confirm("Reset the preview link? The old link stops working.")) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
+    mk("Reset link", async () => { if (await askYes("Reset the preview link? The old link stops working.", { ok: "Reset link", danger: true })) act("/preview/settings", "Preview link reset", { regenerate_token: true }); });
     acts.lastChild.dataset.needs = "configure";
     if (st.live.published) mk("Compare with Live", () => openPreview("live"));
-    mk("Publish this preview", () => { if (confirm("Publish the preview to your live site? This publishes exactly what’s in the preview.")) act("/preview/promote", "Publishing. This usually takes under a minute"); }, true);
+    mk("Publish this preview", async () => { if (await askYes("Publish the preview to your live site? This publishes exactly what’s in the preview.", { ok: "Publish" })) act("/preview/promote", "Publishing. This usually takes under a minute"); }, true);
   }
   card.appendChild(acts);
   // ── G10 → slice B (hard move): the take-offline / bring-back ACTION now lives
@@ -6349,8 +6372,8 @@ async function siteSetState(path, okMsg) {
 }
 async function siteTakeOffline() {
   const name = (S.identity && S.identity.business_name) || "your site";
-  if (!confirm(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring my site back online”) restores everything.`)) return;
-  return siteSetState("/site/offline", "Your site is offline. Publish, or use “Bring my site back online”, to return.");
+  if (!(await askYes(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring back online”) restores everything.`, { ok: "Take it offline", danger: true }))) return;
+  return siteSetState("/site/offline", "Your site is offline. Publish, or use “Bring back online”, to return.");
 }
 async function siteBringOnline() {
   return siteSetState("/site/online", "Bringing your site back — this usually takes under a minute");
@@ -6387,12 +6410,12 @@ async function renderCheckpoints() {
     const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
     mk("View", () => openLaunchPreview(c.id));
     mk("Restore to draft", async () => {
-      if (!confirm("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.")) return;
+      if (!(await askYes("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.", { ok: "Restore" }))) return;
       try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
       catch (err) { toast(nice(err), true); }
     }, true);
     mk("Remove", async () => {
-      if (!confirm("Remove checkpoint “" + c.name + "”? This can’t be undone.")) return;
+      if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
       try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
       catch (err) { toast(nice(err), true); }
     });
@@ -7824,7 +7847,7 @@ async function clSave(idx) {   // CL-1: save a crafted section to the reusable l
   if (name === null) return;
   api("POST", "/content-library", { name, block: blk }).then(() => { CL_ITEMS = null; toast("Saved to your content library"); }).catch((err) => toast(nice(err), true));
 }
-function clInsert(block) {   // CL-1: insert a saved block into the SAME editor (no second editor)
+async function clInsert(block) {   // CL-1: insert a saved block into the SAME editor (no second editor)
   if (!block || !block.type) return;
   const def = BLOCK_DEFS.find((d) => d.type === block.type);
   const copy = JSON.parse(JSON.stringify(block));
@@ -7834,7 +7857,11 @@ function clInsert(block) {   // CL-1: insert a saved block into the SAME editor 
   else if (!BLOCK_SINGLETON.has(block.type)) { BLOCKS_WORK.push(copy); }   // repeatable → just add another copy
   else {
     const at = BLOCKS_WORK.findIndex((b) => b.type === block.type);
-    if (at >= 0) { if (!confirm("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?")) return; BLOCKS_WORK[at] = copy; }
+    if (at >= 0) {
+      if (!(await askYes("You already have a “" + ((def && def.name) || block.type) + "” section. Replace it with the saved one?", { ok: "Replace it", danger: true }))) return;
+      const now = BLOCKS_WORK.findIndex((b) => b.type === block.type);   // read again: the list can move while the question is up
+      if (now >= 0) BLOCKS_WORK[now] = copy; else BLOCKS_WORK.push(copy);
+    }
     else BLOCKS_WORK.push(copy);
   }
   CL_SHOW = false; renderBlocksCard(); toast("Inserted a copy");
@@ -8198,7 +8225,7 @@ async function dcDeletePage(slug) {
     if (refs.library && refs.library.length) bits.push("saved sections link to it (" + refs.library.join(", ") + ")");
     if (bits.length) warn = "\n\nHeads up — " + bits.join("; ") + ". Those links will stop working until you update them.";
   } catch (_) { /* the check is best-effort — the confirm still asks plainly */ }
-  if (!confirm("Delete the page “" + title + "”? Its sections will be removed. Your live site is unchanged until you publish." + warn)) return;
+  if (!(await askYes("Delete the page “" + title + "”? Its sections will be removed. Your live site is unchanged until you publish." + warn, { ok: "Delete page", danger: true }))) return;
   if (!(await dcSavePendingEdits())) return;   // the checkpoint and the Undo below keep the stored page
   // a durable safety point beyond the 20-second Undo (best-effort, never blocks the delete)
   try { await api("POST", "/publishes/checkpoints", { name: ("Before deleting “" + title + "”").slice(0, 80) }); } catch (_) {}
@@ -8258,7 +8285,7 @@ async function dcClearPage(slug) {
   slug = slug || "";
   if (slug !== DC_PAGE && !(await dcSwitchPage(slug))) return;   // clear the page you picked
   if (!Array.isArray(BLOCKS_WORK) || !BLOCKS_WORK.length) { toast("This page is already blank"); return; }
-  if (!confirm("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.")) return;
+  if (!(await askYes("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.", { ok: "Clear the page", danger: true }))) return;
   dcCaptureScroll(); BLOCKS_WORK = []; BLOCK_FOCUS = null; renderBlocksCard(); saveBlocks();
 }
 function blockText(def, blk) {
@@ -8413,7 +8440,7 @@ async function undoPagesAsk(rec, from, to) {
     const p = !c[to] && dcPageObj(c[from].slug);
     if (!p || undoSections(p) === c.sections) continue;
     const title = p.title || p.slug;
-    if (!confirm("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.")) return false;
+    if (!(await askYes("Undo will remove the page “" + title + "” and what’s been added to it. Your live site is unchanged until you publish.", { ok: "Undo and remove it", danger: true }))) return false;
     try { await api("POST", "/publishes/checkpoints", { name: ("Before removing “" + title + "”").slice(0, 80) }); } catch (_) {}
   }
   return true;
@@ -8628,7 +8655,8 @@ async function blocksSaveNow() {
   if (BLOCKS_SAVING || IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT) { blocksSaveSoon(); return true; }
   if (!blocksDirty()) return true;
   // G27 §5: unreadable colors still get their one question; "no" puts the list back
-  if (!ovConfirmContrastAck()) { BLOCKS_WORK = JSON.parse(DC_HIST_LAST); renderBlocksCard(); return false; }
+  if (!(await ovConfirmContrastAck())) { BLOCKS_WORK = JSON.parse(DC_HIST_LAST); renderBlocksCard(); return false; }
+  if (BLOCKS_SAVING) { blocksSaveSoon(); return true; }   // a save that shared the question went first (item 33)
   dcCaptureScroll();   // the save's repaint keeps the canvas where the person is now
   BLOCKS_SAVING = true;
   try { return await saveBlocks(); } finally { BLOCKS_SAVING = false; }
@@ -8695,10 +8723,10 @@ async function putBlocks() {
 //    canvas). Reuses the existing block-save (PUT /settings), so the server
 //    re-validates every starter block through the same validator. Never silently
 //    overwrites — confirms first when the owner already has sections.
-function applyStarterLayout(starter) {
+async function applyStarterLayout(starter) {
   if (!starter || !Array.isArray(starter.blocks) || !starter.blocks.length) return;
   const hasContent = Array.isArray(BLOCKS_WORK) && BLOCKS_WORK.length > 0;
-  if (hasContent && !confirm("Start from the “" + starter.name + "” layout? This replaces your current sections with a ready-made set you can then edit. Your existing sections will be removed.")) return;
+  if (hasContent && !(await askYes("Start from the “" + starter.name + "” layout? This replaces your current sections with a ready-made set you can then edit. Your existing sections will be removed.", { ok: "Use this layout", danger: true }))) return;
   // Deep copy so the shared suggestion payload is never mutated, and MULTI-INSTANCE
   // ids (columns/cards) stay unique against anything already in the working set.
   BLOCKS_WORK = JSON.parse(JSON.stringify(starter.blocks)).map((b) => {
@@ -8846,7 +8874,7 @@ function ovStylePairs(st) {
 // failing, un-acknowledged pair. Confirming records contrast_ack: true on those
 // blocks (cleared again by any later color change, so the check re-arms); cancel
 // returns to the editor with nothing saved. Never a hard block, per Eric.
-function ovConfirmContrastAck() {
+function ovContrastFailing() {
   const failing = [];
   const names = [];
   BLOCKS_WORK.forEach((b, i) => {
@@ -8856,9 +8884,17 @@ function ovConfirmContrastAck() {
     failing.push(i);
     bad.forEach((p) => names.push("section " + (i + 1) + " — " + (p.key === "accent" ? "white button text on your accent" : "text on its background") + " is contrast " + p.ratio.toFixed(1) + " (needs 4.5)"));
   });
+  return { failing, names };
+}
+// Item 33: the question is a styled dialog now, so the page keeps running while it is up. A
+// save that comes along meanwhile shares this answer instead of asking again.
+let OV_ACK_ASKING = null;
+async function ovConfirmContrastAck() {
+  const { failing, names } = ovContrastFailing();
   if (!failing.length) return true;
-  if (!confirm("This text may be unreadable for many visitors — " + names.join("; ") + ". Use it anyway?")) return false;
-  failing.forEach((i) => { BLOCKS_WORK[i] = { ...BLOCKS_WORK[i], style: { ...BLOCKS_WORK[i].style, contrast_ack: true } }; });
+  if (!OV_ACK_ASKING) OV_ACK_ASKING = askYes("This text may be unreadable for many visitors — " + names.join("; ") + ". Use it anyway?", { ok: "Use it anyway", cancel: "Change it" }).finally(() => { OV_ACK_ASKING = null; });
+  if (!(await OV_ACK_ASKING)) return false;
+  ovContrastFailing().failing.forEach((i) => { BLOCKS_WORK[i] = { ...BLOCKS_WORK[i], style: { ...BLOCKS_WORK[i].style, contrast_ack: true } }; });   // read again: the list can move while it is up
   return true;
 }
 // Remember which section's style popover the owner opened, so the full redraw
@@ -9453,7 +9489,7 @@ function renderBlocksCard() {
           const del = el("button", null, "×"); del.dataset.needs = "delete"; del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => {
             // G8: deleting a LIVE-LINKED entry first names the pages it appears on
-            if (used.length && !confirm("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?")) return;
+            if (used.length && !(await askYes("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?", { ok: "Remove anyway", danger: true }))) return;
             try { await api("DELETE", "/content-library/" + it.id); CL_ITEMS = CL_ITEMS.filter((x) => x.id !== it.id); toast("Removed from library"); renderBlocksCard(); } catch (err) { toast(nice(err), true); }
           });
           row.append(ins, lnk, del); list.appendChild(wrap);
@@ -10120,7 +10156,7 @@ function renderFormsCard() {
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
     const nm = el("div", null, form.title || "Form"); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
     const rm = el("button", null, "Remove form"); rm.type = "button"; rm.style.cssText = FF_BTN;
-    rm.addEventListener("click", () => { if (confirm("Remove this form?")) { FORMS_WORK.splice(fi, 1); renderFormsCard(); } });
+    rm.addEventListener("click", async () => { const f = FORMS_WORK[fi]; if (await askYes("Remove this form?", { ok: "Remove form", danger: true })) { const at = FORMS_WORK.indexOf(f); if (at >= 0) FORMS_WORK.splice(at, 1); renderFormsCard(); } });
     head.append(nm, rm); panel.appendChild(head);
 
     // form settings
@@ -10775,7 +10811,7 @@ async function applyTemplateFromGallery(t) {
   // Non-destructive: switching template keeps content — it re-lays-out + re-styles.
   const hasContent = (BLOCKS_WORK && BLOCKS_WORK.length) || (S.offerings || []).length || (S.identity && S.identity.business_name);
   const wasWords = vocabWords();
-  if (hasContent && !confirm("Start with the “" + t.name + "” template? Your words stay exactly as they are — only the layout and styling change. Nothing goes live until you publish.")) return;
+  if (hasContent && !(await askYes("Start with the “" + t.name + "” template? Your words stay exactly as they are — only the layout and styling change. Nothing goes live until you publish.", { ok: "Use this template" }))) return;
   try {
     const r = await api("PUT", "/site/template", { slug: t.slug });
     if (S.site) S.site.template = t.slug;
@@ -11675,11 +11711,12 @@ function dcDuplicate(bi) {
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
-function dcDelete(bi) {
+async function dcDelete(bi) {
   dcSoloEnd();
   const b = BLOCKS_WORK[bi]; if (!b) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
-  if (!confirm("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.")) return;
+  if (!(await askYes("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.", { ok: "Delete", danger: true }))) return;
+  bi = BLOCKS_WORK.indexOf(b); if (bi < 0) return;   // read again: the list can move while the question is up
   // G13 fix (review finding 1): compose the removal shift BEFORE the splice
   // (pre-splice length = the DOM's stamp domain) so stale stamps keep resolving.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
@@ -11734,12 +11771,13 @@ function dcLiveSpans(b, n) {
   const cols = Array.isArray(b.columns) ? b.columns : []; const eq = dcEqualSpans(n);
   return eq.map((e, i) => { const c = cols[i]; return (c && c.span >= 1 && c.span <= 12) ? c.span : e; });
 }
-function dcSetColumns(bi, n) {
+async function dcSetColumns(bi, n) {
   const b = BLOCKS_WORK[bi]; if (!b || b.type !== "columns") return;
   n = dcClampColumns(n); const cur = Array.isArray(b.columns) ? b.columns : [];
   if (n < cur.length && cur.slice(n).some((c) => c && (c.body || c.image_id || c.button)) &&
-    !confirm("Show " + n + " column" + (n === 1 ? "" : "s") + "? The extra column’s content will be removed.")) return;
-  b.columns = dcResizeColumns(cur, n);
+    !(await askYes("Show " + n + " column" + (n === 1 ? "" : "s") + "? The extra column’s content will be removed.", { ok: "Remove the extra content", danger: true }))) return;
+  if (BLOCKS_WORK.indexOf(b) < 0) return;   // gone while the question was up
+  b.columns = dcResizeColumns(Array.isArray(b.columns) ? b.columns : [], n);
   dcRebalanceSpans(b);   // reset to even widths for the new count
   dcCaptureScroll(); renderBlocksCard(); saveBlocks();
 }
