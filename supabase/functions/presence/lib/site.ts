@@ -15,6 +15,11 @@ export interface SiteRow {
   edition: 'monitor' | 'presence';   // M11: monitor = observing an existing external website
 }
 
+/** The presence_sites columns behind a SiteRow, for every `select=` that reads one.
+ *  Item 105: eight files spelled this list out; add a SiteRow field here and in the
+ *  interface above, and every read picks it up. */
+export const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition';
+
 /** The Netlify name every hosted site gets, built from our own id (the provisioner's
  *  routes/admin.ts and commerce/provision.ts, so reruns converge). */
 export const hostedName = (siteId: string): string => `presence-${String(siteId).replace(/-/g, '').slice(0, 12)}`;
@@ -30,7 +35,7 @@ export function siteOrigin(site: { id?: string | null; custom_domain?: string | 
 }
 
 export async function resolveSite(jwt: string): Promise<SiteRow | null> {
-  const r = await asUser(jwt, 'presence_sites?select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1');
+  const r = await asUser(jwt, `presence_sites?select=${SITE_COLS}&limit=1`);
   if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) return null;
   return r.json[0] as SiteRow;
 }

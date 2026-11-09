@@ -11,9 +11,9 @@
 import { svc } from './db.ts';
 import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { sendEmail } from '../commerce/account.ts';
-import type { SiteRow } from './site.ts';
+import { SITE_COLS, type SiteRow } from './site.ts';
+import { UUID_RE } from './uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isScopeId(s: unknown): boolean { return typeof s === 'string' && UUID_RE.test(s); }
 
 export interface ScopeInputs {
@@ -161,7 +161,7 @@ export async function resolveScopedSite(jwt: string, requestedSiteId: string, au
     });
     return { ok: false, status: pre.status, reason: pre.reason };
   }
-  const r = await svc(`presence_sites?id=eq.${requestedSiteId}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
+  const r = await svc(`presence_sites?id=eq.${requestedSiteId}&select=${SITE_COLS}&limit=1`);
   const site = (r.json && r.json[0]) as SiteRow | undefined;
   if (!site) { await finish({ ok: false, status: 404, reason: 'deleted' }, agencyId, ''); return { ok: false, status: 404, reason: 'deleted' }; }
   const name = await clientName(requestedSiteId);

@@ -27,8 +27,8 @@ import { canDecideEstimate, isEstimateDecision, estimateExpired, estimateExpires
 import { linkSecret, signSalesToken, verifySalesToken, dealEvent, loadDeal, firstOpen } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();

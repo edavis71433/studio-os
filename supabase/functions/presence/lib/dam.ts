@@ -4,6 +4,7 @@
 // (from offerings/posts/settings). Reuses the platform's approval philosophy for
 // the lifecycle; nothing here duplicates storage, permissions, or the pipeline.
 
+import { UUID_RE as MEDIA_UUID, UUID_RE } from './uuid.ts';
 export interface Asset {
   id: string;
   storage_path: string;
@@ -246,7 +247,6 @@ export function usageSummary(refs: UsageRef[]): UsageSummary {
 // list. This walk reads the row the way the serializer does (home blocks, then
 // pages[].blocks, linked sections through their library item) and names each
 // place in the owner's words: the section names are presence.html's BLOCK_DEFS.
-const MEDIA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECTION_NAMES: Record<string, string> = {
   gallery: 'Photo gallery', carousel: 'Carousel', before_after: 'Before & after', image: 'Image', image_text: 'Image + text',
   video: 'Video', team: 'Team', partners: 'Trusted by', map: 'Map & directions', download: 'Download', columns: 'Columns',
@@ -498,7 +498,6 @@ export const BULK_ACTIONS = ['tag', 'collection', 'archive', 'approve'] as const
 export type BulkAction = typeof BULK_ACTIONS[number];
 export function isBulkAction(a: unknown): a is BulkAction { return typeof a === 'string' && (BULK_ACTIONS as readonly string[]).includes(a); }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type BulkRequest =
   | { ok: true; action: BulkAction; ids: string[]; tag?: string; collection?: string }

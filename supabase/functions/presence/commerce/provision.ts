@@ -19,9 +19,8 @@ import type { Principal } from '../../_shared/auth.ts';
 import { editionFor } from './catalog.ts';
 import type { PlanKey } from './catalog.ts';
 import type { EntitlementPatch } from './subscriptions.ts';
-import { hostedName } from '../lib/site.ts';
+import { hostedName, SITE_COLS } from '../lib/site.ts';
 
-const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition';
 
 export interface ProvisionResult {
   ok: boolean;

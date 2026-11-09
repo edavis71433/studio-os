@@ -30,8 +30,8 @@ import {
 import { notifyStudioOfClientAction } from '../lib/service_bridge.ts';
 import { logTokenIn } from '../lib/email_log.ts';
 import { handleLoggedEmail } from './email_log.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_BODY = 256 * 1024;   // 256KB — an inbound email above this isn't a real client reply
 const MAX_FULL = 8 * 1024 * 1024;   // the API's full message (body + headers), inline images kept as cid: refs

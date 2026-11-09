@@ -6,6 +6,7 @@
 // endpoints (resolve which projects a customer may see).
 import { svc } from './db.ts';
 import { siteOrigin } from './site.ts';
+import { UUID_RE, UUID_RE as SUPPORT_UUID_RE, UUID_RE as UUID } from './uuid.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
@@ -122,7 +123,6 @@ export async function linkForCustomerVia(customerClientId: string, table: string
 export async function clientIdForRequester(agencySiteId: string, requester: { userId?: string | null; email?: string | null }): Promise<string | null> {
   try {
     if (!agencySiteId) return null;
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const email = String(requester?.email || '').trim().toLowerCase();
     const uid = String(requester?.userId || '').trim();
     const candidates: string[] = [];
@@ -167,7 +167,6 @@ const sbUrlAuth = () => Deno.env.get('SUPABASE_URL') || '';
 const sbServiceAuth = () => Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const SIGNIN_EMAIL_TTL_MS = 10 * 60_000;
 const signInEmails = new Map<string, { email: string; at: number }>();
-const SUPPORT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The email a sign-in id signs in with ('' when unknown). Cached per instance. */
 export async function signInEmail(uid: string): Promise<string> {
@@ -790,7 +789,6 @@ export async function reconcileChecklistFacts(agencySiteId: string, dealId: stri
  *  request read "changed today" after one). One read for every request, scoped to the
  *  site; null when it fails, so the caller counts no request as old rather than guess. */
 export async function supportActivity(siteId: string, rowsIn: Array<{ id?: unknown; created_at?: unknown }>): Promise<Record<string, string> | null> {
-  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const ids = [...new Set(rowsIn.map((r) => String(r.id || '')).filter((id) => UUID.test(id)))];
   if (!ids.length || !UUID.test(siteId)) return {};
   try {

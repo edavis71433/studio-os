@@ -13,9 +13,9 @@ import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { tableMissing } from './estimates.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
 const CAP = 5000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rows = (r: { ok?: boolean; json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const dollars = (c: unknown) => (Math.round(Number(c) || 0) / 100).toFixed(2);
 const s = (v: unknown) => (v === null || v === undefined ? '' : String(v));

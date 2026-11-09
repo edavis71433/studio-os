@@ -11,8 +11,8 @@
 // the opaque /p/:token — it just also expires. No new snapshot, no DB column.
 
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
+import { UUID_RE } from './uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface PreviewLinkPayload { site_id: string; exp: number; scope: 'preview'; }
 

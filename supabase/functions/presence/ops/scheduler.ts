@@ -20,9 +20,8 @@ import { runRecommendation } from '../recommendation/engine.ts';
 import { runMoments } from '../moments/engine.ts';
 import { runGrowthCoach } from '../coach/engine.ts';
 import { sendEmail } from '../commerce/account.ts';
-import type { SiteRow } from '../lib/site.ts';
+import { SITE_COLS, type SiteRow } from '../lib/site.ts';
 
-const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition';
 const DEFAULT_LIMIT = 40;               // sites per invocation — cron cadence covers the rest
 const OPS_ALERT_EMAIL = Deno.env.get('OPS_ALERT_EMAIL') || 'eric@davisdigitalstudio.com';
 

@@ -30,7 +30,7 @@ import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS } from './needs_you.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { siteOrigin, hostedName } from '../lib/site.ts';
+import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -44,8 +44,8 @@ import { previewUrlMap } from '../lib/media.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
 
 /* ── plans, in the words a studio uses ── */
@@ -385,7 +385,6 @@ export interface SitesDeps {
 }
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
-const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition';
 const EXTRA_COLS = 'id,client_id,netlify_site_id,offline_at,uptime_ok,uptime_fail_streak,domain_checked_at,template_slug,created_at';
 
 /** The Sites and Domains routes, or null when the route is someone else's. */

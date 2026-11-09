@@ -9,6 +9,7 @@
 // randomness — same brand in → same tokens out, and colours are contrast-checked
 // so a light brand never yields unreadable buttons.
 
+import { UUID_RE as UUID } from './uuid.ts';
 export interface BrandKit {
   logo_media_id?: string | null;
   primary: string;               // hex — the brand colour
@@ -91,7 +92,6 @@ export function sanitizeBrandKit(raw: unknown): BrandKit | null {
   const r = raw as Record<string, unknown>;
   const primary = normHex(r.primary as string);
   if (!primary) return null;                             // primary colour is the one required field
-  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const kit: BrandKit = { primary };
   if (typeof r.logo_media_id === 'string' && UUID.test(r.logo_media_id)) kit.logo_media_id = r.logo_media_id;
   const sec = normHex(r.secondary as string); if (sec) kit.secondary = sec;

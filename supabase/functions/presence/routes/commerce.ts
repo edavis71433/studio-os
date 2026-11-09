@@ -44,6 +44,7 @@ import { recordAcceptance } from '../commerce/terms.ts';
 import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
 import { isServiceRetainerMeta, applyRetainerSync } from '../commerce/retainers.ts';
 import { checkAiCeiling } from '../commerce/metering.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -410,7 +411,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   let body: any = null;
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const invoiceId = String(body?.invoice_id || '');
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceId)) {
+  if (!UUID_RE.test(invoiceId)) {
     return json({ error: 'bad_request' }, 400, cors);
   }
   const inv = (await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose&limit=1`)).json?.[0];

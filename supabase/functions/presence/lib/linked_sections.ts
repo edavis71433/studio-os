@@ -12,11 +12,11 @@
 // copy-inserted block renders byte-identically to the same block reached via a
 // link. A site with no links does zero extra work and is byte-identical to before.
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The stored block type that marks a placement as a LINK to a library item.
  *  Deliberately NOT a REALIZED_BLOCK_TYPE — validateBlocks drops it, so an
  *  unresolved link never leaks into the render; resolution replaces it first. */
+import { UUID_RE } from './uuid.ts';
 export const LINKED_BLOCK_TYPE = 'linked';
 
 export interface LinkedBlock {

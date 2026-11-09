@@ -27,8 +27,8 @@ import {
 import type { CommentRow } from '../lib/section_comments.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SELECT = 'id,page_slug,block_id,author_kind,body,status,created_at,resolved_at';
 
 function badBody(v: { error: 'empty' | 'too_long' }, cors: Record<string, string>): Response {

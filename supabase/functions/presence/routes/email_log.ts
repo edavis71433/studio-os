@@ -14,9 +14,9 @@ import { RESERVED_NAMES, readReservedJson, writeReservedJson } from '../lib/rese
 import { siteCan, isSiteRole } from '../lib/site_roles.ts';
 import { LOG_TOKEN_RE, newLogToken, logAddress, loggedEmailBody } from '../lib/email_log.ts';
 import { parseInbound, parseAuthResults, senderAuthVerdict, splitQuotedReply, maskEmail, filterSafe } from '../lib/inbound_email.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPEN = ['lead', 'qualified', 'proposal', 'contract'];
 const inboundDomain = () => (Deno.env.get('RESEND_INBOUND_DOMAIN') || '').trim().toLowerCase();
 
