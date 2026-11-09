@@ -61,7 +61,11 @@ db.reset({ presence_sales_templates: [] });
   const all = await RS.readReservedJson(SITE, '__saved_views__');
   ok('Customers and Pipeline views saved at the same moment both stay', a.status === 200 && b.status === 200 && all?.customers?.[0]?.name === 'Hot' && all?.pipeline?.[0]?.name === 'This month', JSON.stringify(all));
 }
-db.reset({ presence_sales_templates: [], presence_broadcasts: [] });
+// S4: a list only holds the studio's own people, so both picked addresses are its contacts
+db.reset({ presence_sales_templates: [], presence_broadcasts: [], presence_contacts: [
+  { id: 'eeeeeeee-0000-4000-8000-00000000000a', site_id: SITE, name: 'A', email: 'a@example.com', deleted_at: null },
+  { id: 'eeeeeeee-0000-4000-8000-00000000000b', site_id: SITE, name: 'B', email: 'b@example.com', deleted_at: null },
+], presence_form_submissions: [], presence_service_links: [] });
 {
   const mk = (email) => B.handleBroadcastListCreate(req('POST', '/broadcasts/lists', { people: [{ email, name: '' }] }), site, owner, cors);
   const [a, b] = await Promise.all([mk('a@example.com'), mk('b@example.com')]);

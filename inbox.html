@@ -913,7 +913,7 @@ let PANE_SEQ=0;   // a stale async pane render must never paint over a newer one
 // pane render lands (slice-1's snapComposer pattern, crm.html). The draft is
 // keyed to the SELECTED item so it can never leak into another conversation;
 // successful sends clear their field BEFORE re-rendering, so nothing resurrects.
-const COMPOSER_FIELDS=['msgBody','supBody','leadBody'];
+const COMPOSER_FIELDS=['msgBody','supBody','leadBody','leadNote'];   // item 65: the enquiry note survives a refresh too
 let DRAFT=null;   // {sel, vals, focus} — set by refresh(), consumed once by the pane loaders
 // ── C3 (SS6): insertSavedReplies(textareaId) — the shared saved-reply insert.
 // ONE lazy cached fetch of /service/saved-replies per page-load; a picker only
@@ -1302,8 +1302,8 @@ function paneLead(host,it){
     };
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
     const ld=$('leadDraft');if(ld)ld.addEventListener('click',()=>draftReply('leadBody',`A short, friendly reply from the studio to ${l.name||'someone'} who sent a ${KIND[l.form_kind]?KIND[l.form_kind].toLowerCase():'message'} through the website: "${String(l.message||'they left their details without a message').slice(0,280)}". Continue after the greeting already written; do not repeat it.`,ld));
-    restoreComposer(it);
   }
+  restoreComposer(it);   // item 65: also for an enquiry with no email (its note is a composer field too)
   const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));
   // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
   const nf=$('leadNotFit');if(nf)nf.addEventListener('click',()=>setLeadStatus(it,'not_a_fit',nf));

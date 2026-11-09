@@ -328,7 +328,8 @@
     // ── send an update to the people picked: keep them as a list, open the composer on it ──
     function sendTo(people, name) {
       return req('/broadcasts/lists', 'POST', { name: name || '', people: people }).then(function (r) {
-        if (r && r.ok && r.body && r.body.data && r.body.data.id) { location.href = '/broadcasts.html?list=' + encodeURIComponent(r.body.data.id); return true; }
+        // S4: people who aren't your contacts, enquiries or customers are left off; the composer says how many
+        if (r && r.ok && r.body && r.body.data && r.body.data.id) { var left = Number(r.body.data.left_out) || 0; location.href = '/broadcasts.html?list=' + encodeURIComponent(r.body.data.id) + (left > 0 ? '&left=' + left : ''); return true; }
         if (window.ddsToast) window.ddsToast((r && r.body && r.body.message) || 'That list didn’t save — try again in a moment.', 'err');
         return false;
       });

@@ -598,6 +598,7 @@ const SI={phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0
 const svgi=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const ACTKINDS=[['call',svgi('phone')+' Call'],['email',svgi('mail')+' Email'],['meeting',svgi('users')+' Meeting'],['note',svgi('pencil')+' Note']];
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
+let DEALS_LOADED=false;   // item 65: renamed stages repaint the list only once the deals are here (no walkthrough flash)
 // The roster read's page size = the server's MAX_PAGE (lib/sales_lifecycle.ts
 // clampLimit). A bare read gets clamped to DEFAULT_PAGE=25, which silently
 // truncated the roster (and its meta "total") to the newest 25 — worst on the
@@ -1636,7 +1637,9 @@ async function load(soft){
     if(!board&&FILTER)qs.set('stage',FILTER);
     const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays()]);   // the board's stale threshold rides the same wave (best-effort)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
-    DEALS=res.data||[];
+    DEALS=res.data||[];DEALS_LOADED=true;
+    // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
+    {const live=new Set(DEALS.map(d=>String(d.id)));for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id);}
     LOADED_AT=Date.now();
     renderCurrent();
   }catch(e){
@@ -1886,8 +1889,13 @@ function bulkHtml(){
 }
 async function bulkSend(){
   const k=KIT();if(!k)return;
-  let r;try{r=await api('/sales/contacts?limit=100&include_deleted=1');}catch(_){r=null;}
-  const byId={};for(const c of ((r&&r.data)||[]))byId[c.id]=c;
+  // item 65: look up exactly the picked deals' contacts (it read only the newest 100,
+  // so an older contact's deal was silently left out). Removed contacts aren't mailed.
+  const ids=[...new Set(DEALS.filter(d=>PICKED.has(String(d.id))&&d.contact_id).map(d=>String(d.contact_id)))];
+  const chunks=[];for(let i=0;i<ids.length;i+=100)chunks.push(ids.slice(i,i+100));
+  let found;try{found=await Promise.all(chunks.map(c=>api('/sales/contacts?limit=100&ids='+c.map(encodeURIComponent).join(','))));}catch(_){found=null;}
+  if(!found){toast('We couldn’t look up the people on those deals just now. Try again in a moment.',true);return;}
+  const byId={};for(const r of found)for(const c of ((r&&r.data)||[]))byId[c.id]=c;
   const people=DEALS.filter(d=>PICKED.has(String(d.id))&&d.contact_id&&byId[d.contact_id]&&byId[d.contact_id].email).map(d=>({email:byId[d.contact_id].email,name:byId[d.contact_id].name||''}));
   if(!people.length){toast('None of the deals you picked has a contact with an email address.',true);return;}
   const b=$('bulkSend');if(b)b.disabled=true;
@@ -3061,7 +3069,7 @@ async function boot(){
     if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
     else{wireViews();wireMore();loadSavedViews();
       // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
-      api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
+      api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the persisted display (syncs the toggle), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
     // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"

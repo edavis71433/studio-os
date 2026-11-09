@@ -92,16 +92,16 @@ ok('schedule: an unparseable time is rejected', scheduleDecision('not-a-date', N
   const resolveFn = async () => ({ recipients: [{ email: 'a@x.com', firstName: 'Al' }, { email: 'b@x.com', firstName: 'Bo' }], suppressed: 1, audience: 3 });
   const b = { id: 'bc1', site_id: 's1', subject: 'Hi {{first_name}}', body: 'Hello {{first_name}} from {{business_name}}', audience: 'contacts' };
 
-  const r1 = await dispatchBroadcast(b, { claimFn, sendFn, loadBrand, resolveFn });
+  const r1 = await dispatchBroadcast(b, { claimFn, sendFn, loadBrand, resolveFn , sentInLastDayFn: async () => 0 });
   ok('dispatch: sends once to each un-suppressed recipient', r1.sent === 2 && r1.failed === 0 && r1.skipped === 1 && sent.length === 2);
 
-  const r2 = await dispatchBroadcast(b, { claimFn, sendFn, loadBrand, resolveFn });
+  const r2 = await dispatchBroadcast(b, { claimFn, sendFn, loadBrand, resolveFn , sentInLastDayFn: async () => 0 });
   ok('dispatch: send-once — a re-run mails NO ONE again (idempotent)', r2.sent === 0 && r2.already === 2 && sent.length === 2);
 
   // a send failure is counted, not silently dropped
   const failClaimed = new Set();
   const failClaim = async (bid, _s, e) => { const k = bid + '|' + e; if (failClaimed.has(k)) return 'duplicate'; failClaimed.add(k); return 'inserted'; };
-  const r3 = await dispatchBroadcast(b, { claimFn: failClaim, sendFn: async () => false, markFailedFn: async () => {}, loadBrand, resolveFn });
+  const r3 = await dispatchBroadcast(b, { claimFn: failClaim, sendFn: async () => false, markFailedFn: async () => {}, loadBrand, resolveFn , sentInLastDayFn: async () => 0 });
   ok('dispatch: a failed send is counted as failed', r3.sent === 0 && r3.failed === 2);
 }
 
