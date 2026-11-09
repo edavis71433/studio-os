@@ -60,8 +60,9 @@ const urlsafe = (s) => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, 
   try { r1 = await executeWrite('s', { id: 'x', provider_key: 'nope', workflow: 'bad', kind: 'write', status: 'approved', payload: {} }, 'x'); r2 = await executeWrite('s', {}, 'x'); } catch { ethrew = true; }
   ok('failure: executing a garbage/interrupted plan returns safely, never throws', !ethrew && r1.ok === false && r2.ok === false);
   // a disconnected provider mid-write → not_connected (unit-level: no token) — represented by gating off
+  const realWrites = WRITE_SPECS.filter((w) => w.kind === 'write');
   ok('failure: a real write with no live scope is honestly unavailable, never a silent drop',
-    WRITE_SPECS.filter((w) => w.kind === 'write').every((w) => writeConfigured(w.workflow) === false));
+    realWrites.length > 0 && realWrites.every((w) => writeConfigured(w.workflow) === false));
 }
 
 // ═══ 3. SECURITY — signed state, approval law, no plaintext ═══
@@ -95,8 +96,9 @@ const urlsafe = (s) => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, 
   // way for Search Console, and the Google siblings carried the same defect).
   const GBP_MANAGE = 'https://www.googleapis.com/auth/business.manage';
   ok('security: least-privilege — every provider declares scopes, all read-oriented', CONNECTED_PROVIDERS.every((p) => Array.isArray(p.scopes) && p.scopes.every((s) => !/write|manage\b/i.test(s) || s === GBP_MANAGE)));
+  const googleProviders = CONNECTED_PROVIDERS.filter((p) => /^(google_|youtube)/.test(p.key));
   ok('security: every Google scope is the FULL URL Google accepts (a short form is rejected at consent)',
-    CONNECTED_PROVIDERS.filter((p) => /^(google_|youtube)/.test(p.key)).every((p) => p.scopes.every((s) => s.startsWith('https://www.googleapis.com/auth/'))));
+    googleProviders.length > 0 && googleProviders.every((p) => p.scopes.length > 0 && p.scopes.every((s) => s.startsWith('https://www.googleapis.com/auth/'))));
 }
 
 // ═══ 4. OWNERSHIP — identical for every provider, never lock-in ═══
@@ -117,8 +119,9 @@ const urlsafe = (s) => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, 
     const pl = buildWritePlan(wf, providerByKey(writeSpec(wf).provider_key), {});
     return pl.requires_approval === true && pl.verify.length > 10 && pl.what_stays.length > 0;
   }));
+  const handoffSpecs = WRITE_SPECS.filter((w) => w.kind === 'handoff');
   ok('write: handoffs never touch a provider (structurally — no endpoint, execute never fetches)',
-    WRITE_SPECS.filter((w) => w.kind === 'handoff').every((w) => !w.endpoint && !w.method));
+    handoffSpecs.length > 0 && handoffSpecs.every((w) => !w.endpoint && !w.method));
   const handoff = await executeWrite(SITE, { id: 'h', provider_key: 'mailchimp', workflow: 'email_draft', kind: 'handoff', status: 'approved', payload: { body: 'x' } }, 'your list');
   ok('write: an approved handoff prepares-not-sends and verifies as such', handoff.ok && handoff.kind === 'handoff' && /nothing was sent/i.test(handoff.verification.note));
   ok('write: no provider write happens without registered scopes (no bypass, honest gate)',

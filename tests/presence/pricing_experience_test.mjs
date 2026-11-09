@@ -28,7 +28,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('presence → managed', nextPlanUp('presence')?.key === 'presence_managed');
   ok('managed → null (agency/enterprise are contact-sales, never auto-upsold)', nextPlanUp('presence_managed') === null);
   ok('unknown/null plan → first self-serve rung (never throws)', (() => { const n = nextPlanUp(null); return !!n && n.rank === 1; })());
-  ok('the upsell target always costs more than the current plan', PLANS.filter((p) => p.monthly != null).every((p) => { const n = nextPlanUp(p.key); return !n || n.monthly == null || n.monthly > p.monthly; }));
+  const pricedPlans = PLANS.filter((p) => p.monthly != null);
+  ok('the upsell target always costs more than the current plan', pricedPlans.length > 0 && pricedPlans.every((p) => { const n = nextPlanUp(p.key); return !n || n.monthly == null || n.monthly > p.monthly; }));
 }
 
 // ═══ 3. upsell gains: honest (from featureDelta) + upgrade policy ═══

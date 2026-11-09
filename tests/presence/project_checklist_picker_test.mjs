@@ -121,8 +121,9 @@ try {
     ok('client flags: exactly the three client-facing steps carry client_visible + client_action_required',
       picked.filter((p) => p.client_visible === true).map((p) => p.source).join(',') === 'checklist:content_received' &&
       checklistRows(SITE, PROJECT).filter((r) => r.client_visible).length === 3);
+    const pickerRows = checklistRowsFor(SITE, PROJECT, DELIVERY_CHECKLIST.map((s) => s.key));
     ok('client tick: a step added by the picker is STILL operator-verified — no client tick, not even the three shared ones',
-      checklistRowsFor(SITE, PROJECT, DELIVERY_CHECKLIST.map((s) => s.key)).every((r) => clientMayTick(r.source) === false));
+      pickerRows.length === DELIVERY_CHECKLIST.length && pickerRows.every((r) => clientMayTick(r.source) === false));
   }
 
   // ═══════════ PART B · the route adds only what's missing ═══════════

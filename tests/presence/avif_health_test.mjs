@@ -82,8 +82,9 @@ const SITE = { baseUrl: 'https://vermilionandvine.example' };
     seen.length = 0;
     await previewUrlMap(manifest);
     const signed = seen.filter((c) => c.url.includes('/object/sign/'));
-    ok('1c preview signs a scaling transform for images', signed.filter((c) => c.url.endsWith('photo.jpg')).every((c) => c.body?.transform?.resize === 'contain'));
-    ok('1c preview signs no transform for a document', signed.filter((c) => c.url.endsWith('menu.pdf')).every((c) => !c.body?.transform));
+    const imageSigns = signed.filter((c) => c.url.endsWith('photo.jpg')), docSigns = signed.filter((c) => c.url.endsWith('menu.pdf'));
+    ok('1c preview signs a scaling transform for images', imageSigns.length > 0 && imageSigns.every((c) => c.body?.transform?.resize === 'contain'));
+    ok('1c preview signs no transform for a document', docSigns.length > 0 && docSigns.every((c) => !c.body?.transform));
   } finally {
     globalThis.fetch = realFetch;
   }

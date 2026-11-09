@@ -98,7 +98,8 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
   const offSnap = structuredClone(fx); offSnap.content.settings = { ...(offSnap.content.settings || {}), visit_counter: false };
   const off = renderSnapshot(offSnap, SITE);
   ok('switch: on (absent) → the counter is on every page', on['index.html'].includes('id="presence-analytics"') && on['privacy/index.html'].includes('id="presence-analytics"'));
-  ok('switch: off → no page carries the counter', Object.entries(off).every(([k, v]) => !k.endsWith('.html') || !String(v).includes('presence-analytics')));
+  const offPages = Object.entries(off).filter(([k]) => k.endsWith('.html'));
+  ok('switch: off → no page carries the counter', offPages.length > 0 && offPages.every(([, v]) => !String(v).includes('presence-analytics')));
   const offCh = describeChanges(offSnap.content, fx.content).changes.map((c) => c.sentence);
   const onCh = describeChanges(fx.content, offSnap.content).changes.map((c) => c.sentence);
   ok('switch: turning it off is a change to publish, in words', offCh.includes('Your site stops counting visits, and its privacy page says so.'));

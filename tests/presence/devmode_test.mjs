@@ -83,7 +83,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('files: theme/css/html editable', byPath['theme/tokens.json'].editable && byPath['styles/custom.css'].editable && byPath['blocks/custom.html'].editable);
   ok('files: render.ts is read-only', byPath['templates/restaurant-classic/1.0.0/render.ts'].editable === false);
   ok('files: manifest is read-only', byPath['templates/restaurant-classic/1.0.0/manifest.json'].editable === false);
-  ok('files: no editable template CODE surface exists (no in-app runtime editor)', files.filter((f) => f.kind === 'template').every((f) => !f.editable));
+  const templateFiles = files.filter((f) => f.kind === 'template');
+  ok('files: no editable template CODE surface exists (no in-app runtime editor)', templateFiles.length > 0 && templateFiles.every((f) => !f.editable));
 }
 
 // ═══ 6. devModeAllowed — operator OR developer capability, no one else ═══

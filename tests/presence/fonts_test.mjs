@@ -43,7 +43,24 @@ ok('a style without library fonts loads none', !devLayerFragments({ theme_tokens
   const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/meadow/1.0.0/fixture.json', ROOT)));
   fx.dev_customization = { theme_tokens: picks, custom_css: '', custom_html: '' };
   const out = renderSnapshot(fx, { baseUrl: 'https://example.com' });
-  ok('every page of a rendered site loads the picked fonts', Object.entries(out).filter(([k]) => k.endsWith('.html')).every(([, v]) => String(v).includes("@font-face{font-family:'Playfair Display'")));
+  const htmlPages = Object.entries(out).filter(([k]) => k.endsWith('.html'));
+  ok('every page of a rendered site loads the picked fonts', htmlPages.length > 0 && htmlPages.every(([, v]) => String(v).includes("@font-face{font-family:'Playfair Display'")));
+}
+{
+  // deep pass, Part 7.11: a body font picked on its own, and its bold face
+  const dm = FONT_LIBRARY.find((f) => f.id === 'dm-sans');
+  const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/meadow/1.0.0/fixture.json', ROOT)));
+  fx.dev_customization = { theme_tokens: { font_body: fontStack(dm) }, custom_css: '', custom_html: '' };
+  const out = renderSnapshot(fx, { baseUrl: 'https://example.com' });
+  const layers = Object.entries(out).filter(([k]) => k.endsWith('.html')).map(([, v]) => (String(v).match(/<style id="presence-dev">[\s\S]*?<\/style>/) || [''])[0]);
+  const css = String(out[Object.keys(out).find((k) => k.startsWith('assets/') && k.endsWith('.css'))] || '');
+  ok('a body font picked on its own: every page sets it as the body font, and the stylesheet’s body uses it',
+    layers.length > 0 && layers.every((l) => l.includes(`--font-body:${fontStack(dm)}`)) && /body\{font-family:var\(--font-body/.test(css));
+  ok('…and loads that family alone, regular and bold', layers.every((l) => (l.match(/@font-face/g) || []).length === 2
+    && l.includes("@font-face{font-family:'DM Sans';src:url(/fonts/library/dm-sans-400.woff2) format('woff2');font-weight:400")
+    && l.includes("@font-face{font-family:'DM Sans';src:url(/fonts/library/dm-sans-700.woff2) format('woff2');font-weight:700")));
+  const serif = FONT_LIBRARY.find((f) => f.id === 'dm-serif-display');
+  ok('a family with no bold declares no bold face (the browser leans on the regular)', !fontFaceCss([serif]).includes('font-weight:700') && (fontFaceCss([serif]).match(/@font-face/g) || []).length === 1);
 }
 
 // ═══ 3. publish fetches exactly those files, and only fonts ═══
@@ -67,6 +84,23 @@ ok('a style without library fonts loads none', !devLayerFragments({ theme_tokens
   ok('a page that isn’t a font is never published as one', got.failed.join() === 'fonts/library/inter-700.woff2' && !('fonts/library/inter-700.woff2' in got.files));
   const pub = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/publish.ts', import.meta.url));
   ok('a font that can’t be copied doesn’t stop the publish (item 89)', !/fail\('fonts'/.test(pub) && /font files not copied/.test(pub));
+}
+{
+  // deep pass, Part 7.11: the app can't be reached, or answers with an error, while a site
+  // publishes. Every file counts as failed and nothing throws, so the publish goes on with
+  // the fallback font (two families no earlier check fetched, so none is kept from before).
+  const realFetch = globalThis.fetch;
+  const two = ['caveat', 'quicksand'].map((id) => FONT_LIBRARY.find((f) => f.id === id));
+  let down;
+  globalThis.fetch = () => (down === 'refused' ? Promise.reject(new TypeError('error sending request: connection refused')) : Promise.resolve(new Response('Service Unavailable', { status: 503 })));
+  const each = [];
+  for (down of ['refused', 'error']) {
+    let got = null, threw = null;
+    try { got = await fetchLibraryFonts(two, { pauseMs: 0 }); } catch (e) { threw = e; }
+    each.push(!threw && got && Object.keys(got.files).length === 0 && got.failed.length === 4 && got.failed.every((p) => /^fonts\/library\/(caveat|quicksand)-(400|700)\.woff2$/.test(p)));
+  }
+  globalThis.fetch = realFetch;
+  ok('fonts out of reach: every file counts as failed and nothing throws, so the publish goes on', each.length === 2 && each.every(Boolean), JSON.stringify(each));
 }
 
 const failed = results.filter((r) => !r.p);

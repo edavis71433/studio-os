@@ -17,7 +17,8 @@ for (const t of ['presence_deliverables', 'presence_approvals']) {
   const unscoped = uses.filter((u) => !/site_id=eq\.\$\{site(Id|\.id)\}/.test(u));
   ok(`tenant: every ${t} query is site-scoped (${uses.length} uses)`, unscoped.length === 0, unscoped[0] || '');
 }
-ok('tenant: media lookups in delivery are site-scoped', (pd.match(/presence_media\?[^`]*/g) || []).every((u) => /site_id=eq\.\$\{site(Id|\.id)\}/.test(u)));
+const mediaReads = pd.match(/presence_media\?[^`]*/g) || [];
+ok(`tenant: media lookups in delivery are site-scoped (${mediaReads.length} uses)`, mediaReads.length > 0 && mediaReads.every((u) => /site_id=eq\.\$\{site(Id|\.id)\}/.test(u)));
 
 // ── studio-only writes; client reviews ──
 ok('perms: deliverable create/patch/delete + approval create are studio-only', (pd.match(/if \(!\(await isStudioSide[\s\S]*?\)\)\) return studioDenied/g) || []).length >= 4);

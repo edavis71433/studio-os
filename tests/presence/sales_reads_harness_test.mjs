@@ -100,7 +100,8 @@ const world = () => ({
   ok('2: …and the others still count', typeof seg('enquiries')?.count === 'number' && seg('enquiries').count >= 1, JSON.stringify(seg('enquiries')));
   db.reset(world());
   const g2 = await res(await B.handleBroadcastSegments(site, cors));
-  ok('2: with every read fine nothing is partial', g2.body?.data?.partial === false && (g2.body.data.segments || []).every((s) => typeof s.count === 'number'), JSON.stringify(g2.body?.data?.segments?.map((s) => [s.key, s.count])));
+  const segs = g2.body?.data?.segments || [];
+  ok('2: with every read fine nothing is partial', g2.body?.data?.partial === false && segs.length > 0 && segs.every((s) => typeof s.count === 'number'), JSON.stringify(g2.body?.data?.segments?.map((s) => [s.key, s.count])));
   const cust = async (setup) => { db.reset(world()); setup(); const r = await res(await B.handleBroadcastSegments(site, cors)); return (r.body?.data?.segments || []).find((s) => s.key === 'customers'); };
   ok('2: "Your customers" shows when the studio has some', (await cust(() => {}))?.count === 1);
   ok('2: …is left out when it has none', (await cust(() => { db.tables.presence_service_links = []; })) === undefined);

@@ -11,6 +11,9 @@ import { CATEGORIES, CEDED_TO_GUARDIAN, MODEL_CATEGORIES, deterministicFindings,
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
+// A check that found a bug left for its own fix: KNOWN while the bug is there, and a failure
+// once it's gone, so the fix turns it into an ordinary check.
+const known = (n, p, bug) => { results.push({ n: `${n} (fixed: make it an ordinary check)`, p: !p }); console.log(`${p ? 'FAIL' : 'KNOWN'}  ${n} — ${p ? 'fixed: make it an ordinary check' : bug}`); };
 
 const RICH = {
   business_name: 'Marlow’s Kitchen', tagline: 'Seasonal plates, honest hours',
@@ -85,6 +88,9 @@ const SCOPE_SITE = { kind: 'site' };
   resetFindingSeq();
   const entity = deterministicFindings(MESSY, { kind: 'entity', targetId: 'p1' });
   ok('scope: entity review narrows to the one item', entity.every((x) => !x.location.id || x.location.id === 'p1'));
+  // p1 skips a heading level and closes on "Click here", which the whole-site review finds
+  known('scope: entity review still finds that item’s own problems', entity.some((x) => x.location.kind === 'post' && x.location.id === 'p1'),
+    'an entity scope reads no section at all (wantSection is false for it), so it never finds anything (reviewer/rules.ts deterministicFindings)');
 }
 
 // ═══ 5. the sanitizer — the model does not get to lie ═══

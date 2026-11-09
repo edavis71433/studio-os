@@ -783,8 +783,9 @@ const ctx = { esc, attr, safeHref };
     const b = validateBlocks([FF([
       TXT('on', { hide_on_phone: true }), TXT('str', { hide_on_phone: 'yes' }), TXT('num', { hide_on_phone: 1 }),
     ])])[0];
+    const notOn = b.elements.filter((e) => e.text.body !== 'on');
     return b.elements.find((e) => e.text.body === 'on').hide_on_phone === true
-      && b.elements.filter((e) => e.text.body !== 'on').every((e) => !('hide_on_phone' in e));
+      && notOn.length === 2 && notOn.every((e) => !('hide_on_phone' in e));
   })());
 
   // — caps: 12 elements per canvas, 4 canvases per page (Eric 2026-07-16) —

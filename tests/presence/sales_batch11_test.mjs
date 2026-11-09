@@ -44,7 +44,8 @@ const world = (over = {}) => {
   const w = world();
   const r = await N.loadCustomerNames(AS, [{ clientId: CL, clientName: 'Jordan Ellis', customerSiteId: SITE }], w.read);
   eq('the contact is found through the won deal (it has no client stamp)', r[CL], { name: 'Larkspur Kitchen + Wine Bar', business_name: 'Larkspur Kitchen + Wine Bar', person_name: 'Jordan Ellis', contact_id: DEALCT, phone: '(555) 010-0000' });
-  ok('every read is scoped to the studio\'s own site', w.paths.filter((p) => !p.startsWith('presence_identity')).every((p) => p.includes(`site_id=eq.${AS}`)));
+  const scopedReads = w.paths.filter((p) => !p.startsWith('presence_identity'));
+  ok('every read is scoped to the studio\'s own site', scopedReads.length > 0 && scopedReads.every((p) => p.includes(`site_id=eq.${AS}`)));
 }
 {
   const w = world({ contacts_by_client: [{ id: STAMPCT, client_id: CL, name: 'Jordan B', company: '' }] });

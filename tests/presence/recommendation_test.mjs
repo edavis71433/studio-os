@@ -56,8 +56,9 @@ function judgmentsFrom(evidence, jctx = CTX) {
   const r = recommend(js, CTX);
   ok('approval model: every recommendation requires approval AND has a manual path (no exceptions)',
     r.recommendations.every((x) => x.approval_required === true && x.manual_available === true));
+  const aiRecs = r.recommendations.filter((x) => x.requires_ai);
   ok('ai boundary: ai-capable recs still declare manual_available (Law 25)',
-    r.recommendations.filter((x) => x.requires_ai).every((x) => x.manual_available === true));
+    aiRecs.length > 0 && aiRecs.every((x) => x.manual_available === true));
   const verify = r.recommendations.find((x) => x.rule === 'rec_facts_inconsistent');
   ok('ai boundary: verification recs are manual-only', verify && verify.requires_ai === false);
 }

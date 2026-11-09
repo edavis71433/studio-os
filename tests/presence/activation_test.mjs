@@ -30,7 +30,8 @@ const v = validateSecrets();
 {
   const core = v.groups.core;
   ok('the 4 core secrets are marked required', core.length === 4 && core.every((s) => s.required));
-  ok('non-core secrets are optional (degrade gracefully)', Object.entries(v.groups).filter(([g]) => g !== 'core').flatMap(([, s]) => s).every((s) => !s.required));
+  const nonCore = Object.entries(v.groups).filter(([g]) => g !== 'core').flatMap(([, s]) => s);
+  ok('non-core secrets are optional (degrade gracefully)', nonCore.length > 0 && nonCore.every((s) => !s.required));
 }
 
 // ═══ 4. a clean environment fails honestly (no false "activated") ═══

@@ -153,7 +153,8 @@ const unzip = (bytes) => {
   ok('contacts carry their answer; customers name the business', /Jordan Ellis,jordan@example\.com,,Larkspur Studio,Referral/.test(files['contacts.csv']) && /Larkspur Studio,jordan@example\.com,active/.test(files['customers.csv']));
   ok('invoices, agreements, proposals, support and tasks name their deal or project', /Website rebuild,Deposit,1250\.00,paid/.test(files['invoices-and-payments.csv']) && /Website rebuild,Service agreement,signed/.test(files['agreements.csv']) && /Logo refresh,Logo refresh,1,sent,900\.00/.test(files['proposals.csv']) && /Logo tweak,Larkspur Studio,open,normal/.test(files['support-requests.csv']) && /Deal: Logo refresh,Send the quote/.test(files['tasks.csv']) && /Project: Larkspur site,Build the pages/.test(files['tasks.csv']));
   ok('an enquiry that looks like a formula is kept as text', files['enquiries.csv'].includes(`"'=HYPERLINK(""x"")"`), files['enquiries.csv']);
-  ok('every read is this studio\'s own', db.log.filter((c) => c.method === 'GET' && /\/rest\/v1\/presence_/.test(c.url)).every((c) => c.url.includes(`site_id=eq.${SITE}`)), JSON.stringify(db.log.filter((c) => c.method === 'GET' && !c.url.includes(SITE)).map((c) => c.url)));
+  const studioReads = db.log.filter((c) => c.method === 'GET' && /\/rest\/v1\/presence_/.test(c.url));
+  ok('every read is this studio\'s own', studioReads.length > 0 && studioReads.every((c) => c.url.includes(`site_id=eq.${SITE}`)), JSON.stringify(db.log.filter((c) => c.method === 'GET' && !c.url.includes(SITE)).map((c) => c.url)));
 
   db.fail.add('presence_invoices');
   const part = unzip(new Uint8Array(await (await X.handleSalesExport(site, owner, cors)).arrayBuffer()));

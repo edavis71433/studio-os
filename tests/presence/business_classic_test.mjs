@@ -58,7 +58,8 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   const pages = Object.entries(f).filter(([k, v]) => k.endsWith('.html') && !String(v).includes('http-equiv="refresh"')).map(([k, v]) => [k, String(v)]);
   ok('every page: lang + skip link + main landmark + single h1', pages.every(([, h]) => h.includes('lang="en"') && h.includes('class="skip"') && h.includes('<main id="main">') && (h.match(/<h1[\s>]/g) || []).length === 1));
   ok('every page: title + description + canonical + og:title', pages.every(([, h]) => h.includes('<title>') && h.includes('name="description"') && h.includes('rel="canonical"') && h.includes('og:title')));
-  ok('aria-current marks the active nav item', pages.filter(([k]) => !['404.html', 'thanks/index.html', 'privacy/index.html', 'accessibility/index.html', 'search/index.html'].includes(k)).every(([, h]) => h.includes('aria-current="page"')));
+  const navPages = pages.filter(([k]) => !['404.html', 'thanks/index.html', 'privacy/index.html', 'accessibility/index.html', 'search/index.html'].includes(k));
+  ok('aria-current marks the active nav item', navPages.length > 0 && navPages.every(([, h]) => h.includes('aria-current="page"')));
   ok('sitemap lists /services/ (not /menu/, not /thanks/)', f['sitemap.xml'].includes('/services/') && !f['sitemap.xml'].includes('/menu/') && !f['sitemap.xml'].includes('/thanks/'));
   ok('robots disallows /thanks/ + points at the sitemap', f['robots.txt'].includes('Disallow: /thanks/') && f['robots.txt'].includes('sitemap.xml'));
   // Content pages stay pure-static. The ONLY first-party inline scripts are the
@@ -66,7 +67,8 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   // enhancement) — both same-origin, zero external origins. Everything else is JS-free.
   // item 99: the Open now line, its hours data and its first-party script, rides on the home page only
   const noOpenNow = (h) => String(h).replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>\n<script>\(function\(\)\{var el=document\.getElementById\('open-now'\)[\s\S]*?<\/script>/, '');
-  ok('zero JavaScript emitted, except the first-party search, tag filter and Open now', pages.filter(([k]) => k !== 'search/index.html' && k !== 'updates/index.html').every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(h))));
+  const scriptPages = pages.filter(([k]) => k !== 'search/index.html' && k !== 'updates/index.html');
+  ok('zero JavaScript emitted, except the first-party search, tag filter and Open now', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(h))));
   ok('the Open now script is on the home page only', pages.filter(([, h]) => String(h).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
 }
 
