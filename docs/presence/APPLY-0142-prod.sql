@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0141  (owner-apply, prod)
+--  APPLY PACK - migration 0142  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships the timed-section sweep change. ADDITIVE and IDEMPOTENT ("if not
@@ -19,7 +19,7 @@
 --    drop index if exists public.presence_sites_window_due_idx;
 --    alter table public.presence_sites drop column if exists next_window_at;
 --
---  Covers: supabase/migrations/0141_next_window_at.sql
+--  Covers: supabase/migrations/0142_next_window_at.sql
 -- ===========================================================================
 
 alter table public.presence_sites

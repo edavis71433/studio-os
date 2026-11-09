@@ -166,7 +166,7 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
 // one of its sections appears or comes down ('infinity' when none will; null when unknown,
 // which every live publish sets). A tick reads only the sites whose instant has come or isn't
 // known yet, works out the next one, and stores it. A site whose re-emit is needed but can't
-// be queued yet keeps its passed instant, so the next tick tries again. Before migration 0141
+// be queued yet keeps its passed instant, so the next tick tries again. Before migration 0142
 // the column doesn't exist; the old scan of every live site runs instead.
 export async function runWindowExpiries(limit = 40): Promise<{ ok: true; run_type: 'window_expiry'; scanned: number; enqueued: number; site_ids: string[] }> {
   const nowIso = new Date().toISOString();

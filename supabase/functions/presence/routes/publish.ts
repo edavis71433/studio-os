@@ -209,7 +209,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // without 0111 applied never fails the main status write above.
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
   // Item 90: the timed-section sweep works out this snapshot's next show-from or show-until
-  // instant on its next tick. Separate and best-effort, like offline_at: before 0141 the
+  // instant on its next tick. Separate and best-effort, like offline_at: before 0142 the
   // column doesn't exist, and the status write above must not fail over it.
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: null }) }).catch(() => {});
   // G3 — a successful publish clears any lingering publish-failed attention notice.

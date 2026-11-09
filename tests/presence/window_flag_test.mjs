@@ -2,7 +2,7 @@
 //   deno run --allow-read --allow-env --allow-net tests/presence/window_flag_test.mjs
 // Every 15 minutes runWindowExpiries read every live site's publish and whole snapshot
 // to find the few with a timed section. Each site now carries next_window_at (migration
-// 0141): the next instant one of its sections appears or comes down. This drives the
+// 0142): the next instant one of its sections appears or comes down. This drives the
 // sweep through a fetch fake and checks what it reads, writes and queues, the fallback
 // before the migration, the custom pages it used to miss, and the publish paths that
 // reset the flag.
@@ -97,7 +97,7 @@ const sweep = async () => { calls = []; patches = []; posts = []; return runWind
   const r = await sweep();
   noColumn = false;
   const siteReads = calls.filter((c) => c.startsWith('GET') && c.includes('/presence_sites?'));
-  ok('B11: before migration 0141 it reads every live site, as it did', siteReads.length === 2 && siteReads[1].includes('order=last_published_at.asc'));
+  ok('B11: before migration 0142 it reads every live site, as it did', siteReads.length === 2 && siteReads[1].includes('order=last_published_at.asc'));
   ok('B12: and writes no instant to a column that isn’t there', patches.length === 0);
   ok('B13: and still re-emits what’s due', r.enqueued === 2);
 }
@@ -115,12 +115,12 @@ globalThis.fetch = realFetch;
   ok('C1: a publish that goes live in the request resets it, in its own best-effort write', reset.test(pub) && /if \(live\) await svc\(`presence_sites\?id=eq\.\$\{site\.id\}`, \{ method: 'PATCH', body: JSON\.stringify\(\{ next_window_at: null \}\)/.test(pub));
   ok('C2: so does one that goes live later (the reconcile path)', reset.test(rec));
   ok('C3: the status write itself is unchanged, so a missing column can’t fail it', /JSON\.stringify\(\{ status: 'live', last_published_at: new Date\(\)\.toISOString\(\) \}\)/.test(pub) && /JSON\.stringify\(\{ status: 'live', last_published_at: nowIso \}\)/.test(rec));
-  const mig = read('supabase/migrations/0141_next_window_at.sql');
-  const pack = read('docs/presence/APPLY-0141-prod.sql');
+  const mig = read('supabase/migrations/0142_next_window_at.sql');
+  const pack = read('docs/presence/APPLY-0142-prod.sql');
   const body = (sql) => sql.split('\n').filter((l) => !l.startsWith('--') && l.trim()).join('\n').replace(/\nselect[\s\S]*$/, '');
-  ok('C4: migration 0141 adds the column and the live-sites index, with its rollback', /add column if not exists next_window_at timestamptz/.test(mig) && /presence_sites_window_due_idx/.test(mig) && /-- rollback:[\s\S]*drop column if exists next_window_at/.test(mig));
+  ok('C4: migration 0142 adds the column and the live-sites index, with its rollback', /add column if not exists next_window_at timestamptz/.test(mig) && /presence_sites_window_due_idx/.test(mig) && /-- rollback:[\s\S]*drop column if exists next_window_at/.test(mig));
   ok('C5: the apply pack runs the same statements, and checks the result', body(pack) === body(mig) && /information_schema\.columns/.test(pack));
-  ok('C6: 0141 is the only migration with that number', [...Deno.readDirSync(new URL('supabase/migrations/', ROOT))].filter((e) => e.name.startsWith('0141_')).length === 1);
+  ok('C6: 0142 is the only migration with that number', [...Deno.readDirSync(new URL('supabase/migrations/', ROOT))].filter((e) => e.name.startsWith('0142_')).length === 1);
 }
 
 const passed = results.filter(Boolean).length;
