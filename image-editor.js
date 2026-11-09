@@ -11,7 +11,7 @@
 // soft-deleted, and media_gc removes its stored object after 7 days.
 //
 // One self-contained file, so the builder's photo picker (presence.html) can
-// load the same editor later: <script src="/image-editor.js?v=1">, then
+// load the same editor later: <script src="/image-editor.js?v=2">, then
 // DDSImageEditor.open({ src, name, mime, onSave }). Bump ?v= on every change:
 // _headers lets browsers keep a .js file for a day.
 //
@@ -334,6 +334,7 @@
       shape: st.shape, turned: !!st.turned, rotate: st.rot, flip_h: !!st.flipH, flip_v: !!st.flipV,
       adjust, filter: st.filter, strength: st.filter === 'none' ? 100 : st.strength,
       background: st.bg.on ? { amount: st.bg.amount, inside: !!st.bg.inside } : null,
+      cutout: !!st.cutout,
     };
   }
 
@@ -445,6 +446,9 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
 .dds-ie .ie-check input{margin-top:2px;accent-color:var(--ie-p)}
 .dds-ie .ie-say{font-size:12.5px;line-height:1.45;color:var(--ie-ink);background:var(--ie-p-soft);border-radius:var(--dds-r-sm,8px);padding:8px 10px;margin:6px 0 10px}
 .dds-ie .ie-say:empty{display:none}
+.dds-ie .ie-say.ie-err{background:none;padding:0}
+.dds-ie .ie-cutbox{border-top:1px solid var(--ie-line);margin-top:16px;padding-top:14px}
+.dds-ie .ie-cutbox .ie-btn{margin:6px 0 4px}
 .dds-ie .ie-foot{display:flex;align-items:center;gap:8px 12px;padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ie-line);flex-wrap:wrap;flex:none}
 .dds-ie .ie-hist,.dds-ie .ie-go{display:flex;gap:6px;flex-wrap:wrap}
 .dds-ie .ie-go{margin-left:auto}
@@ -549,6 +553,10 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         <label class="ie-check"><input type="checkbox" id="ie-bg-in">Also clear that colour inside the shape, like the middle of an “O”</label>
         <p class="ie-say" id="ie-bg-say" aria-live="polite"></p>
         <p class="ie-help">It saves as a PNG, which keeps the see-through parts.</p>
+        ${o.cutout ? `<div class="ie-cutbox"><h3 class="ie-h3">Cut out the subject</h3>
+        <p class="ie-help">For a person or a product on a busy background. A cut-out service does it in a few seconds; the first one after a quiet spell can take a minute or two.</p>
+        <button type="button" class="ie-btn" id="ie-cut" aria-pressed="false">Cut out the subject</button>
+        <p class="ie-say" id="ie-cut-say" aria-live="polite"></p></div>` : ''}
       </section>
     </div>
   </div>
@@ -566,13 +574,16 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
 
   function freshState() {
     const adjust = {}; for (const a of ADJUST) adjust[a.key] = 0;
-    return { rect: { ...FULL }, shape: 'free', turned: false, rot: 0, flipH: false, flipV: false, adjust, filter: 'none', strength: 100, bg: { on: false, amount: 35, inside: false } };
+    return { rect: { ...FULL }, shape: 'free', turned: false, rot: 0, flipH: false, flipV: false, adjust, filter: 'none', strength: 100, bg: { on: false, amount: 35, inside: false }, cutout: false };
   }
 
   /** Open the editor on one photo. opts: src (URL or Blob of the ORIGINAL) and
    *  fallbackSrc (tried if src won't load), name, mime, startTab ('crop' |
    *  'adjust' | 'filters' | 'background'), removeBackground (start with it on),
-   *  title, saveLabel, note, and onSave(result), which stores the picture.
+   *  cutout (optional: () => Promise<Blob | { error }>, the page's cut-out
+   *  service; with it the Background tab offers "Cut out the subject", and
+   *  removeBackground on a photo whose edges aren't one plain colour runs it by
+   *  itself), title, saveLabel, note, and onSave(result), which stores the picture.
    *  result = { blob, mime, width, height, edits }. onSave may return { error }
    *  (or throw): the editor stays open, edits intact, and says so. Resolves
    *  { saved: true, value } once saved, or null when closed. */
@@ -597,10 +608,14 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
       let st = freshState();
       const pristine = JSON.stringify(st);
       let img = null, url = '', W0 = 0, H0 = 0, srcMime = String(o.mime || ''), ready = false, busy = false, closed = false;
+      // the cut-out, once made, sits beside the original: Undo and "Put the
+      // background back" switch pictures without asking the service again
+      let cutPic = null, cutting = false, cutTimer = 0, autoCut = !!(o.removeBackground && o.cutout);
+      const pic = () => (st.cutout && cutPic ? cutPic : { img, w: W0, h: H0 });
       let tab = '', cssW = 1, cssH = 1, pending = 0, dragging = false, drag = null, commitTimer = 0, onKey = null;
       let raw = null, rawKey = '', cut = null, cutKey = '', tileKey = '';
       const hist = [JSON.stringify(st)]; let at = 0;
-      const O = () => orientedSize(W0, H0, st.rot);
+      const O = () => { const p = pic(); return orientedSize(p.w, p.h, st.rot); };
       const ratio = () => shapeRatio(st.shape, st.turned, O().w, O().h);
       const params = () => combineParams(st.adjust, st.filter, st.strength);
       const changed = () => JSON.stringify(st) !== pristine;
@@ -621,11 +636,11 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px';
       }
       function ensureRaw() {
-        const v = viewRect(), key = [v.x, v.y, v.w, v.h, st.rot, st.flipH, st.flipV, cv.width, cv.height].join(',');
+        const v = viewRect(), key = [v.x, v.y, v.w, v.h, st.rot, st.flipH, st.flipV, cv.width, cv.height, st.cutout].join(',');
         if (key === rawKey && raw) return;
         const off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height;
         const octx = off.getContext('2d', { willReadFrequently: true });
-        drawOriented(octx, img, W0, H0, st, v, off.width, off.height);
+        const p = pic(); drawOriented(octx, p.img, p.w, p.h, st, v, off.width, off.height);
         raw = octx.getImageData(0, 0, off.width, off.height); rawKey = key;
       }
       function cropRegion() {
@@ -646,7 +661,9 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         }
         applyPixels(out.data, out.width, out.height, params(), region);
         ctx.putImageData(out, 0, 0);
-        frame.classList.toggle('checker', st.bg.on || /png|webp/.test(srcMime));
+        frame.classList.toggle('checker', st.bg.on || st.cutout || /png|webp/.test(srcMime));
+        // "Remove background" on a busy photo: the plain tool can't, the service can
+        if (autoCut && st.bg.on && cut && !dragging) { autoCut = false; if (cut.ref && cut.plain < 0.55) setTimeout(runCutout, 0); }
         placeCrop(); sayDims(); sayBg();
         if (tab === 'filters') paintTiles();
       }
@@ -664,16 +681,16 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
       }
       function sayBg() {
         const say = $('ie-bg-say');
-        if (!st.bg.on) { say.textContent = ''; return; }
+        if (!st.bg.on || cutting) { say.textContent = ''; return; }
         if (dragging || !cut) return;
         if (!cut.ref) { say.textContent = 'The edges of this picture are already see-through, so there’s no background to take out.'; return; }
         const pct = Math.round(cut.share * 100);
         let t = pct < 1 ? 'Nothing matched the colour at the edges. Move “How much to remove” up.' : `Took out ${pct}% of the picture.`;
-        if (cut.plain < 0.55) t += ' The edges aren’t one plain colour, so some of the background may stay. This tool is for plain backgrounds.';
+        if (cut.plain < 0.55) t += o.cutout ? ' The edges aren’t one plain colour: “Cut out the subject” below is for a busy background.' : ' The edges aren’t one plain colour, so some of the background may stay. This tool is for plain backgrounds.';
         say.textContent = t;
       }
       function paintTiles() {
-        const r = st.rect, key = [r.x, r.y, r.w, r.h, st.rot, st.flipH, st.flipV].join(',');
+        const r = st.rect, key = [r.x, r.y, r.w, r.h, st.rot, st.flipH, st.flipV, st.cutout].join(',');
         if (key === tileKey) return;
         tileKey = key;
         const Ow = O(), rw = r.w * Ow.w, rh = r.h * Ow.h, s = Math.max(TILE_W / rw, TILE_H / rh);
@@ -681,7 +698,7 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         const sub = { x: r.x + (r.w - cw) / 2, y: r.y + (r.h - ch) / 2, w: cw, h: ch };   // cover the tile with the middle of the crop
         const off = document.createElement('canvas'); off.width = TILE_W; off.height = TILE_H;
         const octx = off.getContext('2d', { willReadFrequently: true });
-        drawOriented(octx, img, W0, H0, st, sub, TILE_W, TILE_H);
+        const p = pic(); drawOriented(octx, p.img, p.w, p.h, st, sub, TILE_W, TILE_H);
         const base = octx.getImageData(0, 0, TILE_W, TILE_H);
         dlg.querySelectorAll('.ie-fil').forEach((b) => {
           const d = new ImageData(new Uint8ClampedArray(base.data), TILE_W, TILE_H);
@@ -709,8 +726,11 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         $('ie-str').disabled = st.filter === 'none'; $('ie-str-row').classList.toggle('off', st.filter === 'none');
         $('ie-bg-on').checked = st.bg.on;
         $('ie-bg-amt').value = String(st.bg.amount); $('ie-o-bg').textContent = String(st.bg.amount);
-        $('ie-bg-amt').disabled = !st.bg.on; $('ie-bg-in').disabled = !st.bg.on; $('ie-bg-in').checked = st.bg.inside;
-        $('ie-bg-amt-row').classList.toggle('off', !st.bg.on);
+        $('ie-bg-on').disabled = !!st.cutout;   // a cut-out already has its background gone
+        $('ie-bg-amt').disabled = !st.bg.on || !!st.cutout; $('ie-bg-in').disabled = !st.bg.on || !!st.cutout; $('ie-bg-in').checked = st.bg.inside;
+        $('ie-bg-amt-row').classList.toggle('off', !st.bg.on || !!st.cutout);
+        const cb = $('ie-cut');
+        if (cb) { cb.disabled = !ready || cutting || busy; cb.textContent = cutting ? 'Cutting out…' : st.cutout ? 'Put the background back' : 'Cut out the subject'; cb.setAttribute('aria-pressed', String(!!st.cutout)); }
         $('ie-undo').disabled = at === 0; $('ie-redo').disabled = at >= hist.length - 1;
         dlg.querySelectorAll('.ie-reset').forEach((b) => { b.disabled = !changed(); });
         $('ie-save').disabled = !ready || busy || !changed();
@@ -826,6 +846,39 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
       $('ie-bg-amt').addEventListener('change', commit);
       $('ie-bg-in').addEventListener('change', () => { st.bg.inside = $('ie-bg-in').checked; commit(); schedule(); });
 
+      // ── cut out the subject: the page's service (files.html cutoutOf) answers a
+      //    PNG whose background is see-through; it becomes the picture being edited ──
+      function sayCut(text, bad) { const el = $('ie-cut-say'); if (!el) return; el.textContent = text; el.classList.toggle('ie-err', !!bad); }
+      async function runCutout() {
+        if (!o.cutout || !ready || cutting || busy || closed) return;
+        if (cutPic) { st.cutout = true; st.bg.on = false; commit(); schedule(); sayCut('Cut out. “Put the background back”, or Undo, brings it back.'); return; }
+        cutting = true; sync(); schedule(); sayCut('Cutting out the subject…');
+        const box = dlg.querySelector('.ie-cutbox');   // on a phone it sits below the fold: bring its words into view
+        if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+        cutTimer = setTimeout(() => { if (cutting && !closed) sayCut('Still working. The first cut-out after a quiet spell can take a minute or two.'); }, 8000);
+        let res;
+        try { res = await o.cutout(); } catch (_) { res = null; }
+        clearTimeout(cutTimer);
+        if (closed) return;
+        let pc = null;
+        if (res instanceof Blob) {
+          const u = URL.createObjectURL(res), im = new Image();
+          im.src = u;
+          try { await (im.decode ? im.decode() : new Promise((ok, bad) => { im.onload = ok; im.onerror = bad; })); if (im.naturalWidth && im.naturalHeight) pc = { img: im, w: im.naturalWidth, h: im.naturalHeight, url: u }; } catch (_) { /* unreadable: said below */ }
+          if (!pc) URL.revokeObjectURL(u);
+        }
+        cutting = false;
+        if (closed) { if (pc) URL.revokeObjectURL(pc.url); return; }
+        if (!pc) { sync(); schedule(); sayCut(String((res && res.error) || 'The cut-out didn’t come through, so nothing changed. Try again in a moment.'), true); return; }
+        cutPic = pc; st.cutout = true; st.bg.on = false; commit(); schedule();
+        sayCut('Cut out. “Put the background back”, or Undo, brings it back.');
+      }
+      const cutBtn = $('ie-cut');
+      if (cutBtn) cutBtn.addEventListener('click', () => {
+        if (st.cutout) { st.cutout = false; commit(); schedule(); sayCut(''); }
+        else runCutout();
+      });
+
       // ── undo, redo, start over, leave ──
       $('ie-undo').addEventListener('click', () => step(-1));
       $('ie-redo').addEventListener('click', () => step(1));
@@ -858,10 +911,10 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         const Ow = O(), px = cropPixels(st.rect, Ow.w, Ow.h), size = capOutput(px.w, px.h);
         const out = document.createElement('canvas'); out.width = size.w; out.height = size.h;
         const octx = out.getContext('2d', { willReadFrequently: true });
-        drawOriented(octx, img, W0, H0, st, { x: px.x / Ow.w, y: px.y / Ow.h, w: px.w / Ow.w, h: px.h / Ow.h }, size.w, size.h);
+        const pc = pic(); drawOriented(octx, pc.img, pc.w, pc.h, st, { x: px.x / Ow.w, y: px.y / Ow.h, w: px.w / Ow.w, h: px.h / Ow.h }, size.w, size.h);
         const p = params();
         let clear = false;
-        if (st.bg.on || !isNeutral(p) || /png|webp/.test(srcMime)) {
+        if (st.bg.on || st.cutout || !isNeutral(p) || /png|webp/.test(srcMime)) {
           const id = octx.getImageData(0, 0, size.w, size.h), region = { x: 0, y: 0, w: size.w, h: size.h };
           if (st.bg.on) applyCutout(id.data, size.w, region, cutout(id.data, size.w, size.h, region, st.bg));
           applyPixels(id.data, size.w, size.h, p, region);
@@ -914,6 +967,8 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
         if (ro) ro.disconnect();
         root.removeEventListener('resize', schedule);
         if (url) URL.revokeObjectURL(url);
+        if (cutPic) URL.revokeObjectURL(cutPic.url);
+        clearTimeout(cutTimer);
         try { dlg.close(); } catch (_) { /* already closed */ }
         dlg.remove();
         if (opener && opener.focus && document.contains(opener)) opener.focus();
@@ -956,7 +1011,7 @@ dialog.dds-ie::backdrop{background:rgba(20,14,34,.6)}
   }
 
   root.DDSImageEditor = {
-    version: 1, open, SHAPES, ADJUST, FILTERS,
+    version: 2, open, SHAPES, ADJUST, FILTERS,
     core: {
       orientedSize, shapeRatio, shapeLabel, largestRect, moveRect, resizeRect, rotateRect, flipRect, cropPixels, capOutput,
       combineParams, isNeutral, toneLut, channelLuts, colorMatrix, applyPixels, edgeColor, cutout, applyCutout, hasTransparency,

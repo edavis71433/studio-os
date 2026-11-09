@@ -209,6 +209,7 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
   ok('…only the sliders that moved', JSON.stringify(r.adjust) === '{"brightness":12}');
   ok('…and the cut-out, when it’s on', r.background && r.background.amount === 50 && r.filter === 'none' && r.strength === 100);
   ok('…which is small', JSON.stringify(r).length < 400, String(JSON.stringify(r).length));
+  ok('…and whether the subject was cut out (off by default)', r.cutout === false && C.freshState().cutout === false && C.recipe({ ...st, cutout: true }, 4000, 3000).cutout === true);
 }
 
 // ═══ 8. how the Files page uses it ═══
@@ -226,7 +227,8 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
   ok('saving never replaces or deletes the original', !/\/replace|'DELETE'|rollback|status'/.test(save + editFn));
   ok('a failed upload keeps the editor open with the reason', save.includes("return{error:(up.body&&up.body.message)||") && save.includes("return{error:'The upload didn’t finish"));
   ok('the old AI button is gone from the page; its server route stays', !/api\([^)]*remove-background/.test(files) && !files.includes('removeBg(') && read('supabase/functions/presence/index.ts').includes('/remove-background$/'));
-  ok('the editor loads on first use, with a version to bust the day-long cache', files.includes("s.src='/image-editor.js?v=1'") && /version: 1,/.test(ed));
+  const pageV = (/s\.src='\/image-editor\.js\?v=(\d+)'/.exec(files) || [])[1], edV = (/\bversion: (\d+),/.exec(ed) || [])[1];
+  ok('the editor loads on first use, its ?v= the editor’s own version (to bust the day-long cache)', !!pageV && pageV === edV && pageV === String(E.version), `page v=${pageV}, editor ${edV}`);
   ok('the public build copies the editor (every root .js)', read('scripts/build-public.sh').includes('cp ./*.js dist/'));
   ok('an edited copy says what it came from, with a way back', files.includes('An edited copy of “') && files.includes('data-open-orig="${esc(edFrom)}"') && files.includes("openDetail(b.dataset.openOrig)"));
   ok('the editor itself only ever READS: one fetch, for the photo, and no upload of its own', (ed.match(/fetch\(/g) || []).length === 1 && !/method:\s*'(PUT|POST|PATCH|DELETE)'/.test(ed));
@@ -234,6 +236,11 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
   ok('a button disabled under focus hands focus back to the editor', ed.includes('if (f && f !== dlg && f.disabled && dlg.contains(f)) dlg.focus();'));
   ok('a file dropped on the open editor is not uploaded', files.includes("if(document.querySelector('dialog[open]'))return;"));
   ok('presence.html is untouched by this', !read('presence.html').includes('image-editor.js'));
+  // "Cut out the subject": offered only when the page brings a service; a busy edge runs it by itself
+  ok('the cut-out is offered only when the page brings a service', ed.includes("${o.cutout ? `<div class=\"ie-cutbox\">") && ed.includes("const cutBtn = $('ie-cut');"));
+  ok('Remove background on a busy photo runs the cut-out by itself (a plain one keeps the free tool)', ed.includes('if (autoCut && st.bg.on && cut && !dragging) { autoCut = false; if (cut.ref && cut.plain < 0.55) setTimeout(runCutout, 0); }'));
+  ok('a cut-out made once is reused: Undo and “Put the background back” never ask the service again', ed.includes("if (cutPic) { st.cutout = true; st.bg.on = false; commit(); schedule();") && ed.includes("const pic = () => (st.cutout && cutPic ? cutPic : { img, w: W0, h: H0 });"));
+  ok('a failed cut-out says why and changes nothing', ed.includes("if (!pc) { sync(); schedule(); sayCut(String((res && res.error) ||"));
 }
 
 const passed = results.filter((r) => r.p).length;

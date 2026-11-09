@@ -21,7 +21,9 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop } from '../lib/media.ts';
+import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource } from '../lib/media.ts';
+import { cutoutConfigured, startCutout, checkCutout, jobFor, idFromJob, isPng, CUTOUT_MODEL, CUTOUT_MAX_SIDE, CUTOUT_MAX_BYTES, type CutoutState } from '../lib/cutout.ts';
+import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { editionFromPlan, editionFromSite } from '../commerce/editions.ts';
@@ -563,6 +565,7 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
     thumb_fallback: thumbFallback,
     download_url: download,
     policy: await policyFor(site),
+    cutout_available: cutoutConfigured() && isImageMime(asset.mime || ''),   // items 39 + 117: the editor's "Cut out the subject"
   } }, 200, cors);
 }
 
@@ -690,6 +693,50 @@ export async function handleAssetRemoveBackground(site: SiteRow, principal: Prin
     source_asset_id: id,
     note: 'A draft — approve it to save a new file beside the original, or discard it. The original photo is never changed.',
   } }, 200, cors);
+}
+
+// ── items 39 + 117: cut out the subject (lib/cutout.ts) ───────────────────────
+// The photo editor's way to take a person or a product off a busy background.
+// Answers the PNG itself, or 202 with a job to ask after while a quiet model
+// starts up. Nothing is stored here: the editor puts the picture on its canvas,
+// and saving makes a new file through the ordinary upload door. Each one costs a
+// fraction of a cent, so the guard is volume (60 an hour, 300 a day per site),
+// not the AI spending ceiling, whose $0.04-per-image estimate would overcount it a
+// hundred times. It is logged as a zero-cost operation so usage still shows it.
+export async function handleAssetCutout(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const asset = await loadAsset(site.id, id);
+  if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
+  if (!isImageMime(asset.mime || '')) return json({ error: 'not_an_image', message: 'Cutting out is for photos — this file isn’t an image.' }, 400, cors);
+  if (!cutoutConfigured()) return json({ error: 'not_available', message: 'Cutting out isn’t switched on yet. The plain-background tool still works.' }, 503, cors);
+  if (!(await rateAllow(`cutout:${site.id}`, 60, 3600)) || !(await rateAllow(`cutout-day:${site.id}`, 300, 86400))) return tooMany(cors, 300);
+  const src = await signCutoutSource(asset.storage_path, asset.mime || '', asset.width, asset.height, CUTOUT_MAX_SIDE);
+  if (!src) return json({ error: 'image_unreadable', message: 'We couldn’t open that photo just now, so nothing changed. Try again in a moment.' }, 502, cors);
+  const st = await startCutout(src);
+  if (st.state !== 'failed') recordUsage({ siteId: site.id, clientId: site.client_id, agent: 'cutout' }, CUTOUT_MODEL, 0, 0).catch(() => {});
+  void principal;   // site scope + the role gate (edit) already ran
+  return cutoutAnswer(site, st, cors);
+}
+
+export async function handleCutoutJob(site: SiteRow, job: string, cors: Record<string, string>) {
+  if (!cutoutConfigured()) return json({ error: 'not_available', message: 'Cutting out isn’t switched on yet.' }, 503, cors);
+  const pid = await idFromJob(site.id, job);
+  if (!pid) return json({ error: 'not_found', message: 'That cut-out isn’t here.' }, 404, cors);
+  return cutoutAnswer(site, await checkCutout(pid), cors);
+}
+
+async function cutoutAnswer(site: SiteRow, st: CutoutState, cors: Record<string, string>): Promise<Response> {
+  if (st.state === 'waiting') {
+    return json({ data: { pending: true, job: await jobFor(site.id, st.id), note: 'Starting up. The first cut-out after a quiet spell can take a minute or two.' } }, 202, cors);
+  }
+  const failed = () => json({ error: 'cutout_failed', message: 'The cut-out didn’t come through, so nothing changed. Try again in a moment.' }, 502, cors);
+  if (st.state === 'failed') { console.warn(`[cutout] site=${site.id} failed: ${st.why}`); return failed(); }
+  try {
+    const r = await fetch(st.output, { signal: AbortSignal.timeout(30000) });   // replicate.delivery only (readPrediction)
+    if (!r.ok || Number(r.headers.get('content-length') || 0) > CUTOUT_MAX_BYTES) { await r.body?.cancel(); console.warn(`[cutout] site=${site.id} result HTTP ${r.status}`); return failed(); }
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (!isPng(bytes) || bytes.byteLength > CUTOUT_MAX_BYTES) { console.warn(`[cutout] site=${site.id} result is not a PNG (${bytes.byteLength} bytes)`); return failed(); }
+    return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'image/png', 'Cache-Control': 'no-store' } });
+  } catch (e) { console.warn(`[cutout] site=${site.id} result fetch: ${String(e).slice(0, 200)}`); return failed(); }
 }
 
 export async function handleAssetDownload(site: SiteRow, id: string, cors: Record<string, string>) {

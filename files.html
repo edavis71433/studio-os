@@ -1303,12 +1303,14 @@ function saveBlob(blob,name){const u=URL.createObjectURL(blob);const a=document.
 // removal already on. It used to ask an AI image model (POST
 // /assets/:id/remove-background, G32), which redraws the whole photo and was never
 // switched on in production; the route is still on the server.
+// Where the server has a cut-out key (d.cutout_available), the editor also offers
+// "Cut out the subject" for a busy background, through cutoutOf below.
 // Bump ?v= whenever image-editor.js changes: browsers keep a .js file for a day.
 let EDITOR=null;
 function loadEditor(){
   if(window.DDSImageEditor)return Promise.resolve(window.DDSImageEditor);
   if(!EDITOR)EDITOR=new Promise((res,rej)=>{
-    const s=document.createElement('script');s.src='/image-editor.js?v=1';
+    const s=document.createElement('script');s.src='/image-editor.js?v=2';
     s.onload=()=>window.DDSImageEditor?res(window.DDSImageEditor):rej(new Error('missing'));
     s.onerror=()=>rej(new Error('load'));
     document.head.appendChild(s);
@@ -1330,11 +1332,29 @@ async function editPhoto(tab){
   if(!src){toast('Couldn’t open this photo for editing — try again in a moment.');return;}
   let ed;try{ed=await loadEditor();}catch(_){toast('The photo editor didn’t load. Check your connection and try again.');return;}
   if(!S.current||S.current.asset.id!==a.id)return;   // the panel moved on while it loaded
-  const res=await ed.open({src,fallbackSrc:d.download_url,name:a.name,mime:a.mime,startTab:tab,removeBackground:tab==='background',onSave:(out)=>saveEdited(a,out)});
+  const res=await ed.open({src,fallbackSrc:d.download_url,name:a.name,mime:a.mime,startTab:tab,removeBackground:tab==='background',cutout:d.cutout_available?()=>cutoutOf(a.id):null,onSave:(out)=>saveEdited(a,out)});
   if(!res||!res.saved||!res.value)return;
   toast(res.value.patched?'Saved as a new file. The original is unchanged.':'Saved as a new file. Its name and folder didn’t copy over, so set them here.');
   await load(true);
   const back=detailOpener;openDetail(res.value.id);detailOpener=back;   // closing the copy's panel returns to the list, not to the old panel's button
+}
+// "Cut out the subject": the server asks Replicate (lib/cutout.ts) and answers the
+// PNG itself, or 202 with a job to ask after while a quiet model starts up, which
+// takes a minute or two. Resolves the Blob, or {error} for the editor to say.
+const CUTOUT_POLL_MS=2500,CUTOUT_POLLS=72;   // three minutes at most
+async function cutoutOf(id){
+  const call=(path,method)=>fetch(FN+path,{method,headers:H()});
+  const fail='The cut-out didn’t come through, so nothing changed. Try again in a moment.';
+  let r;try{r=await call('/assets/'+id+'/cutout','POST');}catch(_){return{error:'The cut-out couldn’t start. Check your connection and try again.'};}
+  for(let i=0;;i++){
+    if(r.status===200&&/^image\/png\b/.test(r.headers.get('content-type')||''))return await r.blob();
+    const b=await r.json().catch(()=>({}));
+    const job=r.status===202&&b.data&&b.data.job;
+    if(!job)return{error:(b&&b.message)||fail};
+    if(i>=CUTOUT_POLLS)return{error:'The cut-out service is taking too long just now, so nothing changed. Try again in a few minutes.'};
+    await new Promise((res)=>setTimeout(res,CUTOUT_POLL_MS));
+    try{r=await call('/assets/cutout/'+encodeURIComponent(job),'GET');}catch(_){return{error:fail};}
+  }
 }
 const editedName=(n)=>{n=String(n||'Photo').trim()||'Photo';return /\(edited\)$/i.test(n)?n:(n+' (edited)').slice(0,200);};
 // Through the SAME door as any upload (its size and file limits, the content

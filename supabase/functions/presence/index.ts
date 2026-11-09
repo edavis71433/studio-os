@@ -48,7 +48,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -619,6 +619,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // approving stores a NEW file beside the original. Never destructive.
     const mrb = route.match(/^\/assets\/([0-9a-f-]{36})\/remove-background$/);
     if (mrb && method === 'POST') return handleAssetRemoveBackground(site, principal, mrb[1], cors);
+    // items 39 + 117: the photo editor's "Cut out the subject" (Replicate) — the PNG,
+    // or a job to ask after while the model starts up; nothing is stored
+    const mco = route.match(/^\/assets\/([0-9a-f-]{36})\/cutout$/);
+    if (mco && method === 'POST') return handleAssetCutout(site, principal, mco[1], cors);
+    const mcj = route.match(/^\/assets\/cutout\/([a-z0-9]{10,64}\.[A-Za-z0-9_-]{32})$/);
+    if (mcj && method === 'GET') return handleCutoutJob(site, mcj[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
     if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
