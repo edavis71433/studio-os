@@ -2151,7 +2151,7 @@ function go(view, early) {
 const VIEW_HINTS = {
   design: ["edit-doubleclick", "Double-click the words in a section to change them. Everything saves itself, and nothing goes live until you publish."],
   media: ["media-inuse", "Photos marked “on your site” are in use; the rest wait here until you place them."],
-  search: ["search-plain", "Search settings are plain questions like “Show this page on Google?” — no jargon to learn."],
+  search: ["search-plain", "How people find you on Google, what to fix first, and Search Console. Each page’s own Google settings are on the Pages tab."],
 };
 const TOUCH_DESIGN_HINT = ["edit-tap", "Tap a section to select it, then tap its words to change them. Everything saves itself, and nothing goes live until you publish."];
 let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
@@ -2891,9 +2891,18 @@ $("deskGo").addEventListener("click", async () => {
     toast(nice(err), true);
   }
 });
+// Item 95: a proposed change names its field as the form above it does ("Search description"),
+// not by its storage key ("seo description").
+function fieldName(k) {
+  const lb = document.querySelector('label[for="f-' + k + '"]');
+  const t = lb && lb.textContent.trim().replace(/\s*\([^)]*\)\s*$/, "");   // "Search headline (SEO title)" → "Search headline"
+  if (t) return t;
+  const w = String(k).replace(/_/g, " ").replace(/^seo /, "search ");
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
 function payloadPreview(p) {
   const bits = [];
-  if (p.identity) for (const [k, v] of Object.entries(p.identity)) bits.push(`${k.replace(/_/g, " ")}: ${v}`);
+  if (p.identity) for (const [k, v] of Object.entries(p.identity)) bits.push(`${fieldName(k)}: ${v}`);
   if (p.faqs) for (const f of p.faqs) bits.push(`Q: ${f.question}\nA: ${f.answer}`);
   if (p.post) bits.push(`${p.post.title}\n\n${p.post.body_md}`);
   if (p.offering_descriptions) for (const o of p.offering_descriptions) bits.push(o.description);
@@ -7228,14 +7237,17 @@ async function mountSearchCard() {
     p.appendChild(el("span", null, ok2 ? good : fix));
     card.appendChild(p);
   };
-  line(true, "Google can read your site — sitemap, page details, and your " + (h.schema && h.schema.type ? h.schema.type : "business") + " listing info are built in automatically.");
+  line(true, "Google can read your site: the sitemap, each page’s details and your business listing are built in.");   // item 95: no schema word
   // the not-yet case is a task above (with the door); the sentence speaks when it is true
   if (h.seo_fields.title && h.seo_fields.description) line(true, "Your search headline and description are set.");
   // This reads presence_settings.google_site_verification (routes/search.ts:41) —
   // the HTML meta ownership tag, which is a DIFFERENT thing from a Search Console
   // connection. Saying "connected" here claimed something untrue and contradicted
   // the Connections page, which correctly showed it as not connected.
-  line(h.verification.google, "Your Google verification code is saved.", "Add your free Google Search Console code above to see how people find you.");
+  // Item 95: the code is only the ownership tag; connecting is how searches show here, so the
+  // missing step names the Connect button, and says nothing once Search Console is connected.
+  if (h.verification.google) line(true, "Your Google verification code is saved.");
+  else if (SEO_CONN !== "connected") line(false, "", "To see how people find you on Google, connect Google Search Console with the button above.");
   if (h.verification.bing) line(true, "Bing is connected too (that powers Copilot search).");
   (h.links || []).forEach((l) => { if (l.ok === false) line(false, "", "Your " + l.kind.replace("social:", "") + " link isn’t answering — check " + l.url.slice(0, 40) + "…"); });
   if ((h.links || []).length && (h.links || []).every((l) => l.ok !== false)) line(true, "All your outside links (booking, social, redirects) are answering.");
@@ -13376,7 +13388,7 @@ function refreshSiteStatus(force) {
     routeHash();   // CP-2.6: #hash deep-links (palette/nav) — hash wins when present
   } catch (err) {
     if (err.status === 404) showGate("Almost ready", "Your room is being prepared — your studio is on it. Check back soon, or write to support@davisdigitalstudio.com.", true);
-    else if (err.status === 403) showGate("Paused for now", err.message, true);
+    else if (err.status === 403) showGate("Paused for now", String(err.message || "").replace(/^\[[\w-]+\] /, ""), true);   // item 95: refreshAll tags which read failed, for the log
     else if (err.message !== "no-session") { try { console.error("[presence boot]", err.status, err.message, err.body); } catch (_) {} showGate("Nothing was lost", "Your words are safe and your live site is untouched — this page just couldn’t load. Try again in a moment, or write to support@davisdigitalstudio.com.", true, true); }
   }
 })();
