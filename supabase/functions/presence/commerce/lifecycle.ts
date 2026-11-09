@@ -927,7 +927,8 @@ export async function runApprovalReminders(limit = 50): Promise<{ reminded: numb
 // A proposal/agreement sitting "sent" for 3+ days gets exactly ONE reminder to
 // the client with a freshly minted link (the original may be buried or expiring).
 // Capped at one-ever per document via the notices dedupe; respects nothing older
-// than 21 days (a dead deal shouldn't get a ghost nudge).
+// than 21 days (a dead deal shouldn't get a ghost nudge). An estimate (item 47)
+// gets the same one reminder with its own link and words, unless it has expired.
 export async function runSalesDocReminders(limit = 20): Promise<{ reminded: number }> {
   const { linkSecret, signSalesToken } = await import('../routes/sales.ts');
   const secret = linkSecret();
@@ -936,14 +937,16 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
   const to = new Date(Date.now() - 3 * 86400_000).toISOString();
   const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
   let reminded = 0;
-  for (const kind of ['contract', 'proposal'] as const) {
-    const table = kind === 'contract' ? 'presence_contracts' : 'presence_proposals';
-    const q = await svc(`${table}?status=eq.sent&deleted_at=is.null&sent_at=gte.${encodeURIComponent(from)}&sent_at=lte.${encodeURIComponent(to)}&select=id,site_id,deal_id,title&order=sent_at.asc&limit=${limit}`);
-    for (const doc of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string }>) {
+  for (const kind of ['contract', 'proposal', 'estimate'] as const) {
+    const table = kind === 'contract' ? 'presence_contracts' : kind === 'estimate' ? 'presence_estimates' : 'presence_proposals';
+    // before APPLY-0145 the estimates read fails and that kind simply has nothing to remind
+    const q = await svc(`${table}?status=eq.sent&deleted_at=is.null&sent_at=gte.${encodeURIComponent(from)}&sent_at=lte.${encodeURIComponent(to)}&select=id,site_id,deal_id,title${kind === 'estimate' ? ',expires_at' : ''}&order=sent_at.asc&limit=${limit}`);
+    for (const doc of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string; expires_at?: string | null }>) {
+      if (kind === 'estimate' && doc.expires_at && String(doc.expires_at) < new Date().toISOString()) continue;   // it can't be approved any more
       const siteQ = await svc(`presence_sites?id=eq.${doc.site_id}&select=client_id&limit=1`);
       const clientId = siteQ.json?.[0]?.client_id;
       if (!clientId) continue;
-      const what = kind === 'contract' ? 'agreement' : 'proposal';
+      const what = kind === 'contract' ? 'agreement' : kind === 'estimate' ? 'estimate' : 'proposal';
       // Discover the email FIRST — the notice must tell the truth, and a doc with
       // no reachable client shouldn't burn its once-ever reminder on a no-op.
       let email = '';
@@ -967,11 +970,16 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
       try {
         // The deal's ONE link (a `flow` token, benchmark 2026-10 item 5): the same
         // page the send email pointed at — proposal, agreement and deposit in order.
-        const token = await signSalesToken({ t: 'flow', id: doc.deal_id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
+        // An estimate's link is its own page (an `estimate` token).
+        const token = kind === 'estimate'
+          ? await signSalesToken({ t: 'estimate', id: doc.id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)
+          : await signSalesToken({ t: 'flow', id: doc.deal_id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
         const brand = await loadEmailBrand(doc.site_id);
-        const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : 'Review the proposal'} →</a>`;
-        sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`,
-          `<p>Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.</p><p class="cta">${btn}</p>`, brand, { siteId: doc.site_id }).catch(() => {});
+        const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'contract' ? 'Review & sign' : kind === 'estimate' ? 'See the estimate' : 'Review the proposal'} →</a>`;
+        const line = kind === 'estimate'
+          ? 'Just a gentle reminder: your estimate is ready whenever you are. Here’s a fresh link — approve it, or say not now. Nothing is charged.'
+          : `Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.`;
+        sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { siteId: doc.site_id }).catch(() => {});
         reminded++;
       } catch { /* the owner notice already recorded the attempt */ }
     }

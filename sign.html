@@ -23,8 +23,9 @@
   td{padding:8px 4px;border-bottom:1px solid var(--line)} td:last-child{text-align:right;white-space:nowrap}
   .total td{font-weight:700;border-bottom:none}
   label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
-  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;outline:none}
-  input:focus{border-color:var(--p)}
+  input,textarea{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;outline:none}
+  textarea{min-height:76px;resize:vertical}
+  input:focus,textarea:focus{border-color:var(--p)}
   .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
   button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:var(--btn-ink);padding:11px 22px;cursor:pointer}
   button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
@@ -141,7 +142,7 @@ async function load(after){
     window.__brandName=d.brand.name||'';
   }
   if(d.kind==='flow')renderFlow(d,after||null);
-  else if(d.kind==='proposal')renderProposal(d);else renderContract(d);
+  else if(d.kind==='proposal')renderProposal(d);else if(d.kind==='estimate')renderEstimate(d);else renderContract(d);
 }
 // ── The one-page flow: choose → sign → pay ──────────────────────────────────
 function renderFlow(d,after){
@@ -281,6 +282,37 @@ function renderProposal(p){
     if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';announce('Tap again to confirm declining — this is final');return;}
     dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
     if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else softFail(r.body&&r.body.message);};
+}
+// ── An estimate (item 47): a price before anything is agreed. Approve or Not
+// now, with an optional note — nothing is charged, and approving only tells the
+// studio to prepare the next step (a proposal or an invoice).
+function renderEstimate(e){
+  if(window.__brandName)document.title=`Your estimate — ${window.__brandName}`;
+  const T=proposalTotals(e.line_items);
+  const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  const hasB=T.discount>0||T.tax>0;
+  const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
+  const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
+  const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
+  const until=e.expires_at?new Date(e.expires_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
+  let h=`<h1>${esc(e.title&&e.title!=='Estimate'?e.title:'Your estimate')}</h1>${preparedBy()}<p class="sub">This is an estimate — a price before anything is agreed. Nothing is charged.</p>
+  <div class="card"><table>${items}${bd}<tr class="total"><td>Estimated total</td><td>${money(T.total)}</td></tr></table>${e.terms?`<p class="muted">${esc(e.terms)}</p>`:''}</div>`;
+  if(e.status==='approved')h+=`<div class="ok">✓ You approved this estimate — your studio has been told.</div>`;
+  else if(e.status==='declined')h+=`<p class="muted">You said not now. Changed your mind? Ask your studio to send a fresh one.</p>`;
+  else if(e.expired)h+=`<p class="muted">This estimate has expired — ask your studio for an updated one. Nothing is lost.</p>`;
+  else h+=`<div class="card"><label for="note">Anything you’d like to add? (optional)</label><textarea id="note" maxlength="500" placeholder="A question, or what you’d change"></textarea>
+    <div class="row"><button id="approve">Approve this estimate</button><button class="ghost" id="notnow">Not now</button></div>
+    <p class="muted">${until?`Good until ${esc(until)}. `:''}Approving tells your studio to go ahead with the next step — you’ll get the proposal or the invoice before anything is final.</p></div>`;
+  $('main').innerHTML=h;
+  const note=()=>{const n=$('note');return n?n.value.trim():'';};
+  const a=$('approve');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'approved',note:note()});
+    if(r.ok)thanks('Approved — thank you!','Your studio has been told and will send you the next step.');else softFail(r.body&&r.body.message,a.closest('.row'));};
+  // Not now can't be undone from this link, so it takes two deliberate taps.
+  const nn=$('notnow');if(nn)nn.onclick=async()=>{
+    if(nn.dataset.armed!=='1'){nn.dataset.armed='1';nn.textContent='Tap again to say not now';announce('Tap again to confirm: not now');return;}
+    nn.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'declined',note:note()});
+    if(r.ok)thanks('Thanks for letting us know.','Your studio has been told. If anything changes, they can send an updated estimate any time.');
+    else{nn.dataset.armed='0';nn.textContent='Not now';softFail(r.body&&r.body.message,nn.closest('.row'));}};
 }
 function renderContract(c){
   let h=`<h1>${esc(c.title||'Your agreement')}</h1>${preparedBy()}<p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>

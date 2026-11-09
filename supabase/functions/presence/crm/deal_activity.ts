@@ -16,6 +16,8 @@
 // reverse-chronological timeline, and the "last contacted" derivation. Tested in
 // isolation (tests/presence/deal_activity_test.mjs).
 import { humanWhen } from './contract.ts';
+import { estimateEventLine } from '../lib/estimates.ts';            // item 47
+import { recurringEventLine } from '../lib/recurring_invoices.ts';
 
 export type DealActivityKind = 'call' | 'email' | 'meeting' | 'note';
 export const DEAL_ACTIVITY_KINDS: readonly DealActivityKind[] = ['call', 'email', 'meeting', 'note'];
@@ -67,7 +69,7 @@ const SYS_LABEL: Record<string, string> = {
 };
 // Item 69: the client opened a document's page (routes/sales.ts firstOpen) — "They
 // opened your proposal". pipeline.html mirrors these by hand, like SYS_LABEL.
-const OPENED_WHAT: Record<string, string> = { proposal: 'proposal', agreement: 'agreement', invoice: 'invoice', deposit: 'deposit request' };
+const OPENED_WHAT: Record<string, string> = { proposal: 'proposal', agreement: 'agreement', invoice: 'invoice', deposit: 'deposit request', estimate: 'estimate' };
 /** "They opened your proposal". Pure. */
 export function openedLine(what: unknown): string {
   return 'They opened your ' + (OPENED_WHAT[String(what || '')] || 'document');
@@ -88,9 +90,12 @@ export function describeSystemEvent(row: any): string {
   if (k === 'stage_change' && row?.to_stage) return 'Moved to ' + (STAGE_LABEL[row.to_stage] || row.to_stage);
   if (k === 'proposal_decided' && d.decision) return d.decision === 'accepted' ? 'Proposal accepted' : 'Proposal declined';
   if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer;
+  if (k === 'invoice_sent' && d.amount_cents && d.recurring_id) return 'Recurring invoice sent' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '') + (d.period ? ` (${d.period})` : '');   // item 47
   if (k === 'invoice_sent' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit requested' : 'Invoice sent') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
   if (k === 'invoice_paid' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit paid' : 'Invoice paid') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
   if (k === 'doc_opened') return openedLine(d.what);
+  if (k === 'estimate_sent' || k === 'estimate_decided' || k === 'estimate_deleted') return estimateEventLine(k, d);   // item 47
+  if (k === 'recurring_invoice') return recurringEventLine(d);
   return SYS_LABEL[k] || String(k || '').replace(/_/g, ' ');
 }
 

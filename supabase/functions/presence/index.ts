@@ -59,6 +59,8 @@ import { handleContentLibraryList, handleContentLibrarySave, handleContentLibrar
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 import { handleEmailSending } from './routes/email_sending.ts';
 import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
+import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice } from './routes/estimates.ts';   // sales review item 47
+import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 import { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist } from './routes/broadcasts.ts';
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
@@ -222,6 +224,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalDecide(req, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/sign$/);
     if (m && method === 'POST') return handleSalesContractSign(req, m[1], cors);
+    // item 47: the client's Approve / Not now on an estimate — the estimate's own signed link
+    m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/decide$/);
+    if (m && method === 'POST') return handleEstimateDecide(req, m[1], cors);
   }
   // ── M8: the SIGNED, time-limited preview link — pre-auth, authorized ONLY by
   //    a valid unexpired HMAC signature over {site_id, exp}. Matched before the
@@ -799,8 +804,23 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'DELETE') return handleSalesContractDelete(site, principal, m[1], cors);
     // Mint the printable Document-of-Record URL for the deal drawer (proposal /
     // contract / invoice). Studio-gated & site-scoped like every authed /sales/*.
-    m = route.match(/^\/sales\/(proposals|contracts|invoices)\/([0-9a-f-]{36})\/document$/);
-    if (m && method === 'GET') return handleSalesDocumentLink(site, (m[1] === 'invoices' ? 'invoice' : m[1] === 'contracts' ? 'contract' : 'proposal'), m[2], cors);
+    m = route.match(/^\/sales\/(proposals|contracts|invoices|estimates)\/([0-9a-f-]{36})\/document$/);
+    if (m && method === 'GET') return handleSalesDocumentLink(site, (m[1] === 'invoices' ? 'invoice' : m[1] === 'contracts' ? 'contract' : m[1] === 'estimates' ? 'estimate' : 'proposal'), m[2], cors);
+    // ── item 47: estimates (a price before anything is agreed) and recurring
+    //    invoices (a fresh bill on a schedule). Studio-gated & site-scoped like
+    //    every authed /sales/* route; the client's answer is pre-auth above. ──
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/estimates$/);
+    if (m && method === 'POST') return handleEstimateCreate(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/(send|proposal|invoice)$/);
+    if (m && method === 'POST') return m[2] === 'send' ? handleEstimateSend(req, site, principal, m[1], cors) : m[2] === 'proposal' ? handleEstimateToProposal(req, site, principal, m[1], cors) : handleEstimateToInvoice(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') return handleEstimateDelete(site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/recurring$/);
+    if (m && method === 'POST') return handleRecurringStart(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/recurring\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') return handleRecurringChange(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/recurring\/([0-9a-f-]{36})\/(pause|resume|skip|stop)$/);
+    if (m && method === 'POST') return handleRecurringAction(req, site, principal, m[1], m[2], cors);
   }
   // ── P2-D: Service Delivery (authed, site-scoped). One coherent /projects/*
   //    resource surface — projects · tasks · milestones · activity. Studio side

@@ -23,7 +23,7 @@ import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 export interface DocBrand { name: string; accent: string; accentDark: string }
 const DEFAULT_BRAND: DocBrand = { name: 'Studio OS', accent: '#5b3fa0', accentDark: '#3a2470' };
 
-export type DocKind = 'proposal' | 'contract' | 'invoice';
+export type DocKind = 'proposal' | 'contract' | 'invoice' | 'estimate';   // estimate: item 47
 
 // ── signed document token (own type `doc` so it can NEVER be mistaken for a
 //    sign/accept token — a doc link only ever RENDERS, it never mutates). Mirrors
@@ -33,7 +33,7 @@ export interface DocTokenPayload { t: 'doc'; k: DocKind; id: string; site_id: st
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
-const isKind = (k: unknown): k is DocKind => k === 'proposal' || k === 'contract' || k === 'invoice';
+const isKind = (k: unknown): k is DocKind => k === 'proposal' || k === 'contract' || k === 'invoice' || k === 'estimate';
 
 export async function signDocToken(payload: DocTokenPayload, secret: string): Promise<string> {
   const body = b64url(JSON.stringify(payload));
@@ -141,8 +141,23 @@ function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: s
 </body></html>`;
 }
 
-// ── PROPOSAL ─────────────────────────────────────────────────────────────────
+// ── PROPOSAL (and ESTIMATE, item 47 — the same lines, its own label and note) ──
 export function renderProposalDocument(p: any, brandIn?: Partial<DocBrand> | null): string {
+  const statusNote = p?.status === 'accepted' ? 'Accepted — thank you.'
+    : p?.status === 'declined' ? 'This proposal was declined.'
+    : 'This is a proposal — nothing is final until you accept.';
+  return renderLineItemsDocument(p, brandIn, { docLabel: 'Proposal', heading: String(p?.title || 'Proposal'), note: statusNote });
+}
+/** An estimate prints like a proposal: its lines, discount, tax and total, its
+ *  notes, and a closing line that says what it is (and how long it is good for). */
+export function renderEstimateDocument(e: any, brandIn?: Partial<DocBrand> | null): string {
+  const until = /^\d{4}-\d{2}-\d{2}/.test(String(e?.expires_at || '')) ? String(e.expires_at).slice(0, 10) : '';
+  const note = e?.status === 'approved' ? 'Approved — thank you.'
+    : e?.status === 'declined' ? 'You chose not now on this estimate.'
+    : `This is an estimate, not a final price — nothing is charged until you get an invoice.${until ? ` Good until ${until}.` : ''}`;
+  return renderLineItemsDocument(e, brandIn, { docLabel: 'Estimate', heading: String(e?.title || 'Estimate'), note });
+}
+function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | undefined, o: { docLabel: string; heading: string; note: string }): string {
   const brand = brandOf(brandIn);
   // Unpack the real line items from the reserved discount/tax meta, then recompute
   // the whole breakdown — the document can never disagree with the stored math.
@@ -161,14 +176,11 @@ export function renderProposalDocument(p: any, brandIn?: Partial<DocBrand> | nul
       <tr class="sub"><td style="color:var(--soft)">Subtotal</td><td style="color:var(--soft)">${esc(money(t.subtotal_cents, currency))}</td></tr>
       ${t.discount_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(discLabel)}</td><td style="color:var(--soft)">−${esc(money(t.discount_cents, currency))}</td></tr>` : ''}
       ${t.tax_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(taxLabel)}</td><td style="color:var(--soft)">+${esc(money(t.tax_cents, currency))}</td></tr>` : ''}` : '';
-  const statusNote = p?.status === 'accepted' ? 'Accepted — thank you.'
-    : p?.status === 'declined' ? 'This proposal was declined.'
-    : 'This is a proposal — nothing is final until you accept.';
   const body = `
     <table><tbody>${rows}${breakdown}<tr class="total"><td>Total</td><td>${esc(money(t.total_cents, currency))}</td></tr></tbody></table>
     ${p?.terms ? `<div class="hr"></div><p class="terms">${esc(p.terms)}</p>` : ''}
-    <p class="note">${esc(statusNote)}</p>`;
-  return shell({ title: `${p?.title || 'Proposal'} — ${brand.name}`, brand, docLabel: 'Proposal', heading: String(p?.title || 'Proposal'), sub: undefined, bodyHtml: body });
+    <p class="note">${esc(o.note)}</p>`;
+  return shell({ title: `${o.heading} — ${brand.name}`, brand, docLabel: o.docLabel, heading: o.heading, sub: undefined, bodyHtml: body });
 }
 
 // ── INVOICE / DEPOSIT / RECEIPT ──────────────────────────────────────────────
@@ -230,6 +242,7 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
 /** Dispatch by kind. `data` is an already-loaded, site-scoped row. Pure. */
 export function renderDocument(kind: DocKind, data: any, brand?: Partial<DocBrand> | null): string {
   if (kind === 'proposal') return renderProposalDocument(data, brand);
+  if (kind === 'estimate') return renderEstimateDocument(data, brand);
   if (kind === 'invoice') return renderInvoiceDocument(data, brand);
   return renderContractDocument(data, brand);
 }

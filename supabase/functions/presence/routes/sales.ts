@@ -98,18 +98,19 @@ function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 -
 // Three token kinds share one signature: `proposal` and `contract` name ONE
 // document (the links sent before Oct 2026 — they keep working); `flow` names
 // the DEAL, so one link carries choose → sign → pay and the page reads whatever
-// the deal currently has (benchmark 2026-10, item 5).
-export type SalesTokenKind = 'proposal' | 'contract' | 'flow';
+// the deal currently has (benchmark 2026-10, item 5). `estimate` (item 47) names
+// ONE estimate, whose page is its own (routes/estimates.ts).
+export type SalesTokenKind = 'proposal' | 'contract' | 'flow' | 'estimate';
 export async function signSalesToken(payload: { t: SalesTokenKind; id: string; site_id: string; exp: number }, secret: string): Promise<string> {
   const body = b64url(JSON.stringify(payload));
   return `${body}.${await hmacHex(secret, body)}`;
 }
-async function verifySalesToken(token: string, secret: string, nowSec: number): Promise<{ t: SalesTokenKind; id: string; site_id: string; exp: number } | null> {
+export async function verifySalesToken(token: string, secret: string, nowSec: number): Promise<{ t: SalesTokenKind; id: string; site_id: string; exp: number } | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
   if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
-  if (!p || (p.t !== 'proposal' && p.t !== 'contract' && p.t !== 'flow') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
+  if (!p || (p.t !== 'proposal' && p.t !== 'contract' && p.t !== 'flow' && p.t !== 'estimate') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   if (p.exp < nowSec) return null;
   return p;
 }
@@ -164,7 +165,7 @@ async function docLink(kind: DocKind, id: string, siteId: string): Promise<strin
 }
 
 // ── deal events (sales audit) + provenance mirror ──
-async function dealEvent(siteId: string, dealId: string, kind: string, principal: Principal, extra: Record<string, unknown> = {}) {
+export async function dealEvent(siteId: string, dealId: string, kind: string, principal: Principal, extra: Record<string, unknown> = {}) {
   const { actor, actor_kind } = actorOf(principal);
   await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ deal_id: dealId, site_id: siteId, kind, actor, actor_kind, ...extra }) }).catch(() => {});
@@ -177,7 +178,7 @@ async function dealEvent(siteId: string, dealId: string, kind: string, principal
  *  agreements and invoices get it in 0144 (before that the stamp fails and nothing
  *  is written). Never throws. */
 const OPEN_SYS: Principal = { kind: 'public', userId: 'client-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'doc-open' } as Principal;
-async function firstOpen(table: 'presence_proposals' | 'presence_contracts' | 'presence_invoices', id: string, siteId: string, dealId: unknown, what: 'proposal' | 'agreement' | 'invoice' | 'deposit'): Promise<void> {
+export async function firstOpen(table: 'presence_proposals' | 'presence_contracts' | 'presence_invoices' | 'presence_estimates', id: string, siteId: string, dealId: unknown, what: 'proposal' | 'agreement' | 'invoice' | 'deposit' | 'estimate'): Promise<void> {
   try {
     if (!UUID_RE.test(String(id || ''))) return;
     const r = await svc(`${table}?id=eq.${id}&site_id=eq.${siteId}&first_viewed_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ first_viewed_at: nowIso() }) });
@@ -903,7 +904,7 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
-async function loadDeal(siteId: string, id: string) {
+export async function loadDeal(siteId: string, id: string) {
   const r = await svc(`presence_deals?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=*&limit=1`);
   return rows(r)[0] || null;
 }
@@ -914,7 +915,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
     const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
-    const [contact, proposals, contracts, events, invoices] = await Promise.all([
+    const [contact, proposals, contracts, events, invoices, estimates, recurring] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
       // proposals list never disappears if a deploy is ahead of the migration.
@@ -929,6 +930,9 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
       (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
+      import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
+      import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
     ]);
     const eventRows = rows(events);
     // Oct 2026 benchmark (item 2): every invoice row carries its money state from
@@ -946,7 +950,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // record showed the stored pre-discount subtotal while the deal page added
     // up the lines ($0 after a full discount) for the same draft.
     const proposalRows = rows(proposals).map((p: any) => ({ ...p, total_cents: proposalTotals(p.line_items).total_cents }));
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows } }, 200, cors);
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -1309,8 +1313,10 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
   } catch { return false; }
 }
 
-/** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort. */
-async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number, invoiceId?: string): Promise<boolean> {
+/** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort.
+ *  `note` (item 47) is one plain sentence under the first line — a recurring
+ *  invoice says which one it is and when it's due. */
+export async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number, invoiceId?: string, note?: string): Promise<boolean> {
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
     const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
@@ -1324,7 +1330,8 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
+    const noteLine = note ? `<p>${note.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</p>` : '';
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2210,6 +2217,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   // hiring, not a generic plum. Accent is Brand-Kit contrast-safe already.
   let brand: { name: string; accent: string } | null = null;
   try { const eb = await loadEmailBrand(tok.site_id); brand = { name: eb.name, accent: eb.accent }; } catch { /* neutral fallback */ }
+  // item 47: an estimate's link opens the estimate's own page (Approve · Not now)
+  if (tok.t === 'estimate') return (await import('./estimates.ts')).estimatePublicView(tok, brand, cors);
   if (tok.t === 'flow') {
     // ONE PAGE: the proposal, the agreement and the deposit for this deal, in
     // the order the client walks them. The forced order is enforced HERE as well
@@ -2283,6 +2292,11 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
     if (!p) return htmlResp(errPage('This proposal is no longer available.'), 404);
     return htmlResp(renderDocument('proposal', p, brand));
   }
+  if (tok.k === 'estimate') {   // item 47
+    const e = rows(await svc(`presence_estimates?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`))[0];
+    if (!e) return htmlResp(errPage('This estimate is no longer available.'), 404);
+    return htmlResp(renderDocument('estimate', e, brand));
+  }
   if (tok.k === 'invoice') {
     const { deal_id: invDeal, ...v } = rows(await svc(`presence_invoices?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at&limit=1`))[0] || {} as any;
     if (!v.id) return htmlResp(errPage('This invoice is no longer available.'), 404);
@@ -2301,7 +2315,7 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
 // artifact belongs to THIS site (tenant-safe), then mints a 30-day `doc` token and
 // returns the URL to the server-rendered page above. Studio-gated like every
 // authed /sales/* route.
-const DOC_TABLE: Record<DocKind, string> = { proposal: 'presence_proposals', contract: 'presence_contracts', invoice: 'presence_invoices' };
+const DOC_TABLE: Record<DocKind, string> = { proposal: 'presence_proposals', contract: 'presence_contracts', invoice: 'presence_invoices', estimate: 'presence_estimates' };
 export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const secret = linkSecret();

@@ -303,6 +303,7 @@ const NOTICE_HREF: Record<string, string> = {
   deal_followup: '/pipeline.html', // CRM: a stale deal needs a nudge
   support_aging: '/projects.html', // service edge #3: an aging support request needs a reply (support lives in the project view)
   invoice_paid: '/pipeline.html',  // money landed → the deal it landed on
+  invoice_upcoming: '/pipeline.html',   // item 47: a recurring invoice goes out in three days → that deal's Billing (noticeHrefFor deep-links it)
   invoice_void_paid: '/pipeline.html',   // 0119: money landed on a WITHDRAWN invoice → the deal, where the voided row is
   publish_failed: '/presence.html#publish',
   studio_published: '/presence.html',   // audit change 2: the client's studio published for them → their Website overview
@@ -348,6 +349,12 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   // its Convert step; "Proposal accepted" opens the deal (period signed:/accepted:<deal>)
   const deal = n.kind === 'deal_signed' ? /^(signed|accepted):([0-9a-f-]{36})$/i.exec(String(n.period || '')) : null;
   if (deal) return `/pipeline.html?deal=${deal[2]}${deal[1] === 'signed' ? '#convert' : ''}`;
+  // item 47: an approved or passed-on estimate, a recurring invoice's heads-up or
+  // its pause — each period starts <what>:<deal id>, so it opens that deal's Billing
+  const billing = /^(estimate|estdeclined|recurnext|recurpause):([0-9a-f-]{36}):/i.exec(String(n.period || ''));
+  if (billing && ((n.kind === 'deal_signed' && billing[1] === 'estimate') || (n.kind === 'deal_followup' && (billing[1] === 'estdeclined' || billing[1] === 'recurpause')) || (n.kind === 'invoice_upcoming' && billing[1] === 'recurnext'))) {
+    return `/pipeline.html?deal=${billing[2]}&dtab=billing`;
+  }
   return base;
 };
 

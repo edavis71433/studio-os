@@ -138,6 +138,7 @@ export type FeedTier = 'needs_you' | 'update';
 /** Notice kinds that report rather than ask. Everything else is an ask. */
 export const UPDATE_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder',
+  'invoice_upcoming',   // item 47: "Goes out Dec 1: …" — a recurring invoice sends itself in three days
 ]);
 /** Money kinds — the ones a studio can least afford to scroll past. */
 export const MONEY_NOTICE_KINDS: ReadonlySet<string> = new Set([

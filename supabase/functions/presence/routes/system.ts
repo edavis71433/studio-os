@@ -14,6 +14,7 @@ import { runGa4Sync } from '../ops/ga4_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
+import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
@@ -344,6 +345,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['agreement_renewals', () => runAgreementRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
             ['doc_reminders', () => runSalesDocReminders(20)],
+            ['recurring_invoices', () => runRecurringInvoices(20)],   // item 47: send the recurring invoices that are due (and the heads-up three days before)
             ['approval_reminders', () => runApprovalReminders(50)],   // audit change 8: chase a dated client approval (day before + daily overdue), once a day
             ['review_requests', () => runReviewRequests(20)],   // list item 29: ask a finished project's client for a review, once, behind the switch
             ['booking_reminders', () => runBookingReminders(50)],   // #164: calm customer reminders (transactional, send-once)
@@ -421,6 +423,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const agreementRenewals = await step('agreement_renewals', () => runAgreementRenewalReminders(50)); // signed-agreement term-end heads-up (owner-only)
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
+      const recurringInvoices = await step('recurring_invoices', () => runRecurringInvoices(20));  // item 47: recurring invoices due today (and the heads-up three days before)
       const approvalReminders = await step('approval_reminders', () => runApprovalReminders(50)); // audit change 8: chase a dated client approval (day before + daily overdue), once a day
       const reviewRequests = await step('review_requests', () => runReviewRequests(20)); // list item 29: ask a finished project's client for a review, once, behind the switch
       const bookingReminders = await step('booking_reminders', () => runBookingReminders(50)); // #164: customer appointment reminders (transactional, send-once)
@@ -437,7 +440,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // result.progress, which nobody reads until something else breaks.
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-      return json({ data: { ...cycle, window_expiry: { enqueued: windowExpiry.enqueued, scanned: windowExpiry.scanned }, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, emailAuth, apexDrift, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, approvalReminders, reviewRequests, bookingReminders, bookingFollowups, retention } }, 200, cors);
+      return json({ data: { ...cycle, window_expiry: { enqueued: windowExpiry.enqueued, scanned: windowExpiry.scanned }, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, emailAuth, apexDrift, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, recurringInvoices, approvalReminders, reviewRequests, bookingReminders, bookingFollowups, retention } }, 200, cors);
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }

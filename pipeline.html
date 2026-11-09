@@ -598,7 +598,7 @@ const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed'};
 // item 69: the client opened a document's page (mirrors crm/deal_activity.ts openedLine by hand)
-const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request'};
+const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request',estimate:'estimate'};
 function evtLabel(e){
   const d=(e&&e.detail)||{};
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
@@ -606,9 +606,16 @@ function evtLabel(e){
   // of the record (value_backfilled_cents rides the proposal_decided detail).
   if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined';
   if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
+  if(e.kind==='invoice_sent'&&d.amount_cents&&d.recurring_id)return 'Recurring invoice sent — '+money(d.amount_cents)+(d.period?' ('+d.period+')':'');   // item 47
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
   if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer charge paid':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
   if(e.kind==='doc_opened')return 'They opened your '+(OPENED_WHAT[d.what]||'document');
+  // item 47 (mirrors lib/estimates.ts estimateEventLine and lib/recurring_invoices.ts recurringEventLine)
+  if(e.kind==='estimate_sent')return 'Estimate sent'+(d.total_cents?' — '+money(d.total_cents):'');
+  if(e.kind==='estimate_decided')return d.decision==='approved'?'Estimate approved'+(d.total_cents?' — '+money(d.total_cents):''):'They passed on the estimate (Not now)';
+  if(e.kind==='estimate_deleted')return 'Draft estimate removed';
+  if(e.kind==='recurring_invoice'){const w=d.every==='quarter'?'every 3 months':d.every==='year'?'every year':'every month';const on=d.on?niceDay(d.on):'';const why={unpaid:'the last two invoices are still unpaid',no_email:'there’s no client email on this deal',no_stripe:'Stripe isn’t connected'}[d.reason];
+    return d.action==='started'?'Recurring invoice started'+(d.title?' — '+d.title:'')+(d.amount_cents?', '+money(d.amount_cents)+' '+w:'')+(on?' from '+on:''):d.action==='changed'?'Recurring invoice changed'+(d.amount_cents?' — '+money(d.amount_cents):'')+(on?(d.amount_cents?',':' —')+' next on '+on:''):d.action==='skipped'?'Recurring invoice: skipped '+(on||'one'):d.action==='paused'?'Recurring invoice paused'+(why?' — '+why:''):d.action==='resumed'?'Recurring invoice resumed'+(on?' — next on '+on:''):d.action==='stopped'?'Recurring invoice stopped':d.action==='finished'?'Recurring invoice finished — the last one went out':'Recurring invoice';}
   return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
 }
 const evtDateTime=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';return evtDate(iso)+', '+t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});};
@@ -2383,7 +2390,8 @@ async function openDeal(id){
     // rule for the convert route) or the deal is Won — an unsigned deal at
     // Agreement out keeps "Sign the agreement first" / "Send it for signature".
     const canConvert=((d.stage==='contract'&&signedNow)||d.stage==='won')&&!d.converted_client_id;
-    const BILL_PRIMARY=!dealOpen&&!canConvert?'':canConvert?'convert':SEND_BOTH?'both':draftCon?('con:'+draftCon.id):draftProp?('prop:'+draftProp.id):!(data.proposals||[]).length?'addProp':(!(data.contracts||[]).length&&(data.proposals||[]).some(p=>p.status==='accepted'||p.status==='sent'))?'addCon':'';
+    const apprEst=(data.estimates||[]).find(e=>e.status==='approved'&&!e.proposal_id&&!e.invoice_id);   // item 47
+    const BILL_PRIMARY=!dealOpen&&!canConvert?'':canConvert?'convert':SEND_BOTH?'both':draftCon?('con:'+draftCon.id):draftProp?('prop:'+draftProp.id):(apprEst&&!(data.proposals||[]).length)?('est:'+apprEst.id):!(data.proposals||[]).length?'addProp':(!(data.contracts||[]).length&&(data.proposals||[]).some(p=>p.status==='accepted'||p.status==='sent'))?'addCon':'';
     const fillIf=(on)=>on?'btn':'btn ghost';
     const props=(data.proposals||[]).map(p=>{
       const T=propTotals(p.line_items);
@@ -2411,6 +2419,38 @@ async function openDeal(id){
       const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
+    // item 47: estimates — a price before anything is agreed. Approve or Not now on
+    // the client's own page; Turn into a proposal / Bill it as an invoice make
+    // DRAFTS here (nothing reaches the client until Send). This page goes live on
+    // merge, the server on its own deploy: until the server sends `estimates` and
+    // `recurring`, neither section is drawn (so neither can offer a dead button).
+    const ests=(data.estimates||[]).map(e=>{
+      const T=propTotals(e.line_items);
+      const expired=e.status==='sent'&&e.expires_at&&new Date(e.expires_at).getTime()<Date.now();
+      const chip=e.status==='approved'?`<span class="stage won">Approved ✓</span>`:e.status==='declined'?`<span class="stage lost">Not now</span>`:expired?`<span class="stage lost">Expired</span>`:e.status==='sent'?`<span class="stage">Sent — waiting for their answer</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const send=e.status==='draft'?`<button class="btn ghost" data-send-est="${e.id}">Send${forWhom} →</button> `:(e.status==='sent'&&!expired)?`<button class="btn ghost" data-link-est="${e.id}">Copy link</button> `:'';
+      const turn=(e.status==='draft'||e.proposal_id||e.invoice_id)?'':`<button class="${fillIf(BILL_PRIMARY==='est:'+e.id)}" data-est-prop="${e.id}">Turn into a proposal</button> <button class="btn ghost" data-est-inv="${e.id}">Bill it as an invoice</button> `;
+      const del=e.status==='draft'?`<button class="btn ghost" data-needs="delete" data-del-est="${e.id}" title="Remove this draft — it was never sent" aria-label="Delete draft estimate ${esc(e.title||'Estimate')}">Delete</button>`:'';
+      const bits=[];
+      if(e.first_viewed_at)bits.push(svgi('eye')+' Opened '+ago(e.first_viewed_at));else if(e.status==='sent')bits.push('Not opened yet');
+      if(e.status==='sent'&&e.expires_at&&!expired)bits.push('Good until '+esc(niceDay(e.expires_at)));
+      if(e.decided_note)bits.push('Their note: “'+esc(e.decided_note)+'”');
+      if(e.proposal_id)bits.push('Turned into a proposal');else if(e.invoice_id)bits.push('Billed as an invoice');
+      const sub=bits.length?`<div class="mut" style="font-size:12px;margin-top:2px;flex-basis:100%">${bits.join(' · ')}</div>`:'';
+      return `<div class="row2 lr" data-est="${e.id}"><span class="mut">${esc(e.title||'Estimate')} — ${money0(T.total)} ${chip}</span><span>${send}${turn}<button class="btn ghost" data-doc-est="${e.id}" title="Open a branded, printable copy (save as PDF)">View / print</button>${del}</span>${sub}${(e.status==='sent'&&!expired)?linkNote('estimate',e.id,'link'):''}</div>`;
+    }).join('')||'<div class="mut">A price before anything is agreed. They can approve it or say not now — nothing is charged.</div>';
+    // item 47: recurring invoices — a fresh bill on a schedule that the client
+    // pays themselves (the retainer above charges their card for them)
+    const everyWord=(e)=>e==='quarter'?'every 3 months':e==='year'?'every year':'every month';
+    const pauseWhy=(r)=>r==='unpaid'?'the last two invoices are still unpaid':r==='no_email'?'there’s no client email on this deal':r==='no_stripe'?'Stripe isn’t connected':'you paused it';
+    const RECS=(data.recurring||[]);
+    const recRows=RECS.map(s=>{
+      const live=s.status==='active'||s.status==='paused';
+      const count=s.times?` · ${s.sent_count||0} of ${s.times} sent`:(s.sent_count?` · ${s.sent_count} sent`:'');
+      const state=s.status==='active'?(s.next_on?`Next invoice: ${esc(niceDay(s.next_on))}`:''):s.status==='paused'?`<span style="color:var(--warn,#775d31);font-weight:600">Paused — ${esc(pauseWhy(s.paused_reason))}</span>`:s.status==='finished'?'Finished — the last one went out':'Stopped';
+      const acts=!live?'':(s.status==='active'?`<button class="btn ghost" data-rec-skip="${s.id}">Skip this one</button><button class="btn ghost" data-rec-change="${s.id}">Change</button><button class="btn ghost" data-rec-pause="${s.id}">Pause</button>`:`<button class="btn ghost" data-rec-resume="${s.id}">Resume</button><button class="btn ghost" data-rec-change="${s.id}">Change</button>`)+`<button class="btn ghost" data-needs="delete" data-rec-stop="${s.id}" aria-label="Stop the recurring invoice ${esc(s.title||'')}">Stop</button>`;
+      return `<div class="row2 lr" data-rec="${s.id}"><span class="mut"><strong>${esc(s.title||'Invoice')}</strong> — ${money0(s.amount_cents)} ${everyWord(s.every)} · ${state}${count}</span><span>${acts}</span></div><div id="recForm-${s.id}"></div>`;
+    }).join('');
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-needs="delete" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{
       const signed=k.status==='signed';
@@ -2488,6 +2528,7 @@ async function openDeal(id){
       signedK?kv(IK.check,`Agreement signed${signedK.signed_at?' '+esc(evtDate(signedK.signed_at)):''}`):sentK?kv(IK.check,'Agreement out — awaiting signature'):draftContract?kv(IK.check,'Agreement drafted, not sent',true):kv(IK.check,'No agreement yet',true),
       accP?kv(IK.doc,'Proposal accepted'):sentP?kv(IK.doc,'Proposal sent — awaiting their answer'):(data.proposals||[]).length?kv(IK.doc,'Proposal drafted, not sent',true):kv(IK.doc,'No proposal yet',true),
     ];
+    for(const s of (data.recurring||[]))if(s.status==='active'||s.status==='paused')moneyKv.push(kv(IK.repeat,`Recurring invoice ${money0(s.amount_cents)} ${s.every==='quarter'?'every 3 months':s.every==='year'?'every year':'every month'} · ${s.status==='paused'?'paused':s.next_on?'next '+esc(niceDay(s.next_on)):'active'}`));   // item 47
     if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
     const billN=(openInv.length+procInv.length)?`${openInv.length+procInv.length} open`:'';
     const tlN=tlItems.length?String(tlItems.length):'';
@@ -2558,6 +2599,7 @@ async function openDeal(id){
         ${dpanel('billing')}
         ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
           <div class="row2" style="margin-top:8px"><button class="${fillIf(BILL_PRIMARY==='both')}" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
+        ${Array.isArray(data.estimates)?`<div class="sec" id="estSec"><h3>Estimates</h3><div class="lrows">${ests}</div><div class="row2"><button class="btn ghost" id="addEst">+ Estimate</button></div><div id="estForm"></div></div>`:''}
         <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addProp')}" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
         <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addCon')}" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
@@ -2577,6 +2619,11 @@ async function openDeal(id){
         <div class="sec"><h3>Retainer</h3>
           ${(()=>{const r=d.retainer;if(r&&r.status&&r.status!=='canceled'){const per=r.interval==='year'?'year':'month';const st=r.status==='active'?'<span style="color:var(--good,#33664b);font-weight:700">Active</span>':r.status==='past_due'?'<span style="color:var(--bad,#a3423a);font-weight:700">Payment overdue</span>':'<span style="color:var(--warn,#775d31);font-weight:600">Awaiting the client’s authorization</span>';const copyLink=(r.status==='pending'&&r.checkout_url)?` <button class="btn ghost" data-copy-pay="${esc(r.checkout_url)}">Copy authorization link</button>`:'';return `<div class="row2"><span class="mut"><strong>${money(r.amount_cents)}</strong> every ${per} · ${st}</span><span>${copyLink}<button class="btn ghost" id="cancelRetainer" data-needs="delete">Cancel retainer</button></span></div>`;}return `<div class="mut" style="margin-top:2px">Bill this client automatically for ongoing work — the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do, and either of you can stop it any time.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRetainer">Set up a retainer</button></div><div id="retForm"></div>`;})()}
         </div>
+        ${Array.isArray(data.recurring)?`<div class="sec" id="recSec"><h3>Recurring invoice</h3>
+          <div class="mut" style="margin-top:2px">Send them a fresh invoice on a schedule — they pay each one themselves, and nothing is charged automatically. Each goes out around 9 am your time and is due 14 days later.</div>
+          ${recRows?`<div class="lrows" style="margin-top:6px">${recRows}</div>`:''}
+          <div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRecurring">Set up a recurring invoice</button></div><div id="recForm"></div>
+        </div>`:''}
         <div class="sec"><h3>Convert to customer</h3>
           ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html${customerSite(d)?'?client='+esc(encodeURIComponent(customerSite(d))):''}">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
             canConvert?`<div id="convWrap"><button class="btn" id="convert">Convert — set up their workspace</button><div class="mut" style="margin-top:8px">${convExplain}</div></div>`:
@@ -2748,6 +2795,7 @@ async function openDeal(id){
     // fix is — never a vague "it wasn't emailed".
     const NO_EMAIL=!(c&&c.email);
     const noEmailWhy=(what,linkName)=>what+' prepared — there’s no client email on this deal, so nothing was sent. The '+linkName+' is copied to your clipboard. Add their email in Details to send it automatically.';
+    const sendEstimateById=async(eid)=>{const r=await api('/sales/estimates/'+eid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[eid]=r.url;toast(r.emailed?('Estimate sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):(NO_EMAIL?noEmailWhy('Estimate','link'):'Estimate prepared — it wasn’t emailed, so copy the link and send it yourself.'));copyToClip(r.url);openDeal(id);};   // item 47
     const sendProposalById=async(pid)=>{const r=await api('/sales/proposals/'+pid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[pid]=r.url;toast(r.emailed?('Proposal sent'+(c&&c.name?' — emailed to '+c.name:' — emailed to the client')):(NO_EMAIL?noEmailWhy('Proposal','link'):'Proposal prepared — it wasn’t emailed, so copy the link and send it yourself.'));copyToClip(r.url);openDeal(id);};
     const sendContractById=async(cid)=>{const r=await api('/sales/contracts/'+cid+'/send','POST',{});if(r.url&&!r.emailed)LINKS[cid]=r.url;
       // The sign→pay moment only works if a deposit is WAITING when they sign.
@@ -2828,13 +2876,18 @@ async function openDeal(id){
     const openPropEditor=(opts)=>{
       opts=opts||{};
       const rev=opts.reviseOf||null, pf=opts.prefill||null;
-      const host=$('propForm');
+      // item 47: an estimate is drafted in this same editor (same lines, discount,
+      // tax and totals); only where it saves and what Send does differ. One editor
+      // open at a time — they share their control ids.
+      const est=!!opts.estimate;
+      const host=$(est?'estForm':'propForm');
+      const other=$(est?'propForm':'estForm'); if(other)other.innerHTML='';
       // Each line starts as a DROPDOWN of the studio's services (auto-fills the
       // price) plus a "Custom…" option that reveals the free name+price fields.
       const hasCat=SERVICES.length>0;
       const optsHtml=SERVICES.map((s,i)=>`<option value="${i}">${esc(s.name)} — ${esc(money(s.price_cents)||'$0')}</option>`).join('');
       let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
-      const draftAttr=(kind,n)=>rev?'':` data-dds-draft="prop-${id}-${kind}-${n}"`;   // no drafts while revising
+      const draftAttr=(kind,n)=>rev?'':` data-dds-draft="${est?'est':'prop'}-${id}-${kind}-${n}"`;   // no drafts while revising
       const rowHtml=()=>{ln++;
         const pick=hasCat?`<select class="pl-pick" aria-label="Choose a service"><option value="">Pick a service…</option>${optsHtml}<option value="__custom__">Custom…</option></select>`:'';
         const hide=hasCat?' style="display:none"':'';
@@ -2842,7 +2895,7 @@ async function openDeal(id){
       const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
       // Seed one row per prefilled item (revise/clone), else a single blank row.
       const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
-      const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:'';
+      const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:est?`<div class="mut" style="margin-top:8px">They’ll see each line and the total, with Approve or Not now. Nothing is charged.</div>`:'';
       // Discount + tax: optional, plainly labelled, with a live breakdown so the
       // owner always sees subtotal → discount → tax → total before sending.
       const pricingHtml=`<div style="margin-top:12px;border-top:1px solid var(--line,#e9e4dc);padding-top:10px">
@@ -2884,14 +2937,22 @@ async function openDeal(id){
       const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:Math.max(1,Math.trunc(parseFloat((r.querySelector('.pl-qty')||{}).value||'1'))||1),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save writes the record (revise → vN+1 that supersedes the prior); Save &
       // send then immediately emails the review link.
-      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
+      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=est?('/sales/deals/'+id+'/estimates'):rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
       const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
-      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
-      $('plSaveSend').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}await sendProposalById(pid);}catch(e){toast(nice(e),true);busyProp(false);}};
+      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(est?'Estimate saved as a draft — send it when you’re ready.':rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
+      $('plSaveSend').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}await (est?sendEstimateById(pid):sendProposalById(pid));}catch(e){toast(nice(e),true);busyProp(false);}};
       recalc();
       const f=host.querySelector('.pl-label'); if(f) f.focus();
     };
     const addProp=$('addProp'); if(addProp) addProp.onclick=()=>openPropEditor({});
+    // item 47: estimates — drafted in the proposal editor, sent to their own page
+    const addEst=$('addEst'); if(addEst) addEst.onclick=()=>openPropEditor({estimate:true});
+    $('detailInner').querySelectorAll('[data-send-est]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await sendEstimateById(b.dataset.sendEst);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-link-est]').forEach(b=>b.onclick=async()=>{try{let url=LINKS[b.dataset.linkEst];if(!url){const r=await api('/sales/estimates/'+b.dataset.linkEst+'/send','POST',{});url=r.url;if(url)LINKS[b.dataset.linkEst]=url;}if(!url){toast('No link is available — check your email settings.',true);return;}copyToClip(url);toast('Link copied');}catch(e){toast(nice(e),true);}});
+    $('detailInner').querySelectorAll('[data-doc-est]').forEach(b=>b.onclick=()=>openDoc('estimates',b.dataset.docEst,b));
+    $('detailInner').querySelectorAll('[data-est-prop]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/estimates/'+b.dataset.estProp+'/proposal','POST',{});toast('Proposal drafted from the estimate — check it, then send it the usual way.');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-est-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/estimates/'+b.dataset.estInv+'/invoice','POST',{});toast('Invoice ready under Invoice & deposit — press Send on it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-del-est]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this draft estimate? It was never sent, so nothing the client saw changes.'))return;b.disabled=true;try{await api('/sales/estimates/'+b.dataset.delEst,'DELETE');toast('Draft removed');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     // Revise → pre-fill the editor from the prior proposal (items + discount/tax),
     // submit to /revise as vN+1. The prior is superseded server-side.
     $('detailInner').querySelectorAll('[data-revise-prop]').forEach(b=>b.onclick=()=>{
@@ -3013,6 +3074,33 @@ async function openDeal(id){
     // Retainer: ONE calm toggle — amount + monthly/annual, then the client
     // authorizes via Stripe (nothing charges until they do). NOT a plan-builder.
     const setupRet=$('setupRetainer'); if(setupRet) setupRet.onclick=()=>{const host=$('retForm');host.innerHTML='<div class="mini" style="margin-top:8px"><label class="mut" for="ret-amt">Amount (USD)</label><div class="row2" style="margin-top:2px"><input id="ret-amt" type="number" step="0.01" min="1" placeholder="500" style="max-width:140px"><select id="ret-int" aria-label="Billing frequency"><option value="month">Every month</option><option value="year">Every year</option></select></div><div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ret-cancel" type="button">Cancel</button><button class="btn" id="ret-go" type="button">Start retainer</button></div></div>';$('ret-cancel').onclick=()=>host.innerHTML='';setTimeout(()=>{const a=$('ret-amt');if(a)a.focus();},20);$('ret-go').onclick=async()=>{const a=parseFloat($('ret-amt').value||'0');if(!a||a<1){toast('Enter a retainer amount of at least $1.',true);return;}$('ret-go').disabled=true;try{const r=await api('/sales/deals/'+id+'/retainer','POST',{amount_cents:Math.round(a*100),interval:$('ret-int').value||'month'});const x=r.data||{};toast(x.emailed?'Retainer set up — the authorization link was emailed to the client':'Retainer set up — copy the authorization link to send it');if(x.url&&!x.emailed&&navigator.clipboard)navigator.clipboard.writeText(x.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);$('ret-go').disabled=false;}};};
+    // item 47: recurring invoices — Start, then Skip this one · Change · Pause ·
+    // Resume · Stop. Every action re-reads the deal so the rows say the server's truth.
+    const recToday=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');};
+    const firstOfNext=()=>{const t=new Date();const n=new Date(t.getFullYear(),t.getMonth()+1,1);return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-01';};
+    const recFields=(s)=>`<div class="mini" style="margin-top:8px">
+        <label class="mut" for="rec-title">What it’s for</label><input id="rec-title" type="text" maxlength="120" placeholder="Website care" value="${esc(s?s.title:'')}">
+        <div class="row2" style="margin-top:6px;align-items:flex-end;flex-wrap:wrap">
+          <div><label class="mut" for="rec-amt">Amount (USD)</label><input id="rec-amt" type="number" step="0.01" min="0.5" placeholder="500" style="max-width:140px" value="${s?esc(String((s.amount_cents||0)/100)):''}"></div>
+          ${s?'':`<div><label class="mut" for="rec-every">How often</label><select id="rec-every"><option value="month">Every month</option><option value="quarter">Every 3 months</option><option value="year">Every year</option></select></div>`}
+          <div><label class="mut" for="rec-on">${s?'Next invoice goes out on':'First invoice goes out on'}</label><input id="rec-on" type="date" min="${recToday()}" value="${esc(s?(s.next_on||''):firstOfNext())}"></div>
+          <div><label class="mut" for="rec-times">How many times</label><input id="rec-times" type="number" min="1" max="120" step="1" placeholder="Until you stop it" style="max-width:150px" value="${s&&s.times?esc(String(s.times)):''}"></div>
+        </div>
+        <div class="mut" style="font-size:12px;margin-top:6px">${s?'Changes apply from the next invoice on.':'If the first date is today, it goes out right away. You’ll see a note under Updates three days before each one.'}</div>
+        <div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" type="button" data-rec-cancel>Cancel</button><button class="btn" type="button" data-rec-go>${s?'Save changes':'Start'}</button></div></div>`;
+    const recValues=(host)=>({title:(host.querySelector('#rec-title').value||'').trim(),amount:parseFloat(host.querySelector('#rec-amt').value||'0'),every:(host.querySelector('#rec-every')||{}).value,on:host.querySelector('#rec-on').value||'',times:(host.querySelector('#rec-times').value||'').trim()});
+    const setupRec=$('setupRecurring'); if(setupRec) setupRec.onclick=()=>{const host=$('recForm');host.innerHTML=recFields(null);host.querySelector('[data-rec-cancel]').onclick=()=>host.innerHTML='';setTimeout(()=>{const t=$('rec-title');if(t)t.focus();},20);
+      const go=host.querySelector('[data-rec-go]');go.onclick=async()=>{const v=recValues(host);if(!v.title){toast('Say what it’s for — for example, Website care.',true);return;}if(!v.amount||v.amount<0.5){toast('Enter an amount of at least $0.50.',true);return;}if(!v.on){toast('Pick the date the first one goes out.',true);return;}
+        go.disabled=true;try{const r=await api('/sales/deals/'+id+'/recurring','POST',{title:v.title,amount_cents:Math.round(v.amount*100),every:v.every||'month',first_on:v.on,times:v.times?Number(v.times):null});const x=r.data||{};const out=x.sent&&x.sent.result;
+          toast(out==='sent'?('Recurring invoice started — the first one just went out'+(x.sent.emailed&&c&&c.name?' to '+c.name:'')):out==='paused'?'Recurring invoice started, but it paused itself — the deal says why.':out?'Recurring invoice started — the first one goes out in a few minutes.':('Recurring invoice started — the first one goes out '+niceDay(v.on)+'.'));openDeal(id);}catch(e){toast(nice(e),true);go.disabled=false;}};};
+    $('detailInner').querySelectorAll('[data-rec-change]').forEach(b=>b.onclick=()=>{const s=RECS.find(x=>x.id===b.dataset.recChange);const host=$('recForm-'+b.dataset.recChange);if(!s||!host)return;host.innerHTML=recFields(s);host.querySelector('[data-rec-cancel]').onclick=()=>host.innerHTML='';
+      const go=host.querySelector('[data-rec-go]');go.onclick=async()=>{const v=recValues(host);const body={};if(v.title&&v.title!==s.title)body.title=v.title;if(v.amount&&Math.round(v.amount*100)!==s.amount_cents)body.amount_cents=Math.round(v.amount*100);if(v.on&&v.on!==s.next_on)body.next_on=v.on;const t=v.times?Number(v.times):null;if(t!==(s.times||null))body.times=t;
+        if(!Object.keys(body).length){toast('Nothing changed.');host.innerHTML='';return;}go.disabled=true;try{await api('/sales/recurring/'+s.id,'PATCH',body);toast('Recurring invoice changed — it applies from the next one.');openDeal(id);}catch(e){toast(nice(e),true);go.disabled=false;}};});
+    const recAct=(attr,act,ask,done)=>$('detailInner').querySelectorAll('['+attr+']').forEach(b=>b.onclick=async()=>{const sid=b.getAttribute(attr);const s=RECS.find(x=>x.id===sid)||{};const q=ask&&ask(s);if(q&&!confirm(q))return;b.disabled=true;try{const r=await api('/sales/recurring/'+sid+'/'+act,'POST',{});toast(done(s,r.data||{}));openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    recAct('data-rec-skip','skip',(s)=>s.next_on?`Skip the ${niceDay(s.next_on)} invoice? Nothing goes out that day — the one after goes out as usual.`:'',(s,x)=>x.next_on?'Skipped — the next one goes out '+niceDay(x.next_on):'Skipped');
+    recAct('data-rec-pause','pause',null,()=>'Paused — nothing goes out until you resume it.');
+    recAct('data-rec-resume','resume',(s)=>'Resume this recurring invoice? The next one goes out '+(s.next_on&&s.next_on>=recToday()?niceDay(s.next_on):'today')+'.',(s,x)=>'Resumed — the next one goes out '+(x.next_on?niceDay(x.next_on):'on its usual day'));
+    recAct('data-rec-stop','stop',()=>'Stop this recurring invoice? No more invoices go out. The ones already sent stay as they are.',()=>'Stopped — no more invoices will go out.');
     const cancelRet=$('cancelRetainer'); if(cancelRet) cancelRet.onclick=async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;cancelRet.disabled=true;try{await api('/sales/deals/'+id+'/retainer/cancel','POST',{});toast('Retainer canceled — future billing stopped');openDeal(id);}catch(e){toast(nice(e),true);cancelRet.disabled=false;}};
     // Renewal/expiry date on a SIGNED agreement → the owner gets one calm reminder
     // ~30 and ~7 days before it ends (never an auto-renew).

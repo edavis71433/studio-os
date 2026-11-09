@@ -1,14 +1,16 @@
 // ── "Download my data" (sales review item 69, Nov 2026) ──────────────────────
 // Salesforce's Data Export: one zip of CSVs, so a studio can walk out with what
 // it keeps here (Studio OS imports CSVs on three lists; this is the way back
-// out). Customers, contacts, deals, proposals, agreements, invoices and
-// payments, enquiries, support requests and tasks. Every read is this studio's
+// out). Customers, contacts, deals, proposals, agreements, estimates, invoices
+// and payments, recurring invoices, enquiries, support requests and tasks. Every read is this studio's
 // own (site_id pinned); a table that can't be read is listed in READ-ME.txt
 // rather than shipped as an empty file that looks like "none".
 import { svc } from '../lib/db.ts';
 import { siteCan, isSiteRole } from '../lib/site_roles.ts';
 import { loadStageLabels } from '../lib/stage_names.ts';
 import { toCsv, zipStore } from '../lib/zip_csv.ts';
+import { proposalTotals } from '../lib/sales_lifecycle.ts';
+import { tableMissing } from './estimates.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -27,6 +29,14 @@ async function readAll(path: string): Promise<any[] | null> {
   return any && any.ok ? rows(any) : null;
 }
 
+// item 47: before APPLY-0145 the estimates and recurring tables don't exist yet,
+// which means "none yet" — not "couldn't be read just now"
+async function readNew(path: string): Promise<any[] | null> {
+  const r = await svc(`${path}&deleted_at=is.null&limit=${CAP}`).catch(() => null);
+  if (r && r.ok) return rows(r);
+  return r && tableMissing(r) ? [] : null;
+}
+
 export async function handleSalesExport(site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   // owners always; a team seat only when its role may export (site_roles.ts)
   const role = String((principal as any)?.member?.role || '');
@@ -34,7 +44,7 @@ export async function handleSalesExport(site: SiteRow, principal: Principal, cor
     return new Response(JSON.stringify({ error: 'forbidden', message: 'Downloading everything is for the studio’s owner.' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
   const id = site.id;
-  const [contacts, deals, proposals, contracts, invoices, enquiries, support, dealTasks, tasks, projects, links, labels] = await Promise.all([
+  const [contacts, deals, proposals, contracts, invoices, enquiries, support, dealTasks, tasks, projects, links, labels, estimates, recurring] = await Promise.all([
     readAll(`presence_contacts?site_id=eq.${id}&select=*&order=created_at.asc`),
     readAll(`presence_deals?site_id=eq.${id}&select=*&order=created_at.asc`),
     readAll(`presence_proposals?site_id=eq.${id}&select=*&order=created_at.asc`),
@@ -47,6 +57,8 @@ export async function handleSalesExport(site: SiteRow, principal: Principal, cor
     readAll(`presence_projects?site_id=eq.${id}&select=id,name`),
     svc(`presence_service_links?agency_site_id=eq.${id}&select=customer_client_id,status,created_at&limit=${CAP}`).then((r) => r.ok ? rows(r) : null).catch(() => null),
     loadStageLabels(id).catch(() => null),
+    readNew(`presence_estimates?site_id=eq.${id}&select=*&order=created_at.asc`),
+    readNew(`presence_recurring_invoices?site_id=eq.${id}&select=*&order=created_at.asc`),
   ]);
   // the customers behind this studio's service links (one batched read)
   const clientIds = [...new Set((links || []).map((l: any) => s(l.customer_client_id)).filter((x: string) => UUID_RE.test(x)))];
@@ -74,6 +86,10 @@ export async function handleSalesExport(site: SiteRow, principal: Principal, cor
       rows: proposals && proposals.map((p) => [dealTitle(p.deal_id), p.title, p.version, p.status, dollars(p.subtotal_cents), s(p.sent_at).slice(0, 10), s(p.decided_at).slice(0, 10)]) },
     { name: 'agreements.csv', header: ['Deal', 'Agreement', 'Status', 'Sent', 'Signed', 'Signed by'],
       rows: contracts && contracts.map((c) => [dealTitle(c.deal_id), c.title, c.status, s(c.sent_at).slice(0, 10), s(c.signed_at).slice(0, 10), c.signer_name || c.signed_name]) },
+    { name: 'estimates.csv', header: ['Deal', 'Estimate', 'Status', 'Total', 'Sent', 'Answered', 'Their note'],
+      rows: estimates && estimates.map((e) => [dealTitle(e.deal_id), e.title, e.status === 'declined' ? 'not now' : e.status, dollars(proposalTotals(e.line_items).total_cents), s(e.sent_at).slice(0, 10), s(e.decided_at).slice(0, 10), e.decided_note]) },
+    { name: 'recurring-invoices.csv', header: ['Deal', 'What it’s for', 'Amount', 'How often', 'Next invoice', 'Sent so far', 'How many in all', 'Status', 'Started'],
+      rows: recurring && recurring.map((r) => [dealTitle(r.deal_id), r.title, dollars(r.amount_cents), r.every === 'quarter' ? 'every 3 months' : r.every === 'year' ? 'every year' : 'every month', s(r.next_on).slice(0, 10), r.sent_count, r.times ?? 'until stopped', r.status, s(r.created_at).slice(0, 10)]) },
     { name: 'invoices-and-payments.csv', header: ['Deal', 'Invoice', 'Amount', 'Status', 'Due', 'Paid on', 'Created'],
       rows: invoices && invoices.map((v) => [dealTitle(v.deal_id), v.title, dollars(v.amount_cents), v.status, s(v.due_date).slice(0, 10), s(v.paid_at).slice(0, 10), s(v.created_at).slice(0, 10)]) },
     { name: 'enquiries.csv', header: ['Name', 'Email', 'Phone', 'Message', 'Page', 'Status', 'Spam', 'Received'],

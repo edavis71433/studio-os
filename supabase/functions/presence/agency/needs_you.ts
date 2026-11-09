@@ -278,6 +278,11 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         what: signed ? 'signed the agreement — make them a customer' : 'accepted your proposal — send the agreement',
         when: signed ? 'Agreement signed' : 'Proposal accepted', verb: signed ? 'Convert' : 'Open deal',
         href: `/pipeline.html?deal=${encodeURIComponent(dealId)}${signed ? '#convert' : ''}` });   // item 22: Convert lands on the Convert step
+    } else if (kind === 'deal_signed' && (m = /^estimate:([0-9a-f-]{36}):([0-9a-f-]{36})$/i.exec(p))) {
+      // item 47: the client approved an estimate — turn it into a proposal or an invoice
+      push({ key: `deal:estimate:${m[2]}`, kind: 'deal', site_id: null, client_id: null, name: head.replace(/^Estimate approved —\s*/, '').trim() || 'A deal',
+        what: 'approved your estimate — turn it into a proposal or an invoice', when: 'Estimate approved', verb: 'Open deal',
+        href: `/pipeline.html?deal=${encodeURIComponent(m[1])}&dtab=billing` });
     } else if (kind === 'deal_followup' && (m = /^deal:([^:]+)(?::.*)?$/.exec(p))) {
       if (seen.has(`deal:${m[1]}`)) continue;                     // its late next step is already a row
       push({ key: `deal:quiet:${m[1]}`, kind: 'deal', site_id: null, client_id: null, name: head.replace(/^Follow up on\s*/, '').trim() || 'A deal',
@@ -376,7 +381,7 @@ const ACCOUNT_KINDS: ReadonlySet<string> = new Set(['capacity', 'trial_ending', 
 // customer" for a deal converted months ago, and "no next step" for a deal no
 // longer in the pipeline. A deal notice is only a row while its deal still
 // waits on that step; the caller clears the rest (computeStudioNeeds).
-const DEAL_NOTICE_RE = /^(signed|accepted|deal):([0-9a-f-]{36})(?::.*)?$/i;
+const DEAL_NOTICE_RE = /^(signed|accepted|deal|estimate):([0-9a-f-]{36})(?::.*)?$/i;
 /** The deal ids the studio's deal notices name. Pure. */
 export function dealNoticeIds(notices: Array<{ kind?: string | null; period?: string | null }>): string[] {
   const out = new Set<string>();
@@ -395,9 +400,10 @@ export function staleDealNotices<T extends { kind?: string | null; period?: stri
   for (const n of notices || []) {
     const kind = String(n?.kind || ''); const m = DEAL_NOTICE_RE.exec(String(n?.period || ''));
     if (!m) continue;
-    const isSigned = kind === 'deal_signed' && m[1] !== 'deal';
+    const isEstimate = kind === 'deal_signed' && m[1] === 'estimate';   // item 47: lives as long as its deal (a customer's extra work counts too)
+    const isSigned = kind === 'deal_signed' && (m[1] === 'signed' || m[1] === 'accepted');
     const isQuiet = kind === 'deal_followup' && m[1] === 'deal';
-    if (!isSigned && !isQuiet) continue;
+    if (!isSigned && !isQuiet && !isEstimate) continue;
     const d = deals[m[2].toLowerCase()];
     const gone = !d || !!d.deleted_at || d.stage === 'lost';
     if (gone || (isSigned && !!d?.converted_client_id) || (isQuiet && d?.stage === 'won')) out.push(n);
