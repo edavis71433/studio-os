@@ -38,7 +38,7 @@ The tick's `last_error` names the step (e.g. `retention.evidence_runs failed`). 
 https://status.supabase.com. Nothing to do but wait — published sites stay up; the app shows its own errors. When it returns, the next tick self-heals (retries, reconcile, rotation cursors).
 
 **A bad deploy (function broken after a change)**
-GitHub → Actions → `rollback.yml` → run with the last known-good ref (functions are stateless; rollback is a redeploy). Locally: `git log --oneline` to pick the ref.
+GitHub → Actions → `rollback.yml` → run with the last known-good ref (functions are stateless; rollback is a redeploy of all eight, then the same smoke tests as a deploy). Locally: `git log --oneline` to pick the ref.
 
 **Secret leaked / suspected compromise**
 Rotate in Supabase → Edge Functions → Secrets (and its consumers: for SCHEDULER_SECRET the Vault entry `presence_scheduler_secret` on the same project, plus staging's `watchdog_target_secret` when it is production's; Stripe dashboard for webhook secret, Resend for API key). Service-role key rotation: Supabase Dashboard → Settings → API. Then redeploy nothing — functions read env at invocation.

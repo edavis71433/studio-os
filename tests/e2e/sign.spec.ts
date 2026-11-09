@@ -290,7 +290,7 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await expect(page.locator('.cert')).toContainText('Signature certificate');
   });
 
-  test('phone width: the strip and the proposal fit — no horizontal page scroll', async ({ page, isMobile }) => {
+  test('phone width: the strip and the proposal fit — no horizontal page scroll', { tag: '@layout' }, async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await serve(page);
     await open(page);

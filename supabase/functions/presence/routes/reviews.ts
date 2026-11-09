@@ -31,6 +31,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand, type EmailBrand } from '../lib/email_brand.ts';
+import { ownerReplyTo } from '../lib/service_bridge.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { validateReviewInput, cleanOwnerReply, aggregateApproved, aggregateText, starString } from '../lib/reviews.ts';
@@ -269,18 +270,23 @@ export async function reviewAskBucket(siteId: string, email: string): Promise<st
 
 /** The review request email: a hand-sent one (POST /reviews/request) and the automatic one
  *  after a project is done (commerce/lifecycle.runReviewRequests) are the same email.
- *  False when the address is suppressed (opt-out or bounce). */
-export async function sendReviewAsk(siteId: string, email: string, name: string): Promise<boolean> {
-  const ident = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0];
-  const biz = ident?.business_name || 'us';
-  const brand = await loadEmailBrand(siteId);
+ *  A reply reaches the business that asked (item 72): `replyTo` is its owner's address
+ *  when the caller already read it (the sweep reads every site's at once), else it is
+ *  looked up here. False when the address is suppressed (opt-out or bounce). */
+export async function sendReviewAsk(siteId: string, email: string, name: string, replyTo?: string): Promise<boolean> {
+  const [identR, brand, ownerAddress] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
+    loadEmailBrand(siteId),
+    replyTo === undefined ? ownerReplyTo(siteId) : replyTo,
+  ]);
+  const biz = rows(identR)[0]?.business_name || 'us';
   const link = reviewPageUrl(siteId);
   const hi = name ? `Hi ${esc(name.slice(0, 120))},` : 'Hi there,';
   return await sendEmail(email, `How was your experience with ${biz}?`,
     `<p>${hi}</p>` +
     `<p>Thanks for choosing ${esc(biz)}. If you have a moment, we’d love a quick review — it really helps.</p>` +
     `<p class="cta"><a href="${esc(link)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">Leave a review →</a></p>` +
-    `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`, brand);
+    `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`, brand, { replyTo: ownerAddress });
 }
 
 // ═════════ the public review page HTML (self-contained, zero external origins) ═════════
